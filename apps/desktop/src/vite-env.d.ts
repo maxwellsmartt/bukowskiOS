@@ -16,6 +16,7 @@ import type {
   OverviewSnapshot,
   PackingSlipRow,
   ProjectCardRow,
+  ProjectDetailSnapshot,
   ShellBootstrap,
   UpdateProjectInput,
 } from "@contracts";
@@ -44,6 +45,7 @@ declare global {
     };
     bukowskiProjects?: {
       getList: () => Promise<ProjectCardRow[]>;
+      getDetail: (projectId: string) => Promise<ProjectDetailSnapshot>;
       getCatalog: () => Promise<CatalogSnapshot>;
       create: (input: CreateProjectInput) => Promise<ProjectCardRow[]>;
       update: (input: UpdateProjectInput) => Promise<ProjectCardRow[]>;

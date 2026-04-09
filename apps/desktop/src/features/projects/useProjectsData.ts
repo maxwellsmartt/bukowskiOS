@@ -1,4 +1,4 @@
-import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
+import type { CatalogSnapshot, ProjectCardRow, ProjectDetailSnapshot } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 import { useShellContext } from "@shared/hooks/useShellContext";
 
@@ -8,6 +8,21 @@ const emptyCatalog: CatalogSnapshot = {
   locations: [],
   departments: [],
   users: [],
+};
+
+const emptyProjectDetail: ProjectDetailSnapshot = {
+  project: null,
+  metrics: [],
+  assets: [],
+  incidents: [],
+  responsibles: [],
+  budget: {
+    totalEntries: "$0",
+    reserve: "$0",
+    exposure: "$0",
+    status: "No project selected",
+    note: "Select a project from the sidebar or registry to inspect operational detail.",
+  },
 };
 
 export const useProjectsData = () => {
@@ -30,4 +45,17 @@ export const useCatalogData = () =>
     },
     emptyCatalog,
     [],
+  );
+
+export const useProjectDetail = (projectId: string | null) =>
+  useAsyncValue(
+    async () => {
+      if (!window.bukowskiProjects || !projectId) {
+        return emptyProjectDetail;
+      }
+
+      return window.bukowskiProjects.getDetail(projectId);
+    },
+    emptyProjectDetail,
+    [projectId],
   );

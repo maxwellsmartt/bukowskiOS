@@ -21,6 +21,7 @@ export const ipcChannels = {
   },
   projects: {
     getList: "bukowskiProjects:getList",
+    getDetail: "bukowskiProjects:getDetail",
     getCatalog: "bukowskiProjects:getCatalog",
     create: "bukowskiProjects:create",
     update: "bukowskiProjects:update",

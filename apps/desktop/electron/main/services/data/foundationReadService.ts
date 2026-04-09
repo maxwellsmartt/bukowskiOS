@@ -14,7 +14,11 @@ import type {
   OverviewSnapshot,
   PackingSlipRow,
   ProjectCardRow,
+  ProjectDetailAssetRow,
+  ProjectDetailIncidentRow,
+  ProjectDetailSnapshot,
   ProjectExposureRow,
+  ProjectResponsibleRow,
   ShellBootstrap,
 } from "@contracts";
 
@@ -618,6 +622,272 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       incidentCount: row.incident_count,
       description: row.description,
     }));
+  },
+
+  getProjectDetail(projectId: string): ProjectDetailSnapshot {
+    const project = db
+      .prepare(
+        `
+          SELECT
+            projects.id,
+            projects.code,
+            projects.name,
+            COALESCE(projects.client_name, '—') AS client_name,
+            projects.status,
+            COALESCE(projects.description, '—') AS description,
+            COALESCE((
+              SELECT group_concat(name, ', ')
+              FROM (
+                SELECT DISTINCT departments.name AS name
+                FROM asset_assignments
+                JOIN departments ON departments.id = asset_assignments.department_id
+                WHERE asset_assignments.project_id = projects.id
+                ORDER BY departments.name
+              )
+            ), '—') AS departments,
+            COALESCE((
+              SELECT SUM(cost_estimate)
+              FROM incidents
+              WHERE incidents.project_id = projects.id
+            ), 0) AS exposure,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM asset_current_state
+              WHERE asset_current_state.current_project_id = projects.id
+            ), 0) AS asset_count,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM incidents
+              WHERE incidents.project_id = projects.id
+            ), 0) AS incident_count,
+            COALESCE((
+              SELECT SUM(assets.replacement_value)
+              FROM asset_current_state
+              JOIN assets ON assets.id = asset_current_state.asset_id
+              WHERE asset_current_state.current_project_id = projects.id
+            ), 0) AS replacement_at_risk
+          FROM projects
+          WHERE projects.id = ?
+          LIMIT 1
+        `,
+      )
+      .get(projectId) as
+      | {
+          id: string;
+          code: string;
+          name: string;
+          client_name: string;
+          status: string;
+          description: string;
+          departments: string;
+          exposure: number;
+          asset_count: number;
+          incident_count: number;
+          replacement_at_risk: number;
+        }
+      | undefined;
+
+    if (!project) {
+      return {
+        project: null,
+        metrics: [],
+        assets: [],
+        incidents: [],
+        responsibles: [],
+        budget: {
+          totalEntries: formatCurrency(0),
+          reserve: formatCurrency(0),
+          exposure: formatCurrency(0),
+          status: "No project selected",
+          note: "Select a project from the sidebar or registry to inspect operational detail.",
+        },
+      };
+    }
+
+    const assets = db
+      .prepare(
+        `
+          SELECT
+            assets.id,
+            assets.name,
+            COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
+            asset_current_state.operational_status,
+            asset_current_state.custody_status,
+            asset_current_state.condition_status,
+            COALESCE(locations.name, '—') AS location,
+            COALESCE(users.full_name, '—') AS responsible,
+            assets.replacement_value
+          FROM asset_current_state
+          JOIN assets ON assets.id = asset_current_state.asset_id
+          LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
+          LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
+          LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
+          LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
+          WHERE asset_current_state.current_project_id = ?
+          ORDER BY users.full_name IS NULL, users.full_name, assets.name
+        `,
+      )
+      .all(projectId) as Array<{
+      id: string;
+      name: string;
+      code: string;
+      operational_status: string;
+      custody_status: string;
+      condition_status: string;
+      location: string;
+      responsible: string;
+      replacement_value: number | null;
+    }>;
+
+    const incidents = db
+      .prepare(
+        `
+          SELECT
+            incidents.title,
+            COALESCE(assets.internal_code, '—') AS asset_code,
+            COALESCE(users.full_name, '—') AS responsible,
+            incidents.severity,
+            incidents.cost_estimate,
+            incidents.status
+          FROM incidents
+          LEFT JOIN assets ON assets.id = incidents.asset_id
+          LEFT JOIN users ON users.id = incidents.responsible_user_id
+          WHERE incidents.project_id = ?
+          ORDER BY CASE incidents.status
+            WHEN 'Open' THEN 0
+            WHEN 'In review' THEN 1
+            ELSE 2
+          END, incidents.reported_at DESC
+        `,
+      )
+      .all(projectId) as Array<{
+      title: string;
+      asset_code: string;
+      responsible: string;
+      severity: string;
+      cost_estimate: number | null;
+      status: string;
+    }>;
+
+    const responsibles = db
+      .prepare(
+        `
+          SELECT
+            users.full_name AS name,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM asset_current_state
+              WHERE asset_current_state.current_project_id = ?
+                AND asset_current_state.current_responsible_user_id = users.id
+            ), 0) AS asset_count,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM incidents
+              WHERE incidents.project_id = ?
+                AND incidents.responsible_user_id = users.id
+                AND incidents.status IN ('Open', 'In review')
+            ), 0) AS incident_count
+          FROM users
+          WHERE EXISTS (
+            SELECT 1
+            FROM asset_current_state
+            WHERE asset_current_state.current_project_id = ?
+              AND asset_current_state.current_responsible_user_id = users.id
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM incidents
+            WHERE incidents.project_id = ?
+              AND incidents.responsible_user_id = users.id
+          )
+          ORDER BY asset_count DESC, incident_count DESC, users.full_name
+        `,
+      )
+      .all(projectId, projectId, projectId, projectId) as Array<{
+      name: string;
+      asset_count: number;
+      incident_count: number;
+    }>;
+
+    const budgetRow = db
+      .prepare(
+        `
+          SELECT
+            COALESCE(SUM(amount), 0) AS total_entries,
+            COALESCE(SUM(CASE WHEN entry_type = 'reserve' THEN amount ELSE 0 END), 0) AS reserve_amount,
+            COALESCE(SUM(CASE WHEN status IN ('Approved', 'Linked', 'Booked', 'Paid') THEN amount ELSE 0 END), 0) AS committed_amount
+          FROM financial_entries
+          WHERE project_id = ?
+        `,
+      )
+      .get(projectId) as {
+      total_entries: number;
+      reserve_amount: number;
+      committed_amount: number;
+    };
+
+    const detailMetrics: OverviewMetric[] = [
+      { label: "Assigned assets", value: String(project.asset_count), tone: "info" },
+      { label: "Open incidents", value: String(incidents.filter((row) => row.status !== "Closed").length), tone: "critical" },
+      { label: "Incident exposure", value: formatCurrency(project.exposure), tone: "warning" },
+      { label: "Replacement at risk", value: formatCurrency(project.replacement_at_risk), tone: "neutral" },
+    ];
+
+    const assetRows: ProjectDetailAssetRow[] = assets.map((row) => ({
+      id: row.id,
+      name: row.name,
+      code: row.code,
+      status: mapAssetStatus(row.operational_status, row.custody_status),
+      location: row.location,
+      responsible: row.responsible,
+      condition: row.condition_status,
+      replacementValue: formatCurrency(row.replacement_value),
+    }));
+
+    const incidentRows: ProjectDetailIncidentRow[] = incidents.map((row) => ({
+      title: row.title,
+      asset: row.asset_code,
+      responsible: row.responsible,
+      severity: row.severity,
+      costEstimate: formatCurrency(row.cost_estimate),
+      status: row.status,
+    }));
+
+    const responsibleRows: ProjectResponsibleRow[] = responsibles.map((row) => ({
+      name: row.name,
+      assetCount: row.asset_count,
+      incidentCount: row.incident_count,
+    }));
+
+    const hasBudgetEntries = budgetRow.total_entries > 0;
+
+    return {
+      project: {
+        id: project.id,
+        code: project.code,
+        name: project.name,
+        client: project.client_name,
+        status: project.status,
+        departments: project.departments,
+        exposure: formatCurrency(project.exposure),
+        assetCount: project.asset_count,
+        incidentCount: project.incident_count,
+        description: project.description,
+      },
+      metrics: detailMetrics,
+      assets: assetRows,
+      incidents: incidentRows,
+      responsibles: responsibleRows,
+      budget: {
+        totalEntries: formatCurrency(budgetRow.total_entries),
+        reserve: formatCurrency(budgetRow.reserve_amount),
+        exposure: formatCurrency(project.exposure),
+        status: hasBudgetEntries ? "Finance hooks linked" : "No finance entries yet",
+        note: hasBudgetEntries
+          ? `Committed foundation entries: ${formatCurrency(budgetRow.committed_amount)}.`
+          : "This project is ready for budget, reserve and actual tracking once Finance flows are expanded.",
+      },
+    };
   },
 
   getCatalogSnapshot(): CatalogSnapshot {

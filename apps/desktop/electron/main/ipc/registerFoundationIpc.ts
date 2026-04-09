@@ -26,6 +26,7 @@ export const registerFoundationIpc = ({ foundationReads, projectMutations, asset
   ipcMain.handle(ipcChannels.packing.getList, () => foundationReads.getPackingSlips());
   ipcMain.handle(ipcChannels.incidents.getList, () => foundationReads.getIncidents());
   ipcMain.handle(ipcChannels.projects.getList, () => foundationReads.getProjects());
+  ipcMain.handle(ipcChannels.projects.getDetail, (_event, projectId: string) => foundationReads.getProjectDetail(projectId));
   ipcMain.handle(ipcChannels.projects.getCatalog, () => foundationReads.getCatalogSnapshot());
   ipcMain.handle(ipcChannels.projects.create, (_event, input: CreateProjectInput) => {
     projectMutations.createProject(input);

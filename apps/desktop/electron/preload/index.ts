@@ -17,6 +17,7 @@ import type {
   OverviewSnapshot,
   PackingSlipRow,
   ProjectCardRow,
+  ProjectDetailSnapshot,
   ShellBootstrap,
   UpdateProjectInput,
 } from "@contracts";
@@ -51,6 +52,7 @@ const bukowskiIncidents = {
 
 const bukowskiProjects = {
   getList: () => ipcRenderer.invoke(ipcChannels.projects.getList) as Promise<ProjectCardRow[]>,
+  getDetail: (projectId: string) => ipcRenderer.invoke(ipcChannels.projects.getDetail, projectId) as Promise<ProjectDetailSnapshot>,
   getCatalog: () => ipcRenderer.invoke(ipcChannels.projects.getCatalog) as Promise<CatalogSnapshot>,
   create: (input: CreateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.create, input) as Promise<ProjectCardRow[]>,
   update: (input: UpdateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.update, input) as Promise<ProjectCardRow[]>,

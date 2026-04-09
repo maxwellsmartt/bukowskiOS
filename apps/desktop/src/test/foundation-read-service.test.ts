@@ -35,6 +35,10 @@ describe("foundation read service", () => {
     expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.quantity).toBe(2);
     expect(reads.getAssetDetail("asset-legacy-rentman-1").legacy?.folderPath).toBe("Gripería/Tripodes");
     expect(reads.getAssetDetail("asset-legacy-rentman-1").timeline.length).toBeGreaterThan(0);
+    expect(reads.getProjectDetail("project-aurora").project?.name).toBe("Aurora Campaign");
+    expect(reads.getProjectDetail("project-aurora").assets.length).toBeGreaterThan(0);
+    expect(reads.getProjectDetail("project-aurora").incidents.length).toBeGreaterThan(0);
+    expect(reads.getProjectDetail("project-aurora").metrics).toHaveLength(4);
     expect(reads.getFinanceOverview().metrics).toHaveLength(4);
     expect(reads.getFinanceEntries()).toHaveLength(2);
 

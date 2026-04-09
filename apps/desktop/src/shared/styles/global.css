@@ -916,6 +916,36 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.85fr);
 }
 
+.projects-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.35fr);
+  gap: var(--space-md);
+  align-items: start;
+}
+
+.project-detail-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.project-detail-support-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.project-budget-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.project-budget-note {
+  margin-top: 0;
+}
+
 .preview-stack,
 .timeline-list,
 .summary-list,
@@ -1007,6 +1037,9 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   .queue-grid,
   .finance-grid,
   .project-grid,
+  .projects-layout,
+  .project-detail-support-grid,
+  .project-budget-grid,
   .list-layout,
   .list-layout.has-preview,
   .split-layout {
