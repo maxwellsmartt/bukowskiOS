@@ -1,4 +1,4 @@
-import type { FinanceCostLinkRow, FinanceEntryRow, OverviewMetric } from "@contracts/queries/overview-queries";
+import type { FinanceCostLinkRow, FinanceEntryRow, OverviewMetric } from "@contracts";
 
 export const overviewMetrics: OverviewMetric[] = [
   { label: "Total assets", value: "428", tone: "neutral" },

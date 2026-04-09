@@ -63,6 +63,8 @@ a {
   width: min(156px, 100%);
   height: auto;
   object-fit: contain;
+  margin-top: 20px;
+  margin-left: 25px;
   -webkit-app-region: no-drag;
 }
 

@@ -1,8 +1,10 @@
 import { app, BrowserWindow, Menu } from "electron";
 
 import { registerAppIpc } from "./ipc/registerAppIpc";
+import { registerFoundationIpc } from "./ipc/registerFoundationIpc";
 import { buildAppMenu } from "./menus/buildAppMenu";
 import { getDesktopEnvironment } from "./services/appEnvironment";
+import { initializeLocalDatabase } from "./services/data/localDatabase";
 import { createMainWindow } from "./windows/createMainWindow";
 
 const { devServerUrl, preloadPath, rendererDist } = getDesktopEnvironment(import.meta.url);
@@ -15,7 +17,10 @@ const createAppWindow = () =>
   });
 
 app.whenReady().then(() => {
-  registerAppIpc();
+  const localDatabase = initializeLocalDatabase();
+
+  registerAppIpc({ databasePath: localDatabase.databasePath });
+  registerFoundationIpc({ foundationReads: localDatabase.foundationReads });
   Menu.setApplicationMenu(buildAppMenu());
   createAppWindow();
 

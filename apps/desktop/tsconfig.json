@@ -4,13 +4,21 @@
     "baseUrl": ".",
     "types": ["vite/client", "node"],
     "paths": {
+      "@app": ["src/app"],
       "@app/*": ["src/app/*"],
+      "@features": ["src/features"],
       "@features/*": ["src/features/*"],
+      "@shared": ["src/shared"],
       "@shared/*": ["src/shared/*"],
+      "@contracts": ["../../packages/contracts/src/index.ts"],
       "@contracts/*": ["../../packages/contracts/src/*"],
+      "@domain": ["../../packages/domain/src/index.ts"],
       "@domain/*": ["../../packages/domain/src/*"],
+      "@db": ["../../packages/db/src/index.ts"],
       "@db/*": ["../../packages/db/src/*"],
+      "@sync": ["../../packages/sync/src/index.ts"],
       "@sync/*": ["../../packages/sync/src/*"],
+      "@ui": ["../../packages/ui/src/index.ts"],
       "@ui/*": ["../../packages/ui/src/*"]
     }
   },

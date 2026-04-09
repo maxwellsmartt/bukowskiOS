@@ -7,12 +7,12 @@ type DataColumn<T> = {
   render: (row: T) => ReactNode;
 };
 
-type DataTableProps<T> = {
+type DataTableProps<T = any> = {
   columns: DataColumn<T>[];
   rows: T[];
 };
 
-export const DataTable = <T,>({ columns, rows }: DataTableProps<T>) => (
+export const DataTable = <T = any,>({ columns, rows }: DataTableProps<T>) => (
   <div className="table-shell">
     <table className="data-table">
       <thead>

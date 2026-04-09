@@ -4,4 +4,5 @@ export type AppInfo = {
   isPackaged: boolean;
   version: string;
   shellVersion: string;
+  databasePath: string;
 };

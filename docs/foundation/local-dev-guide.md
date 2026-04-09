@@ -9,16 +9,18 @@ Hoy bukowskiOS ya tiene:
 - repo modular
 - shell desktop Electron + React
 - navegacion base aprobada
-- AssetsOps shell
-- FinanceOps shell visible y estructuralmente real
+- Assets shell
+- Finance shell visible y estructuralmente real
 - schema foundation local
+- SQLite local conectada al shell
+- seed demo local para workspace, assets, incidents, packing y finance shell
 
 Todavia no tiene:
 
-- persistencia SQLite conectada al UI
 - auth real
 - sync real
 - tablas remotas finales en Supabase
+- command pipeline de writes reales
 - operaciones productivas de inventory
 
 ## Prerequisitos
@@ -71,10 +73,10 @@ corepack pnpm dev
 ```
 
 2. Verifica manualmente que abra la app y que veas:
-- sidebar con `Overview`, `AssetsOps`, `FinanceOps`
+- sidebar con `Overview`, `Assets`, `Finance`
 - top context bar
-- subnav de AssetsOps
-- pantalla `FinanceOps` con overview, cost links y entries
+- subnav de Assets
+- pantalla `Finance` con overview, cost links y entries
 - ventana abierta maximizada
 - resize libre respetando limites minimos
 
@@ -89,16 +91,24 @@ corepack pnpm dev
 - `Finance Cost Links`
 - `Finance Entries`
 
+4. Confirma que los datos ya no son solo mocks sueltos:
+- `Overview` muestra metricas cargadas
+- `Assets` muestra el registry desde SQLite
+- `Asset Detail` abre timeline e incidentes del asset
+- `Packing Slips`, `Incidents`, `Projects`, `Catalog` y `Finance` responden con datos seed reales
+
 ## Que debes probar manualmente ahora
 
 - que la ventana abra sin crash
 - que abra maximizada desde el primer launch
 - que puedas redimensionarla y moverla sin perder estabilidad
 - que la navegacion lateral marque estado activo
-- que el subnav cambie entre AssetsOps y FinanceOps
+- que el subnav cambie entre Assets y Finance
 - que el top context bar permanezca estable
 - que el shell se sienta dark, sobrio y con densidad media
-- que FinanceOps no se vea como placeholder vacio
+- que Finance no se vea como placeholder vacio
+- que `Asset Detail` cargue al entrar desde la lista
+- que no aparezcan errores de IPC al navegar
 
 ## Que no necesitas hacer todavia
 
@@ -108,8 +118,43 @@ No necesitas aun:
 - configurar auth
 - crear buckets reales
 - conectar base de datos remota
+- sembrar datos manualmente
 
 La carpeta `supabase/` hoy existe para fijar ownership y preparar el siguiente slice. La migracion remota actual es solo placeholder.
+
+## SQLite local actual
+
+- La app crea una base local en:
+
+```text
+/Users/ernestooffice2/Library/Application Support/@bukowski/desktop/bukowski-foundation.sqlite
+```
+
+- En el primer arranque, la app:
+  - ejecuta la migracion foundation
+  - siembra un workspace demo
+  - siembra assets, incidents, packing slips, projects y finance entries de prueba
+
+- Si quieres resetear el seed local, cierra la app, borra ese archivo `.sqlite` y vuelve a correr `corepack pnpm dev`.
+
+## Warning esperado en terminal
+
+Durante `dev` puedes ver este warning:
+
+```text
+ExperimentalWarning: SQLite is an experimental feature
+```
+
+Hoy esto no esta rompiendo el runtime ni el build.
+
+Impacto: `medio`
+
+Porque:
+- para foundation y testing local nos simplifica mucho el stack
+- pero sigue siendo una API experimental del runtime
+
+Salida estructural si esto molesta luego:
+- migrar a un driver estable como `better-sqlite3` cuando entremos a hardening del runtime local
 
 ## Siguiente paso manual recomendado
 
@@ -126,6 +171,7 @@ Si todo sale bien, debes poder:
 - instalar dependencias
 - correr `dev`
 - ver la app abrir
+- ver datos reales desde SQLite en el shell
 - correr `verify` sin errores
 
 ## Ledger de comandos iniciales
@@ -143,3 +189,4 @@ corepack pnpm dev
 - Si el puerto 5173 esta ocupado, Vite puede moverse a otro puerto automaticamente
 - Si algo falla en build, revisar primero `apps/desktop/vite.config.ts`
 - Si abre pero se ve raro en pantallas pequenas, revisar `apps/desktop/src/shared/styles/global.css`
+- Si quieres reiniciar el estado demo local, borrar el archivo `bukowski-foundation.sqlite`

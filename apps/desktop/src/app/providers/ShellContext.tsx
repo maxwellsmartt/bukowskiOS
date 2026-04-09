@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import type { AppInfo } from "@contracts/ipc/types";
+import type { AppInfo, ShellBootstrap } from "@contracts";
 
 type ShellContextValue = {
   appInfo: AppInfo | null;
@@ -17,17 +17,25 @@ type ShellContextProviderProps = {
 
 export const ShellContextProvider = ({ children }: ShellContextProviderProps) => {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+  const [shellBootstrap, setShellBootstrap] = useState<ShellBootstrap | null>(null);
 
   useEffect(() => {
     const load = async () => {
-      if (!window.bukowskiApp) {
+      if (!window.bukowskiApp || !window.bukowskiShell) {
         return;
       }
 
       try {
-        setAppInfo(await window.bukowskiApp.getAppInfo());
+        const [nextAppInfo, nextShellBootstrap] = await Promise.all([
+          window.bukowskiApp.getAppInfo(),
+          window.bukowskiShell.getBootstrap(),
+        ]);
+
+        setAppInfo(nextAppInfo);
+        setShellBootstrap(nextShellBootstrap);
       } catch {
         setAppInfo(null);
+        setShellBootstrap(null);
       }
     };
 
@@ -37,11 +45,11 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   const value = useMemo<ShellContextValue>(
     () => ({
       appInfo,
-      workspaceName: "Metadata Cine",
-      projectScope: "Global / Cam B / April slate",
-      syncLabel: "Local-first",
+      workspaceName: shellBootstrap?.workspaceName ?? "bukowskiOS",
+      projectScope: shellBootstrap?.projectScope ?? "Global",
+      syncLabel: shellBootstrap?.syncLabel ?? "Local-first",
     }),
-    [appInfo],
+    [appInfo, shellBootstrap],
   );
 
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>;

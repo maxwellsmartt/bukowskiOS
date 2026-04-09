@@ -17,34 +17,42 @@ const sharedAliases = {
   "@ui": path.resolve(rootDir, "../../packages/ui/src"),
 };
 
-export default defineConfig({
-  plugins: [
-    react(),
-    electron({
-      main: {
-        entry: "electron/main/app.ts",
-        vite: {
-          resolve: {
-            alias: sharedAliases,
+export default defineConfig(async () => {
+  const electronPlugins = process.env.VITEST
+    ? []
+    : await electron({
+        main: {
+          entry: "electron/main/app.ts",
+          vite: {
+            build: {
+              rollupOptions: {
+                external: ["node:sqlite"],
+              },
+            },
+            resolve: {
+              alias: sharedAliases,
+            },
           },
         },
-      },
-      preload: {
-        input: "electron/preload/index.ts",
-        vite: {
-          resolve: {
-            alias: sharedAliases,
+        preload: {
+          input: "electron/preload/index.ts",
+          vite: {
+            resolve: {
+              alias: sharedAliases,
+            },
           },
         },
-      },
-      renderer: {},
-    }),
-  ],
-  resolve: {
-    alias: sharedAliases,
-  },
-  test: {
-    environment: "node",
-    include: ["src/test/**/*.test.ts"],
-  },
+        renderer: {},
+      });
+
+  return {
+    plugins: [react(), ...electronPlugins],
+    resolve: {
+      alias: sharedAliases,
+    },
+    test: {
+      environment: "node",
+      include: ["src/test/**/*.test.ts"],
+    },
+  };
 });
