@@ -12,9 +12,6 @@ export const TopContextBar = () => {
           <span className="context-meta-label">Workspace</span>
           <span className="context-meta-value">{workspaceName}</span>
         </div>
-        <div className="context-chip">
-          <span>{projectScope}</span>
-        </div>
       </div>
 
       <div className="top-context-group top-context-group-end">
@@ -23,6 +20,9 @@ export const TopContextBar = () => {
           <span>Search</span>
           <kbd>⌘K</kbd>
         </button>
+        <div className="context-chip">
+          <span>{projectScope}</span>
+        </div>
         <button className="ghost-control sync-control" type="button">
           <RefreshCcw size={13} />
           <span>{syncLabel}</span>

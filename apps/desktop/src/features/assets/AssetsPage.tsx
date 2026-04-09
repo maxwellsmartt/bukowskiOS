@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { DataTable } from "@shared/components/DataTable";
@@ -94,7 +95,20 @@ const AssetsContent = () => {
         </SurfaceCard>
 
         {activeAsset ? (
-          <SurfaceCard title="Quick preview" subtitle="Fast read of the selected asset before opening full detail.">
+          <SurfaceCard
+            aside={
+              <button
+                aria-label="Close quick preview"
+                className="surface-card-action"
+                onClick={() => setSelectedAssetId(null)}
+                type="button"
+              >
+                <X size={14} />
+              </button>
+            }
+            title="Quick preview"
+            subtitle="Fast read of the selected asset before opening full detail."
+          >
             <>
               <div className="summary-grid">
                 <div className="summary-row">
