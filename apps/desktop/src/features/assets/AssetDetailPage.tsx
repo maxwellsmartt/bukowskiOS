@@ -17,7 +17,7 @@ export const AssetDetailPage = () => {
     <div className="page-stack">
       <SurfaceCard
         title={data.asset.name}
-        subtitle="Identity, current state and quick actions stay above the fold. History remains easy to inspect without forcing a bureaucratic layout."
+        subtitle="Current status, custody and recent history for this asset."
         aside={<StatusBadge tone={data.asset.status === "Maintenance" ? "warning" : "info"}>{data.asset.status}</StatusBadge>}
       >
         <div className="summary-grid">
@@ -56,7 +56,7 @@ export const AssetDetailPage = () => {
       </SurfaceCard>
 
       <div className="split-layout">
-        <SurfaceCard title="Event timeline" subtitle="Current state should always be traceable back to the sequence of actions that produced it.">
+        <SurfaceCard title="Event timeline" subtitle="Trace of the operational events behind the current state.">
           <div className="timeline-list">
             {data.timeline.map((event) => (
               <div key={event.timestamp + event.title} className="timeline-item">
@@ -68,7 +68,7 @@ export const AssetDetailPage = () => {
           </div>
         </SurfaceCard>
 
-        <SurfaceCard title="Linked incidents" subtitle="Incident visibility should stay tied to custody and project context.">
+        <SurfaceCard title="Linked incidents" subtitle="Open and recent issues related to this asset.">
           <div className="queue-list">
             {data.linkedIncidents.map((incident) => (
               <div key={incident.title} className="queue-item">

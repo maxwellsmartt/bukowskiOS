@@ -45,7 +45,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   const value = useMemo<ShellContextValue>(
     () => ({
       appInfo,
-      workspaceName: shellBootstrap?.workspaceName ?? "bukowskiOS",
+      workspaceName: shellBootstrap?.workspaceName ?? "Metadata Cine",
       projectScope: shellBootstrap?.projectScope ?? "Global",
       syncLabel: shellBootstrap?.syncLabel ?? "Local-first",
     }),

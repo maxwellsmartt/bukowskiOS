@@ -10,19 +10,19 @@ import { useOverviewSnapshot } from "./useOverviewSnapshot";
 const queueCards = [
   {
     title: "Overdue returns",
-    subtitle: "3 slips need attention before warehouse close.",
+    subtitle: "Slips nearing or past due return need review.",
     icon: ArrowUpRight,
     tone: "warning" as const,
   },
   {
     title: "Active incidents",
-    subtitle: "9 open incidents with 3 still missing cost estimates.",
+    subtitle: "Open issues with pending follow-up or missing estimates.",
     icon: ShieldAlert,
     tone: "critical" as const,
   },
   {
     title: "Maintenance watch",
-    subtitle: "12 assets flagged for bench review or spare-part follow-up.",
+    subtitle: "Assets flagged for bench review or spare-part follow-up.",
     icon: Wrench,
     tone: "success" as const,
   },
@@ -38,9 +38,9 @@ const OverviewContent = () => {
   return (
     <div className="page-stack">
       <SectionHeader
-        eyebrow="InventoryOps v1"
-        title="Operational clarity over warehouse, set and return flows"
-        body="The shell prioritizes fast readability, current exposure and event-driven follow-up without falling into a crowded admin-dashboard layout."
+        eyebrow="Operations"
+        title="Today at a glance"
+        body="Availability, incidents, maintenance pressure and recent movement across warehouse and set."
       />
 
       {error ? <div className="empty-state">Overview unavailable: {error}</div> : null}
@@ -72,7 +72,7 @@ const OverviewContent = () => {
 
       <SurfaceCard
         title="Recent movements"
-        subtitle="This list should stay compact, current and directly useful for supervisors and warehouse staff."
+        subtitle="Latest operational activity across locations, projects and responsible teams."
       >
         <DataTable
           columns={[

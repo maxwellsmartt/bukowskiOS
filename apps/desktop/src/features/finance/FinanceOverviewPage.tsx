@@ -12,8 +12,8 @@ export const FinanceOverviewPage = () => {
     <div className="page-stack">
       <SectionHeader
         eyebrow="Finance"
-        title="Operational-financial visibility that already feels real from v1"
-        body="Finance is visible now because Assets should already expose replacement risk, incident exposure and linked cost context, even before full accounting workflows exist."
+        title="Operational exposure"
+        body="Replacement risk, incident cost and project exposure in one view."
       />
 
       {error ? <div className="empty-state">Finance overview unavailable: {error}</div> : null}
@@ -28,7 +28,7 @@ export const FinanceOverviewPage = () => {
       </div>
 
       <div className="split-layout">
-        <SurfaceCard title="Exposure by project" subtitle="Project scope and asset exposure should stay in the same conversation from day one.">
+        <SurfaceCard title="Exposure by project" subtitle="Projects with active operational risk and linked cost visibility.">
           <DataTable
             columns={[
               { key: "project", label: "Project", render: (row) => row.project },
@@ -40,7 +40,7 @@ export const FinanceOverviewPage = () => {
           />
         </SurfaceCard>
 
-        <SurfaceCard title="Cost-link queue" subtitle="This queue is the bridge between incidents, assets and future finance actions.">
+        <SurfaceCard title="Cost-link queue" subtitle="Incidents that already carry financial context or still need it.">
           <div className="queue-list">
             {data.costLinks.map((row) => (
               <div key={row.incident} className="queue-item">

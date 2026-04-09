@@ -5,11 +5,11 @@ export const SettingsPage = () => (
   <div className="page-stack">
     <SectionHeader
       eyebrow="Admin / Settings"
-      title="Foundation controls for workspace, roles and app behavior"
-      body="This section stays intentionally lean for now, but it marks the future home of workspace administration, roles, permissions and app-level preferences."
+      title="Workspace and system settings"
+      body="Core configuration for the workspace, permissions model and app behavior."
     />
 
-    <SurfaceCard title="Foundation scope" subtitle="Settings are intentionally sparse in this stage to avoid fake completeness.">
+    <SurfaceCard title="Current scope" subtitle="This area stays compact until roles, permissions and sync controls are fully wired.">
       <div className="summary-grid">
         <div className="summary-row">
           <span className="summary-label">Roles & permissions</span>
@@ -21,7 +21,7 @@ export const SettingsPage = () => (
         </div>
         <div className="summary-row">
           <span className="summary-label">Theme</span>
-          <span className="summary-value">Dark-only foundation</span>
+          <span className="summary-value">Dark-only</span>
         </div>
         <div className="summary-row">
           <span className="summary-label">Desktop shell</span>

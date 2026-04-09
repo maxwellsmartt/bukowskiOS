@@ -12,13 +12,13 @@ export const FinanceEntriesPage = () => {
     <div className="page-stack">
       <SectionHeader
         eyebrow="Finance / Entries"
-        title="Ledger shell with clear structure and restrained ambition"
-        body="This is intentionally not a full accounting module yet. It is the structural place where linked financial entries can live without inventing heavy workflows too early."
+        title="Entries"
+        body="Linked reserves and exposure entries created from operational events."
       />
 
       {error ? <div className="empty-state">Entries unavailable: {error}</div> : null}
 
-      <SurfaceCard title="Entry register" subtitle="Status, linkage and project context should already read naturally inside the shell.">
+      <SurfaceCard title="Entry register" subtitle="Current financial entries linked to projects, assets and incidents.">
         <DataTable
           columns={[
             { key: "date", label: "Date", render: (row) => row.date },
@@ -39,8 +39,8 @@ export const FinanceEntriesPage = () => {
         />
 
         <div className="empty-state">
-          <strong>What this shell is ready for</strong>
-          <span>Linked incident reserves, replacement exposure, collaborator fee hooks and future ledger workflows.</span>
+          <strong>Shell readiness</strong>
+          <span>Incident reserves, replacement exposure, collaborator fee hooks and future ledger workflows.</span>
         </div>
       </SurfaceCard>
     </div>

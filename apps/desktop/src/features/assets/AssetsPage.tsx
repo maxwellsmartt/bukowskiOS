@@ -17,23 +17,23 @@ const AssetsContent = () => {
     <div className="page-stack">
       <SectionHeader
         eyebrow="Assets"
-        title="Inventory list with medium density and immediate operational context"
-        body="The list stays readable first, but dense enough for real operators. Filters remain visible, status remains obvious and the detail preview stays one glance away."
+        title="Inventory"
+        body="Live registry of equipment, current status, location and responsibility."
       />
 
       {error ? <div className="empty-state">Assets unavailable: {error}</div> : null}
 
       <div className="chip-row">
         <StatusBadge tone="info">Live registry</StatusBadge>
-        <StatusBadge tone="warning">Assigned assets</StatusBadge>
-        <StatusBadge tone="critical">Open incidents</StatusBadge>
-        <StatusBadge>Local SQLite seed</StatusBadge>
+        <StatusBadge tone="warning">Active custody</StatusBadge>
+        <StatusBadge tone="critical">Open issues</StatusBadge>
+        <StatusBadge>Metadata Cine</StatusBadge>
       </div>
 
       <div className="list-layout">
         <SurfaceCard
           title="Asset registry"
-          subtitle="Identity first. Current state second. History available without cluttering the list."
+          subtitle="Identity, current state and open issue count in one pass."
         >
           <DataTable
             columns={[
@@ -61,7 +61,7 @@ const AssetsContent = () => {
           />
         </SurfaceCard>
 
-        <SurfaceCard title="Live preview" subtitle="This right-hand pane becomes the fast read layer before opening full asset detail.">
+        <SurfaceCard title="Quick preview" subtitle="Fast read of the selected asset before opening full detail.">
           {activeAsset ? (
             <>
               <div className="summary-grid">

@@ -11,14 +11,14 @@ export const IncidentsPage = () => {
   return (
     <div className="page-stack">
       <SectionHeader
-        eyebrow="Incident reporting"
-        title="Fast field capture, supervisor visibility and cost-awareness hooks"
-        body="The reporting surface must stay short enough for technicians, but rich enough for supervisors to understand traceability and financial exposure."
+        eyebrow="Incidents"
+        title="Incident queue"
+        body="Damage, loss and malfunction reports with operational context and cost visibility."
       />
 
       {error ? <div className="empty-state">Incidents unavailable: {error}</div> : null}
 
-      <SurfaceCard title="Incident queue" subtitle="Severity, assignment context and estimated cost stay readable without building an ERP-style wall of columns.">
+      <SurfaceCard title="Open and recent incidents" subtitle="Severity, responsibility and estimated cost in one operational view.">
         <DataTable
           columns={[
             {

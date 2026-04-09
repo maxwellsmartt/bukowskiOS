@@ -12,13 +12,13 @@ export const PackingPage = () => {
     <div className="page-stack">
       <SectionHeader
         eyebrow="Packing slips"
-        title="Structured output and return control without spreadsheet fatigue"
-        body="Packing slips are treated as operational documents with clear status, responsible party and return pressure."
+        title="Outgoing and return control"
+        body="Packing slips by project, department and responsible user."
       />
 
       {error ? <div className="empty-state">Packing slips unavailable: {error}</div> : null}
 
-      <SurfaceCard title="Active slips" subtitle="Partial returns and overdue slips should be visible immediately, not buried inside paperwork flows.">
+      <SurfaceCard title="Active slips" subtitle="Issued, partial-return and overdue slips visible at a glance.">
         <DataTable
           columns={[
             { key: "number", label: "Slip", render: (row) => row.number },

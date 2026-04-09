@@ -10,9 +10,9 @@ export const ProjectsPage = () => {
   return (
     <div className="page-stack">
       <SectionHeader
-        eyebrow="Project context"
-        title="Project-aware, not project-trapped"
-        body="Project context needs to enrich operational decisions without collapsing the whole app into a tree of projects."
+        eyebrow="Projects"
+        title="Active project context"
+        body="Projects, departments in play and current exposure."
       />
 
       {error ? <div className="empty-state">Projects unavailable: {error}</div> : null}

@@ -12,8 +12,8 @@ export const FinanceCostLinksPage = () => {
     <div className="page-stack">
       <SectionHeader
         eyebrow="Finance / Cost links"
-        title="Linked incidents and assets with immediate economic context"
-        body="This table exists to feel structurally useful from v1, even before invoicing, taxes or bank workflows exist."
+        title="Cost links"
+        body="Incident cost, replacement risk and current finance status tied back to operations."
       />
 
       {error ? <div className="empty-state">Cost links unavailable: {error}</div> : null}

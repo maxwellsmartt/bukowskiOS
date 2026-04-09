@@ -11,14 +11,14 @@ export const CatalogPage = () => {
     <div className="page-stack">
       <SectionHeader
         eyebrow="Catalog"
-        title="Configurable operational catalog, not hardcoded Metadata-only labels"
-        body="Departments, locations and categories should be configurable from day one so the product can later travel beyond one company."
+        title="Operational catalog"
+        body="Core locations and departments used across operational flows."
       />
 
       {error ? <div className="empty-state">Catalog unavailable: {error}</div> : null}
 
       <div className="split-layout">
-        <SurfaceCard title="Locations" subtitle="Warehouse, field and maintenance contexts share one model with different types.">
+        <SurfaceCard title="Locations" subtitle="Warehouse, field and maintenance locations available in the workspace.">
           <DataTable
             columns={[
               { key: "code", label: "Code", render: (row) => row.code },
@@ -29,7 +29,7 @@ export const CatalogPage = () => {
           />
         </SurfaceCard>
 
-        <SurfaceCard title="Departments" subtitle="Operational groupings stay configurable and reusable across projects and flows.">
+        <SurfaceCard title="Departments" subtitle="Operational groups reused across projects, assignments and incidents.">
           <DataTable
             columns={[
               { key: "code", label: "Code", render: (row) => row.code },
