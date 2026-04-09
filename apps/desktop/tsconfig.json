@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@app/*": ["src/app/*"],
+      "@features/*": ["src/features/*"],
+      "@shared/*": ["src/shared/*"],
+      "@contracts/*": ["../../packages/contracts/src/*"],
+      "@domain/*": ["../../packages/domain/src/*"],
+      "@db/*": ["../../packages/db/src/*"],
+      "@sync/*": ["../../packages/sync/src/*"],
+      "@ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["src", "electron", "vite.config.ts"]
+}

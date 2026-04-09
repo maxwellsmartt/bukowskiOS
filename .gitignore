@@ -1,0 +1,13 @@
+node_modules
+.DS_Store
+dist
+dist-electron
+coverage
+*.log
+.pnpm-store
+.turbo
+.vite
+apps/desktop/dist
+apps/desktop/dist-electron
+apps/desktop/electron.vite.config.*.timestamp-*
+supabase/.temp

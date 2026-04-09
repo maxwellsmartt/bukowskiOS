@@ -1,0 +1,17 @@
+{
+  "name": "bukowskiOS",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.8.1",
+  "scripts": {
+    "dev": "pnpm --filter @bukowski/desktop dev",
+    "dev:desktop": "pnpm --filter @bukowski/desktop dev",
+    "build": "pnpm --filter @bukowski/desktop build",
+    "test": "pnpm --filter @bukowski/desktop test",
+    "typecheck": "pnpm --filter @bukowski/desktop typecheck",
+    "verify": "pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "pnpm": "10.8.1"
+  }
+}
