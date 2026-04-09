@@ -11,7 +11,7 @@ const activeAsset = assets[0];
 export const AssetsPage = () => (
   <div className="page-stack">
     <SectionHeader
-      eyebrow="AssetsOps"
+      eyebrow="Assets"
       title="Inventory list with medium density and immediate operational context"
       body="The list stays readable first, but dense enough for real operators. Filters remain visible, status remains obvious and the detail preview stays one glance away."
     />

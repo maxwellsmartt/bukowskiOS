@@ -7,7 +7,7 @@ import { financeEntries } from "@shared/lib/sample-data";
 export const FinanceEntriesPage = () => (
   <div className="page-stack">
     <SectionHeader
-      eyebrow="FinanceOps / Entries"
+      eyebrow="Finance / Entries"
       title="Ledger shell with clear structure and restrained ambition"
       body="This is intentionally not a full accounting module yet. It is the structural place where linked financial entries can live without inventing heavy workflows too early."
     />

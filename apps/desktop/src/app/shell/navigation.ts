@@ -19,8 +19,8 @@ export type NavItem = {
 
 export const primaryNav: NavItem[] = [
   { label: "Overview", path: "/overview", icon: BarChart3 },
-  { label: "AssetsOps", path: "/assets", icon: Boxes },
-  { label: "FinanceOps", path: "/finance", icon: BriefcaseBusiness },
+  { label: "Assets", path: "/assets", icon: Boxes },
+  { label: "Finance", path: "/finance", icon: BriefcaseBusiness },
 ];
 
 export const assetsSubnav: NavItem[] = [

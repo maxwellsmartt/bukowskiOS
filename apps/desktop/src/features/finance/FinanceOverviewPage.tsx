@@ -7,9 +7,9 @@ import { financeCostLinks, financeExposureByProject, financeMetrics } from "@sha
 export const FinanceOverviewPage = () => (
   <div className="page-stack">
     <SectionHeader
-      eyebrow="FinanceOps shell"
+      eyebrow="Finance"
       title="Operational-financial visibility that already feels real from v1"
-      body="FinanceOps is visible now because AssetOps should already expose replacement risk, incident exposure and linked cost context, even before full accounting workflows exist."
+      body="Finance is visible now because Assets should already expose replacement risk, incident exposure and linked cost context, even before full accounting workflows exist."
     />
 
     <div className="finance-grid">

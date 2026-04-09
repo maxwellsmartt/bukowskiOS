@@ -27,21 +27,12 @@ export const AppShell = () => {
     return [];
   }, [activeRoute.domain]);
 
-  const domainLabel =
-    activeRoute.domain === "finance"
-      ? "FinanceOps"
-      : activeRoute.domain === "assets"
-        ? "AssetsOps"
-        : activeRoute.domain === "utility"
-          ? "Admin"
-          : "Overview";
-
   return (
     <div className="app-shell">
       <ShellSidebar />
 
       <div className="shell-main">
-        <TopContextBar domainLabel={domainLabel} />
+        <TopContextBar />
         {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
         <main className="shell-content">
           <AppRoutes />

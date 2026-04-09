@@ -5,7 +5,7 @@ import { appRoutes } from "@app/routing/routes";
 
 describe("foundation navigation shell", () => {
   it("keeps the approved primary domains visible", () => {
-    expect(primaryNav.map((item) => item.label)).toEqual(["Overview", "AssetsOps", "FinanceOps"]);
+    expect(primaryNav.map((item) => item.label)).toEqual(["Overview", "Assets", "Finance"]);
   });
 
   it("keeps finance shell structurally real", () => {

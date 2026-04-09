@@ -5,17 +5,7 @@ import { primaryNav, utilityNav } from "./navigation";
 export const ShellSidebar = () => (
   <aside className="shell-sidebar">
     <div className="shell-brand">
-      <div className="shell-brand-mark">
-        <img
-          className="shell-brand-logo"
-          src="/brand/bukowskiOS_logo_white@2x.png"
-          alt="bukowskiOS"
-        />
-      </div>
-      <div>
-        <p className="shell-brand-kicker">Metadata Cine</p>
-        <h1 className="shell-brand-title">bukowskiOS</h1>
-      </div>
+      <img className="shell-brand-lockup" src="/brand/bukowskiOS_logo_white@2x.png" alt="bukowskiOS" />
     </div>
 
     <nav className="shell-nav">

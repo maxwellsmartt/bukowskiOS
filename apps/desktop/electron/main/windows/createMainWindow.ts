@@ -15,8 +15,8 @@ export const createMainWindow = ({
   const window = new BrowserWindow({
     width: 1440,
     height: 920,
-    minWidth: 960,
-    minHeight: 640,
+    minWidth: 880,
+    minHeight: 600,
     show: false,
     center: true,
     resizable: true,
@@ -26,6 +26,7 @@ export const createMainWindow = ({
     backgroundColor: "#0f1113",
     title: "bukowskiOS",
     titleBarStyle: "hiddenInset",
+    trafficLightPosition: { x: 16, y: 16 },
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,

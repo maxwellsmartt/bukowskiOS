@@ -7,7 +7,7 @@ import { financeCostLinks } from "@shared/lib/sample-data";
 export const FinanceCostLinksPage = () => (
   <div className="page-stack">
     <SectionHeader
-      eyebrow="FinanceOps / Cost links"
+      eyebrow="Finance / Cost links"
       title="Linked incidents and assets with immediate economic context"
       body="This table exists to feel structurally useful from v1, even before invoicing, taxes or bank workflows exist."
     />

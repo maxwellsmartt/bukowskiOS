@@ -39,7 +39,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       appInfo,
       workspaceName: "Metadata Cine",
       projectScope: "Global / Cam B / April slate",
-      syncLabel: "Foundation local-first",
+      syncLabel: "Local-first",
     }),
     [appInfo],
   );
