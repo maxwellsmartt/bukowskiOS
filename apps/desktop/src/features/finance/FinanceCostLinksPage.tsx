@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -7,6 +9,7 @@ import { useFinanceCostLinks } from "./useFinanceData";
 
 export const FinanceCostLinksPage = () => {
   const { data, error } = useFinanceCostLinks();
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
     <div className="page-stack">
@@ -20,6 +23,9 @@ export const FinanceCostLinksPage = () => {
 
       <SurfaceCard title="Linked cost register" subtitle="Operational incidents become financially legible here without duplicating domain ownership.">
         <DataTable
+          getRowId={(row) => `${row.incident}-${row.asset}`}
+          maxHeight="min(60vh, 640px)"
+          persistKey="finance-cost-links"
           columns={[
             {
               key: "incident",
@@ -47,6 +53,9 @@ export const FinanceCostLinksPage = () => {
             { key: "status", label: "Finance status", render: (row) => row.financialStatus },
           ]}
           rows={data}
+          selectable
+          selectedRowIds={selectedRowIds}
+          onSelectedRowIdsChange={setSelectedRowIds}
         />
       </SurfaceCard>
     </div>

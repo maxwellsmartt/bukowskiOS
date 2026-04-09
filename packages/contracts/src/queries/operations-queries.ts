@@ -18,11 +18,16 @@ export type IncidentListRow = {
 };
 
 export type ProjectCardRow = {
+  id: string;
+  code: string;
   name: string;
   client: string;
   status: string;
   departments: string;
   exposure: string;
+  assetCount: number;
+  incidentCount: number;
+  description: string;
 };
 
 export type CatalogLocationRow = {

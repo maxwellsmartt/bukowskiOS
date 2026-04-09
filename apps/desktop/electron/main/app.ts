@@ -24,7 +24,10 @@ app.whenReady().then(() => {
   const localDatabase = initializeLocalDatabase();
 
   registerAppIpc({ databasePath: localDatabase.databasePath });
-  registerFoundationIpc({ foundationReads: localDatabase.foundationReads });
+  registerFoundationIpc({
+    foundationReads: localDatabase.foundationReads,
+    projectMutations: localDatabase.projectMutations,
+  });
   Menu.setApplicationMenu(buildAppMenu());
   createAppWindow();
 

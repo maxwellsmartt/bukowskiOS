@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -11,7 +12,48 @@ export const AssetsPage = () => <AssetsContent />;
 
 const AssetsContent = () => {
   const { data: assets, error, isLoading } = useAssetsList();
-  const activeAsset = assets[0];
+  const navigate = useNavigate();
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+
+  const activeAsset = useMemo(
+    () => assets.find((asset) => asset.id === selectedAssetId) ?? null,
+    [assets, selectedAssetId],
+  );
+
+  const assetColumns = useMemo(
+    () => [
+      {
+        key: "asset",
+        label: "Asset",
+        width: 280,
+        minWidth: 220,
+        render: (row: (typeof assets)[number]) => (
+          <div className="identity-cell">
+            <span className="identity-title">{row.name}</span>
+            <span className="identity-meta">{row.code}</span>
+          </div>
+        ),
+      },
+      { key: "category", label: "Category", width: 160, minWidth: 132, render: (row: (typeof assets)[number]) => row.category },
+      { key: "quantity", label: "Qty", align: "right" as const, width: 72, minWidth: 60, render: (row: (typeof assets)[number]) => row.quantity },
+      { key: "tracking", label: "Tracking", width: 110, minWidth: 96, render: (row: (typeof assets)[number]) => row.tracking },
+      { key: "status", label: "Status", width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.status },
+      { key: "condition", label: "Condition", width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.condition },
+      { key: "custody", label: "Custody", width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.custody },
+      { key: "location", label: "Location", width: 190, minWidth: 150, render: (row: (typeof assets)[number]) => row.location },
+      { key: "project", label: "Project", width: 170, minWidth: 140, render: (row: (typeof assets)[number]) => row.project },
+      { key: "responsible", label: "Responsible", width: 160, minWidth: 132, render: (row: (typeof assets)[number]) => row.responsible },
+      { key: "serialNumber", label: "Serial", width: 150, minWidth: 120, render: (row: (typeof assets)[number]) => row.serialNumber },
+      { key: "qrCode", label: "QR", width: 130, minWidth: 108, render: (row: (typeof assets)[number]) => row.qrCode },
+      { key: "warehouseSlot", label: "Warehouse", width: 126, minWidth: 108, render: (row: (typeof assets)[number]) => row.warehouseSlot },
+      { key: "folderPath", label: "Folder path", width: 250, minWidth: 200, render: (row: (typeof assets)[number]) => row.folderPath },
+      { key: "hasAccessories", label: "Accessories", width: 110, minWidth: 96, render: (row: (typeof assets)[number]) => row.hasAccessories },
+      { key: "source", label: "Source", width: 176, minWidth: 150, render: (row: (typeof assets)[number]) => row.source },
+      { key: "incidents", label: "Open issues", align: "right" as const, width: 96, minWidth: 84, render: (row: (typeof assets)[number]) => row.incidentsOpen },
+    ],
+    [assets],
+  );
 
   return (
     <div className="page-stack">
@@ -28,42 +70,31 @@ const AssetsContent = () => {
         <StatusBadge tone="info">Live registry</StatusBadge>
         <StatusBadge tone="warning">Legacy import</StatusBadge>
         <StatusBadge tone="critical">Open issues</StatusBadge>
-        <StatusBadge>Metadata Cine</StatusBadge>
+        <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : "Metadata Cine"}</StatusBadge>
       </div>
 
-      <div className="list-layout">
+      <div className={`list-layout${activeAsset ? " has-preview" : ""}`}>
         <SurfaceCard
           title="Asset registry"
-          subtitle="Identity, quantity, current state and storage context in one pass."
+          subtitle="Single click previews. Double click opens detail. Resize columns and select rows for future bulk actions."
         >
           <DataTable
-            columns={[
-              {
-                key: "asset",
-                label: "Asset",
-                render: (row) => (
-                  <div className="identity-cell">
-                    <Link className="identity-title" to={`/assets/${row.id}`}>
-                      {row.name}
-                    </Link>
-                    <span className="identity-meta">
-                      {row.code} · {row.category}
-                    </span>
-                  </div>
-                ),
-              },
-              { key: "quantity", label: "Qty", align: "right", render: (row) => row.quantity },
-              { key: "tracking", label: "Tracking", render: (row) => row.tracking },
-              { key: "status", label: "Status", render: (row) => row.status },
-              { key: "location", label: "Location", render: (row) => row.location },
-              { key: "incidents", label: "Open issues", align: "right", render: (row) => row.incidentsOpen },
-            ]}
+            activeRowId={selectedAssetId}
+            columns={assetColumns}
+            getRowId={(row) => row.id}
+            maxHeight="min(66vh, 720px)"
+            onRowClick={(row) => setSelectedAssetId(row.id)}
+            onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
+            persistKey="assets-registry"
             rows={assets}
+            selectable
+            selectedRowIds={selectedRowIds}
+            onSelectedRowIdsChange={setSelectedRowIds}
           />
         </SurfaceCard>
 
-        <SurfaceCard title="Quick preview" subtitle="Fast read of the selected asset before opening full detail.">
-          {activeAsset ? (
+        {activeAsset ? (
+          <SurfaceCard title="Quick preview" subtitle="Fast read of the selected asset before opening full detail.">
             <>
               <div className="summary-grid">
                 <div className="summary-row">
@@ -90,17 +121,39 @@ const AssetsContent = () => {
                     {activeAsset.project} · {activeAsset.responsible}
                   </span>
                 </div>
+                <div className="summary-row">
+                  <span className="summary-label">Serial / QR</span>
+                  <span className="summary-value">
+                    {activeAsset.serialNumber} · {activeAsset.qrCode}
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Warehouse / folder</span>
+                  <span className="summary-value">
+                    {activeAsset.warehouseSlot} · {activeAsset.folderPath}
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Condition / custody</span>
+                  <span className="summary-value">
+                    {activeAsset.condition} · {activeAsset.custody}
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Source / accessories</span>
+                  <span className="summary-value">
+                    {activeAsset.source} · {activeAsset.hasAccessories}
+                  </span>
+                </div>
               </div>
 
               <div className="chip-row">
-                <StatusBadge tone="info">Ready to normalize</StatusBadge>
+                <StatusBadge tone="info">Double click to open detail</StatusBadge>
                 <StatusBadge tone="warning">Assignment flow next</StatusBadge>
               </div>
             </>
-          ) : (
-            <div className="empty-state">No assets loaded yet.</div>
-          )}
-        </SurfaceCard>
+          </SurfaceCard>
+        ) : null}
       </div>
     </div>
   );

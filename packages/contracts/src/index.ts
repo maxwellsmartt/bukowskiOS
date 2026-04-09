@@ -2,6 +2,7 @@ export * from "./queries/assets-queries";
 export * from "./queries/finance-queries";
 export * from "./queries/operations-queries";
 export * from "./commands/asset-commands";
+export * from "./commands/project-commands";
 export * from "./ipc/channels";
 export * from "./ipc/types";
 export * from "./queries/overview-queries";

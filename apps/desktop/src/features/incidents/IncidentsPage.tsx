@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -7,6 +9,7 @@ import { useIncidentsData } from "./useIncidentsData";
 
 export const IncidentsPage = () => {
   const { data, error } = useIncidentsData();
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
     <div className="page-stack">
@@ -20,6 +23,9 @@ export const IncidentsPage = () => {
 
       <SurfaceCard title="Open and recent incidents" subtitle="Severity, responsibility and estimated cost in one operational view.">
         <DataTable
+          getRowId={(row) => `${row.title}-${row.asset}`}
+          maxHeight="min(60vh, 640px)"
+          persistKey="incidents-queue"
           columns={[
             {
               key: "title",
@@ -50,6 +56,9 @@ export const IncidentsPage = () => {
             },
           ]}
           rows={data}
+          selectable
+          selectedRowIds={selectedRowIds}
+          onSelectedRowIdsChange={setSelectedRowIds}
         />
       </SurfaceCard>
     </div>

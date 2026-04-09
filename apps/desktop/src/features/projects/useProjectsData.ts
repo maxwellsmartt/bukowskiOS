@@ -1,5 +1,6 @@
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
+import { useShellContext } from "@shared/hooks/useShellContext";
 
 const emptyProjects: ProjectCardRow[] = [];
 
@@ -8,18 +9,14 @@ const emptyCatalog: CatalogSnapshot = {
   departments: [],
 };
 
-export const useProjectsData = () =>
-  useAsyncValue(
-    async () => {
-      if (!window.bukowskiProjects) {
-        return emptyProjects;
-      }
+export const useProjectsData = () => {
+  const { projects, projectsError } = useShellContext();
 
-      return window.bukowskiProjects.getList();
-    },
-    emptyProjects,
-    [],
-  );
+  return {
+    data: projects.length ? projects : emptyProjects,
+    error: projectsError,
+  };
+};
 
 export const useCatalogData = () =>
   useAsyncValue(

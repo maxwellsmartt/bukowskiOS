@@ -5,6 +5,8 @@ import type {
   AssetDetailSnapshot,
   AssetListRow,
   CatalogSnapshot,
+  CreateProjectInput,
+  DeleteProjectInput,
   FinanceCostLinkRow,
   FinanceEntryRow,
   FinanceOverviewSnapshot,
@@ -13,6 +15,7 @@ import type {
   PackingSlipRow,
   ProjectCardRow,
   ShellBootstrap,
+  UpdateProjectInput,
 } from "@contracts";
 
 declare global {
@@ -39,6 +42,9 @@ declare global {
     bukowskiProjects?: {
       getList: () => Promise<ProjectCardRow[]>;
       getCatalog: () => Promise<CatalogSnapshot>;
+      create: (input: CreateProjectInput) => Promise<ProjectCardRow[]>;
+      update: (input: UpdateProjectInput) => Promise<ProjectCardRow[]>;
+      remove: (input: DeleteProjectInput) => Promise<ProjectCardRow[]>;
     };
     bukowskiFinance?: {
       getOverview: () => Promise<FinanceOverviewSnapshot>;

@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -7,6 +9,7 @@ import { useFinanceOverview } from "./useFinanceData";
 
 export const FinanceOverviewPage = () => {
   const { data, error } = useFinanceOverview();
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
     <div className="page-stack">
@@ -30,6 +33,9 @@ export const FinanceOverviewPage = () => {
       <div className="split-layout">
         <SurfaceCard title="Exposure by project" subtitle="Projects with active operational risk and linked cost visibility.">
           <DataTable
+            getRowId={(row) => row.project}
+            maxHeight="min(48vh, 520px)"
+            persistKey="finance-project-exposure"
             columns={[
               { key: "project", label: "Project", render: (row) => row.project },
               { key: "exposure", label: "Exposure", render: (row) => row.exposure },
@@ -37,6 +43,9 @@ export const FinanceOverviewPage = () => {
               { key: "incidentCount", label: "Incidents", align: "right", render: (row) => row.incidentCount },
             ]}
             rows={data.exposureByProject}
+            selectable
+            selectedRowIds={selectedRowIds}
+            onSelectedRowIdsChange={setSelectedRowIds}
           />
         </SurfaceCard>
 

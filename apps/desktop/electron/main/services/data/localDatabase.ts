@@ -7,11 +7,15 @@ import { foundationMigrationSql } from "@db";
 import { createFoundationReadService, type FoundationReadService } from "./foundationReadService";
 import { seedFoundationData } from "./foundationSeed";
 import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
+import { createProjectMutationService, ensureProjectShellDefaults } from "./projectMutationService";
+
+type ProjectMutationService = ReturnType<typeof createProjectMutationService>;
 
 type LocalDatabaseRuntime = {
   database: DatabaseSync;
   databasePath: string;
   foundationReads: FoundationReadService;
+  projectMutations: ProjectMutationService;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -24,12 +28,14 @@ const createRuntime = (): LocalDatabaseRuntime => {
   database.exec("PRAGMA foreign_keys = ON;");
   database.exec(foundationMigrationSql);
   seedFoundationData(database);
+  ensureProjectShellDefaults(database);
   bootstrapLegacyRentmanDemo(database);
 
   return {
     database,
     databasePath,
     foundationReads: createFoundationReadService(database),
+    projectMutations: createProjectMutationService(database),
   };
 };
 

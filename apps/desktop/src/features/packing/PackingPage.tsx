@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -7,6 +9,7 @@ import { usePackingData } from "./usePackingData";
 
 export const PackingPage = () => {
   const { data, error } = usePackingData();
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
     <div className="page-stack">
@@ -20,6 +23,9 @@ export const PackingPage = () => {
 
       <SurfaceCard title="Active slips" subtitle="Issued, partial-return and overdue slips visible at a glance.">
         <DataTable
+          getRowId={(row) => row.number}
+          maxHeight="min(60vh, 640px)"
+          persistKey="packing-slips"
           columns={[
             { key: "number", label: "Slip", render: (row) => row.number },
             { key: "project", label: "Project", render: (row) => row.project },
@@ -37,6 +43,9 @@ export const PackingPage = () => {
             },
           ]}
           rows={data}
+          selectable
+          selectedRowIds={selectedRowIds}
+          onSelectedRowIdsChange={setSelectedRowIds}
         />
       </SurfaceCard>
     </div>

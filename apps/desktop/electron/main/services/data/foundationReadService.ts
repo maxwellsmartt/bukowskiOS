@@ -246,9 +246,20 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
             COALESCE(legacy_rentman_asset_links.import_strategy, 'single') AS tracking,
             asset_current_state.operational_status,
             asset_current_state.custody_status,
+            asset_current_state.condition_status,
             COALESCE(locations.name, '—') AS location,
             COALESCE(projects.name, '—') AS project,
             COALESCE(users.full_name, '—') AS responsible,
+            COALESCE(legacy_rentman_items.serial_number, assets.serial_number, '—') AS serial_number,
+            COALESCE(legacy_rentman_items.qr_code_value, assets.qr_code_value, '—') AS qr_code_value,
+            COALESCE(legacy_rentman_items.warehouse_slot, '—') AS warehouse_slot,
+            COALESCE(legacy_rentman_items.folder_path, '—') AS folder_path,
+            CASE legacy_rentman_items.has_accessories
+              WHEN 1 THEN 'Yes'
+              WHEN 0 THEN 'No'
+              ELSE 'Unknown'
+            END AS has_accessories,
+            COALESCE(legacy_rentman_imports.source_label, 'Operational registry') AS source_label,
             (
               SELECT COUNT(*)
               FROM incidents
@@ -260,6 +271,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
           JOIN asset_current_state ON asset_current_state.asset_id = assets.id
           LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
           LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
+          LEFT JOIN legacy_rentman_imports ON legacy_rentman_imports.id = legacy_rentman_items.import_id
           LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
           LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
           LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
@@ -276,9 +288,16 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       tracking: string;
       operational_status: string;
       custody_status: string;
+      condition_status: string;
       location: string;
       project: string;
       responsible: string;
+      serial_number: string;
+      qr_code_value: string;
+      warehouse_slot: string;
+      folder_path: string;
+      has_accessories: string;
+      source_label: string;
       incidents_open: number;
     }>;
 
@@ -290,9 +309,17 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       quantity: row.quantity,
       tracking: mapTrackingLabel(row.tracking),
       status: mapAssetStatus(row.operational_status, row.custody_status),
+      condition: row.condition_status,
+      custody: row.custody_status,
       location: row.location,
       project: row.project,
       responsible: row.responsible,
+      serialNumber: row.serial_number,
+      qrCode: row.qr_code_value,
+      warehouseSlot: row.warehouse_slot,
+      folderPath: row.folder_path,
+      hasAccessories: row.has_accessories,
+      source: row.source_label,
       incidentsOpen: row.incidents_open,
     }));
   },
@@ -528,9 +555,11 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
         `
           SELECT
             projects.id,
+            projects.code,
             projects.name,
             COALESCE(projects.client_name, '—') AS client_name,
             projects.status,
+            COALESCE(projects.description, '—') AS description,
             COALESCE((
               SELECT group_concat(name, ', ')
               FROM (
@@ -545,7 +574,17 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
               SELECT SUM(cost_estimate)
               FROM incidents
               WHERE incidents.project_id = projects.id
-            ), 0) AS exposure
+            ), 0) AS exposure,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM asset_current_state
+              WHERE asset_current_state.current_project_id = projects.id
+            ), 0) AS asset_count,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM incidents
+              WHERE incidents.project_id = projects.id
+            ), 0) AS incident_count
           FROM projects
           ORDER BY CASE projects.status
             WHEN 'Active' THEN 0
@@ -555,19 +594,29 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
         `,
       )
       .all() as Array<{
+      id: string;
+      code: string;
       name: string;
       client_name: string;
       status: string;
+      description: string;
       departments: string;
       exposure: number;
+      asset_count: number;
+      incident_count: number;
     }>;
 
     return rows.map((row) => ({
+      id: row.id,
+      code: row.code,
       name: row.name,
       client: row.client_name,
       status: row.status,
       departments: row.departments,
       exposure: formatCurrency(row.exposure),
+      assetCount: row.asset_count,
+      incidentCount: row.incident_count,
+      description: row.description,
     }));
   },
 

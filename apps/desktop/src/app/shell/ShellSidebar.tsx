@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 
+import { ShellProjectsPanel } from "./ShellProjectsPanel";
 import { primaryNav, utilityNav } from "./navigation";
 
 export const ShellSidebar = () => (
@@ -24,6 +25,8 @@ export const ShellSidebar = () => (
         );
       })}
     </nav>
+
+    <ShellProjectsPanel />
 
     <nav className="shell-nav shell-nav-utility">
       <span className="shell-nav-label">Utility</span>

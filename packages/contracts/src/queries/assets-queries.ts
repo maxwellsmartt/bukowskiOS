@@ -6,9 +6,17 @@ export type AssetListRow = {
   quantity: number;
   tracking: string;
   status: string;
+  condition: string;
+  custody: string;
   location: string;
   project: string;
   responsible: string;
+  serialNumber: string;
+  qrCode: string;
+  warehouseSlot: string;
+  folderPath: string;
+  hasAccessories: string;
+  source: string;
   incidentsOpen: number;
 };
 

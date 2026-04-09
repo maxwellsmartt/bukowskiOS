@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -7,6 +9,7 @@ import { useFinanceEntries } from "./useFinanceData";
 
 export const FinanceEntriesPage = () => {
   const { data, error } = useFinanceEntries();
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
     <div className="page-stack">
@@ -20,6 +23,9 @@ export const FinanceEntriesPage = () => {
 
       <SurfaceCard title="Entry register" subtitle="Current financial entries linked to projects, assets and incidents.">
         <DataTable
+          getRowId={(row) => `${row.date}-${row.reference}-${row.amount}`}
+          maxHeight="min(56vh, 620px)"
+          persistKey="finance-entries"
           columns={[
             { key: "date", label: "Date", render: (row) => row.date },
             { key: "type", label: "Type", render: (row) => row.type },
@@ -36,6 +42,9 @@ export const FinanceEntriesPage = () => {
             },
           ]}
           rows={data}
+          selectable
+          selectedRowIds={selectedRowIds}
+          onSelectedRowIdsChange={setSelectedRowIds}
         />
 
         <div className="empty-state">

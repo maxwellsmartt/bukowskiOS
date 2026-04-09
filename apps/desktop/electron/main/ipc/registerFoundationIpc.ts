@@ -1,3 +1,4 @@
+import type { CreateProjectInput, DeleteProjectInput, UpdateProjectInput } from "@contracts";
 import { ipcMain } from "electron";
 
 import { ipcChannels } from "@contracts";
@@ -6,9 +7,14 @@ import type { FoundationReadService } from "../services/data/foundationReadServi
 
 type RegisterFoundationIpcOptions = {
   foundationReads: FoundationReadService;
+  projectMutations: {
+    createProject: (input: CreateProjectInput) => void;
+    updateProject: (input: UpdateProjectInput) => void;
+    deleteProject: (input: DeleteProjectInput) => void;
+  };
 };
 
-export const registerFoundationIpc = ({ foundationReads }: RegisterFoundationIpcOptions) => {
+export const registerFoundationIpc = ({ foundationReads, projectMutations }: RegisterFoundationIpcOptions) => {
   ipcMain.handle(ipcChannels.shell.getBootstrap, () => foundationReads.getShellBootstrap());
   ipcMain.handle(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot());
   ipcMain.handle(ipcChannels.assets.getList, () => foundationReads.getAssets());
@@ -17,6 +23,18 @@ export const registerFoundationIpc = ({ foundationReads }: RegisterFoundationIpc
   ipcMain.handle(ipcChannels.incidents.getList, () => foundationReads.getIncidents());
   ipcMain.handle(ipcChannels.projects.getList, () => foundationReads.getProjects());
   ipcMain.handle(ipcChannels.projects.getCatalog, () => foundationReads.getCatalogSnapshot());
+  ipcMain.handle(ipcChannels.projects.create, (_event, input: CreateProjectInput) => {
+    projectMutations.createProject(input);
+    return foundationReads.getProjects();
+  });
+  ipcMain.handle(ipcChannels.projects.update, (_event, input: UpdateProjectInput) => {
+    projectMutations.updateProject(input);
+    return foundationReads.getProjects();
+  });
+  ipcMain.handle(ipcChannels.projects.delete, (_event, input: DeleteProjectInput) => {
+    projectMutations.deleteProject(input);
+    return foundationReads.getProjects();
+  });
   ipcMain.handle(ipcChannels.finance.getOverview, () => foundationReads.getFinanceOverview());
   ipcMain.handle(ipcChannels.finance.getCostLinks, () => foundationReads.getFinanceCostLinks());
   ipcMain.handle(ipcChannels.finance.getEntries, () => foundationReads.getFinanceEntries());

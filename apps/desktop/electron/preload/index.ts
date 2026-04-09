@@ -6,6 +6,8 @@ import type {
   AssetDetailSnapshot,
   AssetListRow,
   CatalogSnapshot,
+  CreateProjectInput,
+  DeleteProjectInput,
   FinanceCostLinkRow,
   FinanceEntryRow,
   FinanceOverviewSnapshot,
@@ -14,6 +16,7 @@ import type {
   PackingSlipRow,
   ProjectCardRow,
   ShellBootstrap,
+  UpdateProjectInput,
 } from "@contracts";
 
 const bukowskiApp = {
@@ -45,6 +48,9 @@ const bukowskiIncidents = {
 const bukowskiProjects = {
   getList: () => ipcRenderer.invoke(ipcChannels.projects.getList) as Promise<ProjectCardRow[]>,
   getCatalog: () => ipcRenderer.invoke(ipcChannels.projects.getCatalog) as Promise<CatalogSnapshot>,
+  create: (input: CreateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.create, input) as Promise<ProjectCardRow[]>,
+  update: (input: UpdateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.update, input) as Promise<ProjectCardRow[]>,
+  remove: (input: DeleteProjectInput) => ipcRenderer.invoke(ipcChannels.projects.delete, input) as Promise<ProjectCardRow[]>,
 };
 
 const bukowskiFinance = {
