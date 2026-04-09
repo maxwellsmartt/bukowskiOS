@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "dist-electron/app.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
