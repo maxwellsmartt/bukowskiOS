@@ -10,7 +10,7 @@ import { useAssetsList } from "./useAssetsData";
 export const AssetsPage = () => <AssetsContent />;
 
 const AssetsContent = () => {
-  const { data: assets, error } = useAssetsList();
+  const { data: assets, error, isLoading } = useAssetsList();
   const activeAsset = assets[0];
 
   return (
@@ -22,6 +22,7 @@ const AssetsContent = () => {
       />
 
       {error ? <div className="empty-state">Assets unavailable: {error}</div> : null}
+      {!error && isLoading ? <div className="empty-state">Loading asset registry...</div> : null}
 
       <div className="chip-row">
         <StatusBadge tone="info">Live registry</StatusBadge>

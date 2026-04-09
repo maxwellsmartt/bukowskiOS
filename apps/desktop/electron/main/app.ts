@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu } from "electron";
+import path from "node:path";
 
 import { registerAppIpc } from "./ipc/registerAppIpc";
 import { registerFoundationIpc } from "./ipc/registerFoundationIpc";
@@ -15,6 +16,9 @@ const createAppWindow = () =>
     preloadPath,
     rendererDist,
   });
+
+app.setName("bukowskiOS");
+app.setPath("userData", path.join(app.getPath("appData"), "@bukowski/desktop"));
 
 app.whenReady().then(() => {
   const localDatabase = initializeLocalDatabase();
