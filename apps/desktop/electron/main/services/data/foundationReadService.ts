@@ -97,6 +97,17 @@ const mapAssetStatus = (operationalStatus: string, custodyStatus: string) => {
   return "Available";
 };
 
+const mapTrackingLabel = (value: string | null | undefined) => {
+  switch (value) {
+    case "serialized":
+      return "Serialized";
+    case "grouped":
+      return "Grouped";
+    default:
+      return "Single";
+  }
+};
+
 const mapEventTitle = (eventType: string) => {
   switch (eventType) {
     case "asset_created":
@@ -143,7 +154,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       .get() as { name: string } | undefined;
 
     return {
-      workspaceName: workspace?.name ?? "bukowskiOS",
+      workspaceName: workspace?.name ?? "Metadata Cine",
       projectScope: activeProject ? `Global / ${activeProject.name}` : "Global",
       syncLabel: "Local-first",
     };
@@ -195,7 +206,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
           LEFT JOIN locations AS location ON location.id = asset_events.location_id
           LEFT JOIN departments ON departments.id = asset_events.department_id
           LEFT JOIN users ON users.id = asset_events.performed_by_user_id
-          WHERE asset_events.event_type IN ('check_out', 'assigned', 'moved', 'maintenance_started', 'check_in')
+          WHERE asset_events.event_type IN ('asset_created', 'check_out', 'assigned', 'moved', 'maintenance_started', 'check_in')
           ORDER BY asset_events.event_timestamp DESC
           LIMIT 3
         `,
@@ -229,8 +240,10 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
           SELECT
             assets.id,
             assets.name,
-            assets.internal_code AS code,
+            COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
             asset_categories.name AS category,
+            COALESCE(legacy_rentman_items.current_quantity, 1) AS quantity,
+            COALESCE(legacy_rentman_asset_links.import_strategy, 'single') AS tracking,
             asset_current_state.operational_status,
             asset_current_state.custody_status,
             COALESCE(locations.name, '—') AS location,
@@ -245,6 +258,8 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
           FROM assets
           JOIN asset_categories ON asset_categories.id = assets.category_id
           JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+          LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
+          LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
           LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
           LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
           LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
@@ -257,6 +272,8 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       name: string;
       code: string;
       category: string;
+      quantity: number;
+      tracking: string;
       operational_status: string;
       custody_status: string;
       location: string;
@@ -270,6 +287,8 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       name: row.name,
       code: row.code,
       category: row.category,
+      quantity: row.quantity,
+      tracking: mapTrackingLabel(row.tracking),
       status: mapAssetStatus(row.operational_status, row.custody_status),
       location: row.location,
       project: row.project,
@@ -285,16 +304,30 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
           SELECT
             assets.id,
             assets.name,
-            assets.internal_code AS code,
+            COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
             assets.replacement_value,
             asset_current_state.condition_status,
             asset_current_state.custody_status,
             asset_current_state.operational_status,
+            COALESCE(legacy_rentman_items.current_quantity, 1) AS quantity,
+            COALESCE(legacy_rentman_asset_links.import_strategy, 'single') AS tracking,
             COALESCE(locations.name, '—') AS location,
             COALESCE(projects.name, '—') AS project,
-            COALESCE(users.full_name, '—') AS responsible
+            COALESCE(users.full_name, '—') AS responsible,
+            COALESCE(legacy_rentman_imports.source_label, 'Operational registry') AS source_label,
+            COALESCE(legacy_rentman_items.qr_code_value, assets.qr_code_value, '—') AS qr_code_value,
+            COALESCE(legacy_rentman_items.warehouse_slot, '—') AS warehouse_slot,
+            COALESCE(legacy_rentman_items.folder_path, '—') AS folder_path,
+            CASE legacy_rentman_items.has_accessories
+              WHEN 1 THEN 'Yes'
+              WHEN 0 THEN 'No'
+              ELSE 'Unknown'
+            END AS has_accessories
           FROM assets
           JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+          LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
+          LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
+          LEFT JOIN legacy_rentman_imports ON legacy_rentman_imports.id = legacy_rentman_items.import_id
           LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
           LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
           LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
@@ -311,15 +344,23 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
           condition_status: string;
           custody_status: string;
           operational_status: string;
+          quantity: number;
+          tracking: string;
           location: string;
           project: string;
           responsible: string;
+          source_label: string;
+          qr_code_value: string;
+          warehouse_slot: string;
+          folder_path: string;
+          has_accessories: string;
         }
       | undefined;
 
     if (!asset) {
       return {
         asset: null,
+        legacy: null,
         timeline: [],
         linkedIncidents: [],
       };
@@ -382,12 +423,22 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
         name: asset.name,
         code: asset.code,
         status: mapAssetStatus(asset.operational_status, asset.custody_status),
+        quantity: asset.quantity,
+        tracking: mapTrackingLabel(asset.tracking),
         location: asset.location,
         project: asset.project,
         responsible: asset.responsible,
         replacementValue: formatCurrency(asset.replacement_value),
         condition: asset.condition_status,
         custody: asset.custody_status,
+      },
+      legacy: {
+        source: asset.source_label,
+        legacyCode: asset.code || "—",
+        qrCode: asset.qr_code_value,
+        warehouseSlot: asset.warehouse_slot,
+        folderPath: asset.folder_path,
+        hasAccessories: asset.has_accessories,
       },
       timeline,
       linkedIncidents: incidentRows,
@@ -539,7 +590,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
     const incidentExposure = db
       .prepare(
         `
-          SELECT SUM(cost_estimate) AS amount
+          SELECT COALESCE(SUM(cost_estimate), 0) AS amount
           FROM incidents
           WHERE status IN ('Open', 'In review')
         `,
@@ -548,7 +599,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
     const replacementAtRisk = db
       .prepare(
         `
-          SELECT SUM(assets.replacement_value) AS amount
+          SELECT COALESCE(SUM(assets.replacement_value), 0) AS amount
           FROM asset_current_state
           JOIN assets ON assets.id = asset_current_state.asset_id
           WHERE asset_current_state.custody_status IN ('checked_out', 'assigned')

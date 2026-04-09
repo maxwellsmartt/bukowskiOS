@@ -18,14 +18,14 @@ const AssetsContent = () => {
       <SectionHeader
         eyebrow="Assets"
         title="Inventory"
-        body="Live registry of equipment, current status, location and responsibility."
+        body="Legacy inventory mounted into the live registry with status, quantity and storage context."
       />
 
       {error ? <div className="empty-state">Assets unavailable: {error}</div> : null}
 
       <div className="chip-row">
         <StatusBadge tone="info">Live registry</StatusBadge>
-        <StatusBadge tone="warning">Active custody</StatusBadge>
+        <StatusBadge tone="warning">Legacy import</StatusBadge>
         <StatusBadge tone="critical">Open issues</StatusBadge>
         <StatusBadge>Metadata Cine</StatusBadge>
       </div>
@@ -33,7 +33,7 @@ const AssetsContent = () => {
       <div className="list-layout">
         <SurfaceCard
           title="Asset registry"
-          subtitle="Identity, current state and open issue count in one pass."
+          subtitle="Identity, quantity, current state and storage context in one pass."
         >
           <DataTable
             columns={[
@@ -51,10 +51,10 @@ const AssetsContent = () => {
                   </div>
                 ),
               },
+              { key: "quantity", label: "Qty", align: "right", render: (row) => row.quantity },
+              { key: "tracking", label: "Tracking", render: (row) => row.tracking },
               { key: "status", label: "Status", render: (row) => row.status },
               { key: "location", label: "Location", render: (row) => row.location },
-              { key: "project", label: "Project", render: (row) => row.project },
-              { key: "responsible", label: "Responsible", render: (row) => row.responsible },
               { key: "incidents", label: "Open issues", align: "right", render: (row) => row.incidentsOpen },
             ]}
             rows={assets}
@@ -70,23 +70,30 @@ const AssetsContent = () => {
                   <span className="summary-value">{activeAsset.name}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Internal code</span>
+                  <span className="summary-label">Registry code</span>
                   <span className="summary-value">{activeAsset.code}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Quantity</span>
+                  <span className="summary-value">
+                    {activeAsset.quantity} · {activeAsset.tracking}
+                  </span>
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">Location</span>
                   <span className="summary-value">{activeAsset.location}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Responsible</span>
-                  <span className="summary-value">{activeAsset.responsible}</span>
+                  <span className="summary-label">Project / responsible</span>
+                  <span className="summary-value">
+                    {activeAsset.project} · {activeAsset.responsible}
+                  </span>
                 </div>
               </div>
 
               <div className="chip-row">
-                <StatusBadge tone="info">Assign</StatusBadge>
-                <StatusBadge tone="warning">Move</StatusBadge>
-                <StatusBadge tone="critical">Report issue</StatusBadge>
+                <StatusBadge tone="info">Ready to normalize</StatusBadge>
+                <StatusBadge tone="warning">Assignment flow next</StatusBadge>
               </div>
             </>
           ) : (

@@ -14,6 +14,7 @@ Hoy bukowskiOS ya tiene:
 - schema foundation local
 - SQLite local conectada al shell
 - seed demo local para workspace, assets, incidents, packing y finance shell
+- import legacy de Rentman montado automaticamente sobre el registro de assets
 
 Todavia no tiene:
 
@@ -93,7 +94,7 @@ corepack pnpm dev
 
 4. Confirma que los datos ya no son solo mocks sueltos:
 - `Overview` muestra metricas cargadas
-- `Assets` muestra el registry desde SQLite
+- `Assets` muestra el registry desde SQLite con el inventario legacy ya montado
 - `Asset Detail` abre timeline e incidentes del asset
 - `Packing Slips`, `Incidents`, `Projects`, `Catalog` y `Finance` responden con datos seed reales
 
@@ -134,6 +135,13 @@ La carpeta `supabase/` hoy existe para fijar ownership y preparar el siguiente s
   - ejecuta la migracion foundation
   - siembra un workspace demo
   - siembra assets, incidents, packing slips, projects y finance entries de prueba
+  - monta el export legacy de Rentman dentro del registro de assets
+
+- El archivo fuente del import legacy hoy vive en:
+
+```text
+/Users/ernestooffice2/Dev/bukowskiOS/packages/db/src/seeds/legacy-rentman-20211015.csv
+```
 
 - Si quieres resetear el seed local, cierra la app, borra ese archivo `.sqlite` y vuelve a correr `corepack pnpm dev`.
 

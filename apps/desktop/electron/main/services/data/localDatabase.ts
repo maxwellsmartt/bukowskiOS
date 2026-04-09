@@ -6,6 +6,7 @@ import { foundationMigrationSql } from "@db";
 
 import { createFoundationReadService, type FoundationReadService } from "./foundationReadService";
 import { seedFoundationData } from "./foundationSeed";
+import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
 
 type LocalDatabaseRuntime = {
   database: DatabaseSync;
@@ -23,6 +24,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   database.exec("PRAGMA foreign_keys = ON;");
   database.exec(foundationMigrationSql);
   seedFoundationData(database);
+  bootstrapLegacyRentmanDemo(database);
 
   return {
     database,

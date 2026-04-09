@@ -3,6 +3,8 @@ export type AssetListRow = {
   name: string;
   code: string;
   category: string;
+  quantity: number;
+  tracking: string;
   status: string;
   location: string;
   project: string;
@@ -28,6 +30,8 @@ export type AssetDetailRow = {
   name: string;
   code: string;
   status: string;
+  quantity: number;
+  tracking: string;
   location: string;
   project: string;
   responsible: string;
@@ -36,8 +40,18 @@ export type AssetDetailRow = {
   custody: string;
 };
 
+export type AssetLegacySnapshot = {
+  source: string;
+  legacyCode: string;
+  qrCode: string;
+  warehouseSlot: string;
+  folderPath: string;
+  hasAccessories: string;
+};
+
 export type AssetDetailSnapshot = {
   asset: AssetDetailRow | null;
+  legacy: AssetLegacySnapshot | null;
   timeline: AssetTimelineItem[];
   linkedIncidents: AssetLinkedIncidentRow[];
 };

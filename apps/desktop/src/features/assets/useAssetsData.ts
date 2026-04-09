@@ -5,6 +5,7 @@ const emptyAssetList: AssetListRow[] = [];
 
 const emptyAssetDetail: AssetDetailSnapshot = {
   asset: null,
+  legacy: null,
   timeline: [],
   linkedIncidents: [],
 };
