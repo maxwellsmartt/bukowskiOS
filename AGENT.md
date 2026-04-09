@@ -1,6 +1,6 @@
 # AGENT.md
 
-Manual operativo para Codex dentro de Bukowski.
+Manual operativo para Codex dentro de bukowskiOS.
 
 ## 1. Principios base
 

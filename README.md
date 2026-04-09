@@ -1,4 +1,4 @@
-# BUKOWSKI
+# bukowskiOS
 
 Sistema operativo interno para Metadata Cine enfocado en InventoryOps / AssetOps, con base event-driven, desktop-first y preparado para crecer hacia FinanceOps, sync multi-device y agentes.
 
@@ -64,6 +64,7 @@ pnpm typecheck
 - [Navigation shell v1](./docs/foundation/navigation-shell-v1.md)
 - [UI density v1](./docs/foundation/ui-density-v1.md)
 - [Local dev guide](./docs/foundation/local-dev-guide.md)
+- [Next slices v1](./docs/foundation/next-slices-v1.md)
 
 ## Notas
 

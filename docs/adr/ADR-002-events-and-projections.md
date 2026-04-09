@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Context
 
-Bukowski necesita responder que paso, quien lo hizo, donde ocurrio y cual es el estado actual sin depender de memoria o chats informales.
+bukowskiOS necesita responder que paso, quien lo hizo, donde ocurrio y cual es el estado actual sin depender de memoria o chats informales.
 
 ## Decision
 

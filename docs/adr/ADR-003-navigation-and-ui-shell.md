@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Context
 
-Bukowski necesita convivir con AssetOps y FinanceOps sin caer en un dashboard inflado ni en una app de dos tabs demasiado simple.
+bukowskiOS necesita convivir con AssetOps y FinanceOps sin caer en un dashboard inflado ni en una app de dos tabs demasiado simple.
 
 ## Decision
 

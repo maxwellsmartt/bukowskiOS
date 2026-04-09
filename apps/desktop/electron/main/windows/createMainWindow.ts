@@ -13,11 +13,18 @@ export const createMainWindow = ({
   rendererDist,
 }: CreateMainWindowOptions) => {
   const window = new BrowserWindow({
-    width: 1520,
-    height: 960,
-    minWidth: 1220,
-    minHeight: 780,
-    backgroundColor: "#111417",
+    width: 1440,
+    height: 920,
+    minWidth: 960,
+    minHeight: 640,
+    show: false,
+    center: true,
+    resizable: true,
+    movable: true,
+    maximizable: true,
+    fullscreenable: true,
+    backgroundColor: "#0f1113",
+    title: "bukowskiOS",
     titleBarStyle: "hiddenInset",
     webPreferences: {
       preload: preloadPath,
@@ -35,6 +42,11 @@ export const createMainWindow = ({
   window.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
+  });
+
+  window.once("ready-to-show", () => {
+    window.maximize();
+    window.show();
   });
 
   return window;

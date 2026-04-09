@@ -12,7 +12,7 @@ export const TopContextBar = ({ domainLabel }: TopContextBarProps) => {
   return (
     <div className="top-context-bar">
       <div className="top-context-group">
-        <div className="context-pill">
+        <div className="context-pill context-pill-solid">
           <span className="context-pill-label">Workspace</span>
           <span>{workspaceName}</span>
         </div>
@@ -27,9 +27,9 @@ export const TopContextBar = ({ domainLabel }: TopContextBarProps) => {
       </div>
 
       <div className="top-context-group top-context-group-end">
-        <button className="ghost-control" type="button">
+        <button className="ghost-control search-control" type="button">
           <Search size={14} />
-          <span>Search</span>
+          <span>Search assets, incidents, projects</span>
           <kbd>⌘K</kbd>
         </button>
         <button className="ghost-control" type="button">

@@ -3,7 +3,7 @@ import { Menu } from "electron";
 export const buildAppMenu = () =>
   Menu.buildFromTemplate([
     {
-      label: "BUKOWSKI",
+      label: "bukowskiOS",
       submenu: [{ role: "about" }, { type: "separator" }, { role: "quit" }],
     },
     {

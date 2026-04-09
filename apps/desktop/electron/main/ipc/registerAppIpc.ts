@@ -4,7 +4,7 @@ import { ipcChannels } from "@contracts/ipc/channels";
 
 export const registerAppIpc = () => {
   ipcMain.handle(ipcChannels.app.getInfo, () => ({
-    appName: "BUKOWSKI",
+    appName: "bukowskiOS",
     platform: process.platform,
     isPackaged: app.isPackaged,
     version: app.getVersion(),

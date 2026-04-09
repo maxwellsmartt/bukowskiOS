@@ -2,27 +2,28 @@
   color-scheme: dark;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg-app: #101317;
-  --bg-sidebar: #12161a;
-  --bg-panel: #171b20;
-  --bg-elevated: #1d2329;
-  --bg-hover: #20272f;
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  --bg-app: #0f1113;
+  --bg-shell: #121417;
+  --bg-sidebar: #14171a;
+  --bg-panel: #171a1e;
+  --bg-elevated: #1c2025;
+  --bg-hover: #20252b;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
 
-  --text-primary: #f5f7fa;
-  --text-secondary: #b8c0cc;
-  --text-muted: #7d8794;
+  --text-primary: #f3f5f7;
+  --text-secondary: #b6bcc6;
+  --text-muted: #7a838e;
 
-  --accent-info: #8fb8ff;
-  --accent-selection: #6c95d8;
-  --accent-warning: #d8a24e;
-  --accent-critical: #d96a6a;
-  --accent-success: #67b58c;
+  --accent-info: #a8b8cb;
+  --accent-selection: #dde4ed;
+  --accent-warning: #c89a56;
+  --accent-critical: #d27070;
+  --accent-success: #6ea987;
 
-  --radius-panel: 18px;
+  --radius-panel: 16px;
   --radius-control: 12px;
-  --shadow-soft: 0 18px 36px rgba(0, 0, 0, 0.24);
+  --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.18);
 
   --space-2xs: 4px;
   --space-xs: 8px;

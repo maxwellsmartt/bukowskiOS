@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Context
 
-Bukowski nace como app operativa interna, desktop-first, con necesidad de resiliencia local, futura sync multi-device y crecimiento hacia producto distribuible.
+bukowskiOS nace como app operativa interna, desktop-first, con necesidad de resiliencia local, futura sync multi-device y crecimiento hacia producto distribuible.
 
 ## Decision
 

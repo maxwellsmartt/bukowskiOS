@@ -1,10 +1,10 @@
 # Local Dev Guide
 
-Guia corta para arrancar, validar y probar el foundation shell actual de Bukowski.
+Guia corta para arrancar, validar y probar el foundation shell actual de bukowskiOS.
 
 ## Estado actual del proyecto
 
-Hoy Bukowski ya tiene:
+Hoy bukowskiOS ya tiene:
 
 - repo modular
 - shell desktop Electron + React
@@ -75,6 +75,8 @@ corepack pnpm dev
 - top context bar
 - subnav de AssetsOps
 - pantalla `FinanceOps` con overview, cost links y entries
+- ventana abierta maximizada
+- resize libre respetando limites minimos
 
 3. Navega al menos por:
 - `Overview`
@@ -90,6 +92,8 @@ corepack pnpm dev
 ## Que debes probar manualmente ahora
 
 - que la ventana abra sin crash
+- que abra maximizada desde el primer launch
+- que puedas redimensionarla y moverla sin perder estabilidad
 - que la navegacion lateral marque estado activo
 - que el subnav cambie entre AssetsOps y FinanceOps
 - que el top context bar permanezca estable
@@ -138,3 +142,4 @@ corepack pnpm dev
 - Si Electron no abre: corre de nuevo `corepack pnpm install`
 - Si el puerto 5173 esta ocupado, Vite puede moverse a otro puerto automaticamente
 - Si algo falla en build, revisar primero `apps/desktop/vite.config.ts`
+- Si abre pero se ve raro en pantallas pequenas, revisar `apps/desktop/src/shared/styles/global.css`
