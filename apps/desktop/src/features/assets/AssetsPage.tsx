@@ -2,25 +2,64 @@ import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useShellContext } from "@shared/hooks/useShellContext";
 
-import { useAssetsList } from "./useAssetsData";
+import { AssetAssignMovePanel, type AssetAssignMoveFormValue } from "./AssetAssignMovePanel";
+import { assignMoveAssets, useAssetsList } from "./useAssetsData";
 
 export const AssetsPage = () => <AssetsContent />;
 
 const AssetsContent = () => {
-  const { data: assets, error, isLoading } = useAssetsList();
+  const { activeProjectId, projects, refreshProjects } = useShellContext();
+  const { data: assets, error, isLoading, reload } = useAssetsList();
+  const { data: catalog, error: catalogError } = useCatalogData();
   const navigate = useNavigate();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [actionPanelOpen, setActionPanelOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
   const activeAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) ?? null,
     [assets, selectedAssetId],
   );
+
+  const handleAssignMove = async (formValue: AssetAssignMoveFormValue) => {
+    try {
+      setIsSubmittingAction(true);
+      const result = await assignMoveAssets({
+        commandId: crypto.randomUUID(),
+        workspaceId: "workspace-metadata",
+        assetIds: selectedRowIds,
+        mode: formValue.mode,
+        projectId: formValue.projectId,
+        departmentId: formValue.departmentId,
+        assignedToUserId: formValue.assignedToUserId,
+        targetLocationId: formValue.targetLocationId,
+        expectedReturnAt: formValue.expectedReturnAt ? new Date(formValue.expectedReturnAt).toISOString() : undefined,
+        notes: formValue.notes,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+
+      await Promise.all([reload(), refreshProjects()]);
+      setActionError(null);
+      setActionFeedback(result.summary);
+      setActionPanelOpen(false);
+      setSelectedRowIds([]);
+    } catch (nextError) {
+      setActionError(nextError instanceof Error ? nextError.message : "Unable to apply assign or move.");
+    } finally {
+      setIsSubmittingAction(false);
+    }
+  };
 
   const assetColumns = useMemo(
     () => [
@@ -73,6 +112,50 @@ const AssetsContent = () => {
         <StatusBadge tone="critical">Open issues</StatusBadge>
         <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : "Metadata Cine"}</StatusBadge>
       </div>
+
+      {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
+      {actionFeedback ? <div className="action-feedback action-feedback-success">{actionFeedback}</div> : null}
+
+      {selectedRowIds.length ? (
+        <div className="selection-action-bar">
+          <div className="selection-action-copy">
+            <span className="selection-action-title">
+              {selectedRowIds.length === 1 ? "1 asset selected" : `${selectedRowIds.length} assets selected`}
+            </span>
+            <span className="selection-action-subtitle">
+              Use the first real command pipeline to assign or move the current selection.
+            </span>
+          </div>
+          <button
+            className="action-primary-button"
+            onClick={() => {
+              setActionPanelOpen(true);
+              setActionFeedback(null);
+            }}
+            type="button"
+          >
+            Assign / move selected
+          </button>
+        </div>
+      ) : null}
+
+      {actionPanelOpen && selectedRowIds.length ? (
+        <AssetAssignMovePanel
+          defaultProjectId={activeProjectId}
+          departments={catalog.departments}
+          error={actionError}
+          isSubmitting={isSubmittingAction}
+          locations={catalog.locations}
+          onClose={() => {
+            setActionPanelOpen(false);
+            setActionError(null);
+          }}
+          onSubmit={handleAssignMove}
+          projects={projects}
+          selectedCount={selectedRowIds.length}
+          users={catalog.users}
+        />
+      ) : null}
 
       <div className={`list-layout${activeAsset ? " has-preview" : ""}`}>
         <SurfaceCard

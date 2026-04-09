@@ -4,6 +4,7 @@ type AsyncValueState<T> = {
   data: T;
   error: string | null;
   isLoading: boolean;
+  reload: () => void;
 };
 
 export const useAsyncValue = <T>(
@@ -11,10 +12,12 @@ export const useAsyncValue = <T>(
   initialValue: T,
   deps: DependencyList,
 ): AsyncValueState<T> => {
+  const [reloadToken, setReloadToken] = useState(0);
   const [state, setState] = useState<AsyncValueState<T>>({
     data: initialValue,
     error: null,
     isLoading: true,
+    reload: () => setReloadToken((current) => current + 1),
   });
 
   useEffect(() => {
@@ -33,6 +36,7 @@ export const useAsyncValue = <T>(
             data,
             error: null,
             isLoading: false,
+            reload: () => setReloadToken((current) => current + 1),
           });
         }
       })
@@ -42,6 +46,7 @@ export const useAsyncValue = <T>(
             data: initialValue,
             error: error instanceof Error ? error.message : "Unknown loading error",
             isLoading: false,
+            reload: () => setReloadToken((current) => current + 1),
           });
         }
       });
@@ -49,7 +54,7 @@ export const useAsyncValue = <T>(
     return () => {
       isCancelled = true;
     };
-  }, deps);
+  }, [...deps, reloadToken]);
 
   return state;
 };

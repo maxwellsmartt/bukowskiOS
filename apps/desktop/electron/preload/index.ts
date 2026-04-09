@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from "electron";
 
 import { ipcChannels } from "@contracts/ipc/channels";
 import type {
+  AssignMoveAssetsInput,
+  AssignMoveAssetsResult,
   AppInfo,
   AssetDetailSnapshot,
   AssetListRow,
@@ -35,6 +37,8 @@ const bukowskiAssets = {
   getList: () => ipcRenderer.invoke(ipcChannels.assets.getList) as Promise<AssetListRow[]>,
   getDetail: (assetId: string) =>
     ipcRenderer.invoke(ipcChannels.assets.getDetail, assetId) as Promise<AssetDetailSnapshot>,
+  assignMove: (input: AssignMoveAssetsInput) =>
+    ipcRenderer.invoke(ipcChannels.assets.assignMove, input) as Promise<AssignMoveAssetsResult>,
 };
 
 const bukowskiPacking = {

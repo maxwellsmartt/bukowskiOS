@@ -31,17 +31,25 @@ export type ProjectCardRow = {
 };
 
 export type CatalogLocationRow = {
+  id: string;
   code: string;
   name: string;
   type: string;
 };
 
 export type CatalogDepartmentRow = {
+  id: string;
   code: string;
   name: string;
+};
+
+export type CatalogUserRow = {
+  id: string;
+  fullName: string;
 };
 
 export type CatalogSnapshot = {
   locations: CatalogLocationRow[];
   departments: CatalogDepartmentRow[];
+  users: CatalogUserRow[];
 };

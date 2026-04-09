@@ -5,17 +5,20 @@ import path from "node:path";
 import { foundationMigrationSql } from "@db";
 
 import { createFoundationReadService, type FoundationReadService } from "./foundationReadService";
+import { createAssetMutationService } from "./assetMutationService";
 import { seedFoundationData } from "./foundationSeed";
 import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
 import { createProjectMutationService, ensureProjectShellDefaults } from "./projectMutationService";
 
 type ProjectMutationService = ReturnType<typeof createProjectMutationService>;
+type AssetMutationService = ReturnType<typeof createAssetMutationService>;
 
 type LocalDatabaseRuntime = {
   database: DatabaseSync;
   databasePath: string;
   foundationReads: FoundationReadService;
   projectMutations: ProjectMutationService;
+  assetMutations: AssetMutationService;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -36,6 +39,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     databasePath,
     foundationReads: createFoundationReadService(database),
     projectMutations: createProjectMutationService(database),
+    assetMutations: createAssetMutationService(database),
   };
 };
 

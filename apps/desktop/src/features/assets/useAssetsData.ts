@@ -1,4 +1,4 @@
-import type { AssetDetailSnapshot, AssetListRow } from "@contracts";
+import type { AssignMoveAssetsInput, AssignMoveAssetsResult, AssetDetailSnapshot, AssetListRow } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 
 const emptyAssetList: AssetListRow[] = [];
@@ -35,3 +35,11 @@ export const useAssetDetail = (assetId: string | undefined) =>
     emptyAssetDetail,
     [assetId],
   );
+
+export const assignMoveAssets = async (input: AssignMoveAssetsInput): Promise<AssignMoveAssetsResult> => {
+  if (!window.bukowskiAssets) {
+    throw new Error("Assets bridge unavailable");
+  }
+
+  return window.bukowskiAssets.assignMove(input);
+};

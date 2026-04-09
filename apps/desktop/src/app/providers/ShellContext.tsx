@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { AppInfo, CreateProjectInput, ProjectCardRow, ShellBootstrap, UpdateProjectInput } from "@contracts";
 
@@ -12,6 +12,7 @@ type ShellContextValue = {
   activeProject: ProjectCardRow | null;
   projectsError: string | null;
   setActiveProjectId: (projectId: string | null) => void;
+  refreshProjects: () => Promise<void>;
   createProject: (input: CreateProjectInput) => Promise<void>;
   updateProject: (input: UpdateProjectInput) => Promise<void>;
   deleteProject: (projectId: string) => Promise<void>;
@@ -59,32 +60,32 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     void load();
   }, []);
 
-  useEffect(() => {
-    const loadProjects = async () => {
-      if (!window.bukowskiProjects) {
-        return;
-      }
+  const refreshProjects = useCallback(async () => {
+    if (!window.bukowskiProjects) {
+      return;
+    }
 
-      try {
-        const nextProjects = await window.bukowskiProjects.getList();
+    try {
+      const nextProjects = await window.bukowskiProjects.getList();
 
-        setProjects(nextProjects);
-        setProjectsError(null);
-        setActiveProjectIdState((currentProjectId) => {
-          if (currentProjectId && nextProjects.some((project) => project.id === currentProjectId)) {
-            return currentProjectId;
-          }
+      setProjects(nextProjects);
+      setProjectsError(null);
+      setActiveProjectIdState((currentProjectId) => {
+        if (currentProjectId && nextProjects.some((project) => project.id === currentProjectId)) {
+          return currentProjectId;
+        }
 
-          return nextProjects[0]?.id ?? null;
-        });
-      } catch (error) {
-        setProjects([]);
-        setProjectsError(error instanceof Error ? error.message : "Project shell unavailable");
-      }
-    };
-
-    void loadProjects();
+        return nextProjects[0]?.id ?? null;
+      });
+    } catch (error) {
+      setProjects([]);
+      setProjectsError(error instanceof Error ? error.message : "Project shell unavailable");
+    }
   }, []);
+
+  useEffect(() => {
+    void refreshProjects();
+  }, [refreshProjects]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -158,11 +159,12 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       activeProject,
       projectsError,
       setActiveProjectId,
+      refreshProjects,
       createProject,
       updateProject,
       deleteProject,
     }),
-    [activeProject, activeProjectId, appInfo, projects, projectsError, shellBootstrap],
+    [activeProject, activeProjectId, appInfo, projects, projectsError, refreshProjects, shellBootstrap],
   );
 
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>;

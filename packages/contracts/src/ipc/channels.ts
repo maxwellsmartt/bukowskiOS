@@ -11,6 +11,7 @@ export const ipcChannels = {
   assets: {
     getList: "bukowskiAssets:getList",
     getDetail: "bukowskiAssets:getDetail",
+    assignMove: "bukowskiAssets:assignMove",
   },
   packing: {
     getList: "bukowskiPacking:getList",

@@ -27,6 +27,7 @@ app.whenReady().then(() => {
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,
     projectMutations: localDatabase.projectMutations,
+    assetMutations: localDatabase.assetMutations,
   });
   Menu.setApplicationMenu(buildAppMenu());
   createAppWindow();

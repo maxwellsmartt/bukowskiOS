@@ -30,3 +30,26 @@ export type ReportIncidentCommand = {
   actorType: CommandActorType;
   sourceChannel: CommandSourceChannel;
 };
+
+export type AssignMoveAssetsInput = {
+  commandId: string;
+  workspaceId: string;
+  assetIds: string[];
+  mode: "assign" | "move";
+  projectId?: string;
+  departmentId?: string;
+  assignedToUserId?: string;
+  targetLocationId?: string;
+  expectedReturnAt?: string;
+  notes?: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+};
+
+export type AssignMoveAssetsResult = {
+  commandId: string;
+  eventType: "assigned" | "moved";
+  processedAssetIds: string[];
+  repeated: boolean;
+  summary: string;
+};

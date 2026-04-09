@@ -7,6 +7,7 @@ const emptyProjects: ProjectCardRow[] = [];
 const emptyCatalog: CatalogSnapshot = {
   locations: [],
   departments: [],
+  users: [],
 };
 
 export const useProjectsData = () => {

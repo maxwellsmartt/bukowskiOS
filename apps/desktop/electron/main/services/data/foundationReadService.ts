@@ -622,16 +622,33 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
 
   getCatalogSnapshot(): CatalogSnapshot {
     const locations = db
-      .prepare("SELECT code, name, type FROM locations WHERE is_active = 1 ORDER BY name")
-      .all() as Array<{ code: string; name: string; type: string }>;
+      .prepare("SELECT id, code, name, type FROM locations WHERE is_active = 1 ORDER BY name")
+      .all() as Array<{ id: string; code: string; name: string; type: string }>;
 
     const departments = db
-      .prepare("SELECT code, name FROM departments WHERE is_active = 1 ORDER BY name")
-      .all() as Array<{ code: string; name: string }>;
+      .prepare("SELECT id, code, name FROM departments WHERE is_active = 1 ORDER BY name")
+      .all() as Array<{ id: string; code: string; name: string }>;
+
+    const users = db
+      .prepare(
+        `
+          SELECT users.id, users.full_name
+          FROM workspace_memberships
+          JOIN users ON users.id = workspace_memberships.user_id
+          WHERE workspace_memberships.workspace_id = 'workspace-metadata'
+            AND workspace_memberships.status = 'active'
+          ORDER BY users.full_name
+        `,
+      )
+      .all() as Array<{ id: string; full_name: string }>;
 
     return {
       locations,
       departments,
+      users: users.map((row) => ({
+        id: row.id,
+        fullName: row.full_name,
+      })),
     };
   },
 

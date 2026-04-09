@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 
 import type {
+  AssignMoveAssetsInput,
+  AssignMoveAssetsResult,
   AppInfo,
   AssetDetailSnapshot,
   AssetListRow,
@@ -32,6 +34,7 @@ declare global {
     bukowskiAssets?: {
       getList: () => Promise<AssetListRow[]>;
       getDetail: (assetId: string) => Promise<AssetDetailSnapshot>;
+      assignMove: (input: AssignMoveAssetsInput) => Promise<AssignMoveAssetsResult>;
     };
     bukowskiPacking?: {
       getList: () => Promise<PackingSlipRow[]>;
