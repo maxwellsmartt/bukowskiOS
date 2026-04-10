@@ -942,12 +942,17 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .table-shell-natural {
   max-height: none;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .table-shell-natural .data-table {
   width: 100%;
   min-width: 100%;
+}
+
+.table-shell-natural .data-table thead th {
+  position: static;
 }
 
 .data-table {
@@ -1202,6 +1207,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .project-scroll-card {
   min-height: 0;
+  overflow: hidden;
 }
 
 .project-scroll-list {
