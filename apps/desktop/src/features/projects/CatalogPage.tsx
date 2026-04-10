@@ -2,11 +2,13 @@ import type { ReactNode } from "react";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { CatalogEntityType, CatalogSnapshot } from "@contracts";
+import type { CatalogEntityType, CatalogListQuery, CatalogSnapshot, CatalogSortField } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
+import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { CatalogEditorPanel } from "./CatalogEditorPanel";
@@ -108,10 +110,71 @@ const buildCatalogPreviewRows = (entityType: CatalogEntityType, row: Record<stri
   }
 };
 
+const catalogSortOptionsByEntityType: Record<CatalogEntityType, Array<ListSortOption<CatalogSortField>>> = {
+  location: [
+    { value: "name", label: "Name", columnKey: "name" },
+    { value: "code", label: "Code", columnKey: "code" },
+    { value: "type", label: "Type", columnKey: "type" },
+    { value: "status", label: "Status", columnKey: "status" },
+    { value: "description", label: "Description", columnKey: "description" },
+  ],
+  department: [
+    { value: "name", label: "Name", columnKey: "name" },
+    { value: "code", label: "Code", columnKey: "code" },
+    { value: "status", label: "Status", columnKey: "status" },
+    { value: "description", label: "Description", columnKey: "description" },
+  ],
+  crew: [
+    { value: "fullName", label: "Crew name", columnKey: "fullName" },
+    { value: "roleLabel", label: "Role", columnKey: "roleLabel" },
+    { value: "email", label: "Email", columnKey: "email" },
+    { value: "phone", label: "Phone", columnKey: "phone" },
+    { value: "status", label: "Status" },
+  ],
+  client: [
+    { value: "name", label: "Client", columnKey: "name" },
+    { value: "contactName", label: "Contact", columnKey: "contactName" },
+    { value: "email", label: "Email", columnKey: "email" },
+    { value: "phone", label: "Phone", columnKey: "phone" },
+    { value: "status", label: "Status" },
+  ],
+  kit: [
+    { value: "name", label: "Kit", columnKey: "name" },
+    { value: "code", label: "Code", columnKey: "code" },
+    { value: "assetCount", label: "Asset count", columnKey: "assetCount" },
+    { value: "description", label: "Description", columnKey: "description" },
+    { value: "status", label: "Status" },
+  ],
+  category: [
+    { value: "name", label: "Category", columnKey: "name" },
+    { value: "code", label: "Code", columnKey: "code" },
+    { value: "status", label: "Status", columnKey: "status" },
+    { value: "description", label: "Description", columnKey: "description" },
+  ],
+};
+
 export const CatalogPage = () => {
-  const { data, error, isLoading, reload } = useCatalogData();
-  const sectionScopeLabel = useSectionScopeLabel();
   const [activeTab, setActiveTab] = useState<CatalogEntityType>("location");
+  const catalogControls = useListControls<CatalogSortField, CatalogListQuery>({
+    viewKey: `catalog-${activeTab}-list`,
+    defaults: {
+      search: "",
+      sortBy: activeTab === "crew" ? "fullName" : "name",
+      sortDirection: "asc",
+    },
+    sortOptions: catalogSortOptionsByEntityType[activeTab],
+    defaultDirectionBySort: {
+      assetCount: "desc",
+    },
+    buildQuery: ({ search, sortBy, sortDirection }) => ({
+      entityType: activeTab,
+      search,
+      sortBy,
+      sortDirection,
+    }),
+  });
+  const { data, error, isLoading, reload } = useCatalogData(catalogControls.query);
+  const sectionScopeLabel = useSectionScopeLabel();
   const [selectedIds, setSelectedIds] = useState<Record<CatalogEntityType, string | null>>(emptySelectedState);
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -249,7 +312,7 @@ export const CatalogPage = () => {
       <SectionHeader
         eyebrow="Catalog"
         title="Master data"
-        body="Global databases for locations, departments, crew, clients, kits and categories that later feed projects, assets and operational flows."
+        body="Global records for locations, departments, crew, clients, kits and categories."
         contextLabel={sectionScopeLabel}
       />
 
@@ -341,14 +404,36 @@ export const CatalogPage = () => {
             </div>
           }
         >
+          <ListToolbar
+            activeSortLabel={catalogControls.activeSortOption?.label}
+            onSearchValueChange={catalogControls.setSearchValue}
+            onSortByChange={catalogControls.setSortField}
+            onToggleSortDirection={catalogControls.toggleSortDirection}
+            resultCount={activeTabConfig.rows.length}
+            resultLabel={activeTabConfig.label.toLowerCase()}
+            searchPlaceholder={`Search ${activeTabConfig.label.toLowerCase()}`}
+            searchValue={catalogControls.searchValue}
+            sortBy={catalogControls.sortBy}
+            sortDirection={catalogControls.sortDirection}
+            sortOptions={catalogSortOptionsByEntityType[activeTab]}
+          />
           <DataTable
             activeRowId={selectedIds[activeTab]}
             columns={activeTabConfig.columns}
             getRowId={(row) => String(row.id)}
             maxHeight="min(68vh, 760px)"
             onRowClick={(row) => setSelectedIds((current) => ({ ...current, [activeTab]: String(row.id) }))}
+            onSortRequest={catalogControls.handleColumnSortRequest}
             persistKey={`catalog-${activeTab}`}
             rows={activeTabConfig.rows}
+            sortState={
+              catalogControls.activeColumnKey
+                ? {
+                    columnKey: catalogControls.activeColumnKey,
+                    direction: catalogControls.sortDirection,
+                  }
+                : null
+            }
           />
         </SurfaceCard>
 
@@ -374,7 +459,7 @@ export const CatalogPage = () => {
         ) : showPreview && selectedRow ? (
           <SurfaceCard
             title={resolveCatalogPreviewTitle(activeTab, selectedRow)}
-            subtitle={`${activeTabConfig.label} preview for global workspace reuse.`}
+            subtitle={`Selected ${singularLabelMap[activeTab]} record.`}
             aside={
               <button
                 aria-label="Close catalog preview"
@@ -397,12 +482,6 @@ export const CatalogPage = () => {
                   <span className="summary-value">{row.value}</span>
                 </div>
               ))}
-            </div>
-
-            <div className="chip-row">
-              <StatusBadge tone="info">Global database</StatusBadge>
-              <StatusBadge tone="success">Project-ready</StatusBadge>
-              <StatusBadge tone="warning">Assignment-ready</StatusBadge>
             </div>
           </SurfaceCard>
         ) : null}

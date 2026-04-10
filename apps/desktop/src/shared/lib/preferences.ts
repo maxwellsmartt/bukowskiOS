@@ -6,6 +6,7 @@ export const uiPreferenceKeys = {
   lastProjectRoutePath: "last-project-route-path",
   lastProjectRouteSection: "last-project-route-section",
   lastRoutePath: "last-route-path",
+  recentEntityKeys: "recent-entity-keys",
   shellSidebarWidth: "shell-sidebar-width",
 } as const;
 

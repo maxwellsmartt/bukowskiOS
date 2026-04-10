@@ -3,12 +3,14 @@ import { contextBridge, ipcRenderer } from "electron";
 import { ipcChannels } from "@contracts/ipc/channels";
 import type {
   ArchiveAssetCommand,
+  AssetListQuery,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppInfo,
   AssetDetailSnapshot,
   AssetEditorMutationResult,
   AssetListRow,
+  CatalogListQuery,
   CatalogSnapshot,
   CreateAssetCommand,
   CreateCatalogEntityInput,
@@ -19,13 +21,19 @@ import type {
   DeleteCatalogEntityInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
+  FinanceEntryListQuery,
   FinanceCostLinkRow,
   FinanceEntryRow,
   FinanceOverviewSnapshot,
+  GlobalSearchGroup,
+  GlobalSearchQuery,
+  IncidentListQuery,
   IncidentListRow,
   OverviewSnapshot,
   PackingSlipDetailSnapshot,
+  PackingSlipListQuery,
   PackingSlipRow,
+  ProjectListQuery,
   ProjectCardRow,
   ProjectDetailSnapshot,
   ReportIncidentCommand,
@@ -50,6 +58,7 @@ const bukowskiApp = {
 
 const bukowskiShell = {
   getBootstrap: () => ipcRenderer.invoke(ipcChannels.shell.getBootstrap) as Promise<ShellBootstrap>,
+  searchGlobal: (query: GlobalSearchQuery) => ipcRenderer.invoke(ipcChannels.shell.searchGlobal, query) as Promise<GlobalSearchGroup[]>,
 };
 
 const bukowskiOverview = {
@@ -59,7 +68,7 @@ const bukowskiOverview = {
 };
 
 const bukowskiAssets = {
-  getList: () => ipcRenderer.invoke(ipcChannels.assets.getList) as Promise<AssetListRow[]>,
+  getList: (query?: AssetListQuery) => ipcRenderer.invoke(ipcChannels.assets.getList, query) as Promise<AssetListRow[]>,
   getDetail: (assetId: string) =>
     ipcRenderer.invoke(ipcChannels.assets.getDetail, assetId) as Promise<AssetDetailSnapshot>,
   assignMove: (input: AssignMoveAssetsInput) =>
@@ -73,7 +82,7 @@ const bukowskiAssets = {
 };
 
 const bukowskiPacking = {
-  getList: () => ipcRenderer.invoke(ipcChannels.packing.getList) as Promise<PackingSlipRow[]>,
+  getList: (query?: PackingSlipListQuery) => ipcRenderer.invoke(ipcChannels.packing.getList, query) as Promise<PackingSlipRow[]>,
   getDetail: (packingSlipId: string) =>
     ipcRenderer.invoke(ipcChannels.packing.getDetail, packingSlipId) as Promise<PackingSlipDetailSnapshot>,
   create: (input: CreatePackingSlipCommand) =>
@@ -83,13 +92,13 @@ const bukowskiPacking = {
 };
 
 const bukowskiIncidents = {
-  getList: () => ipcRenderer.invoke(ipcChannels.incidents.getList) as Promise<IncidentListRow[]>,
+  getList: (query?: IncidentListQuery) => ipcRenderer.invoke(ipcChannels.incidents.getList, query) as Promise<IncidentListRow[]>,
   report: (input: ReportIncidentCommand) =>
     ipcRenderer.invoke(ipcChannels.incidents.report, input) as Promise<ReportIncidentResult>,
 };
 
 const bukowskiProjects = {
-  getList: () => ipcRenderer.invoke(ipcChannels.projects.getList) as Promise<ProjectCardRow[]>,
+  getList: (query?: ProjectListQuery) => ipcRenderer.invoke(ipcChannels.projects.getList, query) as Promise<ProjectCardRow[]>,
   getDetail: (projectId: string) => ipcRenderer.invoke(ipcChannels.projects.getDetail, projectId) as Promise<ProjectDetailSnapshot>,
   getCatalog: () => ipcRenderer.invoke(ipcChannels.projects.getCatalog) as Promise<CatalogSnapshot>,
   create: (input: CreateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.create, input) as Promise<ProjectCardRow[]>,
@@ -110,11 +119,11 @@ const bukowskiProjects = {
 const bukowskiFinance = {
   getOverview: () => ipcRenderer.invoke(ipcChannels.finance.getOverview) as Promise<FinanceOverviewSnapshot>,
   getCostLinks: () => ipcRenderer.invoke(ipcChannels.finance.getCostLinks) as Promise<FinanceCostLinkRow[]>,
-  getEntries: () => ipcRenderer.invoke(ipcChannels.finance.getEntries) as Promise<FinanceEntryRow[]>,
+  getEntries: (query?: FinanceEntryListQuery) => ipcRenderer.invoke(ipcChannels.finance.getEntries, query) as Promise<FinanceEntryRow[]>,
 };
 
 const bukowskiCatalog = {
-  getSnapshot: () => ipcRenderer.invoke(ipcChannels.catalog.getSnapshot) as Promise<CatalogSnapshot>,
+  getSnapshot: (query?: CatalogListQuery) => ipcRenderer.invoke(ipcChannels.catalog.getSnapshot, query) as Promise<CatalogSnapshot>,
   create: (input: CreateCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.create, input) as Promise<CatalogSnapshot>,
   update: (input: UpdateCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.update, input) as Promise<CatalogSnapshot>,
   remove: (input: DeleteCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.delete, input) as Promise<CatalogSnapshot>,

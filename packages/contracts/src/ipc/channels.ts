@@ -4,6 +4,7 @@ export const ipcChannels = {
   },
   shell: {
     getBootstrap: "bukowskiShell:getBootstrap",
+    searchGlobal: "bukowskiShell:searchGlobal",
   },
   overview: {
     getSnapshot: "bukowskiOverview:getSnapshot",

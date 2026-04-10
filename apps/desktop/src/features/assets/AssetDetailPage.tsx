@@ -70,14 +70,6 @@ export const AssetDetailPage = () => {
           </div>
         </div>
 
-        <div className="chip-row">
-          <StatusBadge tone="info">Assign</StatusBadge>
-          <StatusBadge tone="warning">Check in</StatusBadge>
-          <StatusBadge tone="critical">Report issue</StatusBadge>
-          <StatusBadge tone="success">Maintenance</StatusBadge>
-          {data.editor?.primaryCodeValue ? <StatusBadge>{data.editor.primaryCodeValue}</StatusBadge> : null}
-        </div>
-
         <div className="action-panel-actions action-panel-actions-start">
           <button
             className="ghost-control"
@@ -272,7 +264,7 @@ export const AssetDetailPage = () => {
             )}
           </SurfaceCard>
 
-          <SurfaceCard title="Codes" subtitle="Primary scan identity is already ready for future mobile scan and document flows.">
+          <SurfaceCard title="Codes" subtitle="Primary and secondary scan identities for this asset.">
             {data.scannableCodes.length ? (
               <div className="queue-list">
                 {data.scannableCodes.map((code) => (

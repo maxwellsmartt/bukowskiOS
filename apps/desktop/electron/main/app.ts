@@ -42,6 +42,17 @@ app.whenReady().then(() => {
   });
 });
 
+process.on("message", (message) => {
+  if (message !== "electron-vite&type=hot-reload") {
+    return;
+  }
+
+  console.info("[dev] Electron preload reload");
+  BrowserWindow.getAllWindows().forEach((window) => {
+    window.webContents.reload();
+  });
+});
+
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();

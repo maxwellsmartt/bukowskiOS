@@ -1,4 +1,4 @@
-import type { FinanceCostLinkRow, FinanceEntryRow, FinanceOverviewSnapshot } from "@contracts";
+import type { FinanceCostLinkRow, FinanceEntryListQuery, FinanceEntryRow, FinanceOverviewSnapshot } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 
 const emptyOverview: FinanceOverviewSnapshot = {
@@ -9,6 +9,12 @@ const emptyOverview: FinanceOverviewSnapshot = {
 
 const emptyCostLinks: FinanceCostLinkRow[] = [];
 const emptyEntries: FinanceEntryRow[] = [];
+
+const defaultFinanceEntryListQuery: FinanceEntryListQuery = {
+  search: "",
+  sortBy: "date",
+  sortDirection: "desc",
+};
 
 export const useFinanceOverview = () =>
   useAsyncValue(
@@ -36,15 +42,15 @@ export const useFinanceCostLinks = () =>
     [],
   );
 
-export const useFinanceEntries = () =>
+export const useFinanceEntries = (query: FinanceEntryListQuery = defaultFinanceEntryListQuery) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiFinance) {
         return emptyEntries;
       }
 
-      return window.bukowskiFinance.getEntries();
+      return window.bukowskiFinance.getEntries(query);
     },
     emptyEntries,
-    [],
+    [query.search, query.sortBy, query.sortDirection],
   );

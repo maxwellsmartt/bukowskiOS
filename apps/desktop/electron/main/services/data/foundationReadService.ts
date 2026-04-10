@@ -1,31 +1,48 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
+  AssetListQuery,
+  AssetSortField,
   AssetDetailSnapshot,
   AssetLinkedIncidentRow,
   AssetListRow,
   AssetTimelineItem,
+  CatalogListQuery,
+  CatalogSortField,
   CatalogSnapshot,
+  FinanceEntryListQuery,
   FinanceCostLinkRow,
   FinanceEntryRow,
+  FinanceEntrySortField,
   FinanceOverviewSnapshot,
+  GlobalSearchEntityType,
+  GlobalSearchGroup,
+  GlobalSearchQuery,
+  GlobalSearchResult,
+  IncidentListQuery,
   IncidentListRow,
+  IncidentSortField,
+  ListSortDirection,
   OverviewMetric,
   OverviewSnapshot,
-  ScheduleTimelineRange,
-  ScheduleTimelineScale,
-  ScheduleTimelineSnapshot,
   PackingSlipDetailSnapshot,
   PackingSlipItemRow,
+  PackingSlipListQuery,
   PackingSlipRow,
+  PackingSlipSortField,
+  ProjectListQuery,
   ProjectCardRow,
   ProjectDetailAssetRow,
   ProjectDetailIncidentRow,
   ProjectDetailSnapshot,
   ProjectExposureRow,
   ProjectResponsibleRow,
+  ProjectSortField,
   ProjectUnitCrewAssignmentRow,
   ProjectUnitRow,
+  ScheduleTimelineRange,
+  ScheduleTimelineScale,
+  ScheduleTimelineSnapshot,
   ShellBootstrap,
 } from "@contracts";
 
@@ -59,6 +76,57 @@ type AmountRow = {
 
 const formatCurrency = (amount: number | null | undefined) =>
   typeof amount === "number" ? currencyFormatter.format(amount) : "Pending";
+
+const normalizeSearchText = (value: string | null | undefined) =>
+  (value ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+const tokenizeSearch = (value: string | null | undefined) =>
+  normalizeSearchText(value)
+    .split(" ")
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+const matchesSearch = (query: string | undefined, values: Array<string | null | undefined>) => {
+  const tokens = tokenizeSearch(query);
+
+  if (!tokens.length) {
+    return true;
+  }
+
+  const haystacks = values.map((value) => normalizeSearchText(value)).filter(Boolean);
+  return tokens.every((token) => haystacks.some((value) => value.includes(token)));
+};
+
+const compareTextValue = (left: string | null | undefined, right: string | null | undefined, direction: ListSortDirection) => {
+  const leftValue = normalizeSearchText(left) || "zzzzzz";
+  const rightValue = normalizeSearchText(right) || "zzzzzz";
+  const result = leftValue.localeCompare(rightValue, "en-US", { numeric: true, sensitivity: "base" });
+  return direction === "desc" ? result * -1 : result;
+};
+
+const compareNumberValue = (left: number, right: number, direction: ListSortDirection) =>
+  direction === "desc" ? right - left : left - right;
+
+const compareNullableDateValue = (left: string | null, right: string | null, direction: ListSortDirection) => {
+  if (!left && !right) {
+    return 0;
+  }
+
+  if (!left) {
+    return 1;
+  }
+
+  if (!right) {
+    return -1;
+  }
+
+  return direction === "desc" ? right.localeCompare(left) : left.localeCompare(right);
+};
+
+const sortRows = <T>(rows: T[], comparator: (left: T, right: T) => number) => [...rows].sort(comparator);
 
 const formatShortDate = (value: string | null) => {
   if (!value) {
@@ -252,6 +320,257 @@ const resolvePackingStatus = (storedStatus: string, dueDate: string | null, item
   return storedStatus;
 };
 
+const defaultAssetListQuery: AssetListQuery = {
+  scopeProjectId: null,
+  search: "",
+  sortBy: "name",
+  sortDirection: "asc",
+};
+
+const defaultPackingListQuery: PackingSlipListQuery = {
+  scopeProjectId: null,
+  search: "",
+  sortBy: "issuedDate",
+  sortDirection: "desc",
+};
+
+const defaultIncidentListQuery: IncidentListQuery = {
+  scopeProjectId: null,
+  search: "",
+  sortBy: "reportedAt",
+  sortDirection: "desc",
+};
+
+const defaultProjectListQuery: ProjectListQuery = {
+  search: "",
+  sortBy: "name",
+  sortDirection: "asc",
+};
+
+const defaultFinanceEntryListQuery: FinanceEntryListQuery = {
+  search: "",
+  sortBy: "date",
+  sortDirection: "desc",
+};
+
+const defaultCatalogListQuery: CatalogListQuery = {
+  entityType: "location",
+  search: "",
+  sortBy: "name",
+  sortDirection: "asc",
+};
+
+const resolveAssetComparator = (
+  sortBy: AssetSortField,
+  direction: ListSortDirection,
+): ((left: AssetListRow & { createdAt: string | null; updatedAt: string | null }, right: AssetListRow & { createdAt: string | null; updatedAt: string | null }) => number) =>
+  (left, right) => {
+    switch (sortBy) {
+      case "code":
+        return compareTextValue(left.code, right.code, direction);
+      case "category":
+        return compareTextValue(left.category, right.category, direction);
+      case "status":
+        return compareTextValue(left.status, right.status, direction);
+      case "condition":
+        return compareTextValue(left.condition, right.condition, direction);
+      case "location":
+        return compareTextValue(left.location, right.location, direction);
+      case "project":
+        return compareTextValue(left.project, right.project, direction);
+      case "projectUnit":
+        return compareTextValue(left.projectUnit, right.projectUnit, direction);
+      case "responsible":
+        return compareTextValue(left.responsible, right.responsible, direction);
+      case "serialNumber":
+        return compareTextValue(left.serialNumber, right.serialNumber, direction);
+      case "qrCode":
+        return compareTextValue(left.qrCode, right.qrCode, direction);
+      case "incidentsOpen":
+        return compareNumberValue(left.incidentsOpen, right.incidentsOpen, direction);
+      case "createdAt":
+        return compareNullableDateValue(left.createdAt, right.createdAt, direction);
+      case "updatedAt":
+        return compareNullableDateValue(left.updatedAt, right.updatedAt, direction);
+      case "name":
+      default:
+        return compareTextValue(left.name, right.name, direction);
+    }
+  };
+
+const resolvePackingComparator = (
+  sortBy: PackingSlipSortField,
+  direction: ListSortDirection,
+): ((
+  left: PackingSlipRow & { issueDateRaw: string; dueDateRaw: string | null },
+  right: PackingSlipRow & { issueDateRaw: string; dueDateRaw: string | null },
+) => number) => (left, right) => {
+  switch (sortBy) {
+    case "number":
+      return compareTextValue(left.number, right.number, direction);
+    case "project":
+      return compareTextValue(left.project, right.project, direction);
+    case "department":
+      return compareTextValue(left.department, right.department, direction);
+    case "responsible":
+      return compareTextValue(left.responsible, right.responsible, direction);
+    case "dueDate":
+      return compareNullableDateValue(left.dueDateRaw, right.dueDateRaw, direction);
+    case "itemCount":
+      return compareNumberValue(left.itemCount, right.itemCount, direction);
+    case "returnedCount":
+      return compareNumberValue(left.returnedCount, right.returnedCount, direction);
+    case "status":
+      return compareTextValue(left.status, right.status, direction);
+    case "issuedDate":
+    default:
+      return compareNullableDateValue(left.issueDateRaw, right.issueDateRaw, direction);
+  }
+};
+
+const resolveIncidentComparator = (
+  sortBy: IncidentSortField,
+  direction: ListSortDirection,
+): ((left: IncidentListRow & { reportedAt: string }, right: IncidentListRow & { reportedAt: string }) => number) => (left, right) => {
+  switch (sortBy) {
+    case "asset":
+      return compareTextValue(left.asset, right.asset, direction);
+    case "project":
+      return compareTextValue(left.project, right.project, direction);
+    case "responsible":
+      return compareTextValue(left.responsible, right.responsible, direction);
+    case "severity":
+      return compareTextValue(left.severity, right.severity, direction);
+    case "costEstimate":
+      return compareTextValue(left.costEstimate, right.costEstimate, direction);
+    case "status":
+      return compareTextValue(left.status, right.status, direction);
+    case "reportedAt":
+      return compareNullableDateValue(left.reportedAt, right.reportedAt, direction);
+    case "title":
+    default:
+      return compareTextValue(left.title, right.title, direction);
+  }
+};
+
+const resolveProjectComparator = (
+  sortBy: ProjectSortField,
+  direction: ListSortDirection,
+): ((
+  left: ProjectCardRow & { createdAt: string | null; updatedAt: string | null; exposureValue: number },
+  right: ProjectCardRow & { createdAt: string | null; updatedAt: string | null; exposureValue: number },
+) => number) => (left, right) => {
+  switch (sortBy) {
+    case "code":
+      return compareTextValue(left.code, right.code, direction);
+    case "client":
+      return compareTextValue(left.client, right.client, direction);
+    case "status":
+      return compareTextValue(left.status, right.status, direction);
+    case "startDate":
+      return compareNullableDateValue(left.startDate, right.startDate, direction);
+    case "endDate":
+      return compareNullableDateValue(left.endDate, right.endDate, direction);
+    case "colorKey":
+      return compareTextValue(left.colorKey, right.colorKey, direction);
+    case "assetCount":
+      return compareNumberValue(left.assetCount, right.assetCount, direction);
+    case "incidentCount":
+      return compareNumberValue(left.incidentCount, right.incidentCount, direction);
+    case "activeUnitCount":
+      return compareNumberValue(left.activeUnitCount, right.activeUnitCount, direction);
+    case "exposure":
+      return compareNumberValue(left.exposureValue, right.exposureValue, direction);
+    case "createdAt":
+      return compareNullableDateValue(left.createdAt, right.createdAt, direction);
+    case "updatedAt":
+      return compareNullableDateValue(left.updatedAt, right.updatedAt, direction);
+    case "name":
+    default:
+      return compareTextValue(left.name, right.name, direction);
+    }
+  };
+
+const resolveFinanceEntryComparator = (
+  sortBy: FinanceEntrySortField,
+  direction: ListSortDirection,
+): ((left: FinanceEntryRow & { amountValue: number; dateValue: string }, right: FinanceEntryRow & { amountValue: number; dateValue: string }) => number) =>
+  (left, right) => {
+    switch (sortBy) {
+      case "type":
+        return compareTextValue(left.type, right.type, direction);
+      case "category":
+        return compareTextValue(left.category, right.category, direction);
+      case "reference":
+        return compareTextValue(left.reference, right.reference, direction);
+      case "project":
+        return compareTextValue(left.project, right.project, direction);
+      case "amount":
+        return compareNumberValue(left.amountValue, right.amountValue, direction);
+      case "status":
+        return compareTextValue(left.status, right.status, direction);
+      case "date":
+      default:
+        return compareNullableDateValue(left.dateValue, right.dateValue, direction);
+      }
+  };
+
+const globalSearchGroupLabels: Record<GlobalSearchEntityType, string> = {
+  asset: "Assets",
+  project: "Projects",
+  project_unit: "Units",
+  packing_slip: "Packing slips",
+  incident: "Incidents",
+};
+
+const buildRecentEntityKey = (entityType: GlobalSearchEntityType, entityId: string) => `${entityType}:${entityId}`;
+
+const matchesWordStart = (value: string, query: string) => value.split(" ").some((part) => part.startsWith(query));
+
+const resolveSearchRank = (query: string, code: string | null | undefined, title: string | null | undefined) => {
+  const normalizedQuery = normalizeSearchText(query);
+  const normalizedCode = normalizeSearchText(code);
+  const normalizedTitle = normalizeSearchText(title);
+
+  if (!normalizedQuery) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  if (normalizedCode && normalizedCode === normalizedQuery) {
+    return 0;
+  }
+
+  if (normalizedTitle && normalizedTitle === normalizedQuery) {
+    return 10;
+  }
+
+  if (normalizedCode && normalizedCode.startsWith(normalizedQuery)) {
+    return 20;
+  }
+
+  if (normalizedTitle && normalizedTitle.startsWith(normalizedQuery)) {
+    return 30;
+  }
+
+  if (normalizedCode && matchesWordStart(normalizedCode, normalizedQuery)) {
+    return 40;
+  }
+
+  if (normalizedTitle && matchesWordStart(normalizedTitle, normalizedQuery)) {
+    return 50;
+  }
+
+  if (normalizedCode && normalizedCode.includes(normalizedQuery)) {
+    return 60;
+  }
+
+  if (normalizedTitle && normalizedTitle.includes(normalizedQuery)) {
+    return 70;
+  }
+
+  return Number.POSITIVE_INFINITY;
+};
+
 export const createFoundationReadService = (db: DatabaseSync) => {
   const catalogReads = createCatalogReadService(db);
 
@@ -282,6 +601,226 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       projectScope: activeProject ? `Global / ${activeProject.name}` : "Global",
       syncLabel: "Local-first",
     };
+  },
+
+  getGlobalSearch(query: GlobalSearchQuery): GlobalSearchGroup[] {
+    const normalizedQuery = normalizeSearchText(query.query);
+
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    const recentKeys = query.recentEntityKeys ?? [];
+    const recentRank = new Map(recentKeys.map((key, index) => [key, index]));
+    const limit = query.limit ?? 20;
+    const perGroupLimit = Math.min(5, limit);
+
+    const assets = db
+      .prepare(
+        `
+          SELECT
+            assets.id,
+            assets.name,
+            COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
+            COALESCE(projects.name, '—') AS project_name
+          FROM assets
+          LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
+          LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
+          LEFT JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+          LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
+          WHERE assets.is_active = 1
+        `,
+      )
+      .all() as Array<{ id: string; name: string; code: string; project_name: string }>;
+
+    const projects = db
+      .prepare(
+        `
+          SELECT
+            projects.id,
+            projects.code,
+            projects.name,
+            COALESCE(clients.name, projects.client_name, '—') AS client_name
+          FROM projects
+          LEFT JOIN clients ON clients.id = projects.client_id
+        `,
+      )
+      .all() as Array<{ id: string; code: string; name: string; client_name: string }>;
+
+    const units = db
+      .prepare(
+        `
+          SELECT
+            project_units.id,
+            project_units.code,
+            project_units.name,
+            projects.id AS project_id,
+            projects.code AS project_code,
+            projects.name AS project_name
+          FROM project_units
+          JOIN projects ON projects.id = project_units.project_id
+        `,
+      )
+      .all() as Array<{
+      id: string;
+      code: string;
+      name: string;
+      project_id: string;
+      project_code: string;
+      project_name: string;
+    }>;
+
+    const packing = db
+      .prepare(
+        `
+          SELECT
+            packing_slips.id,
+            projects.name AS project_name
+          FROM packing_slips
+          JOIN projects ON projects.id = packing_slips.project_id
+        `,
+      )
+      .all() as Array<{ id: string; project_name: string }>;
+
+    const incidents = db
+      .prepare(
+        `
+          SELECT
+            incidents.id,
+            incidents.title,
+            COALESCE(assets.internal_code, '—') AS asset_code,
+            COALESCE(projects.name, '—') AS project_name
+          FROM incidents
+          LEFT JOIN assets ON assets.id = incidents.asset_id
+          LEFT JOIN projects ON projects.id = incidents.project_id
+        `,
+      )
+      .all() as Array<{ id: string; title: string; asset_code: string; project_name: string }>;
+
+    const rankedResults: Array<GlobalSearchResult & { score: number; recentRank: number }> = [];
+
+    assets.forEach((row) => {
+      if (!matchesSearch(normalizedQuery, [row.code, row.name, row.project_name])) {
+        return;
+      }
+
+      const score = resolveSearchRank(normalizedQuery, row.code, row.name);
+      rankedResults.push({
+        entityType: "asset",
+        entityId: row.id,
+        title: row.name,
+        subtitle: `${row.code} · ${row.project_name}`,
+        navigationPath: `/assets/${row.id}`,
+        recent: recentRank.has(buildRecentEntityKey("asset", row.id)),
+        score,
+        recentRank: recentRank.get(buildRecentEntityKey("asset", row.id)) ?? Number.MAX_SAFE_INTEGER,
+      });
+    });
+
+    projects.forEach((row) => {
+      if (!matchesSearch(normalizedQuery, [row.code, row.name, row.client_name])) {
+        return;
+      }
+
+      const score = resolveSearchRank(normalizedQuery, row.code, row.name);
+      rankedResults.push({
+        entityType: "project",
+        entityId: row.id,
+        title: row.name,
+        subtitle: `${row.code} · ${row.client_name}`,
+        navigationPath: `/projects/${row.id}/overview`,
+        recent: recentRank.has(buildRecentEntityKey("project", row.id)),
+        score,
+        recentRank: recentRank.get(buildRecentEntityKey("project", row.id)) ?? Number.MAX_SAFE_INTEGER,
+      });
+    });
+
+    units.forEach((row) => {
+      if (!matchesSearch(normalizedQuery, [row.code, row.name, row.project_code, row.project_name])) {
+        return;
+      }
+
+      const score = resolveSearchRank(normalizedQuery, row.code, row.name);
+      rankedResults.push({
+        entityType: "project_unit",
+        entityId: row.id,
+        title: `${row.project_code} · ${row.project_name}`,
+        subtitle: `${row.code} · ${row.name}`,
+        navigationPath: `/projects/${row.project_id}/info?unit=${row.id}`,
+        recent: recentRank.has(buildRecentEntityKey("project_unit", row.id)),
+        score,
+        recentRank: recentRank.get(buildRecentEntityKey("project_unit", row.id)) ?? Number.MAX_SAFE_INTEGER,
+      });
+    });
+
+    packing.forEach((row) => {
+      const slipNumber = row.id.replace("packing-", "PS-");
+
+      if (!matchesSearch(normalizedQuery, [slipNumber, row.project_name])) {
+        return;
+      }
+
+      const score = resolveSearchRank(normalizedQuery, slipNumber, row.project_name);
+      rankedResults.push({
+        entityType: "packing_slip",
+        entityId: row.id,
+        title: slipNumber,
+        subtitle: row.project_name,
+        navigationPath: `/packing-slips?focus=${row.id}`,
+        recent: recentRank.has(buildRecentEntityKey("packing_slip", row.id)),
+        score,
+        recentRank: recentRank.get(buildRecentEntityKey("packing_slip", row.id)) ?? Number.MAX_SAFE_INTEGER,
+      });
+    });
+
+    incidents.forEach((row) => {
+      if (!matchesSearch(normalizedQuery, [row.title, row.asset_code, row.project_name])) {
+        return;
+      }
+
+      const score = resolveSearchRank(normalizedQuery, row.asset_code, row.title);
+      rankedResults.push({
+        entityType: "incident",
+        entityId: row.id,
+        title: row.title,
+        subtitle: `${row.asset_code} · ${row.project_name}`,
+        navigationPath: `/incidents?focus=${row.id}`,
+        recent: recentRank.has(buildRecentEntityKey("incident", row.id)),
+        score,
+        recentRank: recentRank.get(buildRecentEntityKey("incident", row.id)) ?? Number.MAX_SAFE_INTEGER,
+      });
+    });
+
+    const grouped = new Map<GlobalSearchEntityType, Array<GlobalSearchResult & { score: number; recentRank: number }>>();
+
+    sortRows(rankedResults, (left, right) => {
+      if (left.score !== right.score) {
+        return left.score - right.score;
+      }
+
+      if (left.recentRank !== right.recentRank) {
+        return left.recentRank - right.recentRank;
+      }
+
+      return compareTextValue(left.title, right.title, "asc");
+    }).forEach((result) => {
+      const current = grouped.get(result.entityType) ?? [];
+
+      if (current.length < perGroupLimit) {
+        current.push(result);
+        grouped.set(result.entityType, current);
+      }
+    });
+
+    const groups = Array.from(grouped.entries())
+      .map(([entityType, results]) => ({
+        entityType,
+        label: globalSearchGroupLabels[entityType],
+        results: results.slice(0, limit).map(({ score: _score, recentRank: _recentRank, ...result }) => result),
+      }))
+      .filter((group) => group.results.length);
+
+    return groups;
   },
 
   getOverviewSnapshot(): OverviewSnapshot {
@@ -546,7 +1085,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     };
   },
 
-  getAssets(): AssetListRow[] {
+  getAssets(query: AssetListQuery = defaultAssetListQuery): AssetListRow[] {
     const rows = db
       .prepare(
         `
@@ -576,6 +1115,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
               ELSE 'Unknown'
             END AS has_accessories,
             COALESCE(legacy_rentman_imports.source_label, 'Operational registry') AS source_label,
+            assets.created_at,
+            assets.updated_at,
             (
               SELECT COUNT(*)
               FROM incidents
@@ -593,7 +1134,6 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           LEFT JOIN project_units ON project_units.id = asset_current_state.project_unit_id
           LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
           WHERE assets.is_active = 1
-          ORDER BY assets.name
         `,
       )
       .all() as Array<{
@@ -618,33 +1158,57 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       folder_path: string;
       has_accessories: string;
       source_label: string;
+      created_at: string | null;
+      updated_at: string | null;
       incidents_open: number;
     }>;
 
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      code: row.code,
-      category: row.category,
-      quantity: row.quantity,
-      tracking: mapTrackingLabel(row.tracking),
-      status: mapAssetStatus(row.operational_status, row.custody_status),
-      condition: row.condition_status,
-      custody: row.custody_status,
-      location: row.location,
-      projectId: row.project_id,
-      project: row.project,
-      projectUnitId: row.project_unit_id,
-      projectUnit: row.project_unit,
-      responsible: row.responsible,
-      serialNumber: row.serial_number,
-      qrCode: row.qr_code_value,
-      warehouseSlot: row.warehouse_slot,
-      folderPath: row.folder_path,
-      hasAccessories: row.has_accessories,
-      source: row.source_label,
-      incidentsOpen: row.incidents_open,
-    }));
+    const scopedRows = rows
+      .map((row) => ({
+        id: row.id,
+        name: row.name,
+        code: row.code,
+        category: row.category,
+        quantity: row.quantity,
+        tracking: mapTrackingLabel(row.tracking),
+        status: mapAssetStatus(row.operational_status, row.custody_status),
+        condition: row.condition_status,
+        custody: row.custody_status,
+        location: row.location,
+        projectId: row.project_id,
+        project: row.project,
+        projectUnitId: row.project_unit_id,
+        projectUnit: row.project_unit,
+        responsible: row.responsible,
+        serialNumber: row.serial_number,
+        qrCode: row.qr_code_value,
+        warehouseSlot: row.warehouse_slot,
+        folderPath: row.folder_path,
+        hasAccessories: row.has_accessories,
+        source: row.source_label,
+        incidentsOpen: row.incidents_open,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }))
+      .filter((row) => !query.scopeProjectId || row.projectId === query.scopeProjectId)
+      .filter((row) =>
+        matchesSearch(query.search, [
+          row.name,
+          row.code,
+          row.category,
+          row.location,
+          row.project,
+          row.projectUnit,
+          row.responsible,
+          row.serialNumber,
+          row.qrCode,
+        ]),
+      );
+
+    return sortRows(
+      scopedRows,
+      resolveAssetComparator(query.sortBy ?? defaultAssetListQuery.sortBy, query.sortDirection ?? defaultAssetListQuery.sortDirection),
+    ).map(({ createdAt: _createdAt, updatedAt: _updatedAt, ...row }) => row);
   },
 
   getAssetDetail(assetId: string): AssetDetailSnapshot {
@@ -866,7 +1430,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     };
   },
 
-  getPackingSlips(): PackingSlipRow[] {
+  getPackingSlips(query: PackingSlipListQuery = defaultPackingListQuery): PackingSlipRow[] {
     const rows = db
       .prepare(
         `
@@ -895,7 +1459,6 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             projects.name,
             departments.name,
             users.full_name
-          ORDER BY packing_slips.issue_date DESC
         `,
       )
       .all() as Array<{
@@ -911,19 +1474,29 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       returned_count: number | null;
     }>;
 
-    return rows.map((row) => ({
-      id: row.id,
-      number: row.id.replace("packing-", "PS-"),
-      projectId: row.project_id,
-      project: row.project,
-      department: row.department,
-      responsible: row.responsible,
-      issuedDate: formatShortDate(row.issue_date),
-      dueDate: formatShortDate(row.return_due_date),
-      itemCount: row.item_count,
-      returnedCount: row.returned_count ?? 0,
-      status: resolvePackingStatus(row.status, row.return_due_date, row.item_count, row.returned_count ?? 0),
-    }));
+    const mappedRows = rows
+      .map((row) => ({
+        id: row.id,
+        number: row.id.replace("packing-", "PS-"),
+        projectId: row.project_id,
+        project: row.project,
+        department: row.department,
+        responsible: row.responsible,
+        issuedDate: formatShortDate(row.issue_date),
+        dueDate: formatShortDate(row.return_due_date),
+        itemCount: row.item_count,
+        returnedCount: row.returned_count ?? 0,
+        status: resolvePackingStatus(row.status, row.return_due_date, row.item_count, row.returned_count ?? 0),
+        issueDateRaw: row.issue_date,
+        dueDateRaw: row.return_due_date,
+      }))
+      .filter((row) => !query.scopeProjectId || row.projectId === query.scopeProjectId)
+      .filter((row) => matchesSearch(query.search, [row.number, row.project, row.department, row.responsible, row.status]));
+
+    return sortRows(
+      mappedRows,
+      resolvePackingComparator(query.sortBy ?? defaultPackingListQuery.sortBy, query.sortDirection ?? defaultPackingListQuery.sortDirection),
+    ).map(({ issueDateRaw: _issueDateRaw, dueDateRaw: _dueDateRaw, ...row }) => row);
   },
 
   getPackingSlipDetail(packingSlipId: string): PackingSlipDetailSnapshot {
@@ -1068,7 +1641,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     };
   },
 
-  getIncidents(): IncidentListRow[] {
+  getIncidents(query: IncidentListQuery = defaultIncidentListQuery): IncidentListRow[] {
     const rows = db
       .prepare(
         `
@@ -1081,12 +1654,12 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             COALESCE(users.full_name, '—') AS responsible,
             incidents.severity,
             incidents.cost_estimate,
-            incidents.status
+            incidents.status,
+            incidents.reported_at
           FROM incidents
           LEFT JOIN assets ON assets.id = incidents.asset_id
           LEFT JOIN projects ON projects.id = incidents.project_id
           LEFT JOIN users ON users.id = incidents.responsible_user_id
-          ORDER BY incidents.reported_at DESC
         `,
       )
       .all() as Array<{
@@ -1099,22 +1672,34 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       severity: string;
       cost_estimate: number | null;
       status: string;
+      reported_at: string;
     }>;
 
-    return rows.map((row) => ({
-      id: row.id,
-      title: row.title,
-      asset: row.asset_code,
-      projectId: row.project_id,
-      project: row.project,
-      responsible: row.responsible,
-      severity: row.severity,
-      costEstimate: formatCurrency(row.cost_estimate),
-      status: row.status,
-    }));
+    const mappedRows = rows
+      .map((row) => ({
+        id: row.id,
+        title: row.title,
+        asset: row.asset_code,
+        projectId: row.project_id,
+        project: row.project,
+        responsible: row.responsible,
+        severity: row.severity,
+        costEstimate: formatCurrency(row.cost_estimate),
+        status: row.status,
+        reportedAt: row.reported_at,
+      }))
+      .filter((row) => !query.scopeProjectId || row.projectId === query.scopeProjectId)
+      .filter((row) =>
+        matchesSearch(query.search, [row.title, row.asset, row.project, row.responsible, row.severity, row.status]),
+      );
+
+    return sortRows(
+      mappedRows,
+      resolveIncidentComparator(query.sortBy ?? defaultIncidentListQuery.sortBy, query.sortDirection ?? defaultIncidentListQuery.sortDirection),
+    ).map(({ reportedAt: _reportedAt, ...row }) => row);
   },
 
-  getProjects(): ProjectCardRow[] {
+  getProjects(query: ProjectListQuery = defaultProjectListQuery): ProjectCardRow[] {
     const rows = db
       .prepare(
         `
@@ -1144,6 +1729,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
               FROM incidents
               WHERE incidents.project_id = projects.id
             ), 0) AS exposure,
+            projects.created_at,
+            projects.updated_at,
             COALESCE((
               SELECT COUNT(*)
               FROM asset_current_state
@@ -1163,11 +1750,6 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             ), 0) AS active_unit_count
           FROM projects
           LEFT JOIN clients ON clients.id = projects.client_id
-          ORDER BY CASE projects.status
-            WHEN 'Active' THEN 0
-            WHEN 'Prep' THEN 1
-            ELSE 2
-          END, projects.name
         `,
       )
       .all() as Array<{
@@ -1183,28 +1765,42 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       description: string;
       departments: string;
       exposure: number;
+      created_at: string | null;
+      updated_at: string | null;
       asset_count: number;
       incident_count: number;
       active_unit_count: number;
     }>;
 
-    return rows.map((row) => ({
-      id: row.id,
-      code: row.code,
-      name: row.name,
-      clientId: row.client_id,
-      client: row.client_name,
-      status: row.status,
-      startDate: row.start_date,
-      endDate: row.end_date,
-      colorKey: row.color_key,
-      departments: row.departments,
-      exposure: formatCurrency(row.exposure),
-      assetCount: row.asset_count,
-      incidentCount: row.incident_count,
-      activeUnitCount: row.active_unit_count,
-      description: row.description,
-    }));
+    const mappedRows = rows
+      .map((row) => ({
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        clientId: row.client_id,
+        client: row.client_name,
+        status: row.status,
+        startDate: row.start_date,
+        endDate: row.end_date,
+        colorKey: row.color_key,
+        departments: row.departments,
+        exposure: formatCurrency(row.exposure),
+        assetCount: row.asset_count,
+        incidentCount: row.incident_count,
+        activeUnitCount: row.active_unit_count,
+        description: row.description,
+        exposureValue: row.exposure,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }))
+      .filter((row) =>
+        matchesSearch(query.search, [row.code, row.name, row.client, row.status, row.departments, row.description]),
+      );
+
+    return sortRows(
+      mappedRows,
+      resolveProjectComparator(query.sortBy ?? defaultProjectListQuery.sortBy, query.sortDirection ?? defaultProjectListQuery.sortDirection),
+    ).map(({ exposureValue: _exposureValue, createdAt: _createdAt, updatedAt: _updatedAt, ...row }) => row);
   },
 
   getProjectDetail(projectId: string): ProjectDetailSnapshot {
@@ -1612,8 +2208,87 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     };
   },
 
-  getCatalogSnapshot(): CatalogSnapshot {
-    return catalogReads.getSnapshot();
+  getCatalogSnapshot(query: CatalogListQuery = defaultCatalogListQuery): CatalogSnapshot {
+    const snapshot = catalogReads.getSnapshot();
+
+    const sortCatalogRows = <T extends Record<string, unknown>>(rows: T[]) =>
+      sortRows(rows, (left, right) => {
+        const leftStatus = "isActive" in left ? ((left.isActive as boolean) ? "active" : "inactive") : "";
+        const rightStatus = "isActive" in right ? ((right.isActive as boolean) ? "active" : "inactive") : "";
+
+        switch (query.sortBy) {
+          case "code":
+            return compareTextValue(String(left.code ?? ""), String(right.code ?? ""), query.sortDirection);
+          case "fullName":
+            return compareTextValue(String(left.fullName ?? ""), String(right.fullName ?? ""), query.sortDirection);
+          case "status":
+            return compareTextValue(leftStatus, rightStatus, query.sortDirection);
+          case "type":
+            return compareTextValue(String(left.type ?? ""), String(right.type ?? ""), query.sortDirection);
+          case "description":
+            return compareTextValue(String(left.description ?? ""), String(right.description ?? ""), query.sortDirection);
+          case "roleLabel":
+            return compareTextValue(String(left.roleLabel ?? ""), String(right.roleLabel ?? ""), query.sortDirection);
+          case "contactName":
+            return compareTextValue(String(left.contactName ?? ""), String(right.contactName ?? ""), query.sortDirection);
+          case "email":
+            return compareTextValue(String(left.email ?? ""), String(right.email ?? ""), query.sortDirection);
+          case "phone":
+            return compareTextValue(String(left.phone ?? ""), String(right.phone ?? ""), query.sortDirection);
+          case "assetCount":
+            return compareNumberValue(Number(left.assetCount ?? 0), Number(right.assetCount ?? 0), query.sortDirection);
+          case "name":
+          default:
+            return compareTextValue(String(left.name ?? ""), String(right.name ?? ""), query.sortDirection);
+        }
+      });
+
+    const filterCatalogRows = <T extends Record<string, unknown>>(rows: T[], values: (row: T) => Array<string | null | undefined>) =>
+      rows.filter((row) => matchesSearch(query.search, values(row)));
+
+    switch (query.entityType) {
+      case "location":
+        return {
+          ...snapshot,
+          locations: sortCatalogRows(
+            filterCatalogRows(snapshot.locations, (row) => [row.code, row.name, row.type, row.description]),
+          ),
+        };
+      case "department":
+        return {
+          ...snapshot,
+          departments: sortCatalogRows(filterCatalogRows(snapshot.departments, (row) => [row.code, row.name, row.description])),
+        };
+      case "crew":
+        return {
+          ...snapshot,
+          crewMembers: sortCatalogRows(
+            filterCatalogRows(snapshot.crewMembers, (row) => [row.fullName, row.roleLabel, row.email, row.phone, row.notes]),
+          ),
+        };
+      case "client":
+        return {
+          ...snapshot,
+          clients: sortCatalogRows(
+            filterCatalogRows(snapshot.clients, (row) => [row.name, row.contactName, row.email, row.phone, row.notes]),
+          ),
+        };
+      case "kit":
+        return {
+          ...snapshot,
+          kits: sortCatalogRows(
+            filterCatalogRows(snapshot.kits, (row) => [row.code, row.name, row.description, row.primaryCodeValue]),
+          ),
+        };
+      case "category":
+      default:
+        return {
+          ...snapshot,
+          categories: sortCatalogRows(
+            filterCatalogRows(snapshot.categories, (row) => [row.code, row.name, row.description]),
+          ),
+        };
+    }
   },
 
   getFinanceOverview(): FinanceOverviewSnapshot {
@@ -1745,7 +2420,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     }));
   },
 
-  getFinanceEntries(): FinanceEntryRow[] {
+  getFinanceEntries(query: FinanceEntryListQuery = defaultFinanceEntryListQuery): FinanceEntryRow[] {
     const rows = db
       .prepare(
         `
@@ -1762,7 +2437,6 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           LEFT JOIN projects ON projects.id = financial_entries.project_id
           LEFT JOIN incidents ON incidents.id = financial_entries.incident_id
           LEFT JOIN assets ON assets.id = financial_entries.asset_id
-          ORDER BY financial_entries.entry_date DESC
         `,
       )
       .all() as Array<{
@@ -1776,16 +2450,25 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       reference: string;
     }>;
 
-    return rows.map((row) => ({
-      id: row.id,
-      date: row.entry_date,
-      type: row.entry_type,
-      category: row.category,
-      reference: row.reference,
-      project: row.project,
-      amount: formatCurrency(row.amount),
-      status: row.status,
-    }));
+    const mappedRows = rows
+      .map((row) => ({
+        id: row.id,
+        date: row.entry_date,
+        type: row.entry_type,
+        category: row.category,
+        reference: row.reference,
+        project: row.project,
+        amount: formatCurrency(row.amount),
+        status: row.status,
+        amountValue: row.amount,
+        dateValue: row.entry_date,
+      }))
+      .filter((row) => matchesSearch(query.search, [row.reference, row.project, row.category, row.type, row.status]));
+
+    return sortRows(
+      mappedRows,
+      resolveFinanceEntryComparator(query.sortBy ?? defaultFinanceEntryListQuery.sortBy, query.sortDirection ?? defaultFinanceEntryListQuery.sortDirection),
+    ).map(({ amountValue: _amountValue, dateValue: _dateValue, ...row }) => row);
   },
 };
 };

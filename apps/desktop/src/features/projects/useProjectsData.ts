@@ -1,9 +1,11 @@
 import type {
   AssignCrewToProjectUnitInput,
+  CatalogListQuery,
   CreateCatalogEntityInput,
   CreateProjectUnitInput,
   DeleteCatalogEntityInput,
   DeleteProjectUnitInput,
+  ProjectListQuery,
   UnassignCrewFromProjectUnitInput,
   UpdateCatalogEntityInput,
   UpdateProjectUnitInput,
@@ -52,21 +54,47 @@ export const useProjectsData = () => {
   };
 };
 
-export const useCatalogData = () =>
+const defaultProjectListQuery: ProjectListQuery = {
+  search: "",
+  sortBy: "name",
+  sortDirection: "asc",
+};
+
+const defaultCatalogListQuery: CatalogListQuery = {
+  entityType: "location",
+  search: "",
+  sortBy: "name",
+  sortDirection: "asc",
+};
+
+export const useProjectsRegistry = (query: ProjectListQuery = defaultProjectListQuery) =>
+  useAsyncValue(
+    async () => {
+      if (!window.bukowskiProjects) {
+        return emptyProjects;
+      }
+
+      return window.bukowskiProjects.getList(query);
+    },
+    emptyProjects,
+    [query.search, query.sortBy, query.sortDirection],
+  );
+
+export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiProjects) {
         if (window.bukowskiCatalog) {
-          return window.bukowskiCatalog.getSnapshot();
+          return window.bukowskiCatalog.getSnapshot(query);
         }
 
         return emptyCatalog;
       }
 
-      return window.bukowskiCatalog ? window.bukowskiCatalog.getSnapshot() : window.bukowskiProjects.getCatalog();
+      return window.bukowskiCatalog ? window.bukowskiCatalog.getSnapshot(query) : window.bukowskiProjects.getCatalog();
     },
     emptyCatalog,
-    [],
+    [query.entityType, query.search, query.sortBy, query.sortDirection],
   );
 
 export const useProjectDetail = (projectId: string | null) =>

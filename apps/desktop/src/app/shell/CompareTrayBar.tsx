@@ -20,16 +20,14 @@ export const CompareTrayBar = () => {
       <div className="compare-tray-header">
         <div>
           <h3 className="compare-tray-title">Compare tray</h3>
-          <p className="compare-tray-subtitle">
-            Keep items from different sections ready for future side-by-side comparison.
-          </p>
+          <p className="compare-tray-subtitle">Keep comparable items together while you review the workspace.</p>
         </div>
 
         <div className="compare-tray-actions">
           <button
             className="ghost-control"
             disabled={!compatibleType || compatibleItems.length < 2}
-            title={reasonDisabled ?? "Comparison surface will land in a later slice."}
+            title={reasonDisabled ?? "Comparison view is not available yet."}
             type="button"
           >
             <Scale size={14} />
@@ -75,8 +73,7 @@ export const CompareTrayBar = () => {
       </div>
 
       <p className="compare-tray-footnote">
-        {reasonDisabled ??
-          "The tray can hold mixed types. Compare will activate only for same-type groups in a later slice."}
+        {reasonDisabled ?? "The tray can hold mixed types. Compare activates only for same-type groups."}
       </p>
     </aside>
   );

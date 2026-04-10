@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
+import type { PackingSlipListQuery, PackingSlipSortField } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
+import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
@@ -15,10 +19,44 @@ type PackingPageProps = {
   projectName?: string | null;
 };
 
+const packingSortOptions: Array<ListSortOption<PackingSlipSortField>> = [
+  { value: "issuedDate", label: "Issued date", columnKey: "issuedDate" },
+  { value: "dueDate", label: "Due date", columnKey: "dueDate" },
+  { value: "number", label: "Slip number", columnKey: "number" },
+  { value: "project", label: "Project", columnKey: "project" },
+  { value: "department", label: "Department", columnKey: "department" },
+  { value: "responsible", label: "Responsible", columnKey: "responsible" },
+  { value: "status", label: "Status", columnKey: "status" },
+  { value: "itemCount", label: "Item count", columnKey: "itemCount" },
+  { value: "returnedCount", label: "Returned count", columnKey: "returnedCount" },
+];
+
 export const PackingPage = ({ projectId = null, projectName = null }: PackingPageProps) => {
   const isProjectMode = Boolean(projectId);
   const sectionScopeLabel = useSectionScopeLabel();
-  const { data, error, reload } = usePackingList(projectId);
+  const [searchParams] = useSearchParams();
+  const packingControls = useListControls<PackingSlipSortField, PackingSlipListQuery>({
+    viewKey: isProjectMode ? "project-packing-list" : "packing-list",
+    defaults: {
+      search: "",
+      sortBy: "issuedDate",
+      sortDirection: "desc",
+    },
+    sortOptions: packingSortOptions,
+    defaultDirectionBySort: {
+      dueDate: "asc",
+      issuedDate: "desc",
+      itemCount: "desc",
+      returnedCount: "desc",
+    },
+    buildQuery: ({ search, sortBy, sortDirection }) => ({
+      scopeProjectId: projectId,
+      search,
+      sortBy,
+      sortDirection,
+    }),
+  });
+  const { data, error, reload } = usePackingList(packingControls.query);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [activePackingSlipId, setActivePackingSlipId] = useState<string | null>(() =>
     readStringPreference(uiPreferenceKeys.activePackingSlipId),
@@ -27,6 +65,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const [returnFeedback, setReturnFeedback] = useState<string | null>(null);
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = usePackingDetail(activePackingSlipId);
+  const focusedPackingSlipId = searchParams.get("focus");
 
   useEffect(() => {
     if (!data.length) {
@@ -40,6 +79,12 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
 
     setActivePackingSlipId(data[0]?.id ?? null);
   }, [activePackingSlipId, data]);
+
+  useEffect(() => {
+    if (focusedPackingSlipId && data.some((row) => row.id === focusedPackingSlipId)) {
+      setActivePackingSlipId(focusedPackingSlipId);
+    }
+  }, [data, focusedPackingSlipId]);
 
   useEffect(() => {
     writePreference(uiPreferenceKeys.activePackingSlipId, activePackingSlipId);
@@ -70,10 +115,25 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               : "Issued, partial-return, overdue and closed slips visible in one operational queue."
           }
         >
+          <ListToolbar
+            activeSortLabel={packingControls.activeSortOption?.label}
+            onSearchValueChange={packingControls.setSearchValue}
+            onSortByChange={packingControls.setSortField}
+            onToggleSortDirection={packingControls.toggleSortDirection}
+            resultCount={data.length}
+            resultLabel="slips"
+            searchPlaceholder={isProjectMode ? "Search slips, departments or crew" : "Search slips, projects or crew"}
+            searchValue={packingControls.searchValue}
+            sortBy={packingControls.sortBy}
+            sortDirection={packingControls.sortDirection}
+            sortOptions={packingSortOptions}
+          />
           <DataTable
             activeRowId={activePackingSlipId}
+            autoScrollToActiveRow
             getRowId={(row) => row.id}
             maxHeight="min(68vh, 720px)"
+            onSortRequest={packingControls.handleColumnSortRequest}
             persistKey="packing-slips"
             columns={[
               { key: "number", label: "Slip", width: 92, minWidth: 82, render: (row) => row.number },
@@ -116,6 +176,14 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             rows={data}
             selectable
             selectedRowIds={selectedRowIds}
+            sortState={
+              packingControls.activeColumnKey
+                ? {
+                    columnKey: packingControls.activeColumnKey,
+                    direction: packingControls.sortDirection,
+                  }
+                : null
+            }
             onRowClick={(row) => {
               setActivePackingSlipId(row.id);
               setReturnError(null);

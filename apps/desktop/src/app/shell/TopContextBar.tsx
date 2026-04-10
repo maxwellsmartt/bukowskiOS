@@ -2,7 +2,11 @@ import { Bell, RefreshCcw, Search } from "lucide-react";
 
 import { useShellContext } from "@shared/hooks/useShellContext";
 
-export const TopContextBar = () => {
+type TopContextBarProps = {
+  onOpenSearch: () => void;
+};
+
+export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { scopeChipLabel, syncLabel, workspaceName } = useShellContext();
 
   return (
@@ -15,7 +19,7 @@ export const TopContextBar = () => {
       </div>
 
       <div className="top-context-group top-context-group-end">
-        <button className="ghost-control search-control" type="button">
+        <button className="ghost-control search-control" onClick={onOpenSearch} type="button">
           <Search size={13} />
           <span>Search</span>
           <kbd>⌘K</kbd>

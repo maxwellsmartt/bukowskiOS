@@ -13,7 +13,7 @@ export const ProjectOverviewPage = () => {
       <SectionHeader
         eyebrow="Project / Overview"
         title={project ? `${project.name}` : "Project overview"}
-        body="Assigned assets, incident pressure, responsibles and budget readiness inside the selected project."
+        body="Assets, incidents, crew and budget signals for the selected project."
         contextLabel={project ? `${project.code} · ${project.name}` : "Project workspace"}
       />
 

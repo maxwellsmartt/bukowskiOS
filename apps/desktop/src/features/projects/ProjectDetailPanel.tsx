@@ -51,7 +51,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   }
 
   if (!data.project) {
-    return <div className="empty-state">Select a project to inspect assets, incidents, responsibles and budget hooks.</div>;
+    return <div className="empty-state">Select a project to inspect assets, incidents, crew and budget.</div>;
   }
 
   return (
@@ -232,7 +232,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         <SurfaceCard
           className="project-scroll-card"
           title="Budget shell"
-          subtitle="Initial FinanceOps structure tied to the project."
+          subtitle="Budget and exposure snapshot for this project."
         >
           <div className="project-budget-grid">
             <div className="summary-row">

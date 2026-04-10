@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
-import { useLocation } from "react-router-dom";
+import { matchPath, useLocation } from "react-router-dom";
 
 import { resolveActiveRoute } from "@app/routing/route-meta";
 import { AppRoutes } from "@app/routing/routes";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
+import { pushRecentEntityKey } from "@shared/lib/recentEntities";
 
 import { CompareTrayBar } from "./CompareTrayBar";
+import { GlobalSearchPalette } from "./GlobalSearchPalette";
 import { assetsSubnav, buildProjectSubnav, financeSubnav } from "./navigation";
 import { ShellErrorBoundary } from "./ShellErrorBoundary";
 import { ShellSidebar } from "./ShellSidebar";
@@ -24,6 +26,7 @@ export const AppShell = () => {
   const { activeProjectId, activeProjectRouteSection, isScopeReady } = useShellContext();
   const activeRoute = resolveActiveRoute(location.pathname);
   const [sidebarWidth, setSidebarWidth] = useState(sidebarWidthDefault);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const subnavItems = useMemo(() => {
     if (activeRoute.scopeMode === "project" && activeProjectId) {
@@ -61,6 +64,56 @@ export const AppShell = () => {
       }
     }
   }, [activeProjectRouteSection, activeRoute.scopeMode, location.pathname]);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const assetMatch = matchPath({ path: "/assets/:assetId", end: true }, location.pathname);
+
+    if (typeof assetMatch?.params.assetId === "string") {
+      pushRecentEntityKey("asset", assetMatch.params.assetId);
+      return;
+    }
+
+    if (activeRoute.scopeMode === "project" && activeRoute.projectId) {
+      pushRecentEntityKey("project", activeRoute.projectId);
+
+      const focusedUnitId = searchParams.get("unit");
+      if (focusedUnitId) {
+        pushRecentEntityKey("project_unit", focusedUnitId);
+      }
+
+      return;
+    }
+
+    if (location.pathname === "/packing-slips") {
+      const focusedPackingId = searchParams.get("focus");
+      if (focusedPackingId) {
+        pushRecentEntityKey("packing_slip", focusedPackingId);
+      }
+      return;
+    }
+
+    if (location.pathname === "/incidents") {
+      const focusedIncidentId = searchParams.get("focus");
+      if (focusedIncidentId) {
+        pushRecentEntityKey("incident", focusedIncidentId);
+      }
+    }
+  }, [activeRoute.projectId, activeRoute.scopeMode, location.pathname, location.search]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   useEffect(
     () => () => {
@@ -106,7 +159,7 @@ export const AppShell = () => {
       />
 
       <div className="shell-main">
-        <TopContextBar />
+        <TopContextBar onOpenSearch={() => setSearchOpen(true)} />
         {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
         <main className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}`}>
           {!isScopeReady ? (
@@ -123,6 +176,7 @@ export const AppShell = () => {
         </main>
         <CompareTrayBar />
       </div>
+      <GlobalSearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 };

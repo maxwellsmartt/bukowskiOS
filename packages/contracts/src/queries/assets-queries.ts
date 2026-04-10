@@ -1,3 +1,5 @@
+import type { ListSortDirection } from "./list-controls-queries";
+
 export type AssetListRow = {
   id: string;
   name: string;
@@ -21,6 +23,29 @@ export type AssetListRow = {
   hasAccessories: string;
   source: string;
   incidentsOpen: number;
+};
+
+export type AssetSortField =
+  | "name"
+  | "code"
+  | "category"
+  | "status"
+  | "condition"
+  | "location"
+  | "project"
+  | "projectUnit"
+  | "responsible"
+  | "serialNumber"
+  | "qrCode"
+  | "incidentsOpen"
+  | "createdAt"
+  | "updatedAt";
+
+export type AssetListQuery = {
+  scopeProjectId?: string | null;
+  search?: string;
+  sortBy: AssetSortField;
+  sortDirection: ListSortDirection;
 };
 
 export type AssetTimelineItem = {

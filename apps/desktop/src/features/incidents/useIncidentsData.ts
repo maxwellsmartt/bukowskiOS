@@ -1,20 +1,26 @@
-import type { IncidentListRow, ReportIncidentCommand, ReportIncidentResult } from "@contracts";
+import type { IncidentListQuery, IncidentListRow, ReportIncidentCommand, ReportIncidentResult } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 
 const emptyIncidents: IncidentListRow[] = [];
 
-export const useIncidentsData = (projectId: string | null = null) =>
+const defaultIncidentListQuery: IncidentListQuery = {
+  scopeProjectId: null,
+  search: "",
+  sortBy: "reportedAt",
+  sortDirection: "desc",
+};
+
+export const useIncidentsData = (query: IncidentListQuery = defaultIncidentListQuery) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiIncidents) {
         return emptyIncidents;
       }
 
-      const rows = await window.bukowskiIncidents.getList();
-      return projectId ? rows.filter((row) => row.projectId === projectId) : rows;
+      return window.bukowskiIncidents.getList(query);
     },
     emptyIncidents,
-    [projectId],
+    [query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
   );
 
 export const reportIncident = async (input: ReportIncidentCommand): Promise<ReportIncidentResult> => {

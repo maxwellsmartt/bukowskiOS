@@ -1,18 +1,60 @@
 import { useState } from "react";
 
+import type { ProjectListQuery, ProjectSortField } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { DataTable } from "@shared/components/DataTable";
+import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { ProjectDetailPanel } from "./ProjectDetailPanel";
-import { useProjectDetail, useProjectsData } from "./useProjectsData";
+import { useProjectDetail, useProjectsRegistry } from "./useProjectsData";
+
+const projectSortOptions: Array<ListSortOption<ProjectSortField>> = [
+  { value: "name", label: "Project name", columnKey: "project" },
+  { value: "code", label: "Code" },
+  { value: "client", label: "Client" },
+  { value: "status", label: "Status", columnKey: "status" },
+  { value: "startDate", label: "Start date", columnKey: "startDate" },
+  { value: "endDate", label: "End date", columnKey: "endDate" },
+  { value: "activeUnitCount", label: "Units", columnKey: "activeUnitCount" },
+  { value: "assetCount", label: "Asset count", columnKey: "assets" },
+  { value: "incidentCount", label: "Incident count", columnKey: "incidents" },
+  { value: "exposure", label: "Exposure", columnKey: "exposure" },
+  { value: "updatedAt", label: "Updated" },
+  { value: "createdAt", label: "Created" },
+];
 
 export const ProjectsPage = () => {
-  const { data, error } = useProjectsData();
+  const projectControls = useListControls<ProjectSortField, ProjectListQuery>({
+    viewKey: "projects-registry-list",
+    defaults: {
+      search: "",
+      sortBy: "name",
+      sortDirection: "asc",
+    },
+    sortOptions: projectSortOptions,
+    defaultDirectionBySort: {
+      activeUnitCount: "desc",
+      assetCount: "desc",
+      incidentCount: "desc",
+      exposure: "desc",
+      updatedAt: "desc",
+      createdAt: "desc",
+      startDate: "asc",
+      endDate: "asc",
+    },
+    buildQuery: ({ search, sortBy, sortDirection }) => ({
+      search,
+      sortBy,
+      sortDirection,
+    }),
+  });
+  const { data, error } = useProjectsRegistry(projectControls.query);
   const { activeProjectId, openProject, setActiveProjectId } = useShellContext();
   const { addItems, hasItem } = useCompareTray();
   const sectionScopeLabel = useSectionScopeLabel();
@@ -24,16 +66,15 @@ export const ProjectsPage = () => {
       <SectionHeader
         eyebrow="Projects"
         title="Project registry"
-        body="Global registry for opening project workspaces, reviewing current exposure and managing the operational base of each project."
+        body="Open project workspaces and review schedule, exposure and current load across the workspace."
         contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Projects unavailable: {error}</div> : null}
 
       <div className="chip-row">
-        <StatusBadge tone="info">Workspace registry</StatusBadge>
         <StatusBadge tone="success">{data.filter((project) => hasItem("project", project.id)).length} in compare</StatusBadge>
-        <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : "Double click opens project workspace"}</StatusBadge>
+        <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : "Workspace scope"}</StatusBadge>
       </div>
 
       {selectedRowIds.length ? (
@@ -42,9 +83,7 @@ export const ProjectsPage = () => {
             <span className="selection-action-title">
               {selectedRowIds.length === 1 ? "1 project selected" : `${selectedRowIds.length} projects selected`}
             </span>
-            <span className="selection-action-subtitle">
-              Keep projects in the compare tray to prepare future side-by-side schedule, resource and budget review.
-            </span>
+            <span className="selection-action-subtitle">Add projects to compare for side-by-side schedule, resource and budget review.</span>
           </div>
           <div className="selection-action-buttons">
             <button
@@ -72,8 +111,22 @@ export const ProjectsPage = () => {
 
       <div className="projects-layout">
         <SurfaceCard title="Projects" subtitle="Single click inspects the registry. Double click opens the project workspace.">
+          <ListToolbar
+            activeSortLabel={projectControls.activeSortOption?.label}
+            onSearchValueChange={projectControls.setSearchValue}
+            onSortByChange={projectControls.setSortField}
+            onToggleSortDirection={projectControls.toggleSortDirection}
+            resultCount={data.length}
+            resultLabel="projects"
+            searchPlaceholder="Search projects, clients or departments"
+            searchValue={projectControls.searchValue}
+            sortBy={projectControls.sortBy}
+            sortDirection={projectControls.sortDirection}
+            sortOptions={projectSortOptions}
+          />
           <DataTable
             activeRowId={activeProjectId}
+            autoScrollToActiveRow
             columns={[
               {
                 key: "project",
@@ -142,10 +195,19 @@ export const ProjectsPage = () => {
             maxHeight="min(72vh, 760px)"
             onRowClick={(row) => setActiveProjectId(row.id)}
             onRowDoubleClick={(row) => openProject(row.id)}
+            onSortRequest={projectControls.handleColumnSortRequest}
             persistKey="projects-registry"
             rows={data}
             selectable
             selectedRowIds={selectedRowIds}
+            sortState={
+              projectControls.activeColumnKey
+                ? {
+                    columnKey: projectControls.activeColumnKey,
+                    direction: projectControls.sortDirection,
+                  }
+                : null
+            }
             onSelectedRowIdsChange={setSelectedRowIds}
           />
         </SurfaceCard>

@@ -2,15 +2,18 @@ import { useMemo, useState } from "react";
 import { Plus, SquarePen, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import type { AssetListQuery, AssetSortField } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { PackingSlipBuilderPanel, type PackingSlipBuilderDraft } from "@features/packing/PackingSlipBuilderPanel";
 import { createPackingSlip } from "@features/packing/usePackingData";
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
+import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
@@ -23,6 +26,23 @@ type AssetsPageProps = {
   projectName?: string | null;
 };
 
+const assetSortOptions: Array<ListSortOption<AssetSortField>> = [
+  { value: "name", label: "Name", columnKey: "asset" },
+  { value: "code", label: "Code" },
+  { value: "category", label: "Category", columnKey: "category" },
+  { value: "status", label: "Status", columnKey: "status" },
+  { value: "condition", label: "Condition", columnKey: "condition" },
+  { value: "location", label: "Location", columnKey: "location" },
+  { value: "project", label: "Project", columnKey: "project" },
+  { value: "projectUnit", label: "Unit", columnKey: "projectUnit" },
+  { value: "responsible", label: "Responsible", columnKey: "responsible" },
+  { value: "serialNumber", label: "Serial", columnKey: "serialNumber" },
+  { value: "qrCode", label: "QR", columnKey: "qrCode" },
+  { value: "incidentsOpen", label: "Open issues", columnKey: "incidents" },
+  { value: "updatedAt", label: "Updated" },
+  { value: "createdAt", label: "Created" },
+];
+
 export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageProps) => (
   <AssetsContent projectId={projectId} projectName={projectName} />
 );
@@ -33,7 +53,27 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const isProjectMode = Boolean(projectId);
   const effectiveProjectName = projectName ?? (isProjectMode ? activeProject?.name ?? null : null);
   const sectionScopeLabel = useSectionScopeLabel();
-  const { data: assets, error, isLoading, reload } = useAssetsList(projectId);
+  const assetControls = useListControls<AssetSortField, AssetListQuery>({
+    viewKey: isProjectMode ? "project-assets-list" : "assets-list",
+    defaults: {
+      search: "",
+      sortBy: "name",
+      sortDirection: "asc",
+    },
+    sortOptions: assetSortOptions,
+    defaultDirectionBySort: {
+      createdAt: "desc",
+      updatedAt: "desc",
+      incidentsOpen: "desc",
+    },
+    buildQuery: ({ search, sortBy, sortDirection }) => ({
+      scopeProjectId: projectId,
+      search,
+      sortBy,
+      sortDirection,
+    }),
+  });
+  const { data: assets, error, isLoading, reload } = useAssetsList(assetControls.query);
   const { data: catalog, error: catalogError } = useCatalogData();
   const navigate = useNavigate();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -230,8 +270,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         title={isProjectMode ? "Assigned assets" : "Inventory"}
         body={
           isProjectMode
-            ? "Assets currently linked to this project, ready for supervision, reassignment, packing and issue reporting."
-            : "Live asset registry with current state, quantity, storage context and operational readiness in one pass."
+            ? "Assets currently linked to this project for supervision, reassignment, packing and issue reporting."
+            : "Current asset inventory with live status, quantity and location."
         }
         contextLabel={sectionScopeLabel}
       />
@@ -240,9 +280,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       {!error && isLoading ? <div className="empty-state">Loading asset registry...</div> : null}
 
       <div className="chip-row">
-        <StatusBadge tone="info">Live registry</StatusBadge>
-        <StatusBadge tone="warning">Legacy import</StatusBadge>
-        <StatusBadge tone="critical">Open issues</StatusBadge>
         <StatusBadge tone="success">{assets.filter((asset) => hasItem("asset", asset.id)).length} in compare</StatusBadge>
         <StatusBadge>
           {selectedRowIds.length
@@ -374,8 +411,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           title="Asset registry"
           subtitle={
             isProjectMode
-              ? "Single click previews. Double click opens detail. This view is scoped to the current project only."
-              : "Single click previews. Double click opens detail. Resize columns and select rows for future bulk actions."
+              ? "Single click previews. Double click opens detail. This view is scoped to the current project."
+              : "Single click previews. Double click opens detail."
           }
           aside={
             <button
@@ -391,17 +428,40 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             </button>
           }
         >
+          <ListToolbar
+            activeSortLabel={assetControls.activeSortOption?.label}
+            onSearchValueChange={assetControls.setSearchValue}
+            onSortByChange={assetControls.setSortField}
+            onToggleSortDirection={assetControls.toggleSortDirection}
+            resultCount={assets.length}
+            resultLabel="assets"
+            searchPlaceholder={isProjectMode ? "Search assets, codes, units or QR" : "Search assets, codes, locations or QR"}
+            searchValue={assetControls.searchValue}
+            sortBy={assetControls.sortBy}
+            sortDirection={assetControls.sortDirection}
+            sortOptions={assetSortOptions}
+          />
           <DataTable
             activeRowId={selectedAssetId}
+            autoScrollToActiveRow
             columns={assetColumns}
             getRowId={(row) => row.id}
             maxHeight="min(66vh, 720px)"
             onRowClick={(row) => setSelectedAssetId(row.id)}
             onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
+            onSortRequest={assetControls.handleColumnSortRequest}
             persistKey="assets-registry"
             rows={assets}
             selectable
             selectedRowIds={selectedRowIds}
+            sortState={
+              assetControls.activeColumnKey
+                ? {
+                    columnKey: assetControls.activeColumnKey,
+                    direction: assetControls.sortDirection,
+                  }
+                : null
+            }
             onSelectedRowIdsChange={setSelectedRowIds}
           />
         </SurfaceCard>
@@ -419,7 +479,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               </button>
             }
             title="Quick preview"
-            subtitle="Fast read of the selected asset before opening full detail."
+            subtitle="Quick read of the selected asset before opening full detail."
           >
             <>
               <div className="summary-grid">
@@ -471,12 +531,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     {activeAsset.source} · {activeAsset.hasAccessories}
                   </span>
                 </div>
-              </div>
-
-              <div className="chip-row">
-                <StatusBadge tone="info">Double click to open detail</StatusBadge>
-                <StatusBadge tone="success">QR ready</StatusBadge>
-                <StatusBadge tone="warning">Assignment flow next</StatusBadge>
               </div>
 
               <div className="action-panel-actions action-panel-actions-start">

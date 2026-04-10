@@ -9,16 +9,16 @@ export const SettingsPage = () => {
     <div className="page-stack">
       <SectionHeader
         eyebrow="Admin / Settings"
-        title="Workspace and system settings"
-        body="Core configuration for the workspace, permissions model and app behavior."
+        title="Settings"
+        body="Workspace configuration and desktop preferences."
         contextLabel={sectionScopeLabel}
       />
 
-      <SurfaceCard title="Current scope" subtitle="This area stays compact until roles, permissions and sync controls are fully wired.">
+      <SurfaceCard title="Workspace settings" subtitle="Permissions, sync controls and app behavior will live here.">
         <div className="summary-grid">
           <div className="summary-row">
             <span className="summary-label">Roles & permissions</span>
-            <span className="summary-value">Workspace memberships + role permissions planned</span>
+            <span className="summary-value">Coming soon</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">Sync profile</span>
@@ -29,8 +29,8 @@ export const SettingsPage = () => {
             <span className="summary-value">Dark-only</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Desktop shell</span>
-            <span className="summary-value">Electron + typed IPC</span>
+            <span className="summary-label">Desktop app</span>
+            <span className="summary-value">BukowskiOS desktop</span>
           </div>
         </div>
       </SurfaceCard>

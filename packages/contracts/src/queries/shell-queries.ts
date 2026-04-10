@@ -3,3 +3,27 @@ export type ShellBootstrap = {
   projectScope: string;
   syncLabel: string;
 };
+
+export type GlobalSearchEntityType = "asset" | "project" | "project_unit" | "packing_slip" | "incident";
+
+export type GlobalSearchQuery = {
+  query: string;
+  recentEntityKeys?: string[];
+  limit?: number;
+};
+
+export type GlobalSearchResult = {
+  entityType: GlobalSearchEntityType;
+  entityId: string;
+  title: string;
+  subtitle: string;
+  meta?: string;
+  navigationPath: string;
+  recent: boolean;
+};
+
+export type GlobalSearchGroup = {
+  entityType: GlobalSearchEntityType;
+  label: string;
+  results: GlobalSearchResult[];
+};

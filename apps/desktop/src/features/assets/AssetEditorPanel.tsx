@@ -78,8 +78,8 @@ export const AssetEditorPanel = ({
   const title = mode === "create" ? "New asset" : "Edit asset";
   const subtitle =
     mode === "create"
-      ? "Create a real asset in the live registry with scan-ready identity and operational defaults."
-      : "Update identity, operational defaults and scan metadata without losing auditability.";
+      ? "Add a new asset with identity, location and scan details."
+      : "Update identity, operational defaults and scan details.";
   const primaryCodeValue = useMemo(() => initialValue?.primaryCodeValue || qrCodeValue.trim() || "Will generate on save", [initialValue, qrCodeValue]);
 
   return (
@@ -92,20 +92,14 @@ export const AssetEditorPanel = ({
       title={title}
       subtitle={subtitle}
     >
-      <div className="chip-row">
-        <StatusBadge tone="info">{mode === "create" ? "Live registry" : "Editable profile"}</StatusBadge>
-        <StatusBadge tone="success">QR ready</StatusBadge>
-        {initialValue ? <StatusBadge>{initialValue.isActive ? "Active" : "Archived"}</StatusBadge> : null}
-      </div>
-
       <div className="summary-grid compact-summary-grid">
         <div className="summary-row">
           <span className="summary-label">Primary code</span>
           <span className="summary-value">{primaryCodeValue}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Scan channel</span>
-          <span className="summary-value">QR today · Barcode-ready next</span>
+          <span className="summary-label">Status</span>
+          <span className="summary-value">{initialValue ? (initialValue.isActive ? "Active" : "Archived") : "New asset"}</span>
         </div>
       </div>
 

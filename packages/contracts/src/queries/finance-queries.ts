@@ -1,4 +1,5 @@
 import type { OverviewMetric } from "./overview-queries";
+import type { ListSortDirection } from "./list-controls-queries";
 
 export type ProjectExposureRow = {
   project: string;
@@ -27,6 +28,14 @@ export type FinanceEntryRow = {
   project: string;
   amount: string;
   status: string;
+};
+
+export type FinanceEntrySortField = "date" | "type" | "category" | "reference" | "project" | "amount" | "status";
+
+export type FinanceEntryListQuery = {
+  search?: string;
+  sortBy: FinanceEntrySortField;
+  sortDirection: ListSortDirection;
 };
 
 export type FinanceOverviewSnapshot = {

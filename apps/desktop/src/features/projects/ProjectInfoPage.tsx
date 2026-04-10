@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { projectColorPalette } from "@contracts";
 import { SelectField } from "@shared/components/SelectField";
@@ -20,6 +21,7 @@ const normalizeOptional = (value: string) => {
 
 export const ProjectInfoPage = () => {
   const { project, projectId } = useProjectMode();
+  const [searchParams] = useSearchParams();
   const { data, error, isLoading, reload } = useProjectDetail(projectId);
   const { data: catalog } = useCatalogData();
   const { refreshProjects, updateProject } = useShellContext();
@@ -35,6 +37,7 @@ export const ProjectInfoPage = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const focusedUnitId = searchParams.get("unit");
 
   useEffect(() => {
     if (!data.project) {
@@ -222,6 +225,7 @@ export const ProjectInfoPage = () => {
 
         <ProjectUnitsManager
           crewMembers={catalog.crewMembers}
+          focusedUnitId={focusedUnitId}
           onChanged={async () => {
             await Promise.all([reload(), refreshProjects()]);
           }}

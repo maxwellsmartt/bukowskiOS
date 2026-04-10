@@ -1,7 +1,9 @@
 import type {
   ArchiveAssetCommand,
+  AssetListQuery,
   AssignMoveAssetsInput,
   AssignCrewToProjectUnitInput,
+  CatalogListQuery,
   CreateAssetCommand,
   CreateCatalogEntityInput,
   CreatePackingSlipCommand,
@@ -10,6 +12,11 @@ import type {
   DeleteCatalogEntityInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
+  FinanceEntryListQuery,
+  GlobalSearchQuery,
+  IncidentListQuery,
+  PackingSlipListQuery,
+  ProjectListQuery,
   ReportIncidentCommand,
   ReturnPackingSlipItemsCommand,
   ScheduleTimelineRange,
@@ -68,26 +75,27 @@ export const registerFoundationIpc = ({
   packingMutations,
 }: RegisterFoundationIpcOptions) => {
   ipcMain.handle(ipcChannels.shell.getBootstrap, () => foundationReads.getShellBootstrap());
+  ipcMain.handle(ipcChannels.shell.searchGlobal, (_event, query: GlobalSearchQuery) => foundationReads.getGlobalSearch(query));
   ipcMain.handle(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot());
   ipcMain.handle(
     ipcChannels.overview.getTimeline,
     (_event, range: ScheduleTimelineRange, scale: ScheduleTimelineScale) => foundationReads.getScheduleTimeline(range, scale),
   );
-  ipcMain.handle(ipcChannels.assets.getList, () => foundationReads.getAssets());
+  ipcMain.handle(ipcChannels.assets.getList, (_event, query: AssetListQuery | undefined) => foundationReads.getAssets(query));
   ipcMain.handle(ipcChannels.assets.getDetail, (_event, assetId: string) => foundationReads.getAssetDetail(assetId));
   ipcMain.handle(ipcChannels.assets.assignMove, (_event, input: AssignMoveAssetsInput) => assetMutations.assignMoveAssets(input));
   ipcMain.handle(ipcChannels.assets.create, (_event, input: CreateAssetCommand) => assetMutations.createAsset(input));
   ipcMain.handle(ipcChannels.assets.update, (_event, input: UpdateAssetCommand) => assetMutations.updateAsset(input));
   ipcMain.handle(ipcChannels.assets.archive, (_event, input: ArchiveAssetCommand) => assetMutations.archiveAsset(input));
-  ipcMain.handle(ipcChannels.packing.getList, () => foundationReads.getPackingSlips());
+  ipcMain.handle(ipcChannels.packing.getList, (_event, query: PackingSlipListQuery | undefined) => foundationReads.getPackingSlips(query));
   ipcMain.handle(ipcChannels.packing.getDetail, (_event, packingSlipId: string) => foundationReads.getPackingSlipDetail(packingSlipId));
   ipcMain.handle(ipcChannels.packing.create, (_event, input: CreatePackingSlipCommand) => packingMutations.createPackingSlip(input));
   ipcMain.handle(ipcChannels.packing.returnItems, (_event, input: ReturnPackingSlipItemsCommand) =>
     packingMutations.returnPackingSlipItems(input),
   );
-  ipcMain.handle(ipcChannels.incidents.getList, () => foundationReads.getIncidents());
+  ipcMain.handle(ipcChannels.incidents.getList, (_event, query: IncidentListQuery | undefined) => foundationReads.getIncidents(query));
   ipcMain.handle(ipcChannels.incidents.report, (_event, input: ReportIncidentCommand) => incidentMutations.reportIncident(input));
-  ipcMain.handle(ipcChannels.projects.getList, () => foundationReads.getProjects());
+  ipcMain.handle(ipcChannels.projects.getList, (_event, query: ProjectListQuery | undefined) => foundationReads.getProjects(query));
   ipcMain.handle(ipcChannels.projects.getDetail, (_event, projectId: string) => foundationReads.getProjectDetail(projectId));
   ipcMain.handle(ipcChannels.projects.getCatalog, () => foundationReads.getCatalogSnapshot());
   ipcMain.handle(ipcChannels.projects.create, (_event, input: CreateProjectInput) => {
@@ -122,7 +130,7 @@ export const registerFoundationIpc = ({
     projectMutations.unassignCrewFromProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });
-  ipcMain.handle(ipcChannels.catalog.getSnapshot, () => foundationReads.getCatalogSnapshot());
+  ipcMain.handle(ipcChannels.catalog.getSnapshot, (_event, query: CatalogListQuery | undefined) => foundationReads.getCatalogSnapshot(query));
   ipcMain.handle(ipcChannels.catalog.create, (_event, input: CreateCatalogEntityInput) => {
     catalogMutations.createEntity(input);
     return foundationReads.getCatalogSnapshot();
@@ -137,5 +145,5 @@ export const registerFoundationIpc = ({
   });
   ipcMain.handle(ipcChannels.finance.getOverview, () => foundationReads.getFinanceOverview());
   ipcMain.handle(ipcChannels.finance.getCostLinks, () => foundationReads.getFinanceCostLinks());
-  ipcMain.handle(ipcChannels.finance.getEntries, () => foundationReads.getFinanceEntries());
+  ipcMain.handle(ipcChannels.finance.getEntries, (_event, query: FinanceEntryListQuery | undefined) => foundationReads.getFinanceEntries(query));
 };

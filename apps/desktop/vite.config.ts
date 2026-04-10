@@ -24,6 +24,13 @@ export default defineConfig(async () => {
     : await electron({
         main: {
           entry: "electron/main/app.ts",
+          onstart: async ({ startup }) => {
+            const processWithElectron = process as NodeJS.Process & { electronApp?: unknown };
+            console.info(
+              processWithElectron.electronApp ? "[dev] Electron main restart" : "[dev] Electron main start",
+            );
+            await startup([".", "--no-sandbox"]);
+          },
           vite: {
             build: {
               rollupOptions: {

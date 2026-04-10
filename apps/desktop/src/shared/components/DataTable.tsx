@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 
+import type { ListSortDirection } from "@contracts";
 import { readJsonPreference, writeJsonPreference } from "@shared/lib/preferences";
 
 type DataColumn<T> = {
@@ -34,6 +35,12 @@ type DataTableProps<T = unknown> = {
   emptyMessage?: string;
   persistKey?: string;
   shellClassName?: string;
+  sortState?: {
+    columnKey: string;
+    direction: ListSortDirection;
+  } | null;
+  onSortRequest?: (columnKey: string) => void;
+  autoScrollToActiveRow?: boolean;
 };
 
 const selectionColumnWidth = 44;
@@ -55,7 +62,11 @@ export const DataTable = <T = unknown,>({
   emptyMessage = "No rows available.",
   persistKey,
   shellClassName,
+  sortState = null,
+  onSortRequest,
+  autoScrollToActiveRow = false,
 }: DataTableProps<T>) => {
+  const tableShellRef = useRef<HTMLDivElement | null>(null);
   const resolvedRowIds = useMemo(
     () => rows.map((row, index) => (getRowId ? getRowId(row, index) : String(index))),
     [getRowId, rows],
@@ -108,6 +119,15 @@ export const DataTable = <T = unknown,>({
 
     writeJsonPreference(`table:${persistKey}`, columnWidths);
   }, [columnWidths, persistKey]);
+
+  useEffect(() => {
+    if (!autoScrollToActiveRow || !activeRowId || !tableShellRef.current) {
+      return;
+    }
+
+    const activeRow = tableShellRef.current.querySelector<HTMLTableRowElement>(`tr[data-row-id="${activeRowId}"]`);
+    activeRow?.scrollIntoView({ block: "nearest" });
+  }, [activeRowId, autoScrollToActiveRow, rows]);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -172,6 +192,7 @@ export const DataTable = <T = unknown,>({
 
   return (
     <div
+      ref={tableShellRef}
       className={`table-shell${shellClassName ? ` ${shellClassName}` : ""}`}
       style={
         {
@@ -207,9 +228,38 @@ export const DataTable = <T = unknown,>({
             ) : null}
 
             {columns.map((column) => (
-              <th key={column.key} className={column.align === "right" ? "align-right" : ""}>
+              <th
+                key={column.key}
+                aria-sort={
+                  sortState?.columnKey === column.key
+                    ? sortState.direction === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
+                className={[
+                  column.align === "right" ? "align-right" : "",
+                  sortState?.columnKey === column.key ? "data-table-sort-active" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
                 <div className="data-table-header-cell">
-                  <span>{column.label}</span>
+                  {onSortRequest ? (
+                    <button className="data-table-sort-button" onClick={() => onSortRequest(column.key)} type="button">
+                      <span>{column.label}</span>
+                      {sortState?.columnKey === column.key ? (
+                        <span className="data-table-sort-indicator">{sortState.direction === "asc" ? "↑" : "↓"}</span>
+                      ) : null}
+                    </button>
+                  ) : (
+                    <span className="data-table-header-label">
+                      <span>{column.label}</span>
+                      {sortState?.columnKey === column.key ? (
+                        <span className="data-table-sort-indicator">{sortState.direction === "asc" ? "↑" : "↓"}</span>
+                      ) : null}
+                    </span>
+                  )}
                   {column.resizable === false ? null : (
                     <button
                       aria-label={`Resize ${column.label} column`}
@@ -234,6 +284,7 @@ export const DataTable = <T = unknown,>({
               return (
                 <tr
                   key={rowId}
+                  data-row-id={rowId}
                   className={[
                     onRowClick || onRowDoubleClick ? "data-table-row-clickable" : "",
                     isActive ? "data-table-row-active" : "",

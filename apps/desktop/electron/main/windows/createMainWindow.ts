@@ -1,6 +1,8 @@
 import { BrowserWindow, shell } from "electron";
 import path from "node:path";
 
+import { bindWindowStatePersistence, getDefaultWindowBounds, readWindowState } from "./windowState";
+
 type CreateMainWindowOptions = {
   devServerUrl?: string;
   preloadPath: string;
@@ -12,13 +14,17 @@ export const createMainWindow = ({
   preloadPath,
   rendererDist,
 }: CreateMainWindowOptions) => {
+  const savedWindowState = readWindowState();
+  const fallbackBounds = getDefaultWindowBounds();
   const window = new BrowserWindow({
-    width: 1440,
-    height: 920,
+    width: savedWindowState?.bounds.width ?? fallbackBounds.width,
+    height: savedWindowState?.bounds.height ?? fallbackBounds.height,
+    x: savedWindowState?.bounds.x,
+    y: savedWindowState?.bounds.y,
     minWidth: 880,
     minHeight: 600,
     show: false,
-    center: true,
+    center: !savedWindowState,
     resizable: true,
     movable: true,
     maximizable: true,
@@ -33,6 +39,7 @@ export const createMainWindow = ({
       nodeIntegration: false,
     },
   });
+  bindWindowStatePersistence(window);
 
   if (devServerUrl) {
     window.loadURL(devServerUrl);
@@ -46,7 +53,9 @@ export const createMainWindow = ({
   });
 
   window.once("ready-to-show", () => {
-    window.maximize();
+    if (savedWindowState?.isMaximized) {
+      window.maximize();
+    }
     window.show();
   });
 

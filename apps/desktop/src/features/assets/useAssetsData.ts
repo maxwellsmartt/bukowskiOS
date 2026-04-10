@@ -2,6 +2,7 @@ import type {
   ArchiveAssetCommand,
   AssetDetailSnapshot,
   AssetEditorMutationResult,
+  AssetListQuery,
   AssetListRow,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
@@ -21,18 +22,24 @@ const emptyAssetDetail: AssetDetailSnapshot = {
   scannableCodes: [],
 };
 
-export const useAssetsList = (projectId: string | null = null) =>
+const defaultAssetListQuery: AssetListQuery = {
+  scopeProjectId: null,
+  search: "",
+  sortBy: "name",
+  sortDirection: "asc",
+};
+
+export const useAssetsList = (query: AssetListQuery = defaultAssetListQuery) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiAssets) {
         return emptyAssetList;
       }
 
-      const rows = await window.bukowskiAssets.getList();
-      return projectId ? rows.filter((row) => row.projectId === projectId) : rows;
+      return window.bukowskiAssets.getList(query);
     },
     emptyAssetList,
-    [projectId],
+    [query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
   );
 
 export const useAssetDetail = (assetId: string | undefined) =>

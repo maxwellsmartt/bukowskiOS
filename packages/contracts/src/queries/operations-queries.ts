@@ -1,4 +1,5 @@
 import type { OverviewMetric } from "./overview-queries";
+import type { ListSortDirection } from "./list-controls-queries";
 
 export type PackingSlipRow = {
   id: string;
@@ -12,6 +13,24 @@ export type PackingSlipRow = {
   itemCount: number;
   returnedCount: number;
   status: string;
+};
+
+export type PackingSlipSortField =
+  | "number"
+  | "project"
+  | "department"
+  | "responsible"
+  | "issuedDate"
+  | "dueDate"
+  | "itemCount"
+  | "returnedCount"
+  | "status";
+
+export type PackingSlipListQuery = {
+  scopeProjectId?: string | null;
+  search?: string;
+  sortBy: PackingSlipSortField;
+  sortDirection: ListSortDirection;
 };
 
 export type PackingSlipDetailSummary = {
@@ -62,6 +81,15 @@ export type IncidentListRow = {
   status: string;
 };
 
+export type IncidentSortField = "title" | "asset" | "project" | "responsible" | "severity" | "costEstimate" | "status" | "reportedAt";
+
+export type IncidentListQuery = {
+  scopeProjectId?: string | null;
+  search?: string;
+  sortBy: IncidentSortField;
+  sortDirection: ListSortDirection;
+};
+
 export type ProjectCardRow = {
   id: string;
   code: string;
@@ -78,6 +106,27 @@ export type ProjectCardRow = {
   incidentCount: number;
   activeUnitCount: number;
   description: string;
+};
+
+export type ProjectSortField =
+  | "name"
+  | "code"
+  | "client"
+  | "status"
+  | "startDate"
+  | "endDate"
+  | "colorKey"
+  | "assetCount"
+  | "incidentCount"
+  | "activeUnitCount"
+  | "exposure"
+  | "createdAt"
+  | "updatedAt";
+
+export type ProjectListQuery = {
+  search?: string;
+  sortBy: ProjectSortField;
+  sortDirection: ListSortDirection;
 };
 
 export type CatalogLocationRow = {

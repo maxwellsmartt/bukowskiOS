@@ -13,3 +13,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </HashRouter>
   </React.StrictMode>,
 );
+
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    console.info("[dev] Renderer hot update applied");
+  });
+}

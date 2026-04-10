@@ -1,16 +1,47 @@
 import { useState } from "react";
 
+import type { FinanceEntryListQuery, FinanceEntrySortField } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { DataTable } from "@shared/components/DataTable";
+import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { useFinanceEntries } from "./useFinanceData";
 
+const financeEntrySortOptions: Array<ListSortOption<FinanceEntrySortField>> = [
+  { value: "date", label: "Entry date", columnKey: "date" },
+  { value: "type", label: "Type", columnKey: "type" },
+  { value: "category", label: "Category", columnKey: "category" },
+  { value: "reference", label: "Reference", columnKey: "reference" },
+  { value: "project", label: "Project", columnKey: "project" },
+  { value: "amount", label: "Amount", columnKey: "amount" },
+  { value: "status", label: "Status", columnKey: "status" },
+];
+
 export const FinanceEntriesPage = () => {
-  const { data, error } = useFinanceEntries();
+  const financeControls = useListControls<FinanceEntrySortField, FinanceEntryListQuery>({
+    viewKey: "finance-entries-list",
+    defaults: {
+      search: "",
+      sortBy: "date",
+      sortDirection: "desc",
+    },
+    sortOptions: financeEntrySortOptions,
+    defaultDirectionBySort: {
+      amount: "desc",
+      date: "desc",
+    },
+    buildQuery: ({ search, sortBy, sortDirection }) => ({
+      search,
+      sortBy,
+      sortDirection,
+    }),
+  });
+  const { data, error } = useFinanceEntries(financeControls.query);
   const { addItems, hasItem } = useCompareTray();
   const sectionScopeLabel = useSectionScopeLabel();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
@@ -20,16 +51,15 @@ export const FinanceEntriesPage = () => {
       <SectionHeader
         eyebrow="Finance / Entries"
         title="Entries"
-        body="Linked reserves and exposure entries created from operational events."
+        body="Financial entries linked to operational events, incidents and projects."
         contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Entries unavailable: {error}</div> : null}
 
       <div className="chip-row">
-        <StatusBadge tone="info">Operational finance hooks</StatusBadge>
         <StatusBadge tone="success">{data.filter((entry) => hasItem("financial_entry", entry.id)).length} in compare</StatusBadge>
-        <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : "Workspace-wide finance shell"}</StatusBadge>
+        <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : "Workspace scope"}</StatusBadge>
       </div>
 
       {selectedRowIds.length ? (
@@ -38,9 +68,7 @@ export const FinanceEntriesPage = () => {
             <span className="selection-action-title">
               {selectedRowIds.length === 1 ? "1 finance entry selected" : `${selectedRowIds.length} finance entries selected`}
             </span>
-            <span className="selection-action-subtitle">
-              Keep cost-bearing entries in the compare tray for future exposure and reserve comparisons.
-            </span>
+            <span className="selection-action-subtitle">Add entries to compare for reserve and exposure review.</span>
           </div>
           <div className="selection-action-buttons">
             <button
@@ -67,9 +95,23 @@ export const FinanceEntriesPage = () => {
       ) : null}
 
       <SurfaceCard title="Entry register" subtitle="Current financial entries linked to projects, assets and incidents.">
+        <ListToolbar
+          activeSortLabel={financeControls.activeSortOption?.label}
+          onSearchValueChange={financeControls.setSearchValue}
+          onSortByChange={financeControls.setSortField}
+          onToggleSortDirection={financeControls.toggleSortDirection}
+          resultCount={data.length}
+          resultLabel="entries"
+          searchPlaceholder="Search references, projects or categories"
+          searchValue={financeControls.searchValue}
+          sortBy={financeControls.sortBy}
+          sortDirection={financeControls.sortDirection}
+          sortOptions={financeEntrySortOptions}
+        />
         <DataTable
           getRowId={(row) => row.id}
           maxHeight="min(56vh, 620px)"
+          onSortRequest={financeControls.handleColumnSortRequest}
           persistKey="finance-entries"
           columns={[
             { key: "date", label: "Date", render: (row) => row.date },
@@ -89,13 +131,16 @@ export const FinanceEntriesPage = () => {
           rows={data}
           selectable
           selectedRowIds={selectedRowIds}
+          sortState={
+            financeControls.activeColumnKey
+              ? {
+                  columnKey: financeControls.activeColumnKey,
+                  direction: financeControls.sortDirection,
+                }
+              : null
+          }
           onSelectedRowIdsChange={setSelectedRowIds}
         />
-
-        <div className="empty-state">
-          <strong>Shell readiness</strong>
-          <span>Incident reserves, replacement exposure, collaborator fee hooks and future ledger workflows.</span>
-        </div>
       </SurfaceCard>
     </div>
   );

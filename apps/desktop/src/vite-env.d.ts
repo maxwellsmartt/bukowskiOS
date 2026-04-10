@@ -2,6 +2,7 @@
 
 import type {
   ArchiveAssetCommand,
+  AssetListQuery,
   AssignCrewToProjectUnitInput,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
@@ -9,6 +10,7 @@ import type {
   AssetDetailSnapshot,
   AssetEditorMutationResult,
   AssetListRow,
+  CatalogListQuery,
   CatalogSnapshot,
   CreateAssetCommand,
   CreateCatalogEntityInput,
@@ -19,13 +21,19 @@ import type {
   DeleteCatalogEntityInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
+  FinanceEntryListQuery,
   FinanceCostLinkRow,
   FinanceEntryRow,
   FinanceOverviewSnapshot,
+  GlobalSearchGroup,
+  GlobalSearchQuery,
+  IncidentListQuery,
   IncidentListRow,
   OverviewSnapshot,
   PackingSlipDetailSnapshot,
+  PackingSlipListQuery,
   PackingSlipRow,
+  ProjectListQuery,
   ProjectCardRow,
   ProjectDetailSnapshot,
   ReportIncidentCommand,
@@ -50,13 +58,14 @@ declare global {
     };
     bukowskiShell?: {
       getBootstrap: () => Promise<ShellBootstrap>;
+      searchGlobal: (query: GlobalSearchQuery) => Promise<GlobalSearchGroup[]>;
     };
     bukowskiOverview?: {
       getSnapshot: () => Promise<OverviewSnapshot>;
       getTimeline: (range: ScheduleTimelineRange, scale: ScheduleTimelineScale) => Promise<ScheduleTimelineSnapshot>;
     };
     bukowskiAssets?: {
-      getList: () => Promise<AssetListRow[]>;
+      getList: (query?: AssetListQuery) => Promise<AssetListRow[]>;
       getDetail: (assetId: string) => Promise<AssetDetailSnapshot>;
       assignMove: (input: AssignMoveAssetsInput) => Promise<AssignMoveAssetsResult>;
       create: (input: CreateAssetCommand) => Promise<AssetEditorMutationResult>;
@@ -64,17 +73,17 @@ declare global {
       archive: (input: ArchiveAssetCommand) => Promise<AssetEditorMutationResult>;
     };
     bukowskiPacking?: {
-      getList: () => Promise<PackingSlipRow[]>;
+      getList: (query?: PackingSlipListQuery) => Promise<PackingSlipRow[]>;
       getDetail: (packingSlipId: string) => Promise<PackingSlipDetailSnapshot>;
       create: (input: CreatePackingSlipCommand) => Promise<CreatePackingSlipResult>;
       returnItems: (input: ReturnPackingSlipItemsCommand) => Promise<ReturnPackingSlipItemsResult>;
     };
     bukowskiIncidents?: {
-      getList: () => Promise<IncidentListRow[]>;
+      getList: (query?: IncidentListQuery) => Promise<IncidentListRow[]>;
       report: (input: ReportIncidentCommand) => Promise<ReportIncidentResult>;
     };
     bukowskiProjects?: {
-      getList: () => Promise<ProjectCardRow[]>;
+      getList: (query?: ProjectListQuery) => Promise<ProjectCardRow[]>;
       getDetail: (projectId: string) => Promise<ProjectDetailSnapshot>;
       getCatalog: () => Promise<CatalogSnapshot>;
       create: (input: CreateProjectInput) => Promise<ProjectCardRow[]>;
@@ -89,10 +98,10 @@ declare global {
     bukowskiFinance?: {
       getOverview: () => Promise<FinanceOverviewSnapshot>;
       getCostLinks: () => Promise<FinanceCostLinkRow[]>;
-      getEntries: () => Promise<FinanceEntryRow[]>;
+      getEntries: (query?: FinanceEntryListQuery) => Promise<FinanceEntryRow[]>;
     };
     bukowskiCatalog?: {
-      getSnapshot: () => Promise<CatalogSnapshot>;
+      getSnapshot: (query?: CatalogListQuery) => Promise<CatalogSnapshot>;
       create: (input: CreateCatalogEntityInput) => Promise<CatalogSnapshot>;
       update: (input: UpdateCatalogEntityInput) => Promise<CatalogSnapshot>;
       remove: (input: DeleteCatalogEntityInput) => Promise<CatalogSnapshot>;

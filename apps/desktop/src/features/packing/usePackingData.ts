@@ -2,6 +2,7 @@ import type {
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
   PackingSlipDetailSnapshot,
+  PackingSlipListQuery,
   PackingSlipRow,
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
@@ -14,18 +15,24 @@ const emptyPackingSlipDetail: PackingSlipDetailSnapshot = {
   items: [],
 };
 
-export const usePackingList = (projectId: string | null = null) =>
+const defaultPackingListQuery: PackingSlipListQuery = {
+  scopeProjectId: null,
+  search: "",
+  sortBy: "issuedDate",
+  sortDirection: "desc",
+};
+
+export const usePackingList = (query: PackingSlipListQuery = defaultPackingListQuery) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiPacking) {
         return emptyPackingSlips;
       }
 
-      const rows = await window.bukowskiPacking.getList();
-      return projectId ? rows.filter((row) => row.projectId === projectId) : rows;
+      return window.bukowskiPacking.getList(query);
     },
     emptyPackingSlips,
-    [projectId],
+    [query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
   );
 
 export const usePackingDetail = (packingSlipId: string | null) =>

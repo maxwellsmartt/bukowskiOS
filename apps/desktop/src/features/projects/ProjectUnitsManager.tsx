@@ -1,5 +1,5 @@
 import { Check, Pencil, RotateCcw, Trash2, WrapText, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { CatalogSnapshot, ProjectDetailSnapshot } from "@contracts";
 import { projectColorPalette } from "@contracts";
@@ -17,6 +17,7 @@ import {
 
 type ProjectUnitsManagerProps = {
   crewMembers: CatalogSnapshot["crewMembers"];
+  focusedUnitId?: string | null;
   onChanged: () => Promise<void> | void;
   projectId: string;
   units: ProjectDetailSnapshot["units"];
@@ -80,7 +81,8 @@ const statusToneMap = {
   cancelled: "critical",
 } as const;
 
-export const ProjectUnitsManager = ({ crewMembers, onChanged, projectId, units }: ProjectUnitsManagerProps) => {
+export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChanged, projectId, units }: ProjectUnitsManagerProps) => {
+  const unitListRef = useRef<HTMLDivElement | null>(null);
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
   const [unitDraft, setUnitDraft] = useState<UnitDraft>(emptyUnitDraft);
@@ -92,6 +94,15 @@ export const ProjectUnitsManager = ({ crewMembers, onChanged, projectId, units }
     () => units.find((unit) => unit.id === editingUnitId) ?? null,
     [editingUnitId, units],
   );
+
+  useEffect(() => {
+    if (!focusedUnitId || !unitListRef.current) {
+      return;
+    }
+
+    const focusedUnit = unitListRef.current.querySelector<HTMLElement>(`[data-unit-id="${focusedUnitId}"]`);
+    focusedUnit?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [focusedUnitId]);
 
   const beginCreate = () => {
     setEditorMode("create");
@@ -248,13 +259,17 @@ export const ProjectUnitsManager = ({ crewMembers, onChanged, projectId, units }
     >
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
-      <div className="project-unit-list">
+      <div ref={unitListRef} className="project-unit-list">
         {units.map((unit) => {
           const crewDraft = crewDrafts[unit.id] ?? emptyCrewDraft;
           const statusTone = statusToneMap[unit.status as keyof typeof statusToneMap] ?? "neutral";
 
           return (
-            <div key={unit.id} className="project-unit-card">
+            <div
+              key={unit.id}
+              className={`project-unit-card${focusedUnitId === unit.id ? " project-unit-card-active" : ""}`}
+              data-unit-id={unit.id}
+            >
               <div className="project-unit-header">
                 <div className="identity-cell">
                   <div className="project-unit-title-row">
