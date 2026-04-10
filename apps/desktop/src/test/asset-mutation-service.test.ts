@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { foundationMigrationSql } from "@db";
 
+import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "../../electron/main/services/data/adminFoundationBootstrap";
 import { createAssetMutationService } from "../../electron/main/services/data/assetMutationService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { seedFoundationData } from "../../electron/main/services/data/foundationSeed";
@@ -19,9 +20,11 @@ const createTempDatabase = () => {
 
   database.exec("PRAGMA foreign_keys = ON;");
   database.exec(foundationMigrationSql);
+  applyAdminFoundationMigration(database);
   seedFoundationData(database);
   ensureProjectShellDefaults(database);
   bootstrapLegacyRentmanDemo(database);
+  bootstrapAdminFoundation(database);
 
   return { database, databasePath };
 };
@@ -85,6 +88,85 @@ describe("asset mutation service", () => {
       .prepare("SELECT COUNT(*) AS count FROM sync_outbox WHERE entity_id = ?")
       .get("asset-legacy-rentman-1") as { count: number };
     expect(outboxCount.count).toBeGreaterThanOrEqual(2);
+
+    database.close();
+    fs.unlinkSync(databasePath);
+  });
+
+  it("creates, updates and archives editable assets with scan-ready codes", () => {
+    const { database, databasePath } = createTempDatabase();
+    const reads = createFoundationReadService(database);
+    const mutations = createAssetMutationService(database);
+
+    const createResult = mutations.createAsset({
+      commandId: "cmd-test-asset-create",
+      workspaceId: "workspace-metadata",
+      name: "Cart battery charger",
+      internalCode: "POWER-001",
+      categoryId: "cat-lighting",
+      brand: "Anton Bauer",
+      model: "Quad",
+      serialNumber: "AB-QUAD-01",
+      description: "Charging station for cart batteries.",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      notes: "Created from admin foundation coverage.",
+      replacementValue: 640,
+      ownershipType: "owned",
+      qrCodeValue: "POWER-001-QR",
+      isActive: true,
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(createResult.repeated).toBe(false);
+
+    let detail = reads.getAssetDetail(createResult.assetId);
+    expect(detail.asset?.code).toBe("POWER-001");
+    expect(detail.editor?.primaryCodeValue).toBe("POWER-001-QR");
+    expect(detail.scannableCodes[0]?.codeValue).toBe("POWER-001-QR");
+
+    const legacyBefore = reads.getAssetDetail("asset-legacy-rentman-1");
+
+    const updateResult = mutations.updateAsset({
+      commandId: "cmd-test-asset-update",
+      workspaceId: "workspace-metadata",
+      assetId: "asset-legacy-rentman-1",
+      name: `${legacyBefore.asset!.name} Updated`,
+      internalCode: legacyBefore.editor!.internalCode,
+      categoryId: legacyBefore.editor!.categoryId,
+      brand: "Legacy Updated",
+      model: legacyBefore.editor!.model,
+      serialNumber: legacyBefore.editor!.serialNumber,
+      description: "Legacy item updated from admin test.",
+      defaultLocationId: legacyBefore.editor!.defaultLocationId ?? undefined,
+      conditionStatus: "Review",
+      notes: "Updated from test coverage.",
+      replacementValue: 180,
+      ownershipType: "owned",
+      qrCodeValue: "LEGACY-UPDATED-QR",
+      isActive: true,
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(updateResult.repeated).toBe(false);
+
+    detail = reads.getAssetDetail("asset-legacy-rentman-1");
+    expect(detail.asset?.condition).toBe("Review");
+    expect(detail.editor?.brand).toBe("Legacy Updated");
+    expect(detail.editor?.primaryCodeValue).toBe("LEGACY-UPDATED-QR");
+
+    const archiveResult = mutations.archiveAsset({
+      commandId: "cmd-test-asset-archive",
+      workspaceId: "workspace-metadata",
+      assetId: createResult.assetId,
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(archiveResult.repeated).toBe(false);
+    expect(reads.getAssets().some((asset) => asset.id === createResult.assetId)).toBe(false);
 
     database.close();
     fs.unlinkSync(databasePath);

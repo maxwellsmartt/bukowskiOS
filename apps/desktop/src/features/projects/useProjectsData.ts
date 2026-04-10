@@ -1,3 +1,4 @@
+import type { CreateCatalogEntityInput, DeleteCatalogEntityInput, UpdateCatalogEntityInput } from "@contracts";
 import type { CatalogSnapshot, ProjectCardRow, ProjectDetailSnapshot } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 import { useShellContext } from "@shared/hooks/useShellContext";
@@ -8,6 +9,11 @@ const emptyCatalog: CatalogSnapshot = {
   locations: [],
   departments: [],
   users: [],
+  crewMembers: [],
+  clients: [],
+  categories: [],
+  kits: [],
+  assetOptions: [],
 };
 
 const emptyProjectDetail: ProjectDetailSnapshot = {
@@ -38,10 +44,14 @@ export const useCatalogData = () =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiProjects) {
+        if (window.bukowskiCatalog) {
+          return window.bukowskiCatalog.getSnapshot();
+        }
+
         return emptyCatalog;
       }
 
-      return window.bukowskiProjects.getCatalog();
+      return window.bukowskiCatalog ? window.bukowskiCatalog.getSnapshot() : window.bukowskiProjects.getCatalog();
     },
     emptyCatalog,
     [],
@@ -59,3 +69,27 @@ export const useProjectDetail = (projectId: string | null) =>
     emptyProjectDetail,
     [projectId],
   );
+
+export const createCatalogEntity = async (input: CreateCatalogEntityInput): Promise<CatalogSnapshot> => {
+  if (!window.bukowskiCatalog) {
+    throw new Error("Catalog bridge unavailable");
+  }
+
+  return window.bukowskiCatalog.create(input);
+};
+
+export const updateCatalogEntity = async (input: UpdateCatalogEntityInput): Promise<CatalogSnapshot> => {
+  if (!window.bukowskiCatalog) {
+    throw new Error("Catalog bridge unavailable");
+  }
+
+  return window.bukowskiCatalog.update(input);
+};
+
+export const deleteCatalogEntity = async (input: DeleteCatalogEntityInput): Promise<CatalogSnapshot> => {
+  if (!window.bukowskiCatalog) {
+    throw new Error("Catalog bridge unavailable");
+  }
+
+  return window.bukowskiCatalog.remove(input);
+};

@@ -2,6 +2,7 @@ import { ArrowRightLeft, PackagePlus, X } from "lucide-react";
 import { useState } from "react";
 
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
+import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 
 export type AssetAssignMoveFormValue = {
@@ -104,42 +105,38 @@ export const AssetAssignMovePanel = ({
           <>
             <label className="action-field">
               <span className="action-field-label">Project</span>
-              <select className="action-field-control" onChange={(event) => setProjectId(event.target.value)} value={projectId}>
+              <SelectField onChange={(event) => setProjectId(event.target.value)} value={projectId}>
                 <option value="">No project</option>
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.code} · {project.name}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
 
             <label className="action-field">
               <span className="action-field-label">Responsible</span>
-              <select
-                className="action-field-control"
-                onChange={(event) => setAssignedToUserId(event.target.value)}
-                value={assignedToUserId}
-              >
+              <SelectField onChange={(event) => setAssignedToUserId(event.target.value)} value={assignedToUserId}>
                 <option value="">Unassigned</option>
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.fullName}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
 
             <label className="action-field">
               <span className="action-field-label">Department</span>
-              <select className="action-field-control" onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
+              <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
                 <option value="">No department</option>
                 {departments.map((department) => (
                   <option key={department.id} value={department.id}>
                     {department.code} · {department.name}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
 
             <label className="action-field">
@@ -156,14 +153,14 @@ export const AssetAssignMovePanel = ({
 
         <label className="action-field">
           <span className="action-field-label">Target location</span>
-          <select className="action-field-control" onChange={(event) => setTargetLocationId(event.target.value)} value={targetLocationId}>
+          <SelectField onChange={(event) => setTargetLocationId(event.target.value)} value={targetLocationId}>
             <option value="">{mode === "assign" ? "Keep current location" : "Choose destination"}</option>
             {locations.map((location) => (
               <option key={location.id} value={location.id}>
                 {location.code} · {location.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="action-field action-field-wide">

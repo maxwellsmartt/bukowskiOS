@@ -6,6 +6,8 @@ import { foundationMigrationSql } from "@db";
 
 import { createFoundationReadService, type FoundationReadService } from "./foundationReadService";
 import { createAssetMutationService } from "./assetMutationService";
+import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
+import { createCatalogMutationService } from "./catalogMutationService";
 import { createIncidentMutationService } from "./incidentMutationService";
 import { createPackingMutationService } from "./packingMutationService";
 import { seedFoundationData } from "./foundationSeed";
@@ -13,6 +15,7 @@ import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
 import { createProjectMutationService, ensureProjectShellDefaults } from "./projectMutationService";
 
 type ProjectMutationService = ReturnType<typeof createProjectMutationService>;
+type CatalogMutationService = ReturnType<typeof createCatalogMutationService>;
 type AssetMutationService = ReturnType<typeof createAssetMutationService>;
 type IncidentMutationService = ReturnType<typeof createIncidentMutationService>;
 type PackingMutationService = ReturnType<typeof createPackingMutationService>;
@@ -22,6 +25,7 @@ type LocalDatabaseRuntime = {
   databasePath: string;
   foundationReads: FoundationReadService;
   projectMutations: ProjectMutationService;
+  catalogMutations: CatalogMutationService;
   assetMutations: AssetMutationService;
   incidentMutations: IncidentMutationService;
   packingMutations: PackingMutationService;
@@ -36,15 +40,18 @@ const createRuntime = (): LocalDatabaseRuntime => {
   database.exec("PRAGMA journal_mode = WAL;");
   database.exec("PRAGMA foreign_keys = ON;");
   database.exec(foundationMigrationSql);
+  applyAdminFoundationMigration(database);
   seedFoundationData(database);
   ensureProjectShellDefaults(database);
   bootstrapLegacyRentmanDemo(database);
+  bootstrapAdminFoundation(database);
 
   return {
     database,
     databasePath,
     foundationReads: createFoundationReadService(database),
     projectMutations: createProjectMutationService(database),
+    catalogMutations: createCatalogMutationService(database),
     assetMutations: createAssetMutationService(database),
     incidentMutations: createIncidentMutationService(database),
     packingMutations: createPackingMutationService(database),

@@ -65,3 +65,50 @@ export type AssignMoveAssetsResult = {
   repeated: boolean;
   summary: string;
 };
+
+export type AssetEditorInput = {
+  name: string;
+  internalCode: string;
+  categoryId: string;
+  brand?: string;
+  model?: string;
+  serialNumber?: string;
+  description?: string;
+  defaultLocationId?: string;
+  conditionStatus: string;
+  notes?: string;
+  replacementValue?: number;
+  ownershipType?: string;
+  qrCodeValue?: string;
+  isActive?: boolean;
+};
+
+export type CreateAssetCommand = AssetEditorInput & {
+  commandId: string;
+  workspaceId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+};
+
+export type UpdateAssetCommand = AssetEditorInput & {
+  commandId: string;
+  workspaceId: string;
+  assetId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+};
+
+export type ArchiveAssetCommand = {
+  commandId: string;
+  workspaceId: string;
+  assetId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+};
+
+export type AssetEditorMutationResult = {
+  commandId: string;
+  assetId: string;
+  repeated: boolean;
+  summary: string;
+};

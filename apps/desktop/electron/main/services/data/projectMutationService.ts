@@ -58,6 +58,70 @@ const ensureValue = (value: string, label: string) => {
   return nextValue;
 };
 
+const resolveClientReference = (db: DatabaseSync, input: { clientId?: string; clientName?: string }) => {
+  const directClientId = input.clientId?.trim();
+
+  if (directClientId) {
+    const existingClient = db
+      .prepare("SELECT id, name FROM clients WHERE id = ? LIMIT 1")
+      .get(directClientId) as { id: string; name: string } | undefined;
+
+    if (!existingClient) {
+      throw new Error("Selected client was not found.");
+    }
+
+    return existingClient;
+  }
+
+  const clientName = input.clientName?.trim();
+
+  if (!clientName) {
+    return null;
+  }
+
+  const existingClient = db
+    .prepare(
+      `
+        SELECT id, name
+        FROM clients
+        WHERE workspace_id = ?
+          AND lower(name) = lower(?)
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, clientName) as { id: string; name: string } | undefined;
+
+  if (existingClient) {
+    return existingClient;
+  }
+
+  const clientId = `client-${slugify(clientName)}-${Date.now().toString(36)}`;
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `
+      INSERT INTO clients (
+        id,
+        workspace_id,
+        name,
+        contact_name,
+        email,
+        phone,
+        notes,
+        is_active,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, NULL, NULL, NULL, 'Created from project flow.', 1, ?, ?)
+    `,
+  ).run(clientId, workspaceId, clientName, now, now);
+
+  return {
+    id: clientId,
+    name: clientName,
+  };
+};
+
 const assertCodeAvailability = (db: DatabaseSync, code: string, currentProjectId?: string) => {
   const existingProject = db
     .prepare(
@@ -149,6 +213,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
     const code = ensureValue(input.code, "Project code").toUpperCase();
     const name = ensureValue(input.name, "Project name");
     const now = new Date().toISOString();
+    const client = resolveClientReference(db, input);
 
     assertCodeAvailability(db, code);
 
@@ -161,6 +226,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
           workspace_id,
           code,
           name,
+          client_id,
           client_name,
           status,
           start_date,
@@ -169,14 +235,15 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
       `,
     ).run(
       projectId,
       workspaceId,
       code,
       name,
-      input.clientName?.trim() || null,
+      client?.id ?? null,
+      client?.name ?? input.clientName?.trim() ?? null,
       input.status?.trim() || "Prep",
       input.description?.trim() || "Project created from the sidebar shell.",
       now,
@@ -188,6 +255,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
     const code = ensureValue(input.code, "Project code").toUpperCase();
     const name = ensureValue(input.name, "Project name");
     const now = new Date().toISOString();
+    const client = resolveClientReference(db, input);
 
     assertCodeAvailability(db, code, input.projectId);
 
@@ -197,6 +265,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
         SET
           code = ?,
           name = ?,
+          client_id = ?,
           client_name = ?,
           status = ?,
           description = ?,
@@ -206,7 +275,8 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
     ).run(
       code,
       name,
-      input.clientName?.trim() || null,
+      client?.id ?? null,
+      client?.name ?? input.clientName?.trim() ?? null,
       input.status?.trim() || "Prep",
       input.description?.trim() || null,
       now,

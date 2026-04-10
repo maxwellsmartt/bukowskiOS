@@ -2,15 +2,20 @@ import { contextBridge, ipcRenderer } from "electron";
 
 import { ipcChannels } from "@contracts/ipc/channels";
 import type {
+  ArchiveAssetCommand,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppInfo,
   AssetDetailSnapshot,
+  AssetEditorMutationResult,
   AssetListRow,
   CatalogSnapshot,
+  CreateAssetCommand,
+  CreateCatalogEntityInput,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
   CreateProjectInput,
+  DeleteCatalogEntityInput,
   DeleteProjectInput,
   FinanceCostLinkRow,
   FinanceEntryRow,
@@ -26,6 +31,8 @@ import type {
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
   ShellBootstrap,
+  UpdateAssetCommand,
+  UpdateCatalogEntityInput,
   UpdateProjectInput,
 } from "@contracts";
 
@@ -47,6 +54,12 @@ const bukowskiAssets = {
     ipcRenderer.invoke(ipcChannels.assets.getDetail, assetId) as Promise<AssetDetailSnapshot>,
   assignMove: (input: AssignMoveAssetsInput) =>
     ipcRenderer.invoke(ipcChannels.assets.assignMove, input) as Promise<AssignMoveAssetsResult>,
+  create: (input: CreateAssetCommand) =>
+    ipcRenderer.invoke(ipcChannels.assets.create, input) as Promise<AssetEditorMutationResult>,
+  update: (input: UpdateAssetCommand) =>
+    ipcRenderer.invoke(ipcChannels.assets.update, input) as Promise<AssetEditorMutationResult>,
+  archive: (input: ArchiveAssetCommand) =>
+    ipcRenderer.invoke(ipcChannels.assets.archive, input) as Promise<AssetEditorMutationResult>,
 };
 
 const bukowskiPacking = {
@@ -80,6 +93,13 @@ const bukowskiFinance = {
   getEntries: () => ipcRenderer.invoke(ipcChannels.finance.getEntries) as Promise<FinanceEntryRow[]>,
 };
 
+const bukowskiCatalog = {
+  getSnapshot: () => ipcRenderer.invoke(ipcChannels.catalog.getSnapshot) as Promise<CatalogSnapshot>,
+  create: (input: CreateCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.create, input) as Promise<CatalogSnapshot>,
+  update: (input: UpdateCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.update, input) as Promise<CatalogSnapshot>,
+  remove: (input: DeleteCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.delete, input) as Promise<CatalogSnapshot>,
+};
+
 contextBridge.exposeInMainWorld("bukowskiApp", bukowskiApp);
 contextBridge.exposeInMainWorld("bukowskiShell", bukowskiShell);
 contextBridge.exposeInMainWorld("bukowskiOverview", bukowskiOverview);
@@ -88,3 +108,4 @@ contextBridge.exposeInMainWorld("bukowskiPacking", bukowskiPacking);
 contextBridge.exposeInMainWorld("bukowskiIncidents", bukowskiIncidents);
 contextBridge.exposeInMainWorld("bukowskiProjects", bukowskiProjects);
 contextBridge.exposeInMainWorld("bukowskiFinance", bukowskiFinance);
+contextBridge.exposeInMainWorld("bukowskiCatalog", bukowskiCatalog);

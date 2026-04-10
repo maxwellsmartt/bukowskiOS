@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { foundationMigrationSql } from "@db";
 
+import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "../../electron/main/services/data/adminFoundationBootstrap";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createIncidentMutationService } from "../../electron/main/services/data/incidentMutationService";
 import { bootstrapLegacyRentmanDemo } from "../../electron/main/services/data/legacyRentmanDemo";
@@ -19,9 +20,11 @@ const createTempDatabase = () => {
 
   database.exec("PRAGMA foreign_keys = ON;");
   database.exec(foundationMigrationSql);
+  applyAdminFoundationMigration(database);
   seedFoundationData(database);
   ensureProjectShellDefaults(database);
   bootstrapLegacyRentmanDemo(database);
+  bootstrapAdminFoundation(database);
 
   return { database, databasePath };
 };

@@ -1,6 +1,15 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import type { AssignMoveAssetsInput, AssignMoveAssetsResult } from "@contracts";
+import type {
+  ArchiveAssetCommand,
+  AssetEditorMutationResult,
+  AssignMoveAssetsInput,
+  AssignMoveAssetsResult,
+  CreateAssetCommand,
+  UpdateAssetCommand,
+} from "@contracts";
+
+import { createCodeGenerationService } from "./codeGenerationService";
 
 const defaultActorUserId = "user-ops";
 
@@ -18,6 +27,11 @@ type AssetStateRow = {
 };
 
 type NamedEntityRow = {
+  id: string;
+  name: string;
+};
+
+type CategoryEntityRow = {
   id: string;
   name: string;
 };
@@ -45,6 +59,24 @@ const loadNamedEntities = (
       `,
     )
     .all(...values) as NamedEntityRow[];
+
+  return new Map(rows.map((row) => [row.id, row.name]));
+};
+
+const loadCategoryEntities = (db: DatabaseSync, values: string[]) => {
+  if (!values.length) {
+    return new Map<string, string>();
+  }
+
+  const rows = db
+    .prepare(
+      `
+        SELECT id, name
+        FROM asset_categories
+        WHERE id IN (${createPlaceholders(values)})
+      `,
+    )
+    .all(...values) as CategoryEntityRow[];
 
   return new Map(rows.map((row) => [row.id, row.name]));
 };
@@ -104,6 +136,44 @@ const summarizeResult = (eventType: "assigned" | "moved", processedCount: number
   return eventType === "assigned"
     ? `${processedCount} ${assetLabel} updated through assignment flow.`
     : `${processedCount} ${assetLabel} moved successfully.`;
+};
+
+const ensureInternalCodeAvailable = (db: DatabaseSync, workspaceId: string, internalCode: string, currentAssetId?: string) => {
+  const existing = db
+    .prepare(
+      `
+        SELECT id
+        FROM assets
+        WHERE workspace_id = ?
+          AND internal_code = ?
+          AND (? IS NULL OR id != ?)
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, internalCode, currentAssetId ?? null, currentAssetId ?? null) as { id: string } | undefined;
+
+  if (existing) {
+    throw new Error(`Registry code ${internalCode} is already in use.`);
+  }
+};
+
+const ensureAssetEditableReferences = (
+  db: DatabaseSync,
+  categoryId: string,
+  locationId?: string,
+) => {
+  const categoryMap = loadCategoryEntities(db, uniqueValues([categoryId]));
+  ensureEntityExists(categoryId, "Category", categoryMap);
+
+  if (locationId) {
+    const locationMap = loadNamedEntities(db, "locations", uniqueValues([locationId]));
+    ensureEntityExists(locationId, "Default location", locationMap);
+  }
+};
+
+const normalizeOptionalText = (value?: string) => {
+  const trimmedValue = value?.trim();
+  return trimmedValue ? trimmedValue : null;
 };
 
 export const createAssetMutationService = (db: DatabaseSync) => ({
@@ -490,6 +560,696 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         error instanceof Error ? error.message : "Unknown asset mutation error",
       );
 
+      throw error;
+    }
+  },
+
+  createAsset(input: CreateAssetCommand): AssetEditorMutationResult {
+    const existingReceipt = db
+      .prepare("SELECT outcome_status FROM command_receipts WHERE command_id = ? LIMIT 1")
+      .get(input.commandId) as { outcome_status: string } | undefined;
+
+    if (existingReceipt?.outcome_status === "success") {
+      const existingAssetId = db
+        .prepare("SELECT entity_id FROM sync_outbox WHERE id = ? LIMIT 1")
+        .get(`outbox-event-${input.commandId}`) as { entity_id: string } | undefined;
+
+      return {
+        commandId: input.commandId,
+        assetId: existingAssetId?.entity_id ?? "unknown-asset",
+        repeated: true,
+        summary: "This asset create command was already applied.",
+      };
+    }
+
+    const assetName = input.name.trim();
+    const internalCode = input.internalCode.trim().toUpperCase();
+    const now = new Date().toISOString();
+    const assetId = `asset-${internalCode.toLowerCase()}-${Date.now().toString(36)}`;
+    const eventId = `event-${input.commandId}`;
+    const codeService = createCodeGenerationService(db);
+
+    if (!assetName) {
+      throw new Error("Asset name is required.");
+    }
+
+    ensureInternalCodeAvailable(db, input.workspaceId, internalCode);
+    ensureAssetEditableReferences(db, input.categoryId, input.defaultLocationId ?? undefined);
+
+    db.exec("BEGIN");
+
+    try {
+      const primaryCode = codeService.ensurePrimaryCode({
+        workspaceId: input.workspaceId,
+        entityType: "asset",
+        entityId: assetId,
+        preferredCodeValue: input.qrCodeValue?.trim() || `AST-${internalCode}`,
+      });
+
+      db.prepare(
+        `
+          INSERT INTO assets (
+            id,
+            workspace_id,
+            category_id,
+            name,
+            brand,
+            model,
+            serial_number,
+            internal_code,
+            description,
+            replacement_value,
+            ownership_type,
+            default_location_id,
+            qr_code_value,
+            notes,
+            is_active,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      ).run(
+        assetId,
+        input.workspaceId,
+        input.categoryId,
+        assetName,
+        normalizeOptionalText(input.brand),
+        normalizeOptionalText(input.model),
+        normalizeOptionalText(input.serialNumber),
+        internalCode,
+        normalizeOptionalText(input.description),
+        typeof input.replacementValue === "number" ? input.replacementValue : null,
+        normalizeOptionalText(input.ownershipType) ?? "owned",
+        input.defaultLocationId?.trim() || null,
+        primaryCode.codeValue,
+        normalizeOptionalText(input.notes),
+        input.isActive === false ? 0 : 1,
+        now,
+        now,
+      );
+
+      const metadataJson = JSON.stringify({
+        kind: "asset_created",
+        internalCode,
+        categoryId: input.categoryId,
+        defaultLocationId: input.defaultLocationId?.trim() || null,
+        primaryCodeValue: primaryCode.codeValue,
+      });
+
+      db.prepare(
+        `
+          INSERT INTO asset_events (
+            id,
+            workspace_id,
+            asset_id,
+            assignment_id,
+            project_id,
+            department_id,
+            performed_by_user_id,
+            event_type,
+            location_id,
+            from_location_id,
+            to_location_id,
+            event_timestamp,
+            command_id,
+            actor_type,
+            source_channel,
+            notes,
+            metadata_json,
+            created_at
+          )
+          VALUES (?, ?, ?, NULL, NULL, NULL, ?, 'asset_created', ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      ).run(
+        eventId,
+        input.workspaceId,
+        assetId,
+        defaultActorUserId,
+        input.defaultLocationId?.trim() || null,
+        input.defaultLocationId?.trim() || null,
+        now,
+        input.commandId,
+        input.actorType,
+        input.sourceChannel,
+        `Created asset ${assetName}.`,
+        metadataJson,
+        now,
+      );
+
+      db.prepare(
+        `
+          INSERT INTO asset_current_state (
+            asset_id,
+            workspace_id,
+            current_location_id,
+            current_project_id,
+            current_department_id,
+            current_responsible_user_id,
+            active_assignment_id,
+            condition_status,
+            operational_status,
+            custody_status,
+            last_event_id,
+            version,
+            updated_at
+          )
+          VALUES (?, ?, ?, NULL, NULL, NULL, NULL, ?, 'available', 'available', ?, 1, ?)
+        `,
+      ).run(
+        assetId,
+        input.workspaceId,
+        input.defaultLocationId?.trim() || null,
+        input.conditionStatus.trim() || "Good",
+        eventId,
+        now,
+      );
+
+      db.prepare(
+        `
+          INSERT INTO sync_outbox (
+            id,
+            workspace_id,
+            entity_type,
+            entity_id,
+            event_id,
+            operation_type,
+            payload_json,
+            status,
+            attempt_count,
+            last_error,
+            next_retry_at,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, 'asset_event', ?, ?, 'upsert', ?, 'pending', 0, NULL, NULL, ?, ?)
+        `,
+      ).run(`outbox-${eventId}`, input.workspaceId, assetId, eventId, metadataJson, now, now);
+
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'success', NULL)
+        `,
+      ).run(input.commandId, input.workspaceId, defaultActorUserId, input.actorType, input.sourceChannel, now);
+
+      db.exec("COMMIT");
+
+      return {
+        commandId: input.commandId,
+        assetId,
+        repeated: false,
+        summary: `Created ${assetName} in the live registry.`,
+      };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)
+        `,
+      ).run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        error instanceof Error ? error.message : "Unknown asset create error",
+      );
+      throw error;
+    }
+  },
+
+  updateAsset(input: UpdateAssetCommand): AssetEditorMutationResult {
+    const existingReceipt = db
+      .prepare("SELECT outcome_status FROM command_receipts WHERE command_id = ? LIMIT 1")
+      .get(input.commandId) as { outcome_status: string } | undefined;
+
+    if (existingReceipt?.outcome_status === "success") {
+      return {
+        commandId: input.commandId,
+        assetId: input.assetId,
+        repeated: true,
+        summary: "This asset update command was already applied.",
+      };
+    }
+
+    const assetName = input.name.trim();
+    const internalCode = input.internalCode.trim().toUpperCase();
+    const now = new Date().toISOString();
+    const eventId = `event-${input.commandId}`;
+    const codeService = createCodeGenerationService(db);
+
+    if (!assetName) {
+      throw new Error("Asset name is required.");
+    }
+
+    const assetRow = db
+      .prepare(
+        `
+          SELECT
+            assets.id,
+            assets.name,
+            asset_current_state.version,
+            asset_current_state.current_location_id,
+            asset_current_state.current_project_id,
+            asset_current_state.current_department_id,
+            asset_current_state.current_responsible_user_id,
+            asset_current_state.active_assignment_id,
+            asset_current_state.custody_status,
+            asset_current_state.operational_status
+          FROM assets
+          JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+          WHERE assets.id = ?
+          LIMIT 1
+        `,
+      )
+      .get(input.assetId) as
+      | {
+          id: string;
+          name: string;
+          version: number;
+          current_location_id: string | null;
+          current_project_id: string | null;
+          current_department_id: string | null;
+          current_responsible_user_id: string | null;
+          active_assignment_id: string | null;
+          custody_status: string;
+          operational_status: string;
+        }
+      | undefined;
+
+    if (!assetRow) {
+      throw new Error("Asset not found.");
+    }
+
+    ensureInternalCodeAvailable(db, input.workspaceId, internalCode, input.assetId);
+    ensureAssetEditableReferences(db, input.categoryId, input.defaultLocationId ?? undefined);
+
+    db.exec("BEGIN");
+
+    try {
+      const primaryCode = codeService.ensurePrimaryCode({
+        workspaceId: input.workspaceId,
+        entityType: "asset",
+        entityId: input.assetId,
+        preferredCodeValue: input.qrCodeValue?.trim() || `AST-${internalCode}`,
+      });
+
+      db.prepare(
+        `
+          UPDATE assets
+          SET
+            category_id = ?,
+            name = ?,
+            brand = ?,
+            model = ?,
+            serial_number = ?,
+            internal_code = ?,
+            description = ?,
+            replacement_value = ?,
+            ownership_type = ?,
+            default_location_id = ?,
+            qr_code_value = ?,
+            notes = ?,
+            is_active = ?,
+            updated_at = ?
+          WHERE id = ?
+        `,
+      ).run(
+        input.categoryId,
+        assetName,
+        normalizeOptionalText(input.brand),
+        normalizeOptionalText(input.model),
+        normalizeOptionalText(input.serialNumber),
+        internalCode,
+        normalizeOptionalText(input.description),
+        typeof input.replacementValue === "number" ? input.replacementValue : null,
+        normalizeOptionalText(input.ownershipType) ?? "owned",
+        input.defaultLocationId?.trim() || null,
+        primaryCode.codeValue,
+        normalizeOptionalText(input.notes),
+        input.isActive === false ? 0 : 1,
+        now,
+        input.assetId,
+      );
+
+      const metadataJson = JSON.stringify({
+        kind: "asset_profile_updated",
+        internalCode,
+        categoryId: input.categoryId,
+        defaultLocationId: input.defaultLocationId?.trim() || null,
+        primaryCodeValue: primaryCode.codeValue,
+      });
+
+      db.prepare(
+        `
+          INSERT INTO asset_events (
+            id,
+            workspace_id,
+            asset_id,
+            assignment_id,
+            project_id,
+            department_id,
+            performed_by_user_id,
+            event_type,
+            location_id,
+            from_location_id,
+            to_location_id,
+            event_timestamp,
+            command_id,
+            actor_type,
+            source_channel,
+            notes,
+            metadata_json,
+            created_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'status_changed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      ).run(
+        eventId,
+        input.workspaceId,
+        input.assetId,
+        assetRow.active_assignment_id,
+        assetRow.current_project_id,
+        assetRow.current_department_id,
+        defaultActorUserId,
+        assetRow.current_location_id,
+        assetRow.current_location_id,
+        assetRow.current_location_id,
+        now,
+        input.commandId,
+        input.actorType,
+        input.sourceChannel,
+        `Updated ${assetName} profile fields and scan metadata.`,
+        metadataJson,
+        now,
+      );
+
+      db.prepare(
+        `
+          UPDATE asset_current_state
+          SET
+            condition_status = ?,
+            last_event_id = ?,
+            version = ?,
+            updated_at = ?
+          WHERE asset_id = ?
+        `,
+      ).run(input.conditionStatus.trim() || "Good", eventId, assetRow.version + 1, now, input.assetId);
+
+      db.prepare(
+        `
+          INSERT INTO sync_outbox (
+            id,
+            workspace_id,
+            entity_type,
+            entity_id,
+            event_id,
+            operation_type,
+            payload_json,
+            status,
+            attempt_count,
+            last_error,
+            next_retry_at,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, 'asset_event', ?, ?, 'upsert', ?, 'pending', 0, NULL, NULL, ?, ?)
+        `,
+      ).run(`outbox-${eventId}`, input.workspaceId, input.assetId, eventId, metadataJson, now, now);
+
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'success', NULL)
+        `,
+      ).run(input.commandId, input.workspaceId, defaultActorUserId, input.actorType, input.sourceChannel, now);
+
+      db.exec("COMMIT");
+
+      return {
+        commandId: input.commandId,
+        assetId: input.assetId,
+        repeated: false,
+        summary: `Updated ${assetName}.`,
+      };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)
+        `,
+      ).run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        error instanceof Error ? error.message : "Unknown asset update error",
+      );
+      throw error;
+    }
+  },
+
+  archiveAsset(input: ArchiveAssetCommand): AssetEditorMutationResult {
+    const existingReceipt = db
+      .prepare("SELECT outcome_status FROM command_receipts WHERE command_id = ? LIMIT 1")
+      .get(input.commandId) as { outcome_status: string } | undefined;
+
+    if (existingReceipt?.outcome_status === "success") {
+      return {
+        commandId: input.commandId,
+        assetId: input.assetId,
+        repeated: true,
+        summary: "This asset archive command was already applied.",
+      };
+    }
+
+    const now = new Date().toISOString();
+    const eventId = `event-${input.commandId}`;
+    const assetRow = db
+      .prepare(
+        `
+          SELECT
+            assets.id,
+            assets.name,
+            assets.is_active,
+            asset_current_state.version,
+            asset_current_state.current_location_id,
+            asset_current_state.current_project_id,
+            asset_current_state.current_department_id,
+            asset_current_state.current_responsible_user_id,
+            asset_current_state.active_assignment_id,
+            asset_current_state.custody_status
+          FROM assets
+          JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+          WHERE assets.id = ?
+          LIMIT 1
+        `,
+      )
+      .get(input.assetId) as
+      | {
+          id: string;
+          name: string;
+          is_active: number;
+          version: number;
+          current_location_id: string | null;
+          current_project_id: string | null;
+          current_department_id: string | null;
+          current_responsible_user_id: string | null;
+          active_assignment_id: string | null;
+          custody_status: string;
+        }
+      | undefined;
+
+    if (!assetRow) {
+      throw new Error("Asset not found.");
+    }
+
+    if (!assetRow.is_active) {
+      return {
+        commandId: input.commandId,
+        assetId: input.assetId,
+        repeated: false,
+        summary: `${assetRow.name} is already archived.`,
+      };
+    }
+
+    if (assetRow.active_assignment_id || assetRow.custody_status !== "available") {
+      throw new Error("This asset is still operationally assigned or checked out and cannot be archived.");
+    }
+
+    db.exec("BEGIN");
+
+    try {
+      db.prepare("UPDATE assets SET is_active = 0, updated_at = ? WHERE id = ?").run(now, input.assetId);
+
+      const metadataJson = JSON.stringify({
+        kind: "asset_archived",
+      });
+
+      db.prepare(
+        `
+          INSERT INTO asset_events (
+            id,
+            workspace_id,
+            asset_id,
+            assignment_id,
+            project_id,
+            department_id,
+            performed_by_user_id,
+            event_type,
+            location_id,
+            from_location_id,
+            to_location_id,
+            event_timestamp,
+            command_id,
+            actor_type,
+            source_channel,
+            notes,
+            metadata_json,
+            created_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'status_changed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      ).run(
+        eventId,
+        input.workspaceId,
+        input.assetId,
+        null,
+        assetRow.current_project_id,
+        assetRow.current_department_id,
+        defaultActorUserId,
+        assetRow.current_location_id,
+        assetRow.current_location_id,
+        assetRow.current_location_id,
+        now,
+        input.commandId,
+        input.actorType,
+        input.sourceChannel,
+        `Archived ${assetRow.name} from the active registry.`,
+        metadataJson,
+        now,
+      );
+
+      db.prepare(
+        `
+          UPDATE asset_current_state
+          SET last_event_id = ?, version = ?, updated_at = ?
+          WHERE asset_id = ?
+        `,
+      ).run(eventId, assetRow.version + 1, now, input.assetId);
+
+      db.prepare(
+        `
+          INSERT INTO sync_outbox (
+            id,
+            workspace_id,
+            entity_type,
+            entity_id,
+            event_id,
+            operation_type,
+            payload_json,
+            status,
+            attempt_count,
+            last_error,
+            next_retry_at,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, 'asset_event', ?, ?, 'upsert', ?, 'pending', 0, NULL, NULL, ?, ?)
+        `,
+      ).run(`outbox-${eventId}`, input.workspaceId, input.assetId, eventId, metadataJson, now, now);
+
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'success', NULL)
+        `,
+      ).run(input.commandId, input.workspaceId, defaultActorUserId, input.actorType, input.sourceChannel, now);
+
+      db.exec("COMMIT");
+
+      return {
+        commandId: input.commandId,
+        assetId: input.assetId,
+        repeated: false,
+        summary: `${assetRow.name} archived from the live registry.`,
+      };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      db.prepare(
+        `
+          INSERT OR REPLACE INTO command_receipts (
+            command_id,
+            workspace_id,
+            actor_user_id,
+            actor_type,
+            source_channel,
+            executed_at,
+            outcome_status,
+            error_message
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'failed', ?)
+        `,
+      ).run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        error instanceof Error ? error.message : "Unknown asset archive error",
+      );
       throw error;
     }
   },

@@ -12,6 +12,9 @@ export const ipcChannels = {
     getList: "bukowskiAssets:getList",
     getDetail: "bukowskiAssets:getDetail",
     assignMove: "bukowskiAssets:assignMove",
+    create: "bukowskiAssets:create",
+    update: "bukowskiAssets:update",
+    archive: "bukowskiAssets:archive",
   },
   packing: {
     getList: "bukowskiPacking:getList",
@@ -30,6 +33,12 @@ export const ipcChannels = {
     create: "bukowskiProjects:create",
     update: "bukowskiProjects:update",
     delete: "bukowskiProjects:delete",
+  },
+  catalog: {
+    getSnapshot: "bukowskiCatalog:getSnapshot",
+    create: "bukowskiCatalog:create",
+    update: "bukowskiCatalog:update",
+    delete: "bukowskiCatalog:delete",
   },
   finance: {
     getOverview: "bukowskiFinance:getOverview",

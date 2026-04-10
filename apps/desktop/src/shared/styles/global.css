@@ -296,6 +296,23 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   outline: none;
 }
 
+.shell-project-select-shell {
+  grid-column: 1 / -1;
+}
+
+.shell-project-select {
+  min-height: 28px;
+  border-radius: 8px;
+}
+
+.shell-project-select.select-field-control {
+  padding-right: 30px;
+}
+
+.shell-project-select + .select-field-chevron {
+  right: 10px;
+}
+
 .shell-project-code {
   text-transform: uppercase;
 }
@@ -567,6 +584,13 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   color: var(--text-primary);
 }
 
+.surface-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .selection-action-bar {
   display: flex;
   align-items: center;
@@ -689,6 +713,27 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   outline: none;
 }
 
+.select-field-shell {
+  position: relative;
+}
+
+.select-field-control {
+  width: 100%;
+  padding-right: 36px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.select-field-chevron {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
 .action-textarea {
   min-height: 86px;
   padding: 10px 12px;
@@ -730,6 +775,17 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .action-panel-actions-start {
   justify-content: flex-start;
+}
+
+.catalog-tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.catalog-tab-count {
+  color: var(--text-muted);
+  font-size: 11px;
 }
 
 .metric-grid,
@@ -1018,6 +1074,10 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   gap: var(--space-sm);
 }
 
+.compact-summary-grid {
+  gap: 10px;
+}
+
 .summary-row {
   display: flex;
   flex-direction: column;
@@ -1059,6 +1119,40 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   padding: 0 12px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.022);
+}
+
+.catalog-kit-assets {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.catalog-kit-assets-header {
+  gap: 12px;
+}
+
+.catalog-asset-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(34vh, 280px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.catalog-asset-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.catalog-asset-option.selected {
+  border-color: rgba(92, 153, 255, 0.3);
+  background: rgba(92, 153, 255, 0.08);
 }
 
 .empty-state {

@@ -1,6 +1,7 @@
 export type CreateProjectInput = {
   code: string;
   name: string;
+  clientId?: string;
   clientName?: string;
   status?: string;
   description?: string;
@@ -10,6 +11,7 @@ export type UpdateProjectInput = {
   projectId: string;
   code: string;
   name: string;
+  clientId?: string;
   clientName?: string;
   status?: string;
   description?: string;

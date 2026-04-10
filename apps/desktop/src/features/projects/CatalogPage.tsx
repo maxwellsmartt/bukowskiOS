@@ -1,62 +1,344 @@
-import { useState } from "react";
+import type { ReactNode } from "react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 
+import type { CatalogEntityType, CatalogSnapshot } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
+import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
-import { useCatalogData } from "./useProjectsData";
+import { CatalogEditorPanel } from "./CatalogEditorPanel";
+import { createCatalogEntity, deleteCatalogEntity, updateCatalogEntity, useCatalogData } from "./useProjectsData";
+
+type CatalogTabConfig = {
+  key: CatalogEntityType;
+  label: string;
+  title: string;
+  subtitle: string;
+  rows: Array<Record<string, unknown>>;
+  columns: Array<{
+    key: string;
+    label: string;
+    width?: number;
+    minWidth?: number;
+    align?: "left" | "right";
+    render: (row: Record<string, unknown>) => ReactNode;
+  }>;
+};
+
+const catalogTabOrder: CatalogEntityType[] = ["location", "department", "crew", "client", "kit", "category"];
+
+const emptySelectedState: Record<CatalogEntityType, string | null> = {
+  location: null,
+  department: null,
+  crew: null,
+  client: null,
+  category: null,
+  kit: null,
+};
+
+const singularLabelMap: Record<CatalogEntityType, string> = {
+  location: "location",
+  department: "department",
+  crew: "crew member",
+  client: "client",
+  category: "category",
+  kit: "kit",
+};
 
 export const CatalogPage = () => {
-  const { data, error } = useCatalogData();
+  const { data, error, isLoading, reload } = useCatalogData();
   const sectionScopeLabel = useSectionScopeLabel();
-  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
-  const [selectedDepartmentIds, setSelectedDepartmentIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<CatalogEntityType>("location");
+  const [selectedIds, setSelectedIds] = useState<Record<CatalogEntityType, string | null>>(emptySelectedState);
+  const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
+
+  const tabs = useMemo<CatalogTabConfig[]>(
+    () => [
+      {
+        key: "location",
+        label: "Locations",
+        title: "Locations",
+        subtitle: "Global physical anchors for warehouse, sets, maintenance and return routing.",
+        rows: data.locations as Array<Record<string, unknown>>,
+        columns: [
+          { key: "code", label: "Code", width: 90, minWidth: 76, render: (row) => row.code as string },
+          { key: "name", label: "Name", width: 180, minWidth: 140, render: (row) => row.name as string },
+          { key: "type", label: "Type", width: 120, minWidth: 100, render: (row) => row.type as string },
+          { key: "description", label: "Description", width: 250, minWidth: 180, render: (row) => row.description as string },
+          {
+            key: "status",
+            label: "Status",
+            width: 90,
+            minWidth: 78,
+            render: (row) => <StatusBadge>{(row.isActive as boolean) ? "Active" : "Inactive"}</StatusBadge>,
+          },
+        ],
+      },
+      {
+        key: "department",
+        label: "Departments",
+        title: "Departments",
+        subtitle: "Reusable operational groups for assignments, incidents, packing and project structure.",
+        rows: data.departments as Array<Record<string, unknown>>,
+        columns: [
+          { key: "code", label: "Code", width: 90, minWidth: 76, render: (row) => row.code as string },
+          { key: "name", label: "Name", width: 180, minWidth: 140, render: (row) => row.name as string },
+          { key: "description", label: "Description", width: 260, minWidth: 180, render: (row) => row.description as string },
+          {
+            key: "status",
+            label: "Status",
+            width: 90,
+            minWidth: 78,
+            render: (row) => <StatusBadge>{(row.isActive as boolean) ? "Active" : "Inactive"}</StatusBadge>,
+          },
+        ],
+      },
+      {
+        key: "crew",
+        label: "Crew",
+        title: "Crew",
+        subtitle: "Operational collaborator catalog, separate from product auth and login concerns.",
+        rows: data.crewMembers as Array<Record<string, unknown>>,
+        columns: [
+          { key: "fullName", label: "Crew", width: 180, minWidth: 144, render: (row) => row.fullName as string },
+          { key: "roleLabel", label: "Role", width: 140, minWidth: 110, render: (row) => (row.roleLabel as string) || "—" },
+          { key: "email", label: "Email", width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
+          { key: "phone", label: "Phone", width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
+        ],
+      },
+      {
+        key: "client",
+        label: "Clients",
+        title: "Clients",
+        subtitle: "Global client records reused by projects instead of loose text fields.",
+        rows: data.clients as Array<Record<string, unknown>>,
+        columns: [
+          { key: "name", label: "Client", width: 180, minWidth: 144, render: (row) => row.name as string },
+          { key: "contactName", label: "Contact", width: 150, minWidth: 120, render: (row) => (row.contactName as string) || "—" },
+          { key: "email", label: "Email", width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
+          { key: "phone", label: "Phone", width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
+        ],
+      },
+      {
+        key: "kit",
+        label: "Kits",
+        title: "Kits",
+        subtitle: "Asset packages that live together and prepare future project, packing and dispatch workflows.",
+        rows: data.kits as Array<Record<string, unknown>>,
+        columns: [
+          { key: "code", label: "Code", width: 90, minWidth: 76, render: (row) => row.code as string },
+          { key: "name", label: "Kit", width: 180, minWidth: 144, render: (row) => row.name as string },
+          { key: "assetCount", label: "Assets", align: "right", width: 80, minWidth: 66, render: (row) => row.assetCount as number },
+          { key: "primaryCodeValue", label: "QR ready", width: 170, minWidth: 132, render: (row) => row.primaryCodeValue as string },
+          { key: "description", label: "Description", width: 220, minWidth: 170, render: (row) => row.description as string },
+        ],
+      },
+      {
+        key: "category",
+        label: "Categories",
+        title: "Categories",
+        subtitle: "Registry categories stay global so new assets remain organized and searchable from day one.",
+        rows: data.categories as Array<Record<string, unknown>>,
+        columns: [
+          { key: "code", label: "Code", width: 90, minWidth: 76, render: (row) => row.code as string },
+          { key: "name", label: "Category", width: 180, minWidth: 144, render: (row) => row.name as string },
+          { key: "description", label: "Description", width: 260, minWidth: 180, render: (row) => row.description as string },
+          {
+            key: "status",
+            label: "Status",
+            width: 90,
+            minWidth: 78,
+            render: (row) => <StatusBadge>{(row.isActive as boolean) ? "Active" : "Inactive"}</StatusBadge>,
+          },
+        ],
+      },
+    ],
+    [data],
+  );
+
+  const activeTabConfig = tabs.find((tab) => tab.key === activeTab) ?? tabs[0];
+  const selectedRow = activeTabConfig.rows.find((row) => row.id === selectedIds[activeTab]) ?? null;
+
+  const applyCatalogMutation = async (
+    callback: () => Promise<CatalogSnapshot>,
+    nextSelectedId: string | null = selectedIds[activeTab],
+  ) => {
+    try {
+      setIsSubmittingEditor(true);
+      await callback();
+      await reload();
+      setSelectedIds((current) => ({ ...current, [activeTab]: nextSelectedId }));
+      setEditorMode(null);
+      setEditorError(null);
+    } catch (nextError) {
+      setEditorError(nextError instanceof Error ? nextError.message : "Catalog mutation failed.");
+    } finally {
+      setIsSubmittingEditor(false);
+    }
+  };
 
   return (
     <div className="page-stack">
       <SectionHeader
         eyebrow="Catalog"
-        title="Operational catalog"
-        body="Core locations and departments used across operational flows."
+        title="Master data"
+        body="Global databases for locations, departments, crew, clients, kits and categories that later feed projects, assets and operational flows."
         contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Catalog unavailable: {error}</div> : null}
+      {!error && isLoading ? <div className="empty-state">Loading master data...</div> : null}
+
+      <div className="catalog-tab-row">
+        {catalogTabOrder.map((tabKey) => {
+          const tab = tabs.find((entry) => entry.key === tabKey);
+          if (!tab) {
+            return null;
+          }
+
+          return (
+            <button
+              key={tab.key}
+              className={`action-mode-button${activeTab === tab.key ? " active" : ""}`}
+              onClick={() => {
+                setActiveTab(tab.key);
+                setEditorMode(null);
+                setEditorError(null);
+              }}
+              type="button"
+            >
+              <span>{tab.label}</span>
+              <span className="catalog-tab-count">{tab.rows.length}</span>
+            </button>
+          );
+        })}
+      </div>
 
       <div className="split-layout">
-        <SurfaceCard title="Locations" subtitle="Warehouse, field and maintenance locations available in the workspace.">
+        <SurfaceCard
+          title={activeTabConfig.title}
+          subtitle={activeTabConfig.subtitle}
+          aside={
+            <div className="surface-card-actions">
+              <button
+                className="ghost-control"
+                disabled={!selectedRow}
+                onClick={() => {
+                  setEditorMode("edit");
+                  setEditorError(null);
+                }}
+                type="button"
+              >
+                <Pencil size={14} />
+                <span>Edit</span>
+              </button>
+              <button
+                className="ghost-control"
+                disabled={!selectedRow}
+                onClick={() => {
+                  if (!selectedRow || typeof selectedRow.id !== "string") {
+                    return;
+                  }
+
+                  const singularLabel = singularLabelMap[activeTab];
+                  const confirmed = window.confirm(`Delete this ${singularLabel}?`);
+                  if (!confirmed) {
+                    return;
+                  }
+
+                  void applyCatalogMutation(
+                    () =>
+                      deleteCatalogEntity({
+                        entityType: activeTab,
+                        id: selectedRow.id as string,
+                      }),
+                    null,
+                  );
+                }}
+                type="button"
+              >
+                <Trash2 size={14} />
+                <span>Delete</span>
+              </button>
+              <button
+                className="action-primary-button"
+                onClick={() => {
+                  setEditorMode("create");
+                  setEditorError(null);
+                }}
+                type="button"
+              >
+                <Plus size={14} />
+                <span>New</span>
+              </button>
+            </div>
+          }
+        >
           <DataTable
-            getRowId={(row) => row.code}
-            maxHeight="min(56vh, 620px)"
-            persistKey="catalog-locations"
-            columns={[
-              { key: "code", label: "Code", render: (row) => row.code },
-              { key: "name", label: "Name", render: (row) => row.name },
-              { key: "type", label: "Type", render: (row) => row.type },
-            ]}
-            rows={data.locations}
-            selectable
-            selectedRowIds={selectedLocationIds}
-            onSelectedRowIdsChange={setSelectedLocationIds}
+            activeRowId={selectedIds[activeTab]}
+            columns={activeTabConfig.columns}
+            getRowId={(row) => String(row.id)}
+            maxHeight="min(68vh, 760px)"
+            onRowClick={(row) => setSelectedIds((current) => ({ ...current, [activeTab]: String(row.id) }))}
+            persistKey={`catalog-${activeTab}`}
+            rows={activeTabConfig.rows}
           />
         </SurfaceCard>
 
-        <SurfaceCard title="Departments" subtitle="Operational groups reused across projects, assignments and incidents.">
-          <DataTable
-            getRowId={(row) => row.code}
-            maxHeight="min(56vh, 620px)"
-            persistKey="catalog-departments"
-            columns={[
-              { key: "code", label: "Code", render: (row) => row.code },
-              { key: "name", label: "Name", render: (row) => row.name },
-            ]}
-            rows={data.departments}
-            selectable
-            selectedRowIds={selectedDepartmentIds}
-            onSelectedRowIdsChange={setSelectedDepartmentIds}
+        {editorMode ? (
+          <CatalogEditorPanel
+            assetOptions={data.assetOptions}
+            entityType={activeTab}
+            error={editorError}
+            initialValue={editorMode === "edit" ? selectedRow : null}
+            isSubmitting={isSubmittingEditor}
+            mode={editorMode}
+            onClose={() => {
+              setEditorMode(null);
+              setEditorError(null);
+            }}
+            onSubmit={async (payload) =>
+              applyCatalogMutation(
+                () => (editorMode === "create" ? createCatalogEntity(payload as never) : updateCatalogEntity(payload as never)),
+                editorMode === "edit" && typeof selectedRow?.id === "string" ? selectedRow.id : selectedIds[activeTab],
+              )
+            }
           />
-        </SurfaceCard>
+        ) : (
+          <SurfaceCard title="Catalog context" subtitle="Master data stays global so projects and assets can reuse clean operational building blocks.">
+            <div className="summary-grid">
+              <div className="summary-row">
+                <span className="summary-label">Active tab</span>
+                <span className="summary-value">{activeTabConfig.label}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Records</span>
+                <span className="summary-value">{activeTabConfig.rows.length}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Selection</span>
+                <span className="summary-value">
+                  {selectedRow && typeof selectedRow.name === "string" ? selectedRow.name : "No record selected"}
+                </span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Next use</span>
+                <span className="summary-value">Projects, assets, assignments, incidents and future dispatch flows.</span>
+              </div>
+            </div>
+
+            <div className="chip-row">
+              <StatusBadge tone="info">Global database</StatusBadge>
+              <StatusBadge tone="success">Project-ready</StatusBadge>
+              <StatusBadge tone="warning">Asset-ready</StatusBadge>
+            </div>
+          </SurfaceCard>
+        )}
       </div>
     </div>
   );

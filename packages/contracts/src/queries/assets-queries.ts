@@ -49,6 +49,32 @@ export type AssetDetailRow = {
   custody: string;
 };
 
+export type AssetEditorSnapshot = {
+  id: string;
+  name: string;
+  internalCode: string;
+  categoryId: string;
+  brand: string;
+  model: string;
+  serialNumber: string;
+  description: string;
+  defaultLocationId: string | null;
+  conditionStatus: string;
+  notes: string;
+  replacementValue: number | null;
+  ownershipType: string;
+  isActive: boolean;
+  qrCodeValue: string;
+  primaryCodeValue: string;
+};
+
+export type AssetScannableCodeRow = {
+  id: string;
+  symbology: string;
+  codeValue: string;
+  isPrimary: boolean;
+};
+
 export type AssetLegacySnapshot = {
   source: string;
   legacyCode: string;
@@ -63,4 +89,6 @@ export type AssetDetailSnapshot = {
   legacy: AssetLegacySnapshot | null;
   timeline: AssetTimelineItem[];
   linkedIncidents: AssetLinkedIncidentRow[];
+  editor: AssetEditorSnapshot | null;
+  scannableCodes: AssetScannableCodeRow[];
 };

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import type { PackingSlipDetailSnapshot } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
+import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 
@@ -92,6 +93,10 @@ export const PackingSlipDetailPanel = ({
           </span>
         </div>
         <div className="summary-row">
+          <span className="summary-label">QR ready</span>
+          <span className="summary-value">{data.slip.primaryCodeValue}</span>
+        </div>
+        <div className="summary-row">
           <span className="summary-label">Notes</span>
           <span className="summary-value">{data.slip.notes}</span>
         </div>
@@ -100,13 +105,13 @@ export const PackingSlipDetailPanel = ({
       <div className="action-form-grid">
         <label className="action-field">
           <span className="action-field-label">Condition in</span>
-          <select className="action-field-control" onChange={(event) => setConditionIn(event.target.value)} value={conditionIn}>
+          <SelectField onChange={(event) => setConditionIn(event.target.value)} value={conditionIn}>
             {conditionOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="action-field action-field-wide">

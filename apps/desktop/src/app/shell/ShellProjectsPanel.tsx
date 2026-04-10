@@ -1,21 +1,24 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
+import { useCatalogData } from "@features/projects/useProjectsData";
+import { SelectField } from "@shared/components/SelectField";
 import { useShellContext } from "@shared/hooks/useShellContext";
 
 type ProjectDraft = {
   code: string;
   name: string;
-  clientName: string;
+  clientId: string;
 };
 
 const emptyDraft: ProjectDraft = {
   code: "",
   name: "",
-  clientName: "",
+  clientId: "",
 };
 
 export const ShellProjectsPanel = () => {
+  const { data: catalog } = useCatalogData();
   const { activeProjectId, createProject, deleteProject, projects, projectsError, setActiveProjectId, updateProject } =
     useShellContext();
   const [draft, setDraft] = useState<ProjectDraft>(emptyDraft);
@@ -36,7 +39,7 @@ export const ShellProjectsPanel = () => {
       await createProject({
         code: draft.code,
         name: draft.name,
-        clientName: draft.clientName,
+        clientId: draft.clientId || undefined,
       });
       setActionError(null);
       resetDraft();
@@ -55,7 +58,7 @@ export const ShellProjectsPanel = () => {
         projectId: editingProjectId,
         code: draft.code,
         name: draft.name,
-        clientName: draft.clientName,
+        clientId: draft.clientId || undefined,
         status: activeDraftProject?.status ?? "Prep",
         description: activeDraftProject?.description ?? "",
       });
@@ -78,7 +81,7 @@ export const ShellProjectsPanel = () => {
     setDraft({
       code: project.code,
       name: project.name,
-      clientName: project.client === "—" ? "" : project.client,
+      clientId: project.clientId ?? "",
     });
     setActionError(null);
   };
@@ -133,12 +136,19 @@ export const ShellProjectsPanel = () => {
             placeholder="Project name"
             value={draft.name}
           />
-          <input
-            className="shell-project-input"
-            onChange={(event) => setDraft((current) => ({ ...current, clientName: event.target.value }))}
-            placeholder="Client"
-            value={draft.clientName}
-          />
+          <SelectField
+            className="shell-project-select"
+            wrapperClassName="shell-project-select-shell"
+            onChange={(event) => setDraft((current) => ({ ...current, clientId: event.target.value }))}
+            value={draft.clientId}
+          >
+            <option value="">No client linked</option>
+            {catalog.clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </SelectField>
 
           <div className="shell-project-editor-actions">
             <button className="shell-project-action shell-project-action-confirm" onClick={editingProjectId ? handleUpdate : handleCreate} type="button">

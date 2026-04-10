@@ -2,6 +2,7 @@ import { PackageCheck, X } from "lucide-react";
 import { useState } from "react";
 
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
+import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 
 export type PackingSlipBuilderDraft = {
@@ -65,42 +66,38 @@ export const PackingSlipBuilderPanel = ({
       <div className="action-form-grid">
         <label className="action-field">
           <span className="action-field-label">Project</span>
-          <select className="action-field-control" onChange={(event) => setProjectId(event.target.value)} value={projectId}>
+          <SelectField onChange={(event) => setProjectId(event.target.value)} value={projectId}>
             <option value="">Choose project</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.code} · {project.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="action-field">
           <span className="action-field-label">Responsible</span>
-          <select
-            className="action-field-control"
-            onChange={(event) => setResponsibleUserId(event.target.value)}
-            value={responsibleUserId}
-          >
+          <SelectField onChange={(event) => setResponsibleUserId(event.target.value)} value={responsibleUserId}>
             <option value="">Auto / current owner</option>
             {users.map((user) => (
               <option key={user.id} value={user.id}>
                 {user.fullName}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="action-field">
           <span className="action-field-label">Department</span>
-          <select className="action-field-control" onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
+          <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
             <option value="">No department</option>
             {departments.map((department) => (
               <option key={department.id} value={department.id}>
                 {department.code} · {department.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="action-field">

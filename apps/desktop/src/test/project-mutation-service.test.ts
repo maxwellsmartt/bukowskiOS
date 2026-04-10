@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { foundationMigrationSql } from "@db";
 
+import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "../../electron/main/services/data/adminFoundationBootstrap";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { seedFoundationData } from "../../electron/main/services/data/foundationSeed";
 import { createProjectMutationService, ensureProjectShellDefaults } from "../../electron/main/services/data/projectMutationService";
@@ -17,8 +18,10 @@ const createTempDatabase = () => {
 
   database.exec("PRAGMA foreign_keys = ON;");
   database.exec(foundationMigrationSql);
+  applyAdminFoundationMigration(database);
   seedFoundationData(database);
   ensureProjectShellDefaults(database);
+  bootstrapAdminFoundation(database);
 
   return { database, databasePath };
 };
@@ -28,11 +31,13 @@ describe("project mutation service", () => {
     const { database, databasePath } = createTempDatabase();
     const reads = createFoundationReadService(database);
     const mutations = createProjectMutationService(database);
+    const catalog = reads.getCatalogSnapshot();
+    const internalClient = catalog.clients.find((client) => client.name === "Internal");
 
     mutations.createProject({
       code: "TEST",
       name: "Test Project",
-      clientName: "Internal",
+      clientId: internalClient?.id,
     });
 
     let createdProject = reads.getProjects().find((project) => project.code === "TEST");

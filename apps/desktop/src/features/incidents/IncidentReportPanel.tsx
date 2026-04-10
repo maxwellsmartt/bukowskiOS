@@ -2,6 +2,7 @@ import { AlertTriangle, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
+import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 
 export type IncidentAssetOption = {
@@ -117,86 +118,72 @@ export const IncidentReportPanel = ({
       <div className="action-form-grid">
         <label className="action-field">
           <span className="action-field-label">Asset</span>
-          <select
-            className="action-field-control"
-            disabled={assetLocked}
-            onChange={(event) => setAssetId(event.target.value)}
-            value={assetId}
-          >
+          <SelectField disabled={assetLocked} onChange={(event) => setAssetId(event.target.value)} value={assetId}>
             <option value="">No asset</option>
             {assetOptions.map((asset) => (
               <option key={asset.id} value={asset.id}>
                 {asset.code} · {asset.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="action-field">
           <span className="action-field-label">Project</span>
-          <select
-            className="action-field-control"
-            disabled={projectLocked}
-            onChange={(event) => setProjectId(event.target.value)}
-            value={projectId}
-          >
+          <SelectField disabled={projectLocked} onChange={(event) => setProjectId(event.target.value)} value={projectId}>
             <option value="">No project</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.code} · {project.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="action-field">
           <span className="action-field-label">Incident type</span>
-          <select className="action-field-control" onChange={(event) => setIncidentType(event.target.value)} value={incidentType}>
+          <SelectField onChange={(event) => setIncidentType(event.target.value)} value={incidentType}>
             {incidentTypeOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="action-field">
           <span className="action-field-label">Severity</span>
-          <select className="action-field-control" onChange={(event) => setSeverity(event.target.value)} value={severity}>
+          <SelectField onChange={(event) => setSeverity(event.target.value)} value={severity}>
             {severityOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="action-field">
           <span className="action-field-label">Department</span>
-          <select className="action-field-control" onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
+          <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
             <option value="">No department</option>
             {departments.map((department) => (
               <option key={department.id} value={department.id}>
                 {department.code} · {department.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="action-field">
           <span className="action-field-label">Responsible</span>
-          <select
-            className="action-field-control"
-            onChange={(event) => setResponsibleUserId(event.target.value)}
-            value={responsibleUserId}
-          >
+          <SelectField onChange={(event) => setResponsibleUserId(event.target.value)} value={responsibleUserId}>
             <option value="">Auto / unassigned</option>
             {users.map((user) => (
               <option key={user.id} value={user.id}>
                 {user.fullName}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="action-field action-field-wide">

@@ -24,6 +24,8 @@ import type {
   ShellBootstrap,
 } from "@contracts";
 
+import { createCatalogReadService } from "./catalogReadService";
+
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -157,7 +159,10 @@ const resolvePackingStatus = (storedStatus: string, dueDate: string | null, item
   return storedStatus;
 };
 
-export const createFoundationReadService = (db: DatabaseSync) => ({
+export const createFoundationReadService = (db: DatabaseSync) => {
+  const catalogReads = createCatalogReadService(db);
+
+  return {
   getShellBootstrap(): ShellBootstrap {
     const workspace = db.prepare("SELECT name FROM workspaces WHERE is_active = 1 ORDER BY created_at LIMIT 1").get() as
       | { name: string }
@@ -358,7 +363,18 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
             assets.id,
             assets.name,
             COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
+            assets.internal_code,
+            assets.category_id,
+            COALESCE(asset_categories.name, '—') AS category_name,
+            assets.brand,
+            assets.model,
+            assets.serial_number,
+            assets.description,
             assets.replacement_value,
+            assets.default_location_id,
+            assets.notes,
+            assets.ownership_type,
+            assets.is_active,
             asset_current_state.condition_status,
             asset_current_state.custody_status,
             asset_current_state.operational_status,
@@ -378,6 +394,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
             END AS has_accessories
           FROM assets
           JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+          LEFT JOIN asset_categories ON asset_categories.id = assets.category_id
           LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
           LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
           LEFT JOIN legacy_rentman_imports ON legacy_rentman_imports.id = legacy_rentman_items.import_id
@@ -393,7 +410,18 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
           id: string;
           name: string;
           code: string;
+          internal_code: string;
+          category_id: string;
+          category_name: string;
+          brand: string | null;
+          model: string | null;
+          serial_number: string | null;
+          description: string | null;
           replacement_value: number | null;
+          default_location_id: string | null;
+          notes: string | null;
+          ownership_type: string | null;
+          is_active: number;
           condition_status: string;
           custody_status: string;
           operational_status: string;
@@ -416,6 +444,8 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
         legacy: null,
         timeline: [],
         linkedIncidents: [],
+        editor: null,
+        scannableCodes: [],
       };
     }
 
@@ -459,6 +489,25 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       severity: string;
     }>;
 
+    const scannableCodes = db
+      .prepare(
+        `
+          SELECT id, symbology, code_value, is_primary
+          FROM scannable_codes
+          WHERE entity_type = 'asset'
+            AND entity_id = ?
+          ORDER BY is_primary DESC, created_at ASC
+        `,
+      )
+      .all(assetId) as Array<{
+      id: string;
+      symbology: string;
+      code_value: string;
+      is_primary: number;
+    }>;
+
+    const primaryCodeValue = scannableCodes.find((row) => row.is_primary)?.code_value ?? asset.qr_code_value;
+
     const timeline: AssetTimelineItem[] = timelineRows.map((row) => ({
       timestamp: formatTimelineTimestamp(row.event_timestamp),
       title: mapEventTitle(row.event_type),
@@ -498,6 +547,30 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       },
       timeline,
       linkedIncidents: incidentRows,
+      editor: {
+        id: asset.id,
+        name: asset.name,
+        internalCode: asset.internal_code,
+        categoryId: asset.category_id,
+        brand: asset.brand ?? "",
+        model: asset.model ?? "",
+        serialNumber: asset.serial_number ?? "",
+        description: asset.description ?? "",
+        defaultLocationId: asset.default_location_id,
+        conditionStatus: asset.condition_status,
+        notes: asset.notes ?? "",
+        replacementValue: asset.replacement_value,
+        ownershipType: asset.ownership_type ?? "owned",
+        isActive: Boolean(asset.is_active),
+        qrCodeValue: asset.qr_code_value === "—" ? "" : asset.qr_code_value,
+        primaryCodeValue: primaryCodeValue ?? "",
+      },
+      scannableCodes: scannableCodes.map((row) => ({
+        id: row.id,
+        symbology: row.symbology,
+        codeValue: row.code_value,
+        isPrimary: Boolean(row.is_primary),
+      })),
     };
   },
 
@@ -564,6 +637,14 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
             COALESCE(departments.name, '—') AS department,
             COALESCE(responsible.full_name, '—') AS responsible,
             COALESCE(prepared.full_name, '—') AS prepared_by,
+            COALESCE((
+              SELECT code_value
+              FROM scannable_codes
+              WHERE entity_type = 'packing_slip'
+                AND entity_id = packing_slips.id
+                AND is_primary = 1
+              LIMIT 1
+            ), packing_slips.id) AS primary_code_value,
             COUNT(packing_slip_items.id) AS item_count,
             SUM(CASE WHEN packing_slip_items.returned_at IS NOT NULL THEN 1 ELSE 0 END) AS returned_count
           FROM packing_slips
@@ -597,6 +678,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
           department: string;
           responsible: string;
           prepared_by: string;
+          primary_code_value: string;
           item_count: number;
           returned_count: number | null;
         }
@@ -677,6 +759,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
         itemCount: slip.item_count,
         returnedCount,
         pendingCount: Math.max(0, slip.item_count - returnedCount),
+        primaryCodeValue: slip.primary_code_value,
       },
       items: itemRows,
     };
@@ -733,7 +816,8 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
             projects.id,
             projects.code,
             projects.name,
-            COALESCE(projects.client_name, '—') AS client_name,
+            projects.client_id,
+            COALESCE(clients.name, projects.client_name, '—') AS client_name,
             projects.status,
             COALESCE(projects.description, '—') AS description,
             COALESCE((
@@ -762,6 +846,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
               WHERE incidents.project_id = projects.id
             ), 0) AS incident_count
           FROM projects
+          LEFT JOIN clients ON clients.id = projects.client_id
           ORDER BY CASE projects.status
             WHEN 'Active' THEN 0
             WHEN 'Prep' THEN 1
@@ -773,6 +858,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       id: string;
       code: string;
       name: string;
+      client_id: string | null;
       client_name: string;
       status: string;
       description: string;
@@ -786,6 +872,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       id: row.id,
       code: row.code,
       name: row.name,
+      clientId: row.client_id,
       client: row.client_name,
       status: row.status,
       departments: row.departments,
@@ -804,7 +891,8 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
             projects.id,
             projects.code,
             projects.name,
-            COALESCE(projects.client_name, '—') AS client_name,
+            projects.client_id,
+            COALESCE(clients.name, projects.client_name, '—') AS client_name,
             projects.status,
             COALESCE(projects.description, '—') AS description,
             COALESCE((
@@ -839,6 +927,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
               WHERE asset_current_state.current_project_id = projects.id
             ), 0) AS replacement_at_risk
           FROM projects
+          LEFT JOIN clients ON clients.id = projects.client_id
           WHERE projects.id = ?
           LIMIT 1
         `,
@@ -848,6 +937,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
           id: string;
           code: string;
           name: string;
+          client_id: string | null;
           client_name: string;
           status: string;
           description: string;
@@ -1041,6 +1131,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
         id: project.id,
         code: project.code,
         name: project.name,
+        clientId: project.client_id,
         client: project.client_name,
         status: project.status,
         departments: project.departments,
@@ -1066,35 +1157,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
   },
 
   getCatalogSnapshot(): CatalogSnapshot {
-    const locations = db
-      .prepare("SELECT id, code, name, type FROM locations WHERE is_active = 1 ORDER BY name")
-      .all() as Array<{ id: string; code: string; name: string; type: string }>;
-
-    const departments = db
-      .prepare("SELECT id, code, name FROM departments WHERE is_active = 1 ORDER BY name")
-      .all() as Array<{ id: string; code: string; name: string }>;
-
-    const users = db
-      .prepare(
-        `
-          SELECT users.id, users.full_name
-          FROM workspace_memberships
-          JOIN users ON users.id = workspace_memberships.user_id
-          WHERE workspace_memberships.workspace_id = 'workspace-metadata'
-            AND workspace_memberships.status = 'active'
-          ORDER BY users.full_name
-        `,
-      )
-      .all() as Array<{ id: string; full_name: string }>;
-
-    return {
-      locations,
-      departments,
-      users: users.map((row) => ({
-        id: row.id,
-        fullName: row.full_name,
-      })),
-    };
+    return catalogReads.getSnapshot();
   },
 
   getFinanceOverview(): FinanceOverviewSnapshot {
@@ -1265,6 +1328,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       status: row.status,
     }));
   },
-});
+};
+};
 
 export type FoundationReadService = ReturnType<typeof createFoundationReadService>;

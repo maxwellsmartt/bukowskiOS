@@ -1,0 +1,550 @@
+import type { DatabaseSync } from "node:sqlite";
+
+import type { CreateCatalogEntityInput, DeleteCatalogEntityInput, UpdateCatalogEntityInput } from "@contracts";
+
+import { createCodeGenerationService } from "./codeGenerationService";
+
+const workspaceId = "workspace-metadata";
+
+const slugify = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+
+const ensureValue = (value: string | undefined, label: string) => {
+  const nextValue = value?.trim() ?? "";
+
+  if (!nextValue) {
+    throw new Error(`${label} is required.`);
+  }
+
+  return nextValue;
+};
+
+const optionalValue = (value: string | undefined) => {
+  const nextValue = value?.trim() ?? "";
+  return nextValue || null;
+};
+
+const uniqueValues = (values: string[] | undefined) => [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))];
+
+const assertUniqueCode = (
+  db: DatabaseSync,
+  tableName: "locations" | "departments" | "asset_categories" | "kits",
+  code: string,
+  currentId?: string,
+) => {
+  const existing = db
+    .prepare(
+      `
+        SELECT id
+        FROM ${tableName}
+        WHERE workspace_id = ?
+          AND code = ?
+          AND (? IS NULL OR id != ?)
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, code, currentId ?? null, currentId ?? null) as { id: string } | undefined;
+
+  if (existing) {
+    throw new Error(`Code ${code} is already in use.`);
+  }
+};
+
+const assertUniqueClientName = (db: DatabaseSync, name: string, currentId?: string) => {
+  const existing = db
+    .prepare(
+      `
+        SELECT id
+        FROM clients
+        WHERE workspace_id = ?
+          AND lower(name) = lower(?)
+          AND (? IS NULL OR id != ?)
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, name, currentId ?? null, currentId ?? null) as { id: string } | undefined;
+
+  if (existing) {
+    throw new Error(`Client ${name} already exists.`);
+  }
+};
+
+const assertAssetIdsExist = (db: DatabaseSync, assetIds: string[]) => {
+  if (!assetIds.length) {
+    return;
+  }
+
+  const placeholders = assetIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+        SELECT id
+        FROM assets
+        WHERE workspace_id = ?
+          AND id IN (${placeholders})
+      `,
+    )
+    .all(workspaceId, ...assetIds) as Array<{ id: string }>;
+
+  if (rows.length !== assetIds.length) {
+    throw new Error("One or more selected assets are no longer available in the registry.");
+  }
+};
+
+const getDeleteGuardCount = (db: DatabaseSync, input: DeleteCatalogEntityInput) => {
+  switch (input.entityType) {
+    case "location": {
+      const row = db
+        .prepare(
+          `
+            SELECT
+              (SELECT COUNT(*) FROM assets WHERE default_location_id = ?) AS asset_defaults,
+              (SELECT COUNT(*) FROM asset_current_state WHERE current_location_id = ?) AS current_state,
+              (SELECT COUNT(*) FROM asset_assignments WHERE source_location_id = ? OR target_location_id = ?) AS assignments,
+              (SELECT COUNT(*) FROM asset_events WHERE location_id = ? OR from_location_id = ? OR to_location_id = ?) AS events
+          `,
+        )
+        .get(input.id, input.id, input.id, input.id, input.id, input.id, input.id) as {
+        asset_defaults: number;
+        current_state: number;
+        assignments: number;
+        events: number;
+      };
+
+      return row.asset_defaults + row.current_state + row.assignments + row.events;
+    }
+
+    case "department": {
+      const row = db
+        .prepare(
+          `
+            SELECT
+              (SELECT COUNT(*) FROM asset_current_state WHERE current_department_id = ?) AS current_state,
+              (SELECT COUNT(*) FROM asset_assignments WHERE department_id = ?) AS assignments,
+              (SELECT COUNT(*) FROM incidents WHERE department_id = ?) AS incidents,
+              (SELECT COUNT(*) FROM packing_slips WHERE department_id = ?) AS packing
+          `,
+        )
+        .get(input.id, input.id, input.id, input.id) as {
+        current_state: number;
+        assignments: number;
+        incidents: number;
+        packing: number;
+      };
+
+      return row.current_state + row.assignments + row.incidents + row.packing;
+    }
+
+    case "client": {
+      const row = db.prepare("SELECT COUNT(*) AS count FROM projects WHERE client_id = ?").get(input.id) as { count: number };
+      return row.count;
+    }
+
+    case "category": {
+      const row = db.prepare("SELECT COUNT(*) AS count FROM assets WHERE category_id = ?").get(input.id) as { count: number };
+      return row.count;
+    }
+
+    default:
+      return 0;
+  }
+};
+
+const replaceKitAssets = (db: DatabaseSync, kitId: string, assetIds: string[], now: string) => {
+  db.prepare("DELETE FROM kit_assets WHERE kit_id = ?").run(kitId);
+
+  const insertKitAsset = db.prepare(
+    `
+      INSERT INTO kit_assets (kit_id, asset_id, added_at)
+      VALUES (?, ?, ?)
+    `,
+  );
+
+  assetIds.forEach((assetId) => {
+    insertKitAsset.run(kitId, assetId, now);
+  });
+};
+
+export const createCatalogMutationService = (db: DatabaseSync) => {
+  const codeService = createCodeGenerationService(db);
+
+  return {
+    createEntity(input: CreateCatalogEntityInput) {
+      const now = new Date().toISOString();
+
+      db.exec("BEGIN");
+
+      try {
+        switch (input.entityType) {
+          case "location": {
+            const code = ensureValue(input.code, "Location code").toUpperCase();
+            assertUniqueCode(db, "locations", code);
+
+            db.prepare(
+              `
+                INSERT INTO locations (id, workspace_id, code, name, type, description, is_active, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+              `,
+            ).run(
+              `location-${slugify(code)}-${Date.now().toString(36)}`,
+              workspaceId,
+              code,
+              ensureValue(input.name, "Location name"),
+              ensureValue(input.locationType, "Location type"),
+              optionalValue(input.description),
+              now,
+            );
+            break;
+          }
+
+          case "department": {
+            const code = ensureValue(input.code, "Department code").toUpperCase();
+            assertUniqueCode(db, "departments", code);
+
+            db.prepare(
+              `
+                INSERT INTO departments (id, workspace_id, code, name, description, is_active, created_at)
+                VALUES (?, ?, ?, ?, ?, 1, ?)
+              `,
+            ).run(
+              `department-${slugify(code)}-${Date.now().toString(36)}`,
+              workspaceId,
+              code,
+              ensureValue(input.name, "Department name"),
+              optionalValue(input.description),
+              now,
+            );
+            break;
+          }
+
+          case "crew": {
+            db.prepare(
+              `
+                INSERT INTO crew_members (
+                  id, workspace_id, full_name, role_label, email, phone, notes, is_active, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+              `,
+            ).run(
+              `crew-${slugify(ensureValue(input.fullName, "Crew name"))}-${Date.now().toString(36)}`,
+              workspaceId,
+              ensureValue(input.fullName, "Crew name"),
+              optionalValue(input.roleLabel),
+              optionalValue(input.email),
+              optionalValue(input.phone),
+              optionalValue(input.notes),
+              now,
+              now,
+            );
+            break;
+          }
+
+          case "client": {
+            const name = ensureValue(input.name, "Client name");
+            assertUniqueClientName(db, name);
+
+            db.prepare(
+              `
+                INSERT INTO clients (
+                  id, workspace_id, name, contact_name, email, phone, notes, is_active, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+              `,
+            ).run(
+              `client-${slugify(name)}-${Date.now().toString(36)}`,
+              workspaceId,
+              name,
+              optionalValue(input.contactName),
+              optionalValue(input.email),
+              optionalValue(input.phone),
+              optionalValue(input.notes),
+              now,
+              now,
+            );
+            break;
+          }
+
+          case "category": {
+            const code = ensureValue(input.code, "Category code").toUpperCase();
+            assertUniqueCode(db, "asset_categories", code);
+
+            db.prepare(
+              `
+                INSERT INTO asset_categories (id, workspace_id, parent_category_id, code, name, description, created_at, is_active)
+                VALUES (?, ?, NULL, ?, ?, ?, ?, 1)
+              `,
+            ).run(
+              `category-${slugify(code)}-${Date.now().toString(36)}`,
+              workspaceId,
+              code,
+              ensureValue(input.name, "Category name"),
+              optionalValue(input.description),
+              now,
+            );
+            break;
+          }
+
+          case "kit": {
+            const code = ensureValue(input.code, "Kit code").toUpperCase();
+            const assetIds = uniqueValues(input.assetIds);
+            assertUniqueCode(db, "kits", code);
+            assertAssetIdsExist(db, assetIds);
+
+            const kitId = `kit-${slugify(code)}-${Date.now().toString(36)}`;
+
+            db.prepare(
+              `
+                INSERT INTO kits (id, workspace_id, code, name, description, notes, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+              `,
+            ).run(
+              kitId,
+              workspaceId,
+              code,
+              ensureValue(input.name, "Kit name"),
+              optionalValue(input.description),
+              optionalValue(input.notes),
+              now,
+              now,
+            );
+
+            replaceKitAssets(db, kitId, assetIds, now);
+            codeService.ensurePrimaryCode({
+              workspaceId,
+              entityType: "kit",
+              entityId: kitId,
+              preferredCodeValue: `KIT-${code}`,
+            });
+            break;
+          }
+        }
+
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
+
+    updateEntity(input: UpdateCatalogEntityInput) {
+      const now = new Date().toISOString();
+
+      db.exec("BEGIN");
+
+      try {
+        switch (input.entityType) {
+          case "location": {
+            const code = ensureValue(input.code, "Location code").toUpperCase();
+            assertUniqueCode(db, "locations", code, input.id);
+            const result = db.prepare(
+              `
+                UPDATE locations
+                SET code = ?, name = ?, type = ?, description = ?
+                WHERE id = ?
+              `,
+            ).run(
+              code,
+              ensureValue(input.name, "Location name"),
+              ensureValue(input.locationType, "Location type"),
+              optionalValue(input.description),
+              input.id,
+            );
+            if (!result.changes) {
+              throw new Error("Location not found.");
+            }
+            break;
+          }
+
+          case "department": {
+            const code = ensureValue(input.code, "Department code").toUpperCase();
+            assertUniqueCode(db, "departments", code, input.id);
+            const result = db.prepare(
+              `
+                UPDATE departments
+                SET code = ?, name = ?, description = ?
+                WHERE id = ?
+              `,
+            ).run(code, ensureValue(input.name, "Department name"), optionalValue(input.description), input.id);
+            if (!result.changes) {
+              throw new Error("Department not found.");
+            }
+            break;
+          }
+
+          case "crew": {
+            const result = db.prepare(
+              `
+                UPDATE crew_members
+                SET full_name = ?, role_label = ?, email = ?, phone = ?, notes = ?, updated_at = ?
+                WHERE id = ?
+              `,
+            ).run(
+              ensureValue(input.fullName, "Crew name"),
+              optionalValue(input.roleLabel),
+              optionalValue(input.email),
+              optionalValue(input.phone),
+              optionalValue(input.notes),
+              now,
+              input.id,
+            );
+            if (!result.changes) {
+              throw new Error("Crew member not found.");
+            }
+            break;
+          }
+
+          case "client": {
+            const name = ensureValue(input.name, "Client name");
+            assertUniqueClientName(db, name, input.id);
+            const result = db.prepare(
+              `
+                UPDATE clients
+                SET name = ?, contact_name = ?, email = ?, phone = ?, notes = ?, updated_at = ?
+                WHERE id = ?
+              `,
+            ).run(
+              name,
+              optionalValue(input.contactName),
+              optionalValue(input.email),
+              optionalValue(input.phone),
+              optionalValue(input.notes),
+              now,
+              input.id,
+            );
+            if (!result.changes) {
+              throw new Error("Client not found.");
+            }
+
+            db.prepare("UPDATE projects SET client_name = ? WHERE client_id = ?").run(name, input.id);
+            break;
+          }
+
+          case "category": {
+            const code = ensureValue(input.code, "Category code").toUpperCase();
+            assertUniqueCode(db, "asset_categories", code, input.id);
+            const result = db.prepare(
+              `
+                UPDATE asset_categories
+                SET code = ?, name = ?, description = ?
+                WHERE id = ?
+              `,
+            ).run(code, ensureValue(input.name, "Category name"), optionalValue(input.description), input.id);
+            if (!result.changes) {
+              throw new Error("Category not found.");
+            }
+            break;
+          }
+
+          case "kit": {
+            const code = ensureValue(input.code, "Kit code").toUpperCase();
+            const assetIds = uniqueValues(input.assetIds);
+            assertUniqueCode(db, "kits", code, input.id);
+            assertAssetIdsExist(db, assetIds);
+            const result = db.prepare(
+              `
+                UPDATE kits
+                SET code = ?, name = ?, description = ?, notes = ?, updated_at = ?
+                WHERE id = ?
+              `,
+            ).run(
+              code,
+              ensureValue(input.name, "Kit name"),
+              optionalValue(input.description),
+              optionalValue(input.notes),
+              now,
+              input.id,
+            );
+            if (!result.changes) {
+              throw new Error("Kit not found.");
+            }
+
+            replaceKitAssets(db, input.id, assetIds, now);
+            codeService.ensurePrimaryCode({
+              workspaceId,
+              entityType: "kit",
+              entityId: input.id,
+              preferredCodeValue: `KIT-${code}`,
+            });
+            break;
+          }
+        }
+
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
+
+    deleteEntity(input: DeleteCatalogEntityInput) {
+      const relationCount = getDeleteGuardCount(db, input);
+
+      if (relationCount > 0) {
+        throw new Error("This catalog record already has linked operational data and cannot be deleted.");
+      }
+
+      db.exec("BEGIN");
+
+      try {
+        switch (input.entityType) {
+          case "location": {
+            const result = db.prepare("DELETE FROM locations WHERE id = ?").run(input.id);
+            if (!result.changes) {
+              throw new Error("Location not found.");
+            }
+            break;
+          }
+          case "department": {
+            const result = db.prepare("DELETE FROM departments WHERE id = ?").run(input.id);
+            if (!result.changes) {
+              throw new Error("Department not found.");
+            }
+            break;
+          }
+          case "crew": {
+            const result = db.prepare("DELETE FROM crew_members WHERE id = ?").run(input.id);
+            if (!result.changes) {
+              throw new Error("Crew member not found.");
+            }
+            break;
+          }
+          case "client": {
+            const result = db.prepare("DELETE FROM clients WHERE id = ?").run(input.id);
+            if (!result.changes) {
+              throw new Error("Client not found.");
+            }
+            break;
+          }
+          case "category": {
+            const result = db.prepare("DELETE FROM asset_categories WHERE id = ?").run(input.id);
+            if (!result.changes) {
+              throw new Error("Category not found.");
+            }
+            break;
+          }
+          case "kit": {
+            db.prepare("DELETE FROM kit_assets WHERE kit_id = ?").run(input.id);
+            db.prepare("DELETE FROM scannable_codes WHERE entity_type = 'kit' AND entity_id = ?").run(input.id);
+            const result = db.prepare("DELETE FROM kits WHERE id = ?").run(input.id);
+            if (!result.changes) {
+              throw new Error("Kit not found.");
+            }
+            break;
+          }
+        }
+
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
+  };
+};
+
+export type CatalogMutationService = ReturnType<typeof createCatalogMutationService>;

@@ -8,7 +8,8 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
 
-import { useAssetDetail } from "./useAssetsData";
+import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
+import { archiveAsset, updateAsset, useAssetDetail } from "./useAssetsData";
 
 export const AssetDetailPage = () => {
   const { assetId } = useParams();
@@ -19,6 +20,11 @@ export const AssetDetailPage = () => {
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const [editorFeedback, setEditorFeedback] = useState<string | null>(null);
+  const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
+  const [isArchivingAsset, setIsArchivingAsset] = useState(false);
 
   if (!data.asset) {
     return <div className="empty-state">Asset not found in the local workspace.</div>;
@@ -69,9 +75,21 @@ export const AssetDetailPage = () => {
           <StatusBadge tone="warning">Check in</StatusBadge>
           <StatusBadge tone="critical">Report issue</StatusBadge>
           <StatusBadge tone="success">Maintenance</StatusBadge>
+          {data.editor?.primaryCodeValue ? <StatusBadge>{data.editor.primaryCodeValue}</StatusBadge> : null}
         </div>
 
         <div className="action-panel-actions action-panel-actions-start">
+          <button
+            className="ghost-control"
+            onClick={() => {
+              setEditorOpen(true);
+              setEditorError(null);
+              setEditorFeedback(null);
+            }}
+            type="button"
+          >
+            Edit asset
+          </button>
           <button
             className="action-primary-button"
             onClick={() => {
@@ -88,6 +106,67 @@ export const AssetDetailPage = () => {
 
       {catalogError ? <div className="empty-state">Incident catalog unavailable: {catalogError}</div> : null}
       {reportFeedback ? <div className="action-feedback action-feedback-success">{reportFeedback}</div> : null}
+      {editorFeedback ? <div className="action-feedback action-feedback-success">{editorFeedback}</div> : null}
+
+      {editorOpen && data.editor ? (
+        <AssetEditorPanel
+          categories={catalog.categories}
+          error={editorError}
+          initialValue={data.editor}
+          isArchiving={isArchivingAsset}
+          isSubmitting={isSubmittingEditor}
+          locations={catalog.locations}
+          mode="edit"
+          onArchive={async () => {
+            try {
+              setIsArchivingAsset(true);
+              const result = await archiveAsset({
+                commandId: crypto.randomUUID(),
+                workspaceId: "workspace-metadata",
+                assetId: data.asset!.id,
+                actorType: "user",
+                sourceChannel: "desktop",
+              });
+
+              await Promise.all([reload(), refreshProjects()]);
+              setEditorOpen(false);
+              setEditorError(null);
+              setEditorFeedback(result.summary);
+            } catch (nextError) {
+              setEditorError(nextError instanceof Error ? nextError.message : "Unable to archive asset.");
+            } finally {
+              setIsArchivingAsset(false);
+            }
+          }}
+          onClose={() => {
+            setEditorOpen(false);
+            setEditorError(null);
+          }}
+          onSubmit={async (value: AssetEditorDraft) => {
+            try {
+              setIsSubmittingEditor(true);
+              const result = await updateAsset({
+                commandId: crypto.randomUUID(),
+                workspaceId: "workspace-metadata",
+                assetId: data.asset!.id,
+                actorType: "user",
+                sourceChannel: "desktop",
+                isActive: true,
+                ...value,
+              });
+
+              await Promise.all([reload(), refreshProjects()]);
+              setEditorOpen(false);
+              setEditorError(null);
+              setEditorFeedback(result.summary);
+            } catch (nextError) {
+              setEditorError(nextError instanceof Error ? nextError.message : "Unable to save asset changes.");
+            } finally {
+              setIsSubmittingEditor(false);
+            }
+          }}
+        />
+      ) : null}
 
       {reportOpen ? (
         <IncidentReportPanel
@@ -189,6 +268,24 @@ export const AssetDetailPage = () => {
               </div>
             ) : (
               <div className="empty-state">No legacy source linked to this asset.</div>
+            )}
+          </SurfaceCard>
+
+          <SurfaceCard title="Codes" subtitle="Primary scan identity is already ready for future mobile scan and document flows.">
+            {data.scannableCodes.length ? (
+              <div className="queue-list">
+                {data.scannableCodes.map((code) => (
+                  <div key={code.id} className="queue-item">
+                    <div className="identity-cell">
+                      <span className="identity-title">{code.codeValue}</span>
+                      <span className="identity-meta">{code.symbology.toUpperCase()}</span>
+                    </div>
+                    <StatusBadge tone={code.isPrimary ? "success" : "info"}>{code.isPrimary ? "Primary" : "Secondary"}</StatusBadge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">No scannable code has been generated yet.</div>
             )}
           </SurfaceCard>
 

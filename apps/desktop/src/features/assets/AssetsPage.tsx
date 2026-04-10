@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { Plus, SquarePen, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { PackingSlipBuilderPanel, type PackingSlipBuilderDraft } from "@features/packing/PackingSlipBuilderPanel";
@@ -14,7 +14,8 @@ import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { AssetAssignMovePanel, type AssetAssignMoveFormValue } from "./AssetAssignMovePanel";
-import { assignMoveAssets, useAssetsList } from "./useAssetsData";
+import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
+import { archiveAsset, assignMoveAssets, createAsset, updateAsset, useAssetDetail, useAssetsList } from "./useAssetsData";
 
 export const AssetsPage = () => <AssetsContent />;
 
@@ -33,6 +34,13 @@ const AssetsContent = () => {
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const [isSubmittingPacking, setIsSubmittingPacking] = useState(false);
+  const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
+  const [isArchivingAsset, setIsArchivingAsset] = useState(false);
+
+  const editorAssetId = editorMode === "edit" ? selectedAssetId ?? undefined : undefined;
+  const { data: editorDetail, reload: reloadEditorDetail } = useAssetDetail(editorAssetId);
 
   const activeAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) ?? null,
@@ -96,6 +104,74 @@ const AssetsContent = () => {
       setPackingError(nextError instanceof Error ? nextError.message : "Unable to issue packing slip.");
     } finally {
       setIsSubmittingPacking(false);
+    }
+  };
+
+  const handleSubmitAssetEditor = async (formValue: AssetEditorDraft) => {
+    try {
+      setIsSubmittingEditor(true);
+
+      if (editorMode === "edit" && editorAssetId) {
+        const result = await updateAsset({
+          commandId: crypto.randomUUID(),
+          workspaceId: "workspace-metadata",
+          assetId: editorAssetId,
+          actorType: "user",
+          sourceChannel: "desktop",
+          isActive: true,
+          ...formValue,
+        });
+
+        await Promise.all([reload(), refreshProjects(), reloadEditorDetail()]);
+        setActionFeedback(result.summary);
+      } else {
+        const result = await createAsset({
+          commandId: crypto.randomUUID(),
+          workspaceId: "workspace-metadata",
+          actorType: "user",
+          sourceChannel: "desktop",
+          isActive: true,
+          ...formValue,
+        });
+
+        await Promise.all([reload(), refreshProjects()]);
+        setSelectedAssetId(result.assetId);
+        setActionFeedback(result.summary);
+      }
+
+      setEditorError(null);
+      setEditorMode(null);
+    } catch (nextError) {
+      setEditorError(nextError instanceof Error ? nextError.message : "Unable to save asset changes.");
+    } finally {
+      setIsSubmittingEditor(false);
+    }
+  };
+
+  const handleArchiveAsset = async () => {
+    if (!editorAssetId) {
+      return;
+    }
+
+    try {
+      setIsArchivingAsset(true);
+      const result = await archiveAsset({
+        commandId: crypto.randomUUID(),
+        workspaceId: "workspace-metadata",
+        assetId: editorAssetId,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+
+      await Promise.all([reload(), refreshProjects()]);
+      setEditorMode(null);
+      setSelectedAssetId(null);
+      setEditorError(null);
+      setActionFeedback(result.summary);
+    } catch (nextError) {
+      setEditorError(nextError instanceof Error ? nextError.message : "Unable to archive asset.");
+    } finally {
+      setIsArchivingAsset(false);
     }
   };
 
@@ -228,10 +304,42 @@ const AssetsContent = () => {
         />
       ) : null}
 
+      {editorMode ? (
+        <AssetEditorPanel
+          key={`${editorMode}-${editorAssetId ?? "new"}-${editorDetail.editor?.id ?? "empty"}`}
+          categories={catalog.categories}
+          error={editorError}
+          initialValue={editorMode === "edit" ? editorDetail.editor : null}
+          isArchiving={isArchivingAsset}
+          isSubmitting={isSubmittingEditor}
+          locations={catalog.locations}
+          mode={editorMode}
+          onArchive={editorMode === "edit" ? handleArchiveAsset : undefined}
+          onClose={() => {
+            setEditorMode(null);
+            setEditorError(null);
+          }}
+          onSubmit={handleSubmitAssetEditor}
+        />
+      ) : null}
+
       <div className={`list-layout${activeAsset ? " has-preview" : ""}`}>
         <SurfaceCard
           title="Asset registry"
           subtitle="Single click previews. Double click opens detail. Resize columns and select rows for future bulk actions."
+          aside={
+            <button
+              className="ghost-control"
+              onClick={() => {
+                setEditorMode("create");
+                setEditorError(null);
+              }}
+              type="button"
+            >
+              <Plus size={14} />
+              <span>New asset</span>
+            </button>
+          }
         >
           <DataTable
             activeRowId={selectedAssetId}
@@ -317,7 +425,25 @@ const AssetsContent = () => {
 
               <div className="chip-row">
                 <StatusBadge tone="info">Double click to open detail</StatusBadge>
+                <StatusBadge tone="success">QR ready</StatusBadge>
                 <StatusBadge tone="warning">Assignment flow next</StatusBadge>
+              </div>
+
+              <div className="action-panel-actions action-panel-actions-start">
+                <button
+                  className="ghost-control"
+                  onClick={() => {
+                    setEditorMode("edit");
+                    setEditorError(null);
+                  }}
+                  type="button"
+                >
+                  <SquarePen size={14} />
+                  <span>Edit asset</span>
+                </button>
+                <button className="action-primary-button" onClick={() => navigate(`/assets/${activeAsset.id}`)} type="button">
+                  Open detail
+                </button>
               </div>
             </>
           </SurfaceCard>

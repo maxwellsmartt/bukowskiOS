@@ -1,15 +1,20 @@
 /// <reference types="vite/client" />
 
 import type {
+  ArchiveAssetCommand,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppInfo,
   AssetDetailSnapshot,
+  AssetEditorMutationResult,
   AssetListRow,
   CatalogSnapshot,
+  CreateAssetCommand,
+  CreateCatalogEntityInput,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
   CreateProjectInput,
+  DeleteCatalogEntityInput,
   DeleteProjectInput,
   FinanceCostLinkRow,
   FinanceEntryRow,
@@ -25,6 +30,8 @@ import type {
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
   ShellBootstrap,
+  UpdateAssetCommand,
+  UpdateCatalogEntityInput,
   UpdateProjectInput,
 } from "@contracts";
 
@@ -43,6 +50,9 @@ declare global {
       getList: () => Promise<AssetListRow[]>;
       getDetail: (assetId: string) => Promise<AssetDetailSnapshot>;
       assignMove: (input: AssignMoveAssetsInput) => Promise<AssignMoveAssetsResult>;
+      create: (input: CreateAssetCommand) => Promise<AssetEditorMutationResult>;
+      update: (input: UpdateAssetCommand) => Promise<AssetEditorMutationResult>;
+      archive: (input: ArchiveAssetCommand) => Promise<AssetEditorMutationResult>;
     };
     bukowskiPacking?: {
       getList: () => Promise<PackingSlipRow[]>;
@@ -66,6 +76,12 @@ declare global {
       getOverview: () => Promise<FinanceOverviewSnapshot>;
       getCostLinks: () => Promise<FinanceCostLinkRow[]>;
       getEntries: () => Promise<FinanceEntryRow[]>;
+    };
+    bukowskiCatalog?: {
+      getSnapshot: () => Promise<CatalogSnapshot>;
+      create: (input: CreateCatalogEntityInput) => Promise<CatalogSnapshot>;
+      update: (input: UpdateCatalogEntityInput) => Promise<CatalogSnapshot>;
+      remove: (input: DeleteCatalogEntityInput) => Promise<CatalogSnapshot>;
     };
   }
 }

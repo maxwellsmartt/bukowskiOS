@@ -27,6 +27,7 @@ app.whenReady().then(() => {
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,
     projectMutations: localDatabase.projectMutations,
+    catalogMutations: localDatabase.catalogMutations,
     assetMutations: localDatabase.assetMutations,
     incidentMutations: localDatabase.incidentMutations,
     packingMutations: localDatabase.packingMutations,

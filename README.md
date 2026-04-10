@@ -13,6 +13,14 @@ Este repo ya incluye el foundation pack aprobado para arrancar la implementació
 - guía de navegación y densidad UI
 - `AGENT.md` operativo para Codex
 
+Además, el branch actual ya incluye el primer batch `admin foundation`:
+
+- catálogo global real para `locations`, `departments`, `crew`, `clients`, `kits` y `categories`
+- edición, creación y archivado real de assets
+- `projects.client_id` con compatibilidad temporal con `client_name`
+- `scannable_codes` como base futura para QR y barcode
+- servicios base para generación de QR, barcode y PDFs
+
 ## Stack base
 
 - Electron
@@ -69,5 +77,5 @@ pnpm typecheck
 ## Notas
 
 - FinanceOps aparece desde el día uno como shell estructural real, pero no incluye todavía flujos contables completos.
-- El shell actual existe para fijar arquitectura, navegación, tono visual y boundaries; no representa todavía el dominio operativo completo.
+- El shell actual ya soporta lectura/escritura real para proyectos, assets, incidentes, packing slips y master data global, pero todavía falta hardening local y bridge cloud.
 - Para levantar y validar el shell actual, seguir [docs/foundation/local-dev-guide.md](./docs/foundation/local-dev-guide.md).
