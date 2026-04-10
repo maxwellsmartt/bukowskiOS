@@ -107,7 +107,7 @@ export const AppShell = () => {
       <div className="shell-main">
         <TopContextBar />
         {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
-        <main className="shell-content">
+        <main className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}`}>
           {!isScopeReady ? (
             <div className="shell-loading-state">
               <div className="empty-state">

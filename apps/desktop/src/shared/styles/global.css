@@ -515,6 +515,10 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   padding-right: 2px;
 }
 
+.shell-content-project {
+  overflow: hidden;
+}
+
 .page-stack {
   display: flex;
   flex-direction: column;
@@ -534,9 +538,11 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding-right: 2px;
+  padding-right: 6px;
+  padding-bottom: var(--space-md);
 }
 
 .section-header {
@@ -944,6 +950,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   max-height: none;
   overflow-x: auto;
   overflow-y: hidden;
+  padding-bottom: 8px;
 }
 
 .table-shell-natural .data-table {
