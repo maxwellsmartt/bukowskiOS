@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { CompareTrayProvider } from "./CompareTrayContext";
 import { ShellContextProvider } from "./ShellContext";
 
 type AppProvidersProps = {
@@ -7,5 +8,7 @@ type AppProvidersProps = {
 };
 
 export const AppProviders = ({ children }: AppProvidersProps) => (
-  <ShellContextProvider>{children}</ShellContextProvider>
+  <ShellContextProvider>
+    <CompareTrayProvider>{children}</CompareTrayProvider>
+  </ShellContextProvider>
 );

@@ -7,6 +7,7 @@ export const ipcChannels = {
   },
   overview: {
     getSnapshot: "bukowskiOverview:getSnapshot",
+    getTimeline: "bukowskiOverview:getTimeline",
   },
   assets: {
     getList: "bukowskiAssets:getList",
@@ -33,6 +34,11 @@ export const ipcChannels = {
     create: "bukowskiProjects:create",
     update: "bukowskiProjects:update",
     delete: "bukowskiProjects:delete",
+    createUnit: "bukowskiProjects:createUnit",
+    updateUnit: "bukowskiProjects:updateUnit",
+    deleteUnit: "bukowskiProjects:deleteUnit",
+    assignCrewToUnit: "bukowskiProjects:assignCrewToUnit",
+    unassignCrewFromUnit: "bukowskiProjects:unassignCrewFromUnit",
   },
   catalog: {
     getSnapshot: "bukowskiCatalog:getSnapshot",

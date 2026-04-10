@@ -66,6 +66,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
           <StatusBadge>{data.project.client}</StatusBadge>
           <StatusBadge>{data.project.departments}</StatusBadge>
           <StatusBadge tone="warning">{data.project.exposure}</StatusBadge>
+          {data.schedule?.windowLabel ? <StatusBadge tone="info">{data.schedule.windowLabel}</StatusBadge> : null}
         </div>
 
         <div className="compact-summary-grid project-overview-summary">
@@ -84,6 +85,10 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
           <div className="summary-row">
             <span className="summary-label">Departments</span>
             <span className="summary-value">{data.project.departments}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Timeline</span>
+            <span className="summary-value">{data.schedule?.windowLabel ?? "Unscheduled"}</span>
           </div>
         </div>
 
@@ -131,6 +136,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
                 workspaceId: "workspace-metadata",
                 assetId: value.assetId,
                 projectId: value.projectId ?? data.project?.id,
+                projectUnitId: value.projectUnitId,
                 departmentId: value.departmentId,
                 responsibleUserId: value.responsibleUserId,
                 incidentType: value.incidentType,
@@ -169,6 +175,34 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
       </div>
 
       <div className="project-detail-support-grid">
+        <SurfaceCard
+          className="project-scroll-card"
+          title="Unit snapshot"
+          subtitle="Active and upcoming units shaping the schedule of this project."
+        >
+          {data.units.length ? (
+            <div className="queue-list">
+              {data.units.map((unit) => (
+                <div key={unit.id} className="queue-item">
+                  <div className="identity-cell">
+                    <span className="identity-title">
+                      {unit.code} · {unit.name}
+                    </span>
+                    <span className="identity-meta">
+                      {unit.startDate ?? "No start"} - {unit.endDate ?? "Open"} · {unit.crewAssignments.length} crew linked
+                    </span>
+                  </div>
+                  <StatusBadge tone={unit.status === "active" ? "info" : unit.status === "planned" ? "warning" : unit.status === "wrapped" ? "success" : "critical"}>
+                    {unit.status}
+                  </StatusBadge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">No units defined yet. Use Project Info to model Main, Second or Splinter work.</div>
+          )}
+        </SurfaceCard>
+
         <SurfaceCard
           className="project-scroll-card"
           title="Responsibles"
@@ -243,6 +277,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             },
             { key: "status", label: "Status", width: 110, minWidth: 92, render: (row) => row.status },
             { key: "location", label: "Location", width: 180, minWidth: 140, render: (row) => row.location },
+            { key: "unit", label: "Unit", width: 150, minWidth: 124, render: (row) => row.projectUnit },
             { key: "responsible", label: "Responsible", width: 160, minWidth: 132, render: (row) => row.responsible },
             { key: "condition", label: "Condition", width: 110, minWidth: 94, render: (row) => row.condition },
             {
@@ -285,6 +320,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               ),
             },
             { key: "responsible", label: "Responsible", width: 160, minWidth: 132, render: (row) => row.responsible },
+            { key: "unit", label: "Unit", width: 150, minWidth: 124, render: (row) => row.projectUnit },
             { key: "severity", label: "Severity", width: 100, minWidth: 90, render: (row) => row.severity },
             { key: "costEstimate", label: "Cost", align: "right", width: 110, minWidth: 96, render: (row) => row.costEstimate },
             { key: "status", label: "Status", width: 108, minWidth: 92, render: (row) => row.status },

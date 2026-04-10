@@ -13,6 +13,7 @@ import { createPackingMutationService } from "./packingMutationService";
 import { seedFoundationData } from "./foundationSeed";
 import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
 import { createProjectMutationService, ensureProjectShellDefaults } from "./projectMutationService";
+import { applySchedulingFoundationMigration, bootstrapSchedulingFoundation } from "./schedulingFoundationBootstrap";
 
 type ProjectMutationService = ReturnType<typeof createProjectMutationService>;
 type CatalogMutationService = ReturnType<typeof createCatalogMutationService>;
@@ -41,10 +42,12 @@ const createRuntime = (): LocalDatabaseRuntime => {
   database.exec("PRAGMA foreign_keys = ON;");
   database.exec(foundationMigrationSql);
   applyAdminFoundationMigration(database);
+  applySchedulingFoundationMigration(database);
   seedFoundationData(database);
   ensureProjectShellDefaults(database);
   bootstrapLegacyRentmanDemo(database);
   bootstrapAdminFoundation(database);
+  bootstrapSchedulingFoundation(database);
 
   return {
     database,

@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -13,6 +14,7 @@ import { useProjectDetail, useProjectsData } from "./useProjectsData";
 export const ProjectsPage = () => {
   const { data, error } = useProjectsData();
   const { activeProjectId, openProject, setActiveProjectId } = useShellContext();
+  const { addItems, hasItem } = useCompareTray();
   const sectionScopeLabel = useSectionScopeLabel();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = useProjectDetail(activeProjectId);
@@ -27,6 +29,46 @@ export const ProjectsPage = () => {
       />
 
       {error ? <div className="empty-state">Projects unavailable: {error}</div> : null}
+
+      <div className="chip-row">
+        <StatusBadge tone="info">Workspace registry</StatusBadge>
+        <StatusBadge tone="success">{data.filter((project) => hasItem("project", project.id)).length} in compare</StatusBadge>
+        <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : "Double click opens project workspace"}</StatusBadge>
+      </div>
+
+      {selectedRowIds.length ? (
+        <div className="selection-action-bar">
+          <div className="selection-action-copy">
+            <span className="selection-action-title">
+              {selectedRowIds.length === 1 ? "1 project selected" : `${selectedRowIds.length} projects selected`}
+            </span>
+            <span className="selection-action-subtitle">
+              Keep projects in the compare tray to prepare future side-by-side schedule, resource and budget review.
+            </span>
+          </div>
+          <div className="selection-action-buttons">
+            <button
+              className="ghost-control"
+              onClick={() =>
+                addItems(
+                  data
+                    .filter((project) => selectedRowIds.includes(project.id))
+                    .map((project) => ({
+                      id: project.id,
+                      entityType: "project" as const,
+                      label: `${project.code} · ${project.name}`,
+                      subtitle: `${project.client} · ${project.status}`,
+                      meta: project.startDate || project.endDate ? `${project.startDate ?? "Open"} - ${project.endDate ?? "Open"}` : undefined,
+                    })),
+                )
+              }
+              type="button"
+            >
+              Add to compare
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="projects-layout">
         <SurfaceCard title="Projects" subtitle="Single click inspects the registry. Double click opens the project workspace.">
@@ -53,6 +95,35 @@ export const ProjectsPage = () => {
                 width: 96,
                 minWidth: 86,
                 render: (row) => <StatusBadge>{row.status}</StatusBadge>,
+              },
+              {
+                key: "startDate",
+                label: "Start",
+                width: 108,
+                minWidth: 92,
+                render: (row) => row.startDate ?? "—",
+              },
+              {
+                key: "endDate",
+                label: "End",
+                width: 108,
+                minWidth: 92,
+                render: (row) => row.endDate ?? "—",
+              },
+              {
+                key: "colorKey",
+                label: "Color",
+                width: 94,
+                minWidth: 82,
+                render: (row) => row.colorKey ?? "Default",
+              },
+              {
+                key: "activeUnitCount",
+                label: "Units",
+                align: "right",
+                width: 74,
+                minWidth: 62,
+                render: (row) => row.activeUnitCount,
               },
               { key: "assets", label: "Assets", align: "right", width: 80, minWidth: 68, render: (row) => row.assetCount },
               {

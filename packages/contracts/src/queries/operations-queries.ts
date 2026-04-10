@@ -69,10 +69,14 @@ export type ProjectCardRow = {
   clientId: string | null;
   client: string;
   status: string;
+  startDate: string | null;
+  endDate: string | null;
+  colorKey: string | null;
   departments: string;
   exposure: string;
   assetCount: number;
   incidentCount: number;
+  activeUnitCount: number;
   description: string;
 };
 
@@ -106,6 +110,7 @@ export type CatalogCrewRow = {
   phone: string;
   notes: string;
   isActive: boolean;
+  linkedUserId: string | null;
 };
 
 export type CatalogClientRow = {
@@ -166,6 +171,8 @@ export type ProjectDetailAssetRow = {
   responsible: string;
   condition: string;
   replacementValue: string;
+  projectUnitId: string | null;
+  projectUnit: string;
 };
 
 export type ProjectDetailIncidentRow = {
@@ -176,6 +183,8 @@ export type ProjectDetailIncidentRow = {
   severity: string;
   costEstimate: string;
   status: string;
+  projectUnitId: string | null;
+  projectUnit: string;
 };
 
 export type ProjectResponsibleRow = {
@@ -192,8 +201,51 @@ export type ProjectBudgetShell = {
   note: string;
 };
 
+export type ProjectScheduleSummary = {
+  startDate: string | null;
+  endDate: string | null;
+  colorKey: string | null;
+  status: string;
+  windowLabel: string;
+};
+
+export type ProjectUnitCrewAssignmentRow = {
+  id: string;
+  crewMemberId: string;
+  fullName: string;
+  linkedUserId: string | null;
+  roleLabel: string;
+  startDate: string | null;
+  endDate: string | null;
+  notes: string;
+};
+
+export type ProjectUnitRow = {
+  id: string;
+  code: string;
+  name: string;
+  sortOrder: number;
+  status: string;
+  statusSource: "derived" | "manual_override";
+  colorKey: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  notes: string;
+  crewAssignments: ProjectUnitCrewAssignmentRow[];
+};
+
+export type ProjectTimelineSummary = {
+  activeUnits: number;
+  plannedUnits: number;
+  wrappedUnits: number;
+  cancelledUnits: number;
+};
+
 export type ProjectDetailSnapshot = {
   project: ProjectCardRow | null;
+  schedule: ProjectScheduleSummary | null;
+  units: ProjectUnitRow[];
+  timelineSummary: ProjectTimelineSummary | null;
   metrics: OverviewMetric[];
   assets: ProjectDetailAssetRow[];
   incidents: ProjectDetailIncidentRow[];

@@ -1,4 +1,5 @@
 export * from "./queries/assets-queries";
+export * from "./queries/compare-queries";
 export * from "./queries/finance-queries";
 export * from "./queries/operations-queries";
 export * from "./commands/asset-commands";
@@ -10,3 +11,4 @@ export * from "./ipc/types";
 export * from "./queries/overview-queries";
 export * from "./queries/shell-queries";
 export * from "./schemas/schema-outline";
+export * from "./schemas/project-visuals";

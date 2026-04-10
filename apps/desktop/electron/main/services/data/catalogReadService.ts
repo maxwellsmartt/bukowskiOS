@@ -81,6 +81,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
             COALESCE(email, '') AS email,
             COALESCE(phone, '') AS phone,
             COALESCE(notes, '') AS notes,
+            linked_user_id,
             is_active
           FROM crew_members
           WHERE workspace_id = ?
@@ -94,6 +95,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       email: string;
       phone: string;
       notes: string;
+      linked_user_id: string | null;
       is_active: number;
     }>;
 
@@ -251,6 +253,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         phone: row.phone,
         notes: row.notes,
         isActive: Boolean(row.is_active),
+        linkedUserId: row.linked_user_id,
       })),
       clients: clients.map((row) => ({
         id: row.id,

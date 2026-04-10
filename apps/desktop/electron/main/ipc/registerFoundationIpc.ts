@@ -1,17 +1,25 @@
 import type {
   ArchiveAssetCommand,
   AssignMoveAssetsInput,
+  AssignCrewToProjectUnitInput,
   CreateAssetCommand,
   CreateCatalogEntityInput,
   CreatePackingSlipCommand,
   CreateProjectInput,
+  CreateProjectUnitInput,
   DeleteCatalogEntityInput,
   DeleteProjectInput,
+  DeleteProjectUnitInput,
   ReportIncidentCommand,
   ReturnPackingSlipItemsCommand,
+  ScheduleTimelineRange,
+  ScheduleTimelineScale,
+  ScheduleTimelineSnapshot,
+  UnassignCrewFromProjectUnitInput,
   UpdateAssetCommand,
   UpdateCatalogEntityInput,
   UpdateProjectInput,
+  UpdateProjectUnitInput,
 } from "@contracts";
 import { ipcMain } from "electron";
 
@@ -25,6 +33,11 @@ type RegisterFoundationIpcOptions = {
     createProject: (input: CreateProjectInput) => void;
     updateProject: (input: UpdateProjectInput) => void;
     deleteProject: (input: DeleteProjectInput) => void;
+    createProjectUnit: (input: CreateProjectUnitInput) => void;
+    updateProjectUnit: (input: UpdateProjectUnitInput) => void;
+    deleteProjectUnit: (input: DeleteProjectUnitInput) => void;
+    assignCrewToProjectUnit: (input: AssignCrewToProjectUnitInput) => void;
+    unassignCrewFromProjectUnit: (input: UnassignCrewFromProjectUnitInput) => void;
   };
   catalogMutations: {
     createEntity: (input: CreateCatalogEntityInput) => void;
@@ -56,6 +69,10 @@ export const registerFoundationIpc = ({
 }: RegisterFoundationIpcOptions) => {
   ipcMain.handle(ipcChannels.shell.getBootstrap, () => foundationReads.getShellBootstrap());
   ipcMain.handle(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot());
+  ipcMain.handle(
+    ipcChannels.overview.getTimeline,
+    (_event, range: ScheduleTimelineRange, scale: ScheduleTimelineScale) => foundationReads.getScheduleTimeline(range, scale),
+  );
   ipcMain.handle(ipcChannels.assets.getList, () => foundationReads.getAssets());
   ipcMain.handle(ipcChannels.assets.getDetail, (_event, assetId: string) => foundationReads.getAssetDetail(assetId));
   ipcMain.handle(ipcChannels.assets.assignMove, (_event, input: AssignMoveAssetsInput) => assetMutations.assignMoveAssets(input));
@@ -84,6 +101,26 @@ export const registerFoundationIpc = ({
   ipcMain.handle(ipcChannels.projects.delete, (_event, input: DeleteProjectInput) => {
     projectMutations.deleteProject(input);
     return foundationReads.getProjects();
+  });
+  ipcMain.handle(ipcChannels.projects.createUnit, (_event, input: CreateProjectUnitInput) => {
+    projectMutations.createProjectUnit(input);
+    return foundationReads.getProjectDetail(input.projectId);
+  });
+  ipcMain.handle(ipcChannels.projects.updateUnit, (_event, input: UpdateProjectUnitInput) => {
+    projectMutations.updateProjectUnit(input);
+    return foundationReads.getProjectDetail(input.projectId);
+  });
+  ipcMain.handle(ipcChannels.projects.deleteUnit, (_event, input: DeleteProjectUnitInput) => {
+    projectMutations.deleteProjectUnit(input);
+    return foundationReads.getProjectDetail(input.projectId);
+  });
+  ipcMain.handle(ipcChannels.projects.assignCrewToUnit, (_event, input: AssignCrewToProjectUnitInput) => {
+    projectMutations.assignCrewToProjectUnit(input);
+    return foundationReads.getProjectDetail(input.projectId);
+  });
+  ipcMain.handle(ipcChannels.projects.unassignCrewFromUnit, (_event, input: UnassignCrewFromProjectUnitInput) => {
+    projectMutations.unassignCrewFromProjectUnit(input);
+    return foundationReads.getProjectDetail(input.projectId);
   });
   ipcMain.handle(ipcChannels.catalog.getSnapshot, () => foundationReads.getCatalogSnapshot());
   ipcMain.handle(ipcChannels.catalog.create, (_event, input: CreateCatalogEntityInput) => {

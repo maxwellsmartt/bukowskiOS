@@ -1,7 +1,8 @@
 import { AlertTriangle, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
+import { useProjectDetail } from "@features/projects/useProjectsData";
 import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 
@@ -14,6 +15,7 @@ export type IncidentAssetOption = {
 export type IncidentReportDraft = {
   assetId?: string;
   projectId?: string;
+  projectUnitId?: string;
   departmentId?: string;
   responsibleUserId?: string;
   incidentType: string;
@@ -70,6 +72,7 @@ export const IncidentReportPanel = ({
 }: IncidentReportPanelProps) => {
   const [assetId, setAssetId] = useState(initialValue?.assetId ?? "");
   const [projectId, setProjectId] = useState(initialValue?.projectId ?? "");
+  const [projectUnitId, setProjectUnitId] = useState(initialValue?.projectUnitId ?? "");
   const [departmentId, setDepartmentId] = useState(initialValue?.departmentId ?? "");
   const [responsibleUserId, setResponsibleUserId] = useState(initialValue?.responsibleUserId ?? "");
   const [incidentType, setIncidentType] = useState(initialValue?.incidentType ?? "damage");
@@ -80,6 +83,13 @@ export const IncidentReportPanel = ({
     typeof initialValue?.costEstimate === "number" ? String(initialValue.costEstimate) : "",
   );
   const [notes, setNotes] = useState(initialValue?.notes ?? "");
+  const { data: projectDetail } = useProjectDetail(normalizeOptional(projectId) ?? null);
+
+  useEffect(() => {
+    setProjectUnitId((current) =>
+      projectDetail.units.some((unit) => unit.id === current) ? current : "",
+    );
+  }, [projectDetail.units, projectId]);
 
   const selectedAssetLabel = useMemo(() => {
     const selectedAsset = assetOptions.find((option) => option.id === assetId);
@@ -90,6 +100,7 @@ export const IncidentReportPanel = ({
     await onSubmit({
       assetId: normalizeOptional(assetId),
       projectId: normalizeOptional(projectId),
+      projectUnitId: normalizeOptional(projectUnitId),
       departmentId: normalizeOptional(departmentId),
       responsibleUserId: normalizeOptional(responsibleUserId),
       incidentType,
@@ -157,6 +168,18 @@ export const IncidentReportPanel = ({
             {severityOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
+              </option>
+            ))}
+          </SelectField>
+        </label>
+
+        <label className="action-field">
+          <span className="action-field-label">Unit</span>
+          <SelectField disabled={!projectId} onChange={(event) => setProjectUnitId(event.target.value)} value={projectUnitId}>
+            <option value="">{projectId ? "No specific unit" : "Choose project first"}</option>
+            {projectDetail.units.map((unit) => (
+              <option key={unit.id} value={unit.id}>
+                {unit.code} · {unit.name}
               </option>
             ))}
           </SelectField>

@@ -8,10 +8,17 @@ type AssetIncidentContextRow = {
   asset_id: string;
   asset_name: string;
   current_project_id: string | null;
+  project_unit_id: string | null;
   current_department_id: string | null;
   current_responsible_user_id: string | null;
   active_assignment_id: string | null;
   current_location_id: string | null;
+};
+
+type ProjectUnitRow = {
+  id: string;
+  project_id: string;
+  name: string;
 };
 
 const ensureValue = (value: string, label: string) => {
@@ -64,6 +71,24 @@ const loadUserMap = (db: DatabaseSync, values: string[]) => {
     .all(...values) as Array<{ id: string; label: string }>;
 
   return new Map(rows.map((row) => [row.id, row.label]));
+};
+
+const loadProjectUnitMap = (db: DatabaseSync, values: string[]) => {
+  if (!values.length) {
+    return new Map<string, ProjectUnitRow>();
+  }
+
+  const rows = db
+    .prepare(
+      `
+        SELECT id, project_id, name
+        FROM project_units
+        WHERE id IN (${createPlaceholders(values)})
+      `,
+    )
+    .all(...values) as ProjectUnitRow[];
+
+  return new Map(rows.map((row) => [row.id, row]));
 };
 
 const ensureEntityExists = (value: string | undefined, label: string, map: Map<string, string>) => {
@@ -135,6 +160,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
                 asset_current_state.asset_id,
                 assets.name AS asset_name,
                 asset_current_state.current_project_id,
+                asset_current_state.project_unit_id,
                 asset_current_state.current_department_id,
                 asset_current_state.current_responsible_user_id,
                 asset_current_state.active_assignment_id,
@@ -153,11 +179,31 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
       throw new Error("Selected asset is no longer available in the local registry.");
     }
 
-    const nextProjectId = input.projectId ?? assetContext?.current_project_id ?? undefined;
+    const projectUnitMap = loadProjectUnitMap(db, uniqueValues([input.projectUnitId]));
+    const explicitUnit = input.projectUnitId ? projectUnitMap.get(input.projectUnitId) : undefined;
+    let nextProjectId = input.projectId ?? assetContext?.current_project_id ?? undefined;
+    let nextProjectUnitId = input.projectUnitId ?? assetContext?.project_unit_id ?? undefined;
     const nextDepartmentId = input.departmentId ?? assetContext?.current_department_id ?? undefined;
     const nextResponsibleUserId = input.responsibleUserId ?? assetContext?.current_responsible_user_id ?? undefined;
     const nextAssignmentId = input.assignmentId ?? assetContext?.active_assignment_id ?? undefined;
     const nextLocationId = assetContext?.current_location_id ?? undefined;
+
+    if (input.projectUnitId && !explicitUnit) {
+      throw new Error("Project unit not found.");
+    }
+
+    if (explicitUnit) {
+      if (nextProjectId && nextProjectId !== explicitUnit.project_id) {
+        throw new Error("Selected unit does not belong to the chosen project.");
+      }
+
+      nextProjectId = explicitUnit.project_id;
+      nextProjectUnitId = explicitUnit.id;
+    }
+
+    if (!nextProjectId) {
+      nextProjectUnitId = undefined;
+    }
 
     const projectMap = loadEntityMap(db, "projects", uniqueValues([nextProjectId]));
     const departmentMap = loadEntityMap(db, "departments", uniqueValues([nextDepartmentId]));
@@ -209,6 +255,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
             workspace_id,
             asset_id,
             project_id,
+            project_unit_id,
             department_id,
             assignment_id,
             reported_by_user_id,
@@ -227,13 +274,14 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
             created_at,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Open', ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Open', ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)
         `,
       ).run(
         incidentId,
         input.workspaceId,
         input.assetId ?? null,
         nextProjectId ?? null,
+        nextProjectUnitId ?? null,
         nextDepartmentId ?? null,
         nextAssignmentId ?? null,
         defaultActorUserId,
@@ -259,6 +307,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
           costEstimate,
           currency,
           financialStatus,
+          projectUnitId: nextProjectUnitId ?? null,
         });
 
         db.prepare(
@@ -360,6 +409,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
           incidentId,
           assetId: input.assetId ?? null,
           projectId: nextProjectId ?? null,
+          projectUnitId: nextProjectUnitId ?? null,
           responsibleUserId: nextResponsibleUserId ?? null,
           severity,
           financialStatus,

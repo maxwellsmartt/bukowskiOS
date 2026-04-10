@@ -1,4 +1,5 @@
 import { ArrowUpRight, ShieldAlert, Wrench } from "lucide-react";
+import { useState } from "react";
 
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -6,7 +7,8 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
-import { useOverviewSnapshot } from "./useOverviewSnapshot";
+import { OverviewScheduleTimeline } from "./OverviewScheduleTimeline";
+import { useOverviewSnapshot, useOverviewTimeline } from "./useOverviewSnapshot";
 
 const queueCards = [
   {
@@ -36,6 +38,8 @@ export const OverviewPage = () => (
 const OverviewContent = () => {
   const sectionScopeLabel = useSectionScopeLabel();
   const { data, error, isLoading } = useOverviewSnapshot();
+  const [timelineRange, setTimelineRange] = useState<"30d" | "90d" | "6m">("90d");
+  const { data: timelineSnapshot, isLoading: timelineLoading } = useOverviewTimeline(timelineRange, "week");
 
   return (
     <div className="page-stack">
@@ -72,6 +76,13 @@ const OverviewContent = () => {
           );
         })}
       </div>
+
+      <OverviewScheduleTimeline
+        isLoading={timelineLoading}
+        onRangeChange={setTimelineRange}
+        range={timelineRange}
+        snapshot={timelineSnapshot}
+      />
 
       <SurfaceCard
         title="Recent movements"

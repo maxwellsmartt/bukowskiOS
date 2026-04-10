@@ -18,6 +18,7 @@ type AssetStateRow = {
   asset_name: string;
   current_location_id: string | null;
   current_project_id: string | null;
+  project_unit_id: string | null;
   current_department_id: string | null;
   current_responsible_user_id: string | null;
   active_assignment_id: string | null;
@@ -33,6 +34,12 @@ type NamedEntityRow = {
 
 type CategoryEntityRow = {
   id: string;
+  name: string;
+};
+
+type ProjectUnitEntityRow = {
+  id: string;
+  project_id: string;
   name: string;
 };
 
@@ -79,6 +86,24 @@ const loadCategoryEntities = (db: DatabaseSync, values: string[]) => {
     .all(...values) as CategoryEntityRow[];
 
   return new Map(rows.map((row) => [row.id, row.name]));
+};
+
+const loadProjectUnitEntities = (db: DatabaseSync, values: string[]) => {
+  if (!values.length) {
+    return new Map<string, ProjectUnitEntityRow>();
+  }
+
+  const rows = db
+    .prepare(
+      `
+        SELECT id, project_id, name
+        FROM project_units
+        WHERE id IN (${createPlaceholders(values)})
+      `,
+    )
+    .all(...values) as ProjectUnitEntityRow[];
+
+  return new Map(rows.map((row) => [row.id, row]));
 };
 
 const loadUserEntities = (db: DatabaseSync, values: string[]) => {
@@ -220,6 +245,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
     const projectMap = loadNamedEntities(db, "projects", uniqueValues([input.projectId]));
     const departmentMap = loadNamedEntities(db, "departments", uniqueValues([input.departmentId]));
     const locationMap = loadNamedEntities(db, "locations", uniqueValues([input.targetLocationId]));
+    const projectUnitMap = loadProjectUnitEntities(db, uniqueValues([input.projectUnitId]));
     const userMap = loadUserEntities(db, uniqueValues([input.assignedToUserId, defaultActorUserId]));
 
     ensureEntityExists(input.projectId, "Project", projectMap);
@@ -227,6 +253,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
     ensureEntityExists(input.targetLocationId, "Target location", locationMap);
     ensureEntityExists(input.assignedToUserId, "Responsible user", userMap);
     ensureEntityExists(defaultActorUserId, "Actor user", userMap);
+
+    if (input.projectUnitId && !projectUnitMap.has(input.projectUnitId)) {
+      throw new Error("Project unit not found.");
+    }
 
     const assetStateRows = db
       .prepare(
@@ -236,6 +266,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             assets.name AS asset_name,
             asset_current_state.current_location_id,
             asset_current_state.current_project_id,
+            asset_current_state.project_unit_id,
             asset_current_state.current_department_id,
             asset_current_state.current_responsible_user_id,
             asset_current_state.active_assignment_id,
@@ -261,6 +292,12 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         ? assetStateRows.filter((row) => row.current_location_id !== input.targetLocationId)
         : assetStateRows.filter((row) => {
             const nextProjectId = input.projectId ?? row.current_project_id;
+            const nextProjectUnitId =
+              input.projectUnitId
+                ? input.projectUnitId
+                : input.projectId && input.projectId !== row.current_project_id
+                  ? null
+                  : row.project_unit_id;
             const nextDepartmentId = input.departmentId ?? row.current_department_id;
             const nextResponsibleUserId = input.assignedToUserId ?? row.current_responsible_user_id;
             const nextLocationId = input.targetLocationId ?? row.current_location_id;
@@ -269,6 +306,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
               row.active_assignment_id === null ||
               row.custody_status !== "assigned" ||
               row.current_project_id !== nextProjectId ||
+              row.project_unit_id !== nextProjectUnitId ||
               row.current_department_id !== nextDepartmentId ||
               row.current_responsible_user_id !== nextResponsibleUserId ||
               row.current_location_id !== nextLocationId ||
@@ -324,6 +362,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             asset_id,
             project_id,
             department_id,
+            project_unit_id,
             assigned_to_user_id,
             assigned_by_user_id,
             source_location_id,
@@ -336,7 +375,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             created_at,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
         `,
       );
       const updateAssignmentLocationStatement = db.prepare(
@@ -378,6 +417,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             current_location_id = ?,
             current_project_id = ?,
             current_department_id = ?,
+            project_unit_id = ?,
             current_responsible_user_id = ?,
             active_assignment_id = ?,
             custody_status = ?,
@@ -412,11 +452,36 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
 
       processedRows.forEach((row, index) => {
         const targetLocationId = input.targetLocationId ?? row.current_location_id;
-        const nextProjectId = input.mode === "assign" ? input.projectId ?? row.current_project_id : row.current_project_id;
+        let nextProjectId = input.mode === "assign" ? input.projectId ?? row.current_project_id : row.current_project_id;
+        let nextProjectUnitId =
+          input.mode === "assign"
+            ? input.projectId && input.projectId !== row.current_project_id
+              ? null
+              : row.project_unit_id
+            : row.project_unit_id;
         const nextDepartmentId = input.mode === "assign" ? input.departmentId ?? row.current_department_id : row.current_department_id;
         const nextResponsibleUserId =
           input.mode === "assign" ? input.assignedToUserId ?? row.current_responsible_user_id : row.current_responsible_user_id;
         let nextAssignmentId = row.active_assignment_id;
+
+        if (input.mode === "assign" && input.projectUnitId) {
+          const nextUnit = projectUnitMap.get(input.projectUnitId);
+
+          if (!nextUnit) {
+            throw new Error("Project unit not found.");
+          }
+
+          if (nextProjectId && nextProjectId !== nextUnit.project_id) {
+            throw new Error("Selected unit does not belong to the chosen project.");
+          }
+
+          nextProjectId = nextUnit.project_id;
+          nextProjectUnitId = nextUnit.id;
+        }
+
+        if (!nextProjectId) {
+          nextProjectUnitId = null;
+        }
 
         if (input.mode === "assign") {
           if (row.active_assignment_id) {
@@ -431,6 +496,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             row.asset_id,
             nextProjectId,
             nextDepartmentId,
+            nextProjectUnitId,
             nextResponsibleUserId,
             defaultActorUserId,
             row.current_location_id,
@@ -449,13 +515,19 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         const eventId = `event-${input.commandId}-${index}`;
         const projectName = nextProjectId ? projectMap.get(nextProjectId) : undefined;
         const departmentName = nextDepartmentId ? departmentMap.get(nextDepartmentId) : undefined;
+        const unitName = nextProjectUnitId ? projectUnitMap.get(nextProjectUnitId)?.name : undefined;
         const targetLocationName = targetLocationId ? locationMap.get(targetLocationId) ?? currentLocationMap.get(targetLocationId) : undefined;
         const sourceLocationName = row.current_location_id ? currentLocationMap.get(row.current_location_id) : undefined;
         const responsibleName = nextResponsibleUserId ? userMap.get(nextResponsibleUserId) : undefined;
         const note =
           input.notes?.trim() ||
           (input.mode === "assign"
-            ? buildAssignmentNote(row.asset_name, projectName ?? departmentName, responsibleName, targetLocationName)
+            ? buildAssignmentNote(
+                row.asset_name,
+                unitName ? `${projectName ?? departmentName ?? "Project"} / ${unitName}` : projectName ?? departmentName,
+                responsibleName,
+                targetLocationName,
+              )
             : buildMoveNote(row.asset_name, sourceLocationName, targetLocationName));
 
         const metadataJson = JSON.stringify({
@@ -463,6 +535,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
           previous: {
             locationId: row.current_location_id,
             projectId: row.current_project_id,
+            projectUnitId: row.project_unit_id,
             departmentId: row.current_department_id,
             responsibleUserId: row.current_responsible_user_id,
             activeAssignmentId: row.active_assignment_id,
@@ -471,6 +544,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
           next: {
             locationId: targetLocationId,
             projectId: nextProjectId,
+            projectUnitId: nextProjectUnitId,
             departmentId: nextDepartmentId,
             responsibleUserId: nextResponsibleUserId,
             activeAssignmentId: nextAssignmentId,
@@ -504,6 +578,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
           targetLocationId,
           nextProjectId,
           nextDepartmentId,
+          nextProjectUnitId,
           nextResponsibleUserId,
           nextAssignmentId,
           input.mode === "assign" ? "assigned" : row.custody_status,

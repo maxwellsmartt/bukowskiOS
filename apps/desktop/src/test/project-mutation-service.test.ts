@@ -1,34 +1,11 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-
 import { describe, expect, it } from "vitest";
-
-import { foundationMigrationSql } from "@db";
-
-import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "../../electron/main/services/data/adminFoundationBootstrap";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
-import { seedFoundationData } from "../../electron/main/services/data/foundationSeed";
-import { createProjectMutationService, ensureProjectShellDefaults } from "../../electron/main/services/data/projectMutationService";
-
-const createTempDatabase = () => {
-  const databasePath = path.join(os.tmpdir(), `bukowski-project-test-${Date.now()}-${Math.random()}.sqlite`);
-  const database = new DatabaseSync(databasePath);
-
-  database.exec("PRAGMA foreign_keys = ON;");
-  database.exec(foundationMigrationSql);
-  applyAdminFoundationMigration(database);
-  seedFoundationData(database);
-  ensureProjectShellDefaults(database);
-  bootstrapAdminFoundation(database);
-
-  return { database, databasePath };
-};
+import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
+import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("project mutation service", () => {
   it("creates, updates and deletes standalone sidebar projects", () => {
-    const { database, databasePath } = createTempDatabase();
+    const { cleanup, database } = createTestDatabase("bukowski-project-test");
     const reads = createFoundationReadService(database);
     const mutations = createProjectMutationService(database);
     const catalog = reads.getCatalogSnapshot();
@@ -60,7 +37,6 @@ describe("project mutation service", () => {
 
     expect(reads.getProjects().some((project) => project.code === "TEST")).toBe(false);
 
-    database.close();
-    fs.unlinkSync(databasePath);
+    cleanup();
   });
 });

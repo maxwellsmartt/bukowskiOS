@@ -2,6 +2,7 @@
 
 import type {
   ArchiveAssetCommand,
+  AssignCrewToProjectUnitInput,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppInfo,
@@ -14,8 +15,10 @@ import type {
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
   CreateProjectInput,
+  CreateProjectUnitInput,
   DeleteCatalogEntityInput,
   DeleteProjectInput,
+  DeleteProjectUnitInput,
   FinanceCostLinkRow,
   FinanceEntryRow,
   FinanceOverviewSnapshot,
@@ -29,10 +32,15 @@ import type {
   ReportIncidentResult,
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
+  ScheduleTimelineRange,
+  ScheduleTimelineScale,
+  ScheduleTimelineSnapshot,
   ShellBootstrap,
+  UnassignCrewFromProjectUnitInput,
   UpdateAssetCommand,
   UpdateCatalogEntityInput,
   UpdateProjectInput,
+  UpdateProjectUnitInput,
 } from "@contracts";
 
 declare global {
@@ -45,6 +53,7 @@ declare global {
     };
     bukowskiOverview?: {
       getSnapshot: () => Promise<OverviewSnapshot>;
+      getTimeline: (range: ScheduleTimelineRange, scale: ScheduleTimelineScale) => Promise<ScheduleTimelineSnapshot>;
     };
     bukowskiAssets?: {
       getList: () => Promise<AssetListRow[]>;
@@ -71,6 +80,11 @@ declare global {
       create: (input: CreateProjectInput) => Promise<ProjectCardRow[]>;
       update: (input: UpdateProjectInput) => Promise<ProjectCardRow[]>;
       remove: (input: DeleteProjectInput) => Promise<ProjectCardRow[]>;
+      createUnit: (input: CreateProjectUnitInput) => Promise<ProjectDetailSnapshot>;
+      updateUnit: (input: UpdateProjectUnitInput) => Promise<ProjectDetailSnapshot>;
+      removeUnit: (input: DeleteProjectUnitInput) => Promise<ProjectDetailSnapshot>;
+      assignCrewToUnit: (input: AssignCrewToProjectUnitInput) => Promise<ProjectDetailSnapshot>;
+      unassignCrewFromUnit: (input: UnassignCrewFromProjectUnitInput) => Promise<ProjectDetailSnapshot>;
     };
     bukowskiFinance?: {
       getOverview: () => Promise<FinanceOverviewSnapshot>;

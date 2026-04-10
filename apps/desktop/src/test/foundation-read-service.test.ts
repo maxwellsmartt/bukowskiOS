@@ -1,34 +1,10 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-
 import { describe, expect, it } from "vitest";
-
-import { foundationMigrationSql } from "@db";
-
-import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "../../electron/main/services/data/adminFoundationBootstrap";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
-import { bootstrapLegacyRentmanDemo } from "../../electron/main/services/data/legacyRentmanDemo";
-import { seedFoundationData } from "../../electron/main/services/data/foundationSeed";
-
-const createTempDatabase = () => {
-  const databasePath = path.join(os.tmpdir(), `bukowski-foundation-test-${Date.now()}-${Math.random()}.sqlite`);
-  const database = new DatabaseSync(databasePath);
-
-  database.exec("PRAGMA foreign_keys = ON;");
-  database.exec(foundationMigrationSql);
-  applyAdminFoundationMigration(database);
-  seedFoundationData(database);
-  bootstrapLegacyRentmanDemo(database);
-  bootstrapAdminFoundation(database);
-
-  return { database, databasePath };
-};
+import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("foundation read service", () => {
   it("hydrates shell, imported assets and finance snapshots from the local foundation database", () => {
-    const { database, databasePath } = createTempDatabase();
+    const { cleanup, database } = createTestDatabase("bukowski-foundation-test");
     const reads = createFoundationReadService(database);
 
     expect(reads.getShellBootstrap().workspaceName).toBe("Metadata Cine");
@@ -55,7 +31,6 @@ describe("foundation read service", () => {
     expect(reads.getFinanceOverview().metrics).toHaveLength(4);
     expect(reads.getFinanceEntries()).toHaveLength(2);
 
-    database.close();
-    fs.unlinkSync(databasePath);
+    cleanup();
   });
 });

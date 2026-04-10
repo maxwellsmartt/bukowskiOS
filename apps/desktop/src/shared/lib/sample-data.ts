@@ -229,6 +229,7 @@ export const financeCostLinks: FinanceCostLinkRow[] = [
 
 export const financeEntries: FinanceEntryRow[] = [
   {
+    id: "entry-204",
     date: "2026-04-09",
     type: "Incident reserve",
     category: "Repair",
@@ -238,6 +239,7 @@ export const financeEntries: FinanceEntryRow[] = [
     status: "Draft",
   },
   {
+    id: "entry-mon-014",
     date: "2026-04-08",
     type: "Replacement exposure",
     category: "Asset risk",

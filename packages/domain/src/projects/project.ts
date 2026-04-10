@@ -5,4 +5,7 @@ export type Project = {
   name: string;
   clientName?: string;
   status: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  colorKey?: string | null;
 };

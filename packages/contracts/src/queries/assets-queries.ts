@@ -11,6 +11,8 @@ export type AssetListRow = {
   location: string;
   projectId: string | null;
   project: string;
+  projectUnitId: string | null;
+  projectUnit: string;
   responsible: string;
   serialNumber: string;
   qrCode: string;

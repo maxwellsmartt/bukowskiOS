@@ -6,6 +6,7 @@ export type AssignAssetCommand = {
   workspaceId: string;
   assetId: string;
   projectId?: string;
+  projectUnitId?: string;
   departmentId?: string;
   assignedToUserId?: string;
   sourceLocationId?: string;
@@ -22,6 +23,7 @@ export type ReportIncidentCommand = {
   assetId?: string;
   assignmentId?: string;
   projectId?: string;
+  projectUnitId?: string;
   departmentId?: string;
   responsibleUserId?: string;
   incidentType: string;
@@ -49,6 +51,7 @@ export type AssignMoveAssetsInput = {
   assetIds: string[];
   mode: "assign" | "move";
   projectId?: string;
+  projectUnitId?: string;
   departmentId?: string;
   assignedToUserId?: string;
   targetLocationId?: string;

@@ -1,37 +1,11 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-
 import { describe, expect, it } from "vitest";
-
-import { foundationMigrationSql } from "@db";
-
-import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "../../electron/main/services/data/adminFoundationBootstrap";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createIncidentMutationService } from "../../electron/main/services/data/incidentMutationService";
-import { bootstrapLegacyRentmanDemo } from "../../electron/main/services/data/legacyRentmanDemo";
-import { seedFoundationData } from "../../electron/main/services/data/foundationSeed";
-import { ensureProjectShellDefaults } from "../../electron/main/services/data/projectMutationService";
-
-const createTempDatabase = () => {
-  const databasePath = path.join(os.tmpdir(), `bukowski-incident-mutation-test-${Date.now()}-${Math.random()}.sqlite`);
-  const database = new DatabaseSync(databasePath);
-
-  database.exec("PRAGMA foreign_keys = ON;");
-  database.exec(foundationMigrationSql);
-  applyAdminFoundationMigration(database);
-  seedFoundationData(database);
-  ensureProjectShellDefaults(database);
-  bootstrapLegacyRentmanDemo(database);
-  bootstrapAdminFoundation(database);
-
-  return { database, databasePath };
-};
+import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("incident mutation service", () => {
   it("creates incidents from asset context and project-only context with audit linkage", () => {
-    const { database, databasePath } = createTempDatabase();
+    const { cleanup, database } = createTestDatabase("bukowski-incident-mutation-test");
     const reads = createFoundationReadService(database);
     const mutations = createIncidentMutationService(database);
 
@@ -86,7 +60,6 @@ describe("incident mutation service", () => {
       .get() as { count: number };
     expect(outboxCount.count).toBeGreaterThanOrEqual(2);
 
-    database.close();
-    fs.unlinkSync(databasePath);
+    cleanup();
   });
 });

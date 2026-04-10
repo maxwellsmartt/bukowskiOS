@@ -197,6 +197,7 @@ export const AssetDetailPage = () => {
                 workspaceId: "workspace-metadata",
                 assetId: value.assetId,
                 projectId: value.projectId,
+                projectUnitId: value.projectUnitId,
                 departmentId: value.departmentId,
                 responsibleUserId: value.responsibleUserId,
                 incidentType: value.incidentType,

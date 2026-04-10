@@ -19,6 +19,7 @@ export type FinanceCostLinkRow = {
 };
 
 export type FinanceEntryRow = {
+  id: string;
   date: string;
   type: string;
   category: string;

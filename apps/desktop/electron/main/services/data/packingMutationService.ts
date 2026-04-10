@@ -16,6 +16,7 @@ type PackingAssetRow = {
   current_location_id: string | null;
   default_location_id: string | null;
   current_project_id: string | null;
+  project_unit_id: string | null;
   current_department_id: string | null;
   current_responsible_user_id: string | null;
   active_assignment_id: string | null;
@@ -29,6 +30,7 @@ type PackingAssetRow = {
 type PackingSlipRow = {
   id: string;
   project_id: string;
+  project_unit_id: string | null;
   department_id: string | null;
   responsible_user_id: string | null;
   status: string;
@@ -43,6 +45,7 @@ type PendingSlipItemRow = {
   current_location_id: string | null;
   default_location_id: string | null;
   current_project_id: string | null;
+  project_unit_id: string | null;
   current_department_id: string | null;
   current_responsible_user_id: string | null;
   active_assignment_id: string | null;
@@ -59,6 +62,12 @@ type NamedEntityRow = {
 type SlipCountRow = {
   item_count: number;
   returned_count: number | null;
+};
+
+type ProjectUnitRow = {
+  id: string;
+  project_id: string;
+  name: string;
 };
 
 const uniqueValues = (values: Array<string | null | undefined>) =>
@@ -104,6 +113,24 @@ const loadUserEntities = (db: DatabaseSync, values: string[]) => {
     .all(...values) as NamedEntityRow[];
 
   return new Map(rows.map((row) => [row.id, row.name]));
+};
+
+const loadProjectUnitEntities = (db: DatabaseSync, values: string[]) => {
+  if (!values.length) {
+    return new Map<string, ProjectUnitRow>();
+  }
+
+  const rows = db
+    .prepare(
+      `
+        SELECT id, project_id, name
+        FROM project_units
+        WHERE id IN (${createPlaceholders(values)})
+      `,
+    )
+    .all(...values) as ProjectUnitRow[];
+
+  return new Map(rows.map((row) => [row.id, row]));
 };
 
 const ensureEntityExists = (value: string | undefined, label: string, map: Map<string, string>) => {
@@ -203,12 +230,23 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
 
     const projectMap = loadNamedEntities(db, "projects", uniqueValues([input.projectId]));
     const departmentMap = loadNamedEntities(db, "departments", uniqueValues([input.departmentId]));
+    const projectUnitMap = loadProjectUnitEntities(db, uniqueValues([input.projectUnitId]));
     const userMap = loadUserEntities(db, uniqueValues([input.responsibleUserId, defaultActorUserId]));
 
     ensureEntityExists(input.projectId, "Project", projectMap);
     ensureEntityExists(input.departmentId, "Department", departmentMap);
     ensureEntityExists(input.responsibleUserId, "Responsible user", userMap);
     ensureEntityExists(defaultActorUserId, "Actor user", userMap);
+
+    const explicitProjectUnit = input.projectUnitId ? projectUnitMap.get(input.projectUnitId) : undefined;
+
+    if (input.projectUnitId && !explicitProjectUnit) {
+      throw new Error("Project unit not found.");
+    }
+
+    if (explicitProjectUnit && explicitProjectUnit.project_id !== input.projectId) {
+      throw new Error("Selected unit does not belong to the chosen project.");
+    }
 
     const assetRows = db
       .prepare(
@@ -220,6 +258,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             asset_current_state.current_location_id,
             assets.default_location_id,
             asset_current_state.current_project_id,
+            asset_current_state.project_unit_id,
             asset_current_state.current_department_id,
             asset_current_state.current_responsible_user_id,
             asset_current_state.active_assignment_id,
@@ -296,6 +335,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             id,
             workspace_id,
             project_id,
+            project_unit_id,
             department_id,
             prepared_by_user_id,
             approved_by_user_id,
@@ -307,12 +347,13 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             created_at,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, NULL, ?, 'Issued', ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'Issued', ?, ?, ?, ?, ?)
         `,
       ).run(
         packingSlipId,
         input.workspaceId,
         input.projectId,
+        explicitProjectUnit?.id ?? null,
         nextDepartmentId,
         defaultActorUserId,
         nextResponsibleUserId,
@@ -346,6 +387,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             asset_id,
             project_id,
             department_id,
+            project_unit_id,
             assigned_to_user_id,
             assigned_by_user_id,
             source_location_id,
@@ -358,7 +400,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             created_at,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'checked_out', ?, ?, NULL, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'checked_out', ?, ?, NULL, ?, ?, ?)
         `,
       );
       const updateAssignmentStatement = db.prepare(
@@ -367,6 +409,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           SET
             project_id = ?,
             department_id = ?,
+            project_unit_id = ?,
             assigned_to_user_id = ?,
             target_location_id = ?,
             assignment_status = 'checked_out',
@@ -409,6 +452,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             current_location_id = ?,
             current_project_id = ?,
             current_department_id = ?,
+            project_unit_id = ?,
             current_responsible_user_id = ?,
             active_assignment_id = ?,
             custody_status = 'checked_out',
@@ -466,6 +510,8 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
         const nextLocationId = row.current_location_id;
         const responsibleUserId = nextResponsibleUserId ?? row.current_responsible_user_id;
         const departmentId = nextDepartmentId ?? row.current_department_id;
+        const projectUnitId =
+          explicitProjectUnit?.id ?? (row.current_project_id === input.projectId ? row.project_unit_id : null);
         const itemId = `packing-item-${input.commandId}-${index}`;
         const eventId = `event-${input.commandId}-${index}`;
         const metadataJson = JSON.stringify({
@@ -474,12 +520,14 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           quantity: row.quantity,
           previous: {
             projectId: row.current_project_id,
+            projectUnitId: row.project_unit_id,
             departmentId: row.current_department_id,
             responsibleUserId: row.current_responsible_user_id,
             custodyStatus: row.custody_status,
           },
           next: {
             projectId: input.projectId,
+            projectUnitId,
             departmentId,
             responsibleUserId,
             custodyStatus: "checked_out",
@@ -498,6 +546,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           updateAssignmentStatement.run(
             input.projectId,
             departmentId,
+            projectUnitId,
             responsibleUserId,
             nextLocationId,
             now,
@@ -513,6 +562,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             row.asset_id,
             input.projectId,
             departmentId,
+            projectUnitId,
             responsibleUserId,
             defaultActorUserId,
             row.current_location_id,
@@ -549,6 +599,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           nextLocationId,
           input.projectId,
           departmentId,
+          projectUnitId,
           responsibleUserId,
           assignmentId,
           eventId,
@@ -569,6 +620,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           packingSlipId,
           slipNumber,
           projectId: input.projectId,
+          projectUnitId: explicitProjectUnit?.id ?? null,
           departmentId: nextDepartmentId,
           responsibleUserId: nextResponsibleUserId,
           status: "Issued",
@@ -648,7 +700,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
     const slip = db
       .prepare(
         `
-          SELECT id, project_id, department_id, responsible_user_id, status, return_due_date
+          SELECT id, project_id, project_unit_id, department_id, responsible_user_id, status, return_due_date
           FROM packing_slips
           WHERE id = ?
             AND workspace_id = ?
@@ -678,6 +730,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             asset_current_state.current_location_id,
             assets.default_location_id,
             asset_current_state.current_project_id,
+            asset_current_state.project_unit_id,
             asset_current_state.current_department_id,
             asset_current_state.current_responsible_user_id,
             asset_current_state.active_assignment_id,
@@ -780,6 +833,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           SET
             current_location_id = ?,
             current_project_id = NULL,
+            project_unit_id = NULL,
             current_department_id = NULL,
             current_responsible_user_id = NULL,
             active_assignment_id = NULL,
@@ -831,6 +885,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           previous: {
             locationId: row.current_location_id,
             projectId: row.current_project_id,
+            projectUnitId: row.project_unit_id,
             departmentId: row.current_department_id,
             responsibleUserId: row.current_responsible_user_id,
             assignmentId: row.active_assignment_id,

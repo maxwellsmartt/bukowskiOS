@@ -1,12 +1,14 @@
 import { PackageCheck, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
+import { useProjectDetail } from "@features/projects/useProjectsData";
 import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 
 export type PackingSlipBuilderDraft = {
   projectId: string;
+  projectUnitId?: string;
   departmentId?: string;
   responsibleUserId?: string;
   returnDueAt?: string;
@@ -42,10 +44,18 @@ export const PackingSlipBuilderPanel = ({
   users,
 }: PackingSlipBuilderPanelProps) => {
   const [projectId, setProjectId] = useState(defaultProjectId ?? "");
+  const [projectUnitId, setProjectUnitId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [responsibleUserId, setResponsibleUserId] = useState("");
   const [returnDueAt, setReturnDueAt] = useState("");
   const [notes, setNotes] = useState("");
+  const { data: projectDetail } = useProjectDetail(normalizeOptional(projectId) ?? null);
+
+  useEffect(() => {
+    setProjectUnitId((current) =>
+      projectDetail.units.some((unit) => unit.id === current) ? current : "",
+    );
+  }, [projectDetail.units, projectId]);
 
   const selectedLabel = selectedCount === 1 ? "1 asset selected" : `${selectedCount} assets selected`;
 
@@ -83,6 +93,18 @@ export const PackingSlipBuilderPanel = ({
             {users.map((user) => (
               <option key={user.id} value={user.id}>
                 {user.fullName}
+              </option>
+            ))}
+          </SelectField>
+        </label>
+
+        <label className="action-field">
+          <span className="action-field-label">Unit</span>
+          <SelectField disabled={!projectId} onChange={(event) => setProjectUnitId(event.target.value)} value={projectUnitId}>
+            <option value="">{projectId ? "No specific unit" : "Choose project first"}</option>
+            {projectDetail.units.map((unit) => (
+              <option key={unit.id} value={unit.id}>
+                {unit.code} · {unit.name}
               </option>
             ))}
           </SelectField>
@@ -134,6 +156,7 @@ export const PackingSlipBuilderPanel = ({
           onClick={() =>
             void onSubmit({
               projectId: projectId.trim(),
+              projectUnitId: normalizeOptional(projectUnitId),
               departmentId: normalizeOptional(departmentId),
               responsibleUserId: normalizeOptional(responsibleUserId),
               returnDueAt: normalizeOptional(returnDueAt),

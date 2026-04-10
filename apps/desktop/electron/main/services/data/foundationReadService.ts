@@ -12,6 +12,9 @@ import type {
   IncidentListRow,
   OverviewMetric,
   OverviewSnapshot,
+  ScheduleTimelineRange,
+  ScheduleTimelineScale,
+  ScheduleTimelineSnapshot,
   PackingSlipDetailSnapshot,
   PackingSlipItemRow,
   PackingSlipRow,
@@ -21,10 +24,13 @@ import type {
   ProjectDetailSnapshot,
   ProjectExposureRow,
   ProjectResponsibleRow,
+  ProjectUnitCrewAssignmentRow,
+  ProjectUnitRow,
   ShellBootstrap,
 } from "@contracts";
 
 import { createCatalogReadService } from "./catalogReadService";
+import { deriveProjectUnitStatus, resolveScheduleWindowLabel } from "./projectScheduling";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -60,6 +66,93 @@ const formatShortDate = (value: string | null) => {
   }
 
   return dateFormatter.format(new Date(value));
+};
+
+const isoDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "2-digit",
+});
+
+const formatDateOnlyLabel = (value: string | null) => {
+  if (!value) {
+    return "—";
+  }
+
+  return isoDateFormatter.format(new Date(`${value}T00:00:00.000Z`));
+};
+
+const todayDateOnly = () => new Date().toISOString().slice(0, 10);
+
+const addDays = (date: string, offset: number) => {
+  const nextDate = new Date(`${date}T00:00:00.000Z`);
+  nextDate.setUTCDate(nextDate.getUTCDate() + offset);
+  return nextDate.toISOString().slice(0, 10);
+};
+
+const startOfWeek = (date: string) => {
+  const nextDate = new Date(`${date}T00:00:00.000Z`);
+  const day = nextDate.getUTCDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  nextDate.setUTCDate(nextDate.getUTCDate() + offset);
+  return nextDate.toISOString().slice(0, 10);
+};
+
+const resolveTimelineWindow = (range: ScheduleTimelineRange) => {
+  const start = startOfWeek(addDays(todayDateOnly(), -7));
+
+  if (range === "30d") {
+    return {
+      start,
+      end: addDays(start, 29),
+    };
+  }
+
+  if (range === "6m") {
+    return {
+      start,
+      end: addDays(start, 181),
+    };
+  }
+
+  return {
+    start,
+    end: addDays(start, 89),
+  };
+};
+
+const compareDateOnly = (left: string | null, right: string | null) => {
+  if (!left && !right) {
+    return 0;
+  }
+
+  if (!left) {
+    return 1;
+  }
+
+  if (!right) {
+    return -1;
+  }
+
+  return left.localeCompare(right);
+};
+
+const diffDaysInclusive = (start: string, end: string) => {
+  const startTime = new Date(`${start}T00:00:00.000Z`).getTime();
+  const endTime = new Date(`${end}T00:00:00.000Z`).getTime();
+  return Math.max(0, Math.floor((endTime - startTime) / (24 * 60 * 60 * 1000)));
+};
+
+const compareProjectStatus = (status: string) => {
+  switch (status) {
+    case "Active":
+      return 0;
+    case "Prep":
+      return 1;
+    case "Wrap":
+      return 2;
+    default:
+      return 3;
+  }
 };
 
 const formatTimelineTimestamp = (value: string) => {
@@ -264,6 +357,195 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     };
   },
 
+  getScheduleTimeline(range: ScheduleTimelineRange, scale: ScheduleTimelineScale): ScheduleTimelineSnapshot {
+    const window = resolveTimelineWindow(range);
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            projects.id AS project_id,
+            projects.code AS project_code,
+            projects.name AS project_name,
+            COALESCE(clients.name, projects.client_name, '—') AS client_name,
+            projects.status AS project_status,
+            projects.color_key AS project_color_key,
+            projects.start_date AS project_start_date,
+            projects.end_date AS project_end_date,
+            project_units.id AS unit_id,
+            project_units.code AS unit_code,
+            project_units.name AS unit_name,
+            project_units.sort_order AS unit_sort_order,
+            project_units.status AS unit_status,
+            project_units.status_source AS unit_status_source,
+            project_units.color_key AS unit_color_key,
+            project_units.start_date AS unit_start_date,
+            project_units.end_date AS unit_end_date
+          FROM projects
+          LEFT JOIN clients ON clients.id = projects.client_id
+          LEFT JOIN project_units ON project_units.project_id = projects.id
+          ORDER BY projects.name, project_units.sort_order, project_units.start_date, project_units.name
+        `,
+      )
+      .all() as Array<{
+      project_id: string;
+      project_code: string;
+      project_name: string;
+      client_name: string;
+      project_status: string;
+      project_color_key: string | null;
+      project_start_date: string | null;
+      project_end_date: string | null;
+      unit_id: string | null;
+      unit_code: string | null;
+      unit_name: string | null;
+      unit_sort_order: number | null;
+      unit_status: string | null;
+      unit_status_source: string | null;
+      unit_color_key: string | null;
+      unit_start_date: string | null;
+      unit_end_date: string | null;
+    }>;
+
+    const projectMap = new Map<
+      string,
+      {
+        id: string;
+        code: string;
+        name: string;
+        client: string;
+        status: string;
+        colorKey: string | null;
+        startDate: string | null;
+        endDate: string | null;
+        activeUnitCount: number;
+        units: ScheduleTimelineSnapshot["projects"][number]["units"];
+      }
+    >();
+
+    rows.forEach((row) => {
+      const projectEntry =
+        projectMap.get(row.project_id) ??
+        {
+          id: row.project_id,
+          code: row.project_code,
+          name: row.project_name,
+          client: row.client_name,
+          status: row.project_status,
+          colorKey: row.project_color_key,
+          startDate: row.project_start_date,
+          endDate: row.project_end_date,
+          activeUnitCount: 0,
+          units: [],
+        };
+
+      if (!projectMap.has(row.project_id)) {
+        projectMap.set(row.project_id, projectEntry);
+      }
+
+      if (row.unit_id) {
+        const resolvedStatus = deriveProjectUnitStatus(
+          row.unit_start_date,
+          row.unit_end_date,
+          row.unit_status,
+          row.unit_status_source,
+        );
+
+        if (resolvedStatus.status === "active") {
+          projectEntry.activeUnitCount += 1;
+        }
+
+        projectEntry.units.push({
+          id: row.unit_id,
+          code: row.unit_code ?? "UNIT",
+          name: row.unit_name ?? "Project unit",
+          status: resolvedStatus.status,
+          statusSource: resolvedStatus.statusSource,
+          colorKey: row.unit_color_key,
+          startDate: row.unit_start_date,
+          endDate: row.unit_end_date,
+          sortOrder: row.unit_sort_order ?? 0,
+        });
+      }
+    });
+
+    const markers = Array.from({ length: Math.ceil((diffDaysInclusive(window.start, window.end) + 1) / 7) })
+      .map((_, index) => {
+        const markerStart = addDays(window.start, index * 7);
+        if (markerStart > window.end) {
+          return null;
+        }
+
+        const markerEnd = addDays(markerStart, 6) > window.end ? window.end : addDays(markerStart, 6);
+        return {
+          key: markerStart,
+          label: formatDateOnlyLabel(markerStart),
+          startDate: markerStart,
+          endDate: markerEnd,
+        };
+      })
+      .filter((marker): marker is ScheduleTimelineSnapshot["markers"][number] => Boolean(marker));
+
+    const scheduledProjects: ScheduleTimelineSnapshot["projects"] = [];
+    const unscheduled: ScheduleTimelineSnapshot["unscheduled"] = [];
+
+    projectMap.forEach((project) => {
+      project.units.sort((left, right) => {
+        const sortOrderDelta = left.sortOrder - right.sortOrder;
+        if (sortOrderDelta !== 0) {
+          return sortOrderDelta;
+        }
+
+        const dateDelta = compareDateOnly(left.startDate, right.startDate);
+        if (dateDelta !== 0) {
+          return dateDelta;
+        }
+
+        return left.name.localeCompare(right.name);
+      });
+
+      if (!project.startDate && !project.endDate) {
+        unscheduled.push({
+          id: project.id,
+          code: project.code,
+          name: project.name,
+          client: project.client,
+          status: project.status,
+          colorKey: project.colorKey,
+          activeUnitCount: project.activeUnitCount,
+        });
+        return;
+      }
+
+      scheduledProjects.push(project);
+    });
+
+    scheduledProjects.sort((left, right) => {
+      const statusDelta = compareProjectStatus(left.status) - compareProjectStatus(right.status);
+      if (statusDelta !== 0) {
+        return statusDelta;
+      }
+
+      const dateDelta = compareDateOnly(left.startDate, right.startDate);
+      if (dateDelta !== 0) {
+        return dateDelta;
+      }
+
+      return left.code.localeCompare(right.code);
+    });
+
+    unscheduled.sort((left, right) => left.code.localeCompare(right.code));
+
+    return {
+      range,
+      scale,
+      rangeStart: window.start,
+      rangeEnd: window.end,
+      markers,
+      projects: scheduledProjects,
+      unscheduled,
+    };
+  },
+
   getAssets(): AssetListRow[] {
     const rows = db
       .prepare(
@@ -281,6 +563,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             COALESCE(locations.name, '—') AS location,
             asset_current_state.current_project_id AS project_id,
             COALESCE(projects.name, '—') AS project,
+            asset_current_state.project_unit_id AS project_unit_id,
+            COALESCE(project_units.name, '—') AS project_unit,
             COALESCE(users.full_name, '—') AS responsible,
             COALESCE(legacy_rentman_items.serial_number, assets.serial_number, '—') AS serial_number,
             COALESCE(legacy_rentman_items.qr_code_value, assets.qr_code_value, '—') AS qr_code_value,
@@ -306,6 +590,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           LEFT JOIN legacy_rentman_imports ON legacy_rentman_imports.id = legacy_rentman_items.import_id
           LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
           LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
+          LEFT JOIN project_units ON project_units.id = asset_current_state.project_unit_id
           LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
           WHERE assets.is_active = 1
           ORDER BY assets.name
@@ -324,6 +609,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       location: string;
       project_id: string | null;
       project: string;
+      project_unit_id: string | null;
+      project_unit: string;
       responsible: string;
       serial_number: string;
       qr_code_value: string;
@@ -347,6 +634,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       location: row.location,
       projectId: row.project_id,
       project: row.project,
+      projectUnitId: row.project_unit_id,
+      projectUnit: row.project_unit,
       responsible: row.responsible,
       serialNumber: row.serial_number,
       qrCode: row.qr_code_value,
@@ -836,6 +1125,9 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             projects.client_id,
             COALESCE(clients.name, projects.client_name, '—') AS client_name,
             projects.status,
+            projects.start_date,
+            projects.end_date,
+            projects.color_key,
             COALESCE(projects.description, '—') AS description,
             COALESCE((
               SELECT group_concat(name, ', ')
@@ -862,6 +1154,13 @@ export const createFoundationReadService = (db: DatabaseSync) => {
               FROM incidents
               WHERE incidents.project_id = projects.id
             ), 0) AS incident_count
+            ,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM project_units
+              WHERE project_units.project_id = projects.id
+                AND project_units.status = 'active'
+            ), 0) AS active_unit_count
           FROM projects
           LEFT JOIN clients ON clients.id = projects.client_id
           ORDER BY CASE projects.status
@@ -878,11 +1177,15 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       client_id: string | null;
       client_name: string;
       status: string;
+      start_date: string | null;
+      end_date: string | null;
+      color_key: string | null;
       description: string;
       departments: string;
       exposure: number;
       asset_count: number;
       incident_count: number;
+      active_unit_count: number;
     }>;
 
     return rows.map((row) => ({
@@ -892,10 +1195,14 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       clientId: row.client_id,
       client: row.client_name,
       status: row.status,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      colorKey: row.color_key,
       departments: row.departments,
       exposure: formatCurrency(row.exposure),
       assetCount: row.asset_count,
       incidentCount: row.incident_count,
+      activeUnitCount: row.active_unit_count,
       description: row.description,
     }));
   },
@@ -911,6 +1218,9 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             projects.client_id,
             COALESCE(clients.name, projects.client_name, '—') AS client_name,
             projects.status,
+            projects.start_date,
+            projects.end_date,
+            projects.color_key,
             COALESCE(projects.description, '—') AS description,
             COALESCE((
               SELECT group_concat(name, ', ')
@@ -957,6 +1267,9 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           client_id: string | null;
           client_name: string;
           status: string;
+          start_date: string | null;
+          end_date: string | null;
+          color_key: string | null;
           description: string;
           departments: string;
           exposure: number;
@@ -969,6 +1282,9 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     if (!project) {
       return {
         project: null,
+        schedule: null,
+        units: [],
+        timelineSummary: null,
         metrics: [],
         assets: [],
         incidents: [],
@@ -995,12 +1311,15 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             asset_current_state.condition_status,
             COALESCE(locations.name, '—') AS location,
             COALESCE(users.full_name, '—') AS responsible,
-            assets.replacement_value
+            assets.replacement_value,
+            asset_current_state.project_unit_id,
+            COALESCE(project_units.name, '—') AS project_unit
           FROM asset_current_state
           JOIN assets ON assets.id = asset_current_state.asset_id
           LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
           LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
           LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
+          LEFT JOIN project_units ON project_units.id = asset_current_state.project_unit_id
           LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
           WHERE asset_current_state.current_project_id = ?
           ORDER BY users.full_name IS NULL, users.full_name, assets.name
@@ -1016,6 +1335,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       location: string;
       responsible: string;
       replacement_value: number | null;
+      project_unit_id: string | null;
+      project_unit: string;
     }>;
 
     const incidents = db
@@ -1028,9 +1349,12 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             COALESCE(users.full_name, '—') AS responsible,
             incidents.severity,
             incidents.cost_estimate,
-            incidents.status
+            incidents.status,
+            incidents.project_unit_id,
+            COALESCE(project_units.name, '—') AS project_unit
           FROM incidents
           LEFT JOIN assets ON assets.id = incidents.asset_id
+          LEFT JOIN project_units ON project_units.id = incidents.project_unit_id
           LEFT JOIN users ON users.id = incidents.responsible_user_id
           WHERE incidents.project_id = ?
           ORDER BY CASE incidents.status
@@ -1048,6 +1372,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       severity: string;
       cost_estimate: number | null;
       status: string;
+      project_unit_id: string | null;
+      project_unit: string;
     }>;
 
     const responsibles = db
@@ -1107,6 +1433,56 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       committed_amount: number;
     };
 
+    const unitRows = db
+      .prepare(
+        `
+          SELECT
+            project_units.id,
+            project_units.code,
+            project_units.name,
+            project_units.sort_order,
+            project_units.status,
+            project_units.status_source,
+            project_units.color_key,
+            project_units.start_date,
+            project_units.end_date,
+            COALESCE(project_units.notes, '') AS notes,
+            project_unit_crew_assignments.id AS assignment_id,
+            project_unit_crew_assignments.crew_member_id,
+            COALESCE(crew_members.full_name, '—') AS crew_full_name,
+            crew_members.linked_user_id,
+            COALESCE(project_unit_crew_assignments.role_label, COALESCE(crew_members.role_label, 'Crew')) AS role_label,
+            project_unit_crew_assignments.start_date AS assignment_start_date,
+            project_unit_crew_assignments.end_date AS assignment_end_date,
+            COALESCE(project_unit_crew_assignments.notes, '') AS assignment_notes
+          FROM project_units
+          LEFT JOIN project_unit_crew_assignments ON project_unit_crew_assignments.project_unit_id = project_units.id
+          LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
+          WHERE project_units.project_id = ?
+          ORDER BY project_units.sort_order, project_units.start_date, project_units.name, crew_members.full_name
+        `,
+      )
+      .all(projectId) as Array<{
+      id: string;
+      code: string;
+      name: string;
+      sort_order: number;
+      status: string;
+      status_source: "derived" | "manual_override";
+      color_key: string | null;
+      start_date: string | null;
+      end_date: string | null;
+      notes: string;
+      assignment_id: string | null;
+      crew_member_id: string | null;
+      crew_full_name: string;
+      linked_user_id: string | null;
+      role_label: string;
+      assignment_start_date: string | null;
+      assignment_end_date: string | null;
+      assignment_notes: string;
+    }>;
+
     const detailMetrics: OverviewMetric[] = [
       { label: "Assigned assets", value: String(project.asset_count), tone: "info" },
       { label: "Open incidents", value: String(incidents.filter((row) => row.status !== "Closed").length), tone: "critical" },
@@ -1123,6 +1499,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       responsible: row.responsible,
       condition: row.condition_status,
       replacementValue: formatCurrency(row.replacement_value),
+      projectUnitId: row.project_unit_id,
+      projectUnit: row.project_unit,
     }));
 
     const incidentRows: ProjectDetailIncidentRow[] = incidents.map((row) => ({
@@ -1133,6 +1511,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       severity: row.severity,
       costEstimate: formatCurrency(row.cost_estimate),
       status: row.status,
+      projectUnitId: row.project_unit_id,
+      projectUnit: row.project_unit,
     }));
 
     const responsibleRows: ProjectResponsibleRow[] = responsibles.map((row) => ({
@@ -1140,6 +1520,52 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       assetCount: row.asset_count,
       incidentCount: row.incident_count,
     }));
+
+    const unitsMap = new Map<string, ProjectUnitRow>();
+
+    unitRows.forEach((row) => {
+      const derived = deriveProjectUnitStatus(row.start_date, row.end_date, row.status, row.status_source);
+      const unit =
+        unitsMap.get(row.id) ??
+        {
+          id: row.id,
+          code: row.code,
+          name: row.name,
+          sortOrder: row.sort_order,
+          status: derived.status,
+          statusSource: derived.statusSource,
+          colorKey: row.color_key,
+          startDate: row.start_date,
+          endDate: row.end_date,
+          notes: row.notes,
+          crewAssignments: [],
+        };
+
+      if (!unitsMap.has(row.id)) {
+        unitsMap.set(row.id, unit);
+      }
+
+      if (row.assignment_id && row.crew_member_id) {
+        unit.crewAssignments.push({
+          id: row.assignment_id,
+          crewMemberId: row.crew_member_id,
+          fullName: row.crew_full_name,
+          linkedUserId: row.linked_user_id,
+          roleLabel: row.role_label,
+          startDate: row.assignment_start_date,
+          endDate: row.assignment_end_date,
+          notes: row.assignment_notes,
+        });
+      }
+    });
+
+    const units = Array.from(unitsMap.values());
+    const timelineSummary = {
+      activeUnits: units.filter((unit) => unit.status === "active").length,
+      plannedUnits: units.filter((unit) => unit.status === "planned").length,
+      wrappedUnits: units.filter((unit) => unit.status === "wrapped").length,
+      cancelledUnits: units.filter((unit) => unit.status === "cancelled").length,
+    };
 
     const hasBudgetEntries = budgetRow.total_entries > 0;
 
@@ -1151,12 +1577,25 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         clientId: project.client_id,
         client: project.client_name,
         status: project.status,
+        startDate: project.start_date,
+        endDate: project.end_date,
+        colorKey: project.color_key,
         departments: project.departments,
         exposure: formatCurrency(project.exposure),
         assetCount: project.asset_count,
         incidentCount: project.incident_count,
+        activeUnitCount: timelineSummary.activeUnits,
         description: project.description,
       },
+      schedule: {
+        startDate: project.start_date,
+        endDate: project.end_date,
+        colorKey: project.color_key,
+        status: project.status,
+        windowLabel: resolveScheduleWindowLabel(project.start_date, project.end_date),
+      },
+      units,
+      timelineSummary,
       metrics: detailMetrics,
       assets: assetRows,
       incidents: incidentRows,
@@ -1311,6 +1750,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       .prepare(
         `
           SELECT
+            financial_entries.id,
             financial_entries.entry_date,
             financial_entries.entry_type,
             financial_entries.category,
@@ -1326,6 +1766,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         `,
       )
       .all() as Array<{
+      id: string;
       entry_date: string;
       entry_type: string;
       category: string;
@@ -1336,6 +1777,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     }>;
 
     return rows.map((row) => ({
+      id: row.id,
       date: row.entry_date,
       type: row.entry_type,
       category: row.category,

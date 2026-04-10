@@ -6,6 +6,7 @@ import { AppRoutes } from "@app/routing/routes";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
+import { CompareTrayBar } from "./CompareTrayBar";
 import { assetsSubnav, buildProjectSubnav, financeSubnav } from "./navigation";
 import { ShellErrorBoundary } from "./ShellErrorBoundary";
 import { ShellSidebar } from "./ShellSidebar";
@@ -120,6 +121,7 @@ export const AppShell = () => {
             </ShellErrorBoundary>
           )}
         </main>
+        <CompareTrayBar />
       </div>
     </div>
   );

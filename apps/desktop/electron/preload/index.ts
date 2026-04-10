@@ -15,8 +15,10 @@ import type {
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
   CreateProjectInput,
+  CreateProjectUnitInput,
   DeleteCatalogEntityInput,
   DeleteProjectInput,
+  DeleteProjectUnitInput,
   FinanceCostLinkRow,
   FinanceEntryRow,
   FinanceOverviewSnapshot,
@@ -30,10 +32,16 @@ import type {
   ReportIncidentResult,
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
+  ScheduleTimelineRange,
+  ScheduleTimelineScale,
+  ScheduleTimelineSnapshot,
   ShellBootstrap,
+  AssignCrewToProjectUnitInput,
+  UnassignCrewFromProjectUnitInput,
   UpdateAssetCommand,
   UpdateCatalogEntityInput,
   UpdateProjectInput,
+  UpdateProjectUnitInput,
 } from "@contracts";
 
 const bukowskiApp = {
@@ -46,6 +54,8 @@ const bukowskiShell = {
 
 const bukowskiOverview = {
   getSnapshot: () => ipcRenderer.invoke(ipcChannels.overview.getSnapshot) as Promise<OverviewSnapshot>,
+  getTimeline: (range: ScheduleTimelineRange, scale: ScheduleTimelineScale) =>
+    ipcRenderer.invoke(ipcChannels.overview.getTimeline, range, scale) as Promise<ScheduleTimelineSnapshot>,
 };
 
 const bukowskiAssets = {
@@ -85,6 +95,16 @@ const bukowskiProjects = {
   create: (input: CreateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.create, input) as Promise<ProjectCardRow[]>,
   update: (input: UpdateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.update, input) as Promise<ProjectCardRow[]>,
   remove: (input: DeleteProjectInput) => ipcRenderer.invoke(ipcChannels.projects.delete, input) as Promise<ProjectCardRow[]>,
+  createUnit: (input: CreateProjectUnitInput) =>
+    ipcRenderer.invoke(ipcChannels.projects.createUnit, input) as Promise<ProjectDetailSnapshot>,
+  updateUnit: (input: UpdateProjectUnitInput) =>
+    ipcRenderer.invoke(ipcChannels.projects.updateUnit, input) as Promise<ProjectDetailSnapshot>,
+  removeUnit: (input: DeleteProjectUnitInput) =>
+    ipcRenderer.invoke(ipcChannels.projects.deleteUnit, input) as Promise<ProjectDetailSnapshot>,
+  assignCrewToUnit: (input: AssignCrewToProjectUnitInput) =>
+    ipcRenderer.invoke(ipcChannels.projects.assignCrewToUnit, input) as Promise<ProjectDetailSnapshot>,
+  unassignCrewFromUnit: (input: UnassignCrewFromProjectUnitInput) =>
+    ipcRenderer.invoke(ipcChannels.projects.unassignCrewFromUnit, input) as Promise<ProjectDetailSnapshot>,
 };
 
 const bukowskiFinance = {

@@ -1,4 +1,13 @@
-import type { CreateCatalogEntityInput, DeleteCatalogEntityInput, UpdateCatalogEntityInput } from "@contracts";
+import type {
+  AssignCrewToProjectUnitInput,
+  CreateCatalogEntityInput,
+  CreateProjectUnitInput,
+  DeleteCatalogEntityInput,
+  DeleteProjectUnitInput,
+  UnassignCrewFromProjectUnitInput,
+  UpdateCatalogEntityInput,
+  UpdateProjectUnitInput,
+} from "@contracts";
 import type { CatalogSnapshot, ProjectCardRow, ProjectDetailSnapshot } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 import { useShellContext } from "@shared/hooks/useShellContext";
@@ -18,6 +27,9 @@ const emptyCatalog: CatalogSnapshot = {
 
 const emptyProjectDetail: ProjectDetailSnapshot = {
   project: null,
+  schedule: null,
+  units: [],
+  timelineSummary: null,
   metrics: [],
   assets: [],
   incidents: [],
@@ -92,4 +104,46 @@ export const deleteCatalogEntity = async (input: DeleteCatalogEntityInput): Prom
   }
 
   return window.bukowskiCatalog.remove(input);
+};
+
+export const createProjectUnit = async (input: CreateProjectUnitInput): Promise<ProjectDetailSnapshot> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.createUnit(input);
+};
+
+export const updateProjectUnit = async (input: UpdateProjectUnitInput): Promise<ProjectDetailSnapshot> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.updateUnit(input);
+};
+
+export const deleteProjectUnit = async (input: DeleteProjectUnitInput): Promise<ProjectDetailSnapshot> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.removeUnit(input);
+};
+
+export const assignCrewToProjectUnit = async (input: AssignCrewToProjectUnitInput): Promise<ProjectDetailSnapshot> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.assignCrewToUnit(input);
+};
+
+export const unassignCrewFromProjectUnit = async (
+  input: UnassignCrewFromProjectUnitInput,
+): Promise<ProjectDetailSnapshot> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.unassignCrewFromUnit(input);
 };

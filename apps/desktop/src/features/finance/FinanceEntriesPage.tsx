@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -10,6 +11,7 @@ import { useFinanceEntries } from "./useFinanceData";
 
 export const FinanceEntriesPage = () => {
   const { data, error } = useFinanceEntries();
+  const { addItems, hasItem } = useCompareTray();
   const sectionScopeLabel = useSectionScopeLabel();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
@@ -24,9 +26,49 @@ export const FinanceEntriesPage = () => {
 
       {error ? <div className="empty-state">Entries unavailable: {error}</div> : null}
 
+      <div className="chip-row">
+        <StatusBadge tone="info">Operational finance hooks</StatusBadge>
+        <StatusBadge tone="success">{data.filter((entry) => hasItem("financial_entry", entry.id)).length} in compare</StatusBadge>
+        <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : "Workspace-wide finance shell"}</StatusBadge>
+      </div>
+
+      {selectedRowIds.length ? (
+        <div className="selection-action-bar">
+          <div className="selection-action-copy">
+            <span className="selection-action-title">
+              {selectedRowIds.length === 1 ? "1 finance entry selected" : `${selectedRowIds.length} finance entries selected`}
+            </span>
+            <span className="selection-action-subtitle">
+              Keep cost-bearing entries in the compare tray for future exposure and reserve comparisons.
+            </span>
+          </div>
+          <div className="selection-action-buttons">
+            <button
+              className="ghost-control"
+              onClick={() =>
+                addItems(
+                  data
+                    .filter((entry) => selectedRowIds.includes(entry.id))
+                    .map((entry) => ({
+                      id: entry.id,
+                      entityType: "financial_entry" as const,
+                      label: `${entry.reference} · ${entry.amount}`,
+                      subtitle: `${entry.category} · ${entry.project}`,
+                      meta: entry.type,
+                    })),
+                )
+              }
+              type="button"
+            >
+              Add to compare
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <SurfaceCard title="Entry register" subtitle="Current financial entries linked to projects, assets and incidents.">
         <DataTable
-          getRowId={(row) => `${row.date}-${row.reference}-${row.amount}`}
+          getRowId={(row) => row.id}
           maxHeight="min(56vh, 620px)"
           persistKey="finance-entries"
           columns={[

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Plus, SquarePen, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { PackingSlipBuilderPanel, type PackingSlipBuilderDraft } from "@features/packing/PackingSlipBuilderPanel";
 import { createPackingSlip } from "@features/packing/usePackingData";
 import { useCatalogData } from "@features/projects/useProjectsData";
@@ -28,6 +29,7 @@ export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageP
 
 const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const { activeProject, projects, refreshProjects } = useShellContext();
+  const { addItems, hasItem } = useCompareTray();
   const isProjectMode = Boolean(projectId);
   const effectiveProjectName = projectName ?? (isProjectMode ? activeProject?.name ?? null : null);
   const sectionScopeLabel = useSectionScopeLabel();
@@ -65,6 +67,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         assetIds: selectedRowIds,
         mode: formValue.mode,
         projectId: formValue.projectId,
+        projectUnitId: formValue.projectUnitId,
         departmentId: formValue.departmentId,
         assignedToUserId: formValue.assignedToUserId,
         targetLocationId: formValue.targetLocationId,
@@ -94,6 +97,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         workspaceId: "workspace-metadata",
         assetIds: selectedRowIds,
         projectId: formValue.projectId,
+        projectUnitId: formValue.projectUnitId,
         departmentId: formValue.departmentId,
         responsibleUserId: formValue.responsibleUserId,
         returnDueAt: formValue.returnDueAt ? new Date(formValue.returnDueAt).toISOString() : undefined,
@@ -206,6 +210,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       { key: "custody", label: "Custody", width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.custody },
       { key: "location", label: "Location", width: 190, minWidth: 150, render: (row: (typeof assets)[number]) => row.location },
       { key: "project", label: "Project", width: 170, minWidth: 140, render: (row: (typeof assets)[number]) => row.project },
+      { key: "projectUnit", label: "Unit", width: 150, minWidth: 124, render: (row: (typeof assets)[number]) => row.projectUnit },
       { key: "responsible", label: "Responsible", width: 160, minWidth: 132, render: (row: (typeof assets)[number]) => row.responsible },
       { key: "serialNumber", label: "Serial", width: 150, minWidth: 120, render: (row: (typeof assets)[number]) => row.serialNumber },
       { key: "qrCode", label: "QR", width: 130, minWidth: 108, render: (row: (typeof assets)[number]) => row.qrCode },
@@ -238,6 +243,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         <StatusBadge tone="info">Live registry</StatusBadge>
         <StatusBadge tone="warning">Legacy import</StatusBadge>
         <StatusBadge tone="critical">Open issues</StatusBadge>
+        <StatusBadge tone="success">{assets.filter((asset) => hasItem("asset", asset.id)).length} in compare</StatusBadge>
         <StatusBadge>
           {selectedRowIds.length
             ? `${selectedRowIds.length} selected`
@@ -263,6 +269,25 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             </span>
           </div>
           <div className="selection-action-buttons">
+            <button
+              className="ghost-control"
+              onClick={() =>
+                addItems(
+                  assets
+                    .filter((asset) => selectedRowIds.includes(asset.id))
+                    .map((asset) => ({
+                      id: asset.id,
+                      entityType: "asset" as const,
+                      label: `${asset.code} · ${asset.name}`,
+                      subtitle: `${asset.location} · ${asset.project}`,
+                      meta: asset.projectUnit && asset.projectUnit !== "—" ? `Unit · ${asset.projectUnit}` : undefined,
+                    })),
+                )
+              }
+              type="button"
+            >
+              Add to compare
+            </button>
             <button
               className="ghost-control"
               onClick={() => {

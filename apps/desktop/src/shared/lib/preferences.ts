@@ -1,4 +1,5 @@
 export const uiPreferenceKeys = {
+  compareTrayState: "compare-tray-state",
   activePackingSlipId: "active-packing-slip-id",
   activeProjectId: "active-project-id",
   lastGlobalRoutePath: "last-global-route-path",

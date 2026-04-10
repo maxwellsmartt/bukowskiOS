@@ -1,13 +1,15 @@
 import { ArrowRightLeft, PackagePlus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
+import { useProjectDetail } from "@features/projects/useProjectsData";
 import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 
 export type AssetAssignMoveFormValue = {
   mode: "assign" | "move";
   projectId?: string;
+  projectUnitId?: string;
   departmentId?: string;
   assignedToUserId?: string;
   targetLocationId?: string;
@@ -47,16 +49,23 @@ export const AssetAssignMovePanel = ({
 }: AssetAssignMovePanelProps) => {
   const [mode, setMode] = useState<"assign" | "move">("assign");
   const [projectId, setProjectId] = useState(defaultProjectId ?? "");
+  const [projectUnitId, setProjectUnitId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [assignedToUserId, setAssignedToUserId] = useState("");
   const [targetLocationId, setTargetLocationId] = useState("");
   const [expectedReturnAt, setExpectedReturnAt] = useState("");
   const [notes, setNotes] = useState("");
+  const { data: projectDetail } = useProjectDetail(mode === "assign" ? normalizeOptional(projectId) ?? null : null);
+
+  useEffect(() => {
+    setProjectUnitId("");
+  }, [projectId, mode]);
 
   const handleSubmit = async () => {
     await onSubmit({
       mode,
       projectId: mode === "assign" ? normalizeOptional(projectId) : undefined,
+      projectUnitId: mode === "assign" ? normalizeOptional(projectUnitId) : undefined,
       departmentId: mode === "assign" ? normalizeOptional(departmentId) : undefined,
       assignedToUserId: mode === "assign" ? normalizeOptional(assignedToUserId) : undefined,
       targetLocationId: normalizeOptional(targetLocationId),
@@ -134,6 +143,18 @@ export const AssetAssignMovePanel = ({
                 {departments.map((department) => (
                   <option key={department.id} value={department.id}>
                     {department.code} · {department.name}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
+
+            <label className="action-field">
+              <span className="action-field-label">Unit</span>
+              <SelectField disabled={!projectId} onChange={(event) => setProjectUnitId(event.target.value)} value={projectUnitId}>
+                <option value="">{projectId ? "No specific unit" : "Choose project first"}</option>
+                {projectDetail.units.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.code} · {unit.name}
                   </option>
                 ))}
               </SelectField>

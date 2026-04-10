@@ -1,37 +1,11 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-
 import { describe, expect, it } from "vitest";
-
-import { foundationMigrationSql } from "@db";
-
-import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "../../electron/main/services/data/adminFoundationBootstrap";
 import { createCatalogMutationService } from "../../electron/main/services/data/catalogMutationService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
-import { seedFoundationData } from "../../electron/main/services/data/foundationSeed";
-import { bootstrapLegacyRentmanDemo } from "../../electron/main/services/data/legacyRentmanDemo";
-import { ensureProjectShellDefaults } from "../../electron/main/services/data/projectMutationService";
-
-const createTempDatabase = () => {
-  const databasePath = path.join(os.tmpdir(), `bukowski-catalog-mutation-test-${Date.now()}-${Math.random()}.sqlite`);
-  const database = new DatabaseSync(databasePath);
-
-  database.exec("PRAGMA foreign_keys = ON;");
-  database.exec(foundationMigrationSql);
-  applyAdminFoundationMigration(database);
-  seedFoundationData(database);
-  ensureProjectShellDefaults(database);
-  bootstrapLegacyRentmanDemo(database);
-  bootstrapAdminFoundation(database);
-
-  return { database, databasePath };
-};
+import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("catalog mutation service", () => {
   it("creates, updates and guards global catalog entities", () => {
-    const { database, databasePath } = createTempDatabase();
+    const { cleanup, database } = createTestDatabase("bukowski-catalog-mutation-test");
     const mutations = createCatalogMutationService(database);
     const reads = createFoundationReadService(database);
 
@@ -106,7 +80,6 @@ describe("catalog mutation service", () => {
     snapshot = reads.getCatalogSnapshot();
     expect(snapshot.categories.some((category) => category.id === createdCategory!.id)).toBe(false);
 
-    database.close();
-    fs.unlinkSync(databasePath);
+    cleanup();
   });
 });
