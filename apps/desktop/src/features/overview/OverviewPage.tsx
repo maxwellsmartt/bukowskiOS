@@ -94,6 +94,8 @@ const OverviewContent = () => {
             { key: "actor", label: "Handled by", render: (row) => row.actor },
             { key: "time", label: "Time", align: "right", render: (row) => row.timestamp },
           ]}
+          maxHeight="min(44vh, 420px)"
+          persistKey="overview-recent-movements"
           rows={data.recentMovements}
         />
       </SurfaceCard>

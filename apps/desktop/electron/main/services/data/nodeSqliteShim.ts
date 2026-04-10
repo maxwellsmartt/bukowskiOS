@@ -18,8 +18,6 @@ type NodeSqliteModule = {
   DatabaseSync: new (databasePath: string) => DatabaseAdapter;
 };
 
-let didReportFallback = false;
-
 const withSuppressedSqliteWarning = <T>(callback: () => T) => {
   const originalEmitWarning = process.emitWarning.bind(process);
 
@@ -55,11 +53,6 @@ export class DatabaseSync {
     try {
       this.connection = new BetterSqlite3(databasePath) as unknown as DatabaseAdapter;
     } catch (error) {
-      if (!didReportFallback) {
-        didReportFallback = true;
-        console.info("Electron runtime is using the local node:sqlite fallback for storage until a matching better-sqlite3 build is available.");
-      }
-
       this.connection = createNodeSqliteAdapter(databasePath);
     }
   }

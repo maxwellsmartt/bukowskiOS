@@ -41,16 +41,18 @@ a {
   --sidebar-width: 248px;
   display: grid;
   grid-template-columns: var(--sidebar-width) 10px minmax(0, 1fr);
+  height: 100vh;
   min-height: 100vh;
   padding-top: var(--window-top-safe);
   background: var(--bg-shell);
 }
 
 .shell-sidebar {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 18px;
   min-width: 0;
+  min-height: 0;
   padding: 12px 14px 14px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 24%),
@@ -66,7 +68,8 @@ a {
   flex-direction: column;
   gap: 18px;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding-right: 4px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
@@ -182,7 +185,6 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-direction: column;
   gap: 8px;
   min-height: 0;
-  flex: 1;
 }
 
 .shell-projects-header {
@@ -367,6 +369,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
   min-width: 0;
   padding: 10px 14px 14px;
 }
@@ -1161,6 +1164,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   gap: var(--space-md);
+  align-items: start;
+  min-height: 0;
 }
 
 .queue-list {
