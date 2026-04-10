@@ -1,18 +1,24 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import type { AppInfo, CreateProjectInput, ProjectCardRow, ShellBootstrap, UpdateProjectInput } from "@contracts";
+import type { ProjectRouteSection, ScopeMode } from "@app/routing/route-meta";
+import { resolveActiveRoute, resolveRememberedGlobalPath } from "@app/routing/route-meta";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 type ShellContextValue = {
   appInfo: AppInfo | null;
   workspaceName: string;
-  projectScope: string;
+  scopeMode: ScopeMode;
+  scopeChipLabel: string;
   syncLabel: string;
   projects: ProjectCardRow[];
   activeProjectId: string | null;
   activeProject: ProjectCardRow | null;
+  activeProjectRouteSection: ProjectRouteSection | null;
   projectsError: string | null;
   setActiveProjectId: (projectId: string | null) => void;
+  openProject: (projectId: string, section?: ProjectRouteSection) => void;
   refreshProjects: () => Promise<void>;
   createProject: (input: CreateProjectInput) => Promise<void>;
   updateProject: (input: UpdateProjectInput) => Promise<void>;
@@ -25,14 +31,34 @@ type ShellContextProviderProps = {
   children: ReactNode;
 };
 
+const resolveProjectSectionPreference = () => {
+  const section = readStringPreference(uiPreferenceKeys.lastProjectRouteSection, "overview");
+
+  if (
+    section === "overview" ||
+    section === "assets" ||
+    section === "packing" ||
+    section === "incidents" ||
+    section === "budget" ||
+    section === "info"
+  ) {
+    return section;
+  }
+
+  return "overview";
+};
+
 export const ShellContextProvider = ({ children }: ShellContextProviderProps) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeRoute = useMemo(() => resolveActiveRoute(location.pathname), [location.pathname]);
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [shellBootstrap, setShellBootstrap] = useState<ShellBootstrap | null>(null);
   const [projects, setProjects] = useState<ProjectCardRow[]>([]);
   const [projectsError, setProjectsError] = useState<string | null>(null);
-  const [activeProjectId, setActiveProjectIdState] = useState<string | null>(() => {
-    return readStringPreference(uiPreferenceKeys.activeProjectId);
-  });
+  const [rememberedProjectId, setRememberedProjectId] = useState<string | null>(() =>
+    readStringPreference(uiPreferenceKeys.activeProjectId),
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -57,6 +83,12 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     void load();
   }, []);
 
+  useEffect(() => {
+    if (activeRoute.scopeMode === "project" && activeRoute.projectId) {
+      setRememberedProjectId((currentProjectId) => (currentProjectId === activeRoute.projectId ? currentProjectId : activeRoute.projectId));
+    }
+  }, [activeRoute.projectId, activeRoute.scopeMode]);
+
   const refreshProjects = useCallback(async () => {
     if (!window.bukowskiProjects) {
       return;
@@ -67,7 +99,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
 
       setProjects(nextProjects);
       setProjectsError(null);
-      setActiveProjectIdState((currentProjectId) => {
+      setRememberedProjectId((currentProjectId) => {
         if (currentProjectId && nextProjects.some((project) => project.id === currentProjectId)) {
           return currentProjectId;
         }
@@ -85,17 +117,41 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   }, [refreshProjects]);
 
   useEffect(() => {
-    writePreference(uiPreferenceKeys.activeProjectId, activeProjectId);
-  }, [activeProjectId]);
+    writePreference(uiPreferenceKeys.activeProjectId, rememberedProjectId);
+  }, [rememberedProjectId]);
+
+  const activeProjectId = activeRoute.scopeMode === "project" ? activeRoute.projectId : rememberedProjectId;
 
   const activeProject = useMemo(
     () => projects.find((project) => project.id === activeProjectId) ?? null,
     [activeProjectId, projects],
   );
 
+  useEffect(() => {
+    if (activeRoute.scopeMode !== "project" || !activeRoute.projectId || !projects.length) {
+      return;
+    }
+
+    const projectStillExists = projects.some((project) => project.id === activeRoute.projectId);
+
+    if (!projectStillExists) {
+      navigate(resolveRememberedGlobalPath(), { replace: true });
+    }
+  }, [activeRoute.projectId, activeRoute.scopeMode, navigate, projects]);
+
   const setActiveProjectId = (projectId: string | null) => {
-    setActiveProjectIdState(projectId);
+    setRememberedProjectId(projectId);
   };
+
+  const openProject = useCallback(
+    (projectId: string, section?: ProjectRouteSection) => {
+      const targetSection = section ?? resolveProjectSectionPreference();
+
+      setRememberedProjectId(projectId);
+      navigate(`/projects/${projectId}/${targetSection}`);
+    },
+    [navigate],
+  );
 
   const createProject = async (input: CreateProjectInput) => {
     if (!window.bukowskiProjects) {
@@ -109,7 +165,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     const createdProject =
       nextProjects.find((project) => project.code === input.code.trim().toUpperCase() && project.name === input.name.trim()) ?? null;
 
-    setActiveProjectIdState(createdProject?.id ?? nextProjects[0]?.id ?? null);
+    setRememberedProjectId(createdProject?.id ?? nextProjects[0]?.id ?? null);
   };
 
   const updateProject = async (input: UpdateProjectInput) => {
@@ -120,7 +176,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     const nextProjects = await window.bukowskiProjects.update(input);
     setProjects(nextProjects);
     setProjectsError(null);
-    setActiveProjectIdState(input.projectId);
+    setRememberedProjectId(input.projectId);
   };
 
   const deleteProject = async (projectId: string) => {
@@ -131,28 +187,54 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     const nextProjects = await window.bukowskiProjects.remove({ projectId });
     setProjects(nextProjects);
     setProjectsError(null);
-    setActiveProjectIdState((currentProjectId) =>
+    setRememberedProjectId((currentProjectId) =>
       currentProjectId === projectId ? nextProjects[0]?.id ?? null : currentProjectId,
     );
+
+    if (activeRoute.scopeMode === "project" && activeRoute.projectId === projectId) {
+      navigate(resolveRememberedGlobalPath(), { replace: true });
+    }
   };
+
+  const scopeChipLabel =
+    activeRoute.scopeMode === "project"
+      ? activeProject
+        ? `Project · ${activeProject.code} / ${activeProject.name}`
+        : "Project mode"
+      : "Global workspace";
 
   const value = useMemo<ShellContextValue>(
     () => ({
       appInfo,
       workspaceName: shellBootstrap?.workspaceName ?? "Metadata Cine",
-      projectScope: activeProject ? `Global / ${activeProject.name}` : shellBootstrap?.projectScope ?? "Global",
+      scopeMode: activeRoute.scopeMode,
+      scopeChipLabel,
       syncLabel: shellBootstrap?.syncLabel ?? "Local-first",
       projects,
       activeProjectId,
       activeProject,
+      activeProjectRouteSection: activeRoute.scopeMode === "project" ? activeRoute.projectSection ?? null : null,
       projectsError,
       setActiveProjectId,
+      openProject,
       refreshProjects,
       createProject,
       updateProject,
       deleteProject,
     }),
-    [activeProject, activeProjectId, appInfo, projects, projectsError, refreshProjects, shellBootstrap],
+    [
+      activeProject,
+      activeProjectId,
+      activeRoute.projectSection,
+      activeRoute.scopeMode,
+      appInfo,
+      openProject,
+      projects,
+      projectsError,
+      refreshProjects,
+      scopeChipLabel,
+      shellBootstrap,
+    ],
   );
 
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>;

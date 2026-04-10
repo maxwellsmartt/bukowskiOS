@@ -12,11 +12,18 @@ import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 import { IncidentReportPanel } from "./IncidentReportPanel";
 import { reportIncident, useIncidentsData } from "./useIncidentsData";
 
-export const IncidentsPage = () => {
-  const { activeProjectId, projects, refreshProjects } = useShellContext();
+type IncidentsPageProps = {
+  projectId?: string | null;
+  projectName?: string | null;
+};
+
+export const IncidentsPage = ({ projectId = null, projectName = null }: IncidentsPageProps) => {
+  const { activeProject, projects, refreshProjects } = useShellContext();
+  const isProjectMode = Boolean(projectId);
+  const effectiveProjectName = projectName ?? (isProjectMode ? activeProject?.name ?? null : null);
   const sectionScopeLabel = useSectionScopeLabel();
-  const { data, error, reload } = useIncidentsData();
-  const { data: assets } = useAssetsList();
+  const { data, error, reload } = useIncidentsData(projectId);
+  const { data: assets } = useAssetsList(projectId);
   const { data: catalog, error: catalogError } = useCatalogData();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [reportOpen, setReportOpen] = useState(false);
@@ -27,9 +34,13 @@ export const IncidentsPage = () => {
   return (
     <div className="page-stack">
       <SectionHeader
-        eyebrow="Incidents"
-        title="Incident queue"
-        body="Damage, loss and malfunction reports with operational context and cost visibility."
+        eyebrow={isProjectMode ? "Project / Incidents" : "Incidents"}
+        title={isProjectMode ? "Project incident queue" : "Incident queue"}
+        body={
+          isProjectMode
+            ? "Damage, loss and malfunction reports currently linked to this project and ready for follow-up."
+            : "Damage, loss and malfunction reports with operational context and cost visibility."
+        }
         contextLabel={sectionScopeLabel}
       />
 
@@ -40,7 +51,9 @@ export const IncidentsPage = () => {
         <div className="selection-action-copy">
           <span className="selection-action-title">Incident reporting is now live</span>
           <span className="selection-action-subtitle">
-            Create new reports here or from Asset and Project detail. Every report leaves auditable linkage.
+            {isProjectMode
+              ? `Create reports directly inside ${effectiveProjectName ?? "this project"} and keep linkage explicit.`
+              : "Create new reports here or from Asset and Project detail. Every report leaves auditable linkage."}
           </span>
         </div>
         <button
@@ -67,8 +80,9 @@ export const IncidentsPage = () => {
           }))}
           departments={catalog.departments}
           error={reportError}
-          initialValue={{ projectId: activeProjectId ?? undefined, severity: "Medium" }}
+          initialValue={{ projectId: isProjectMode ? projectId ?? undefined : undefined, severity: "Medium" }}
           isSubmitting={isSubmitting}
+          projectLocked={isProjectMode}
           onClose={() => {
             setReportOpen(false);
             setReportError(null);

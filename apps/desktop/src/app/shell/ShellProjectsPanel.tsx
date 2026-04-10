@@ -19,7 +19,7 @@ const emptyDraft: ProjectDraft = {
 
 export const ShellProjectsPanel = () => {
   const { data: catalog } = useCatalogData();
-  const { activeProjectId, createProject, deleteProject, projects, projectsError, setActiveProjectId, updateProject } =
+  const { activeProjectId, createProject, deleteProject, openProject, projects, projectsError, scopeMode, updateProject } =
     useShellContext();
   const [draft, setDraft] = useState<ProjectDraft>(emptyDraft);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -167,14 +167,14 @@ export const ShellProjectsPanel = () => {
         {projects.map((project) => (
           <div
             key={project.id}
-            className={`shell-project-item${project.id === activeProjectId ? " active" : ""}`}
-            onClick={() => setActiveProjectId(project.id)}
+            className={`shell-project-item${scopeMode === "project" && project.id === activeProjectId ? " active" : ""}`}
+            onClick={() => openProject(project.id)}
             role="button"
             tabIndex={0}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                setActiveProjectId(project.id);
+                openProject(project.id);
               }
             }}
           >

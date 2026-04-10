@@ -1,6 +1,9 @@
 export const uiPreferenceKeys = {
   activePackingSlipId: "active-packing-slip-id",
   activeProjectId: "active-project-id",
+  lastGlobalRoutePath: "last-global-route-path",
+  lastProjectRoutePath: "last-project-route-path",
+  lastProjectRouteSection: "last-project-route-section",
   lastRoutePath: "last-route-path",
   shellSidebarWidth: "shell-sidebar-width",
 } as const;

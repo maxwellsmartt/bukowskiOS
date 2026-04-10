@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
-import { matchPath, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
-import { AppRoutes, appRoutes } from "@app/routing/routes";
+import { resolveActiveRoute } from "@app/routing/route-meta";
+import { AppRoutes } from "@app/routing/routes";
+import { useShellContext } from "@shared/hooks/useShellContext";
 import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
-import { assetsSubnav, financeSubnav } from "./navigation";
+import { assetsSubnav, buildProjectSubnav, financeSubnav } from "./navigation";
 import { ShellSidebar } from "./ShellSidebar";
 import { SubnavTabs } from "./SubnavTabs";
 import { TopContextBar } from "./TopContextBar";
-
-const resolveActiveRoute = (pathname: string) =>
-  appRoutes.find((route) => matchPath({ path: route.path, end: true }, pathname)) ?? appRoutes[0];
 
 const sidebarWidthMin = 220;
 const sidebarWidthMax = 420;
@@ -20,10 +19,15 @@ const clampSidebarWidth = (width: number) => Math.min(sidebarWidthMax, Math.max(
 
 export const AppShell = () => {
   const location = useLocation();
+  const { activeProjectId, activeProjectRouteSection } = useShellContext();
   const activeRoute = resolveActiveRoute(location.pathname);
   const [sidebarWidth, setSidebarWidth] = useState(sidebarWidthDefault);
 
   const subnavItems = useMemo(() => {
+    if (activeRoute.scopeMode === "project" && activeProjectId) {
+      return buildProjectSubnav(activeProjectId);
+    }
+
     if (activeRoute.domain === "finance") {
       return financeSubnav;
     }
@@ -46,8 +50,15 @@ export const AppShell = () => {
   useEffect(() => {
     if (location.pathname !== "/") {
       writePreference(uiPreferenceKeys.lastRoutePath, location.pathname);
+
+      if (activeRoute.scopeMode === "project") {
+        writePreference(uiPreferenceKeys.lastProjectRoutePath, location.pathname);
+        writePreference(uiPreferenceKeys.lastProjectRouteSection, activeProjectRouteSection ?? "overview");
+      } else {
+        writePreference(uiPreferenceKeys.lastGlobalRoutePath, location.pathname);
+      }
     }
-  }, [location.pathname]);
+  }, [activeProjectRouteSection, activeRoute.scopeMode, location.pathname]);
 
   useEffect(
     () => () => {

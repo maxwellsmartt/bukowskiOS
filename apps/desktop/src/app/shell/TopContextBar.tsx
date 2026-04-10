@@ -3,7 +3,7 @@ import { Bell, RefreshCcw, Search } from "lucide-react";
 import { useShellContext } from "@shared/hooks/useShellContext";
 
 export const TopContextBar = () => {
-  const { projectScope, syncLabel, workspaceName } = useShellContext();
+  const { scopeChipLabel, syncLabel, workspaceName } = useShellContext();
 
   return (
     <div className="top-context-bar">
@@ -21,7 +21,7 @@ export const TopContextBar = () => {
           <kbd>⌘K</kbd>
         </button>
         <div className="context-chip">
-          <span>{projectScope}</span>
+          <span>{scopeChipLabel}</span>
         </div>
         <button className="ghost-control sync-control" type="button">
           <RefreshCcw size={13} />

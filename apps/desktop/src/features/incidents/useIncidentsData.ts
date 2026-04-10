@@ -3,17 +3,18 @@ import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 
 const emptyIncidents: IncidentListRow[] = [];
 
-export const useIncidentsData = () =>
+export const useIncidentsData = (projectId: string | null = null) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiIncidents) {
         return emptyIncidents;
       }
 
-      return window.bukowskiIncidents.getList();
+      const rows = await window.bukowskiIncidents.getList();
+      return projectId ? rows.filter((row) => row.projectId === projectId) : rows;
     },
     emptyIncidents,
-    [],
+    [projectId],
   );
 
 export const reportIncident = async (input: ReportIncidentCommand): Promise<ReportIncidentResult> => {

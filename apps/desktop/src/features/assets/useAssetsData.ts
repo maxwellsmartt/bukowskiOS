@@ -21,17 +21,18 @@ const emptyAssetDetail: AssetDetailSnapshot = {
   scannableCodes: [],
 };
 
-export const useAssetsList = () =>
+export const useAssetsList = (projectId: string | null = null) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiAssets) {
         return emptyAssetList;
       }
 
-      return window.bukowskiAssets.getList();
+      const rows = await window.bukowskiAssets.getList();
+      return projectId ? rows.filter((row) => row.projectId === projectId) : rows;
     },
     emptyAssetList,
-    [],
+    [projectId],
   );
 
 export const useAssetDetail = (assetId: string | undefined) =>

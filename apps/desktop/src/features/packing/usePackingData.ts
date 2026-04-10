@@ -14,17 +14,18 @@ const emptyPackingSlipDetail: PackingSlipDetailSnapshot = {
   items: [],
 };
 
-export const usePackingList = () =>
+export const usePackingList = (projectId: string | null = null) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiPacking) {
         return emptyPackingSlips;
       }
 
-      return window.bukowskiPacking.getList();
+      const rows = await window.bukowskiPacking.getList();
+      return projectId ? rows.filter((row) => row.projectId === projectId) : rows;
     },
     emptyPackingSlips,
-    [],
+    [projectId],
   );
 
 export const usePackingDetail = (packingSlipId: string | null) =>

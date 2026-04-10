@@ -10,9 +10,15 @@ import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared
 import { PackingSlipDetailPanel } from "./PackingSlipDetailPanel";
 import { returnPackingSlipItems, usePackingDetail, usePackingList } from "./usePackingData";
 
-export const PackingPage = () => {
+type PackingPageProps = {
+  projectId?: string | null;
+  projectName?: string | null;
+};
+
+export const PackingPage = ({ projectId = null, projectName = null }: PackingPageProps) => {
+  const isProjectMode = Boolean(projectId);
   const sectionScopeLabel = useSectionScopeLabel();
-  const { data, error, reload } = usePackingList();
+  const { data, error, reload } = usePackingList(projectId);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [activePackingSlipId, setActivePackingSlipId] = useState<string | null>(() =>
     readStringPreference(uiPreferenceKeys.activePackingSlipId),
@@ -42,9 +48,13 @@ export const PackingPage = () => {
   return (
     <div className="page-stack">
       <SectionHeader
-        eyebrow="Packing slips"
-        title="Outgoing and return control"
-        body="Operational documents for dispatch, pending returns and custody handoff across active projects."
+        eyebrow={isProjectMode ? "Project / Packing" : "Packing slips"}
+        title={isProjectMode ? "Project dispatch and returns" : "Outgoing and return control"}
+        body={
+          isProjectMode
+            ? `Dispatches, pending returns and custody handoff linked to ${projectName ?? "the current project"}.`
+            : "Operational documents for dispatch, pending returns and custody handoff across active projects."
+        }
         contextLabel={sectionScopeLabel}
       />
 
@@ -52,7 +62,14 @@ export const PackingPage = () => {
       {returnFeedback ? <div className="action-feedback action-feedback-success">{returnFeedback}</div> : null}
 
       <div className="split-layout">
-        <SurfaceCard title="Slip registry" subtitle="Issued, partial-return, overdue and closed slips visible in one operational queue.">
+        <SurfaceCard
+          title={isProjectMode ? "Project slips" : "Slip registry"}
+          subtitle={
+            isProjectMode
+              ? "Issued, partial-return, overdue and closed slips for this project."
+              : "Issued, partial-return, overdue and closed slips visible in one operational queue."
+          }
+        >
           <DataTable
             activeRowId={activePackingSlipId}
             getRowId={(row) => row.id}

@@ -10,7 +10,7 @@ export const ShellSidebar = () => (
     </div>
 
     <nav className="shell-nav">
-      <span className="shell-nav-label">Primary</span>
+      <span className="shell-nav-label">Global</span>
       {primaryNav.map((item) => {
         const Icon = item.icon;
         return (

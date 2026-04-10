@@ -3,6 +3,7 @@ import type { OverviewMetric } from "./overview-queries";
 export type PackingSlipRow = {
   id: string;
   number: string;
+  projectId: string;
   project: string;
   department: string;
   responsible: string;
@@ -53,6 +54,7 @@ export type IncidentListRow = {
   id: string;
   title: string;
   asset: string;
+  projectId: string | null;
   project: string;
   responsible: string;
   severity: string;

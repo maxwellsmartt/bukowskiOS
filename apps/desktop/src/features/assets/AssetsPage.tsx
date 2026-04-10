@@ -17,12 +17,21 @@ import { AssetAssignMovePanel, type AssetAssignMoveFormValue } from "./AssetAssi
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
 import { archiveAsset, assignMoveAssets, createAsset, updateAsset, useAssetDetail, useAssetsList } from "./useAssetsData";
 
-export const AssetsPage = () => <AssetsContent />;
+type AssetsPageProps = {
+  projectId?: string | null;
+  projectName?: string | null;
+};
 
-const AssetsContent = () => {
-  const { activeProjectId, projects, refreshProjects } = useShellContext();
+export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageProps) => (
+  <AssetsContent projectId={projectId} projectName={projectName} />
+);
+
+const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
+  const { activeProject, projects, refreshProjects } = useShellContext();
+  const isProjectMode = Boolean(projectId);
+  const effectiveProjectName = projectName ?? (isProjectMode ? activeProject?.name ?? null : null);
   const sectionScopeLabel = useSectionScopeLabel();
-  const { data: assets, error, isLoading, reload } = useAssetsList();
+  const { data: assets, error, isLoading, reload } = useAssetsList(projectId);
   const { data: catalog, error: catalogError } = useCatalogData();
   const navigate = useNavigate();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -212,9 +221,13 @@ const AssetsContent = () => {
   return (
     <div className="page-stack">
       <SectionHeader
-        eyebrow="Assets"
-        title="Inventory"
-        body="Live asset registry with current state, quantity, storage context and operational readiness in one pass."
+        eyebrow={isProjectMode ? "Project / Assets" : "Assets"}
+        title={isProjectMode ? "Assigned assets" : "Inventory"}
+        body={
+          isProjectMode
+            ? "Assets currently linked to this project, ready for supervision, reassignment, packing and issue reporting."
+            : "Live asset registry with current state, quantity, storage context and operational readiness in one pass."
+        }
         contextLabel={sectionScopeLabel}
       />
 
@@ -225,7 +238,13 @@ const AssetsContent = () => {
         <StatusBadge tone="info">Live registry</StatusBadge>
         <StatusBadge tone="warning">Legacy import</StatusBadge>
         <StatusBadge tone="critical">Open issues</StatusBadge>
-        <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : "Metadata Cine"}</StatusBadge>
+        <StatusBadge>
+          {selectedRowIds.length
+            ? `${selectedRowIds.length} selected`
+            : isProjectMode
+              ? effectiveProjectName ?? "Project scope"
+              : "Workspace-wide"}
+        </StatusBadge>
       </div>
 
       {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
@@ -238,7 +257,9 @@ const AssetsContent = () => {
               {selectedRowIds.length === 1 ? "1 asset selected" : `${selectedRowIds.length} assets selected`}
             </span>
             <span className="selection-action-subtitle">
-              Assign, move or issue a packing slip from the current selection.
+              {isProjectMode
+                ? "Operate on the assets already assigned to this project or move them to a new destination."
+                : "Assign, move or issue a packing slip from the current selection."}
             </span>
           </div>
           <div className="selection-action-buttons">
@@ -271,7 +292,7 @@ const AssetsContent = () => {
 
       {actionPanelOpen && selectedRowIds.length ? (
         <AssetAssignMovePanel
-          defaultProjectId={activeProjectId}
+          defaultProjectId={isProjectMode ? projectId ?? null : null}
           departments={catalog.departments}
           error={actionError}
           isSubmitting={isSubmittingAction}
@@ -289,7 +310,7 @@ const AssetsContent = () => {
 
       {packingPanelOpen && selectedRowIds.length ? (
         <PackingSlipBuilderPanel
-          defaultProjectId={activeProjectId}
+          defaultProjectId={isProjectMode ? projectId ?? null : null}
           departments={catalog.departments}
           error={packingError}
           isSubmitting={isSubmittingPacking}
@@ -326,7 +347,11 @@ const AssetsContent = () => {
       <div className={`list-layout${activeAsset ? " has-preview" : ""}`}>
         <SurfaceCard
           title="Asset registry"
-          subtitle="Single click previews. Double click opens detail. Resize columns and select rows for future bulk actions."
+          subtitle={
+            isProjectMode
+              ? "Single click previews. Double click opens detail. This view is scoped to the current project only."
+              : "Single click previews. Double click opens detail. Resize columns and select rows for future bulk actions."
+          }
           aside={
             <button
               className="ghost-control"

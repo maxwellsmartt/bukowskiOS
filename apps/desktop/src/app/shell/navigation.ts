@@ -4,12 +4,17 @@ import {
   BriefcaseBusiness,
   Building2,
   ClipboardList,
+  FolderKanban,
   FolderCog,
+  Info,
   PackageSearch,
   ScrollText,
   Settings,
+  Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+
+import type { ProjectRouteSection } from "@app/routing/route-meta";
 
 export type NavItem = {
   label: string;
@@ -36,5 +41,20 @@ export const financeSubnav: NavItem[] = [
   { label: "Cost Links", path: "/finance/cost-links", icon: ClipboardList },
   { label: "Entries", path: "/finance/entries", icon: ScrollText },
 ];
+
+const projectSectionMeta: Record<ProjectRouteSection, Omit<NavItem, "path">> = {
+  overview: { label: "Overview", icon: BarChart3 },
+  assets: { label: "Assets", icon: PackageSearch },
+  packing: { label: "Packing", icon: ScrollText },
+  incidents: { label: "Incidents", icon: ClipboardList },
+  budget: { label: "Budget", icon: Wallet },
+  info: { label: "Info", icon: Info },
+};
+
+export const buildProjectSubnav = (projectId: string): NavItem[] =>
+  (Object.entries(projectSectionMeta) as Array<[ProjectRouteSection, Omit<NavItem, "path">]>).map(([section, item]) => ({
+    ...item,
+    path: `/projects/${projectId}/${section}`,
+  }));
 
 export const utilityNav: NavItem[] = [{ label: "Settings", path: "/settings", icon: Settings }];

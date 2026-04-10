@@ -9,6 +9,7 @@ export type AssetListRow = {
   condition: string;
   custody: string;
   location: string;
+  projectId: string | null;
   project: string;
   responsible: string;
   serialNumber: string;

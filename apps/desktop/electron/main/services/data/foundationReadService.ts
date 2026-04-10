@@ -279,6 +279,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             asset_current_state.custody_status,
             asset_current_state.condition_status,
             COALESCE(locations.name, '—') AS location,
+            asset_current_state.current_project_id AS project_id,
             COALESCE(projects.name, '—') AS project,
             COALESCE(users.full_name, '—') AS responsible,
             COALESCE(legacy_rentman_items.serial_number, assets.serial_number, '—') AS serial_number,
@@ -321,6 +322,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       custody_status: string;
       condition_status: string;
       location: string;
+      project_id: string | null;
       project: string;
       responsible: string;
       serial_number: string;
@@ -343,6 +345,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       condition: row.condition_status,
       custody: row.custody_status,
       location: row.location,
+      projectId: row.project_id,
       project: row.project,
       responsible: row.responsible,
       serialNumber: row.serial_number,
@@ -583,6 +586,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             packing_slips.status,
             packing_slips.issue_date,
             packing_slips.return_due_date,
+            packing_slips.project_id,
             projects.name AS project,
             COALESCE(departments.name, '—') AS department,
             COALESCE(users.full_name, '—') AS responsible,
@@ -593,7 +597,15 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           LEFT JOIN departments ON departments.id = packing_slips.department_id
           LEFT JOIN users ON users.id = packing_slips.responsible_user_id
           LEFT JOIN packing_slip_items ON packing_slip_items.packing_slip_id = packing_slips.id
-          GROUP BY packing_slips.id, packing_slips.status, packing_slips.issue_date, packing_slips.return_due_date, projects.name, departments.name, users.full_name
+          GROUP BY
+            packing_slips.id,
+            packing_slips.status,
+            packing_slips.issue_date,
+            packing_slips.return_due_date,
+            packing_slips.project_id,
+            projects.name,
+            departments.name,
+            users.full_name
           ORDER BY packing_slips.issue_date DESC
         `,
       )
@@ -602,6 +614,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       status: string;
       issue_date: string;
       return_due_date: string | null;
+      project_id: string;
       project: string;
       department: string;
       responsible: string;
@@ -612,6 +625,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     return rows.map((row) => ({
       id: row.id,
       number: row.id.replace("packing-", "PS-"),
+      projectId: row.project_id,
       project: row.project,
       department: row.department,
       responsible: row.responsible,
@@ -773,6 +787,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             incidents.id,
             incidents.title,
             COALESCE(assets.internal_code, '—') AS asset_code,
+            incidents.project_id,
             COALESCE(projects.name, '—') AS project,
             COALESCE(users.full_name, '—') AS responsible,
             incidents.severity,
@@ -789,6 +804,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       id: string;
       title: string;
       asset_code: string;
+      project_id: string | null;
       project: string;
       responsible: string;
       severity: string;
@@ -800,6 +816,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       id: row.id,
       title: row.title,
       asset: row.asset_code,
+      projectId: row.project_id,
       project: row.project,
       responsible: row.responsible,
       severity: row.severity,

@@ -12,7 +12,7 @@ import { useProjectDetail, useProjectsData } from "./useProjectsData";
 
 export const ProjectsPage = () => {
   const { data, error } = useProjectsData();
-  const { activeProjectId, setActiveProjectId } = useShellContext();
+  const { activeProjectId, openProject, setActiveProjectId } = useShellContext();
   const sectionScopeLabel = useSectionScopeLabel();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = useProjectDetail(activeProjectId);
@@ -22,14 +22,14 @@ export const ProjectsPage = () => {
       <SectionHeader
         eyebrow="Projects"
         title="Project registry"
-        body="Projects now carry operational detail: assigned assets, incidents, responsibles and a first budget shell. Project CRUD still lives in the sidebar."
+        body="Global registry for opening project workspaces, reviewing current exposure and managing the operational base of each project."
         contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Projects unavailable: {error}</div> : null}
 
       <div className="projects-layout">
-        <SurfaceCard title="Projects" subtitle="Select a project from the sidebar or inspect the full workspace registry here.">
+        <SurfaceCard title="Projects" subtitle="Single click inspects the registry. Double click opens the project workspace.">
           <DataTable
             activeRowId={activeProjectId}
             columns={[
@@ -70,6 +70,7 @@ export const ProjectsPage = () => {
             getRowId={(row) => row.id}
             maxHeight="min(72vh, 760px)"
             onRowClick={(row) => setActiveProjectId(row.id)}
+            onRowDoubleClick={(row) => openProject(row.id)}
             persistKey="projects-registry"
             rows={data}
             selectable

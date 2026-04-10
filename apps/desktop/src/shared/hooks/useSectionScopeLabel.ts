@@ -1,7 +1,11 @@
 import { useShellContext } from "@shared/hooks/useShellContext";
 
 export const useSectionScopeLabel = () => {
-  const { activeProject } = useShellContext();
+  const { activeProject, scopeMode } = useShellContext();
 
-  return activeProject ? `${activeProject.code} · ${activeProject.name}` : "Global workspace";
+  if (scopeMode === "project" && activeProject) {
+    return `${activeProject.code} · ${activeProject.name}`;
+  }
+
+  return "Global workspace";
 };
