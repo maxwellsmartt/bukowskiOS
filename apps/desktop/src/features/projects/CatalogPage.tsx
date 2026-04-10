@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { CatalogEntityType, CatalogSnapshot } from "@contracts";
@@ -46,6 +46,66 @@ const singularLabelMap: Record<CatalogEntityType, string> = {
   client: "client",
   category: "category",
   kit: "kit",
+};
+
+const resolveCatalogPreviewTitle = (entityType: CatalogEntityType, row: Record<string, unknown>) => {
+  switch (entityType) {
+    case "crew":
+      return (row.fullName as string) || "Crew member";
+    case "client":
+      return (row.name as string) || "Client";
+    case "kit":
+      return (row.name as string) || "Kit";
+    case "location":
+    case "department":
+    case "category":
+    default:
+      return (row.name as string) || (row.code as string) || "Catalog record";
+  }
+};
+
+const buildCatalogPreviewRows = (entityType: CatalogEntityType, row: Record<string, unknown>) => {
+  switch (entityType) {
+    case "location":
+      return [
+        { label: "Code", value: String(row.code ?? "—") },
+        { label: "Type", value: String(row.type ?? "—") },
+        { label: "Status", value: (row.isActive as boolean) ? "Active" : "Inactive" },
+        { label: "Description", value: String(row.description ?? "—") },
+      ];
+    case "department":
+      return [
+        { label: "Code", value: String(row.code ?? "—") },
+        { label: "Status", value: (row.isActive as boolean) ? "Active" : "Inactive" },
+        { label: "Description", value: String(row.description ?? "—") },
+      ];
+    case "crew":
+      return [
+        { label: "Role", value: String(row.roleLabel ?? "—") },
+        { label: "Email", value: String(row.email ?? "—") },
+        { label: "Phone", value: String(row.phone ?? "—") },
+      ];
+    case "client":
+      return [
+        { label: "Contact", value: String(row.contactName ?? "—") },
+        { label: "Email", value: String(row.email ?? "—") },
+        { label: "Phone", value: String(row.phone ?? "—") },
+      ];
+    case "kit":
+      return [
+        { label: "Code", value: String(row.code ?? "—") },
+        { label: "Assets", value: String(row.assetCount ?? "0") },
+        { label: "Primary QR", value: String(row.primaryCodeValue ?? "Pending") },
+        { label: "Description", value: String(row.description ?? "—") },
+      ];
+    case "category":
+    default:
+      return [
+        { label: "Code", value: String(row.code ?? "—") },
+        { label: "Status", value: (row.isActive as boolean) ? "Active" : "Inactive" },
+        { label: "Description", value: String(row.description ?? "—") },
+      ];
+  }
 };
 
 export const CatalogPage = () => {
@@ -163,6 +223,8 @@ export const CatalogPage = () => {
 
   const activeTabConfig = tabs.find((tab) => tab.key === activeTab) ?? tabs[0];
   const selectedRow = activeTabConfig.rows.find((row) => row.id === selectedIds[activeTab]) ?? null;
+  const showPreview = Boolean(selectedRow) && !editorMode;
+  const showContextColumn = Boolean(editorMode) || showPreview;
 
   const applyCatalogMutation = async (
     callback: () => Promise<CatalogSnapshot>,
@@ -219,7 +281,7 @@ export const CatalogPage = () => {
         })}
       </div>
 
-      <div className="split-layout">
+      <div className={showContextColumn ? "split-layout" : "list-layout"}>
         <SurfaceCard
           title={activeTabConfig.title}
           subtitle={activeTabConfig.subtitle}
@@ -309,36 +371,41 @@ export const CatalogPage = () => {
               )
             }
           />
-        ) : (
-          <SurfaceCard title="Catalog context" subtitle="Master data stays global so projects and assets can reuse clean operational building blocks.">
+        ) : showPreview && selectedRow ? (
+          <SurfaceCard
+            title={resolveCatalogPreviewTitle(activeTab, selectedRow)}
+            subtitle={`${activeTabConfig.label} preview for global workspace reuse.`}
+            aside={
+              <button
+                aria-label="Close catalog preview"
+                className="surface-card-action"
+                onClick={() => setSelectedIds((current) => ({ ...current, [activeTab]: null }))}
+                type="button"
+              >
+                <X size={14} />
+              </button>
+            }
+          >
             <div className="summary-grid">
               <div className="summary-row">
-                <span className="summary-label">Active tab</span>
+                <span className="summary-label">Database</span>
                 <span className="summary-value">{activeTabConfig.label}</span>
               </div>
-              <div className="summary-row">
-                <span className="summary-label">Records</span>
-                <span className="summary-value">{activeTabConfig.rows.length}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Selection</span>
-                <span className="summary-value">
-                  {selectedRow && typeof selectedRow.name === "string" ? selectedRow.name : "No record selected"}
-                </span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Next use</span>
-                <span className="summary-value">Projects, assets, assignments, incidents and future dispatch flows.</span>
-              </div>
+              {buildCatalogPreviewRows(activeTab, selectedRow).map((row) => (
+                <div key={row.label} className="summary-row">
+                  <span className="summary-label">{row.label}</span>
+                  <span className="summary-value">{row.value}</span>
+                </div>
+              ))}
             </div>
 
             <div className="chip-row">
               <StatusBadge tone="info">Global database</StatusBadge>
               <StatusBadge tone="success">Project-ready</StatusBadge>
-              <StatusBadge tone="warning">Asset-ready</StatusBadge>
+              <StatusBadge tone="warning">Assignment-ready</StatusBadge>
             </div>
           </SurfaceCard>
-        )}
+        ) : null}
       </div>
     </div>
   );

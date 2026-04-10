@@ -23,7 +23,7 @@ export const ProjectBudgetPage = () => {
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack-project">
       <SectionHeader
         eyebrow="Project / Budget"
         title={`${data.project.name} budget`}
@@ -32,7 +32,7 @@ export const ProjectBudgetPage = () => {
       />
 
       <div className="project-detail-support-grid">
-        <SurfaceCard title="Budget shell" subtitle="Project-level finance readiness without duplicating global Finance ownership.">
+        <SurfaceCard className="project-scroll-card" title="Budget shell" subtitle="Project-level finance readiness without duplicating global Finance ownership.">
           <div className="project-budget-grid">
             <div className="summary-row">
               <span className="summary-label">Total entries</span>
@@ -55,6 +55,7 @@ export const ProjectBudgetPage = () => {
         </SurfaceCard>
 
         <SurfaceCard
+          className="project-scroll-card"
           title="Project context"
           subtitle="This tab stays inside project mode. Global Finance remains workspace-wide and supervises the whole company."
         >
@@ -66,7 +67,11 @@ export const ProjectBudgetPage = () => {
         </SurfaceCard>
       </div>
 
-      <SurfaceCard title="Cost-bearing incidents" subtitle="Incidents already shaping the budget and exposure of this project.">
+      <SurfaceCard
+        className="project-scroll-card"
+        title="Cost-bearing incidents"
+        subtitle="Incidents already shaping the budget and exposure of this project."
+      >
         <DataTable
           columns={[
             {

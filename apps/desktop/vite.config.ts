@@ -15,6 +15,7 @@ const sharedAliases = {
   "@db": path.resolve(rootDir, "../../packages/db/src"),
   "@sync": path.resolve(rootDir, "../../packages/sync/src"),
   "@ui": path.resolve(rootDir, "../../packages/ui/src"),
+  "node:sqlite": path.resolve(rootDir, "electron/main/services/data/nodeSqliteShim.ts"),
 };
 
 export default defineConfig(async () => {
@@ -26,7 +27,7 @@ export default defineConfig(async () => {
           vite: {
             build: {
               rollupOptions: {
-                external: ["node:sqlite"],
+                external: ["better-sqlite3"],
               },
             },
             resolve: {

@@ -13,6 +13,7 @@ type ShellContextValue = {
   scopeChipLabel: string;
   syncLabel: string;
   projects: ProjectCardRow[];
+  isScopeReady: boolean;
   activeProjectId: string | null;
   activeProject: ProjectCardRow | null;
   activeProjectRouteSection: ProjectRouteSection | null;
@@ -56,6 +57,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   const [shellBootstrap, setShellBootstrap] = useState<ShellBootstrap | null>(null);
   const [projects, setProjects] = useState<ProjectCardRow[]>([]);
   const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [projectsHydrated, setProjectsHydrated] = useState(false);
   const [rememberedProjectId, setRememberedProjectId] = useState<string | null>(() =>
     readStringPreference(uiPreferenceKeys.activeProjectId),
   );
@@ -99,6 +101,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
 
       setProjects(nextProjects);
       setProjectsError(null);
+      setProjectsHydrated(true);
       setRememberedProjectId((currentProjectId) => {
         if (currentProjectId && nextProjects.some((project) => project.id === currentProjectId)) {
           return currentProjectId;
@@ -109,6 +112,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     } catch (error) {
       setProjects([]);
       setProjectsError(error instanceof Error ? error.message : "Project shell unavailable");
+      setProjectsHydrated(true);
     }
   }, []);
 
@@ -127,8 +131,20 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     [activeProjectId, projects],
   );
 
+  const isScopeReady = useMemo(() => {
+    if (activeRoute.scopeMode !== "project") {
+      return true;
+    }
+
+    if (!projectsHydrated || !activeRoute.projectId) {
+      return false;
+    }
+
+    return projects.some((project) => project.id === activeRoute.projectId);
+  }, [activeRoute.projectId, activeRoute.scopeMode, projects, projectsHydrated]);
+
   useEffect(() => {
-    if (activeRoute.scopeMode !== "project" || !activeRoute.projectId || !projects.length) {
+    if (activeRoute.scopeMode !== "project" || !projectsHydrated || !activeRoute.projectId) {
       return;
     }
 
@@ -137,7 +153,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     if (!projectStillExists) {
       navigate(resolveRememberedGlobalPath(), { replace: true });
     }
-  }, [activeRoute.projectId, activeRoute.scopeMode, navigate, projects]);
+  }, [activeRoute.projectId, activeRoute.scopeMode, navigate, projects, projectsHydrated]);
 
   const setActiveProjectId = (projectId: string | null) => {
     setRememberedProjectId(projectId);
@@ -211,6 +227,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       scopeChipLabel,
       syncLabel: shellBootstrap?.syncLabel ?? "Local-first",
       projects,
+      isScopeReady,
       activeProjectId,
       activeProject,
       activeProjectRouteSection: activeRoute.scopeMode === "project" ? activeRoute.projectSection ?? null : null,
@@ -228,6 +245,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       activeRoute.projectSection,
       activeRoute.scopeMode,
       appInfo,
+      isScopeReady,
       openProject,
       projects,
       projectsError,

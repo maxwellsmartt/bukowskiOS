@@ -22,7 +22,7 @@ export const ProjectInfoPage = () => {
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack-project">
       <SectionHeader
         eyebrow="Project / Info"
         title={`${data.project.name} info`}
@@ -32,6 +32,7 @@ export const ProjectInfoPage = () => {
 
       <div className="project-detail-support-grid">
         <SurfaceCard
+          className="project-scroll-card"
           title={`${data.project.code} · ${data.project.name}`}
           subtitle={data.project.description || "No project description yet."}
           aside={<StatusBadge>{data.project.status}</StatusBadge>}
@@ -60,9 +61,13 @@ export const ProjectInfoPage = () => {
           </div>
         </SurfaceCard>
 
-        <SurfaceCard title="Responsibles" subtitle="People currently carrying inventory or incident follow-up inside this project.">
+        <SurfaceCard
+          className="project-scroll-card"
+          title="Responsibles"
+          subtitle="People currently carrying inventory or incident follow-up inside this project."
+        >
           {data.responsibles.length ? (
-            <div className="queue-list">
+            <div className="queue-list project-scroll-list">
               {data.responsibles.map((row) => (
                 <div key={row.name} className="queue-item">
                   <div className="identity-cell">

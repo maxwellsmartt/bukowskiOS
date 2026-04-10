@@ -60,6 +60,37 @@ a {
   overflow: hidden;
 }
 
+.shell-sidebar-scroll-zone {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.shell-sidebar-scroll-zone::-webkit-scrollbar {
+  width: 4px;
+}
+
+.shell-sidebar-scroll-zone::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.shell-sidebar-scroll-zone::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.shell-sidebar-utility-zone {
+  flex-shrink: 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
 .shell-sidebar-resize-handle {
   position: relative;
   width: 10px;
@@ -151,6 +182,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-direction: column;
   gap: 8px;
   min-height: 0;
+  flex: 1;
 }
 
 .shell-projects-header {
@@ -164,9 +196,9 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-direction: column;
   gap: 6px;
   min-height: 0;
-  max-height: min(50vh, 520px);
-  overflow: auto;
-  padding-right: 4px;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
@@ -474,6 +506,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-direction: column;
   gap: var(--space-md);
   min-width: 0;
+  min-height: 0;
   overflow: auto;
   padding-right: 2px;
 }
@@ -482,6 +515,11 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  min-height: 0;
+}
+
+.page-stack-project {
+  min-height: 0;
 }
 
 .section-header {
@@ -589,6 +627,17 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.shell-loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
+.shell-error-state {
+  max-width: 420px;
 }
 
 .selection-action-bar {
@@ -1017,6 +1066,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.35fr);
   gap: var(--space-md);
   align-items: start;
+  min-height: 0;
 }
 
 .project-detail-stack {
@@ -1024,12 +1074,23 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-direction: column;
   gap: var(--space-md);
   min-width: 0;
+  min-height: 0;
 }
 
 .project-detail-support-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-md);
+}
+
+.project-overview-card {
+  gap: 12px;
+}
+
+.project-overview-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .project-budget-grid {
@@ -1108,6 +1169,15 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   gap: var(--space-sm);
   max-height: min(52vh, 520px);
   overflow: auto;
+}
+
+.project-scroll-card {
+  min-height: 0;
+}
+
+.project-scroll-list {
+  max-height: min(34vh, 300px);
+  padding-right: 4px;
 }
 
 .queue-item {

@@ -7,6 +7,7 @@ import { useShellContext } from "@shared/hooks/useShellContext";
 import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 import { assetsSubnav, buildProjectSubnav, financeSubnav } from "./navigation";
+import { ShellErrorBoundary } from "./ShellErrorBoundary";
 import { ShellSidebar } from "./ShellSidebar";
 import { SubnavTabs } from "./SubnavTabs";
 import { TopContextBar } from "./TopContextBar";
@@ -19,7 +20,7 @@ const clampSidebarWidth = (width: number) => Math.min(sidebarWidthMax, Math.max(
 
 export const AppShell = () => {
   const location = useLocation();
-  const { activeProjectId, activeProjectRouteSection } = useShellContext();
+  const { activeProjectId, activeProjectRouteSection, isScopeReady } = useShellContext();
   const activeRoute = resolveActiveRoute(location.pathname);
   const [sidebarWidth, setSidebarWidth] = useState(sidebarWidthDefault);
 
@@ -37,7 +38,7 @@ export const AppShell = () => {
     }
 
     return [];
-  }, [activeRoute.domain]);
+  }, [activeProjectId, activeRoute.domain, activeRoute.scopeMode]);
 
   useEffect(() => {
     setSidebarWidth(clampSidebarWidth(readNumberPreference(uiPreferenceKeys.shellSidebarWidth, sidebarWidthDefault)));
@@ -107,7 +108,17 @@ export const AppShell = () => {
         <TopContextBar />
         {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
         <main className="shell-content">
-          <AppRoutes />
+          {!isScopeReady ? (
+            <div className="shell-loading-state">
+              <div className="empty-state">
+                Validating project workspace before restoring the last route.
+              </div>
+            </div>
+          ) : (
+            <ShellErrorBoundary>
+              <AppRoutes />
+            </ShellErrorBoundary>
+          )}
         </main>
       </div>
     </div>

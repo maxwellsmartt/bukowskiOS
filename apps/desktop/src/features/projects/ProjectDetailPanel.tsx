@@ -60,11 +60,31 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         title={`${data.project.code} · ${data.project.name}`}
         subtitle={data.project.description}
         aside={<StatusBadge tone={toneForStatus(data.project.status)}>{data.project.status}</StatusBadge>}
+        className="project-overview-card"
       >
         <div className="chip-row">
           <StatusBadge>{data.project.client}</StatusBadge>
           <StatusBadge>{data.project.departments}</StatusBadge>
           <StatusBadge tone="warning">{data.project.exposure}</StatusBadge>
+        </div>
+
+        <div className="compact-summary-grid project-overview-summary">
+          <div className="summary-row">
+            <span className="summary-label">Assigned assets</span>
+            <span className="summary-value">{data.project.assetCount}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Open incidents</span>
+            <span className="summary-value">{data.project.incidentCount}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Client</span>
+            <span className="summary-value">{data.project.client}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Departments</span>
+            <span className="summary-value">{data.project.departments}</span>
+          </div>
         </div>
 
         <div className="action-panel-actions action-panel-actions-start">
@@ -149,9 +169,13 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
       </div>
 
       <div className="project-detail-support-grid">
-        <SurfaceCard title="Responsibles" subtitle="People currently carrying project inventory or open incidents.">
+        <SurfaceCard
+          className="project-scroll-card"
+          title="Responsibles"
+          subtitle="People currently carrying project inventory or open incidents."
+        >
           {data.responsibles.length ? (
-            <div className="queue-list">
+            <div className="queue-list project-scroll-list">
               {data.responsibles.map((row) => (
                 <div key={row.name} className="queue-item">
                   <div className="identity-cell">
@@ -171,7 +195,11 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
           )}
         </SurfaceCard>
 
-        <SurfaceCard title="Budget shell" subtitle="Initial FinanceOps structure tied to the project.">
+        <SurfaceCard
+          className="project-scroll-card"
+          title="Budget shell"
+          subtitle="Initial FinanceOps structure tied to the project."
+        >
           <div className="project-budget-grid">
             <div className="summary-row">
               <span className="summary-label">Total entries</span>
@@ -194,7 +222,11 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         </SurfaceCard>
       </div>
 
-      <SurfaceCard title="Assigned assets" subtitle="Current inventory assigned to this project. Double click an asset to open its full profile.">
+      <SurfaceCard
+        className="project-scroll-card"
+        title="Assigned assets"
+        subtitle="Current inventory assigned to this project. Double click an asset to open its full profile."
+      >
         <DataTable
           columns={[
             {
@@ -233,7 +265,11 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         />
       </SurfaceCard>
 
-      <SurfaceCard title="Incident queue" subtitle="Project incidents with direct operational and financial linkage.">
+      <SurfaceCard
+        className="project-scroll-card"
+        title="Incident queue"
+        subtitle="Project incidents with direct operational and financial linkage."
+      >
         <DataTable
           columns={[
             {

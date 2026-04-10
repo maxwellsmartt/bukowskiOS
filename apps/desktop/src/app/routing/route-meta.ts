@@ -6,6 +6,7 @@ export type ScopeMode = "global" | "project";
 export type GlobalDomainKey = "overview" | "assets" | "finance" | "utility";
 export type ProjectRouteSection = "overview" | "assets" | "packing" | "incidents" | "budget" | "info";
 export type DomainKey = GlobalDomainKey | "project";
+export type PrimaryNavKey = "overview" | "assets" | "finance";
 
 export type AppRouteMeta = {
   path: string;
@@ -126,3 +127,25 @@ export const resolveInitialPath = () => {
 
 export const resolveActiveRoute = (pathname: string) =>
   findMatchingRoute(pathname) ?? toResolvedRoute(globalRouteMeta[0], null);
+
+export const resolvePrimaryNavKey = (pathname: string): PrimaryNavKey | null => {
+  const activeRoute = resolveActiveRoute(pathname);
+
+  if (activeRoute.scopeMode !== "global") {
+    return null;
+  }
+
+  if (activeRoute.domain === "overview") {
+    return "overview";
+  }
+
+  if (activeRoute.domain === "assets") {
+    return "assets";
+  }
+
+  if (activeRoute.domain === "finance") {
+    return "finance";
+  }
+
+  return null;
+};

@@ -9,7 +9,7 @@ export const ProjectOverviewPage = () => {
   const { data, error, isLoading, reload } = useProjectDetail(projectId);
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack-project">
       <SectionHeader
         eyebrow="Project / Overview"
         title={project ? `${project.name}` : "Project overview"}
