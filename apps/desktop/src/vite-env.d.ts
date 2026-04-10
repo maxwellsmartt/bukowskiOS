@@ -7,6 +7,8 @@ import type {
   AssetDetailSnapshot,
   AssetListRow,
   CatalogSnapshot,
+  CreatePackingSlipCommand,
+  CreatePackingSlipResult,
   CreateProjectInput,
   DeleteProjectInput,
   FinanceCostLinkRow,
@@ -14,11 +16,14 @@ import type {
   FinanceOverviewSnapshot,
   IncidentListRow,
   OverviewSnapshot,
+  PackingSlipDetailSnapshot,
   PackingSlipRow,
   ProjectCardRow,
   ProjectDetailSnapshot,
   ReportIncidentCommand,
   ReportIncidentResult,
+  ReturnPackingSlipItemsCommand,
+  ReturnPackingSlipItemsResult,
   ShellBootstrap,
   UpdateProjectInput,
 } from "@contracts";
@@ -41,6 +46,9 @@ declare global {
     };
     bukowskiPacking?: {
       getList: () => Promise<PackingSlipRow[]>;
+      getDetail: (packingSlipId: string) => Promise<PackingSlipDetailSnapshot>;
+      create: (input: CreatePackingSlipCommand) => Promise<CreatePackingSlipResult>;
+      returnItems: (input: ReturnPackingSlipItemsCommand) => Promise<ReturnPackingSlipItemsResult>;
     };
     bukowskiIncidents?: {
       getList: () => Promise<IncidentListRow[]>;

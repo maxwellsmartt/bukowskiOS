@@ -4,11 +4,13 @@ import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { useFinanceCostLinks } from "./useFinanceData";
 
 export const FinanceCostLinksPage = () => {
   const { data, error } = useFinanceCostLinks();
+  const sectionScopeLabel = useSectionScopeLabel();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
@@ -17,6 +19,7 @@ export const FinanceCostLinksPage = () => {
         eyebrow="Finance / Cost links"
         title="Cost links"
         body="Incident cost, replacement risk and current finance status tied back to operations."
+        contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Cost links unavailable: {error}</div> : null}

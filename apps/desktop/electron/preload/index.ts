@@ -8,6 +8,8 @@ import type {
   AssetDetailSnapshot,
   AssetListRow,
   CatalogSnapshot,
+  CreatePackingSlipCommand,
+  CreatePackingSlipResult,
   CreateProjectInput,
   DeleteProjectInput,
   FinanceCostLinkRow,
@@ -15,11 +17,14 @@ import type {
   FinanceOverviewSnapshot,
   IncidentListRow,
   OverviewSnapshot,
+  PackingSlipDetailSnapshot,
   PackingSlipRow,
   ProjectCardRow,
   ProjectDetailSnapshot,
   ReportIncidentCommand,
   ReportIncidentResult,
+  ReturnPackingSlipItemsCommand,
+  ReturnPackingSlipItemsResult,
   ShellBootstrap,
   UpdateProjectInput,
 } from "@contracts";
@@ -46,6 +51,12 @@ const bukowskiAssets = {
 
 const bukowskiPacking = {
   getList: () => ipcRenderer.invoke(ipcChannels.packing.getList) as Promise<PackingSlipRow[]>,
+  getDetail: (packingSlipId: string) =>
+    ipcRenderer.invoke(ipcChannels.packing.getDetail, packingSlipId) as Promise<PackingSlipDetailSnapshot>,
+  create: (input: CreatePackingSlipCommand) =>
+    ipcRenderer.invoke(ipcChannels.packing.create, input) as Promise<CreatePackingSlipResult>,
+  returnItems: (input: ReturnPackingSlipItemsCommand) =>
+    ipcRenderer.invoke(ipcChannels.packing.returnItems, input) as Promise<ReturnPackingSlipItemsResult>,
 };
 
 const bukowskiIncidents = {

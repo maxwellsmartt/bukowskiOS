@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { AppInfo, CreateProjectInput, ProjectCardRow, ShellBootstrap, UpdateProjectInput } from "@contracts";
+import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 type ShellContextValue = {
   appInfo: AppInfo | null;
@@ -30,11 +31,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   const [projects, setProjects] = useState<ProjectCardRow[]>([]);
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [activeProjectId, setActiveProjectIdState] = useState<string | null>(() => {
-    if (typeof window === "undefined") {
-      return null;
-    }
-
-    return window.localStorage.getItem("bukowski:active-project-id");
+    return readStringPreference(uiPreferenceKeys.activeProjectId);
   });
 
   useEffect(() => {
@@ -88,16 +85,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   }, [refreshProjects]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    if (activeProjectId) {
-      window.localStorage.setItem("bukowski:active-project-id", activeProjectId);
-      return;
-    }
-
-    window.localStorage.removeItem("bukowski:active-project-id");
+    writePreference(uiPreferenceKeys.activeProjectId, activeProjectId);
   }, [activeProjectId]);
 
   const activeProject = useMemo(

@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { readJsonPreference, writeJsonPreference } from "@shared/lib/preferences";
+
 type DataColumn<T> = {
   key: string;
   label: string;
@@ -62,10 +64,7 @@ export const DataTable = <T = unknown,>({
   const resizeStateRef = useRef<{ columnKey: string; startX: number; startWidth: number } | null>(null);
 
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
-    const persistedWidths =
-      persistKey && typeof window !== "undefined" ? window.localStorage.getItem(`bukowski-table:${persistKey}`) : null;
-
-    const parsedWidths = persistedWidths ? (JSON.parse(persistedWidths) as Record<string, number>) : {};
+    const parsedWidths = persistKey ? readJsonPreference<Record<string, number>>(`table:${persistKey}`, {}) : {};
 
     return columns.reduce<Record<string, number>>((accumulator, column) => {
       accumulator[column.key] = parsedWidths[column.key] ?? column.width ?? 160;
@@ -105,7 +104,7 @@ export const DataTable = <T = unknown,>({
       return;
     }
 
-    window.localStorage.setItem(`bukowski-table:${persistKey}`, JSON.stringify(columnWidths));
+    writeJsonPreference(`table:${persistKey}`, columnWidths);
   }, [columnWidths, persistKey]);
 
   useEffect(() => {

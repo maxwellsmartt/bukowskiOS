@@ -12,6 +12,8 @@ import type {
   IncidentListRow,
   OverviewMetric,
   OverviewSnapshot,
+  PackingSlipDetailSnapshot,
+  PackingSlipItemRow,
   PackingSlipRow,
   ProjectCardRow,
   ProjectDetailAssetRow,
@@ -133,6 +135,26 @@ const mapEventTitle = (eventType: string) => {
     default:
       return "Status updated";
   }
+};
+
+const resolvePackingStatus = (storedStatus: string, dueDate: string | null, itemCount: number, returnedCount: number) => {
+  if (itemCount > 0 && returnedCount >= itemCount) {
+    return "Closed";
+  }
+
+  if (dueDate) {
+    const dueTimestamp = new Date(dueDate).getTime();
+
+    if (Number.isFinite(dueTimestamp) && dueTimestamp < Date.now() && returnedCount < itemCount) {
+      return "Overdue";
+    }
+  }
+
+  if (returnedCount > 0 && returnedCount < itemCount) {
+    return "Partial return";
+  }
+
+  return storedStatus;
 };
 
 export const createFoundationReadService = (db: DatabaseSync) => ({
@@ -486,34 +508,178 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
           SELECT
             packing_slips.id,
             packing_slips.status,
+            packing_slips.issue_date,
             packing_slips.return_due_date,
             projects.name AS project,
             COALESCE(departments.name, '—') AS department,
-            COALESCE(users.full_name, '—') AS responsible
+            COALESCE(users.full_name, '—') AS responsible,
+            COUNT(packing_slip_items.id) AS item_count,
+            SUM(CASE WHEN packing_slip_items.returned_at IS NOT NULL THEN 1 ELSE 0 END) AS returned_count
           FROM packing_slips
           JOIN projects ON projects.id = packing_slips.project_id
           LEFT JOIN departments ON departments.id = packing_slips.department_id
           LEFT JOIN users ON users.id = packing_slips.responsible_user_id
+          LEFT JOIN packing_slip_items ON packing_slip_items.packing_slip_id = packing_slips.id
+          GROUP BY packing_slips.id, packing_slips.status, packing_slips.issue_date, packing_slips.return_due_date, projects.name, departments.name, users.full_name
           ORDER BY packing_slips.issue_date DESC
         `,
       )
       .all() as Array<{
       id: string;
       status: string;
+      issue_date: string;
       return_due_date: string | null;
       project: string;
       department: string;
       responsible: string;
+      item_count: number;
+      returned_count: number | null;
     }>;
 
     return rows.map((row) => ({
+      id: row.id,
       number: row.id.replace("packing-", "PS-"),
       project: row.project,
       department: row.department,
       responsible: row.responsible,
+      issuedDate: formatShortDate(row.issue_date),
       dueDate: formatShortDate(row.return_due_date),
-      status: row.status,
+      itemCount: row.item_count,
+      returnedCount: row.returned_count ?? 0,
+      status: resolvePackingStatus(row.status, row.return_due_date, row.item_count, row.returned_count ?? 0),
     }));
+  },
+
+  getPackingSlipDetail(packingSlipId: string): PackingSlipDetailSnapshot {
+    const slip = db
+      .prepare(
+        `
+          SELECT
+            packing_slips.id,
+            packing_slips.status,
+            packing_slips.issue_date,
+            packing_slips.return_due_date,
+            COALESCE(packing_slips.notes, 'No operational notes yet.') AS notes,
+            projects.name AS project,
+            COALESCE(departments.name, '—') AS department,
+            COALESCE(responsible.full_name, '—') AS responsible,
+            COALESCE(prepared.full_name, '—') AS prepared_by,
+            COUNT(packing_slip_items.id) AS item_count,
+            SUM(CASE WHEN packing_slip_items.returned_at IS NOT NULL THEN 1 ELSE 0 END) AS returned_count
+          FROM packing_slips
+          JOIN projects ON projects.id = packing_slips.project_id
+          LEFT JOIN departments ON departments.id = packing_slips.department_id
+          LEFT JOIN users AS responsible ON responsible.id = packing_slips.responsible_user_id
+          LEFT JOIN users AS prepared ON prepared.id = packing_slips.prepared_by_user_id
+          LEFT JOIN packing_slip_items ON packing_slip_items.packing_slip_id = packing_slips.id
+          WHERE packing_slips.id = ?
+          GROUP BY
+            packing_slips.id,
+            packing_slips.status,
+            packing_slips.issue_date,
+            packing_slips.return_due_date,
+            packing_slips.notes,
+            projects.name,
+            departments.name,
+            responsible.full_name,
+            prepared.full_name
+          LIMIT 1
+        `,
+      )
+      .get(packingSlipId) as
+      | {
+          id: string;
+          status: string;
+          issue_date: string;
+          return_due_date: string | null;
+          notes: string;
+          project: string;
+          department: string;
+          responsible: string;
+          prepared_by: string;
+          item_count: number;
+          returned_count: number | null;
+        }
+      | undefined;
+
+    if (!slip) {
+      return {
+        slip: null,
+        items: [],
+      };
+    }
+
+    const items = db
+      .prepare(
+        `
+          SELECT
+            packing_slip_items.id,
+            assets.id AS asset_id,
+            assets.name AS asset_name,
+            COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
+            packing_slip_items.quantity,
+            COALESCE(packing_slip_items.condition_out, '—') AS condition_out,
+            COALESCE(packing_slip_items.condition_in, '—') AS condition_in,
+            packing_slip_items.returned_at,
+            COALESCE(locations.name, '—') AS location,
+            COALESCE(users.full_name, '—') AS responsible
+          FROM packing_slip_items
+          JOIN assets ON assets.id = packing_slip_items.asset_id
+          JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+          LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
+          LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
+          LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
+          LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
+          WHERE packing_slip_items.packing_slip_id = ?
+          ORDER BY assets.name
+        `,
+      )
+      .all(packingSlipId) as Array<{
+      id: string;
+      asset_id: string;
+      asset_name: string;
+      code: string;
+      quantity: number;
+      condition_out: string;
+      condition_in: string;
+      returned_at: string | null;
+      location: string;
+      responsible: string;
+    }>;
+
+    const returnedCount = slip.returned_count ?? 0;
+    const itemRows: PackingSlipItemRow[] = items.map((row) => ({
+      id: row.id,
+      assetId: row.asset_id,
+      asset: row.asset_name,
+      code: row.code,
+      quantity: row.quantity,
+      conditionOut: row.condition_out,
+      conditionIn: row.condition_in,
+      returnedAt: row.returned_at ? formatTimelineTimestamp(row.returned_at) : "Pending return",
+      status: row.returned_at ? "Returned" : "Out",
+      location: row.location,
+      responsible: row.responsible,
+    }));
+
+    return {
+      slip: {
+        id: slip.id,
+        number: slip.id.replace("packing-", "PS-"),
+        project: slip.project,
+        department: slip.department,
+        responsible: slip.responsible,
+        preparedBy: slip.prepared_by,
+        issueDate: formatShortDate(slip.issue_date),
+        dueDate: formatShortDate(slip.return_due_date),
+        status: resolvePackingStatus(slip.status, slip.return_due_date, slip.item_count, returnedCount),
+        notes: slip.notes,
+        itemCount: slip.item_count,
+        returnedCount,
+        pendingCount: Math.max(0, slip.item_count - returnedCount),
+      },
+      items: itemRows,
+    };
   },
 
   getIncidents(): IncidentListRow[] {

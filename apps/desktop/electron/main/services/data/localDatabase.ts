@@ -7,6 +7,7 @@ import { foundationMigrationSql } from "@db";
 import { createFoundationReadService, type FoundationReadService } from "./foundationReadService";
 import { createAssetMutationService } from "./assetMutationService";
 import { createIncidentMutationService } from "./incidentMutationService";
+import { createPackingMutationService } from "./packingMutationService";
 import { seedFoundationData } from "./foundationSeed";
 import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
 import { createProjectMutationService, ensureProjectShellDefaults } from "./projectMutationService";
@@ -14,6 +15,7 @@ import { createProjectMutationService, ensureProjectShellDefaults } from "./proj
 type ProjectMutationService = ReturnType<typeof createProjectMutationService>;
 type AssetMutationService = ReturnType<typeof createAssetMutationService>;
 type IncidentMutationService = ReturnType<typeof createIncidentMutationService>;
+type PackingMutationService = ReturnType<typeof createPackingMutationService>;
 
 type LocalDatabaseRuntime = {
   database: DatabaseSync;
@@ -22,6 +24,7 @@ type LocalDatabaseRuntime = {
   projectMutations: ProjectMutationService;
   assetMutations: AssetMutationService;
   incidentMutations: IncidentMutationService;
+  packingMutations: PackingMutationService;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -44,6 +47,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     projectMutations: createProjectMutationService(database),
     assetMutations: createAssetMutationService(database),
     incidentMutations: createIncidentMutationService(database),
+    packingMutations: createPackingMutationService(database),
   };
 };
 

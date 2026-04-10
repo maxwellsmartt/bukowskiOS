@@ -15,6 +15,9 @@ export const ipcChannels = {
   },
   packing: {
     getList: "bukowskiPacking:getList",
+    getDetail: "bukowskiPacking:getDetail",
+    create: "bukowskiPacking:create",
+    returnItems: "bukowskiPacking:returnItems",
   },
   incidents: {
     getList: "bukowskiIncidents:getList",

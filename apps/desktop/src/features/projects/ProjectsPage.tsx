@@ -5,6 +5,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { ProjectDetailPanel } from "./ProjectDetailPanel";
 import { useProjectDetail, useProjectsData } from "./useProjectsData";
@@ -12,6 +13,7 @@ import { useProjectDetail, useProjectsData } from "./useProjectsData";
 export const ProjectsPage = () => {
   const { data, error } = useProjectsData();
   const { activeProjectId, setActiveProjectId } = useShellContext();
+  const sectionScopeLabel = useSectionScopeLabel();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = useProjectDetail(activeProjectId);
 
@@ -21,6 +23,7 @@ export const ProjectsPage = () => {
         eyebrow="Projects"
         title="Project registry"
         body="Projects now carry operational detail: assigned assets, incidents, responsibles and a first budget shell. Project CRUD still lives in the sidebar."
+        contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Projects unavailable: {error}</div> : null}

@@ -4,11 +4,13 @@ import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { useFinanceOverview } from "./useFinanceData";
 
 export const FinanceOverviewPage = () => {
   const { data, error } = useFinanceOverview();
+  const sectionScopeLabel = useSectionScopeLabel();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
@@ -17,6 +19,7 @@ export const FinanceOverviewPage = () => {
         eyebrow="Finance"
         title="Operational exposure"
         body="Replacement risk, incident cost and project exposure in one view."
+        contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Finance overview unavailable: {error}</div> : null}

@@ -1,4 +1,12 @@
-import type { AssignMoveAssetsInput, CreateProjectInput, DeleteProjectInput, ReportIncidentCommand, UpdateProjectInput } from "@contracts";
+import type {
+  AssignMoveAssetsInput,
+  CreatePackingSlipCommand,
+  CreateProjectInput,
+  DeleteProjectInput,
+  ReportIncidentCommand,
+  ReturnPackingSlipItemsCommand,
+  UpdateProjectInput,
+} from "@contracts";
 import { ipcMain } from "electron";
 
 import { ipcChannels } from "@contracts";
@@ -18,6 +26,10 @@ type RegisterFoundationIpcOptions = {
   incidentMutations: {
     reportIncident: (input: ReportIncidentCommand) => unknown;
   };
+  packingMutations: {
+    createPackingSlip: (input: CreatePackingSlipCommand) => unknown;
+    returnPackingSlipItems: (input: ReturnPackingSlipItemsCommand) => unknown;
+  };
 };
 
 export const registerFoundationIpc = ({
@@ -25,6 +37,7 @@ export const registerFoundationIpc = ({
   projectMutations,
   assetMutations,
   incidentMutations,
+  packingMutations,
 }: RegisterFoundationIpcOptions) => {
   ipcMain.handle(ipcChannels.shell.getBootstrap, () => foundationReads.getShellBootstrap());
   ipcMain.handle(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot());
@@ -32,6 +45,11 @@ export const registerFoundationIpc = ({
   ipcMain.handle(ipcChannels.assets.getDetail, (_event, assetId: string) => foundationReads.getAssetDetail(assetId));
   ipcMain.handle(ipcChannels.assets.assignMove, (_event, input: AssignMoveAssetsInput) => assetMutations.assignMoveAssets(input));
   ipcMain.handle(ipcChannels.packing.getList, () => foundationReads.getPackingSlips());
+  ipcMain.handle(ipcChannels.packing.getDetail, (_event, packingSlipId: string) => foundationReads.getPackingSlipDetail(packingSlipId));
+  ipcMain.handle(ipcChannels.packing.create, (_event, input: CreatePackingSlipCommand) => packingMutations.createPackingSlip(input));
+  ipcMain.handle(ipcChannels.packing.returnItems, (_event, input: ReturnPackingSlipItemsCommand) =>
+    packingMutations.returnPackingSlipItems(input),
+  );
   ipcMain.handle(ipcChannels.incidents.getList, () => foundationReads.getIncidents());
   ipcMain.handle(ipcChannels.incidents.report, (_event, input: ReportIncidentCommand) => incidentMutations.reportIncident(input));
   ipcMain.handle(ipcChannels.projects.getList, () => foundationReads.getProjects());

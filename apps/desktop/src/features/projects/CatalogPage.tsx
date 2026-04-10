@@ -3,11 +3,13 @@ import { useState } from "react";
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { useCatalogData } from "./useProjectsData";
 
 export const CatalogPage = () => {
   const { data, error } = useCatalogData();
+  const sectionScopeLabel = useSectionScopeLabel();
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [selectedDepartmentIds, setSelectedDepartmentIds] = useState<string[]>([]);
 
@@ -17,6 +19,7 @@ export const CatalogPage = () => {
         eyebrow="Catalog"
         title="Operational catalog"
         body="Core locations and departments used across operational flows."
+        contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Catalog unavailable: {error}</div> : null}

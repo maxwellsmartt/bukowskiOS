@@ -2,12 +2,16 @@ import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { PackingSlipBuilderPanel, type PackingSlipBuilderDraft } from "@features/packing/PackingSlipBuilderPanel";
+import { createPackingSlip } from "@features/packing/usePackingData";
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
+import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { AssetAssignMovePanel, type AssetAssignMoveFormValue } from "./AssetAssignMovePanel";
 import { assignMoveAssets, useAssetsList } from "./useAssetsData";
@@ -16,15 +20,19 @@ export const AssetsPage = () => <AssetsContent />;
 
 const AssetsContent = () => {
   const { activeProjectId, projects, refreshProjects } = useShellContext();
+  const sectionScopeLabel = useSectionScopeLabel();
   const { data: assets, error, isLoading, reload } = useAssetsList();
   const { data: catalog, error: catalogError } = useCatalogData();
   const navigate = useNavigate();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [actionPanelOpen, setActionPanelOpen] = useState(false);
+  const [packingPanelOpen, setPackingPanelOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [packingError, setPackingError] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [isSubmittingPacking, setIsSubmittingPacking] = useState(false);
 
   const activeAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) ?? null,
@@ -58,6 +66,36 @@ const AssetsContent = () => {
       setActionError(nextError instanceof Error ? nextError.message : "Unable to apply assign or move.");
     } finally {
       setIsSubmittingAction(false);
+    }
+  };
+
+  const handleCreatePackingSlip = async (formValue: PackingSlipBuilderDraft) => {
+    try {
+      setIsSubmittingPacking(true);
+      const result = await createPackingSlip({
+        commandId: crypto.randomUUID(),
+        workspaceId: "workspace-metadata",
+        assetIds: selectedRowIds,
+        projectId: formValue.projectId,
+        departmentId: formValue.departmentId,
+        responsibleUserId: formValue.responsibleUserId,
+        returnDueAt: formValue.returnDueAt ? new Date(formValue.returnDueAt).toISOString() : undefined,
+        notes: formValue.notes,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+
+      await Promise.all([reload(), refreshProjects()]);
+      writePreference(uiPreferenceKeys.activePackingSlipId, result.packingSlipId);
+      setPackingError(null);
+      setActionFeedback(result.summary);
+      setPackingPanelOpen(false);
+      setSelectedRowIds([]);
+      navigate("/packing-slips");
+    } catch (nextError) {
+      setPackingError(nextError instanceof Error ? nextError.message : "Unable to issue packing slip.");
+    } finally {
+      setIsSubmittingPacking(false);
     }
   };
 
@@ -100,7 +138,8 @@ const AssetsContent = () => {
       <SectionHeader
         eyebrow="Assets"
         title="Inventory"
-        body="Legacy inventory mounted into the live registry with status, quantity and storage context."
+        body="Live asset registry with current state, quantity, storage context and operational readiness in one pass."
+        contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Assets unavailable: {error}</div> : null}
@@ -123,19 +162,34 @@ const AssetsContent = () => {
               {selectedRowIds.length === 1 ? "1 asset selected" : `${selectedRowIds.length} assets selected`}
             </span>
             <span className="selection-action-subtitle">
-              Use the first real command pipeline to assign or move the current selection.
+              Assign, move or issue a packing slip from the current selection.
             </span>
           </div>
-          <button
-            className="action-primary-button"
-            onClick={() => {
-              setActionPanelOpen(true);
-              setActionFeedback(null);
-            }}
-            type="button"
-          >
-            Assign / move selected
-          </button>
+          <div className="selection-action-buttons">
+            <button
+              className="ghost-control"
+              onClick={() => {
+                setPackingPanelOpen(true);
+                setActionPanelOpen(false);
+                setPackingError(null);
+                setActionFeedback(null);
+              }}
+              type="button"
+            >
+              Create packing slip
+            </button>
+            <button
+              className="action-primary-button"
+              onClick={() => {
+                setActionPanelOpen(true);
+                setPackingPanelOpen(false);
+                setActionFeedback(null);
+              }}
+              type="button"
+            >
+              Assign / move selected
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -151,6 +205,23 @@ const AssetsContent = () => {
             setActionError(null);
           }}
           onSubmit={handleAssignMove}
+          projects={projects}
+          selectedCount={selectedRowIds.length}
+          users={catalog.users}
+        />
+      ) : null}
+
+      {packingPanelOpen && selectedRowIds.length ? (
+        <PackingSlipBuilderPanel
+          defaultProjectId={activeProjectId}
+          departments={catalog.departments}
+          error={packingError}
+          isSubmitting={isSubmittingPacking}
+          onClose={() => {
+            setPackingPanelOpen(false);
+            setPackingError(null);
+          }}
+          onSubmit={handleCreatePackingSlip}
           projects={projects}
           selectedCount={selectedRowIds.length}
           users={catalog.users}

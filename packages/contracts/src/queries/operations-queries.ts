@@ -1,12 +1,51 @@
 import type { OverviewMetric } from "./overview-queries";
 
 export type PackingSlipRow = {
+  id: string;
   number: string;
   project: string;
   department: string;
   responsible: string;
+  issuedDate: string;
+  dueDate: string;
+  itemCount: number;
+  returnedCount: number;
+  status: string;
+};
+
+export type PackingSlipDetailSummary = {
+  id: string;
+  number: string;
+  project: string;
+  department: string;
+  responsible: string;
+  preparedBy: string;
+  issueDate: string;
   dueDate: string;
   status: string;
+  notes: string;
+  itemCount: number;
+  returnedCount: number;
+  pendingCount: number;
+};
+
+export type PackingSlipItemRow = {
+  id: string;
+  assetId: string;
+  asset: string;
+  code: string;
+  quantity: number;
+  conditionOut: string;
+  conditionIn: string;
+  returnedAt: string;
+  status: string;
+  location: string;
+  responsible: string;
+};
+
+export type PackingSlipDetailSnapshot = {
+  slip: PackingSlipDetailSummary | null;
+  items: PackingSlipItemRow[];
 };
 
 export type IncidentListRow = {

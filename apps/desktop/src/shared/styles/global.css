@@ -86,17 +86,19 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .shell-brand {
   display: flex;
   align-items: center;
+  justify-content: center;
   min-height: 30px;
-  padding: 4px 8px 10px;
+  padding: 22px 12px 14px;
   -webkit-app-region: drag;
 }
 
 .shell-brand-lockup {
-  width: min(156px, 100%);
+  display: block;
+  width: clamp(128px, calc(var(--sidebar-width) - 66px), 170px);
+  max-width: 100%;
   height: auto;
   object-fit: contain;
-  margin-top: 20px;
-  margin-left: 25px;
+  margin: 0 auto;
   -webkit-app-region: no-drag;
 }
 
@@ -472,6 +474,13 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   max-width: 700px;
 }
 
+.section-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .section-header-eyebrow {
   margin: 0;
   color: var(--accent-info);
@@ -485,6 +494,19 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   font-size: 22px;
   font-weight: 500;
   letter-spacing: -0.02em;
+}
+
+.section-header-context-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.028);
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .section-header-body {
@@ -561,6 +583,13 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+
+.selection-action-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .selection-action-title,
@@ -693,6 +722,10 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.action-panel-actions-inline {
+  justify-content: flex-start;
 }
 
 .action-panel-actions-start {

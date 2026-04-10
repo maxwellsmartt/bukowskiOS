@@ -7,12 +7,14 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { IncidentReportPanel } from "./IncidentReportPanel";
 import { reportIncident, useIncidentsData } from "./useIncidentsData";
 
 export const IncidentsPage = () => {
   const { activeProjectId, projects, refreshProjects } = useShellContext();
+  const sectionScopeLabel = useSectionScopeLabel();
   const { data, error, reload } = useIncidentsData();
   const { data: assets } = useAssetsList();
   const { data: catalog, error: catalogError } = useCatalogData();
@@ -28,6 +30,7 @@ export const IncidentsPage = () => {
         eyebrow="Incidents"
         title="Incident queue"
         body="Damage, loss and malfunction reports with operational context and cost visibility."
+        contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Incidents unavailable: {error}</div> : null}

@@ -4,11 +4,13 @@ import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { useFinanceEntries } from "./useFinanceData";
 
 export const FinanceEntriesPage = () => {
   const { data, error } = useFinanceEntries();
+  const sectionScopeLabel = useSectionScopeLabel();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
@@ -17,6 +19,7 @@ export const FinanceEntriesPage = () => {
         eyebrow="Finance / Entries"
         title="Entries"
         body="Linked reserves and exposure entries created from operational events."
+        contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Entries unavailable: {error}</div> : null}

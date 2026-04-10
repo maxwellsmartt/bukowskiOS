@@ -29,6 +29,7 @@ app.whenReady().then(() => {
     projectMutations: localDatabase.projectMutations,
     assetMutations: localDatabase.assetMutations,
     incidentMutations: localDatabase.incidentMutations,
+    packingMutations: localDatabase.packingMutations,
   });
   Menu.setApplicationMenu(buildAppMenu());
   createAppWindow();

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as Re
 import { matchPath, useLocation } from "react-router-dom";
 
 import { AppRoutes, appRoutes } from "@app/routing/routes";
+import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 import { assetsSubnav, financeSubnav } from "./navigation";
 import { ShellSidebar } from "./ShellSidebar";
@@ -11,7 +12,6 @@ import { TopContextBar } from "./TopContextBar";
 const resolveActiveRoute = (pathname: string) =>
   appRoutes.find((route) => matchPath({ path: route.path, end: true }, pathname)) ?? appRoutes[0];
 
-const sidebarWidthStorageKey = "bukowski:shell-sidebar-width";
 const sidebarWidthMin = 220;
 const sidebarWidthMax = 420;
 const sidebarWidthDefault = 248;
@@ -36,22 +36,18 @@ export const AppShell = () => {
   }, [activeRoute.domain]);
 
   useEffect(() => {
-    const storedWidth = window.localStorage.getItem(sidebarWidthStorageKey);
-
-    if (!storedWidth) {
-      return;
-    }
-
-    const parsedWidth = Number.parseInt(storedWidth, 10);
-
-    if (!Number.isNaN(parsedWidth)) {
-      setSidebarWidth(clampSidebarWidth(parsedWidth));
-    }
+    setSidebarWidth(clampSidebarWidth(readNumberPreference(uiPreferenceKeys.shellSidebarWidth, sidebarWidthDefault)));
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(sidebarWidthStorageKey, String(sidebarWidth));
+    writePreference(uiPreferenceKeys.shellSidebarWidth, String(sidebarWidth));
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (location.pathname !== "/") {
+      writePreference(uiPreferenceKeys.lastRoutePath, location.pathname);
+    }
+  }, [location.pathname]);
 
   useEffect(
     () => () => {
