@@ -33,6 +33,7 @@ type DataTableProps<T = unknown> = {
   maxHeight?: number | string;
   emptyMessage?: string;
   persistKey?: string;
+  shellClassName?: string;
 };
 
 const selectionColumnWidth = 44;
@@ -53,6 +54,7 @@ export const DataTable = <T = unknown,>({
   maxHeight,
   emptyMessage = "No rows available.",
   persistKey,
+  shellClassName,
 }: DataTableProps<T>) => {
   const resolvedRowIds = useMemo(
     () => rows.map((row, index) => (getRowId ? getRowId(row, index) : String(index))),
@@ -170,7 +172,7 @@ export const DataTable = <T = unknown,>({
 
   return (
     <div
-      className="table-shell"
+      className={`table-shell${shellClassName ? ` ${shellClassName}` : ""}`}
       style={
         {
           "--table-max-height": resolveMaxHeight(maxHeight),

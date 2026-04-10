@@ -255,10 +255,10 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             },
           ]}
           getRowId={(row) => row.id}
-          maxHeight="min(38vh, 360px)"
           onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
           persistKey="project-detail-assets"
           rows={data.assets}
+          shellClassName="table-shell-natural"
           selectable
           selectedRowIds={selectedAssetIds}
           onSelectedRowIdsChange={setSelectedAssetIds}
@@ -290,9 +290,9 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             { key: "status", label: "Status", width: 108, minWidth: 92, render: (row) => row.status },
           ]}
           getRowId={(row) => row.id}
-          maxHeight="min(34vh, 320px)"
           persistKey="project-detail-incidents"
           rows={data.incidents}
+          shellClassName="table-shell-natural"
           selectable
           selectedRowIds={selectedIncidentIds}
           onSelectedRowIdsChange={setSelectedIncidentIds}

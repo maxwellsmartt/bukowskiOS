@@ -483,12 +483,13 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .subnav-tabs {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 4px;
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.018);
-  overflow-x: auto;
+  overflow: visible;
   -webkit-app-region: no-drag;
 }
 
@@ -524,7 +525,9 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .page-stack-project {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
 }
 
 .project-workspace-scroll {
@@ -935,6 +938,16 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.01);
   overflow-x: auto;
+}
+
+.table-shell-natural {
+  max-height: none;
+  overflow: visible;
+}
+
+.table-shell-natural .data-table {
+  width: 100%;
+  min-width: 100%;
 }
 
 .data-table {
