@@ -78,3 +78,21 @@ export const resolveScheduleWindowLabel = (startDate: string | null, endDate: st
 };
 
 export const todayDateOnly = () => new Date().toISOString().slice(0, 10);
+
+export const assertProjectUnitSupportsOperationalFlow = (
+  startDate: string | null,
+  endDate: string | null,
+  storedStatus: string | null,
+  statusSource: string | null,
+  label: string,
+) => {
+  const resolved = deriveProjectUnitStatus(startDate, endDate, storedStatus, statusSource);
+
+  if (resolved.status === "cancelled") {
+    throw new Error(`${label} is cancelled and cannot receive new operational activity.`);
+  }
+
+  if (resolved.status === "wrapped") {
+    throw new Error(`${label} is already wrapped and cannot receive new operational activity.`);
+  }
+};

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createAssetMutationService } from "../../electron/main/services/data/assetMutationService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
+import { createPackingMutationService } from "../../electron/main/services/data/packingMutationService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("asset mutation service", () => {
@@ -62,6 +63,56 @@ describe("asset mutation service", () => {
       .prepare("SELECT COUNT(*) AS count FROM sync_outbox WHERE entity_id = ?")
       .get("asset-legacy-rentman-1") as { count: number };
     expect(outboxCount.count).toBeGreaterThanOrEqual(2);
+
+    cleanup();
+  });
+
+  it("blocks reassigning assets that are currently checked out and records the failed receipt", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-mutation-test");
+    const assetMutations = createAssetMutationService(database);
+    const packingMutations = createPackingMutationService(database);
+
+    const createdAsset = assetMutations.createAsset({
+      commandId: "cmd-test-asset-create-hardening",
+      workspaceId: "workspace-metadata",
+      name: "Hardening cart battery",
+      internalCode: "HARD-001",
+      categoryId: "cat-lighting",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    packingMutations.createPackingSlip({
+      commandId: "cmd-test-asset-packing-first",
+      workspaceId: "workspace-metadata",
+      assetIds: [createdAsset.assetId],
+      projectId: "project-aurora",
+      responsibleUserId: "user-paola",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(() =>
+      assetMutations.assignMoveAssets({
+        commandId: "cmd-test-assign-checked-out",
+        workspaceId: "workspace-metadata",
+        assetIds: [createdAsset.assetId],
+        mode: "assign",
+        projectId: "project-archipielago",
+        assignedToUserId: "user-paola",
+        actorType: "user",
+        sourceChannel: "desktop",
+      }),
+    ).toThrow("currently checked out");
+
+    const failedReceipt = database
+      .prepare("SELECT outcome_status, error_message FROM command_receipts WHERE command_id = ?")
+      .get("cmd-test-assign-checked-out") as { outcome_status: string; error_message: string | null } | undefined;
+
+    expect(failedReceipt?.outcome_status).toBe("failed");
+    expect(failedReceipt?.error_message).toContain("currently checked out");
 
     cleanup();
   });

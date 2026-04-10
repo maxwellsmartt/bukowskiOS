@@ -6,6 +6,7 @@ import type {
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
 } from "@contracts";
+import { assertProjectUnitSupportsOperationalFlow } from "./projectScheduling";
 
 const defaultActorUserId = "user-ops";
 
@@ -59,6 +60,12 @@ type NamedEntityRow = {
   name: string;
 };
 
+type ProjectEntityRow = {
+  id: string;
+  name: string;
+  status: string;
+};
+
 type SlipCountRow = {
   item_count: number;
   returned_count: number | null;
@@ -68,6 +75,10 @@ type ProjectUnitRow = {
   id: string;
   project_id: string;
   name: string;
+  status: string;
+  status_source: string | null;
+  start_date: string | null;
+  end_date: string | null;
 };
 
 const uniqueValues = (values: Array<string | null | undefined>) =>
@@ -97,6 +108,24 @@ const loadNamedEntities = (
   return new Map(rows.map((row) => [row.id, row.name]));
 };
 
+const loadProjectEntities = (db: DatabaseSync, values: string[]) => {
+  if (!values.length) {
+    return new Map<string, ProjectEntityRow>();
+  }
+
+  const rows = db
+    .prepare(
+      `
+        SELECT id, name, status
+        FROM projects
+        WHERE id IN (${createPlaceholders(values)})
+      `,
+    )
+    .all(...values) as ProjectEntityRow[];
+
+  return new Map(rows.map((row) => [row.id, row]));
+};
+
 const loadUserEntities = (db: DatabaseSync, values: string[]) => {
   if (!values.length) {
     return new Map<string, string>();
@@ -123,7 +152,7 @@ const loadProjectUnitEntities = (db: DatabaseSync, values: string[]) => {
   const rows = db
     .prepare(
       `
-        SELECT id, project_id, name
+        SELECT id, project_id, name, status, status_source, start_date, end_date
         FROM project_units
         WHERE id IN (${createPlaceholders(values)})
       `,
@@ -142,6 +171,11 @@ const ensureEntityExists = (value: string | undefined, label: string, map: Map<s
     throw new Error(`${label} not found.`);
   }
 };
+
+const buildFailedCommandMessage = (label: string, previousError?: string | null) =>
+  previousError
+    ? `This command id already failed once for ${label}: ${previousError}`
+    : `This command id already failed once for ${label}. Generate a new action and retry.`;
 
 const parsePackingSequence = (value: string) => {
   const match = value.match(/(\d+)$/);
@@ -193,13 +227,41 @@ const resolveSlipStatus = (itemCount: number, returnedCount: number) => {
 export const createPackingMutationService = (db: DatabaseSync) => ({
   createPackingSlip(input: CreatePackingSlipCommand): CreatePackingSlipResult {
     const assetIds = uniqueValues(input.assetIds);
+    const insertReceipt = db.prepare(
+      `
+        INSERT OR REPLACE INTO command_receipts (
+          command_id,
+          workspace_id,
+          actor_user_id,
+          actor_type,
+          source_channel,
+          executed_at,
+          outcome_status,
+          error_message
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+    );
+    const fail = (message: string): never => {
+      insertReceipt.run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        new Date().toISOString(),
+        "failed",
+        message,
+      );
+      throw new Error(message);
+    };
 
     if (!assetIds.length) {
-      throw new Error("Select at least one asset before issuing a packing slip.");
+      fail("Select at least one asset before issuing a packing slip.");
     }
 
     if (!input.projectId?.trim()) {
-      throw new Error("Choose a project before issuing a packing slip.");
+      fail("Choose a project before issuing a packing slip.");
     }
 
     const existingReceipt = db
@@ -211,7 +273,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           LIMIT 1
         `,
       )
-      .get(input.commandId) as { outcome_status: string } | undefined;
+      .get(input.commandId) as { outcome_status: string; error_message: string | null } | undefined;
 
     if (existingReceipt?.outcome_status === "success") {
       return {
@@ -225,27 +287,59 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
     }
 
     if (existingReceipt?.outcome_status === "failed") {
-      throw new Error("This command id already failed once. Generate a new packing action and retry.");
+      throw new Error(buildFailedCommandMessage("packing issue", existingReceipt.error_message));
     }
 
     const projectMap = loadNamedEntities(db, "projects", uniqueValues([input.projectId]));
+    const projectEntityMap = loadProjectEntities(db, uniqueValues([input.projectId]));
     const departmentMap = loadNamedEntities(db, "departments", uniqueValues([input.departmentId]));
     const projectUnitMap = loadProjectUnitEntities(db, uniqueValues([input.projectUnitId]));
     const userMap = loadUserEntities(db, uniqueValues([input.responsibleUserId, defaultActorUserId]));
 
-    ensureEntityExists(input.projectId, "Project", projectMap);
-    ensureEntityExists(input.departmentId, "Department", departmentMap);
-    ensureEntityExists(input.responsibleUserId, "Responsible user", userMap);
-    ensureEntityExists(defaultActorUserId, "Actor user", userMap);
+    if (input.projectId && !projectMap.has(input.projectId)) {
+      fail("Project not found.");
+    }
+
+    if (input.departmentId && !departmentMap.has(input.departmentId)) {
+      fail("Department not found.");
+    }
+
+    if (input.responsibleUserId && !userMap.has(input.responsibleUserId)) {
+      fail("Responsible user not found.");
+    }
+
+    if (!userMap.has(defaultActorUserId)) {
+      fail("Actor user not found.");
+    }
 
     const explicitProjectUnit = input.projectUnitId ? projectUnitMap.get(input.projectUnitId) : undefined;
 
     if (input.projectUnitId && !explicitProjectUnit) {
-      throw new Error("Project unit not found.");
+      fail("Project unit not found.");
     }
 
     if (explicitProjectUnit && explicitProjectUnit.project_id !== input.projectId) {
-      throw new Error("Selected unit does not belong to the chosen project.");
+      fail("Selected unit does not belong to the chosen project.");
+    }
+
+    const project = projectEntityMap.get(input.projectId);
+
+    if (project?.status === "Wrapped") {
+      fail(`${project.name} is wrapped and cannot receive new packing activity.`);
+    }
+
+    if (explicitProjectUnit) {
+      try {
+        assertProjectUnitSupportsOperationalFlow(
+          explicitProjectUnit.start_date,
+          explicitProjectUnit.end_date,
+          explicitProjectUnit.status,
+          explicitProjectUnit.status_source,
+          explicitProjectUnit.name,
+        );
+      } catch (error) {
+        fail(error instanceof Error ? error.message : "Project unit is not available for packing.");
+      }
     }
 
     const assetRows = db
@@ -278,19 +372,19 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       .all(input.workspaceId, ...assetIds) as PackingAssetRow[];
 
     if (assetRows.length !== assetIds.length) {
-      throw new Error("One or more selected assets no longer exist in the live registry.");
+      fail("One or more selected assets no longer exist in the live registry.");
     }
 
     const maintenanceAsset = assetRows.find((row) => row.operational_status === "maintenance");
 
     if (maintenanceAsset) {
-      throw new Error(`${maintenanceAsset.asset_name} is in maintenance and cannot be packed out right now.`);
+      fail(`${maintenanceAsset.asset_name} is in maintenance and cannot be packed out right now.`);
     }
 
     const checkedOutAsset = assetRows.find((row) => row.custody_status === "checked_out");
 
     if (checkedOutAsset) {
-      throw new Error(`${checkedOutAsset.asset_name} is already checked out on another active flow.`);
+      fail(`${checkedOutAsset.asset_name} is already checked out on another active flow.`);
     }
 
     const conflictingProjectAsset = assetRows.find(
@@ -298,7 +392,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
     );
 
     if (conflictingProjectAsset) {
-      throw new Error(
+      fail(
         `${conflictingProjectAsset.asset_name} is still assigned to another project. Reassign it before issuing this slip.`,
       );
     }
@@ -309,22 +403,6 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
     const nextDepartmentId = input.departmentId?.trim() || null;
     const nextResponsibleUserId = input.responsibleUserId?.trim() || null;
     const nextReturnDueAt = input.returnDueAt?.trim() || null;
-
-    const insertReceipt = db.prepare(
-      `
-        INSERT OR REPLACE INTO command_receipts (
-          command_id,
-          workspace_id,
-          actor_user_id,
-          actor_type,
-          source_channel,
-          executed_at,
-          outcome_status,
-          error_message
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    );
 
     db.exec("BEGIN");
 
@@ -671,6 +749,34 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
 
   returnPackingSlipItems(input: ReturnPackingSlipItemsCommand): ReturnPackingSlipItemsResult {
     const selectedAssetIds = uniqueValues(input.assetIds ?? []);
+    const insertReceipt = db.prepare(
+      `
+        INSERT OR REPLACE INTO command_receipts (
+          command_id,
+          workspace_id,
+          actor_user_id,
+          actor_type,
+          source_channel,
+          executed_at,
+          outcome_status,
+          error_message
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+    );
+    const fail = (message: string): never => {
+      insertReceipt.run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        new Date().toISOString(),
+        "failed",
+        message,
+      );
+      throw new Error(message);
+    };
     const existingReceipt = db
       .prepare(
         `
@@ -680,7 +786,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           LIMIT 1
         `,
       )
-      .get(input.commandId) as { outcome_status: string } | undefined;
+      .get(input.commandId) as { outcome_status: string; error_message: string | null } | undefined;
 
     if (existingReceipt?.outcome_status === "success") {
       return {
@@ -694,7 +800,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
     }
 
     if (existingReceipt?.outcome_status === "failed") {
-      throw new Error("This command id already failed once. Generate a new return action and retry.");
+      throw new Error(buildFailedCommandMessage("packing return", existingReceipt.error_message));
     }
 
     const slip = db
@@ -709,12 +815,12 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       )
       .get(input.packingSlipId, input.workspaceId) as PackingSlipRow | undefined;
 
-    if (!slip) {
-      throw new Error("Packing slip not found in the local registry.");
-    }
+    const resolvedSlip = slip ?? fail("Packing slip not found in the local registry.");
 
     const actorUserMap = loadUserEntities(db, [defaultActorUserId]);
-    ensureEntityExists(defaultActorUserId, "Actor user", actorUserMap);
+    if (!actorUserMap.has(defaultActorUserId)) {
+      fail("Actor user not found.");
+    }
 
     const filterSql = selectedAssetIds.length
       ? `AND packing_slip_items.asset_id IN (${createPlaceholders(selectedAssetIds)})`
@@ -751,33 +857,17 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       .all(input.packingSlipId, ...selectedAssetIds) as PendingSlipItemRow[];
 
     if (!pendingRows.length) {
-      throw new Error("All selected packing slip items are already returned.");
+      fail("All selected packing slip items are already returned.");
     }
 
     if (selectedAssetIds.length && pendingRows.length !== selectedAssetIds.length) {
-      throw new Error("Some selected assets are no longer pending on this packing slip.");
+      fail("Some selected assets are no longer pending on this packing slip.");
     }
 
     const now = new Date().toISOString();
     const conditionIn = input.conditionIn?.trim();
     const note = input.notes?.trim() || null;
     const slipNumber = input.packingSlipId.replace("packing-", "PS-");
-
-    const insertReceipt = db.prepare(
-      `
-        INSERT OR REPLACE INTO command_receipts (
-          command_id,
-          workspace_id,
-          actor_user_id,
-          actor_type,
-          source_channel,
-          executed_at,
-          outcome_status,
-          error_message
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    );
 
     db.exec("BEGIN");
 
@@ -909,8 +999,8 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           input.workspaceId,
           row.asset_id,
           row.active_assignment_id,
-          slip.project_id,
-          slip.department_id,
+          resolvedSlip.project_id,
+          resolvedSlip.department_id,
           defaultActorUserId,
           nextLocationId,
           row.current_location_id,

@@ -39,4 +39,23 @@ describe("project mutation service", () => {
 
     cleanup();
   });
+
+  it("blocks shrinking a project window when units would fall outside the new dates", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-test");
+    const mutations = createProjectMutationService(database);
+
+    expect(() =>
+      mutations.updateProject({
+        projectId: "project-aurora",
+        code: "AURORA",
+        name: "Aurora Campaign",
+        status: "Active",
+        description: "Window shrink test",
+        startDate: "2026-04-01",
+        endDate: "2026-04-09",
+      }),
+    ).toThrow("falls outside the new project date window");
+
+    cleanup();
+  });
 });

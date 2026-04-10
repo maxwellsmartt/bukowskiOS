@@ -10,6 +10,7 @@ import type {
 } from "@contracts";
 
 import { createCodeGenerationService } from "./codeGenerationService";
+import { assertProjectUnitSupportsOperationalFlow } from "./projectScheduling";
 
 const defaultActorUserId = "user-ops";
 
@@ -32,6 +33,12 @@ type NamedEntityRow = {
   name: string;
 };
 
+type ProjectEntityRow = {
+  id: string;
+  name: string;
+  status: string;
+};
+
 type CategoryEntityRow = {
   id: string;
   name: string;
@@ -41,6 +48,10 @@ type ProjectUnitEntityRow = {
   id: string;
   project_id: string;
   name: string;
+  status: string;
+  status_source: string | null;
+  start_date: string | null;
+  end_date: string | null;
 };
 
 const uniqueValues = (values: Array<string | null | undefined>) =>
@@ -70,6 +81,24 @@ const loadNamedEntities = (
   return new Map(rows.map((row) => [row.id, row.name]));
 };
 
+const loadProjectEntities = (db: DatabaseSync, values: string[]) => {
+  if (!values.length) {
+    return new Map<string, ProjectEntityRow>();
+  }
+
+  const rows = db
+    .prepare(
+      `
+        SELECT id, name, status
+        FROM projects
+        WHERE id IN (${createPlaceholders(values)})
+      `,
+    )
+    .all(...values) as ProjectEntityRow[];
+
+  return new Map(rows.map((row) => [row.id, row]));
+};
+
 const loadCategoryEntities = (db: DatabaseSync, values: string[]) => {
   if (!values.length) {
     return new Map<string, string>();
@@ -96,7 +125,7 @@ const loadProjectUnitEntities = (db: DatabaseSync, values: string[]) => {
   const rows = db
     .prepare(
       `
-        SELECT id, project_id, name
+        SELECT id, project_id, name, status, status_source, start_date, end_date
         FROM project_units
         WHERE id IN (${createPlaceholders(values)})
       `,
@@ -133,6 +162,11 @@ const ensureEntityExists = (value: string | undefined, label: string, map: Map<s
     throw new Error(`${label} not found.`);
   }
 };
+
+const buildFailedCommandMessage = (label: string, previousError?: string | null) =>
+  previousError
+    ? `This command id already failed once for ${label}: ${previousError}`
+    : `This command id already failed once for ${label}. Generate a new action and retry.`;
 
 const buildAssignmentNote = (
   assetName: string,
@@ -204,17 +238,45 @@ const normalizeOptionalText = (value?: string) => {
 export const createAssetMutationService = (db: DatabaseSync) => ({
   assignMoveAssets(input: AssignMoveAssetsInput): AssignMoveAssetsResult {
     const assetIds = uniqueValues(input.assetIds);
+    const insertReceipt = db.prepare(
+      `
+        INSERT OR REPLACE INTO command_receipts (
+          command_id,
+          workspace_id,
+          actor_user_id,
+          actor_type,
+          source_channel,
+          executed_at,
+          outcome_status,
+          error_message
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+    );
+    const fail = (message: string): never => {
+      insertReceipt.run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        new Date().toISOString(),
+        "failed",
+        message,
+      );
+      throw new Error(message);
+    };
 
     if (!assetIds.length) {
-      throw new Error("Select at least one asset before running assign or move.");
+      fail("Select at least one asset before running assign or move.");
     }
 
     if (input.mode === "move" && !input.targetLocationId) {
-      throw new Error("Choose a destination location before moving assets.");
+      fail("Choose a destination location before moving assets.");
     }
 
     if (input.mode === "assign" && !input.projectId && !input.departmentId && !input.assignedToUserId) {
-      throw new Error("Assignment needs at least a project, department or responsible user.");
+      fail("Assignment needs at least a project, department or responsible user.");
     }
 
     const existingReceipt = db
@@ -226,7 +288,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
           LIMIT 1
         `,
       )
-      .get(input.commandId) as { outcome_status: string } | undefined;
+      .get(input.commandId) as { outcome_status: string; error_message: string | null } | undefined;
 
     if (existingReceipt?.outcome_status === "success") {
       return {
@@ -239,23 +301,64 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
     }
 
     if (existingReceipt?.outcome_status === "failed") {
-      throw new Error("This command id already failed once. Generate a new action and retry.");
+      throw new Error(buildFailedCommandMessage("asset assign / move", existingReceipt.error_message));
     }
 
     const projectMap = loadNamedEntities(db, "projects", uniqueValues([input.projectId]));
+    const projectEntityMap = loadProjectEntities(db, uniqueValues([input.projectId]));
     const departmentMap = loadNamedEntities(db, "departments", uniqueValues([input.departmentId]));
     const locationMap = loadNamedEntities(db, "locations", uniqueValues([input.targetLocationId]));
     const projectUnitMap = loadProjectUnitEntities(db, uniqueValues([input.projectUnitId]));
     const userMap = loadUserEntities(db, uniqueValues([input.assignedToUserId, defaultActorUserId]));
 
-    ensureEntityExists(input.projectId, "Project", projectMap);
-    ensureEntityExists(input.departmentId, "Department", departmentMap);
-    ensureEntityExists(input.targetLocationId, "Target location", locationMap);
-    ensureEntityExists(input.assignedToUserId, "Responsible user", userMap);
-    ensureEntityExists(defaultActorUserId, "Actor user", userMap);
+    if (input.projectId && !projectMap.has(input.projectId)) {
+      fail("Project not found.");
+    }
+
+    if (input.departmentId && !departmentMap.has(input.departmentId)) {
+      fail("Department not found.");
+    }
+
+    if (input.targetLocationId && !locationMap.has(input.targetLocationId)) {
+      fail("Target location not found.");
+    }
+
+    if (input.assignedToUserId && !userMap.has(input.assignedToUserId)) {
+      fail("Responsible user not found.");
+    }
+
+    if (!userMap.has(defaultActorUserId)) {
+      fail("Actor user not found.");
+    }
 
     if (input.projectUnitId && !projectUnitMap.has(input.projectUnitId)) {
-      throw new Error("Project unit not found.");
+      fail("Project unit not found.");
+    }
+
+    if (input.projectId) {
+      const project = projectEntityMap.get(input.projectId);
+
+      if (project?.status === "Wrapped") {
+        fail(`${project.name} is wrapped and cannot receive new assignment activity.`);
+      }
+    }
+
+    if (input.projectUnitId) {
+      const nextUnit = projectUnitMap.get(input.projectUnitId);
+
+      if (nextUnit) {
+        try {
+          assertProjectUnitSupportsOperationalFlow(
+            nextUnit.start_date,
+            nextUnit.end_date,
+            nextUnit.status,
+            nextUnit.status_source,
+            nextUnit.name,
+          );
+        } catch (error) {
+          fail(error instanceof Error ? error.message : "Project unit is not available for new operational activity.");
+        }
+      }
     }
 
     const assetStateRows = db
@@ -282,7 +385,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
       .all(input.workspaceId, ...assetIds) as AssetStateRow[];
 
     if (assetStateRows.length !== assetIds.length) {
-      throw new Error("One or more selected assets no longer exist in the local registry.");
+      fail("One or more selected assets no longer exist in the local registry.");
     }
 
     const currentLocationIds = uniqueValues(assetStateRows.map((row) => row.current_location_id));
@@ -315,34 +418,31 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
           });
 
     if (!processedRows.length) {
-      throw new Error("The selected assets already match the requested assignment or movement.");
+      fail("The selected assets already match the requested assignment or movement.");
     }
 
     if (input.mode === "assign") {
       const maintenanceAsset = processedRows.find((row) => row.operational_status === "maintenance");
 
       if (maintenanceAsset) {
-        throw new Error(`${maintenanceAsset.asset_name} is in maintenance and cannot be assigned right now.`);
+        fail(`${maintenanceAsset.asset_name} is in maintenance and cannot be assigned right now.`);
+      }
+
+      const checkedOutAsset = processedRows.find((row) => row.custody_status === "checked_out");
+
+      if (checkedOutAsset) {
+        fail(`${checkedOutAsset.asset_name} is currently checked out. Return it before reassigning it.`);
+      }
+    } else {
+      const checkedOutAsset = processedRows.find((row) => row.custody_status === "checked_out");
+
+      if (checkedOutAsset) {
+        fail(`${checkedOutAsset.asset_name} is currently checked out. Use the return flow before moving it.`);
       }
     }
 
     const now = new Date().toISOString();
     const eventType = input.mode === "assign" ? "assigned" : "moved";
-    const insertReceipt = db.prepare(
-      `
-        INSERT OR REPLACE INTO command_receipts (
-          command_id,
-          workspace_id,
-          actor_user_id,
-          actor_type,
-          source_channel,
-          executed_at,
-          outcome_status,
-          error_message
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    );
 
     db.exec("BEGIN");
 
@@ -642,7 +742,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
   createAsset(input: CreateAssetCommand): AssetEditorMutationResult {
     const existingReceipt = db
       .prepare("SELECT outcome_status FROM command_receipts WHERE command_id = ? LIMIT 1")
-      .get(input.commandId) as { outcome_status: string } | undefined;
+      .get(input.commandId) as { outcome_status: string; error_message: string | null } | undefined;
 
     if (existingReceipt?.outcome_status === "success") {
       const existingAssetId = db
@@ -655,6 +755,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         repeated: true,
         summary: "This asset create command was already applied.",
       };
+    }
+
+    if (existingReceipt?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage("asset create", existingReceipt.error_message));
     }
 
     const assetName = input.name.trim();
@@ -877,7 +981,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
   updateAsset(input: UpdateAssetCommand): AssetEditorMutationResult {
     const existingReceipt = db
       .prepare("SELECT outcome_status FROM command_receipts WHERE command_id = ? LIMIT 1")
-      .get(input.commandId) as { outcome_status: string } | undefined;
+      .get(input.commandId) as { outcome_status: string; error_message: string | null } | undefined;
 
     if (existingReceipt?.outcome_status === "success") {
       return {
@@ -886,6 +990,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         repeated: true,
         summary: "This asset update command was already applied.",
       };
+    }
+
+    if (existingReceipt?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage("asset update", existingReceipt.error_message));
     }
 
     const assetName = input.name.trim();
@@ -1129,7 +1237,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
   archiveAsset(input: ArchiveAssetCommand): AssetEditorMutationResult {
     const existingReceipt = db
       .prepare("SELECT outcome_status FROM command_receipts WHERE command_id = ? LIMIT 1")
-      .get(input.commandId) as { outcome_status: string } | undefined;
+      .get(input.commandId) as { outcome_status: string; error_message: string | null } | undefined;
 
     if (existingReceipt?.outcome_status === "success") {
       return {
@@ -1138,6 +1246,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         repeated: true,
         summary: "This asset archive command was already applied.",
       };
+    }
+
+    if (existingReceipt?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage("asset archive", existingReceipt.error_message));
     }
 
     const now = new Date().toISOString();
@@ -1192,6 +1304,21 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
 
     if (assetRow.active_assignment_id || assetRow.custody_status !== "available") {
       throw new Error("This asset is still operationally assigned or checked out and cannot be archived.");
+    }
+
+    const openIncidentCount = (db
+      .prepare(
+        `
+          SELECT COUNT(*) AS count
+          FROM incidents
+          WHERE asset_id = ?
+            AND status IN ('Open', 'In review')
+        `,
+      )
+      .get(input.assetId) as { count: number }).count;
+
+    if (openIncidentCount > 0) {
+      throw new Error("This asset still has open incidents and cannot be archived yet.");
     }
 
     db.exec("BEGIN");

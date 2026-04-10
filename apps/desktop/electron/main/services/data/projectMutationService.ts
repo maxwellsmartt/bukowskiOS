@@ -360,6 +360,42 @@ const assertUnitWithinProjectWindow = (
   }
 };
 
+const assertExistingUnitsWithinProjectWindow = (
+  db: DatabaseSync,
+  projectId: string,
+  projectStartDate: string | null,
+  projectEndDate: string | null,
+) => {
+  const conflictingUnits = db
+    .prepare(
+      `
+        SELECT code, name, start_date, end_date
+        FROM project_units
+        WHERE project_id = ?
+          AND (
+            (? IS NOT NULL AND start_date IS NOT NULL AND start_date < ?)
+            OR (? IS NOT NULL AND end_date IS NOT NULL AND end_date > ?)
+          )
+        ORDER BY sort_order, start_date, name
+        LIMIT 1
+      `,
+    )
+    .get(projectId, projectStartDate, projectStartDate, projectEndDate, projectEndDate) as
+    | {
+        code: string;
+        name: string;
+        start_date: string | null;
+        end_date: string | null;
+      }
+    | undefined;
+
+  if (conflictingUnits) {
+    throw new Error(
+      `${conflictingUnits.code} · ${conflictingUnits.name} falls outside the new project date window. Adjust the unit first.`,
+    );
+  }
+};
+
 const resolveDerivedStatusRow = (
   startDate: string | null,
   endDate: string | null,
@@ -467,6 +503,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
     const colorKey = input.colorKey === undefined ? currentProject.color_key : normalizeColorKey(input.colorKey);
 
     assertDateWindow(startDate, endDate, "Project");
+    assertExistingUnitsWithinProjectWindow(db, input.projectId, startDate, endDate);
 
     const result = db.prepare(
       `

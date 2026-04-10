@@ -117,6 +117,11 @@ const buildIncidentSummary = (title: string, assetName?: string, projectName?: s
   return `${title} logged successfully.`;
 };
 
+const buildFailedCommandMessage = (label: string, previousError?: string | null) =>
+  previousError
+    ? `This command id already failed once for ${label}: ${previousError}`
+    : `This command id already failed once for ${label}. Generate a new action and retry.`;
+
 export const createIncidentMutationService = (db: DatabaseSync) => ({
   reportIncident(input: ReportIncidentCommand): ReportIncidentResult {
     const title = ensureValue(input.title, "Incident title");
@@ -137,7 +142,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
           LIMIT 1
         `,
       )
-      .get(input.commandId) as { outcome_status: string } | undefined;
+      .get(input.commandId) as { outcome_status: string; error_message: string | null } | undefined;
 
     if (existingReceipt?.outcome_status === "success") {
       return {
@@ -149,7 +154,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
     }
 
     if (existingReceipt?.outcome_status === "failed") {
-      throw new Error("This command id already failed once. Generate a new action and retry.");
+      throw new Error(buildFailedCommandMessage("incident reporting", existingReceipt.error_message));
     }
 
     const assetContext = input.assetId
