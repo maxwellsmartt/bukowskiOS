@@ -27,6 +27,7 @@ export type AssetTimelineItem = {
 };
 
 export type AssetLinkedIncidentRow = {
+  id: string;
   title: string;
   project: string;
   costEstimate: string;

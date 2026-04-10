@@ -17,6 +17,8 @@ import type {
   PackingSlipRow,
   ProjectCardRow,
   ProjectDetailSnapshot,
+  ReportIncidentCommand,
+  ReportIncidentResult,
   ShellBootstrap,
   UpdateProjectInput,
 } from "@contracts";
@@ -42,6 +44,7 @@ declare global {
     };
     bukowskiIncidents?: {
       getList: () => Promise<IncidentListRow[]>;
+      report: (input: ReportIncidentCommand) => Promise<ReportIncidentResult>;
     };
     bukowskiProjects?: {
       getList: () => Promise<ProjectCardRow[]>;

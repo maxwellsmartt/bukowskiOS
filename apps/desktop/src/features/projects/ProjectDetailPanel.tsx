@@ -2,14 +2,19 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { ProjectDetailSnapshot } from "@contracts";
+import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
+import { reportIncident } from "@features/incidents/useIncidentsData";
+import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useShellContext } from "@shared/hooks/useShellContext";
 
 type ProjectDetailPanelProps = {
   data: ProjectDetailSnapshot;
   error: string | null;
   isLoading: boolean;
+  onIncidentCreated: () => void | Promise<void>;
 };
 
 const toneForStatus = (status: string) => {
@@ -26,10 +31,16 @@ const toneForStatus = (status: string) => {
   }
 };
 
-export const ProjectDetailPanel = ({ data, error, isLoading }: ProjectDetailPanelProps) => {
+export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }: ProjectDetailPanelProps) => {
   const navigate = useNavigate();
+  const { projects, refreshProjects } = useShellContext();
+  const { data: catalog, error: catalogError } = useCatalogData();
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [selectedIncidentIds, setSelectedIncidentIds] = useState<string[]>([]);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportFeedback, setReportFeedback] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (error) {
     return <div className="empty-state">Project detail unavailable: {error}</div>;
@@ -55,7 +66,78 @@ export const ProjectDetailPanel = ({ data, error, isLoading }: ProjectDetailPane
           <StatusBadge>{data.project.departments}</StatusBadge>
           <StatusBadge tone="warning">{data.project.exposure}</StatusBadge>
         </div>
+
+        <div className="action-panel-actions action-panel-actions-start">
+          <button
+            className="action-primary-button"
+            onClick={() => {
+              setReportOpen(true);
+              setReportError(null);
+              setReportFeedback(null);
+            }}
+            type="button"
+          >
+            Report incident for this project
+          </button>
+        </div>
       </SurfaceCard>
+
+      {catalogError ? <div className="empty-state">Incident catalog unavailable: {catalogError}</div> : null}
+      {reportFeedback ? <div className="action-feedback action-feedback-success">{reportFeedback}</div> : null}
+
+      {reportOpen ? (
+        <IncidentReportPanel
+          assetOptions={data.assets.map((asset) => ({
+            id: asset.id,
+            code: asset.code,
+            name: asset.name,
+          }))}
+          departments={catalog.departments}
+          error={reportError}
+          initialValue={{
+            projectId: data.project.id,
+            severity: "Medium",
+          }}
+          isSubmitting={isSubmitting}
+          onClose={() => {
+            setReportOpen(false);
+            setReportError(null);
+          }}
+          onSubmit={async (value) => {
+            try {
+              setIsSubmitting(true);
+              const result = await reportIncident({
+                commandId: crypto.randomUUID(),
+                workspaceId: "workspace-metadata",
+                assetId: value.assetId,
+                projectId: value.projectId ?? data.project?.id,
+                departmentId: value.departmentId,
+                responsibleUserId: value.responsibleUserId,
+                incidentType: value.incidentType,
+                severity: value.severity,
+                title: value.title,
+                description: value.description,
+                costEstimate: value.costEstimate,
+                notes: value.notes,
+                actorType: "user",
+                sourceChannel: "desktop",
+              });
+
+              await Promise.all([Promise.resolve(onIncidentCreated()), refreshProjects()]);
+              setReportOpen(false);
+              setReportError(null);
+              setReportFeedback(result.summary);
+            } catch (nextError) {
+              setReportError(nextError instanceof Error ? nextError.message : "Unable to create incident.");
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
+          projectLocked
+          projects={projects}
+          users={catalog.users}
+        />
+      ) : null}
 
       <div className="metric-grid">
         {data.metrics.map((metric) => (
@@ -171,7 +253,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading }: ProjectDetailPane
             { key: "costEstimate", label: "Cost", align: "right", width: 110, minWidth: 96, render: (row) => row.costEstimate },
             { key: "status", label: "Status", width: 108, minWidth: 92, render: (row) => row.status },
           ]}
-          getRowId={(row) => `${row.title}-${row.asset}`}
+          getRowId={(row) => row.id}
           maxHeight="min(34vh, 320px)"
           persistKey="project-detail-incidents"
           rows={data.incidents}

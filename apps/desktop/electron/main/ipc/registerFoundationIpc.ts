@@ -1,4 +1,4 @@
-import type { AssignMoveAssetsInput, CreateProjectInput, DeleteProjectInput, UpdateProjectInput } from "@contracts";
+import type { AssignMoveAssetsInput, CreateProjectInput, DeleteProjectInput, ReportIncidentCommand, UpdateProjectInput } from "@contracts";
 import { ipcMain } from "electron";
 
 import { ipcChannels } from "@contracts";
@@ -15,9 +15,17 @@ type RegisterFoundationIpcOptions = {
   assetMutations: {
     assignMoveAssets: (input: AssignMoveAssetsInput) => unknown;
   };
+  incidentMutations: {
+    reportIncident: (input: ReportIncidentCommand) => unknown;
+  };
 };
 
-export const registerFoundationIpc = ({ foundationReads, projectMutations, assetMutations }: RegisterFoundationIpcOptions) => {
+export const registerFoundationIpc = ({
+  foundationReads,
+  projectMutations,
+  assetMutations,
+  incidentMutations,
+}: RegisterFoundationIpcOptions) => {
   ipcMain.handle(ipcChannels.shell.getBootstrap, () => foundationReads.getShellBootstrap());
   ipcMain.handle(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot());
   ipcMain.handle(ipcChannels.assets.getList, () => foundationReads.getAssets());
@@ -25,6 +33,7 @@ export const registerFoundationIpc = ({ foundationReads, projectMutations, asset
   ipcMain.handle(ipcChannels.assets.assignMove, (_event, input: AssignMoveAssetsInput) => assetMutations.assignMoveAssets(input));
   ipcMain.handle(ipcChannels.packing.getList, () => foundationReads.getPackingSlips());
   ipcMain.handle(ipcChannels.incidents.getList, () => foundationReads.getIncidents());
+  ipcMain.handle(ipcChannels.incidents.report, (_event, input: ReportIncidentCommand) => incidentMutations.reportIncident(input));
   ipcMain.handle(ipcChannels.projects.getList, () => foundationReads.getProjects());
   ipcMain.handle(ipcChannels.projects.getDetail, (_event, projectId: string) => foundationReads.getProjectDetail(projectId));
   ipcMain.handle(ipcChannels.projects.getCatalog, () => foundationReads.getCatalogSnapshot());

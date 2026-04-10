@@ -18,6 +18,8 @@ import type {
   PackingSlipRow,
   ProjectCardRow,
   ProjectDetailSnapshot,
+  ReportIncidentCommand,
+  ReportIncidentResult,
   ShellBootstrap,
   UpdateProjectInput,
 } from "@contracts";
@@ -48,6 +50,8 @@ const bukowskiPacking = {
 
 const bukowskiIncidents = {
   getList: () => ipcRenderer.invoke(ipcChannels.incidents.getList) as Promise<IncidentListRow[]>,
+  report: (input: ReportIncidentCommand) =>
+    ipcRenderer.invoke(ipcChannels.incidents.report, input) as Promise<ReportIncidentResult>,
 };
 
 const bukowskiProjects = {

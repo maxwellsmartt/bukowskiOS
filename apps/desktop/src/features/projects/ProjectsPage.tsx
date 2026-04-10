@@ -13,7 +13,7 @@ export const ProjectsPage = () => {
   const { data, error } = useProjectsData();
   const { activeProjectId, setActiveProjectId } = useShellContext();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  const { data: detail, error: detailError, isLoading: detailLoading } = useProjectDetail(activeProjectId);
+  const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = useProjectDetail(activeProjectId);
 
   return (
     <div className="page-stack">
@@ -75,7 +75,7 @@ export const ProjectsPage = () => {
           />
         </SurfaceCard>
 
-        <ProjectDetailPanel data={detail} error={detailError} isLoading={detailLoading} />
+        <ProjectDetailPanel data={detail} error={detailError} isLoading={detailLoading} onIncidentCreated={reloadDetail} />
       </div>
     </div>
   );

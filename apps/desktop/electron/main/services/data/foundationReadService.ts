@@ -417,6 +417,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       .prepare(
         `
           SELECT
+            incidents.id,
             title,
             COALESCE(projects.name, '—') AS project,
             cost_estimate,
@@ -429,6 +430,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
         `,
       )
       .all(assetId) as Array<{
+      id: string;
       title: string;
       project: string;
       cost_estimate: number | null;
@@ -442,6 +444,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
     }));
 
     const incidentRows: AssetLinkedIncidentRow[] = linkedIncidents.map((row) => ({
+      id: row.id,
       title: row.title,
       project: row.project,
       costEstimate: formatCurrency(row.cost_estimate),
@@ -518,6 +521,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       .prepare(
         `
           SELECT
+            incidents.id,
             incidents.title,
             COALESCE(assets.internal_code, '—') AS asset_code,
             COALESCE(projects.name, '—') AS project,
@@ -533,6 +537,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
         `,
       )
       .all() as Array<{
+      id: string;
       title: string;
       asset_code: string;
       project: string;
@@ -543,6 +548,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
     }>;
 
     return rows.map((row) => ({
+      id: row.id,
       title: row.title,
       asset: row.asset_code,
       project: row.project,
@@ -743,6 +749,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
       .prepare(
         `
           SELECT
+            incidents.id,
             incidents.title,
             COALESCE(assets.internal_code, '—') AS asset_code,
             COALESCE(users.full_name, '—') AS responsible,
@@ -761,6 +768,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
         `,
       )
       .all(projectId) as Array<{
+      id: string;
       title: string;
       asset_code: string;
       responsible: string;
@@ -845,6 +853,7 @@ export const createFoundationReadService = (db: DatabaseSync) => ({
     }));
 
     const incidentRows: ProjectDetailIncidentRow[] = incidents.map((row) => ({
+      id: row.id,
       title: row.title,
       asset: row.asset_code,
       responsible: row.responsible,

@@ -1,13 +1,24 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 
+import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
+import { reportIncident } from "@features/incidents/useIncidentsData";
+import { useCatalogData } from "@features/projects/useProjectsData";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useShellContext } from "@shared/hooks/useShellContext";
 
 import { useAssetDetail } from "./useAssetsData";
 
 export const AssetDetailPage = () => {
   const { assetId } = useParams();
-  const { data } = useAssetDetail(assetId);
+  const { data, reload } = useAssetDetail(assetId);
+  const { projects, refreshProjects } = useShellContext();
+  const { data: catalog, error: catalogError } = useCatalogData();
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportFeedback, setReportFeedback] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!data.asset) {
     return <div className="empty-state">Asset not found in the local workspace.</div>;
@@ -59,7 +70,80 @@ export const AssetDetailPage = () => {
           <StatusBadge tone="critical">Report issue</StatusBadge>
           <StatusBadge tone="success">Maintenance</StatusBadge>
         </div>
+
+        <div className="action-panel-actions action-panel-actions-start">
+          <button
+            className="action-primary-button"
+            onClick={() => {
+              setReportOpen(true);
+              setReportError(null);
+              setReportFeedback(null);
+            }}
+            type="button"
+          >
+            Report incident for this asset
+          </button>
+        </div>
       </SurfaceCard>
+
+      {catalogError ? <div className="empty-state">Incident catalog unavailable: {catalogError}</div> : null}
+      {reportFeedback ? <div className="action-feedback action-feedback-success">{reportFeedback}</div> : null}
+
+      {reportOpen ? (
+        <IncidentReportPanel
+          assetLocked
+          assetOptions={[
+            {
+              id: data.asset.id,
+              code: data.asset.code,
+              name: data.asset.name,
+            },
+          ]}
+          departments={catalog.departments}
+          error={reportError}
+          initialValue={{
+            assetId: data.asset.id,
+            severity: "Medium",
+          }}
+          isSubmitting={isSubmitting}
+          onClose={() => {
+            setReportOpen(false);
+            setReportError(null);
+          }}
+          onSubmit={async (value) => {
+            try {
+              setIsSubmitting(true);
+              const result = await reportIncident({
+                commandId: crypto.randomUUID(),
+                workspaceId: "workspace-metadata",
+                assetId: value.assetId,
+                projectId: value.projectId,
+                departmentId: value.departmentId,
+                responsibleUserId: value.responsibleUserId,
+                incidentType: value.incidentType,
+                severity: value.severity,
+                title: value.title,
+                description: value.description,
+                costEstimate: value.costEstimate,
+                notes: value.notes,
+                actorType: "user",
+                sourceChannel: "desktop",
+              });
+
+              await Promise.all([reload(), refreshProjects()]);
+              setReportOpen(false);
+              setReportError(null);
+              setReportFeedback(result.summary);
+            } catch (nextError) {
+              setReportError(nextError instanceof Error ? nextError.message : "Unable to create incident.");
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
+          projects={projects}
+          users={catalog.users}
+        />
+      ) : null}
 
       <div className="split-layout">
         <SurfaceCard title="Event timeline" subtitle="Trace of the operational events behind the current state.">
@@ -112,7 +196,7 @@ export const AssetDetailPage = () => {
             {data.linkedIncidents.length ? (
               <div className="queue-list">
                 {data.linkedIncidents.map((incident) => (
-                  <div key={incident.title} className="queue-item">
+                  <div key={incident.id} className="queue-item">
                     <div className="identity-cell">
                       <span className="identity-title">{incident.title}</span>
                       <span className="identity-meta">

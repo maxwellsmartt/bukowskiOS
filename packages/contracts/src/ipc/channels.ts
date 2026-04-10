@@ -18,6 +18,7 @@ export const ipcChannels = {
   },
   incidents: {
     getList: "bukowskiIncidents:getList",
+    report: "bukowskiIncidents:report",
   },
   projects: {
     getList: "bukowskiProjects:getList",

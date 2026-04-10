@@ -10,6 +10,7 @@ export type PackingSlipRow = {
 };
 
 export type IncidentListRow = {
+  id: string;
   title: string;
   asset: string;
   project: string;
@@ -68,6 +69,7 @@ export type ProjectDetailAssetRow = {
 };
 
 export type ProjectDetailIncidentRow = {
+  id: string;
   title: string;
   asset: string;
   responsible: string;

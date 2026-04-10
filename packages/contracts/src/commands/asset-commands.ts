@@ -23,12 +23,24 @@ export type ReportIncidentCommand = {
   assignmentId?: string;
   projectId?: string;
   departmentId?: string;
+  responsibleUserId?: string;
   incidentType: string;
   severity: string;
   title: string;
   description: string;
+  costEstimate?: number;
+  currency?: string;
+  financialStatus?: string;
+  notes?: string;
   actorType: CommandActorType;
   sourceChannel: CommandSourceChannel;
+};
+
+export type ReportIncidentResult = {
+  commandId: string;
+  incidentId: string;
+  repeated: boolean;
+  summary: string;
 };
 
 export type AssignMoveAssetsInput = {

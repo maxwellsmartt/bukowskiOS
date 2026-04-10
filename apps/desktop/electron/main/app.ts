@@ -28,6 +28,7 @@ app.whenReady().then(() => {
     foundationReads: localDatabase.foundationReads,
     projectMutations: localDatabase.projectMutations,
     assetMutations: localDatabase.assetMutations,
+    incidentMutations: localDatabase.incidentMutations,
   });
   Menu.setApplicationMenu(buildAppMenu());
   createAppWindow();

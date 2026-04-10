@@ -6,12 +6,14 @@ import { foundationMigrationSql } from "@db";
 
 import { createFoundationReadService, type FoundationReadService } from "./foundationReadService";
 import { createAssetMutationService } from "./assetMutationService";
+import { createIncidentMutationService } from "./incidentMutationService";
 import { seedFoundationData } from "./foundationSeed";
 import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
 import { createProjectMutationService, ensureProjectShellDefaults } from "./projectMutationService";
 
 type ProjectMutationService = ReturnType<typeof createProjectMutationService>;
 type AssetMutationService = ReturnType<typeof createAssetMutationService>;
+type IncidentMutationService = ReturnType<typeof createIncidentMutationService>;
 
 type LocalDatabaseRuntime = {
   database: DatabaseSync;
@@ -19,6 +21,7 @@ type LocalDatabaseRuntime = {
   foundationReads: FoundationReadService;
   projectMutations: ProjectMutationService;
   assetMutations: AssetMutationService;
+  incidentMutations: IncidentMutationService;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -40,6 +43,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     foundationReads: createFoundationReadService(database),
     projectMutations: createProjectMutationService(database),
     assetMutations: createAssetMutationService(database),
+    incidentMutations: createIncidentMutationService(database),
   };
 };
 
