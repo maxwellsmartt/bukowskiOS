@@ -17,7 +17,9 @@ export const ProjectOverviewPage = () => {
         contextLabel={project ? `${project.code} · ${project.name}` : "Project workspace"}
       />
 
-      <ProjectDetailPanel data={data} error={error} isLoading={isLoading} onIncidentCreated={reload} />
+      <div className="project-workspace-scroll">
+        <ProjectDetailPanel data={data} error={error} isLoading={isLoading} onIncidentCreated={reload} />
+      </div>
     </div>
   );
 };

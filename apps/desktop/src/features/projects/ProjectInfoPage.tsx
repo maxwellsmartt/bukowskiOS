@@ -30,62 +30,64 @@ export const ProjectInfoPage = () => {
         contextLabel={project ? `${project.code} · ${project.name}` : "Project workspace"}
       />
 
-      <div className="project-detail-support-grid">
-        <SurfaceCard
-          className="project-scroll-card"
-          title={`${data.project.code} · ${data.project.name}`}
-          subtitle={data.project.description || "No project description yet."}
-          aside={<StatusBadge>{data.project.status}</StatusBadge>}
-        >
-          <div className="summary-grid">
-            <div className="summary-row">
-              <span className="summary-label">Client</span>
-              <span className="summary-value">{data.project.client}</span>
+      <div className="project-workspace-scroll">
+        <div className="project-detail-support-grid">
+          <SurfaceCard
+            className="project-scroll-card"
+            title={`${data.project.code} · ${data.project.name}`}
+            subtitle={data.project.description || "No project description yet."}
+            aside={<StatusBadge>{data.project.status}</StatusBadge>}
+          >
+            <div className="summary-grid">
+              <div className="summary-row">
+                <span className="summary-label">Client</span>
+                <span className="summary-value">{data.project.client}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Departments</span>
+                <span className="summary-value">{data.project.departments}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Assigned assets</span>
+                <span className="summary-value">{data.project.assetCount}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Incidents</span>
+                <span className="summary-value">{data.project.incidentCount}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Exposure</span>
+                <span className="summary-value">{data.project.exposure}</span>
+              </div>
             </div>
-            <div className="summary-row">
-              <span className="summary-label">Departments</span>
-              <span className="summary-value">{data.project.departments}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Assigned assets</span>
-              <span className="summary-value">{data.project.assetCount}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Incidents</span>
-              <span className="summary-value">{data.project.incidentCount}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Exposure</span>
-              <span className="summary-value">{data.project.exposure}</span>
-            </div>
-          </div>
-        </SurfaceCard>
+          </SurfaceCard>
 
-        <SurfaceCard
-          className="project-scroll-card"
-          title="Responsibles"
-          subtitle="People currently carrying inventory or incident follow-up inside this project."
-        >
-          {data.responsibles.length ? (
-            <div className="queue-list project-scroll-list">
-              {data.responsibles.map((row) => (
-                <div key={row.name} className="queue-item">
-                  <div className="identity-cell">
-                    <span className="identity-title">{row.name}</span>
-                    <span className="identity-meta">
-                      {row.assetCount} assets · {row.incidentCount} open incidents
-                    </span>
+          <SurfaceCard
+            className="project-scroll-card"
+            title="Responsibles"
+            subtitle="People currently carrying inventory or incident follow-up inside this project."
+          >
+            {data.responsibles.length ? (
+              <div className="queue-list project-scroll-list">
+                {data.responsibles.map((row) => (
+                  <div key={row.name} className="queue-item">
+                    <div className="identity-cell">
+                      <span className="identity-title">{row.name}</span>
+                      <span className="identity-meta">
+                        {row.assetCount} assets · {row.incidentCount} open incidents
+                      </span>
+                    </div>
+                    <StatusBadge tone={row.incidentCount ? "critical" : "info"}>
+                      {row.incidentCount ? "Needs follow-up" : "Stable"}
+                    </StatusBadge>
                   </div>
-                  <StatusBadge tone={row.incidentCount ? "critical" : "info"}>
-                    {row.incidentCount ? "Needs follow-up" : "Stable"}
-                  </StatusBadge>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">No responsibles linked yet. Assign assets or incidents to build project ownership.</div>
-          )}
-        </SurfaceCard>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">No responsibles linked yet. Assign assets or incidents to build project ownership.</div>
+            )}
+          </SurfaceCard>
+        </div>
       </div>
     </div>
   );

@@ -522,7 +522,18 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .page-stack-project {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
+}
+
+.project-workspace-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .section-header {
@@ -1181,8 +1192,9 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .project-scroll-list {
-  max-height: min(34vh, 300px);
-  padding-right: 4px;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .queue-item {
