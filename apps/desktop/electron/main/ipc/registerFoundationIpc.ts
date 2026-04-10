@@ -79,7 +79,8 @@ export const registerFoundationIpc = ({
   ipcMain.handle(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot());
   ipcMain.handle(
     ipcChannels.overview.getTimeline,
-    (_event, range: ScheduleTimelineRange, scale: ScheduleTimelineScale) => foundationReads.getScheduleTimeline(range, scale),
+    (_event, range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate?: string) =>
+      foundationReads.getScheduleTimeline(range, scale, anchorDate),
   );
   ipcMain.handle(ipcChannels.assets.getList, (_event, query: AssetListQuery | undefined) => foundationReads.getAssets(query));
   ipcMain.handle(ipcChannels.assets.getDetail, (_event, assetId: string) => foundationReads.getAssetDetail(assetId));

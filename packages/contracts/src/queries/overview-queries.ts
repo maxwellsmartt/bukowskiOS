@@ -16,7 +16,7 @@ export type RecentMovementRow = {
 };
 
 export type ScheduleTimelineRange = "30d" | "90d" | "6m";
-export type ScheduleTimelineScale = "week";
+export type ScheduleTimelineScale = "day" | "week" | "month";
 
 export type ScheduleTimelineMarker = {
   key: string;
@@ -63,6 +63,7 @@ export type ScheduleTimelineUnscheduledRow = {
 export type ScheduleTimelineSnapshot = {
   range: ScheduleTimelineRange;
   scale: ScheduleTimelineScale;
+  anchorDate: string;
   rangeStart: string;
   rangeEnd: string;
   markers: ScheduleTimelineMarker[];

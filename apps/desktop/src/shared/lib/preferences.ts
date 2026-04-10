@@ -6,6 +6,10 @@ export const uiPreferenceKeys = {
   lastProjectRoutePath: "last-project-route-path",
   lastProjectRouteSection: "last-project-route-section",
   lastRoutePath: "last-route-path",
+  overviewTimelineAnchorDate: "overview-timeline-anchor-date",
+  overviewTimelineExpandedProjects: "overview-timeline-expanded-projects",
+  overviewTimelineRange: "overview-timeline-range",
+  overviewTimelineScale: "overview-timeline-scale",
   recentEntityKeys: "recent-entity-keys",
   shellSidebarWidth: "shell-sidebar-width",
 } as const;

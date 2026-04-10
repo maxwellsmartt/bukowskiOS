@@ -63,8 +63,8 @@ const bukowskiShell = {
 
 const bukowskiOverview = {
   getSnapshot: () => ipcRenderer.invoke(ipcChannels.overview.getSnapshot) as Promise<OverviewSnapshot>,
-  getTimeline: (range: ScheduleTimelineRange, scale: ScheduleTimelineScale) =>
-    ipcRenderer.invoke(ipcChannels.overview.getTimeline, range, scale) as Promise<ScheduleTimelineSnapshot>,
+  getTimeline: (range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate?: string) =>
+    ipcRenderer.invoke(ipcChannels.overview.getTimeline, range, scale, anchorDate) as Promise<ScheduleTimelineSnapshot>,
 };
 
 const bukowskiAssets = {

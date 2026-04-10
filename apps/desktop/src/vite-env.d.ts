@@ -62,7 +62,7 @@ declare global {
     };
     bukowskiOverview?: {
       getSnapshot: () => Promise<OverviewSnapshot>;
-      getTimeline: (range: ScheduleTimelineRange, scale: ScheduleTimelineScale) => Promise<ScheduleTimelineSnapshot>;
+      getTimeline: (range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate?: string) => Promise<ScheduleTimelineSnapshot>;
     };
     bukowskiAssets?: {
       getList: (query?: AssetListQuery) => Promise<AssetListRow[]>;

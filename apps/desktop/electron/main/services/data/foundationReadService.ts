@@ -165,27 +165,109 @@ const startOfWeek = (date: string) => {
   return nextDate.toISOString().slice(0, 10);
 };
 
-const resolveTimelineWindow = (range: ScheduleTimelineRange) => {
-  const start = startOfWeek(addDays(todayDateOnly(), -7));
+const startOfMonth = (date: string) => {
+  const nextDate = new Date(`${date}T00:00:00.000Z`);
+  nextDate.setUTCDate(1);
+  return nextDate.toISOString().slice(0, 10);
+};
 
+const resolveTimelineRangeLength = (range: ScheduleTimelineRange) => {
   if (range === "30d") {
-    return {
-      start,
-      end: addDays(start, 29),
-    };
+    return 30;
   }
 
   if (range === "6m") {
-    return {
-      start,
-      end: addDays(start, 181),
-    };
+    return 182;
   }
 
+  return 90;
+};
+
+const sanitizeTimelineAnchorDate = (value?: string | null) =>
+  value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : todayDateOnly();
+
+const clampDate = (value: string, min: string, max: string) => {
+  if (value < min) {
+    return min;
+  }
+
+  if (value > max) {
+    return max;
+  }
+
+  return value;
+};
+
+const resolveTimelineWindow = (range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate?: string | null) => {
+  const totalDays = resolveTimelineRangeLength(range);
+  const safeAnchorDate = sanitizeTimelineAnchorDate(anchorDate);
+  const lookbackDays = Math.max(1, Math.floor(totalDays * 0.2));
+  const rawStart = addDays(safeAnchorDate, -lookbackDays);
+  const alignedStart = scale === "month" ? startOfMonth(rawStart) : startOfWeek(rawStart);
+  const start = alignedStart;
+  const end = addDays(start, totalDays - 1);
+
   return {
+    anchorDate: safeAnchorDate,
     start,
-    end: addDays(start, 89),
+    end,
   };
+};
+
+const formatTimelineMonthLabel = (value: string) =>
+  new Intl.DateTimeFormat("en-US", { month: "short" }).format(new Date(`${value}T00:00:00.000Z`)).toUpperCase();
+
+const buildTimelineMarkers = (
+  rangeStart: string,
+  rangeEnd: string,
+  scale: ScheduleTimelineScale,
+): ScheduleTimelineSnapshot["markers"] => {
+  if (scale === "day") {
+    return Array.from({ length: diffDaysInclusive(rangeStart, rangeEnd) + 1 }, (_, index) => {
+      const markerDate = addDays(rangeStart, index);
+      return {
+        key: markerDate,
+        label: new Intl.DateTimeFormat("en-US", { day: "numeric" }).format(new Date(`${markerDate}T00:00:00.000Z`)),
+        startDate: markerDate,
+        endDate: markerDate,
+      };
+    });
+  }
+
+  if (scale === "month") {
+    const markers: ScheduleTimelineSnapshot["markers"] = [];
+    let markerStart = startOfMonth(rangeStart);
+
+    while (markerStart <= rangeEnd) {
+      const markerEnd = addDays(startOfMonth(addDays(markerStart, 32)), -1);
+      markers.push({
+        key: markerStart,
+        label: formatTimelineMonthLabel(markerStart),
+        startDate: clampDate(markerStart, rangeStart, rangeEnd),
+        endDate: clampDate(markerEnd, rangeStart, rangeEnd),
+      });
+      markerStart = startOfMonth(addDays(markerStart, 32));
+    }
+
+    return markers;
+  }
+
+  return Array.from({ length: Math.ceil((diffDaysInclusive(rangeStart, rangeEnd) + 1) / 7) })
+    .map((_, index) => {
+      const markerStart = addDays(rangeStart, index * 7);
+      if (markerStart > rangeEnd) {
+        return null;
+      }
+
+      const markerEnd = addDays(markerStart, 6) > rangeEnd ? rangeEnd : addDays(markerStart, 6);
+      return {
+        key: markerStart,
+        label: formatDateOnlyLabel(markerStart),
+        startDate: markerStart,
+        endDate: markerEnd,
+      };
+    })
+    .filter((marker): marker is ScheduleTimelineSnapshot["markers"][number] => Boolean(marker));
 };
 
 const compareDateOnly = (left: string | null, right: string | null) => {
@@ -896,8 +978,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     };
   },
 
-  getScheduleTimeline(range: ScheduleTimelineRange, scale: ScheduleTimelineScale): ScheduleTimelineSnapshot {
-    const window = resolveTimelineWindow(range);
+  getScheduleTimeline(range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate?: string): ScheduleTimelineSnapshot {
+    const window = resolveTimelineWindow(range, scale, anchorDate);
     const rows = db
       .prepare(
         `
@@ -1007,22 +1089,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       }
     });
 
-    const markers = Array.from({ length: Math.ceil((diffDaysInclusive(window.start, window.end) + 1) / 7) })
-      .map((_, index) => {
-        const markerStart = addDays(window.start, index * 7);
-        if (markerStart > window.end) {
-          return null;
-        }
-
-        const markerEnd = addDays(markerStart, 6) > window.end ? window.end : addDays(markerStart, 6);
-        return {
-          key: markerStart,
-          label: formatDateOnlyLabel(markerStart),
-          startDate: markerStart,
-          endDate: markerEnd,
-        };
-      })
-      .filter((marker): marker is ScheduleTimelineSnapshot["markers"][number] => Boolean(marker));
+    const markers = buildTimelineMarkers(window.start, window.end, scale);
 
     const scheduledProjects: ScheduleTimelineSnapshot["projects"] = [];
     const unscheduled: ScheduleTimelineSnapshot["unscheduled"] = [];
@@ -1077,6 +1144,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     return {
       range,
       scale,
+      anchorDate: window.anchorDate,
       rangeStart: window.start,
       rangeEnd: window.end,
       markers,

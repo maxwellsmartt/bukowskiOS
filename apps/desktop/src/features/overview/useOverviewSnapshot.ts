@@ -14,6 +14,7 @@ const emptySnapshot: OverviewSnapshot = {
 const emptyTimeline: ScheduleTimelineSnapshot = {
   range: "90d",
   scale: "week",
+  anchorDate: "",
   rangeStart: "",
   rangeEnd: "",
   markers: [],
@@ -34,15 +35,15 @@ export const useOverviewSnapshot = () =>
     [],
   );
 
-export const useOverviewTimeline = (range: ScheduleTimelineRange, scale: ScheduleTimelineScale) =>
+export const useOverviewTimeline = (range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate?: string | null) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiOverview) {
-        return { ...emptyTimeline, range, scale };
+        return { ...emptyTimeline, range, scale, anchorDate: anchorDate ?? "" };
       }
 
-      return window.bukowskiOverview.getTimeline(range, scale);
+      return window.bukowskiOverview.getTimeline(range, scale, anchorDate ?? undefined);
     },
-    { ...emptyTimeline, range, scale },
-    [range, scale],
+    { ...emptyTimeline, range, scale, anchorDate: anchorDate ?? "" },
+    [range, scale, anchorDate],
   );

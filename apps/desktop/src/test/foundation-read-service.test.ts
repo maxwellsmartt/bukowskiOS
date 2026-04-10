@@ -33,4 +33,26 @@ describe("foundation read service", () => {
 
     cleanup();
   });
+
+  it("builds timeline windows from range, scale and anchor date without changing project data", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-foundation-timeline");
+    const reads = createFoundationReadService(database);
+
+    const weeklyTimeline = reads.getScheduleTimeline("90d", "week", "2026-04-10");
+    const dailyTimeline = reads.getScheduleTimeline("30d", "day", "2026-04-10");
+    const monthlyTimeline = reads.getScheduleTimeline("6m", "month", "2026-06-15");
+    const shiftedTimeline = reads.getScheduleTimeline("90d", "week", "2026-07-10");
+
+    expect(weeklyTimeline.anchorDate).toBe("2026-04-10");
+    expect(weeklyTimeline.scale).toBe("week");
+    expect(dailyTimeline.scale).toBe("day");
+    expect(monthlyTimeline.scale).toBe("month");
+    expect(dailyTimeline.markers.length).toBeGreaterThan(weeklyTimeline.markers.length);
+    expect(monthlyTimeline.markers.length).toBeLessThan(weeklyTimeline.markers.length);
+    expect(shiftedTimeline.rangeStart).not.toBe(weeklyTimeline.rangeStart);
+    expect(shiftedTimeline.projects).toHaveLength(weeklyTimeline.projects.length);
+    expect(shiftedTimeline.unscheduled).toHaveLength(weeklyTimeline.unscheduled.length);
+
+    cleanup();
+  });
 });

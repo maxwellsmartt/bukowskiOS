@@ -1,11 +1,13 @@
 import { ArrowUpRight, ShieldAlert, Wrench } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import type { ScheduleTimelineRange, ScheduleTimelineScale } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
+import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 import { OverviewScheduleTimeline } from "./OverviewScheduleTimeline";
 import { useOverviewSnapshot, useOverviewTimeline } from "./useOverviewSnapshot";
@@ -35,11 +37,45 @@ export const OverviewPage = () => (
   <OverviewContent />
 );
 
+const todayDateOnly = () => new Date().toISOString().slice(0, 10);
+
+const isTimelineRange = (value: string | null): value is ScheduleTimelineRange =>
+  value === "30d" || value === "90d" || value === "6m";
+
+const isTimelineScale = (value: string | null): value is ScheduleTimelineScale =>
+  value === "day" || value === "week" || value === "month";
+
 const OverviewContent = () => {
   const sectionScopeLabel = useSectionScopeLabel();
   const { data, error, isLoading } = useOverviewSnapshot();
-  const [timelineRange, setTimelineRange] = useState<"30d" | "90d" | "6m">("90d");
-  const { data: timelineSnapshot, isLoading: timelineLoading } = useOverviewTimeline(timelineRange, "week");
+  const [timelineRange, setTimelineRange] = useState<ScheduleTimelineRange>(() => {
+    const storedValue = readStringPreference(uiPreferenceKeys.overviewTimelineRange, "90d");
+    return isTimelineRange(storedValue) ? storedValue : "90d";
+  });
+  const [timelineScale, setTimelineScale] = useState<ScheduleTimelineScale>(() => {
+    const storedValue = readStringPreference(uiPreferenceKeys.overviewTimelineScale, "week");
+    return isTimelineScale(storedValue) ? storedValue : "week";
+  });
+  const [timelineAnchorDate, setTimelineAnchorDate] = useState(() =>
+    readStringPreference(uiPreferenceKeys.overviewTimelineAnchorDate, todayDateOnly()) ?? todayDateOnly(),
+  );
+  const { data: timelineSnapshot, isLoading: timelineLoading } = useOverviewTimeline(
+    timelineRange,
+    timelineScale,
+    timelineAnchorDate,
+  );
+
+  useEffect(() => {
+    writePreference(uiPreferenceKeys.overviewTimelineRange, timelineRange);
+  }, [timelineRange]);
+
+  useEffect(() => {
+    writePreference(uiPreferenceKeys.overviewTimelineScale, timelineScale);
+  }, [timelineScale]);
+
+  useEffect(() => {
+    writePreference(uiPreferenceKeys.overviewTimelineAnchorDate, timelineAnchorDate);
+  }, [timelineAnchorDate]);
 
   return (
     <div className="page-stack">
@@ -78,9 +114,13 @@ const OverviewContent = () => {
       </div>
 
       <OverviewScheduleTimeline
+        anchorDate={timelineAnchorDate}
         isLoading={timelineLoading}
+        onAnchorDateChange={setTimelineAnchorDate}
         onRangeChange={setTimelineRange}
+        onScaleChange={setTimelineScale}
         range={timelineRange}
+        scale={timelineScale}
         snapshot={timelineSnapshot}
       />
 
