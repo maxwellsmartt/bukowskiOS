@@ -153,10 +153,7 @@ type TimelineGridProps = {
     months: TimelineBand[];
     weeks: TimelineBand[];
   };
-  playheadLabel?: string;
-  playheadLeft: number;
   scale: ScheduleTimelineScale;
-  showPlayheadLabel?: boolean;
 };
 
 type TimelineBarGeometry = {
@@ -208,6 +205,30 @@ const startOfMonth = (date: string) => {
   const nextDate = parseDateOnly(date);
   nextDate.setUTCDate(1);
   return nextDate.toISOString().slice(0, 10);
+};
+
+const resolveTimelineRangeLength = (range: ScheduleTimelineRange) => {
+  if (range === "30d") {
+    return 30;
+  }
+
+  if (range === "6m") {
+    return 182;
+  }
+
+  return 90;
+};
+
+const resolveTimelineWindow = (range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate: string) => {
+  const totalDays = resolveTimelineRangeLength(range);
+  const lookbackDays = Math.max(1, Math.floor(totalDays * 0.2));
+  const rawStart = addDays(anchorDate, -lookbackDays);
+  const alignedStart = scale === "month" ? startOfMonth(rawStart) : scale === "week" ? startOfWeek(rawStart) : rawStart;
+
+  return {
+    end: addDays(alignedStart, totalDays - 1),
+    start: alignedStart,
+  };
 };
 
 const diffDays = (start: string, end: string) =>
@@ -356,16 +377,50 @@ const buildDayBands = (rangeStart: string, rangeEnd: string) => {
   });
 };
 
+const buildSparseHeaderBands = (
+  source: TimelineBand[],
+  stride: number,
+  rangeStart: string,
+  rangeEnd: string,
+  includeBand: (band: TimelineBand, index: number) => boolean,
+) => {
+  if (!source.length) {
+    return [];
+  }
+
+  const selectedIndices = source.reduce<number[]>((indices, band, index) => {
+    if (index === 0 || index % stride === 0 || includeBand(band, index)) {
+      indices.push(index);
+    }
+
+    return indices;
+  }, []);
+
+  return selectedIndices.map((index, position) => {
+    const band = source[index];
+    const nextBand = source[selectedIndices[position + 1]];
+    const endDate = nextBand ? addDays(nextBand.startDate, -1) : rangeEnd;
+
+    return resolveBand(band.startDate, endDate, rangeStart, rangeEnd, band.label);
+  });
+};
+
 const buildTimelineBands = (rangeStart: string, rangeEnd: string, scale: ScheduleTimelineScale) => {
   const months = buildMonthBands(rangeStart, rangeEnd);
   const weeks = buildWeekBands(rangeStart, rangeEnd);
   const days = scale === "day" ? buildDayBands(rangeStart, rangeEnd) : [];
 
   if (scale === "day") {
-    const dayStride = days.length > 120 ? 7 : days.length > 60 ? 3 : days.length > 35 ? 2 : 1;
+    const dayStride = days.length > 150 ? 6 : days.length > 120 ? 5 : days.length > 90 ? 3 : days.length > 60 ? 2 : 1;
     return {
       days,
-      header: days.filter((band, index) => index % dayStride === 0 || band.startDate.endsWith("-01")),
+      header: buildSparseHeaderBands(
+        days,
+        dayStride,
+        rangeStart,
+        rangeEnd,
+        (band) => band.startDate.endsWith("-01"),
+      ),
       months,
       weeks,
     };
@@ -399,10 +454,7 @@ const shiftAnchorDate = (anchorDate: string, deltaDays: number) => addDays(ancho
 
 const TimelineGrid = ({
   bands,
-  playheadLabel,
-  playheadLeft,
   scale,
-  showPlayheadLabel = false,
 }: TimelineGridProps) => (
   <div className={`timeline-grid-shell timeline-grid-shell-${scale}`}>
     {bands.days.map((band) => (
@@ -426,12 +478,6 @@ const TimelineGrid = ({
         style={{ left: `${band.left}%` }}
       />
     ))}
-    <span className="timeline-playhead-line" style={{ left: `${playheadLeft}%` }} />
-    {showPlayheadLabel && playheadLabel ? (
-      <span className="timeline-playhead-chip" style={{ left: `${playheadLeft}%` }}>
-        {playheadLabel}
-      </span>
-    ) : null}
   </div>
 );
 
@@ -442,7 +488,6 @@ const TimelineLane = ({
   onBarHover,
   onBarLeave,
   onToggle,
-  playheadLeft,
   project,
   rangeEnd,
   rangeStart,
@@ -458,7 +503,6 @@ const TimelineLane = ({
   ) => void;
   onBarLeave: () => void;
   onToggle: () => void;
-  playheadLeft: number;
   project: ScheduleTimelineProjectLane;
   rangeEnd: string;
   rangeStart: string;
@@ -503,7 +547,6 @@ const TimelineLane = ({
           >
             <TimelineGrid
               bands={bands}
-              playheadLeft={playheadLeft}
               scale={scale}
             />
             {projectBar ? (
@@ -556,7 +599,6 @@ const TimelineLane = ({
                   >
                     <TimelineGrid
                       bands={bands}
-                      playheadLeft={playheadLeft}
                       scale={scale}
                     />
                     {unitBar ? (
@@ -618,45 +660,77 @@ export const OverviewScheduleTimeline = ({
     target: null,
   });
   const ignoreNextClickRef = useRef(false);
+  const previewAnchorDateRef = useRef(anchorDate || todayDateOnly());
   const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>(() =>
     readJsonPreference<string[]>(uiPreferenceKeys.overviewTimelineExpandedProjects, []),
   );
+  const [isPanning, setIsPanning] = useState(false);
   const [playheadDate, setPlayheadDate] = useState(todayDateOnly());
+  const [previewAnchorDate, setPreviewAnchorDate] = useState(anchorDate || todayDateOnly());
   const [tooltip, setTooltip] = useState<TimelineTooltipState | null>(null);
 
   useEffect(() => {
     writeJsonPreference(uiPreferenceKeys.overviewTimelineExpandedProjects, expandedProjectIds);
   }, [expandedProjectIds]);
 
-  const effectiveAnchorDate = snapshot.anchorDate || anchorDate || todayDateOnly();
-  const visibleWindowDays =
-    snapshot.rangeStart && snapshot.rangeEnd ? diffDaysInclusive(snapshot.rangeStart, snapshot.rangeEnd) : 1;
+  useEffect(() => {
+    previewAnchorDateRef.current = previewAnchorDate;
+  }, [previewAnchorDate]);
+
+  useEffect(() => {
+    if (!isPanning) {
+      const nextAnchorDate = anchorDate || todayDateOnly();
+      setPreviewAnchorDate(nextAnchorDate);
+      previewAnchorDateRef.current = nextAnchorDate;
+    }
+  }, [anchorDate, isPanning]);
+
+  const effectiveAnchorDate = previewAnchorDate || anchorDate || todayDateOnly();
+  const visibleWindow = useMemo(
+    () => resolveTimelineWindow(range, scale, effectiveAnchorDate),
+    [effectiveAnchorDate, range, scale],
+  );
+  const visibleWindowDays = diffDaysInclusive(visibleWindow.start, visibleWindow.end);
   const clampedPlayheadDate =
-    snapshot.rangeStart && snapshot.rangeEnd
-      ? clampDate(playheadDate, snapshot.rangeStart, snapshot.rangeEnd)
+    visibleWindow.start && visibleWindow.end
+      ? clampDate(playheadDate, visibleWindow.start, visibleWindow.end)
       : playheadDate;
   const playheadLeft =
-    snapshot.rangeStart && snapshot.rangeEnd
-      ? resolveDateLeft(clampedPlayheadDate, snapshot.rangeStart, snapshot.rangeEnd)
+    visibleWindow.start && visibleWindow.end
+      ? resolveDateLeft(clampedPlayheadDate, visibleWindow.start, visibleWindow.end)
       : 0;
   const renderedPlayheadLeft = Math.min(99.2, Math.max(0.8, playheadLeft));
   const playheadLabel = formatPlayheadLabel(playheadDate);
   const bands = useMemo(() => {
-    if (!snapshot.rangeStart || !snapshot.rangeEnd) {
+    if (!visibleWindow.start || !visibleWindow.end) {
       return emptyBands;
     }
 
-    return buildTimelineBands(snapshot.rangeStart, snapshot.rangeEnd, scale);
-  }, [scale, snapshot.rangeEnd, snapshot.rangeStart]);
+    return buildTimelineBands(visibleWindow.start, visibleWindow.end, scale);
+  }, [scale, visibleWindow.end, visibleWindow.start]);
+
+  const sharedPlayheadStyle = useMemo(
+    () => ({
+      left: `calc(var(--timeline-meta-width) + var(--timeline-column-gap) + ((100% - var(--timeline-meta-width) - var(--timeline-column-gap)) * ${
+        renderedPlayheadLeft / 100
+      }))`,
+    }),
+    [renderedPlayheadLeft],
+  );
 
   const setTodayAnchor = () => {
     const today = todayDateOnly();
+    setPreviewAnchorDate(today);
+    previewAnchorDateRef.current = today;
     onAnchorDateChange(today);
     setPlayheadDate(today);
   };
 
   const shiftWindow = (direction: -1 | 1) => {
-    onAnchorDateChange(shiftAnchorDate(effectiveAnchorDate, direction * visibleWindowDays));
+    const nextAnchorDate = shiftAnchorDate(effectiveAnchorDate, direction * visibleWindowDays);
+    setPreviewAnchorDate(nextAnchorDate);
+    previewAnchorDateRef.current = nextAnchorDate;
+    onAnchorDateChange(nextAnchorDate);
   };
 
   const updateTooltip = (
@@ -688,6 +762,7 @@ export const OverviewScheduleTimeline = ({
 
     const target = event.currentTarget;
     target.setPointerCapture(event.pointerId);
+    setIsPanning(true);
     dragStateRef.current = {
       anchorDate: effectiveAnchorDate,
       axis: null,
@@ -701,10 +776,6 @@ export const OverviewScheduleTimeline = ({
   };
 
   const handleTrackPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!snapshot.rangeStart || !snapshot.rangeEnd) {
-      return;
-    }
-
     const dragState = dragStateRef.current;
     if (dragState.pointerId !== event.pointerId) {
       return;
@@ -728,7 +799,9 @@ export const OverviewScheduleTimeline = ({
     }
 
     ignoreNextClickRef.current = true;
-    onAnchorDateChange(shiftAnchorDate(dragState.anchorDate, deltaDays));
+    const nextAnchorDate = shiftAnchorDate(dragState.anchorDate, deltaDays);
+    setPreviewAnchorDate(nextAnchorDate);
+    previewAnchorDateRef.current = nextAnchorDate;
   };
 
   const releaseDrag = (pointerId?: number) => {
@@ -746,9 +819,13 @@ export const OverviewScheduleTimeline = ({
       startY: 0,
       target: null,
     };
+    setIsPanning(false);
   };
 
   const handleTrackPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragStateRef.current.axis === "horizontal") {
+      onAnchorDateChange(previewAnchorDateRef.current);
+    }
     releaseDrag(event.pointerId);
   };
 
@@ -757,17 +834,13 @@ export const OverviewScheduleTimeline = ({
   };
 
   const handleTrackClick = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!snapshot.rangeStart || !snapshot.rangeEnd) {
-      return;
-    }
-
     if (ignoreNextClickRef.current) {
       ignoreNextClickRef.current = false;
       return;
     }
 
     const rect = event.currentTarget.getBoundingClientRect();
-    const nextDate = resolveDateFromClientX(event.clientX, rect, snapshot.rangeStart, snapshot.rangeEnd);
+    const nextDate = resolveDateFromClientX(event.clientX, rect, visibleWindow.start, visibleWindow.end);
     setPlayheadDate(nextDate);
   };
 
@@ -847,81 +920,81 @@ export const OverviewScheduleTimeline = ({
       {isLoading ? <div className="empty-state">Loading schedule...</div> : null}
 
       <div className="timeline-layout" ref={timelineRootRef}>
-        <div className="timeline-header-row">
-          <div className="timeline-header-copy">
-            <span className="timeline-header-label">Projects / units</span>
+        <div className="timeline-main">
+          <div className="timeline-shared-playhead" style={sharedPlayheadStyle} />
+          <div className="timeline-shared-playhead-chip" style={sharedPlayheadStyle}>
+            {playheadLabel}
           </div>
 
-          <div
-            className="timeline-header-panel"
-            onClick={interactionHandlers.onClick}
-            onPointerCancel={interactionHandlers.onPointerCancel}
-            onPointerDown={interactionHandlers.onPointerDown}
-            onPointerMove={interactionHandlers.onPointerMove}
-            onPointerUp={interactionHandlers.onPointerUp}
-            onWheel={interactionHandlers.onWheel}
-          >
-            <div className="timeline-header-bands timeline-header-bands-months">
-              {bands.months.map((band) => (
-                <div
-                  key={`header-month-${band.key}`}
-                  className="timeline-header-band timeline-header-band-month"
-                  style={{ left: `${band.left}%`, width: `${band.width}%` }}
-                >
-                  {band.label}
-                </div>
-              ))}
+          <div className="timeline-header-row">
+            <div className="timeline-header-copy">
+              <span className="timeline-header-label">Projects / units</span>
             </div>
 
-            {scale !== "month" ? (
-              <div className="timeline-header-bands timeline-header-bands-secondary">
-                {bands.header.map((band) => (
+            <div
+              className="timeline-header-panel"
+              onClick={interactionHandlers.onClick}
+              onPointerCancel={interactionHandlers.onPointerCancel}
+              onPointerDown={interactionHandlers.onPointerDown}
+              onPointerMove={interactionHandlers.onPointerMove}
+              onPointerUp={interactionHandlers.onPointerUp}
+              onWheel={interactionHandlers.onWheel}
+            >
+              <div className="timeline-header-bands timeline-header-bands-months">
+                {bands.months.map((band) => (
                   <div
-                    key={`header-secondary-${band.key}`}
-                    className={`timeline-header-band timeline-header-band-${scale}`}
+                    key={`header-month-${band.key}`}
+                    className="timeline-header-band timeline-header-band-month"
                     style={{ left: `${band.left}%`, width: `${band.width}%` }}
                   >
                     {band.label}
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="timeline-header-bands timeline-header-bands-secondary is-empty" />
-            )}
 
-            <TimelineGrid
-              bands={bands}
-              playheadLabel={playheadLabel}
-              playheadLeft={renderedPlayheadLeft}
-              scale={scale}
-              showPlayheadLabel
-            />
+              {scale !== "month" ? (
+                <div className="timeline-header-bands timeline-header-bands-secondary">
+                  {bands.header.map((band) => (
+                    <div
+                      key={`header-secondary-${band.key}`}
+                      className={`timeline-header-band timeline-header-band-${scale}`}
+                      style={{ left: `${band.left}%`, width: `${band.width}%` }}
+                    >
+                      {band.label}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="timeline-header-bands timeline-header-bands-secondary is-empty" />
+              )}
+
+              <TimelineGrid bands={bands} scale={scale} />
+            </div>
           </div>
-        </div>
 
-        <div className="timeline-lanes">
-          {snapshot.projects.map((project) => (
-            <TimelineLane
-              key={project.id}
-              bands={bands}
-              interactionHandlers={interactionHandlers}
-              isExpanded={expandedProjectIds.includes(project.id)}
-              onBarHover={updateTooltip}
-              onBarLeave={clearTooltip}
-              onToggle={() =>
-                setExpandedProjectIds((current) =>
-                  current.includes(project.id)
-                    ? current.filter((value) => value !== project.id)
-                    : [...current, project.id],
-                )
-              }
-              playheadLeft={renderedPlayheadLeft}
-              project={project}
-              rangeEnd={snapshot.rangeEnd}
-              rangeStart={snapshot.rangeStart}
-              scale={scale}
-            />
-          ))}
+          <div className="timeline-lanes">
+            {snapshot.projects.map((project) => (
+              <TimelineLane
+                key={project.id}
+                bands={bands}
+                interactionHandlers={interactionHandlers}
+                isExpanded={expandedProjectIds.includes(project.id)}
+                onBarHover={updateTooltip}
+                onBarLeave={clearTooltip}
+                onToggle={() =>
+                  setExpandedProjectIds((current) =>
+                    current.includes(project.id)
+                      ? current.filter((value) => value !== project.id)
+                      : [...current, project.id],
+                  )
+                }
+                project={project}
+                rangeEnd={visibleWindow.end}
+                rangeStart={visibleWindow.start}
+                scale={scale}
+              />
+            ))}
+          </div>
         </div>
 
         {snapshot.unscheduled.length ? (

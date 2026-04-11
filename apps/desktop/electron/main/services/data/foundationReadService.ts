@@ -203,7 +203,8 @@ const resolveTimelineWindow = (range: ScheduleTimelineRange, scale: ScheduleTime
   const safeAnchorDate = sanitizeTimelineAnchorDate(anchorDate);
   const lookbackDays = Math.max(1, Math.floor(totalDays * 0.2));
   const rawStart = addDays(safeAnchorDate, -lookbackDays);
-  const alignedStart = scale === "month" ? startOfMonth(rawStart) : startOfWeek(rawStart);
+  const alignedStart =
+    scale === "month" ? startOfMonth(rawStart) : scale === "week" ? startOfWeek(rawStart) : rawStart;
   const start = alignedStart;
   const end = addDays(start, totalDays - 1);
 

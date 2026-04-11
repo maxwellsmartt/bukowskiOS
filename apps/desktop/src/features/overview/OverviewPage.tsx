@@ -59,11 +59,7 @@ const OverviewContent = () => {
   const [timelineAnchorDate, setTimelineAnchorDate] = useState(() =>
     readStringPreference(uiPreferenceKeys.overviewTimelineAnchorDate, todayDateOnly()) ?? todayDateOnly(),
   );
-  const { data: timelineSnapshot, isLoading: timelineLoading } = useOverviewTimeline(
-    timelineRange,
-    timelineScale,
-    timelineAnchorDate,
-  );
+  const { data: timelineSnapshot, isLoading: timelineLoading } = useOverviewTimeline();
 
   useEffect(() => {
     writePreference(uiPreferenceKeys.overviewTimelineRange, timelineRange);
@@ -74,7 +70,11 @@ const OverviewContent = () => {
   }, [timelineScale]);
 
   useEffect(() => {
-    writePreference(uiPreferenceKeys.overviewTimelineAnchorDate, timelineAnchorDate);
+    const timer = window.setTimeout(() => {
+      writePreference(uiPreferenceKeys.overviewTimelineAnchorDate, timelineAnchorDate);
+    }, 140);
+
+    return () => window.clearTimeout(timer);
   }, [timelineAnchorDate]);
 
   return (

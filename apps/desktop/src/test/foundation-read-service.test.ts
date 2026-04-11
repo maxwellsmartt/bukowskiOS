@@ -47,6 +47,8 @@ describe("foundation read service", () => {
     expect(weeklyTimeline.scale).toBe("week");
     expect(dailyTimeline.scale).toBe("day");
     expect(monthlyTimeline.scale).toBe("month");
+    expect(dailyTimeline.rangeStart).toBe("2026-04-04");
+    expect(weeklyTimeline.rangeStart).toBe("2026-03-23");
     expect(dailyTimeline.markers.length).toBeGreaterThan(weeklyTimeline.markers.length);
     expect(monthlyTimeline.markers.length).toBeLessThan(weeklyTimeline.markers.length);
     expect(shiftedTimeline.rangeStart).not.toBe(weeklyTimeline.rangeStart);
