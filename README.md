@@ -72,6 +72,7 @@ pnpm typecheck
 - [Navigation shell v1](./docs/foundation/navigation-shell-v1.md)
 - [UI density v1](./docs/foundation/ui-density-v1.md)
 - [Local dev guide](./docs/foundation/local-dev-guide.md)
+- [Current handoff v1](./docs/foundation/current-handoff-v1.md)
 - [Next slices v1](./docs/foundation/next-slices-v1.md)
 
 ## Notas
