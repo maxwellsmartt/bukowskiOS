@@ -3,7 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 
-import type { AppDiagnosticsSnapshot, AppSyncOutboxRow } from "@contracts";
+import type { AppDiagnosticsSnapshot, AppExportResult, AppInfo, AppSupportSnapshot, AppSyncOutboxRow } from "@contracts";
 import { foundationMigrations } from "@db";
 
 import { createAssistantGatewayService } from "../ai/assistantGatewayService";
@@ -24,12 +24,14 @@ import { createDataRetentionService, summarizeDataRetention } from "./dataRetent
 import { createFinanceMutationService } from "./financeMutationService";
 import { createIncidentMutationService } from "./incidentMutationService";
 import { createPackingMutationService } from "./packingMutationService";
+import { cleanupPerformanceFoundationData, seedPerformanceFoundationData } from "./performanceFoundationSeed";
 import { seedFoundationData } from "./foundationSeed";
 import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
 import { createProjectMutationService, ensureProjectShellDefaults } from "./projectMutationService";
 import { createRmaMutationService } from "./rmaMutationService";
 import { createRuntimeDiagnosticsService, type RuntimeDiagnosticsService } from "./runtimeDiagnosticsService";
 import { applySchedulingFoundationMigration, bootstrapSchedulingFoundation } from "./schedulingFoundationBootstrap";
+import { createSupportDiagnosticsService, type SupportDiagnosticsService } from "./supportDiagnosticsService";
 import { createSyncOutboxWorkerService, summarizeSyncOutboxWorker } from "./syncOutboxWorkerService";
 import {
   applyTrackedSqlMigrations,
@@ -38,6 +40,7 @@ import {
   runIntegrityChecks,
   shouldRefreshBackup,
 } from "./localDatabaseSupport";
+import { getDesktopLogger, initializeDesktopLogger } from "../logger";
 
 type ProjectMutationService = ReturnType<typeof createProjectMutationService>;
 type CatalogMutationService = ReturnType<typeof createCatalogMutationService>;
@@ -64,13 +67,17 @@ type LocalDatabaseRuntime = {
   rmaMutations: RmaMutationService;
   agentMutations: AgentMutationService;
   runtimeDiagnostics: RuntimeDiagnosticsService;
+  supportDiagnostics: SupportDiagnosticsService;
   getDiagnosticsSnapshot: () => AppDiagnosticsSnapshot;
+  getSupportSnapshot: () => AppSupportSnapshot;
   createBackupNow: () => AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => AppDiagnosticsSnapshot;
   runLocalSyncNow: () => AppDiagnosticsSnapshot;
   getSyncOutboxRows: () => AppSyncOutboxRow[];
   retrySyncOutboxRow: (id: string) => AppDiagnosticsSnapshot;
   retryAllFailedSyncOutboxRows: () => AppDiagnosticsSnapshot;
+  exportRecentLogs: (filePath: string) => AppExportResult;
+  exportSupportBundle: (directoryPath: string) => AppExportResult;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -84,6 +91,7 @@ let lastRetentionSummary: string | null = null;
 let lastSyncRunAt: string | null = null;
 let lastSyncSummary: string | null = null;
 let lastSyncStatus: "healthy" | "failed" | "idle" = "idle";
+const logger = getDesktopLogger("local-database");
 
 const backupMaxAgeMs = 24 * 60 * 60 * 1000;
 
@@ -123,11 +131,16 @@ const withRecoveredDatabase = (databasePath: string, backupPath: string) => {
 const createRuntime = (): LocalDatabaseRuntime => {
   const databasePath = path.join(app.getPath("userData"), "bukowski-foundation.sqlite");
   const backupPath = path.join(app.getPath("userData"), "bukowski-foundation.backup.sqlite");
+  initializeDesktopLogger(path.join(app.getPath("userData"), "logs"));
+  logger.info("Initializing local database runtime.", {
+    profileDatasetEnabled: process.env.BUKOWSKI_PROFILE_DATASET === "1",
+  });
   const databaseAlreadyExisted = fs.existsSync(databasePath);
   const database = withRecoveredDatabase(databasePath, backupPath);
 
   if (databaseAlreadyExisted && shouldRefreshBackup(backupPath, backupMaxAgeMs)) {
     createDatabaseBackup(database, backupPath);
+    logger.info("Refreshed local database backup before migrations.");
   }
 
   applyTrackedSqlMigrations(database, foundationMigrations);
@@ -140,13 +153,32 @@ const createRuntime = (): LocalDatabaseRuntime => {
   bootstrapLegacyRentmanDemo(database);
   bootstrapAdminFoundation(database);
   bootstrapSchedulingFoundation(database);
+  if (process.env.BUKOWSKI_PROFILE_DATASET === "1") {
+    seedPerformanceFoundationData(database);
+    logger.info("Seeded heavy performance dataset.");
+  } else {
+    const cleanedRows = cleanupPerformanceFoundationData(database);
+
+    if (cleanedRows > 0) {
+      logger.info("Removed synthetic performance dataset from the local workspace.", { cleanedRows });
+    }
+  }
   runIntegrityChecks(database);
   lastIntegrityCheckAt = new Date().toISOString();
   lastIntegrityCheckStatus = "healthy";
 
   if (!databaseAlreadyExisted || shouldRefreshBackup(backupPath, backupMaxAgeMs)) {
     createDatabaseBackup(database, backupPath);
+    logger.info("Created startup backup for local database.");
   }
+
+  const getAppInfo = (): AppInfo => ({
+    appName: "bukowskiOS",
+    platform: process.platform,
+    isPackaged: app.isPackaged,
+    version: app.getVersion(),
+    shellVersion: "foundation-v1",
+  });
 
   const getDiagnosticsSnapshot = (): AppDiagnosticsSnapshot => {
     const databaseStats = fs.existsSync(databasePath) ? fs.statSync(databasePath) : null;
@@ -192,6 +224,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
 
   const createBackupNow = () => {
     createDatabaseBackup(database, backupPath);
+    logger.info("Created backup on demand from Settings.");
     return getDiagnosticsSnapshot();
   };
 
@@ -200,9 +233,11 @@ const createRuntime = (): LocalDatabaseRuntime => {
       runIntegrityChecks(database);
       lastIntegrityCheckAt = new Date().toISOString();
       lastIntegrityCheckStatus = "healthy";
+      logger.info("Completed manual integrity check successfully.");
     } catch (error) {
       lastIntegrityCheckAt = new Date().toISOString();
       lastIntegrityCheckStatus = "failed";
+      logger.error("Manual integrity check failed.", error);
       throw error;
     }
 
@@ -216,6 +251,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     lastSyncRunAt = new Date().toISOString();
     lastSyncSummary = summarizeSyncOutboxWorker(syncSummary);
     lastSyncStatus = syncSummary.failedRows > 0 ? "failed" : "healthy";
+    logger.info("Completed local sync pass.", syncSummary);
 
     return getDiagnosticsSnapshot();
   };
@@ -229,11 +265,13 @@ const createRuntime = (): LocalDatabaseRuntime => {
       throw new Error("That outbox row is not retryable anymore.");
     }
 
+    logger.info("Queued one sync outbox row for retry.", { id });
     return runLocalSyncNow();
   };
 
   const retryAllFailedSyncOutboxRows = () => {
-    syncOutboxWorker.retryAllFailedRows();
+    const retriedCount = syncOutboxWorker.retryAllFailedRows();
+    logger.info("Queued failed sync outbox rows for retry.", { retriedCount });
     return runLocalSyncNow();
   };
 
@@ -262,14 +300,22 @@ const createRuntime = (): LocalDatabaseRuntime => {
     attachmentsRootPath,
   });
   const runtimeDiagnostics = createRuntimeDiagnosticsService(database);
+  const supportDiagnostics = createSupportDiagnosticsService({
+    database,
+    getDiagnosticsSnapshot,
+    getAppInfo,
+    runtimeDiagnostics,
+  });
   const dataRetention = createDataRetentionService(database);
   assistantChatService.reconcileInterruptedThreads();
   try {
     const retentionSummary = dataRetention.run();
     lastRetentionRunAt = new Date().toISOString();
     lastRetentionSummary = summarizeDataRetention(retentionSummary);
+    logger.info("Completed startup retention pass.", retentionSummary);
   } catch {
     // Retention must not block startup for an internal alpha build.
+    logger.warn("Startup retention pass failed.");
   }
   try {
     runLocalSyncNow();
@@ -277,6 +323,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     lastSyncRunAt = new Date().toISOString();
     lastSyncStatus = "failed";
     lastSyncSummary = "The local sync worker failed during startup.";
+    logger.warn("Startup local sync pass failed.");
   }
   walCheckpointTimer?.unref();
   walCheckpointTimer = setInterval(() => {
@@ -289,8 +336,10 @@ const createRuntime = (): LocalDatabaseRuntime => {
       const retentionSummary = dataRetention.run();
       lastRetentionRunAt = new Date().toISOString();
       lastRetentionSummary = summarizeDataRetention(retentionSummary);
+      logger.info("Completed scheduled retention pass.", retentionSummary);
     } catch {
       // Best effort maintenance only.
+      logger.warn("Scheduled retention pass failed.");
     }
   }, 12 * 60 * 60 * 1000);
   retentionTimer.unref();
@@ -302,6 +351,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
       lastSyncRunAt = new Date().toISOString();
       lastSyncStatus = "failed";
       lastSyncSummary = "The scheduled local sync pass failed.";
+      logger.warn("Scheduled local sync pass failed.");
     }
   }, 60 * 1000);
   syncOutboxTimer.unref();
@@ -321,13 +371,17 @@ const createRuntime = (): LocalDatabaseRuntime => {
     packingMutations: createPackingMutationService(database),
     rmaMutations: createRmaMutationService(database),
     runtimeDiagnostics,
+    supportDiagnostics,
     getDiagnosticsSnapshot,
+    getSupportSnapshot: () => supportDiagnostics.getSupportSnapshot(),
     createBackupNow,
     runIntegrityCheckNow,
     runLocalSyncNow,
     getSyncOutboxRows,
     retrySyncOutboxRow,
     retryAllFailedSyncOutboxRows,
+    exportRecentLogs: (filePath: string) => supportDiagnostics.exportRecentLogs(filePath),
+    exportSupportBundle: (directoryPath: string) => supportDiagnostics.exportSupportBundle(directoryPath),
     agentMutations: createAgentMutationService(database, {
       secretStore,
       openaiProviderService,

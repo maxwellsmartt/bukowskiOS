@@ -91,24 +91,8 @@ a {
   flex-direction: column;
   gap: 18px;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding-right: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
-}
-
-.shell-sidebar-scroll-zone::-webkit-scrollbar {
-  width: 4px;
-}
-
-.shell-sidebar-scroll-zone::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.shell-sidebar-scroll-zone::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  padding-right: 2px;
 }
 
 .shell-sidebar-utility-zone {
@@ -207,12 +191,17 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-direction: column;
   gap: 8px;
   min-height: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 .shell-projects-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
+  padding: 2px 0 4px;
+  background: var(--bg-sidebar);
 }
 
 .shell-project-list {
@@ -220,9 +209,10 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-direction: column;
   gap: 6px;
   min-height: 0;
-  max-height: none;
-  overflow: visible;
-  padding-right: 0;
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
