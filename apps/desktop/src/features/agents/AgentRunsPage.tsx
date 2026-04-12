@@ -84,7 +84,7 @@ export const AgentRunsPage = () => {
                   <div className="agent-run-approval-panel">
                     <div className="agent-run-approval-copy">
                       <strong>Approval required</strong>
-                      <p>Review this supervised draft here before anything moves forward.</p>
+                      <p>{run.approvalReason ?? "Review this supervised draft here before anything moves forward."}</p>
                     </div>
                     <div className="agent-run-approval-actions">
                       <button

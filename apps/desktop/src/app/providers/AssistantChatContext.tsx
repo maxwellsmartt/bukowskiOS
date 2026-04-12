@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useLocation } from "react-router-dom";
 
 import type {
+  AssistantApprovalPreference,
   AssistantChatAttachmentRow,
   AssistantChatMessageMeta,
   AssistantChatMessageRow,
@@ -16,6 +17,7 @@ import {
   getAssistantChatSnapshot,
   sendAssistantChatTurn,
   setActiveAssistantThread,
+  updateAssistantThreadPreferences,
 } from "@features/agents/useAgentsData";
 
 export type AssistantChatSessionState = AssistantChatMessageMeta;
@@ -38,6 +40,7 @@ export type AssistantChatSession = {
   createdAt: number;
   updatedAt: number;
   summaryText: string;
+  preferredApprovalMode: AssistantApprovalPreference;
   threadState: AssistantChatThreadState;
   lastErrorSummary: string | null;
   lastIntent: string | null;
@@ -59,6 +62,7 @@ type AssistantChatContextValue = {
   createSession: () => Promise<void>;
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
+  updateSessionApprovalMode: (sessionId: string, preferredApprovalMode: AssistantApprovalPreference) => Promise<void>;
   sendTurn: (input: SendAssistantChatTurnCommand) => Promise<void>;
   setCompareTrayVisible: (visible: boolean) => void;
 };
@@ -93,6 +97,7 @@ const buildFallbackSession = (pathname: string): AssistantChatSession => ({
   createdAt: Date.now(),
   updatedAt: Date.now(),
   summaryText: "",
+  preferredApprovalMode: "supervised",
   threadState: "idle",
   lastErrorSummary: null,
   lastIntent: null,
@@ -167,6 +172,7 @@ const normalizeThread = (thread: AssistantChatThreadRow): AssistantChatSession =
     createdAt: parseTimestamp(thread.createdAt),
     updatedAt: parseTimestamp(thread.updatedAt),
     summaryText: thread.summaryText,
+    preferredApprovalMode: thread.preferredApprovalMode,
     threadState: thread.state,
     lastErrorSummary: thread.lastErrorSummary,
     lastIntent: thread.lastIntent,
@@ -219,6 +225,21 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    const hasLiveWork =
+      snapshot?.threads.some((thread) => thread.state === "pending" || thread.state === "streaming") ?? false;
+
+    if (!hasLiveWork) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void refresh();
+    }, 1500);
+
+    return () => window.clearInterval(interval);
+  }, [refresh, snapshot]);
+
   const sessions = useMemo(() => {
     const rows = snapshot?.threads.map(normalizeThread) ?? [];
     return rows.length ? rows : [buildFallbackSession(location.pathname)];
@@ -266,6 +287,16 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
           commandId: `cmd-thread-delete-${Date.now().toString(36)}`,
           workspaceId,
           threadId: sessionId,
+        });
+        setSnapshot(nextSnapshot);
+        setIsHydrated(true);
+      },
+      updateSessionApprovalMode: async (sessionId: string, preferredApprovalMode: AssistantApprovalPreference) => {
+        const nextSnapshot = await updateAssistantThreadPreferences({
+          commandId: `cmd-thread-preferences-${Date.now().toString(36)}`,
+          workspaceId,
+          threadId: sessionId,
+          preferredApprovalMode,
         });
         setSnapshot(nextSnapshot);
         setIsHydrated(true);

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEv
 import { ArrowUp, Bot, ChevronDown, Ellipsis, PanelLeftClose, PanelLeftOpen, Paperclip, Plus, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AssistantChatSession, AssistantChatSessionState } from "@app/providers/AssistantChatContext";
-import type { AssistantGatewayAttachment } from "@contracts";
+import type { AssistantApprovalPreference, AssistantGatewayAttachment } from "@contracts";
 
 import { useAssistantChat } from "@app/providers/AssistantChatContext";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
@@ -11,7 +11,16 @@ import { reviewAgentRun } from "@features/agents/useAgentsData";
 const workspaceId = "workspace-metadata";
 const modelOptions = ["GPT-5.4", "Claude Sonnet", "OpenClaw Balanced"];
 const reasoningOptions = ["Low", "Medium", "High"];
-const approvalOptions = ["Supervised", "Needs approval", "Auto"];
+const approvalOptions: Array<{ label: string; value: AssistantApprovalPreference }> = [
+  { label: "Supervised", value: "supervised" },
+  { label: "Needs approval", value: "needs_approval" },
+  { label: "Unsupervised", value: "unsupervised" },
+];
+const approvalModeDescriptions: Record<AssistantApprovalPreference, string> = {
+  supervised: "Drafts and delegated work stay review-aware.",
+  needs_approval: "Always ask before continuing delegated work in this thread.",
+  unsupervised: "Skips approval prompts for supervised agents only. Agents marked needs approval still ask.",
+};
 
 type ActiveSelector = "model" | "reasoning" | "approval" | null;
 type ThreadMenuState = {
@@ -28,6 +37,16 @@ type OptimisticTurn = {
     body: string;
   };
   state: AssistantChatSessionState;
+};
+
+type OptimisticAssistantMessage = {
+  threadId: string;
+  message: {
+    id: string;
+    role: "assistant";
+    body: string;
+    state: AssistantChatSessionState;
+  };
 };
 
 const maxImageAttachments = 3;
@@ -162,25 +181,41 @@ const resolveApprovalSummary = (state: AssistantChatSessionState) => {
   return "Approved. This draft can continue under supervision, but the command layer still does not execute automatically.";
 };
 
-const buildOptimisticSession = (session: AssistantChatSession, optimisticTurn: OptimisticTurn | null): AssistantChatSession => {
-  if (!optimisticTurn || optimisticTurn.threadId !== session.id) {
+const buildOptimisticSession = (
+  session: AssistantChatSession,
+  optimisticTurn: OptimisticTurn | null,
+  optimisticAssistantMessage: OptimisticAssistantMessage | null,
+): AssistantChatSession => {
+  if ((!optimisticTurn || optimisticTurn.threadId !== session.id) && (!optimisticAssistantMessage || optimisticAssistantMessage.threadId !== session.id)) {
     return session;
+  }
+
+  const nextMessages = [...session.messages];
+
+  if (optimisticTurn && optimisticTurn.threadId === session.id) {
+    nextMessages.push({
+      ...optimisticTurn.userMessage,
+      state: null,
+      attachments: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  }
+
+  if (optimisticAssistantMessage && optimisticAssistantMessage.threadId === session.id) {
+    nextMessages.push({
+      ...optimisticAssistantMessage.message,
+      attachments: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
   }
 
   return {
     ...session,
     updatedAt: Date.now(),
-    latestState: optimisticTurn.state,
-    messages: [
-      ...session.messages,
-      {
-        ...optimisticTurn.userMessage,
-        state: null,
-        attachments: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-    ],
+    latestState: optimisticAssistantMessage?.message.state ?? optimisticTurn?.state ?? session.latestState,
+    messages: nextMessages,
   };
 };
 
@@ -201,13 +236,14 @@ export const GlobalAssistantChat = () => {
     selectSession,
     sessions,
     setCompareTrayVisible,
+    updateSessionApprovalMode,
     toggle,
   } = useAssistantChat();
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState("GPT-5.4");
   const [selectedReasoning, setSelectedReasoning] = useState("High");
-  const [selectedApproval, setSelectedApproval] = useState("Supervised");
+  const [selectedApproval, setSelectedApproval] = useState<AssistantApprovalPreference>("supervised");
   const [attachments, setAttachments] = useState<AssistantGatewayAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [activeSelector, setActiveSelector] = useState<ActiveSelector>(null);
@@ -216,6 +252,7 @@ export const GlobalAssistantChat = () => {
   const [threadMenuState, setThreadMenuState] = useState<ThreadMenuState>(null);
   const [expandedMessageDetails, setExpandedMessageDetails] = useState<Record<string, boolean>>({});
   const [optimisticTurn, setOptimisticTurn] = useState<OptimisticTurn | null>(null);
+  const [optimisticAssistantMessage, setOptimisticAssistantMessage] = useState<OptimisticAssistantMessage | null>(null);
   const [reviewingRunId, setReviewingRunId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
@@ -225,8 +262,8 @@ export const GlobalAssistantChat = () => {
   const threadEndRef = useRef<HTMLDivElement | null>(null);
 
   const resolvedActiveSession = useMemo(
-    () => buildOptimisticSession(activeSession, optimisticTurn),
-    [activeSession, optimisticTurn],
+    () => buildOptimisticSession(activeSession, optimisticTurn, optimisticAssistantMessage),
+    [activeSession, optimisticAssistantMessage, optimisticTurn],
   );
   const activeSessionState = resolvedActiveSession.latestState;
   const stateActions = useMemo(() => buildStateActions(activeSessionState), [activeSessionState]);
@@ -315,11 +352,13 @@ export const GlobalAssistantChat = () => {
     setActiveSelector(null);
     setThreadMenuState(null);
     setExpandedMessageDetails({});
+    setOptimisticAssistantMessage(null);
+    setSelectedApproval(activeSession.preferredApprovalMode);
 
     if (attachmentInputRef.current) {
       attachmentInputRef.current.value = "";
     }
-  }, [resolvedActiveSession.id]);
+  }, [activeSession.preferredApprovalMode, resolvedActiveSession.id]);
 
   useEffect(() => {
     if (!sessions.some((session) => session.id === expandedSessionId)) {
@@ -415,6 +454,7 @@ export const GlobalAssistantChat = () => {
           activeProjectId: location.pathname.startsWith("/projects/") ? location.pathname.split("/")[2] ?? null : null,
           currentView: resolvedActiveSession.contextLabel,
           activeFilters: {},
+          requestedApprovalMode: selectedApproval,
         },
       });
     } catch (error) {
@@ -430,6 +470,34 @@ export const GlobalAssistantChat = () => {
   const handleReviewRun = async (runId: string, decision: "approve" | "deny" | "approve_for_session") => {
     setReviewingRunId(runId);
     setActionError(null);
+    if (decision !== "deny") {
+      setOptimisticAssistantMessage({
+        threadId: resolvedActiveSession.id,
+        message: {
+          id: `assistant-optimistic-review-${Date.now().toString(36)}`,
+          role: "assistant",
+          body:
+            decision === "approve_for_session"
+              ? "Perfecto. Estoy continuando este trabajo aprobado para toda la sesión."
+              : "Perfecto. Estoy continuando este trabajo aprobado bajo supervisión.",
+          state: {
+            tone: "sending",
+            label: decision === "approve_for_session" ? "Continuing approved work for this session" : "Continuing approved work",
+            body:
+              decision === "approve_for_session"
+                ? "Using your session approval to continue the delegated work without asking again in this thread."
+                : "Applying your approval and waiting for the delegated work to finish.",
+            routedAgentId: resolvedActiveSession.lastRoutedAgentId,
+            routedAgentName: activeSessionState?.routedAgentName ?? "Supervisor Agent",
+            intentLabel: "Approval decision recorded",
+            commandStateLabel: "Command layer still idle",
+            draftRunId: runId,
+            approvalDecision: decision === "approve_for_session" ? "approved_for_session" : "approved",
+            approvalScope: decision === "approve_for_session" ? "session" : "run",
+          },
+        },
+      });
+    }
 
     try {
       await reviewAgentRun({
@@ -442,8 +510,14 @@ export const GlobalAssistantChat = () => {
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "No pude registrar esa decisión todavía.");
     } finally {
+      setOptimisticAssistantMessage(null);
       setReviewingRunId(null);
     }
+  };
+
+  const handleApprovalPreferenceChange = async (nextValue: AssistantApprovalPreference) => {
+    setSelectedApproval(nextValue);
+    await updateSessionApprovalMode(resolvedActiveSession.id, nextValue);
   };
 
   const handleComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
@@ -691,7 +765,7 @@ export const GlobalAssistantChat = () => {
                         <div className="assistant-chat-approval-copy">
                           <span className="assistant-chat-approval-eyebrow">Approval required</span>
                           <strong>Choose how you want to handle this supervised draft.</strong>
-                          <p>No real execution happens here yet. This only records your decision cleanly in the flow.</p>
+                          <p>{messageState.approvalReason ?? "No real execution happens here yet. This only records your decision cleanly in the flow."}</p>
                         </div>
                         <div className="assistant-chat-approval-actions">
                           <button
@@ -737,6 +811,9 @@ export const GlobalAssistantChat = () => {
                           {messageState.label}
                         </span>
                         <p className="assistant-chat-state-body">{messageState.body}</p>
+                        {messageState.approvalReason ? (
+                          <p className="assistant-chat-state-body assistant-chat-state-body-subtle">{messageState.approvalReason}</p>
+                        ) : null}
                         <div className="assistant-chat-state-meta">
                           <span>{messageState.intentLabel}</span>
                           {messageState.toolLabel ? <span>{messageState.toolLabel}</span> : null}
@@ -905,24 +982,27 @@ export const GlobalAssistantChat = () => {
                     onClick={() => setActiveSelector((current) => (current === "approval" ? null : "approval"))}
                     type="button"
                   >
-                    <span>{selectedApproval}</span>
+                    <span>{approvalOptions.find((option) => option.value === selectedApproval)?.label ?? "Supervised"}</span>
                     <ChevronDown size={14} />
                   </button>
                   {activeSelector === "approval" ? (
                     <div className="assistant-chat-selector-popover">
                       {approvalOptions.map((option) => (
                         <button
-                          key={option}
-                          className={`assistant-chat-selector-option${selectedApproval === option ? " is-selected" : ""}`}
+                          key={option.value}
+                          className={`assistant-chat-selector-option${selectedApproval === option.value ? " is-selected" : ""}`}
                           onClick={() => {
-                            setSelectedApproval(option);
+                            void handleApprovalPreferenceChange(option.value);
                             setActiveSelector(null);
                           }}
                           type="button"
                         >
-                          {option}
+                          {option.label}
                         </button>
                       ))}
+                      <p className="assistant-chat-selector-helper">
+                        {approvalModeDescriptions[selectedApproval]}
+                      </p>
                     </div>
                   ) : null}
                 </div>

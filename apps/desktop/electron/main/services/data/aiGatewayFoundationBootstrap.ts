@@ -157,6 +157,7 @@ export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
   ensureColumn(db, "assistant_chat_attachments", "deleted_at", "TEXT");
   ensureColumn(db, "assistant_chat_thread_state", "session_approval_agent_id", "TEXT");
   ensureColumn(db, "assistant_chat_thread_state", "session_approval_granted_at", "TEXT");
+  ensureColumn(db, "assistant_chat_thread_state", "preferred_approval_mode", "TEXT DEFAULT 'supervised'");
 
   const agentsMissingProvider = db
     .prepare(

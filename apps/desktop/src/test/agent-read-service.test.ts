@@ -6,10 +6,35 @@ import { createTestDatabase } from "./helpers/createTestDatabase";
 describe("agent read service", () => {
   it("hydrates mission control, runs, models and connectors from the local database", () => {
     const { cleanup, database } = createTestDatabase("bukowski-agents-test");
+    const supervisor = database
+      .prepare("SELECT id FROM agents WHERE workspace_id = ? AND is_supervisor = 1 LIMIT 1")
+      .get("workspace-metadata") as { id: string } | undefined;
+    database
+      .prepare(
+        `
+          INSERT INTO agent_runs (
+            id,
+            workspace_id,
+            agent_id,
+            source_channel,
+            title,
+            input_summary,
+            output_summary,
+            status,
+            approval_mode,
+            approval_required,
+            created_at,
+            updated_at
+          ) VALUES ('run-supervisor-working', ?, ?, 'chat', 'Supervisor check', 'Check state', 'Running', 'running', 'supervised', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `,
+      )
+      .run("workspace-metadata", supervisor?.id ?? null);
+
     const reads = createAgentReadService(database);
     const missionControl = reads.getMissionControlSnapshot();
 
     expect(missionControl.supervisor?.displayName).toBe("Supervisor Agent");
+    expect(missionControl.supervisor?.operationalState).toBe("working");
     expect(missionControl.subagents.length).toBeGreaterThanOrEqual(5);
     expect(missionControl.queue.length).toBeGreaterThan(0);
     expect(missionControl.activity.length).toBeGreaterThan(0);

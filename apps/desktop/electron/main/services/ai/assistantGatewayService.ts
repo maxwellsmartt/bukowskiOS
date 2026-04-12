@@ -224,6 +224,79 @@ const loadAgentTarget = (db: DatabaseSync, agentKey: string) =>
       }
     | undefined;
 
+const loadAgentRuntimeConfigByKey = (db: DatabaseSync, agentKey: string) =>
+  db
+    .prepare(
+      `
+        SELECT id, agent_key, display_name, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
+        FROM agents
+        WHERE workspace_id = ?
+          AND agent_key = ?
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, agentKey) as
+    | {
+        id: string;
+        agent_key: string;
+        display_name: string;
+        approval_mode: string;
+        provider_key: string | null;
+        model_key: string;
+        base_prompt: string;
+      }
+    | undefined;
+
+const loadAgentRuntimeConfigById = (db: DatabaseSync, agentId: string) =>
+  db
+    .prepare(
+      `
+        SELECT id, agent_key, display_name, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
+        FROM agents
+        WHERE workspace_id = ?
+          AND id = ?
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, agentId) as
+    | {
+        id: string;
+        agent_key: string;
+        display_name: string;
+        approval_mode: string;
+        provider_key: string | null;
+        model_key: string;
+        base_prompt: string;
+      }
+    | undefined;
+
+const inferProjectIdFromPath = (activePath?: string | null) => {
+  if (!activePath) {
+    return null;
+  }
+
+  const match = activePath.match(/^\/projects\/([^/]+)/);
+  return match?.[1] ?? null;
+};
+
+const loadThreadRouteContext = (db: DatabaseSync, threadId: string) =>
+  db
+    .prepare(
+      `
+        SELECT context_key, context_label
+        FROM assistant_chat_threads
+        WHERE id = ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `,
+    )
+    .get(threadId) as
+    | {
+        context_key: string;
+        context_label: string;
+      }
+    | undefined;
+
 const loadThreadSessionApproval = (db: DatabaseSync, threadId: string) =>
   db
     .prepare(
@@ -376,6 +449,28 @@ const buildHumanErrorResponse = (
   orchestration: null,
 });
 
+const deriveApprovalReason = (args: {
+  requestedApprovalMode: "supervised" | "needs_approval" | "unsupervised";
+  targetAgentName: string;
+  targetApprovalMode: string;
+  orchestrationRequiresApproval: boolean;
+  answerKind: "informational" | "draft_run" | "needs_approval" | "error";
+}) => {
+  if (args.requestedApprovalMode === "needs_approval") {
+    return "This thread is set to Needs approval, so delegated follow-up must stop here for review.";
+  }
+
+  if (args.targetApprovalMode === "needs_approval") {
+    return `${args.targetAgentName} is configured to always ask for approval before continuing delegated work.`;
+  }
+
+  if (args.orchestrationRequiresApproval || args.answerKind === "needs_approval") {
+    return "Supervisor marked this as action-like work that should stay behind an approval boundary.";
+  }
+
+  return null;
+};
+
 export const createAssistantGatewayService = (
   db: DatabaseSync,
   options: {
@@ -385,87 +480,101 @@ export const createAssistantGatewayService = (
     toolRegistry: AgentToolRegistry;
     memoryService?: AssistantMemoryService;
   },
-) => ({
-  async sendMessage(request: AssistantGatewayRequest): Promise<AssistantGatewayResponse> {
+) => {
+  const runGatewayTurn = async (
+    request: AssistantGatewayRequest,
+    executionOptions?: {
+      approvalBypassAgentId?: string | null;
+      approvalScope?: "run" | "session" | null;
+      existingRunId?: string | null;
+      existingRunTitle?: string | null;
+    },
+  ): Promise<AssistantGatewayResponse> => {
     const supervisor = loadSupervisorConfig(db);
-    const providerKey = supervisor?.provider_key ?? "openai";
-    const modelKey = supervisor?.model_key ?? "openai:gpt-5.4";
+    const supervisorProviderKey = supervisor?.provider_key ?? "openai";
+    const supervisorModelKey = supervisor?.model_key ?? "openai:gpt-5.4";
 
     if (!supervisor) {
       return buildHumanErrorResponse(
         "needs_configuration",
         "Supervisor Agent is not configured yet. Assign a provider and model in Models first.",
-        providerKey,
-        modelKey,
+        supervisorProviderKey,
+        supervisorModelKey,
       );
     }
 
-    const provider = loadProviderConfig(db, providerKey);
+    const supervisorProvider = loadProviderConfig(db, supervisorProviderKey);
 
-    if (!provider || provider.enabled !== 1) {
+    if (!supervisorProvider || supervisorProvider.enabled !== 1) {
       return buildHumanErrorResponse(
         "needs_configuration",
         "OpenAI is not enabled yet. Configure the provider in Models before using chat.",
-        providerKey,
-        modelKey,
+        supervisorProviderKey,
+        supervisorModelKey,
       );
     }
 
-    const apiKey = options.secretStore.getProviderSecret(workspaceId, providerKey);
+    const supervisorApiKey = options.secretStore.getProviderSecret(workspaceId, supervisorProviderKey);
 
-    if (!apiKey) {
+    if (!supervisorApiKey) {
       return buildHumanErrorResponse(
         "needs_configuration",
         "This provider does not have a stored API key on this Mac yet.",
-        providerKey,
-        modelKey,
+        supervisorProviderKey,
+        supervisorModelKey,
       );
     }
 
     const sessionSnapshot = options.sessionStore.read(request.workspaceId, request.threadId);
     options.sessionStore.touchMessage(request.workspaceId, request.threadId, summarizeMessageForSession(request));
-    const memoryOverlay = options.memoryService?.getOverlay({
-      agentId: supervisor.id,
-      projectId: request.context.activeProjectId ?? null,
-      query: request.message,
-      limit: 5,
-    }) ?? { agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] };
 
-    const instructions = [
+    const supervisorMemoryOverlay =
+      options.memoryService?.getOverlay({
+        agentId: supervisor.id,
+        projectId: request.context.activeProjectId ?? null,
+        query: request.message,
+        limit: 5,
+      }) ?? { agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] };
+
+    const supervisorInstructions = [
       supervisor.base_prompt || "You are the BukowskiOS Supervisor Agent.",
       "Never imply that the command layer executed. Only read-only tools and supervised draft runs are allowed.",
       "Choose one target_agent from the allowed list below.",
-      "If a write-like action is implied, set requires_approval=true and answer_kind='draft_run' or 'needs_approval'.",
+      "Only set requires_approval=true when the requested action truly needs an explicit approval boundary or when the target agent is configured as needs_approval.",
       "Keep user_facing_summary practical and concise.",
       "Allowed agents:",
       loadAgentsPrompt(db),
       "When tool data is needed, call only the smallest relevant tool.",
       `Previous session summary: intent=${sessionSnapshot.lastIntent ?? "none"} | target=${sessionSnapshot.lastTargetAgent ?? "none"} | tool=${sessionSnapshot.lastToolResultSummary ?? "none"}`,
-      memoryOverlay.agentEntries.length
-        ? `Agent memory:\n${memoryOverlay.agentEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`
+      supervisorMemoryOverlay.agentEntries.length
+        ? `Agent memory:\n${supervisorMemoryOverlay.agentEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`
         : "Agent memory: none",
-      memoryOverlay.workspaceEntries.length
-        ? `Workspace memory:\n${memoryOverlay.workspaceEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`
+      supervisorMemoryOverlay.workspaceEntries.length
+        ? `Workspace memory:\n${supervisorMemoryOverlay.workspaceEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`
         : "Workspace memory: none",
-      memoryOverlay.projectEntries.length
-        ? `Project memory:\n${memoryOverlay.projectEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`
+      supervisorMemoryOverlay.projectEntries.length
+        ? `Project memory:\n${supervisorMemoryOverlay.projectEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`
         : "Project memory: none",
     ].join("\n");
 
     const initialPrompt = buildGatewayInput(request, sessionSnapshot.recentUserMessages);
-
     const toolTraces: AIGatewayToolCallTrace[] = [];
+    const executedToolPayloads: Array<{
+      toolName: string;
+      payload: unknown;
+    }> = [];
+
     let previousResponseId = sessionSnapshot.isExpired ? null : sessionSnapshot.previousResponseId;
     let result = await options.openaiProviderService.createResponse(
       {
-        apiKey,
-        baseUrl: provider.base_url,
-        defaultModelKey: modelKey,
-        timeoutMs: provider.timeout_ms,
+        apiKey: supervisorApiKey,
+        baseUrl: supervisorProvider.base_url,
+        defaultModelKey: supervisorModelKey,
+        timeoutMs: supervisorProvider.timeout_ms,
       },
       {
-        model: modelKey,
-        instructions,
+        model: supervisorModelKey,
+        instructions: supervisorInstructions,
         input: initialPrompt,
         previousResponseId,
         tools: options.toolRegistry.definitions,
@@ -487,7 +596,7 @@ export const createAssistantGatewayService = (
           WHERE workspace_id = ?
             AND provider_key = ?
         `,
-      ).run(result.status, now, result.summary, now, workspaceId, providerKey);
+      ).run(result.status, now, result.summary, now, workspaceId, supervisorProviderKey);
 
       options.sessionStore.writeResult(request.workspaceId, request.threadId, {
         previousResponseId: null,
@@ -501,8 +610,8 @@ export const createAssistantGatewayService = (
       return buildHumanErrorResponse(
         "provider_error",
         "The provider could not answer right now. Check the connection in Models and try again.",
-        providerKey,
-        modelKey,
+        supervisorProviderKey,
+        supervisorModelKey,
       );
     }
 
@@ -520,6 +629,10 @@ export const createAssistantGatewayService = (
         try {
           const execution = options.toolRegistry.execute(call.name, call.arguments, request.context);
           toolTraces.push(execution.trace);
+          executedToolPayloads.push({
+            toolName: call.name,
+            payload: execution.result.payload,
+          });
           outputs.push({
             type: "function_call_output",
             call_id: call.call_id,
@@ -547,14 +660,15 @@ export const createAssistantGatewayService = (
             status: "tool_error",
             stateLabel: "Read-only query failed",
             stateBody: "A supervised lookup failed before any action could be prepared.",
-            assistantMessage: "I could not finish that read-only lookup cleanly. No change was applied, and the command layer is still idle.",
+            assistantMessage:
+              "I could not finish that read-only lookup cleanly. No change was applied, and the command layer is still idle.",
             routedAgentId: null,
             routedAgentName: "Supervisor Agent",
             intentLabel: "Intent classified",
             commandStateLabel: "Command layer still idle",
             draftRunId: null,
-            providerKey,
-            modelKey,
+            providerKey: supervisorProviderKey,
+            modelKey: supervisorModelKey,
             toolTraces,
             orchestration: null,
           };
@@ -563,13 +677,13 @@ export const createAssistantGatewayService = (
 
       result = await options.openaiProviderService.createResponse(
         {
-          apiKey,
-          baseUrl: provider.base_url,
-          defaultModelKey: modelKey,
-          timeoutMs: provider.timeout_ms,
+          apiKey: supervisorApiKey,
+          baseUrl: supervisorProvider.base_url,
+          defaultModelKey: supervisorModelKey,
+          timeoutMs: supervisorProvider.timeout_ms,
         },
         {
-          model: modelKey,
+          model: supervisorModelKey,
           previousResponseId,
           input: outputs,
           tools: options.toolRegistry.definitions,
@@ -583,8 +697,8 @@ export const createAssistantGatewayService = (
         return buildHumanErrorResponse(
           "provider_error",
           "The provider stopped responding while finishing the supervised answer.",
-          providerKey,
-          modelKey,
+          supervisorProviderKey,
+          supervisorModelKey,
         );
       }
 
@@ -623,22 +737,126 @@ export const createAssistantGatewayService = (
         intentLabel: "Intent classified",
         commandStateLabel: "Command layer still idle",
         draftRunId: null,
-        providerKey,
-        modelKey,
+        providerKey: supervisorProviderKey,
+        modelKey: supervisorModelKey,
         toolTraces,
         orchestration: null,
       };
     }
 
     const target = loadAgentTarget(db, orchestration.target_agent);
+    const targetRuntime = loadAgentRuntimeConfigByKey(db, orchestration.target_agent);
     const sessionApproval = loadThreadSessionApproval(db, request.threadId);
+    const requestedApprovalMode = request.context.requestedApprovalMode ?? "supervised";
     const sessionApprovalApplies =
       Boolean(sessionApproval?.session_approval_granted_at) &&
       Boolean(target?.id) &&
       sessionApproval?.session_approval_agent_id === target?.id;
+    const approvalBypassApplies =
+      Boolean(executionOptions?.approvalBypassAgentId) &&
+      Boolean(target?.id) &&
+      executionOptions?.approvalBypassAgentId === target?.id;
+    const targetApprovalMode = targetRuntime?.approval_mode ?? target?.approval_mode ?? "supervised";
+    const forceNeedsApproval = requestedApprovalMode === "needs_approval";
+    const allowUnsupervised = requestedApprovalMode === "unsupervised" && targetApprovalMode !== "needs_approval";
     const requiresApproval =
       !sessionApprovalApplies &&
-      (orchestration.requires_approval || orchestration.answer_kind === "draft_run" || orchestration.answer_kind === "needs_approval");
+      !approvalBypassApplies &&
+      !allowUnsupervised &&
+      (forceNeedsApproval ||
+        orchestration.requires_approval ||
+        orchestration.answer_kind === "needs_approval" ||
+        targetApprovalMode === "needs_approval");
+    const approvalReason = requiresApproval
+      ? deriveApprovalReason({
+          requestedApprovalMode,
+          targetAgentName: target?.display_name ?? "Supervisor Agent",
+          targetApprovalMode,
+          orchestrationRequiresApproval: orchestration.requires_approval,
+          answerKind: orchestration.answer_kind,
+        })
+      : null;
+
+    const targetMemoryOverlay =
+      targetRuntime && options.memoryService
+        ? options.memoryService.getOverlay({
+            agentId: targetRuntime.id,
+            projectId: request.context.activeProjectId ?? null,
+            query: request.message,
+            limit: 5,
+          })
+        : { agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] };
+
+    const fallbackAssistantMessage = orchestration.user_facing_summary;
+    let specialistMessage = fallbackAssistantMessage;
+    let responseProviderKey = supervisorProviderKey;
+    let responseModelKey = supervisorModelKey;
+
+    if (targetRuntime) {
+      const targetProviderKey = targetRuntime.provider_key ?? supervisorProviderKey;
+      const targetProvider = loadProviderConfig(db, targetProviderKey);
+      const targetApiKey = options.secretStore.getProviderSecret(workspaceId, targetProviderKey);
+
+      if (targetProvider?.enabled === 1 && targetApiKey) {
+        responseProviderKey = targetProviderKey;
+        responseModelKey = targetRuntime.model_key || supervisorModelKey;
+
+        const specialistInstructions = [
+          targetRuntime.base_prompt || `You are the ${targetRuntime.display_name} inside BukowskiOS.`,
+          "You are responding after Supervisor routing has already classified the request.",
+          "Ground the answer in the provided read-only results and operational context.",
+          "Do not invent facts and do not claim that the command layer executed.",
+          "If this is still supervised work, explain the current supervised state clearly and naturally.",
+          targetMemoryOverlay.agentEntries.length
+            ? `Agent memory:\n${targetMemoryOverlay.agentEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`
+            : "Agent memory: none",
+          targetMemoryOverlay.workspaceEntries.length
+            ? `Workspace memory:\n${targetMemoryOverlay.workspaceEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`
+            : "Workspace memory: none",
+          targetMemoryOverlay.projectEntries.length
+            ? `Project memory:\n${targetMemoryOverlay.projectEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`
+            : "Project memory: none",
+        ].join("\n");
+
+        const specialistInput = JSON.stringify({
+          userRequest: request.message,
+          intent: orchestration.intent,
+          answerKind: orchestration.answer_kind,
+          activeContext: parseAppContextSummary(request),
+          approvalBypassed: sessionApprovalApplies || approvalBypassApplies,
+          draftContext:
+            orchestration.answer_kind === "draft_run"
+              ? {
+                  title: orchestration.draft_run_title,
+                  description: orchestration.draft_run_description,
+                }
+              : null,
+          supervisorSummary: orchestration.user_facing_summary,
+          toolResults: executedToolPayloads,
+        });
+
+        const specialistResult = await options.openaiProviderService.createResponse(
+          {
+            apiKey: targetApiKey,
+            baseUrl: targetProvider.base_url,
+            defaultModelKey: responseModelKey,
+            timeoutMs: targetProvider.timeout_ms,
+          },
+          {
+            model: responseModelKey,
+            instructions: specialistInstructions,
+            input: specialistInput,
+            toolChoice: "none",
+            maxOutputTokens: 700,
+          },
+        );
+
+        if (specialistResult.ok && specialistResult.outputText.trim()) {
+          specialistMessage = specialistResult.outputText.trim();
+        }
+      }
+    }
+
     const now = new Date().toISOString();
     const toolResultSummary = toolTraces.map((trace) => trace.summary).join(" · ") || null;
     const typedOrchestration: OrchestrationResult = {
@@ -649,34 +867,96 @@ export const createAssistantGatewayService = (
       requiresApproval,
       toolCallRequested: orchestration.tool_call_requested,
       toolCalls: toolTraces,
-      userFacingSummary: orchestration.user_facing_summary,
+      userFacingSummary: specialistMessage,
       answerKind: orchestration.answer_kind,
       draftRunTitle: orchestration.draft_run_title,
       draftRunDescription: orchestration.draft_run_description,
     };
 
+    const approvalDecision = requiresApproval
+      ? "pending"
+      : sessionApprovalApplies || executionOptions?.approvalScope === "session"
+        ? "approved_for_session"
+        : executionOptions?.approvalBypassAgentId
+          ? "approved"
+          : null;
+    const approvalScope = requiresApproval
+      ? "run"
+      : approvalDecision === "approved_for_session"
+        ? "session"
+        : approvalDecision === "approved"
+          ? "run"
+          : null;
+
     const detailsJson = JSON.stringify({
-      provider_key: providerKey,
-      model_key: modelKey,
+      provider_key: responseProviderKey,
+      model_key: responseModelKey,
       intent: typedOrchestration.intent,
       target_agent: orchestration.target_agent,
       tool_calls: toolTraces.map((trace) => trace.toolName),
       status: orchestration.answer_kind,
-      approval_decision: requiresApproval ? "pending" : sessionApprovalApplies ? "approved_for_session" : null,
-      });
+      approval_decision: approvalDecision,
+      approval_reason: approvalReason,
+      existing_run_id: executionOptions?.existingRunId ?? null,
+    });
 
     let draftRunId: string | null = null;
-    if (typedOrchestration.answerKind === "draft_run" && typedOrchestration.draftRunTitle && typedOrchestration.draftRunDescription) {
+    if (executionOptions?.existingRunId) {
+      draftRunId = executionOptions.existingRunId;
+      db.prepare(
+        `
+          UPDATE agent_runs
+          SET status = ?,
+              output_summary = ?,
+              approval_decision = ?,
+              approval_scope = ?,
+              approval_decided_at = ?,
+              details_json = ?,
+              updated_at = ?
+          WHERE workspace_id = ?
+            AND id = ?
+        `,
+      ).run(
+        requiresApproval ? "needs_approval" : "done",
+        typedOrchestration.draftRunDescription ?? specialistMessage,
+        approvalDecision,
+        approvalScope,
+        approvalDecision ? now : null,
+        detailsJson,
+        now,
+        workspaceId,
+        executionOptions.existingRunId,
+      );
+
+      createActivityEvent(db, {
+        id: `agent-activity-${Date.now().toString(36)}`,
+        agentId: target?.id ?? null,
+        runId: draftRunId,
+        kind: requiresApproval ? "ai_run_still_waiting_for_approval" : "ai_run_completed_after_approval",
+        title: requiresApproval ? "Approval still required" : "Approved run completed",
+        body: requiresApproval
+          ? "The delegated follow-up still requires an explicit approval boundary."
+          : executionOptions.existingRunTitle ?? "Approved supervised follow-up completed.",
+        tone: requiresApproval ? "warning" : "success",
+        source: "ai_gateway",
+        detailsJson,
+        createdAt: now,
+      });
+    } else if (
+      typedOrchestration.answerKind === "draft_run" &&
+      typedOrchestration.draftRunTitle &&
+      typedOrchestration.draftRunDescription
+    ) {
       const createdRun = createDraftRun(db, {
         threadId: request.threadId,
         routedAgentId: target?.id ?? null,
         title: typedOrchestration.draftRunTitle,
         inputSummary: request.message,
         outputSummary: typedOrchestration.draftRunDescription,
-        approvalMode: target?.approval_mode ?? "supervised",
+        approvalMode: targetApprovalMode,
         requiresApproval,
-        approvalDecision: requiresApproval ? "pending" : sessionApprovalApplies ? "approved_for_session" : null,
-        approvalScope: requiresApproval ? "run" : sessionApprovalApplies ? "session" : null,
+        approvalDecision,
+        approvalScope,
         detailsJson,
       });
       draftRunId = createdRun.runId;
@@ -688,7 +968,7 @@ export const createAssistantGatewayService = (
         kind: "ai_draft_run_created",
         title: "AI draft run prepared",
         body: typedOrchestration.draftRunTitle,
-        tone: "info",
+        tone: requiresApproval ? "warning" : "info",
         source: "ai_gateway",
         detailsJson,
         createdAt: createdRun.now,
@@ -700,7 +980,7 @@ export const createAssistantGatewayService = (
         runId: null,
         kind: "ai_request_routed",
         title: "AI request routed",
-        body: typedOrchestration.userFacingSummary,
+        body: specialistMessage,
         tone: requiresApproval ? "warning" : "success",
         source: "ai_gateway",
         detailsJson,
@@ -718,7 +998,7 @@ export const createAssistantGatewayService = (
         WHERE workspace_id = ?
           AND provider_key = ?
       `,
-    ).run(now, now, workspaceId, providerKey);
+    ).run(now, now, workspaceId, supervisorProviderKey);
 
     options.sessionStore.writeResult(request.workspaceId, request.threadId, {
       previousResponseId,
@@ -735,35 +1015,126 @@ export const createAssistantGatewayService = (
       stateBody: draftRunId
         ? requiresApproval
           ? "Prepared a supervised draft. This still needs approval before any change is applied."
-          : sessionApprovalApplies
-            ? "Prepared a supervised draft under your session approval. No command-layer action was executed."
-            : "Prepared a supervised draft. No command-layer action was executed."
+          : approvalDecision === "approved_for_session"
+            ? "Prepared or completed this supervised follow-up under your session approval. No command-layer action was executed."
+            : approvalDecision === "approved"
+              ? "Completed the approved supervised follow-up. No command-layer action was executed."
+              : "Prepared a supervised draft. No command-layer action was executed."
         : typedOrchestration.toolCalls.length
           ? `${typedOrchestration.targetAgentName} answered after a read-only lookup.`
           : `${typedOrchestration.targetAgentName} answered directly from supervised routing.`,
-      assistantMessage: typedOrchestration.userFacingSummary,
+      assistantMessage: specialistMessage,
       routedAgentId: typedOrchestration.targetAgentId,
       routedAgentName: typedOrchestration.targetAgentName,
       intentLabel: `Intent classified · ${typedOrchestration.intent}`,
       commandStateLabel: draftRunId
         ? requiresApproval
           ? "Prepared supervised draft · command layer still not executed"
-          : sessionApprovalApplies
-            ? "Session-approved draft · command layer still not executed"
-            : "Approved draft · command layer still not executed"
+          : approvalDecision === "approved_for_session"
+            ? "Session-approved follow-up · command layer still not executed"
+            : "Approved follow-up · command layer still not executed"
         : "Read-only answer · command layer still not executed",
       draftRunId,
-      approvalDecision: requiresApproval ? "pending" : sessionApprovalApplies ? "approved_for_session" : null,
-      approvalScope: requiresApproval ? "run" : sessionApprovalApplies ? "session" : null,
-      providerKey,
-      modelKey,
+      approvalDecision,
+      approvalScope,
+      approvalReason,
+      providerKey: responseProviderKey,
+      modelKey: responseModelKey,
       toolTraces,
       orchestration: {
         ...typedOrchestration,
         requiresApproval,
       },
     };
-  },
-});
+  };
+
+  return {
+    async sendMessage(request: AssistantGatewayRequest): Promise<AssistantGatewayResponse> {
+      return runGatewayTurn(request);
+    },
+
+    async continueApprovedRun(args: {
+      workspaceId: string;
+      threadId: string;
+      runId: string;
+      approvalScope: "run" | "session";
+    }): Promise<AssistantGatewayResponse> {
+      const run = db
+        .prepare(
+          `
+            SELECT id, thread_id, agent_id, title, input_summary
+            FROM agent_runs
+            WHERE workspace_id = ?
+              AND id = ?
+            LIMIT 1
+          `,
+        )
+        .get(workspaceId, args.runId) as
+        | {
+            id: string;
+            thread_id: string | null;
+            agent_id: string | null;
+            title: string;
+            input_summary: string;
+          }
+        | undefined;
+
+      if (!run || !run.thread_id || !run.agent_id) {
+        throw new Error("Approved run is not linked to a recoverable chat thread.");
+      }
+
+      const threadContext = loadThreadRouteContext(db, run.thread_id);
+      const request: AssistantGatewayRequest = {
+        commandId: `cmd-approved-${Date.now().toString(36)}`,
+        workspaceId: args.workspaceId,
+        threadId: run.thread_id,
+        message: run.input_summary,
+        attachments: [],
+        context: {
+          workspaceId: args.workspaceId,
+          activePath: threadContext?.context_key ?? "/agents",
+          currentView: threadContext?.context_label ?? "Agents",
+          activeProjectId: inferProjectIdFromPath(threadContext?.context_key ?? null),
+          activeFilters: {},
+        },
+      };
+
+      try {
+        return await runGatewayTurn(request, {
+          approvalBypassAgentId: run.agent_id,
+          approvalScope: args.approvalScope,
+          existingRunId: run.id,
+          existingRunTitle: run.title,
+        });
+      } catch (error) {
+        const summary = error instanceof Error ? error.message : "Approved run could not continue.";
+        const now = new Date().toISOString();
+        db.prepare(
+          `
+            UPDATE agent_runs
+            SET status = 'failed',
+                output_summary = ?,
+                updated_at = ?
+            WHERE workspace_id = ?
+              AND id = ?
+          `,
+        ).run(summary, now, workspaceId, run.id);
+
+        createActivityEvent(db, {
+          id: `agent-activity-${Date.now().toString(36)}`,
+          agentId: run.agent_id,
+          runId: run.id,
+          kind: "ai_run_failed_after_approval",
+          title: "Approved run failed",
+          body: summary,
+          tone: "critical",
+          source: "ai_gateway",
+          createdAt: now,
+        });
+        throw error;
+      }
+    },
+  };
+};
 
 export type AssistantGatewayService = ReturnType<typeof createAssistantGatewayService>;

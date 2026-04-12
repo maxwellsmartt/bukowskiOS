@@ -10,10 +10,12 @@ import type {
   CreateAgentCommand,
   ArchiveAssetCommand,
   CreateDraftRunFromChatCommand,
+  RecordRuntimeErrorCommand,
   ReviewAgentRunCommand,
   SendAssistantChatTurnCommand,
   AssetListQuery,
   SetActiveAssistantThreadCommand,
+  UpdateAssistantThreadPreferencesCommand,
   SetAgentApprovalModeCommand,
   SetAgentStatusCommand,
   AssignMoveAssetsInput,
@@ -107,10 +109,14 @@ type RegisterFoundationIpcOptions = {
     createAssistantThread: (input: CreateAssistantThreadCommand) => AssistantChatSnapshot;
     deleteAssistantThread: (input: DeleteAssistantThreadCommand) => AssistantChatSnapshot;
     setActiveAssistantThread: (input: SetActiveAssistantThreadCommand) => AssistantChatSnapshot;
+    updateAssistantThreadPreferences: (input: UpdateAssistantThreadPreferencesCommand) => AssistantChatSnapshot;
     sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
     reviewRun: (input: ReviewAgentRunCommand) => unknown;
     sendAssistantMessage: (input: AssistantGatewayRequest) => Promise<AssistantGatewayResponse>;
     createDraftRunFromChat: (input: CreateDraftRunFromChatCommand) => unknown;
+  };
+  runtimeDiagnostics: {
+    recordRuntimeError: (input: RecordRuntimeErrorCommand) => unknown;
   };
 };
 
@@ -124,6 +130,7 @@ export const registerFoundationIpc = ({
   packingMutations,
   rmaMutations,
   agentMutations,
+  runtimeDiagnostics,
 }: RegisterFoundationIpcOptions) => {
   ipcMain.handle(ipcChannels.shell.getBootstrap, () => foundationReads.getShellBootstrap());
   ipcMain.handle(ipcChannels.shell.searchGlobal, (_event, query: GlobalSearchQuery) => foundationReads.getGlobalSearch(query));
@@ -167,6 +174,10 @@ export const registerFoundationIpc = ({
     (_event, input: SetActiveAssistantThreadCommand) => agentMutations.setActiveAssistantThread(input),
   );
   ipcMain.handle(
+    ipcChannels.agents.updateAssistantThreadPreferences,
+    (_event, input: UpdateAssistantThreadPreferencesCommand) => agentMutations.updateAssistantThreadPreferences(input),
+  );
+  ipcMain.handle(
     ipcChannels.agents.sendAssistantChatTurn,
     (_event, input: SendAssistantChatTurnCommand) => agentMutations.sendAssistantChatTurn(input),
   );
@@ -178,6 +189,10 @@ export const registerFoundationIpc = ({
   ipcMain.handle(
     ipcChannels.agents.createDraftRunFromChat,
     (_event, input: CreateDraftRunFromChatCommand) => agentMutations.createDraftRunFromChat(input),
+  );
+  ipcMain.handle(
+    ipcChannels.app.reportRuntimeError,
+    (_event, input: RecordRuntimeErrorCommand) => runtimeDiagnostics.recordRuntimeError(input),
   );
   ipcMain.handle(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot());
   ipcMain.handle(

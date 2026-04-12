@@ -25,6 +25,7 @@ import { seedFoundationData } from "./foundationSeed";
 import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
 import { createProjectMutationService, ensureProjectShellDefaults } from "./projectMutationService";
 import { createRmaMutationService } from "./rmaMutationService";
+import { createRuntimeDiagnosticsService, type RuntimeDiagnosticsService } from "./runtimeDiagnosticsService";
 import { applySchedulingFoundationMigration, bootstrapSchedulingFoundation } from "./schedulingFoundationBootstrap";
 
 type ProjectMutationService = ReturnType<typeof createProjectMutationService>;
@@ -48,6 +49,7 @@ type LocalDatabaseRuntime = {
   packingMutations: PackingMutationService;
   rmaMutations: RmaMutationService;
   agentMutations: AgentMutationService;
+  runtimeDiagnostics: RuntimeDiagnosticsService;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -92,6 +94,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     memoryService,
     attachmentsRootPath,
   });
+  const runtimeDiagnostics = createRuntimeDiagnosticsService(database);
   assistantChatService.reconcileInterruptedThreads();
 
   return {
@@ -106,6 +109,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     incidentMutations: createIncidentMutationService(database),
     packingMutations: createPackingMutationService(database),
     rmaMutations: createRmaMutationService(database),
+    runtimeDiagnostics,
     agentMutations: createAgentMutationService(database, {
       secretStore,
       openaiProviderService,

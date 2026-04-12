@@ -24,6 +24,7 @@ import type {
   SaveAIProviderConfigCommand,
   SendAssistantChatTurnCommand,
   SetActiveAssistantThreadCommand,
+  UpdateAssistantThreadPreferencesCommand,
   SetAgentApprovalModeCommand,
   SetAgentStatusCommand,
   TestAIProviderConnectionCommand,
@@ -316,6 +317,18 @@ export const setActiveAssistantThread = async (input: SetActiveAssistantThreadCo
   }
 
   const result = await window.bukowskiAgents.setActiveAssistantThread(input);
+  notifyAgentsChanged();
+  return result;
+};
+
+export const updateAssistantThreadPreferences = async (
+  input: UpdateAssistantThreadPreferencesCommand,
+): Promise<AssistantChatSnapshot> => {
+  if (!window.bukowskiAgents) {
+    throw new Error("Agents bridge unavailable");
+  }
+
+  const result = await window.bukowskiAgents.updateAssistantThreadPreferences(input);
   notifyAgentsChanged();
   return result;
 };

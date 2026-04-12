@@ -19,6 +19,9 @@ describe("assistant chat service", () => {
         sendMessage: async () => {
           throw new Error("Not used in this test.");
         },
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
       },
       memoryService: {
         extractAndPersist: () => [],
@@ -79,6 +82,9 @@ describe("assistant chat service", () => {
             draftRunDescription: null,
           },
         }),
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
       },
       memoryService: {
         extractAndPersist: () => [],
@@ -169,6 +175,9 @@ describe("assistant chat service", () => {
         sendMessage: async () => {
           throw new Error("Not used in this test.");
         },
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
       },
       memoryService: {
         extractAndPersist: () => [],
@@ -223,6 +232,47 @@ describe("assistant chat service", () => {
     expect(interruptedThread?.lastErrorSummary).toContain("interrupted");
     expect(interruptedMessage?.state).toBe("error");
     expect(interruptedMessage?.body).toContain("interrupted");
+
+    cleanup();
+    fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
+  });
+
+  it("persists per-thread approval preferences", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-assistant-chat-preferences");
+    const attachmentsRootPath = createAttachmentsRoot("bukowski-assistant-chat-preferences");
+    const service = createAssistantChatService(database, {
+      attachmentsRootPath,
+      assistantGatewayService: {
+        sendMessage: async () => {
+          throw new Error("Not used in this test.");
+        },
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
+      },
+      memoryService: {
+        extractAndPersist: () => [],
+        getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        recordFailure: () => undefined,
+      },
+    });
+
+    const created = service.createThread({
+      commandId: "cmd-thread-create-preferences",
+      workspaceId: "workspace-metadata",
+      contextKey: "/agents",
+      contextLabel: "Agents",
+    });
+    const threadId = created.activeThreadId ?? created.threads[0]?.id ?? "";
+
+    const updated = service.updateThreadPreferences({
+      commandId: "cmd-thread-preferences",
+      workspaceId: "workspace-metadata",
+      threadId,
+      preferredApprovalMode: "unsupervised",
+    });
+
+    expect(updated.threads[0]?.preferredApprovalMode).toBe("unsupervised");
 
     cleanup();
     fs.rmSync(attachmentsRootPath, { recursive: true, force: true });

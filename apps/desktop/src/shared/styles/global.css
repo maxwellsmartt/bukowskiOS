@@ -2421,6 +2421,24 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
 }
 
+.mission-node-operational-idle {
+  border-color: rgba(255, 176, 92, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 176, 92, 0.06);
+}
+
+.mission-node-operational-working {
+  border-color: rgba(92, 190, 146, 0.38);
+  box-shadow:
+    0 0 0 1px rgba(92, 190, 146, 0.1),
+    0 0 24px rgba(92, 190, 146, 0.14),
+    inset 0 0 18px rgba(92, 190, 146, 0.045);
+}
+
+.mission-node-operational-attention {
+  border-color: rgba(255, 107, 107, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.08);
+}
+
 .mission-node:hover,
 .agent-directory-card:hover {
   border-color: rgba(255, 255, 255, 0.14);
@@ -2598,6 +2616,17 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .agent-run-row-copy {
   display: grid;
   gap: 8px;
+}
+
+.agent-run-row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.agent-run-row-pending {
+  align-items: flex-start;
 }
 
 .agent-run-approval-panel {
@@ -3784,6 +3813,10 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   line-height: 1.45;
 }
 
+.assistant-chat-state-body-subtle {
+  color: var(--text-muted);
+}
+
 .assistant-chat-state-meta {
   display: grid;
   gap: 4px;
@@ -4104,6 +4137,14 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
+}
+
+.assistant-chat-selector-helper {
+  margin: 2px 2px 0;
+  padding: 6px 8px 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .assistant-chat-selector-option.is-selected {

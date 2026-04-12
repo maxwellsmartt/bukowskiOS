@@ -35,6 +35,21 @@ const parseJsonArray = (value: string | null | undefined) => {
   }
 };
 
+const parseRunDetails = (value: string | null | undefined) => {
+  if (!value) {
+    return { approvalReason: null as string | null };
+  }
+
+  try {
+    const parsed = JSON.parse(value) as { approval_reason?: unknown };
+    return {
+      approvalReason: typeof parsed.approval_reason === "string" ? parsed.approval_reason : null,
+    };
+  } catch {
+    return { approvalReason: null as string | null };
+  }
+};
+
 const formatTimestampLabel = (value: string) => {
   const timestamp = new Date(value).getTime();
   const now = Date.now();
@@ -129,7 +144,70 @@ const toRosterRow = (row: AgentRow): AgentRosterRow => {
   };
 };
 
-const toGraphNode = (row: AgentRow): AgentGraphNode => ({
+const loadBusyAgentIds = (db: DatabaseSync) => {
+  const runRows = db
+    .prepare(
+      `
+        SELECT DISTINCT agent_id
+        FROM agent_runs
+        WHERE workspace_id = ?
+          AND agent_id IS NOT NULL
+          AND status IN ('routing', 'running', 'approved')
+      `,
+    )
+    .all(workspaceId) as Array<{ agent_id: string }>;
+
+  const threadRows = db
+    .prepare(
+      `
+        SELECT DISTINCT last_routed_agent_id
+        FROM assistant_chat_thread_state
+        WHERE last_routed_agent_id IS NOT NULL
+          AND last_state IN ('pending', 'streaming')
+      `,
+    )
+    .all() as Array<{ last_routed_agent_id: string }>;
+
+  return new Set([
+    ...runRows.map((row) => row.agent_id),
+    ...threadRows.map((row) => row.last_routed_agent_id),
+  ]);
+};
+
+const loadAttentionAgentIds = (db: DatabaseSync) => {
+  const providerRows = loadProviderRows(db);
+  const unhealthyProviders = new Set(
+    providerRows
+      .filter((row) => row.enabled === 1 && !["healthy", "configured"].includes(row.status))
+      .map((row) => row.provider_key),
+  );
+
+  const stalledRuns = db
+    .prepare(
+      `
+        SELECT DISTINCT agent_id
+        FROM agent_runs
+        WHERE workspace_id = ?
+          AND agent_id IS NOT NULL
+          AND status IN ('failed', 'denied', 'paused')
+      `,
+    )
+    .all(workspaceId) as Array<{ agent_id: string }>;
+
+  return {
+    providerKeys: unhealthyProviders,
+    runAgentIds: new Set(stalledRuns.map((row) => row.agent_id)),
+  };
+};
+
+const toGraphNode = (
+  row: AgentRow,
+  statusContext: {
+    busyAgentIds: Set<string>;
+    attentionAgentIds: Set<string>;
+    unhealthyProviderKeys: Set<string>;
+  },
+): AgentGraphNode => ({
   id: row.id,
   agentId: row.agent_key,
   displayName: row.display_name,
@@ -137,6 +215,12 @@ const toGraphNode = (row: AgentRow): AgentGraphNode => ({
   role: row.role_summary,
   domain: row.domain_key,
   status: row.status,
+  operationalState:
+    row.status === "paused" || statusContext.unhealthyProviderKeys.has(row.provider_key ?? "openai") || statusContext.attentionAgentIds.has(row.id)
+      ? "attention"
+      : statusContext.busyAgentIds.has(row.id)
+        ? "working"
+        : "idle",
   secondaryLabel: row.model_label,
   isSupervisor: row.is_supervisor === 1,
 });
@@ -207,6 +291,7 @@ const loadRuns = (db: DatabaseSync, limit?: number, agentId?: string) => {
       agent_runs.approval_required,
       agent_runs.approval_decision,
       agent_runs.approval_scope,
+      agent_runs.details_json,
       agent_runs.created_at,
       agent_runs.updated_at,
       COALESCE(agents.display_name, 'Supervisor Agent') AS agent_display_name
@@ -231,27 +316,39 @@ const loadRuns = (db: DatabaseSync, limit?: number, agentId?: string) => {
     approval_required: number;
     approval_decision: AgentRunRow["approvalDecision"];
     approval_scope: AgentRunRow["approvalScope"];
+    details_json: string | null;
     created_at: string;
     updated_at: string;
     agent_display_name: string;
   }>;
 };
 
-const toRunRow = (row: ReturnType<typeof loadRuns>[number]): AgentRunRow => ({
-  id: row.id,
-  agentId: row.agent_id,
-  threadId: row.thread_id,
-  title: row.title,
-  status: row.status,
-  summary: row.output_summary,
-  agentDisplayName: row.agent_display_name,
-  approvalMode: row.approval_mode,
-  approvalRequired: row.approval_required === 1,
-  approvalDecision: row.approval_decision,
-  approvalScope: row.approval_scope,
-  createdAtLabel: formatTimestampLabel(row.created_at),
-  updatedAtLabel: formatTimestampLabel(row.updated_at),
-});
+const toRunRow = (row: ReturnType<typeof loadRuns>[number]): AgentRunRow => {
+  const details = parseRunDetails(row.details_json);
+  const fallbackApprovalReason =
+    row.approval_required === 1
+      ? row.approval_mode === "needs_approval"
+        ? `${row.agent_display_name} is configured to always require approval before continuing.`
+        : "This supervised draft pauses here until you review it."
+      : null;
+
+  return {
+    id: row.id,
+    agentId: row.agent_id,
+    threadId: row.thread_id,
+    title: row.title,
+    status: row.status,
+    summary: row.output_summary,
+    agentDisplayName: row.agent_display_name,
+    approvalMode: row.approval_mode,
+    approvalRequired: row.approval_required === 1,
+    approvalDecision: row.approval_decision,
+    approvalScope: row.approval_scope,
+    approvalReason: details.approvalReason ?? fallbackApprovalReason,
+    createdAtLabel: formatTimestampLabel(row.created_at),
+    updatedAtLabel: formatTimestampLabel(row.updated_at),
+  };
+};
 
 const loadActivity = (db: DatabaseSync, limit = 6) =>
   db
@@ -352,6 +449,8 @@ export const createAgentReadService = (
     const agentRows = loadAgentRows(db);
     const supervisor = agentRows.find((row) => row.is_supervisor === 1) ?? null;
     const subagents = agentRows.filter((row) => row.is_supervisor !== 1);
+    const busyAgentIds = loadBusyAgentIds(db);
+    const attentionContext = loadAttentionAgentIds(db);
     const modelSummary = buildProviderRows(db, secretStore);
     const connectorSummary = db
       .prepare(
@@ -386,8 +485,20 @@ export const createAgentReadService = (
     const assignedModels = agentRows.filter((row) => row.model_label.trim().length > 0).length;
 
     return {
-      supervisor: supervisor ? toGraphNode(supervisor) : null,
-      subagents: subagents.map(toGraphNode),
+      supervisor: supervisor
+        ? toGraphNode(supervisor, {
+            busyAgentIds,
+            attentionAgentIds: attentionContext.runAgentIds,
+            unhealthyProviderKeys: attentionContext.providerKeys,
+          })
+        : null,
+      subagents: subagents.map((agent) =>
+        toGraphNode(agent, {
+          busyAgentIds,
+          attentionAgentIds: attentionContext.runAgentIds,
+          unhealthyProviderKeys: attentionContext.providerKeys,
+        }),
+      ),
       queue: loadRuns(db, 5).map(toRunRow),
       activity: loadActivity(db, 6).map(toActivityRow),
       health: {

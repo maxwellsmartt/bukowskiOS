@@ -21,12 +21,18 @@ const asOptionalString = (value: unknown) => {
   const nextValue = asString(value);
   return nextValue || null;
 };
+const asStringArray = (value: unknown) =>
+  Array.isArray(value) ? value.map((item) => asString(item)).filter(Boolean) : [];
 const asInteger = (value: unknown, fallback: number) => {
   const nextValue = asNumber(value);
   return nextValue === null ? fallback : Math.max(1, Math.floor(nextValue));
 };
 
 const truncate = (value: string, max = 120) => (value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value);
+const resolveDraftLanguage = (value: unknown) => {
+  const nextValue = asString(value).toLowerCase();
+  return nextValue.startsWith("es") || nextValue.includes("spanish") ? "es" : "en";
+};
 
 const inferProjectIdFromContext = (context: AIGatewayToolContext) => {
   if (context.activeProjectId) {
@@ -981,6 +987,480 @@ export const createAgentToolRegistry = (
               dueDate: row.dueDate,
               status: row.status,
             })),
+          },
+        };
+      },
+    },
+    {
+      name: "list_recipients",
+      description: "List compact communication targets across workspace members, crew, clients and manufacturers.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          query: { type: "string" },
+          recipient_type: { type: "string" },
+          project_id: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+      execute: (args, context) => {
+        const items = foundationReads.listCommunicationRecipients({
+          query: asOptionalString(args.query),
+          recipientType: asOptionalString(args.recipient_type),
+          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          limit: asInteger(args.limit, 8),
+        });
+
+        return {
+          summary: items.length ? `Loaded ${items.length} possible communication targets.` : "No communication targets found.",
+          payload: {
+            count: items.length,
+            items,
+          },
+        };
+      },
+    },
+    {
+      name: "get_thread_context",
+      description: "Return compact durable thread context for drafting or follow-up communication.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          thread_id: { type: "string" },
+          limit: { type: "number" },
+        },
+        required: ["thread_id"],
+      },
+      execute: (args) => {
+        const payload = foundationReads.getThreadContextSnapshot(asString(args.thread_id), asInteger(args.limit, 6));
+
+        return {
+          summary: payload.thread ? `Loaded thread context for ${payload.thread.title}.` : "Thread context was not found.",
+          payload,
+        };
+      },
+    },
+    {
+      name: "preview_send_targets",
+      description: "Resolve reachable communication targets before preparing a supervised draft.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          recipient_ids: {
+            type: "array",
+            items: { type: "string" },
+          },
+          query: { type: "string" },
+          recipient_type: { type: "string" },
+          project_id: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+      execute: (args, context) => {
+        const payload = foundationReads.previewCommunicationTargets({
+          recipientIds: asStringArray(args.recipient_ids),
+          query: asOptionalString(args.query),
+          recipientType: asOptionalString(args.recipient_type),
+          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          limit: asInteger(args.limit, 8),
+        });
+
+        return {
+          summary: payload.totalTargets
+            ? `Prepared a preview of ${payload.totalTargets} communication targets.`
+            : "No communication targets matched this preview.",
+          payload,
+        };
+      },
+    },
+    {
+      name: "get_delivery_status",
+      description: "Return the truthful status of communications runs. Sending is still draft-only in this phase.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          thread_id: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+      execute: (args) => {
+        const payload = foundationReads.getCommunicationDeliveryStatus({
+          threadId: asOptionalString(args.thread_id),
+          limit: asInteger(args.limit, 8),
+        });
+
+        return {
+          summary: payload.items.length
+            ? `Loaded ${payload.items.length} communication draft states.`
+            : "No communication delivery records found.",
+          payload,
+        };
+      },
+    },
+    {
+      name: "draft_message",
+      description: "Prepare a draft-only operational message scaffold. This never sends anything.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          purpose: { type: "string" },
+          recipient_label: { type: "string" },
+          tone: { type: "string" },
+          subject: { type: "string" },
+          context: { type: "string" },
+          key_points: {
+            type: "array",
+            items: { type: "string" },
+          },
+          call_to_action: { type: "string" },
+          language: { type: "string" },
+        },
+        required: ["purpose"],
+      },
+      execute: (args) => {
+        const language = resolveDraftLanguage(args.language);
+        const recipientLabel = asOptionalString(args.recipient_label) ?? (language === "es" ? "equipo" : "team");
+        const tone = asOptionalString(args.tone) ?? (language === "es" ? "operativo" : "operational");
+        const purpose = asString(args.purpose);
+        const contextSummary = asOptionalString(args.context);
+        const callToAction = asOptionalString(args.call_to_action);
+        const keyPoints = asStringArray(args.key_points).slice(0, 5);
+        const subject =
+          asOptionalString(args.subject) ??
+          (language === "es" ? `Borrador: ${purpose}` : `Draft: ${purpose}`);
+
+        const bodyLines =
+          language === "es"
+            ? [
+                `Hola ${recipientLabel},`,
+                "",
+                contextSummary || `Te comparto este borrador relacionado con: ${purpose}.`,
+                ...(keyPoints.length
+                  ? ["", "Puntos clave:", ...keyPoints.map((point) => `- ${point}`)]
+                  : []),
+                ...(callToAction ? ["", `Siguiente paso sugerido: ${callToAction}`] : []),
+                "",
+                "Quedo atento.",
+              ]
+            : [
+                `Hello ${recipientLabel},`,
+                "",
+                contextSummary || `I'm sharing this draft regarding: ${purpose}.`,
+                ...(keyPoints.length ? ["", "Key points:", ...keyPoints.map((point) => `- ${point}`)] : []),
+                ...(callToAction ? ["", `Suggested next step: ${callToAction}`] : []),
+                "",
+                "Best regards,",
+              ];
+
+        return {
+          summary: "Prepared a supervised message draft scaffold.",
+          payload: {
+            status: "draft_only",
+            deliveryEnabled: false,
+            tone,
+            language,
+            subject,
+            body: bodyLines.join("\n"),
+            keyPoints,
+          },
+        };
+      },
+    },
+    {
+      name: "search_errors",
+      description: "Search real assistant, run and provider issues across BukowskiOS.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          query: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+      execute: (args) => {
+        const items = foundationReads.searchSystemErrors({
+          query: asOptionalString(args.query),
+          limit: asInteger(args.limit, 8),
+        });
+
+        return {
+          summary: items.length ? `Found ${items.length} system issues.` : "No matching system issues found.",
+          payload: {
+            count: items.length,
+            items,
+          },
+        };
+      },
+    },
+    {
+      name: "get_error_detail",
+      description: "Get detailed context for one system issue from runs, threads or provider health.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          issue_id: { type: "string" },
+        },
+        required: ["issue_id"],
+      },
+      execute: (args) => {
+        const payload = foundationReads.getSystemErrorDetail(asString(args.issue_id));
+
+        return {
+          summary: payload ? `Loaded detail for ${payload.title}.` : "Issue detail was not found.",
+          payload: {
+            issue: payload,
+          },
+        };
+      },
+    },
+    {
+      name: "get_session_trace",
+      description: "Return compact thread trace and related runs for a system issue or chat thread.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          thread_id: { type: "string" },
+          issue_id: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+      execute: (args) => {
+        const payload = foundationReads.getSessionTrace({
+          threadId: asOptionalString(args.thread_id),
+          issueId: asOptionalString(args.issue_id),
+          limit: asInteger(args.limit, 8),
+        });
+
+        return {
+          summary: payload.thread ? `Loaded session trace for ${payload.thread.title}.` : payload.note ?? "No session trace is available.",
+          payload,
+        };
+      },
+    },
+    {
+      name: "get_recent_deploys",
+      description: "Return deploy telemetry status. In this phase BukowskiOS may report that deploy telemetry is not connected yet.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          limit: { type: "number" },
+        },
+      },
+      execute: (args) => {
+        const payload = foundationReads.getRecentDeploys(asInteger(args.limit, 5));
+
+        return {
+          summary: payload.telemetryAvailable
+            ? `Loaded ${payload.items.length} recent deploy records.`
+            : payload.note,
+          payload,
+        };
+      },
+    },
+    {
+      name: "get_agent_failures",
+      description: "Return recent failures for one agent or across all agents.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          agent_key: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+      execute: (args) => {
+        const payload = foundationReads.getAgentFailures({
+          agentKey: asOptionalString(args.agent_key),
+          limit: asInteger(args.limit, 8),
+        });
+
+        return {
+          summary: payload.count ? `Loaded ${payload.count} agent failures.` : "No agent failures found.",
+          payload,
+        };
+      },
+    },
+    {
+      name: "draft_bug_report",
+      description: "Prepare a structured bug report draft from an issue or thread trace without mutating any external system.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          issue_id: { type: "string" },
+          thread_id: { type: "string" },
+          audience: { type: "string" },
+        },
+      },
+      execute: (args) => {
+        const issueId = asOptionalString(args.issue_id);
+        const threadId = asOptionalString(args.thread_id);
+        const audience = asOptionalString(args.audience) ?? "engineering";
+        const detail = issueId ? foundationReads.getSystemErrorDetail(issueId) : null;
+        const trace = foundationReads.getSessionTrace({
+          issueId,
+          threadId: threadId ?? detail?.threadId ?? null,
+          limit: 8,
+        });
+
+        const titleSeed = detail?.title ?? trace.thread?.title ?? "Unknown issue";
+        const summarySeed = detail?.summary ?? trace.thread?.lastErrorSummary ?? trace.thread?.summaryText ?? "Issue summary unavailable.";
+        const severity = typeof detail?.severity === "string" ? detail.severity : "medium";
+        const reproduction = [
+          ...(Array.isArray(trace.reproductionHints) ? trace.reproductionHints : []),
+          trace.thread?.contextKey ? `Start from ${trace.thread.contextKey}.` : null,
+        ].filter((value): value is string => Boolean(value));
+        const relatedRuns = Array.isArray(trace.relatedRuns) ? trace.relatedRuns : [];
+
+        return {
+          summary: `Prepared a draft bug report for ${titleSeed}.`,
+          payload: {
+            status: "draft_only",
+            audience,
+            issueId: issueId ?? null,
+            threadId: threadId ?? detail?.threadId ?? trace.thread?.id ?? null,
+            title: `[Bug] ${truncate(titleSeed, 72)}`,
+            severity,
+            summary: truncate(summarySeed, 240),
+            impact:
+              severity === "critical"
+                ? "High operational risk. This can block supervised routing or make the assistant unavailable."
+                : "Operational issue present, but it still needs confirmation and prioritization.",
+            reproduction,
+            relatedRuns,
+            suggestedChecks:
+              detail && Array.isArray(detail.suggestedChecks)
+                ? detail.suggestedChecks
+                : ["Review the latest thread trace and confirm if the issue still reproduces."],
+            ownerHint:
+              audience === "product"
+                ? "Product Agent should review UX impact and handoff."
+                : "Bugs Agent should hand this to engineering with the trace and suggested checks.",
+          },
+        };
+      },
+    },
+    {
+      name: "get_user_feedback",
+      description: "Return reviewed product feedback memories when available.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          query: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+      execute: (args) => {
+        const items = foundationReads.getUserFeedback({
+          query: asOptionalString(args.query),
+          limit: asInteger(args.limit, 8),
+        });
+
+        return {
+          summary: items.length ? `Loaded ${items.length} reviewed feedback items.` : "No reviewed product feedback is available yet.",
+          payload: {
+            count: items.length,
+            items,
+          },
+        };
+      },
+    },
+    {
+      name: "get_feature_usage",
+      description: "Return current product usage signals from assistant surfaces.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          limit: { type: "number" },
+        },
+      },
+      execute: (args) => {
+        const payload = foundationReads.getFeatureUsage(asInteger(args.limit, 6));
+
+        return {
+          summary: payload.items.length ? "Loaded current feature usage signals." : payload.note,
+          payload,
+        };
+      },
+    },
+    {
+      name: "get_funnel_dropoffs",
+      description: "Return assistant-thread dropoff states so product can reason about friction.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          limit: { type: "number" },
+        },
+      },
+      execute: (args) => {
+        const payload = foundationReads.getFunnelDropoffs(asInteger(args.limit, 6));
+
+        return {
+          summary: payload.items.length ? "Loaded current assistant funnel outcomes." : payload.note,
+          payload,
+        };
+      },
+    },
+    {
+      name: "get_backlog_items",
+      description: "Return product and bugs draft backlog items already captured as runs.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          limit: { type: "number" },
+        },
+      },
+      execute: (args) => {
+        const items = foundationReads.getBacklogItems(asInteger(args.limit, 8));
+
+        return {
+          summary: items.length ? `Loaded ${items.length} backlog items.` : "No product or bugs backlog items are available yet.",
+          payload: {
+            count: items.length,
+            items,
+          },
+        };
+      },
+    },
+    {
+      name: "link_feedback_to_feature",
+      description: "Prepare a structured draft linking a feedback signal to a feature area. This does not mutate backlog.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          feedback: { type: "string" },
+          feature_area: { type: "string" },
+          hypothesis: { type: "string" },
+        },
+        required: ["feedback"],
+      },
+      execute: (args) => {
+        const feedback = asString(args.feedback);
+        const featureArea = asOptionalString(args.feature_area) ?? "Unassigned feature area";
+        const hypothesis =
+          asOptionalString(args.hypothesis) ?? "This signal may point to friction, missing visibility, or a workflow gap.";
+
+        return {
+          summary: "Prepared a draft feedback-to-feature linkage.",
+          payload: {
+            status: "draft_only",
+            featureArea,
+            feedback,
+            hypothesis,
+            suggestedNextStep: "Review with Product Agent and create a supervised draft backlog item if the signal repeats.",
           },
         };
       },

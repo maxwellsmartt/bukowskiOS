@@ -2,6 +2,8 @@ export type AgentStatus = "active" | "paused";
 
 export type AgentApprovalMode = "auto" | "supervised" | "needs_approval";
 
+export type AssistantApprovalPreference = "supervised" | "needs_approval" | "unsupervised";
+
 export type AgentRunStatus = "queued" | "routing" | "running" | "needs_approval" | "approved" | "denied" | "done" | "failed" | "paused";
 
 export type AgentRunApprovalDecision = "pending" | "approved" | "approved_for_session" | "denied";
@@ -37,6 +39,7 @@ export type AssistantChatMessageMeta = {
   draftRunId?: string | null;
   approvalDecision?: AgentRunApprovalDecision | null;
   approvalScope?: AgentRunApprovalScope | null;
+  approvalReason?: string | null;
 };
 
 export type AssistantChatAttachmentRow = {
@@ -64,6 +67,7 @@ export type AssistantChatThreadRow = {
   contextKey: string;
   contextLabel: string;
   summaryText: string;
+  preferredApprovalMode: AssistantApprovalPreference;
   state: AssistantChatThreadState;
   lastErrorCode: string | null;
   lastErrorSummary: string | null;
@@ -87,6 +91,7 @@ export type AgentGraphNode = {
   role: string;
   domain: string;
   status: AgentStatus;
+  operationalState: "idle" | "working" | "attention";
   secondaryLabel: string;
   isSupervisor: boolean;
 };
@@ -127,6 +132,7 @@ export type AgentRunRow = {
   approvalRequired: boolean;
   approvalDecision: AgentRunApprovalDecision | null;
   approvalScope: AgentRunApprovalScope | null;
+  approvalReason: string | null;
   createdAtLabel: string;
   updatedAtLabel: string;
 };

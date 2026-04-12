@@ -6,7 +6,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 
 import { AgentWizardPanel } from "./AgentWizardPanel";
-import { setAgentApprovalMode, setAgentStatus, useAgentDetail, useMissionControlSnapshot } from "./useAgentsData";
+import { reviewAgentRun, setAgentApprovalMode, setAgentStatus, useAgentDetail, useMissionControlSnapshot } from "./useAgentsData";
 
 const workspaceId = "workspace-metadata";
 
@@ -16,18 +16,31 @@ const statusLabelMap = {
 } as const;
 
 export const AgentsMissionControlPage = () => {
-  const { data, error } = useMissionControlSnapshot();
+  const { data, error, reload } = useMissionControlSnapshot();
   const [searchParams] = useSearchParams();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [queueFilter, setQueueFilter] = useState<"all" | "needs_approval" | "running" | "done">("all");
+  const [processingRunId, setProcessingRunId] = useState<string | null>(null);
+  const [approvalFeedback, setApprovalFeedback] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState({
     queue: false,
     activity: false,
     models: true,
     connectors: true,
   });
-  const { data: detail } = useAgentDetail(selectedAgentId);
+  const { data: detail, reload: reloadDetail } = useAgentDetail(selectedAgentId);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      reload();
+      if (selectedAgentId) {
+        reloadDetail();
+      }
+    }, 2000);
+
+    return () => window.clearInterval(interval);
+  }, [reload, reloadDetail, selectedAgentId]);
 
   useEffect(() => {
     const focusedAgentId = searchParams.get("agent");
@@ -63,6 +76,7 @@ export const AgentsMissionControlPage = () => {
 
     return data.queue.filter((run) => run.status === queueFilter);
   }, [data.queue, queueFilter]);
+  const pendingApprovals = useMemo(() => data.queue.filter((run) => run.status === "needs_approval"), [data.queue]);
 
   const toggleSection = (section: keyof typeof collapsedSections) => {
     setCollapsedSections((current) => ({
@@ -104,6 +118,29 @@ export const AgentsMissionControlPage = () => {
     });
   };
 
+  const handleReviewRun = async (runId: string, decision: "approve" | "deny" | "approve_for_session") => {
+    setProcessingRunId(runId);
+    setApprovalFeedback(null);
+
+    try {
+      const result = await reviewAgentRun({
+        commandId: `cmd-mission-review-${Date.now().toString(36)}`,
+        workspaceId,
+        runId,
+        decision,
+      });
+      setApprovalFeedback(result.summary);
+      reload();
+      if (selectedAgentId) {
+        reloadDetail();
+      }
+    } catch (error) {
+      setApprovalFeedback(error instanceof Error ? error.message : "No pude registrar esa decisión.");
+    } finally {
+      setProcessingRunId(null);
+    }
+  };
+
   return (
     <div className="page-stack">
       <SectionHeader
@@ -113,6 +150,7 @@ export const AgentsMissionControlPage = () => {
       />
 
       {error ? <div className="empty-state">Mission Control unavailable: {error}</div> : null}
+      {approvalFeedback ? <div className="form-inline-error">{approvalFeedback}</div> : null}
 
       <div className="agents-health-grid">
         {healthCards.map((card) => (
@@ -132,7 +170,9 @@ export const AgentsMissionControlPage = () => {
           <div className="mission-graph">
             {data.supervisor ? (
               <button
-                className={`mission-node mission-node-root${selectedAgentId === data.supervisor.id ? " is-selected" : ""}`}
+                className={`mission-node mission-node-root mission-node-operational-${data.supervisor.operationalState}${
+                  selectedAgentId === data.supervisor.id ? " is-selected" : ""
+                }`}
                 onClick={() => setSelectedAgentId(data.supervisor?.id ?? null)}
                 type="button"
               >
@@ -158,7 +198,9 @@ export const AgentsMissionControlPage = () => {
                 <div key={agent.id} className="mission-graph-branch">
                   <div className="mission-graph-branch-line" />
                   <button
-                    className={`mission-node${selectedAgentId === agent.id ? " is-selected" : ""}`}
+                    className={`mission-node mission-node-operational-${agent.operationalState}${
+                      selectedAgentId === agent.id ? " is-selected" : ""
+                    }`}
                     onClick={() => setSelectedAgentId(agent.id)}
                     type="button"
                   >
@@ -258,6 +300,66 @@ export const AgentsMissionControlPage = () => {
         ) : null}
       </div>
 
+      {pendingApprovals.length ? (
+        <SurfaceCard
+          title="Pending approvals"
+          subtitle={`${pendingApprovals.length} drafts are waiting for your review before anything can continue.`}
+        >
+          <div className="agent-support-list">
+            {pendingApprovals.map((run) => (
+              <div key={run.id} className="agent-run-row agent-run-row-pending">
+                <div className="agent-run-row-copy">
+                  <div className="agent-run-row-heading">
+                    <strong>{run.title}</strong>
+                    <span className={`run-status-pill run-status-pill-${run.status}`}>{run.status.replace(/_/g, " ")}</span>
+                  </div>
+                  <p>{run.agentDisplayName}</p>
+                  <p>{run.approvalReason ?? "This supervised draft is waiting for your review."}</p>
+                  <div className="agent-run-approval-actions">
+                    <button
+                      className="primary-control"
+                      disabled={processingRunId === run.id}
+                      onClick={() => void handleReviewRun(run.id, "approve")}
+                      type="button"
+                    >
+                      Approve
+                    </button>
+                    {run.threadId ? (
+                      <button
+                        className="surface-card-action-text"
+                        disabled={processingRunId === run.id}
+                        onClick={() => void handleReviewRun(run.id, "approve_for_session")}
+                        type="button"
+                      >
+                        Approve for this session
+                      </button>
+                    ) : null}
+                    <button
+                      className="surface-card-action-text is-danger"
+                      disabled={processingRunId === run.id}
+                      onClick={() => void handleReviewRun(run.id, "deny")}
+                      type="button"
+                    >
+                      Deny
+                    </button>
+                    <button
+                      className="surface-card-action-text"
+                      onClick={() => setSelectedAgentId(run.agentId ?? data.supervisor?.id ?? null)}
+                      type="button"
+                    >
+                      View agent
+                    </button>
+                  </div>
+                </div>
+                <div className="agent-run-row-meta">
+                  <span className="agent-run-time">{run.updatedAtLabel}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SurfaceCard>
+      ) : null}
+
       <div className="agents-support-grid">
         <SurfaceCard
           className={collapsedSections.queue ? "is-collapsed" : ""}
@@ -303,7 +405,7 @@ export const AgentsMissionControlPage = () => {
                   >
                     <div>
                       <strong>{run.title}</strong>
-                      <p>{run.agentDisplayName}</p>
+                      <p>{run.status === "needs_approval" ? run.approvalReason ?? run.agentDisplayName : run.agentDisplayName}</p>
                     </div>
                     <div className="agent-run-row-meta">
                       <span className={`run-status-pill run-status-pill-${run.status}`}>{run.status.replace(/_/g, " ")}</span>

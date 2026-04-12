@@ -80,6 +80,7 @@ import type {
   UnassignCrewFromProjectUnitInput,
   UpdateAgentCommand,
   UpdateAssetCommand,
+  UpdateAssistantThreadPreferencesCommand,
   UpdateCatalogEntityInput,
   UpdateProjectInput,
   UpdateProjectUnitInput,
@@ -116,6 +117,7 @@ declare global {
       createAssistantThread: (input: CreateAssistantThreadCommand) => Promise<AssistantChatSnapshot>;
       deleteAssistantThread: (input: DeleteAssistantThreadCommand) => Promise<AssistantChatSnapshot>;
       setActiveAssistantThread: (input: SetActiveAssistantThreadCommand) => Promise<AssistantChatSnapshot>;
+      updateAssistantThreadPreferences: (input: UpdateAssistantThreadPreferencesCommand) => Promise<AssistantChatSnapshot>;
       sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
       reviewRun: (input: ReviewAgentRunCommand) => Promise<AgentRunReviewResult>;
       sendAssistantMessage: (input: AssistantGatewayRequest) => Promise<AssistantGatewayResponse>;

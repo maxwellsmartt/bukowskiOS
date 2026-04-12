@@ -1,5 +1,6 @@
 import type {
   AgentApprovalMode,
+  AssistantApprovalPreference,
   AgentRunApprovalDecision,
   AgentRunApprovalScope,
   AgentRunStatus,
@@ -59,6 +60,7 @@ export type AIGatewayToolContext = {
   activeProjectId?: string | null;
   currentView?: string | null;
   activeFilters?: Record<string, string>;
+  requestedApprovalMode?: AssistantApprovalPreference;
 };
 
 export type AssistantGatewayAttachment = {
@@ -95,6 +97,24 @@ export type SetActiveAssistantThreadCommand = {
   commandId: string;
   workspaceId: string;
   threadId: string;
+};
+
+export type UpdateAssistantThreadPreferencesCommand = {
+  commandId: string;
+  workspaceId: string;
+  threadId: string;
+  preferredApprovalMode: AssistantApprovalPreference;
+};
+
+export type RecordRuntimeErrorCommand = {
+  sourceKind: "main" | "renderer" | "webcontents";
+  processLabel: string;
+  errorName: string;
+  message: string;
+  stack?: string | null;
+  severity?: "low" | "medium" | "critical";
+  context?: Record<string, unknown> | null;
+  threadId?: string | null;
 };
 
 export type SendAssistantChatTurnCommand = AssistantGatewayRequest;
@@ -201,6 +221,7 @@ export type AssistantGatewayResponse = {
   draftRunId: string | null;
   approvalDecision?: AgentRunApprovalDecision | null;
   approvalScope?: AgentRunApprovalScope | null;
+  approvalReason?: string | null;
   providerKey: string | null;
   modelKey: string | null;
   toolTraces: AIGatewayToolCallTrace[];

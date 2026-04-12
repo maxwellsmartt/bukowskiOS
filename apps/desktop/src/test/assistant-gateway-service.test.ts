@@ -44,6 +44,9 @@ describe("assistant gateway service", () => {
         sendMessage: async () => {
           throw new Error("Not used while setting provider config.");
         },
+        continueApprovedRun: async () => {
+          throw new Error("Not used while setting provider config.");
+        },
       },
     });
 
@@ -68,7 +71,9 @@ describe("assistant gateway service", () => {
       }),
       openaiProviderService: {
         createResponse: async (_config, input) => {
-          capturedInput = input.input;
+          if (!capturedInput) {
+            capturedInput = input.input;
+          }
 
           return {
             ok: true as const,
@@ -172,6 +177,9 @@ describe("assistant gateway service", () => {
       },
       assistantGatewayService: {
         sendMessage: async () => {
+          throw new Error("Not used while setting provider config.");
+        },
+        continueApprovedRun: async () => {
           throw new Error("Not used while setting provider config.");
         },
       },
@@ -322,6 +330,9 @@ describe("assistant gateway service", () => {
         sendMessage: async () => {
           throw new Error("Not used while setting provider config.");
         },
+        continueApprovedRun: async () => {
+          throw new Error("Not used while setting provider config.");
+        },
       },
     });
 
@@ -431,7 +442,7 @@ describe("assistant gateway service", () => {
     expect(firstAssistantMessage?.meta?.approvalDecision).toBe("pending");
     expect(firstDraftRunId).toBeTruthy();
 
-    const reviewResult = mutations.reviewRun({
+    const reviewResult = await mutations.reviewRun({
       commandId: "cmd-review-session-approval",
       workspaceId: "workspace-metadata",
       runId: firstDraftRunId ?? "",
@@ -492,6 +503,118 @@ describe("assistant gateway service", () => {
       status: "approved",
       approval_decision: "approved_for_session",
       approval_scope: "session",
+    });
+
+    cleanup();
+  });
+
+  it("respects unsupervised thread preference without re-prompting for approval on supervised drafts", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-unsupervised");
+    const secrets = new Map<string, string>();
+    const secretStore = {
+      hasProviderSecret: (workspaceId: string, providerKey: string) => secrets.has(`${workspaceId}:${providerKey}`),
+      getProviderSecret: (workspaceId: string, providerKey: string) => secrets.get(`${workspaceId}:${providerKey}`) ?? null,
+      setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => {
+        secrets.set(`${workspaceId}:${providerKey}`, secret);
+      },
+      clearProviderSecret: (workspaceId: string, providerKey: string) => {
+        secrets.delete(`${workspaceId}:${providerKey}`);
+      },
+    };
+
+    const configMutations = createAgentMutationService(database, {
+      secretStore,
+      openaiProviderService: {
+        createResponse: async () => ({
+          ok: true as const,
+          responseId: "noop",
+          status: "completed",
+          outputText: "{}",
+          functionCalls: [],
+        }),
+        testConnection: async () => ({
+          ok: true as const,
+          status: "healthy" as const,
+          summary: "OpenAI responded successfully.",
+        }),
+      },
+      assistantGatewayService: {
+        sendMessage: async () => {
+          throw new Error("Not used while setting provider config.");
+        },
+        continueApprovedRun: async () => {
+          throw new Error("Not used while setting provider config.");
+        },
+      },
+    });
+
+    configMutations.saveAIProviderConfig({
+      commandId: "cmd-openai-config-unsupervised",
+      workspaceId: "workspace-metadata",
+      providerKey: "openai",
+      enabled: true,
+      apiKey: "sk-test",
+      defaultModelKey: "openai:gpt-5.4",
+      timeoutMs: 20000,
+      retryCount: 1,
+      baseUrl: "",
+    });
+
+    const gateway = createAssistantGatewayService(database, {
+      secretStore,
+      sessionStore: createAssistantGatewaySessionStore(),
+      toolRegistry: createAgentToolRegistry(createFoundationReadService(database), {
+        getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+      }),
+      openaiProviderService: {
+        createResponse: async () => ({
+          ok: true as const,
+          responseId: "resp-unsupervised",
+          status: "completed",
+            outputText: JSON.stringify({
+            intent: "prepare_incident_review",
+            target_agent: "incidents-maintenance-agent",
+            confidence: 0.93,
+            requires_approval: false,
+            tool_call_requested: false,
+            user_facing_summary: "Prepared the incident review draft.",
+            answer_kind: "draft_run",
+            draft_run_title: "Incident review",
+            draft_run_description: "Review current incident exposure before any follow-up.",
+          }),
+          functionCalls: [],
+        }),
+        testConnection: async () => ({
+          ok: true as const,
+          status: "healthy" as const,
+          summary: "OpenAI responded successfully.",
+        }),
+      },
+    });
+
+    const result = await gateway.sendMessage({
+      commandId: "cmd-chat-unsupervised",
+      workspaceId: "workspace-metadata",
+      threadId: "thread-unsupervised",
+      message: "Prepare an incident review draft without asking again.",
+      context: {
+        workspaceId: "workspace-metadata",
+        activePath: "/incidents",
+        currentView: "Incidents",
+        requestedApprovalMode: "unsupervised",
+      },
+    });
+
+    expect(result.status).toBe("draft_created");
+    expect(result.approvalDecision).toBeNull();
+
+    const runRow = database
+      .prepare("SELECT status, approval_required FROM agent_runs WHERE id = ?")
+      .get(result.draftRunId) as { status: string; approval_required: number } | undefined;
+
+    expect(runRow).toEqual({
+      status: "queued",
+      approval_required: 0,
     });
 
     cleanup();

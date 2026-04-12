@@ -57,6 +57,7 @@ import type {
   ProjectDetailSnapshot,
   ReportIncidentCommand,
   ReportIncidentResult,
+  RecordRuntimeErrorCommand,
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
   ScheduleTimelineRange,
@@ -85,6 +86,7 @@ import type {
   AgentRunReviewResult,
   DraftRunFromChatResult,
   SendAssistantChatTurnCommand,
+  UpdateAssistantThreadPreferencesCommand,
   } from "@contracts";
 
 const shellActionListeners = new Set<(action: ShellAppAction) => void>();
@@ -146,6 +148,8 @@ const bukowskiAgents = {
     ipcRenderer.invoke(ipcChannels.agents.deleteAssistantThread, input) as Promise<AssistantChatSnapshot>,
   setActiveAssistantThread: (input: SetActiveAssistantThreadCommand) =>
     ipcRenderer.invoke(ipcChannels.agents.setActiveAssistantThread, input) as Promise<AssistantChatSnapshot>,
+  updateAssistantThreadPreferences: (input: UpdateAssistantThreadPreferencesCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.updateAssistantThreadPreferences, input) as Promise<AssistantChatSnapshot>,
   sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) =>
     ipcRenderer.invoke(ipcChannels.agents.sendAssistantChatTurn, input) as Promise<AssistantChatSnapshot>,
   reviewRun: (input: ReviewAgentRunCommand) =>
@@ -226,6 +230,44 @@ const bukowskiRma = {
   create: (input: CreateRmaCaseCommand) => ipcRenderer.invoke(ipcChannels.rma.create, input) as Promise<RmaCaseMutationResult>,
   update: (input: UpdateRmaCaseCommand) => ipcRenderer.invoke(ipcChannels.rma.update, input) as Promise<RmaCaseMutationResult>,
 };
+
+const reportRuntimeError = (input: RecordRuntimeErrorCommand) =>
+  ipcRenderer.invoke(ipcChannels.app.reportRuntimeError, input).catch(() => undefined);
+
+window.addEventListener("error", (event) => {
+  const runtimeError = event.error instanceof Error ? event.error : null;
+
+  void reportRuntimeError({
+    sourceKind: "renderer",
+    processLabel: "Renderer",
+    errorName: runtimeError?.name ?? "window.error",
+    message: runtimeError?.message ?? event.message ?? "Renderer error",
+    stack: runtimeError?.stack ?? null,
+    severity: "medium",
+    context: {
+      pathname: window.location.pathname,
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+    },
+  });
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+
+  void reportRuntimeError({
+    sourceKind: "renderer",
+    processLabel: "Renderer",
+    errorName: reason.name || "unhandledrejection",
+    message: reason.message || "Unhandled renderer rejection",
+    stack: reason.stack ?? null,
+    severity: "medium",
+    context: {
+      pathname: window.location.pathname,
+    },
+  });
+});
 
 contextBridge.exposeInMainWorld("bukowskiApp", bukowskiApp);
 contextBridge.exposeInMainWorld("bukowskiShell", bukowskiShell);

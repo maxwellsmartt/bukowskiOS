@@ -75,6 +75,9 @@ describe("agent provider config", () => {
         sendMessage: async () => {
           throw new Error("Not used in this test.");
         },
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
       },
     });
     const reads = createAgentReadService(database, secretStore);

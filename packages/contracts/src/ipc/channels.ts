@@ -2,6 +2,7 @@ export const ipcChannels = {
   app: {
     getInfo: "bukowskiApp:getInfo",
     openExternal: "bukowskiApp:openExternal",
+    reportRuntimeError: "bukowskiApp:reportRuntimeError",
   },
   shell: {
     getBootstrap: "bukowskiShell:getBootstrap",
@@ -27,6 +28,7 @@ export const ipcChannels = {
     createAssistantThread: "bukowskiAgents:createAssistantThread",
     deleteAssistantThread: "bukowskiAgents:deleteAssistantThread",
     setActiveAssistantThread: "bukowskiAgents:setActiveAssistantThread",
+    updateAssistantThreadPreferences: "bukowskiAgents:updateAssistantThreadPreferences",
     sendAssistantChatTurn: "bukowskiAgents:sendAssistantChatTurn",
     reviewRun: "bukowskiAgents:reviewRun",
     sendAssistantMessage: "bukowskiAgents:sendAssistantMessage",

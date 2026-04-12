@@ -83,6 +83,21 @@ type AmountRow = {
 const formatCurrency = (amount: number | null | undefined) =>
   typeof amount === "number" ? currencyFormatter.format(amount) : "Pending";
 
+const truncate = (value: string, max = 120) => (value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value);
+const interruptedConversationSummary = "This conversation was interrupted before the assistant finished responding.";
+
+const resolvePreferredChannel = (email: string | null | undefined, phone: string | null | undefined) => {
+  if ((email ?? "").trim()) {
+    return "email";
+  }
+
+  if ((phone ?? "").trim()) {
+    return "phone";
+  }
+
+  return "unreachable";
+};
+
 const parseJsonObject = (value: string | null | undefined) => {
   if (!value) {
     return null as Record<string, unknown> | null;
@@ -95,6 +110,131 @@ const parseJsonObject = (value: string | null | undefined) => {
     return null;
   }
 };
+
+const deriveSystemIssueSeverity = (sourceType: "run" | "thread" | "provider" | "runtime", status: string) => {
+  if (sourceType === "provider") {
+    return status === "invalid_key" || status === "unavailable" ? "critical" : "medium";
+  }
+
+  if (sourceType === "runtime") {
+    return status === "main" ? "critical" : "medium";
+  }
+
+  if (status === "provider_error" || status === "needs_configuration") {
+    return "critical";
+  }
+
+  if (status === "tool_error" || status === "structured_error") {
+    return "medium";
+  }
+
+  if (status === "interrupted") {
+    return "low";
+  }
+
+  return "medium";
+};
+
+const buildIssueFingerprint = (sourceType: "run" | "thread" | "provider" | "runtime", status: string, title: string) =>
+  `${sourceType}:${status}:${normalizeSearchText(title).slice(0, 42)}`;
+
+const deriveSuggestedChecks = (input: {
+  sourceType: "run" | "thread" | "provider" | "runtime";
+  status: string;
+  details?: Record<string, unknown> | null;
+}) => {
+  const checks = [] as string[];
+
+  if (input.sourceType === "provider") {
+    checks.push("Verify the provider key and Models health state.");
+    checks.push("Retest the provider connection from Models.");
+    return checks;
+  }
+
+  if (input.sourceType === "runtime") {
+    checks.push("Inspect the runtime stack preview and renderer/main context payload.");
+    checks.push("Replay the same UI flow and confirm whether the error reproduces.");
+  }
+
+  if (input.status === "tool_error") {
+    checks.push("Review the tool arguments and the underlying read service response.");
+  }
+
+  if (input.status === "structured_error") {
+    checks.push("Inspect the structured gateway output and parsing contract.");
+  }
+
+  if (input.status === "provider_error" || input.status === "needs_configuration") {
+    checks.push("Check provider configuration, stored key, timeout and model assignment.");
+  }
+
+  const providerKey = typeof input.details?.provider_key === "string" ? input.details.provider_key : null;
+  const targetAgent = typeof input.details?.target_agent === "string" ? input.details.target_agent : null;
+
+  if (providerKey) {
+    checks.push(`Review provider health for ${providerKey}.`);
+  }
+
+  if (targetAgent) {
+    checks.push(`Confirm tool coverage and approval policy for ${targetAgent}.`);
+  }
+
+  if (!checks.length) {
+    checks.push("Review the latest thread trace and related runs for a reproducible path.");
+  }
+
+  return checks;
+};
+
+const loadRunActivityTimeline = (db: DatabaseSync, runId: string, limit = 6) =>
+  db
+    .prepare(
+      `
+        SELECT
+          title,
+          body,
+          tone,
+          created_at
+        FROM agent_activity_events
+        WHERE workspace_id = ?
+          AND run_id = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+      `,
+    )
+    .all(workspaceId, runId, limit) as Array<{
+    title: string;
+    body: string;
+    tone: string;
+    created_at: string;
+  }>;
+
+const loadThreadActivityTimeline = (db: DatabaseSync, threadId: string, limit = 8) =>
+  db
+    .prepare(
+      `
+        SELECT
+          agent_activity_events.title,
+          agent_activity_events.body,
+          agent_activity_events.tone,
+          agent_activity_events.created_at
+        FROM agent_activity_events
+        WHERE workspace_id = ?
+          AND run_id IN (
+            SELECT id
+            FROM agent_runs
+            WHERE thread_id = ?
+          )
+        ORDER BY agent_activity_events.created_at DESC
+        LIMIT ?
+      `,
+    )
+    .all(workspaceId, threadId, limit) as Array<{
+    title: string;
+    body: string;
+    tone: string;
+    created_at: string;
+  }>;
 
 const parseJsonStringArray = (value: string | null | undefined) => {
   if (!value) {
@@ -3668,6 +3808,1117 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         reportedAt: formatTimelineTimestamp(row.reported_at),
       })),
     };
+  },
+
+  listCommunicationRecipients(input?: {
+    query?: string | null;
+    recipientType?: string | null;
+    projectId?: string | null;
+    limit?: number;
+  }) {
+    const projectDetail = input?.projectId ? this.getProjectDetail(input.projectId) : null;
+    const projectResponsibleNames = new Set(
+      (projectDetail?.responsibles ?? []).map((row) => normalizeSearchText(row.name)).filter(Boolean),
+    );
+    const projectClientName = normalizeSearchText(projectDetail?.project?.client ?? "");
+
+    const users = db
+      .prepare(
+        `
+          SELECT users.id, users.full_name, COALESCE(users.email, '') AS email, COALESCE(users.phone, '') AS phone
+          FROM workspace_memberships
+          JOIN users ON users.id = workspace_memberships.user_id
+          WHERE workspace_memberships.workspace_id = ?
+            AND workspace_memberships.status = 'active'
+            AND users.is_active = 1
+          ORDER BY users.full_name
+        `,
+      )
+      .all(workspaceId) as Array<{
+      id: string;
+      full_name: string;
+      email: string;
+      phone: string;
+    }>;
+
+    const crewMembers = db
+      .prepare(
+        `
+          SELECT id, full_name, COALESCE(role_label, '') AS role_label, COALESCE(email, '') AS email, COALESCE(phone, '') AS phone
+          FROM crew_members
+          WHERE workspace_id = ?
+            AND is_active = 1
+          ORDER BY full_name
+        `,
+      )
+      .all(workspaceId) as Array<{
+      id: string;
+      full_name: string;
+      role_label: string;
+      email: string;
+      phone: string;
+    }>;
+
+    const clients = db
+      .prepare(
+        `
+          SELECT id, name, COALESCE(contact_name, '') AS contact_name, COALESCE(email, '') AS email, COALESCE(phone, '') AS phone
+          FROM clients
+          WHERE workspace_id = ?
+            AND is_active = 1
+          ORDER BY name
+        `,
+      )
+      .all(workspaceId) as Array<{
+      id: string;
+      name: string;
+      contact_name: string;
+      email: string;
+      phone: string;
+    }>;
+
+    const manufacturers = db
+      .prepare(
+        `
+          SELECT id, name, COALESCE(contact_name, '') AS contact_name, COALESCE(support_email, '') AS support_email, COALESCE(phone, '') AS phone
+          FROM manufacturers
+          WHERE workspace_id = ?
+            AND is_active = 1
+          ORDER BY name
+        `,
+      )
+      .all(workspaceId) as Array<{
+      id: string;
+      name: string;
+      contact_name: string;
+      support_email: string;
+      phone: string;
+    }>;
+
+    const rows = [
+      ...users.map((row) => ({
+        id: row.id,
+        recipientKey: `user:${row.id}`,
+        type: "user",
+        label: row.full_name,
+        subtitle: "Workspace member",
+        contactName: row.full_name,
+        email: row.email,
+        phone: row.phone,
+        preferredChannel: resolvePreferredChannel(row.email, row.phone),
+        projectRelevance: projectResponsibleNames.has(normalizeSearchText(row.full_name)) ? "project_owner" : null,
+      })),
+      ...crewMembers.map((row) => ({
+        id: row.id,
+        recipientKey: `crew:${row.id}`,
+        type: "crew_member",
+        label: row.full_name,
+        subtitle: row.role_label || "Crew member",
+        contactName: row.full_name,
+        email: row.email,
+        phone: row.phone,
+        preferredChannel: resolvePreferredChannel(row.email, row.phone),
+        projectRelevance: projectResponsibleNames.has(normalizeSearchText(row.full_name)) ? "project_owner" : null,
+      })),
+      ...clients.map((row) => ({
+        id: row.id,
+        recipientKey: `client:${row.id}`,
+        type: "client",
+        label: row.name,
+        subtitle: row.contact_name || "Client",
+        contactName: row.contact_name || row.name,
+        email: row.email,
+        phone: row.phone,
+        preferredChannel: resolvePreferredChannel(row.email, row.phone),
+        projectRelevance:
+          projectClientName &&
+          (normalizeSearchText(row.name) === projectClientName || normalizeSearchText(row.contact_name) === projectClientName)
+            ? "project_client"
+            : null,
+      })),
+      ...manufacturers.map((row) => ({
+        id: row.id,
+        recipientKey: `manufacturer:${row.id}`,
+        type: "manufacturer",
+        label: row.name,
+        subtitle: row.contact_name || "Manufacturer",
+        contactName: row.contact_name || row.name,
+        email: row.support_email,
+        phone: row.phone,
+        preferredChannel: resolvePreferredChannel(row.support_email, row.phone),
+        projectRelevance: null,
+      })),
+    ]
+      .filter((row) => !input?.recipientType || row.type === input.recipientType)
+      .filter((row) =>
+        matchesSearch(input?.query ?? undefined, [row.label, row.subtitle, row.contactName, row.email, row.phone, row.type]),
+      )
+      .sort((left, right) => {
+        const leftProjectRank = left.projectRelevance ? 0 : 1;
+        const rightProjectRank = right.projectRelevance ? 0 : 1;
+
+        if (leftProjectRank !== rightProjectRank) {
+          return leftProjectRank - rightProjectRank;
+        }
+
+        const leftReachabilityRank = left.preferredChannel === "unreachable" ? 1 : 0;
+        const rightReachabilityRank = right.preferredChannel === "unreachable" ? 1 : 0;
+
+        if (leftReachabilityRank !== rightReachabilityRank) {
+          return leftReachabilityRank - rightReachabilityRank;
+        }
+
+        return compareTextValue(left.label, right.label, "asc");
+      })
+      .slice(0, input?.limit ?? 8);
+
+    return rows.map((row) => ({
+      ...row,
+      projectLabel: projectDetail?.project?.name ?? null,
+    }));
+  },
+
+  getThreadContextSnapshot(threadId: string, limit = 6) {
+    const thread = db
+      .prepare(
+        `
+          SELECT
+            assistant_chat_threads.id,
+            assistant_chat_threads.title,
+            assistant_chat_threads.context_key,
+            assistant_chat_threads.context_label,
+            assistant_chat_threads.summary_text,
+            assistant_chat_threads.updated_at,
+            COALESCE(assistant_chat_thread_state.last_state, 'idle') AS last_state,
+            COALESCE(assistant_chat_thread_state.last_error_summary, '') AS last_error_summary,
+            COALESCE(assistant_chat_thread_state.last_intent, '') AS last_intent
+          FROM assistant_chat_threads
+          LEFT JOIN assistant_chat_thread_state
+            ON assistant_chat_thread_state.thread_id = assistant_chat_threads.id
+          WHERE assistant_chat_threads.id = ?
+            AND assistant_chat_threads.deleted_at IS NULL
+          LIMIT 1
+        `,
+      )
+      .get(threadId) as
+      | {
+          id: string;
+          title: string;
+          context_key: string;
+          context_label: string;
+          summary_text: string;
+          updated_at: string;
+          last_state: string;
+          last_error_summary: string;
+          last_intent: string;
+        }
+      | undefined;
+
+    if (!thread) {
+      return {
+        thread: null,
+        messages: [],
+      };
+    }
+
+    const messages = db
+      .prepare(
+        `
+          SELECT
+            assistant_chat_messages.id,
+            assistant_chat_messages.role,
+            assistant_chat_messages.body,
+            assistant_chat_messages.message_state,
+            assistant_chat_messages.state_payload_json,
+            assistant_chat_messages.created_at,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM assistant_chat_attachments
+              WHERE assistant_chat_attachments.message_id = assistant_chat_messages.id
+                AND assistant_chat_attachments.deleted_at IS NULL
+                AND assistant_chat_attachments.status IN ('available', 'missing', 'cleanup_pending')
+            ), 0) AS attachment_count
+          FROM assistant_chat_messages
+          WHERE assistant_chat_messages.thread_id = ?
+            AND assistant_chat_messages.deleted_at IS NULL
+          ORDER BY assistant_chat_messages.created_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(threadId, limit) as Array<{
+      id: string;
+      role: "assistant" | "user";
+      body: string;
+      message_state: string;
+      state_payload_json: string | null;
+      created_at: string;
+      attachment_count: number;
+    }>;
+
+    return {
+      thread: {
+        id: thread.id,
+        title: thread.title,
+        contextKey: thread.context_key,
+        contextLabel: thread.context_label,
+        summaryText: thread.summary_text,
+        lastState: thread.last_state,
+        lastIntent: thread.last_intent || null,
+        lastErrorSummary: thread.last_error_summary || null,
+        updatedAt: formatTimelineTimestamp(thread.updated_at),
+      },
+      messages: messages
+        .reverse()
+        .map((row) => {
+          const meta = parseJsonObject(row.state_payload_json);
+          return {
+            id: row.id,
+            role: row.role,
+            body: truncate(row.body, 240),
+            state: row.message_state,
+            routedAgentName: typeof meta?.routedAgentName === "string" ? meta.routedAgentName : null,
+            label: typeof meta?.label === "string" ? meta.label : null,
+            attachmentCount: row.attachment_count,
+            createdAt: formatTimelineTimestamp(row.created_at),
+          };
+        }),
+    };
+  },
+
+  previewCommunicationTargets(input?: {
+    recipientIds?: string[] | null;
+    query?: string | null;
+    recipientType?: string | null;
+    projectId?: string | null;
+    limit?: number;
+  }) {
+    const requestedRecipientIds = new Set((input?.recipientIds ?? []).filter(Boolean));
+    const candidates = this.listCommunicationRecipients({
+      query: input?.query ?? null,
+      recipientType: input?.recipientType ?? null,
+      projectId: input?.projectId ?? null,
+      limit: Math.max(input?.limit ?? 8, requestedRecipientIds.size || 0, 8),
+    }).filter((row) => !requestedRecipientIds.size || requestedRecipientIds.has(row.recipientKey));
+
+    const missingRecipientIds = requestedRecipientIds.size
+      ? Array.from(requestedRecipientIds).filter((recipientKey) => !candidates.some((row) => row.recipientKey === recipientKey))
+      : [];
+
+    return {
+      totalTargets: candidates.length,
+      reachableTargets: candidates.filter((row) => row.preferredChannel !== "unreachable").length,
+      missingContactTargets: candidates.filter((row) => row.preferredChannel === "unreachable").length,
+      missingRecipientIds,
+      items: candidates.slice(0, input?.limit ?? 8),
+    };
+  },
+
+  getCommunicationDeliveryStatus(input?: { threadId?: string | null; limit?: number }) {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            agent_runs.id,
+            agent_runs.thread_id,
+            agent_runs.title,
+            agent_runs.status,
+            agent_runs.approval_required,
+            COALESCE(agent_runs.approval_decision, 'pending') AS approval_decision,
+            COALESCE(agent_runs.approval_scope, '') AS approval_scope,
+            agent_runs.updated_at,
+            COALESCE(agent_runs.output_summary, '') AS output_summary
+          FROM agent_runs
+          JOIN agents ON agents.id = agent_runs.agent_id
+          WHERE agent_runs.workspace_id = ?
+            AND agents.agent_key = 'communications-agent'
+            AND (? IS NULL OR agent_runs.thread_id = ?)
+          ORDER BY agent_runs.updated_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(workspaceId, input?.threadId ?? null, input?.threadId ?? null, input?.limit ?? 8) as Array<{
+      id: string;
+      thread_id: string | null;
+      title: string;
+      status: string;
+      approval_required: number;
+      approval_decision: string;
+      approval_scope: string;
+      updated_at: string;
+      output_summary: string;
+    }>;
+
+    return {
+      deliveryEnabled: false,
+      executionMode: "draft_only",
+      items: rows.map((row) => ({
+        runId: row.id,
+        threadId: row.thread_id,
+        title: row.title,
+        status: row.status,
+        approvalRequired: row.approval_required === 1,
+        approvalDecision: row.approval_decision,
+        approvalScope: row.approval_scope || null,
+        updatedAt: formatTimelineTimestamp(row.updated_at),
+        summary: row.output_summary || "Draft prepared for supervised review.",
+      })),
+    };
+  },
+
+  searchSystemErrors(input?: { query?: string | null; limit?: number }) {
+    const failedRuns = db
+      .prepare(
+        `
+          SELECT
+            agent_runs.id,
+            agent_runs.thread_id,
+            agent_runs.title,
+            agent_runs.status,
+            agent_runs.updated_at,
+            COALESCE(agent_runs.output_summary, agent_runs.input_summary, '') AS summary_text,
+            COALESCE(agents.display_name, 'Supervisor Agent') AS agent_name
+          FROM agent_runs
+          LEFT JOIN agents ON agents.id = agent_runs.agent_id
+          WHERE agent_runs.workspace_id = ?
+            AND agent_runs.status IN ('failed', 'provider_error', 'tool_error', 'structured_error', 'needs_configuration')
+          ORDER BY agent_runs.updated_at DESC
+          LIMIT 24
+        `,
+      )
+      .all(workspaceId) as Array<{
+      id: string;
+      thread_id: string | null;
+      title: string;
+      status: string;
+      updated_at: string;
+      summary_text: string;
+      agent_name: string;
+    }>;
+
+    const threadErrors = db
+      .prepare(
+        `
+          SELECT
+            assistant_chat_threads.id,
+            assistant_chat_threads.title,
+            assistant_chat_threads.updated_at,
+            assistant_chat_thread_state.last_state,
+            COALESCE(assistant_chat_thread_state.last_error_summary, '') AS last_error_summary
+          FROM assistant_chat_threads
+          JOIN assistant_chat_thread_state ON assistant_chat_thread_state.thread_id = assistant_chat_threads.id
+          WHERE assistant_chat_threads.deleted_at IS NULL
+            AND assistant_chat_thread_state.last_state IN ('provider_error', 'tool_error', 'structured_error', 'interrupted', 'needs_configuration')
+          ORDER BY assistant_chat_threads.updated_at DESC
+          LIMIT 24
+        `,
+      )
+      .all() as Array<{
+      id: string;
+      title: string;
+      updated_at: string;
+      last_state: string;
+      last_error_summary: string;
+    }>;
+
+    const providerErrors = db
+      .prepare(
+        `
+          SELECT provider_key, display_name, status, enabled, COALESCE(last_error_summary, '') AS last_error_summary,
+                 COALESCE(last_tested_at, updated_at) AS updated_at
+          FROM ai_provider_configs
+          WHERE workspace_id = ?
+            AND status IN ('invalid_key', 'unavailable', 'not_configured')
+          ORDER BY updated_at DESC
+          LIMIT 12
+        `,
+      )
+      .all(workspaceId) as Array<{
+      provider_key: string;
+      display_name: string;
+      status: string;
+      enabled: number;
+      last_error_summary: string;
+      updated_at: string;
+    }>;
+
+    const runtimeErrors = db
+      .prepare(
+        `
+          SELECT
+            id,
+            source_kind,
+            process_label,
+            severity,
+            error_name,
+            message,
+            thread_id,
+            created_at
+          FROM runtime_error_events
+          WHERE workspace_id = ?
+          ORDER BY created_at DESC
+          LIMIT 24
+        `,
+      )
+      .all(workspaceId) as Array<{
+      id: string;
+      source_kind: string;
+      process_label: string;
+      severity: string;
+      error_name: string;
+      message: string;
+      thread_id: string | null;
+      created_at: string;
+    }>;
+
+    return [
+      ...failedRuns.map((row) => ({
+        id: `run:${row.id}`,
+        sourceType: "run",
+        title: row.title,
+        status: row.status,
+        severity: deriveSystemIssueSeverity("run", row.status),
+        fingerprint: buildIssueFingerprint("run", row.status, row.title),
+        owner: row.agent_name,
+        threadId: row.thread_id,
+        updatedAtRaw: row.updated_at,
+        updatedAt: formatTimelineTimestamp(row.updated_at),
+        summary: row.summary_text || "Run failed without a compact summary.",
+      })),
+      ...threadErrors.map((row) => ({
+        id: `thread:${row.id}`,
+        sourceType: "thread",
+        title: row.title,
+        status: row.last_state,
+        severity: deriveSystemIssueSeverity("thread", row.last_state),
+        fingerprint: buildIssueFingerprint("thread", row.last_state, row.title),
+        owner: "Assistant chat",
+        threadId: row.id,
+        updatedAtRaw: row.updated_at,
+        updatedAt: formatTimelineTimestamp(row.updated_at),
+        summary: row.last_error_summary || interruptedConversationSummary,
+      })),
+      ...providerErrors.map((row) => ({
+        id: `provider:${row.provider_key}`,
+        sourceType: "provider",
+        title: row.display_name,
+        status: row.status,
+        severity: deriveSystemIssueSeverity("provider", row.status),
+        fingerprint: buildIssueFingerprint("provider", row.status, row.display_name),
+        owner: row.enabled === 1 ? "AI provider" : "Disabled provider",
+        threadId: null,
+        updatedAtRaw: row.updated_at,
+        updatedAt: formatTimelineTimestamp(row.updated_at),
+        summary: row.last_error_summary || "Provider is not ready for live requests.",
+      })),
+      ...runtimeErrors.map((row) => ({
+        id: `runtime:${row.id}`,
+        sourceType: "runtime",
+        title: `${row.process_label} · ${row.error_name}`,
+        status: row.source_kind,
+        severity: row.severity,
+        fingerprint: buildIssueFingerprint("runtime", row.source_kind, `${row.process_label} ${row.error_name}`),
+        owner: "Runtime telemetry",
+        threadId: row.thread_id,
+        updatedAtRaw: row.created_at,
+        updatedAt: formatTimelineTimestamp(row.created_at),
+        summary: row.message,
+      })),
+    ]
+      .filter((row) => matchesSearch(input?.query ?? undefined, [row.title, row.status, row.owner, row.summary]))
+      .sort((left, right) => right.updatedAtRaw.localeCompare(left.updatedAtRaw))
+      .map(({ updatedAtRaw: _updatedAtRaw, ...row }) => row)
+      .slice(0, input?.limit ?? 8);
+  },
+
+  getSystemErrorDetail(issueId: string) {
+    if (issueId.startsWith("run:")) {
+      const runId = issueId.slice(4);
+      const row = db
+        .prepare(
+          `
+            SELECT
+              agent_runs.id,
+              agent_runs.thread_id,
+              agent_runs.title,
+              agent_runs.status,
+              agent_runs.input_summary,
+              agent_runs.output_summary,
+              agent_runs.approval_mode,
+              agent_runs.approval_required,
+              agent_runs.approval_decision,
+              agent_runs.approval_scope,
+              agent_runs.updated_at,
+              COALESCE(agent_runs.details_json, '{}') AS details_json,
+              COALESCE(agents.display_name, 'Supervisor Agent') AS agent_name
+            FROM agent_runs
+            LEFT JOIN agents ON agents.id = agent_runs.agent_id
+            WHERE agent_runs.id = ?
+            LIMIT 1
+          `,
+        )
+        .get(runId) as
+        | {
+            id: string;
+            thread_id: string | null;
+            title: string;
+            status: string;
+            input_summary: string;
+            output_summary: string;
+            approval_mode: string;
+            approval_required: number;
+            approval_decision: string | null;
+            approval_scope: string | null;
+            updated_at: string;
+            details_json: string;
+            agent_name: string;
+          }
+        | undefined;
+
+      if (!row) {
+        return null;
+      }
+
+      const details = parseJsonObject(row.details_json);
+      const activity = loadRunActivityTimeline(db, row.id, 6);
+
+      return {
+        id: issueId,
+        sourceType: "run",
+        title: row.title,
+        status: row.status,
+        severity: deriveSystemIssueSeverity("run", row.status),
+        fingerprint: buildIssueFingerprint("run", row.status, row.title),
+        owner: row.agent_name,
+        threadId: row.thread_id,
+        updatedAt: formatTimelineTimestamp(row.updated_at),
+        summary: row.output_summary || row.input_summary,
+        details,
+        approvalMode: row.approval_mode,
+        approvalRequired: row.approval_required === 1,
+        approvalDecision: row.approval_decision,
+        approvalScope: row.approval_scope,
+        relatedActivity: activity.map((event) => ({
+          title: event.title,
+          body: event.body,
+          tone: event.tone,
+          timestamp: formatTimelineTimestamp(event.created_at),
+        })),
+        suggestedChecks: deriveSuggestedChecks({
+          sourceType: "run",
+          status: row.status,
+          details,
+        }),
+      };
+    }
+
+    if (issueId.startsWith("thread:")) {
+      const threadId = issueId.slice(7);
+      const context = this.getThreadContextSnapshot(threadId, 8);
+
+      if (!context.thread) {
+        return null;
+      }
+
+      return {
+        id: issueId,
+        sourceType: "thread",
+        title: context.thread.title,
+        status: context.thread.lastState,
+        severity: deriveSystemIssueSeverity("thread", context.thread.lastState),
+        fingerprint: buildIssueFingerprint("thread", context.thread.lastState, context.thread.title),
+        owner: "Assistant chat",
+        threadId,
+        updatedAt: context.thread.updatedAt,
+        summary: context.thread.lastErrorSummary ?? context.thread.summaryText,
+        details: {
+          lastIntent: context.thread.lastIntent,
+          messages: context.messages,
+        },
+        relatedActivity: loadThreadActivityTimeline(db, threadId, 6).map((event) => ({
+          title: event.title,
+          body: event.body,
+          tone: event.tone,
+          timestamp: formatTimelineTimestamp(event.created_at),
+        })),
+        suggestedChecks: deriveSuggestedChecks({
+          sourceType: "thread",
+          status: context.thread.lastState,
+        }),
+      };
+    }
+
+    if (issueId.startsWith("provider:")) {
+      const providerKey = issueId.slice(9);
+      const row = db
+        .prepare(
+          `
+            SELECT
+              provider_key,
+              display_name,
+              status,
+              enabled,
+              default_model_key,
+              COALESCE(last_error_summary, '') AS last_error_summary,
+              last_tested_at,
+              last_success_at
+            FROM ai_provider_configs
+            WHERE workspace_id = ?
+              AND provider_key = ?
+            LIMIT 1
+          `,
+        )
+        .get(workspaceId, providerKey) as
+        | {
+            provider_key: string;
+            display_name: string;
+            status: string;
+            enabled: number;
+            default_model_key: string;
+            last_error_summary: string;
+            last_tested_at: string | null;
+            last_success_at: string | null;
+          }
+        | undefined;
+
+      if (!row) {
+        return null;
+      }
+
+      return {
+        id: issueId,
+        sourceType: "provider",
+        title: row.display_name,
+        status: row.status,
+        severity: deriveSystemIssueSeverity("provider", row.status),
+        fingerprint: buildIssueFingerprint("provider", row.status, row.display_name),
+        owner: row.enabled === 1 ? "AI provider" : "Disabled provider",
+        threadId: null,
+        updatedAt: formatTimelineTimestamp(row.last_tested_at ?? row.last_success_at ?? new Date().toISOString()),
+        summary: row.last_error_summary || "Provider is not ready for live requests.",
+        details: {
+          providerKey: row.provider_key,
+          defaultModelKey: row.default_model_key,
+          lastTestedAt: row.last_tested_at ? formatTimelineTimestamp(row.last_tested_at) : null,
+          lastSuccessAt: row.last_success_at ? formatTimelineTimestamp(row.last_success_at) : null,
+        },
+        suggestedChecks: deriveSuggestedChecks({
+          sourceType: "provider",
+          status: row.status,
+        }),
+      };
+    }
+
+    if (issueId.startsWith("runtime:")) {
+      const runtimeId = issueId.slice(8);
+      const row = db
+        .prepare(
+          `
+            SELECT
+              id,
+              source_kind,
+              process_label,
+              severity,
+              error_name,
+              message,
+              stack,
+              fingerprint,
+              context_json,
+              thread_id,
+              created_at
+            FROM runtime_error_events
+            WHERE workspace_id = ?
+              AND id = ?
+            LIMIT 1
+          `,
+        )
+        .get(workspaceId, runtimeId) as
+        | {
+            id: string;
+            source_kind: string;
+            process_label: string;
+            severity: string;
+            error_name: string;
+            message: string;
+            stack: string | null;
+            fingerprint: string;
+            context_json: string | null;
+            thread_id: string | null;
+            created_at: string;
+          }
+        | undefined;
+
+      if (!row) {
+        return null;
+      }
+
+      const details = parseJsonObject(row.context_json);
+
+      return {
+        id: issueId,
+        sourceType: "runtime",
+        title: `${row.process_label} · ${row.error_name}`,
+        status: row.source_kind,
+        severity: row.severity,
+        fingerprint: row.fingerprint,
+        owner: "Runtime telemetry",
+        threadId: row.thread_id,
+        updatedAt: formatTimelineTimestamp(row.created_at),
+        summary: row.message,
+        details: {
+          ...details,
+          stackPreview: row.stack ? truncate(row.stack, 600) : null,
+        },
+        suggestedChecks: deriveSuggestedChecks({
+          sourceType: "runtime",
+          status: row.source_kind,
+          details,
+        }),
+      };
+    }
+
+    return null;
+  },
+
+  getSessionTrace(input?: { threadId?: string | null; issueId?: string | null; limit?: number }) {
+    const threadId =
+      input?.threadId ??
+      (input?.issueId?.startsWith("thread:") ? input.issueId.slice(7) : null) ??
+      (input?.issueId?.startsWith("run:")
+        ? ((db
+            .prepare(
+              `
+                SELECT thread_id
+                FROM agent_runs
+                WHERE id = ?
+                LIMIT 1
+              `,
+            )
+            .get(input.issueId.slice(4)) as { thread_id: string | null } | undefined)?.thread_id ?? null)
+        : input?.issueId?.startsWith("runtime:")
+          ? ((db
+              .prepare(
+                `
+                  SELECT thread_id
+                  FROM runtime_error_events
+                  WHERE id = ?
+                  LIMIT 1
+                `,
+              )
+              .get(input.issueId.slice(8)) as { thread_id: string | null } | undefined)?.thread_id ?? null)
+        : null);
+
+    if (!threadId) {
+      return {
+        thread: null,
+        messages: [],
+        relatedRuns: [],
+        note: "No thread trace is available for this issue.",
+      };
+    }
+
+    const context = this.getThreadContextSnapshot(threadId, input?.limit ?? 8);
+    const threadState = db
+      .prepare(
+        `
+          SELECT
+            preferred_approval_mode,
+            session_approval_agent_id,
+            session_approval_granted_at,
+            last_state,
+            COALESCE(last_error_summary, '') AS last_error_summary
+          FROM assistant_chat_thread_state
+          WHERE thread_id = ?
+          LIMIT 1
+        `,
+      )
+      .get(threadId) as
+      | {
+          preferred_approval_mode: string;
+          session_approval_agent_id: string | null;
+          session_approval_granted_at: string | null;
+          last_state: string;
+          last_error_summary: string;
+        }
+      | undefined;
+    const relatedRuns = db
+      .prepare(
+        `
+          SELECT
+            agent_runs.id,
+            agent_runs.title,
+            agent_runs.status,
+            COALESCE(agents.display_name, 'Supervisor Agent') AS agent_name,
+            agent_runs.updated_at
+          FROM agent_runs
+          LEFT JOIN agents ON agents.id = agent_runs.agent_id
+          WHERE agent_runs.thread_id = ?
+          ORDER BY agent_runs.updated_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(threadId, input?.limit ?? 6) as Array<{
+      id: string;
+      title: string;
+      status: string;
+      agent_name: string;
+      updated_at: string;
+    }>;
+
+    return {
+      thread: context.thread,
+      threadState: threadState
+        ? {
+            preferredApprovalMode: threadState.preferred_approval_mode,
+            sessionApprovalAgentId: threadState.session_approval_agent_id,
+            sessionApprovalGrantedAt: threadState.session_approval_granted_at
+              ? formatTimelineTimestamp(threadState.session_approval_granted_at)
+              : null,
+            lastState: threadState.last_state,
+            lastErrorSummary: threadState.last_error_summary || null,
+          }
+        : null,
+      messages: context.messages,
+      relatedRuns: relatedRuns.map((row) => ({
+        runId: row.id,
+        title: row.title,
+        status: row.status,
+        agent: row.agent_name,
+        updatedAt: formatTimelineTimestamp(row.updated_at),
+      })),
+      activity: loadThreadActivityTimeline(db, threadId, input?.limit ?? 8).map((event) => ({
+        title: event.title,
+        body: event.body,
+        tone: event.tone,
+        timestamp: formatTimelineTimestamp(event.created_at),
+      })),
+      reproductionHints: [
+        context.thread?.contextKey ? `Open ${context.thread.contextKey} and replay the same chat flow.` : null,
+        context.thread?.lastIntent ? `Repeat the request that classified as ${context.thread.lastIntent}.` : null,
+        threadState?.last_error_summary ? `Watch for the same error: ${truncate(threadState.last_error_summary, 140)}.` : null,
+      ].filter((value): value is string => Boolean(value)),
+      note: null,
+    };
+  },
+
+  getRecentDeploys(limit = 5) {
+    return {
+      telemetryAvailable: false,
+      source: "not_connected",
+      items: [] as Array<unknown>,
+      note: "Deploy telemetry is not connected yet, so BukowskiOS cannot show recent deploys in this phase.",
+      requestedLimit: limit,
+    };
+  },
+
+  getAgentFailures(input?: { agentKey?: string | null; limit?: number }) {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            agent_runs.id,
+            agent_runs.thread_id,
+            agent_runs.title,
+            agent_runs.status,
+            agent_runs.updated_at,
+            COALESCE(agent_runs.output_summary, agent_runs.input_summary, '') AS summary_text,
+            COALESCE(agents.display_name, 'Supervisor Agent') AS agent_name,
+            COALESCE(agents.agent_key, 'supervisor-agent') AS agent_key
+          FROM agent_runs
+          LEFT JOIN agents ON agents.id = agent_runs.agent_id
+          WHERE agent_runs.workspace_id = ?
+            AND agent_runs.status IN ('failed', 'provider_error', 'tool_error', 'structured_error', 'needs_configuration')
+            AND (? IS NULL OR agents.agent_key = ?)
+          ORDER BY agent_runs.updated_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(workspaceId, input?.agentKey ?? null, input?.agentKey ?? null, input?.limit ?? 8) as Array<{
+      id: string;
+      thread_id: string | null;
+      title: string;
+      status: string;
+      updated_at: string;
+      summary_text: string;
+      agent_name: string;
+      agent_key: string;
+    }>;
+
+    return {
+      count: rows.length,
+      byStatus: rows.reduce<Record<string, number>>((accumulator, row) => {
+        accumulator[row.status] = (accumulator[row.status] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+      items: rows.map((row) => ({
+        runId: row.id,
+        issueId: `run:${row.id}`,
+        threadId: row.thread_id,
+        title: row.title,
+        status: row.status,
+        severity: deriveSystemIssueSeverity("run", row.status),
+        agent: row.agent_name,
+        agentKey: row.agent_key,
+        updatedAt: formatTimelineTimestamp(row.updated_at),
+        summary: row.summary_text || "Failure without compact summary.",
+      })),
+    };
+  },
+
+  getUserFeedback(input?: { query?: string | null; limit?: number }) {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            id,
+            body,
+            source_reason,
+            confidence,
+            agent_id,
+            project_id,
+            updated_at
+          FROM assistant_memory_entries
+          WHERE workspace_id = ?
+            AND status = 'active'
+            AND kind = 'product_feedback'
+          ORDER BY updated_at DESC
+          LIMIT 24
+        `,
+      )
+      .all(workspaceId) as Array<{
+      id: string;
+      body: string;
+      source_reason: string;
+      confidence: number;
+      agent_id: string | null;
+      project_id: string | null;
+      updated_at: string;
+    }>;
+
+    return rows
+      .filter((row) => matchesSearch(input?.query ?? undefined, [row.body, row.source_reason, row.project_id]))
+      .slice(0, input?.limit ?? 8)
+      .map((row) => ({
+        id: row.id,
+        body: row.body,
+        sourceReason: row.source_reason,
+        confidence: row.confidence,
+        agentId: row.agent_id,
+        projectId: row.project_id,
+        updatedAt: formatTimelineTimestamp(row.updated_at),
+      }));
+  },
+
+  getFeatureUsage(limit = 6) {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            context_key,
+            context_label,
+            COUNT(*) AS thread_count,
+            MAX(updated_at) AS last_seen_at
+          FROM assistant_chat_threads
+          WHERE deleted_at IS NULL
+          GROUP BY context_key, context_label
+          ORDER BY thread_count DESC, last_seen_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(limit) as Array<{
+      context_key: string;
+      context_label: string;
+      thread_count: number;
+      last_seen_at: string | null;
+    }>;
+
+    return {
+      telemetryAvailable: true,
+      source: "assistant_chat_threads",
+      note: "This is currently surface usage from durable assistant threads, not full product analytics.",
+      items: rows.map((row) => ({
+        contextKey: row.context_key,
+        contextLabel: row.context_label,
+        threadCount: row.thread_count,
+        lastSeenAt: row.last_seen_at ? formatTimelineTimestamp(row.last_seen_at) : "—",
+      })),
+    };
+  },
+
+  getFunnelDropoffs(limit = 6) {
+    const rows = db
+      .prepare(
+        `
+          SELECT last_state, COUNT(*) AS thread_count
+          FROM assistant_chat_thread_state
+          GROUP BY last_state
+          ORDER BY thread_count DESC
+          LIMIT ?
+        `,
+      )
+      .all(limit) as Array<{
+      last_state: string;
+      thread_count: number;
+    }>;
+
+    return {
+      telemetryAvailable: true,
+      source: "assistant_chat_thread_state",
+      note: "This funnel reflects assistant-thread outcomes only, not whole-app onboarding or product conversion.",
+      items: rows.map((row) => ({
+        state: row.last_state,
+        threadCount: row.thread_count,
+        isDropoff:
+          row.last_state === "provider_error" ||
+          row.last_state === "tool_error" ||
+          row.last_state === "structured_error" ||
+          row.last_state === "interrupted" ||
+          row.last_state === "needs_configuration",
+      })),
+    };
+  },
+
+  getBacklogItems(limit = 8) {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            agent_runs.id,
+            agent_runs.thread_id,
+            agent_runs.title,
+            agent_runs.status,
+            agent_runs.updated_at,
+            COALESCE(agent_runs.output_summary, '') AS output_summary,
+            COALESCE(agents.display_name, 'Unknown agent') AS agent_name,
+            COALESCE(agents.agent_key, '') AS agent_key
+          FROM agent_runs
+          LEFT JOIN agents ON agents.id = agent_runs.agent_id
+          WHERE agent_runs.workspace_id = ?
+            AND agents.agent_key IN ('bugs-agent', 'product-agent')
+          ORDER BY agent_runs.updated_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(workspaceId, limit) as Array<{
+      id: string;
+      thread_id: string | null;
+      title: string;
+      status: string;
+      updated_at: string;
+      output_summary: string;
+      agent_name: string;
+      agent_key: string;
+    }>;
+
+    return rows.map((row) => ({
+      runId: row.id,
+      threadId: row.thread_id,
+      title: row.title,
+      status: row.status,
+      agent: row.agent_name,
+      agentKey: row.agent_key,
+      updatedAt: formatTimelineTimestamp(row.updated_at),
+      summary: row.output_summary || "Draft item recorded for supervised review.",
+    }));
   },
 
   getProjectFinancials(projectId: string) {

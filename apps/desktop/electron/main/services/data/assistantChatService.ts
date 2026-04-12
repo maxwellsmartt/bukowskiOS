@@ -3,6 +3,7 @@ import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
+  AssistantApprovalPreference,
   AssistantChatAttachmentRow,
   AssistantChatAttachmentStatus,
   AssistantChatMessageMeta,
@@ -15,6 +16,7 @@ import type {
   DeleteAssistantThreadCommand,
   SendAssistantChatTurnCommand,
   SetActiveAssistantThreadCommand,
+  UpdateAssistantThreadPreferencesCommand,
 } from "@contracts";
 
 import type { AssistantMemoryService } from "../ai/assistantMemoryService";
@@ -85,6 +87,7 @@ const normalizeMeta = (response: {
   draftRunId: string | null;
   approvalDecision?: "pending" | "approved" | "approved_for_session" | "denied" | null;
   approvalScope?: "run" | "session" | null;
+  approvalReason?: string | null;
   orchestration: { requiresApproval: boolean } | null;
 }): AssistantChatMessageMeta => ({
   tone:
@@ -106,6 +109,7 @@ const normalizeMeta = (response: {
   draftRunId: response.draftRunId,
   approvalDecision: response.approvalDecision ?? null,
   approvalScope: response.approvalScope ?? null,
+  approvalReason: response.approvalReason ?? null,
 });
 
 const mapThreadStateFromResponse = (status: string): AssistantChatThreadState => {
@@ -159,6 +163,7 @@ type ThreadRow = {
   last_error_summary: string | null;
   last_routed_agent_id: string | null;
   last_intent: string | null;
+  preferred_approval_mode: AssistantApprovalPreference | null;
   is_active: number | null;
 };
 
@@ -182,6 +187,21 @@ type AttachmentDbRow = {
   status: AssistantChatAttachmentStatus;
   storage_path: string;
 };
+
+const loadSupervisorAgentId = (db: DatabaseSync) =>
+  (
+    db
+      .prepare(
+        `
+          SELECT id
+          FROM agents
+          WHERE workspace_id = ?
+            AND is_supervisor = 1
+          LIMIT 1
+        `,
+      )
+      .get(workspaceId) as { id: string } | undefined
+  )?.id ?? null;
 
 export const createAssistantChatService = (
   db: DatabaseSync,
@@ -303,6 +323,7 @@ export const createAssistantChatService = (
           assistant_chat_thread_state.last_error_summary,
           assistant_chat_thread_state.last_routed_agent_id,
           assistant_chat_thread_state.last_intent,
+          assistant_chat_thread_state.preferred_approval_mode,
           assistant_chat_thread_state.is_active
         FROM assistant_chat_threads
         LEFT JOIN assistant_chat_thread_state
@@ -318,6 +339,7 @@ export const createAssistantChatService = (
       contextKey: thread.context_key,
       contextLabel: thread.context_label,
       summaryText: thread.summary_text,
+      preferredApprovalMode: thread.preferred_approval_mode ?? "supervised",
       state: thread.last_state ?? "idle",
       lastErrorCode: thread.last_error_code,
       lastErrorSummary: thread.last_error_summary,
@@ -389,9 +411,10 @@ export const createAssistantChatService = (
           thread_id,
           last_state,
           recent_user_messages_json,
+          preferred_approval_mode,
           is_active,
           updated_at
-        ) VALUES (?, 'idle', '[]', 1, ?)
+        ) VALUES (?, 'idle', '[]', 'supervised', 1, ?)
       `,
     ).run(threadId, now);
 
@@ -452,6 +475,164 @@ export const createAssistantChatService = (
     }
 
     return `${trimmed}\n\n${attachmentSummary}`;
+  };
+
+  const createAssistantMessageRow = (
+    threadId: string,
+    body: string,
+    state: AssistantChatMessageRow["state"],
+    meta: AssistantChatMessageMeta | null,
+  ) => {
+    const messageId = `assistant-reply-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const now = new Date().toISOString();
+    db.prepare(
+      `
+        INSERT INTO assistant_chat_messages (
+          id,
+          thread_id,
+          role,
+          body,
+          message_state,
+          state_payload_json,
+          created_at,
+          updated_at,
+          deleted_at
+        ) VALUES (?, ?, 'assistant', ?, ?, ?, ?, ?, NULL)
+      `,
+    ).run(messageId, threadId, body, state, meta ? JSON.stringify(meta) : null, now, now);
+
+    return {
+      messageId,
+      timestamp: now,
+    };
+  };
+
+  const markThreadPending = (threadId: string, messageId: string, routedAgentId?: string | null) => {
+    const now = new Date().toISOString();
+    db.prepare(
+      `
+        UPDATE assistant_chat_thread_state
+        SET last_state = 'pending',
+            last_error_code = NULL,
+            last_error_summary = NULL,
+            last_routed_agent_id = COALESCE(?, last_routed_agent_id),
+            active_message_id = ?,
+            is_active = 1,
+            updated_at = ?
+        WHERE thread_id = ?
+      `,
+    ).run(routedAgentId ?? null, messageId, now, threadId);
+    setActiveThreadRow(threadId);
+  };
+
+  const completeAssistantMessage = (
+    threadId: string,
+    assistantMessageId: string,
+    summarySeed: string,
+    response: {
+      status: string;
+      assistantMessage: string;
+      routedAgentId: string | null;
+      routedAgentName: string;
+      orchestration: { intent: string | null; requiresApproval: boolean } | null;
+      stateLabel: string;
+      stateBody: string;
+      intentLabel: string;
+      commandStateLabel: string;
+      toolTraces: Array<{ summary: string }>;
+      draftRunId: string | null;
+      approvalDecision?: "pending" | "approved" | "approved_for_session" | "denied" | null;
+      approvalScope?: "run" | "session" | null;
+      approvalReason?: string | null;
+    },
+  ) => {
+    const completedAt = new Date().toISOString();
+    const meta = normalizeMeta(response);
+    db.prepare(
+      `
+        UPDATE assistant_chat_messages
+        SET body = ?,
+            message_state = 'completed',
+            state_payload_json = ?,
+            updated_at = ?
+        WHERE id = ?
+      `,
+    ).run(response.assistantMessage, JSON.stringify(meta), completedAt, assistantMessageId);
+
+    db.prepare(
+      `
+        UPDATE assistant_chat_threads
+        SET summary_text = ?,
+            updated_at = ?
+        WHERE id = ?
+      `,
+    ).run(buildSummaryText(summarySeed, response.assistantMessage, response.routedAgentName), completedAt, threadId);
+
+    db.prepare(
+      `
+        UPDATE assistant_chat_thread_state
+        SET last_state = ?,
+            last_error_code = NULL,
+            last_error_summary = NULL,
+            last_routed_agent_id = ?,
+            last_intent = ?,
+            active_message_id = ?,
+            updated_at = ?
+        WHERE thread_id = ?
+      `,
+    ).run(
+      mapThreadStateFromResponse(response.status),
+      response.routedAgentId,
+      response.orchestration?.intent ?? null,
+      assistantMessageId,
+      completedAt,
+      threadId,
+    );
+  };
+
+  const failAssistantMessage = (threadId: string, assistantMessageId: string, summarySeed: string, errorMessage: string) => {
+    const failedAt = new Date().toISOString();
+    const errorMeta: AssistantChatMessageMeta = {
+      tone: "error",
+      label: "Assistant unavailable",
+      body: errorMessage,
+      routedAgentId: null,
+      routedAgentName: "Supervisor Agent",
+      intentLabel: "Routing unavailable",
+      commandStateLabel: "Command layer still idle",
+    };
+
+    db.prepare(
+      `
+        UPDATE assistant_chat_messages
+        SET body = ?,
+            message_state = 'error',
+            state_payload_json = ?,
+            updated_at = ?
+        WHERE id = ?
+      `,
+    ).run(errorMessage, JSON.stringify(errorMeta), failedAt, assistantMessageId);
+
+    db.prepare(
+      `
+        UPDATE assistant_chat_threads
+        SET summary_text = ?,
+            updated_at = ?
+        WHERE id = ?
+      `,
+    ).run(buildSummaryText(summarySeed, errorMessage, "Supervisor Agent"), failedAt, threadId);
+
+    db.prepare(
+      `
+        UPDATE assistant_chat_thread_state
+        SET last_state = 'provider_error',
+            last_error_code = 'provider_error',
+            last_error_summary = ?,
+            active_message_id = ?,
+            updated_at = ?
+        WHERE thread_id = ?
+      `,
+    ).run(errorMessage, assistantMessageId, failedAt, threadId);
   };
 
   return {
@@ -553,9 +734,8 @@ export const createAssistantChatService = (
         throw new Error("Assistant thread was not found.");
       }
 
-      const now = new Date().toISOString();
       const userMessageId = `assistant-user-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-      const assistantMessageId = `assistant-reply-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      const now = new Date().toISOString();
       const userBody = getPrimaryAttachmentMessage(input.message, input.attachments ?? []);
       const nextTitle = thread.title === defaultThreadTitle ? deriveThreadTitle(userBody) : thread.title;
 
@@ -579,21 +759,7 @@ export const createAssistantChatService = (
         persistAttachment(input.threadId, userMessageId, attachment);
       });
 
-      db.prepare(
-        `
-          INSERT INTO assistant_chat_messages (
-            id,
-            thread_id,
-            role,
-            body,
-            message_state,
-            state_payload_json,
-            created_at,
-            updated_at,
-            deleted_at
-          ) VALUES (?, ?, 'assistant', '', 'pending', NULL, ?, ?, NULL)
-        `,
-      ).run(assistantMessageId, input.threadId, now, now);
+      const { messageId: assistantMessageId } = createAssistantMessageRow(input.threadId, "", "pending", null);
 
       db.prepare(
         `
@@ -606,64 +772,11 @@ export const createAssistantChatService = (
         `,
       ).run(nextTitle, input.context.activePath ?? "/agents", input.context.currentView ?? "Agents", now, input.threadId);
 
-      db.prepare(
-        `
-          UPDATE assistant_chat_thread_state
-          SET last_state = 'pending',
-              last_error_code = NULL,
-              last_error_summary = NULL,
-              active_message_id = ?,
-              is_active = 1,
-              updated_at = ?
-          WHERE thread_id = ?
-        `,
-      ).run(assistantMessageId, now, input.threadId);
-      setActiveThreadRow(input.threadId);
+      markThreadPending(input.threadId, assistantMessageId, loadSupervisorAgentId(db));
 
       try {
         const response = await options.assistantGatewayService.sendMessage(input);
-        const meta = normalizeMeta(response);
-        const completedAt = new Date().toISOString();
-        db.prepare(
-          `
-            UPDATE assistant_chat_messages
-            SET body = ?,
-                message_state = 'completed',
-                state_payload_json = ?,
-                updated_at = ?
-            WHERE id = ?
-          `,
-        ).run(response.assistantMessage, JSON.stringify(meta), completedAt, assistantMessageId);
-
-        db.prepare(
-          `
-            UPDATE assistant_chat_threads
-            SET summary_text = ?,
-                updated_at = ?
-            WHERE id = ?
-          `,
-        ).run(buildSummaryText(userBody, response.assistantMessage, response.routedAgentName), completedAt, input.threadId);
-
-        db.prepare(
-          `
-            UPDATE assistant_chat_thread_state
-            SET last_state = ?,
-                last_error_code = NULL,
-                last_error_summary = NULL,
-                last_routed_agent_id = ?,
-                last_intent = ?,
-                active_message_id = ?,
-                updated_at = ?
-            WHERE thread_id = ?
-          `,
-        ).run(
-          mapThreadStateFromResponse(response.status),
-          response.routedAgentId,
-          response.orchestration?.intent ?? null,
-          assistantMessageId,
-          completedAt,
-          input.threadId,
-        );
+        completeAssistantMessage(input.threadId, assistantMessageId, userBody, response);
 
         try {
           options.memoryService.extractAndPersist({
@@ -683,28 +796,80 @@ export const createAssistantChatService = (
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Assistant unavailable";
-        const failedAt = new Date().toISOString();
-        const errorMeta: AssistantChatMessageMeta = {
-          tone: "error",
-          label: "Assistant unavailable",
-          body: errorMessage,
-          routedAgentId: null,
-          routedAgentName: "Supervisor Agent",
-          intentLabel: "Routing unavailable",
-          commandStateLabel: "Command layer still idle",
-        };
+        failAssistantMessage(input.threadId, assistantMessageId, userBody, errorMessage);
+      }
 
-        db.prepare(
+      return loadSnapshot();
+    },
+    updateThreadPreferences(input: UpdateAssistantThreadPreferencesCommand) {
+      const now = new Date().toISOString();
+      db.prepare(
+        `
+          UPDATE assistant_chat_thread_state
+          SET preferred_approval_mode = ?,
+              updated_at = ?
+          WHERE thread_id = ?
+        `,
+      ).run(input.preferredApprovalMode, now, input.threadId);
+
+      return loadSnapshot();
+    },
+    async continueReviewedRun(input: {
+      runId: string;
+      decision: "approve" | "deny" | "approve_for_session";
+    }) {
+      const run = db
+        .prepare(
           `
-            UPDATE assistant_chat_messages
-            SET body = ?,
-                message_state = 'error',
-                state_payload_json = ?,
-                updated_at = ?
-            WHERE id = ?
+            SELECT
+              agent_runs.id,
+              agent_runs.thread_id,
+              agent_runs.agent_id,
+              agent_runs.title,
+              COALESCE(agents.display_name, 'Supervisor Agent') AS agent_display_name
+            FROM agent_runs
+            LEFT JOIN agents ON agents.id = agent_runs.agent_id
+            WHERE agent_runs.workspace_id = ?
+              AND agent_runs.id = ?
+            LIMIT 1
           `,
-        ).run(errorMessage, JSON.stringify(errorMeta), failedAt, assistantMessageId);
+        )
+        .get(workspaceId, input.runId) as
+        | {
+            id: string;
+            thread_id: string | null;
+            agent_id: string | null;
+            title: string;
+            agent_display_name: string;
+          }
+        | undefined;
 
+      if (!run?.thread_id) {
+        return loadSnapshot();
+      }
+
+      const summarySeed = `Approval review · ${run.title}`;
+
+      if (input.decision === "deny") {
+        const deniedMeta: AssistantChatMessageMeta = {
+          tone: "approval",
+          label: "Denied",
+          body: "You denied this supervised draft. No command-layer action was executed.",
+          routedAgentId: run.agent_id,
+          routedAgentName: run.agent_display_name,
+          intentLabel: "Approval decision recorded",
+          commandStateLabel: "Command layer still idle",
+          draftRunId: run.id,
+          approvalDecision: "denied",
+          approvalScope: "run",
+        };
+        const { messageId } = createAssistantMessageRow(
+          run.thread_id,
+          "Understood. I stopped this supervised follow-up. No command-layer action was executed.",
+          "completed",
+          deniedMeta,
+        );
+        const completedAt = new Date().toISOString();
         db.prepare(
           `
             UPDATE assistant_chat_threads
@@ -712,19 +877,56 @@ export const createAssistantChatService = (
                 updated_at = ?
             WHERE id = ?
           `,
-        ).run(buildSummaryText(userBody, errorMessage, "Supervisor Agent"), failedAt, input.threadId);
-
+        ).run(
+          buildSummaryText(summarySeed, "Understood. I stopped this supervised follow-up. No command-layer action was executed.", run.agent_display_name),
+          completedAt,
+          run.thread_id,
+        );
         db.prepare(
           `
             UPDATE assistant_chat_thread_state
-            SET last_state = 'provider_error',
-                last_error_code = 'provider_error',
-                last_error_summary = ?,
+            SET last_state = 'completed',
+                last_error_code = NULL,
+                last_error_summary = NULL,
+                last_routed_agent_id = ?,
                 active_message_id = ?,
                 updated_at = ?
             WHERE thread_id = ?
           `,
-        ).run(errorMessage, assistantMessageId, failedAt, input.threadId);
+        ).run(run.agent_id, messageId, completedAt, run.thread_id);
+        return loadSnapshot();
+      }
+
+      const pendingMeta: AssistantChatMessageMeta = {
+        tone: "sending",
+        label: input.decision === "approve_for_session" ? "Continuing under session approval" : "Continuing approved draft",
+        body:
+          input.decision === "approve_for_session"
+            ? "Using your session approval to continue this supervised follow-up."
+            : "Applying your approval and continuing this supervised follow-up.",
+        routedAgentId: run.agent_id,
+        routedAgentName: run.agent_display_name,
+        intentLabel: "Approval decision recorded",
+        commandStateLabel: "Command layer still idle",
+        draftRunId: run.id,
+        approvalDecision: input.decision === "approve_for_session" ? "approved_for_session" : "approved",
+        approvalScope: input.decision === "approve_for_session" ? "session" : "run",
+      };
+
+      const { messageId: assistantMessageId } = createAssistantMessageRow(run.thread_id, "", "pending", pendingMeta);
+      markThreadPending(run.thread_id, assistantMessageId, run.agent_id);
+
+      try {
+        const response = await options.assistantGatewayService.continueApprovedRun({
+          workspaceId,
+          threadId: run.thread_id,
+          runId: run.id,
+          approvalScope: input.decision === "approve_for_session" ? "session" : "run",
+        });
+        completeAssistantMessage(run.thread_id, assistantMessageId, summarySeed, response);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Approved follow-up could not continue.";
+        failAssistantMessage(run.thread_id, assistantMessageId, summarySeed, errorMessage);
       }
 
       return loadSnapshot();

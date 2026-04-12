@@ -57,6 +57,11 @@
         "get_financial_exposure_summary",
         "get_schedule_conflicts",
         "get_overdue_returns",
+        "list_recipients",
+        "get_thread_context",
+        "preview_send_targets",
+        "get_delivery_status",
+        "draft_message",
         "get_runs_snapshot"
       ],
       "allowed_domains_json": [
@@ -252,9 +257,14 @@
       "status": "active",
       "approval_mode": "needs_approval",
       "allowed_tools_json": [
-        "get_runs_snapshot",
+        "list_recipients",
+        "get_thread_context",
+        "preview_send_targets",
+        "get_delivery_status",
+        "draft_message",
         "get_overdue_returns",
-        "get_open_incidents"
+        "get_open_incidents",
+        "get_runs_snapshot"
       ],
       "allowed_domains_json": [
         "communications",
@@ -347,6 +357,12 @@
       "status": "active",
       "approval_mode": "supervised",
       "allowed_tools_json": [
+        "search_errors",
+        "get_error_detail",
+        "get_session_trace",
+        "get_recent_deploys",
+        "get_agent_failures",
+        "draft_bug_report",
         "get_runs_snapshot"
       ],
       "allowed_domains_json": [
@@ -394,6 +410,11 @@
       "status": "active",
       "approval_mode": "supervised",
       "allowed_tools_json": [
+        "get_user_feedback",
+        "get_feature_usage",
+        "get_funnel_dropoffs",
+        "get_backlog_items",
+        "link_feedback_to_feature",
         "get_runs_snapshot"
       ],
       "allowed_domains_json": [

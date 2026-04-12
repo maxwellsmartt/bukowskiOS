@@ -20,6 +20,7 @@ import type {
   SaveAIProviderConfigCommand,
   SendAssistantChatTurnCommand,
   SetActiveAssistantThreadCommand,
+  UpdateAssistantThreadPreferencesCommand,
   SetAgentApprovalModeCommand,
   SetAgentStatusCommand,
   TestAIProviderConnectionCommand,
@@ -827,6 +828,14 @@ export const createAgentMutationService = (
     return options.assistantChatService.setActiveThread(input);
   },
 
+  updateAssistantThreadPreferences(input: UpdateAssistantThreadPreferencesCommand): AssistantChatSnapshot {
+    if (!options.assistantChatService) {
+      throw new Error("Assistant chat service unavailable.");
+    }
+
+    return options.assistantChatService.updateThreadPreferences(input);
+  },
+
   sendAssistantChatTurn(input: SendAssistantChatTurnCommand): Promise<AssistantChatSnapshot> {
     if (!options.assistantChatService) {
       throw new Error("Assistant chat service unavailable.");
@@ -835,7 +844,7 @@ export const createAgentMutationService = (
     return options.assistantChatService.sendTurn(input);
   },
 
-  reviewRun(input: ReviewAgentRunCommand): AgentRunReviewResult {
+  async reviewRun(input: ReviewAgentRunCommand): Promise<AgentRunReviewResult> {
     const now = new Date().toISOString();
     const run = db
       .prepare(
@@ -880,13 +889,13 @@ export const createAgentMutationService = (
     }
 
     const nextStatus = input.decision === "deny" ? "denied" : "approved";
-    const approvalDecision =
+    const approvalDecision: AgentRunReviewResult["approvalDecision"] =
       input.decision === "deny"
         ? "denied"
         : input.decision === "approve_for_session"
           ? "approved_for_session"
           : "approved";
-    const approvalScope = input.decision === "approve_for_session" ? "session" : "run";
+    const approvalScope: AgentRunReviewResult["approvalScope"] = input.decision === "approve_for_session" ? "session" : "run";
 
     db.exec("BEGIN");
 
@@ -961,13 +970,38 @@ export const createAgentMutationService = (
 
       db.exec("COMMIT");
 
-      return {
+      const result = {
         runId: run.id,
         status: nextStatus as AgentRunReviewResult["status"],
         approvalDecision,
         approvalScope,
         summary,
       };
+
+      if (options.assistantChatService && run.thread_id) {
+        try {
+          await options.assistantChatService.continueReviewedRun({
+            runId: run.id,
+            decision: input.decision,
+          });
+        } catch (continuationError) {
+          createActivityEvent(db, {
+            id: `agent-activity-${Date.now().toString(36)}`,
+            agentId: run.agent_id,
+            runId: run.id,
+            kind: "run_review_followup_failed",
+            title: "Approval follow-up failed",
+            body:
+              continuationError instanceof Error
+                ? continuationError.message
+                : "The approval decision was saved, but the chat follow-up could not continue cleanly.",
+            tone: "warning",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      return result;
     } catch (error) {
       db.exec("ROLLBACK");
       throw error;
