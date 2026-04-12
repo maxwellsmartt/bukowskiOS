@@ -59,17 +59,26 @@
   - `bajo`: algunos reads simples sin parámetros siguen usando `safeHandleRead` porque el riesgo efectivo ahí es bajo
 
 ### Slice P0.3 — Smoke empaquetado arm64
-- Estado: `planned`
+- Estado: `in_progress`
 - Objetivo:
   - validar `.dmg` real en Mac arm64 limpia con checklist reproducible
 - Área:
   - infra / manual QA
-- Alcance inicial:
-  - install/open
-  - single-instance
-  - export data
-  - support bundle
-  - sync queue
+- Qué cambió:
+  - checklist de smoke enlazado a una evidencia explícita de macOS arm64
+  - build interno y verificación de firma local re-ejecutados
+  - evidencia nueva en `docs/foundation/macos-arm64-smoke-evidence-v1.md`
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop package:mac`
+  - `corepack pnpm --filter @bukowski/desktop verify:mac-build`
+  - `codesign --verify --deep --strict apps/desktop/dist-packaged/mac-arm64/bukowskiOS.app`
+- Evidencia:
+  - `.app` y `.zip` arm64 regenerados
+  - `codesign` OK
+  - `spctl` falla como esperado en build `internal alpha` ad-hoc no notarizado
+- Riesgos remanentes:
+  - `medio`: falta smoke manual en Mac arm64 limpia para cerrar instalación/apertura real
+  - `medio`: el `.dmg` existente no quedó con timestamp nuevo en esta pasada; conviene regenerarlo y abrirlo durante el smoke limpio
 
 ## Fase 1 — Operación visible
 

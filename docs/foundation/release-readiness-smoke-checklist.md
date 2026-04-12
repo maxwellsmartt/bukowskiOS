@@ -49,6 +49,15 @@ Cobertura actual:
 - mover la app a `Applications`
 - abrirla dos veces para confirmar comportamiento de instancia
 - verificar que no hay error de firma ad-hoc en instalación interna
+- registrar resultado en `docs/foundation/macos-arm64-smoke-evidence-v1.md`
+
+## Evidencia local disponible
+- build interno y verificación local de firma ya documentados en:
+  - `docs/foundation/macos-arm64-smoke-evidence-v1.md`
+- estado actual:
+  - `codesign` OK
+  - `spctl` falla como esperado en internal alpha no notarizada
+  - falta smoke manual en Mac arm64 limpia
 
 ## Criterios de salida
 - sin white screen
