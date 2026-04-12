@@ -105,7 +105,40 @@
   - `medio`: el warning de bundle grande sigue visible por chunking general del renderer; no bloquea este slice pero sigue siendo deuda de performance
 
 ### Slice O2 — Packing Slip PDF real
+- Estado: `done`
+- Objetivo:
+  - exportar packing slips como PDF real, legible e imprimible desde la propia vista operativa
+- Área:
+  - backend / frontend
+- Qué cambió:
+  - export `PDF` desde `Packing detail` usando `pdfkit` en `main`
+  - diagramación más cuidada con header, metadatos, QR, notas y tabla de items
+  - el archivo sugerido ya usa el número real del slip, no el ID interno
+  - ajuste adyacente de UX en `Assets`: scroll horizontal restaurado y tabla un poco más alta para ver más filas
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - botón `Export PDF` visible en `PackingSlipDetailPanel`
+  - export vía IPC seguro desde `bukowskiPacking:exportPdf`
+  - el PDF incluye QR y una tabla de ítems con contexto operativo
+- Riesgos remanentes:
+  - `medio`: falta smoke manual visual de impresión real y revisión del PDF en Preview/Acrobat
+  - `medio`: quedan ajustes finos pendientes en el comportamiento de resize/scroll horizontal de columnas para que se sienta totalmente natural en macOS
+  - `medio`: quedan ajustes de diagramación del packing slip PDF para priorizar mejor información operativa y pulir headers/espaciado
+  - `bajo`: la impresión nativa directa todavía no entra en este corte; v1 cierra export estable primero
+
+### Follow-up UX.1 — Tabla y PDF de packing
 - Estado: `planned`
+- Objetivo:
+  - cerrar el polish pendiente del resize/scroll horizontal de columnas y el layout final del packing slip PDF
+- Área:
+  - frontend / backend
+- Incluye:
+  - resize de columnas más flexible y confiable en tablas grandes
+  - control horizontal de `Assets` más integrado visualmente con el sistema
+  - revisión final de jerarquía, densidad y relevancia de información en el PDF de packing
 
 ### Slice O3 — Uploads para Assets e Incidents
 - Estado: `planned`

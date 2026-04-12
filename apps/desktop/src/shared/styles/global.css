@@ -1446,6 +1446,44 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   overflow-x: auto;
 }
 
+.data-table-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.table-shell-wide-scroll {
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: 4px;
+}
+
+.data-table-horizontal-range-shell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 2px 2px 0;
+}
+
+.data-table-horizontal-range {
+  width: 100%;
+  margin: 0;
+  accent-color: rgba(255, 255, 255, 0.26);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .table-shell-natural {
   max-height: none;
   overflow-x: auto;
@@ -1540,7 +1578,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  max-width: calc(100% - 10px);
+  max-width: calc(100% - 18px);
   padding: 0;
   border: none;
   background: transparent;
@@ -1566,14 +1604,21 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .column-resizer {
   position: absolute;
-  right: -4px;
+  right: 0;
   top: 0;
-  width: 8px;
+  width: 12px;
   height: 100%;
   padding: 0;
   border: none;
   background: transparent;
   cursor: col-resize;
+  z-index: 3;
+}
+
+.column-resizer:hover,
+.column-resizer:focus-visible {
+  background: rgba(255, 255, 255, 0.04);
+  outline: none;
 }
 
 .column-resizer::after {
@@ -1581,7 +1626,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   position: absolute;
   top: 7px;
   bottom: 7px;
-  left: 3px;
+  left: 6px;
   width: 1px;
   background: rgba(255, 255, 255, 0.06);
 }

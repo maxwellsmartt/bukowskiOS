@@ -6,6 +6,7 @@ import { registerAppIpc } from "./ipc/registerAppIpc";
 import { registerFoundationIpc } from "./ipc/registerFoundationIpc";
 import { buildAppMenu } from "./menus/buildAppMenu";
 import { getDesktopEnvironment } from "./services/appEnvironment";
+import { createDocumentGenerationService } from "./services/data/documentGenerationService";
 import { initializeLocalDatabase } from "./services/data/localDatabase";
 import { getDesktopLogger, initializeDesktopLogger } from "./services/logger";
 import { createMainWindow } from "./windows/createMainWindow";
@@ -125,6 +126,7 @@ app.whenReady().then(() => {
   });
 
   const localDatabase = initializeLocalDatabase();
+  const documentGeneration = createDocumentGenerationService();
   attachProcessRuntimeTelemetry(localDatabase.runtimeDiagnostics);
 
   registerAppIpc({
@@ -149,6 +151,45 @@ app.whenReady().then(() => {
     incidentMutations: localDatabase.incidentMutations,
     financeMutations: localDatabase.financeMutations,
     packingMutations: localDatabase.packingMutations,
+    exportPackingSlipPdf: async (packingSlipId, targetFilePath) => {
+      const detail = localDatabase.foundationReads.getPackingSlipDetail(packingSlipId);
+      if (!detail.slip) {
+        throw new Error("Packing slip was not found.");
+      }
+
+      const pdf = await documentGeneration.createPackingSlipPdf({
+        slipNumber: detail.slip.number,
+        projectName: detail.slip.project,
+        departmentName: detail.slip.department,
+        responsibleName: detail.slip.responsible,
+        preparedByName: detail.slip.preparedBy,
+        issueDate: detail.slip.issueDate,
+        dueDate: detail.slip.dueDate,
+        status: detail.slip.status,
+        notes: detail.slip.notes ?? "",
+        primaryCodeValue: detail.slip.primaryCodeValue,
+        summary: {
+          itemCount: detail.slip.itemCount,
+          returnedCount: detail.slip.returnedCount,
+          pendingCount: detail.slip.pendingCount,
+        },
+        items: detail.items.map((item) => ({
+          code: item.code,
+          name: item.asset,
+          quantity: item.quantity,
+          conditionOut: item.conditionOut,
+          conditionIn: item.conditionIn,
+          location: item.location,
+          responsible: item.responsible,
+          status: item.status,
+        })),
+      });
+
+      return {
+        ...pdf,
+        targetFilePath,
+      };
+    },
     rmaMutations: localDatabase.rmaMutations,
     agentMutations: localDatabase.agentMutations,
     runtimeDiagnostics: localDatabase.runtimeDiagnostics,

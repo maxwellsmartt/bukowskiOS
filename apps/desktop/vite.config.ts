@@ -34,7 +34,7 @@ export default defineConfig(async () => {
           vite: {
             build: {
               rollupOptions: {
-                external: ["better-sqlite3"],
+                external: ["better-sqlite3", "bwip-js", "qrcode", "pdfkit"],
               },
             },
             resolve: {

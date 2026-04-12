@@ -1,3 +1,7 @@
+import { app, dialog } from "electron";
+import fs from "node:fs";
+import path from "node:path";
+
 import {
   archiveAssetSchema,
   assignAgentModelSchema,
@@ -156,6 +160,15 @@ type RegisterFoundationIpcOptions = {
     createPackingSlip: (input: CreatePackingSlipCommand) => unknown;
     returnPackingSlipItems: (input: ReturnPackingSlipItemsCommand) => unknown;
   };
+  exportPackingSlipPdf: (
+    packingSlipId: string,
+    targetFilePath: string,
+  ) => Promise<{
+    fileName: string;
+    mimeType: "application/pdf";
+    buffer: Buffer;
+    targetFilePath: string;
+  }>;
   rmaMutations: {
     createRmaCase: (input: CreateRmaCaseCommand) => unknown;
     updateRmaCase: (input: UpdateRmaCaseCommand) => unknown;
@@ -192,6 +205,7 @@ export const registerFoundationIpc = ({
     incidentMutations,
     financeMutations,
     packingMutations,
+  exportPackingSlipPdf,
   rmaMutations,
   agentMutations,
   runtimeDiagnostics,
@@ -351,6 +365,43 @@ export const registerFoundationIpc = ({
     idReadArgsSchema,
     (_event, packingSlipId: string) => foundationReads.getPackingSlipDetail(packingSlipId),
     "The app could not load that packing slip.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.packing.exportPdf,
+    idReadArgsSchema,
+    async (_event, packingSlipId: string) => {
+      const detail = foundationReads.getPackingSlipDetail(packingSlipId);
+
+      if (!detail.slip) {
+        throw new Error("Packing slip was not found.");
+      }
+
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: "Export packing slip PDF",
+        defaultPath: path.join(app.getPath("documents"), `${detail.slip.number}.pdf`),
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+
+      if (canceled || !filePath) {
+        return {
+          saved: false,
+          fileName: null,
+          savedPath: null,
+          summary: "Packing slip PDF export cancelled.",
+        };
+      }
+
+      const pdf = await exportPackingSlipPdf(packingSlipId, filePath);
+      fs.writeFileSync(filePath, pdf.buffer);
+
+      return {
+        saved: true,
+        fileName: path.basename(filePath),
+        savedPath: filePath,
+        summary: `Exported ${pdf.fileName} to ${path.basename(filePath)}.`,
+      };
+    },
+    "The app could not export that packing slip PDF.",
   );
   safeHandle(ipcChannels.packing.create, createPackingSlipSchema, (_event, input) => packingMutations.createPackingSlip(input));
   safeHandle(ipcChannels.packing.returnItems, returnPackingSlipItemsSchema, (_event, input) =>

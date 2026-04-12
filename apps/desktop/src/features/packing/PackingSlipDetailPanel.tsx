@@ -1,4 +1,4 @@
-import { RotateCcw } from "lucide-react";
+import { Download, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { PackingSlipDetailSnapshot } from "@contracts";
@@ -14,7 +14,9 @@ type PackingSlipDetailPanelProps = {
   error: string | null;
   isLoading: boolean;
   isSubmittingReturn: boolean;
+  isExportingPdf: boolean;
   onReturnItems: (assetIds: string[], conditionIn?: string, notes?: string) => Promise<void>;
+  onExportPdf: () => Promise<void>;
 };
 
 const conditionOptions = ["Good", "Review", "Damaged"] as const;
@@ -24,7 +26,9 @@ export const PackingSlipDetailPanel = ({
   error,
   isLoading,
   isSubmittingReturn,
+  isExportingPdf,
   onReturnItems,
+  onExportPdf,
 }: PackingSlipDetailPanelProps) => {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [conditionIn, setConditionIn] = useState("Good");
@@ -138,6 +142,15 @@ export const PackingSlipDetailPanel = ({
       </div>
 
       <div className="action-panel-actions action-panel-actions-inline">
+        <button
+          className="ghost-control"
+          disabled={isExportingPdf}
+          onClick={() => void onExportPdf()}
+          type="button"
+        >
+          <Download size={14} />
+          <span>{isExportingPdf ? "Exporting PDF..." : "Export PDF"}</span>
+        </button>
         <button
           className="action-primary-button"
           disabled={isSubmittingReturn || !pendingAssetIds.length}

@@ -35,6 +35,7 @@ type DataTableProps<T = unknown> = {
   emptyMessage?: string;
   persistKey?: string;
   shellClassName?: string;
+  persistentHorizontalScroll?: boolean;
   sortState?: {
     columnKey: string;
     direction: ListSortDirection;
@@ -62,11 +63,14 @@ export const DataTable = <T = unknown,>({
   emptyMessage = "No rows available.",
   persistKey,
   shellClassName,
+  persistentHorizontalScroll = false,
   sortState = null,
   onSortRequest,
   autoScrollToActiveRow = false,
 }: DataTableProps<T>) => {
+  const defaultMinColumnWidth = 56;
   const tableShellRef = useRef<HTMLDivElement | null>(null);
+  const tableRef = useRef<HTMLTableElement | null>(null);
   const resolvedRowIds = useMemo(
     () => rows.map((row, index) => (getRowId ? getRowId(row, index) : String(index))),
     [getRowId, rows],
@@ -83,6 +87,11 @@ export const DataTable = <T = unknown,>({
       accumulator[column.key] = parsedWidths[column.key] ?? column.width ?? 160;
       return accumulator;
     }, {});
+  });
+  const [horizontalScrollMetrics, setHorizontalScrollMetrics] = useState({
+    hasOverflow: false,
+    maxScrollLeft: 0,
+    scrollLeft: 0,
   });
 
   const setSelection = (nextSelection: string[]) => {
@@ -130,18 +139,81 @@ export const DataTable = <T = unknown,>({
   }, [activeRowId, autoScrollToActiveRow, rows]);
 
   useEffect(() => {
+    if (!persistentHorizontalScroll) {
+      return;
+    }
+
+    const shell = tableShellRef.current;
+    const table = tableRef.current;
+
+    if (!shell || !table) {
+      return;
+    }
+
+    const updateMetrics = () => {
+      const maxScrollLeft = Math.max(0, table.scrollWidth - shell.clientWidth);
+      const hasOverflow = maxScrollLeft > 2;
+      setHorizontalScrollMetrics({
+        hasOverflow,
+        maxScrollLeft,
+        scrollLeft: Math.min(shell.scrollLeft, maxScrollLeft),
+      });
+    };
+
+    updateMetrics();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateMetrics();
+    });
+
+    resizeObserver.observe(shell);
+    resizeObserver.observe(table);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [columns, columnWidths, persistentHorizontalScroll, rows]);
+
+  useEffect(() => {
+    if (!persistentHorizontalScroll) {
+      return;
+    }
+
+    const shell = tableShellRef.current;
+
+    if (!shell) {
+      return;
+    }
+
+    const handleShellScroll = () => {
+      setHorizontalScrollMetrics((current) => ({
+        ...current,
+        scrollLeft: shell.scrollLeft,
+      }));
+    };
+
+    shell.addEventListener("scroll", handleShellScroll, { passive: true });
+
+    return () => {
+      shell.removeEventListener("scroll", handleShellScroll);
+    };
+  }, [persistentHorizontalScroll]);
+
+  useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
-      if (!resizeStateRef.current) {
+      const resizeState = resizeStateRef.current;
+
+      if (!resizeState) {
         return;
       }
 
-      const activeColumn = columns.find((column) => column.key === resizeStateRef.current?.columnKey);
-      const minWidth = activeColumn?.minWidth ?? 88;
-      const nextWidth = Math.max(minWidth, resizeStateRef.current.startWidth + (event.clientX - resizeStateRef.current.startX));
+      const activeColumn = columns.find((column) => column.key === resizeState.columnKey);
+      const minWidth = activeColumn?.minWidth ?? defaultMinColumnWidth;
+      const nextWidth = Math.max(minWidth, resizeState.startWidth + (event.clientX - resizeState.startX));
 
       setColumnWidths((currentWidths) => ({
         ...currentWidths,
-        [resizeStateRef.current!.columnKey]: nextWidth,
+        [resizeState.columnKey]: nextWidth,
       }));
     };
 
@@ -191,20 +263,21 @@ export const DataTable = <T = unknown,>({
   };
 
   return (
-    <div
-      ref={tableShellRef}
-      className={`table-shell${shellClassName ? ` ${shellClassName}` : ""}`}
-      style={
-        {
-          "--table-max-height": resolveMaxHeight(maxHeight),
-        } as CSSProperties
-      }
-    >
-      <table className="data-table">
+    <div className="data-table-stack">
+      <div
+        ref={tableShellRef}
+        className={`table-shell${shellClassName ? ` ${shellClassName}` : ""}`}
+        style={
+          {
+            "--table-max-height": resolveMaxHeight(maxHeight),
+          } as CSSProperties
+        }
+      >
+        <table ref={tableRef} className="data-table">
         <colgroup>
           {selectable ? <col style={{ width: selectionColumnWidth, minWidth: selectionColumnWidth }} /> : null}
           {columns.map((column) => (
-            <col key={column.key} style={{ width: columnWidths[column.key], minWidth: column.minWidth ?? 88 }} />
+            <col key={column.key} style={{ width: columnWidths[column.key], minWidth: column.minWidth ?? defaultMinColumnWidth }} />
           ))}
         </colgroup>
 
@@ -323,7 +396,32 @@ export const DataTable = <T = unknown,>({
             </tr>
           )}
         </tbody>
-      </table>
+        </table>
+      </div>
+      {persistentHorizontalScroll && horizontalScrollMetrics.hasOverflow ? (
+        <label className="data-table-horizontal-range-shell">
+          <span className="sr-only">Horizontal table scroll</span>
+          <input
+            aria-label="Horizontal table scroll"
+            className="data-table-horizontal-range"
+            max={horizontalScrollMetrics.maxScrollLeft}
+            min={0}
+            onChange={(event) => {
+              const nextScrollLeft = Number(event.target.value);
+              setHorizontalScrollMetrics((current) => ({
+                ...current,
+                scrollLeft: nextScrollLeft,
+              }));
+
+              if (tableShellRef.current) {
+                tableShellRef.current.scrollLeft = nextScrollLeft;
+              }
+            }}
+            type="range"
+            value={horizontalScrollMetrics.scrollLeft}
+          />
+        </label>
+      ) : null}
     </div>
   );
 };

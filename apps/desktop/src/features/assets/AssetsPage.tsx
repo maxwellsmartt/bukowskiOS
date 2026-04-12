@@ -487,12 +487,14 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 : "No assets yet. Create the first asset after setting Catalog basics."
             }
             getRowId={(row) => row.id}
-            maxHeight="min(66vh, 720px)"
+            maxHeight="min(68vh, 760px)"
             onRowClick={(row) => setSelectedAssetId(row.id)}
             onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
             onSortRequest={assetControls.handleColumnSortRequest}
             persistKey="assets-registry"
+            persistentHorizontalScroll
             rows={assets}
+            shellClassName="table-shell-wide-scroll"
             selectable
             selectedRowIds={selectedRowIds}
             sortState={

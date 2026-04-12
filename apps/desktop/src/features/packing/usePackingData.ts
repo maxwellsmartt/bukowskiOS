@@ -1,4 +1,5 @@
 import type {
+  AppExportResult,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
   PackingSlipDetailSnapshot,
@@ -64,4 +65,12 @@ export const returnPackingSlipItems = async (
   }
 
   return window.bukowskiPacking.returnItems(input);
+};
+
+export const exportPackingSlipPdf = async (packingSlipId: string): Promise<AppExportResult> => {
+  if (!window.bukowskiPacking) {
+    throw new Error("Packing bridge unavailable");
+  }
+
+  return window.bukowskiPacking.exportPdf(packingSlipId);
 };
