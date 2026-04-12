@@ -3,8 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
+import { emptyReadArgsSchema } from "@contracts";
 import { ipcChannels } from "@contracts/ipc/channels";
 import { assertAllowedExternalUrl, assertTrustedIpcSender, sanitizeIpcError } from "../security/securityConfig";
+import { safeHandleReadWithSchema } from "./ipcSafeHandler";
 
 type RegisterAppIpcOptions = {
   database: DatabaseSync;
@@ -88,25 +90,15 @@ export const registerAppIpc = ({
   exportRecentLogs,
   exportSupportBundle,
 }: RegisterAppIpcOptions) => {
-  ipcMain.handle(ipcChannels.app.getInfo, (event) => {
-    assertTrustedIpcSender(event);
-
-    return {
+  safeHandleReadWithSchema(ipcChannels.app.getInfo, emptyReadArgsSchema, () => ({
     appName: "bukowskiOS",
     platform: process.platform,
     isPackaged: app.isPackaged,
     version: app.getVersion(),
     shellVersion: "foundation-v1",
-    };
-  });
-  ipcMain.handle(ipcChannels.app.getDiagnostics, (event) => {
-    assertTrustedIpcSender(event);
-    return getDiagnosticsSnapshot();
-  });
-  ipcMain.handle(ipcChannels.app.getSupportSnapshot, (event) => {
-    assertTrustedIpcSender(event);
-    return getSupportSnapshot();
-  });
+  }));
+  safeHandleReadWithSchema(ipcChannels.app.getDiagnostics, emptyReadArgsSchema, () => getDiagnosticsSnapshot());
+  safeHandleReadWithSchema(ipcChannels.app.getSupportSnapshot, emptyReadArgsSchema, () => getSupportSnapshot());
   ipcMain.handle(ipcChannels.app.createBackup, (event) => {
     try {
       assertTrustedIpcSender(event);
@@ -140,14 +132,12 @@ export const registerAppIpc = ({
       throw sanitizeIpcError(error, "The app could not complete the local sync pass.");
     }
   });
-  ipcMain.handle(ipcChannels.app.getSyncOutboxRows, (event) => {
-    try {
-      assertTrustedIpcSender(event);
-      return getSyncOutboxRows();
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not load the local sync queue.");
-    }
-  });
+  safeHandleReadWithSchema(
+    ipcChannels.app.getSyncOutboxRows,
+    emptyReadArgsSchema,
+    () => getSyncOutboxRows(),
+    "The app could not load the local sync queue.",
+  );
   ipcMain.handle(ipcChannels.app.retrySyncOutboxRow, (event, id: string) => {
     try {
       assertTrustedIpcSender(event);

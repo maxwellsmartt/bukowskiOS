@@ -1,0 +1,155 @@
+import { z } from "zod";
+
+const nonEmptyId = z.string().trim().min(1).max(160);
+const boundedSearch = z.string().trim().max(200);
+const sortDirectionSchema = z.enum(["asc", "desc"]);
+const isoDateSchema = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/u, "Expected a YYYY-MM-DD date.");
+
+const assetSortFieldSchema = z.enum([
+  "name",
+  "code",
+  "category",
+  "status",
+  "condition",
+  "location",
+  "project",
+  "projectUnit",
+  "responsible",
+  "serialNumber",
+  "qrCode",
+  "incidentsOpen",
+  "createdAt",
+  "updatedAt",
+]);
+
+const packingSlipSortFieldSchema = z.enum([
+  "number",
+  "project",
+  "department",
+  "responsible",
+  "issuedDate",
+  "dueDate",
+  "itemCount",
+  "returnedCount",
+  "status",
+]);
+
+const incidentSortFieldSchema = z.enum([
+  "title",
+  "asset",
+  "project",
+  "responsible",
+  "severity",
+  "costEstimate",
+  "status",
+  "reportedAt",
+]);
+
+const projectSortFieldSchema = z.enum([
+  "name",
+  "code",
+  "client",
+  "status",
+  "startDate",
+  "endDate",
+  "colorKey",
+  "assetCount",
+  "incidentCount",
+  "activeUnitCount",
+  "exposure",
+  "createdAt",
+  "updatedAt",
+]);
+
+const financeEntrySortFieldSchema = z.enum(["date", "type", "category", "reference", "project", "amount", "status"]);
+const catalogEntityTypeSchema = z.enum(["location", "department", "crew", "client", "manufacturer", "category", "kit"]);
+const catalogSortFieldSchema = z.enum([
+  "code",
+  "name",
+  "fullName",
+  "status",
+  "type",
+  "description",
+  "roleLabel",
+  "contactName",
+  "supportEmail",
+  "email",
+  "phone",
+  "assetCount",
+]);
+
+export const emptyReadArgsSchema = z.tuple([]);
+
+export const idReadArgsSchema = z.tuple([nonEmptyId]);
+
+export const globalSearchQuerySchema = z.object({
+  query: boundedSearch,
+  recentEntityKeys: z.array(nonEmptyId).max(50).optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+});
+
+export const globalSearchReadArgsSchema = z.tuple([globalSearchQuerySchema]);
+
+export const scheduleTimelinePaginationSchema = z.object({
+  limit: z.number().int().min(1).max(100).optional(),
+  offset: z.number().int().min(0).max(1000).optional(),
+});
+
+export const scheduleTimelineReadArgsSchema = z.tuple([
+  z.enum(["30d", "90d", "6m"]),
+  z.enum(["day", "week", "month"]),
+  isoDateSchema.optional(),
+  scheduleTimelinePaginationSchema.optional(),
+]);
+
+export const assetListQuerySchema = z.object({
+  scopeProjectId: nonEmptyId.nullable().optional(),
+  search: boundedSearch.optional(),
+  sortBy: assetSortFieldSchema,
+  sortDirection: sortDirectionSchema,
+});
+
+export const assetListReadArgsSchema = z.tuple([assetListQuerySchema.optional()]);
+
+export const packingSlipListQuerySchema = z.object({
+  scopeProjectId: nonEmptyId.nullable().optional(),
+  search: boundedSearch.optional(),
+  sortBy: packingSlipSortFieldSchema,
+  sortDirection: sortDirectionSchema,
+});
+
+export const packingSlipListReadArgsSchema = z.tuple([packingSlipListQuerySchema.optional()]);
+
+export const incidentListQuerySchema = z.object({
+  scopeProjectId: nonEmptyId.nullable().optional(),
+  search: boundedSearch.optional(),
+  sortBy: incidentSortFieldSchema,
+  sortDirection: sortDirectionSchema,
+});
+
+export const incidentListReadArgsSchema = z.tuple([incidentListQuerySchema.optional()]);
+
+export const projectListQuerySchema = z.object({
+  search: boundedSearch.optional(),
+  sortBy: projectSortFieldSchema,
+  sortDirection: sortDirectionSchema,
+});
+
+export const projectListReadArgsSchema = z.tuple([projectListQuerySchema.optional()]);
+
+export const financeEntryListQuerySchema = z.object({
+  search: boundedSearch.optional(),
+  sortBy: financeEntrySortFieldSchema,
+  sortDirection: sortDirectionSchema,
+});
+
+export const financeEntryListReadArgsSchema = z.tuple([financeEntryListQuerySchema.optional()]);
+
+export const catalogListQuerySchema = z.object({
+  entityType: catalogEntityTypeSchema,
+  search: boundedSearch.optional(),
+  sortBy: catalogSortFieldSchema,
+  sortDirection: sortDirectionSchema,
+});
+
+export const catalogListReadArgsSchema = z.tuple([catalogListQuerySchema.optional()]);

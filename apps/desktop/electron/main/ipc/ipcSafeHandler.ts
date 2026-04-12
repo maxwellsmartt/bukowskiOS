@@ -42,3 +42,25 @@ export const safeHandleRead = <TArgs extends unknown[], TResult>(
     }
   });
 };
+
+export const safeHandleReadWithSchema = <TArgs extends unknown[], TResult>(
+  channel: string,
+  schema: ZodTypeAny,
+  handler: (event: IpcMainInvokeEvent, ...args: TArgs) => AsyncResult<TResult>,
+  fallbackMessage?: string,
+) => {
+  ipcMain.handle(channel, async (event, ...args) => {
+    assertTrustedIpcSender(event);
+
+    const parsedArgs = schema.safeParse(args);
+    if (!parsedArgs.success) {
+      throw sanitizeIpcError(parsedArgs.error.issues[0]?.message ?? "Invalid request payload.", "Invalid request payload.");
+    }
+
+    try {
+      return await handler(event, ...(parsedArgs.data as TArgs));
+    } catch (error) {
+      throw sanitizeIpcError(error, fallbackMessage);
+    }
+  });
+};

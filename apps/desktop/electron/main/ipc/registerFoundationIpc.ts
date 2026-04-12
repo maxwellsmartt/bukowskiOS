@@ -13,10 +13,19 @@ import {
   createProjectSchema,
   createProjectUnitSchema,
   createRmaCaseSchema,
+  idReadArgsSchema,
   deleteAssistantThreadSchema,
   deleteCatalogEntitySchema,
   deleteProjectSchema,
   deleteProjectUnitSchema,
+  emptyReadArgsSchema,
+  financeEntryListReadArgsSchema,
+  globalSearchReadArgsSchema,
+  assetListReadArgsSchema,
+  incidentListReadArgsSchema,
+  packingSlipListReadArgsSchema,
+  projectListReadArgsSchema,
+  catalogListReadArgsSchema,
   recordRuntimeErrorSchema,
   reportIncidentSchema,
   resolveIncidentSchema,
@@ -38,6 +47,7 @@ import {
   updateProjectSchema,
   updateProjectUnitSchema,
   updateRmaCaseSchema,
+  scheduleTimelineReadArgsSchema,
 } from "@contracts";
 import type {
   AssistantChatSnapshot,
@@ -99,7 +109,7 @@ import type {
 import { ipcChannels } from "@contracts";
 
 import type { FoundationReadService } from "../services/data/foundationReadService";
-import { safeHandle, safeHandleRead } from "./ipcSafeHandler";
+import { safeHandle, safeHandleRead, safeHandleReadWithSchema } from "./ipcSafeHandler";
 
 type RegisterFoundationIpcOptions = {
   foundationReads: FoundationReadService;
@@ -186,9 +196,15 @@ export const registerFoundationIpc = ({
   agentMutations,
   runtimeDiagnostics,
 }: RegisterFoundationIpcOptions) => {
-  safeHandleRead(ipcChannels.shell.getBootstrap, () => foundationReads.getShellBootstrap(), "The app could not load the shell bootstrap.");
-  safeHandleRead(
+  safeHandleReadWithSchema(
+    ipcChannels.shell.getBootstrap,
+    emptyReadArgsSchema,
+    () => foundationReads.getShellBootstrap(),
+    "The app could not load the shell bootstrap.",
+  );
+  safeHandleReadWithSchema(
     ipcChannels.shell.searchGlobal,
+    globalSearchReadArgsSchema,
     (_event, query: GlobalSearchQuery) => foundationReads.getGlobalSearch(query),
     "The app could not complete that search.",
   );
@@ -288,9 +304,15 @@ export const registerFoundationIpc = ({
     recordRuntimeErrorSchema,
     (_event, input) => runtimeDiagnostics.recordRuntimeError(input),
   );
-  safeHandleRead(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot(), "The app could not load the overview.");
-  safeHandleRead(
+  safeHandleReadWithSchema(
+    ipcChannels.overview.getSnapshot,
+    emptyReadArgsSchema,
+    () => foundationReads.getOverviewSnapshot(),
+    "The app could not load the overview.",
+  );
+  safeHandleReadWithSchema(
     ipcChannels.overview.getTimeline,
+    scheduleTimelineReadArgsSchema,
     (
       _event,
       range: ScheduleTimelineRange,
@@ -300,11 +322,17 @@ export const registerFoundationIpc = ({
     ) => foundationReads.getScheduleTimeline(range, scale, anchorDate, pagination),
     "The app could not load the schedule timeline.",
   );
-  safeHandleRead(ipcChannels.assets.getList, (_event, query: AssetListQuery | undefined) => foundationReads.getAssets(query), "The app could not load assets.");
+  safeHandleReadWithSchema(
+    ipcChannels.assets.getList,
+    assetListReadArgsSchema,
+    (_event, query: AssetListQuery | undefined) => foundationReads.getAssets(query),
+    "The app could not load assets.",
+  );
   safeHandleRead(ipcChannels.assets.getSummary, () => foundationReads.getAssetSummary(), "The app could not load the asset summary.");
   safeHandleRead(ipcChannels.assets.getOverview, () => foundationReads.getAssetsOverview(), "The app could not load the asset overview.");
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.assets.getDetail,
+    idReadArgsSchema,
     (_event, assetId: string) => foundationReads.getAssetDetail(assetId),
     "The app could not load that asset.",
   );
@@ -312,13 +340,15 @@ export const registerFoundationIpc = ({
   safeHandle(ipcChannels.assets.create, createAssetSchema, (_event, input) => assetMutations.createAsset(input));
   safeHandle(ipcChannels.assets.update, updateAssetSchema, (_event, input) => assetMutations.updateAsset(input));
   safeHandle(ipcChannels.assets.archive, archiveAssetSchema, (_event, input) => assetMutations.archiveAsset(input));
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.packing.getList,
+    packingSlipListReadArgsSchema,
     (_event, query: PackingSlipListQuery | undefined) => foundationReads.getPackingSlips(query),
     "The app could not load packing slips.",
   );
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.packing.getDetail,
+    idReadArgsSchema,
     (_event, packingSlipId: string) => foundationReads.getPackingSlipDetail(packingSlipId),
     "The app could not load that packing slip.",
   );
@@ -326,26 +356,30 @@ export const registerFoundationIpc = ({
   safeHandle(ipcChannels.packing.returnItems, returnPackingSlipItemsSchema, (_event, input) =>
     packingMutations.returnPackingSlipItems(input),
   );
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.incidents.getList,
+    incidentListReadArgsSchema,
     (_event, query: IncidentListQuery | undefined) => foundationReads.getIncidents(query),
     "The app could not load incidents.",
   );
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.incidents.getDetail,
+    idReadArgsSchema,
     (_event, incidentId: string) => foundationReads.getIncidentDetail(incidentId),
     "The app could not load that incident.",
   );
   safeHandle(ipcChannels.incidents.report, reportIncidentSchema, (_event, input) => incidentMutations.reportIncident(input));
   safeHandle(ipcChannels.incidents.update, updateIncidentSchema, (_event, input) => incidentMutations.updateIncident(input));
   safeHandle(ipcChannels.incidents.resolve, resolveIncidentSchema, (_event, input) => incidentMutations.resolveIncident(input));
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.projects.getList,
+    projectListReadArgsSchema,
     (_event, query: ProjectListQuery | undefined) => foundationReads.getProjects(query),
     "The app could not load projects.",
   );
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.projects.getDetail,
+    idReadArgsSchema,
     (_event, projectId: string) => foundationReads.getProjectDetail(projectId),
     "The app could not load that project.",
   );
@@ -382,8 +416,9 @@ export const registerFoundationIpc = ({
     projectMutations.unassignCrewFromProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.catalog.getSnapshot,
+    catalogListReadArgsSchema,
     (_event, query: CatalogListQuery | undefined) => foundationReads.getCatalogSnapshot(query),
     "The app could not load the catalog snapshot.",
   );
@@ -400,8 +435,9 @@ export const registerFoundationIpc = ({
     return foundationReads.getCatalogSnapshot();
   });
   safeHandleRead(ipcChannels.rma.getSnapshot, () => foundationReads.getRmaSnapshot(), "The app could not load the RMA snapshot.");
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.rma.getDetail,
+    idReadArgsSchema,
     (_event, rmaCaseId: string) => foundationReads.getRmaCaseDetail(rmaCaseId),
     "The app could not load that RMA case.",
   );
@@ -409,8 +445,9 @@ export const registerFoundationIpc = ({
   safeHandle(ipcChannels.rma.update, updateRmaCaseSchema, (_event, input) => rmaMutations.updateRmaCase(input));
   safeHandleRead(ipcChannels.finance.getOverview, () => foundationReads.getFinanceOverview(), "The app could not load finance overview.");
   safeHandleRead(ipcChannels.finance.getCostLinks, () => foundationReads.getFinanceCostLinks(), "The app could not load finance cost links.");
-  safeHandleRead(
+  safeHandleReadWithSchema(
     ipcChannels.finance.getEntries,
+    financeEntryListReadArgsSchema,
     (_event, query: FinanceEntryListQuery | undefined) => foundationReads.getFinanceEntries(query),
     "The app could not load finance entries.",
   );

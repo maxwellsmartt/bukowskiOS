@@ -34,16 +34,29 @@
   - `medio`: el support bundle v1 exporta carpeta estructurada, no `.zip`
 
 ### Slice P0.2 — Read validation crítica
-- Estado: `planned`
+- Estado: `done`
 - Objetivo:
   - extender schemas runtime a reads de mayor superficie y riesgo
 - Área:
   - backend
-- Alcance inicial:
-  - global search
-  - overview/timeline
-  - detail queries principales
-  - app-level reads de sync/support
+- Qué cambió:
+  - nuevo set de schemas Zod para reads críticos en `@contracts/validation/read-schemas`
+  - nueva variante `safeHandleReadWithSchema(...)` para validar parámetros de lecturas antes de tocar servicios
+  - validación añadida a:
+    - `global search`
+    - `overview/timeline`
+    - list/detail reads de `assets`, `packing`, `incidents`, `projects`, `catalog`, `rma` y `finance`
+    - app-level reads de `getInfo`, `getDiagnostics`, `getSupportSnapshot` y `getSyncOutboxRows`
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - prueba unitaria nueva para `ipcSafeHandler` verificando aceptación de args válidos y rechazo limpio de args inválidos
+  - handlers críticos del `main` ya no aceptan payloads arbitrarios en lecturas expuestas
+- Riesgos remanentes:
+  - `medio`: todavía quedan reads secundarios sin schema runtime, sobre todo en superficies internas de agentes
+  - `bajo`: algunos reads simples sin parámetros siguen usando `safeHandleRead` porque el riesgo efectivo ahí es bajo
 
 ### Slice P0.3 — Smoke empaquetado arm64
 - Estado: `planned`
