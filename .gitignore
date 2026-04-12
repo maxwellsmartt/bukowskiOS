@@ -9,5 +9,6 @@ coverage
 .vite
 apps/desktop/dist
 apps/desktop/dist-electron
+apps/desktop/dist-packaged
 apps/desktop/electron.vite.config.*.timestamp-*
 supabase/.temp

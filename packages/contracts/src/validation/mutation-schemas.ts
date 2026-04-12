@@ -1,0 +1,485 @@
+import { z } from "zod";
+
+const nonEmptyString = z.string().trim().min(1);
+const optionalTrimmedString = z.string().trim().optional();
+const optionalNullableString = z.string().trim().nullable().optional();
+const commandActorTypeSchema = z.enum(["user", "agent", "integration"]);
+const commandSourceChannelSchema = z.enum(["desktop", "mobile", "api", "whatsapp", "telegram"]);
+const agentStatusSchema = z.enum(["active", "paused"]);
+const agentApprovalModeSchema = z.enum(["auto", "supervised", "needs_approval"]);
+const assistantApprovalPreferenceSchema = z.enum(["supervised", "needs_approval", "unsupervised"]);
+const rmaStatusSchema = z.enum(["Draft", "Ready", "Sent", "Closed"]);
+
+export const createAgentSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    agentId: nonEmptyString,
+    displayName: nonEmptyString,
+    emoji: optionalTrimmedString,
+    modelKey: nonEmptyString,
+    role: nonEmptyString,
+    domain: nonEmptyString,
+    allowedTools: z.array(nonEmptyString),
+    allowedDomains: z.array(nonEmptyString),
+    status: agentStatusSchema,
+    approvalMode: agentApprovalModeSchema,
+    notes: optionalTrimmedString,
+  })
+  .strict();
+
+export const updateAgentSchema = createAgentSchema.extend({
+  id: nonEmptyString,
+});
+
+export const setAgentStatusSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    id: nonEmptyString,
+    status: agentStatusSchema,
+  })
+  .strict();
+
+export const setAgentApprovalModeSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    id: nonEmptyString,
+    approvalMode: agentApprovalModeSchema,
+  })
+  .strict();
+
+export const saveAiProviderConfigSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    providerKey: nonEmptyString,
+    enabled: z.boolean(),
+    apiKey: optionalTrimmedString,
+    clearStoredKey: z.boolean().optional(),
+    baseUrl: optionalTrimmedString,
+    defaultModelKey: nonEmptyString,
+    timeoutMs: z.number().int().nonnegative(),
+    retryCount: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const testAiProviderConnectionSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    providerKey: nonEmptyString,
+  })
+  .strict();
+
+export const assignAgentModelSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    agentId: nonEmptyString,
+    providerKey: nonEmptyString,
+    modelKey: nonEmptyString,
+    modelLabel: nonEmptyString,
+  })
+  .strict();
+
+export const createAssistantThreadSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    contextKey: nonEmptyString,
+    contextLabel: nonEmptyString,
+  })
+  .strict();
+
+export const deleteAssistantThreadSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    threadId: nonEmptyString,
+  })
+  .strict();
+
+export const setActiveAssistantThreadSchema = deleteAssistantThreadSchema;
+
+export const updateAssistantThreadPreferencesSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    threadId: nonEmptyString,
+    preferredApprovalMode: assistantApprovalPreferenceSchema,
+  })
+  .strict();
+
+export const assistantGatewayAttachmentSchema = z
+  .object({
+    id: nonEmptyString,
+    kind: z.literal("image"),
+    name: nonEmptyString,
+    mimeType: nonEmptyString,
+    dataUrl: nonEmptyString,
+  })
+  .strict();
+
+export const assistantGatewayToolContextSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    activePath: optionalTrimmedString,
+    activeProjectId: optionalNullableString,
+    currentView: optionalNullableString,
+    activeFilters: z.record(z.string(), z.string()).optional(),
+    requestedApprovalMode: assistantApprovalPreferenceSchema.optional(),
+  })
+  .strict();
+
+export const sendAssistantChatTurnSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    threadId: nonEmptyString,
+    message: nonEmptyString,
+    attachments: z.array(assistantGatewayAttachmentSchema).optional(),
+    context: assistantGatewayToolContextSchema,
+  })
+  .strict();
+
+export const reviewAgentRunSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    runId: nonEmptyString,
+    decision: z.enum(["approve", "deny", "approve_for_session"]),
+  })
+  .strict();
+
+export const createDraftRunFromChatSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    message: nonEmptyString,
+    routeHint: optionalTrimmedString,
+    activePath: optionalTrimmedString,
+  })
+  .strict();
+
+export const recordRuntimeErrorSchema = z
+  .object({
+    sourceKind: z.enum(["main", "renderer", "webcontents"]),
+    processLabel: nonEmptyString,
+    errorName: nonEmptyString,
+    message: nonEmptyString,
+    stack: z.string().nullable().optional(),
+    severity: z.enum(["low", "medium", "critical"]).optional(),
+    context: z.record(z.string(), z.unknown()).nullable().optional(),
+    threadId: z.string().nullable().optional(),
+  })
+  .strict();
+
+const assetEditorSchema = z
+  .object({
+    name: nonEmptyString,
+    internalCode: nonEmptyString,
+    categoryId: nonEmptyString,
+    brand: optionalTrimmedString,
+    model: optionalTrimmedString,
+    serialNumber: optionalTrimmedString,
+    description: optionalTrimmedString,
+    defaultLocationId: optionalTrimmedString,
+    conditionStatus: nonEmptyString,
+    notes: optionalTrimmedString,
+    replacementValue: z.number().finite().nonnegative().optional(),
+    ownershipType: optionalTrimmedString,
+    qrCodeValue: optionalTrimmedString,
+    isActive: z.boolean().optional(),
+  })
+  .strict();
+
+export const createAssetSchema = assetEditorSchema.extend({
+  commandId: nonEmptyString,
+  workspaceId: nonEmptyString,
+  actorType: commandActorTypeSchema,
+  sourceChannel: commandSourceChannelSchema,
+});
+
+export const updateAssetSchema = createAssetSchema.extend({
+  assetId: nonEmptyString,
+});
+
+export const archiveAssetSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    assetId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
+export const assignMoveAssetsSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    assetIds: z.array(nonEmptyString).min(1),
+    mode: z.enum(["assign", "move"]),
+    projectId: optionalTrimmedString,
+    projectUnitId: optionalTrimmedString,
+    departmentId: optionalTrimmedString,
+    assignedToUserId: optionalTrimmedString,
+    targetLocationId: optionalTrimmedString,
+    expectedReturnAt: optionalTrimmedString,
+    notes: optionalTrimmedString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
+export const reportIncidentSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    assetId: optionalTrimmedString,
+    assignmentId: optionalTrimmedString,
+    projectId: optionalTrimmedString,
+    projectUnitId: optionalTrimmedString,
+    departmentId: optionalTrimmedString,
+    responsibleUserId: optionalTrimmedString,
+    incidentType: nonEmptyString,
+    severity: nonEmptyString,
+    title: nonEmptyString,
+    description: nonEmptyString,
+    costEstimate: z.number().finite().nonnegative().optional(),
+    currency: optionalTrimmedString,
+    financialStatus: optionalTrimmedString,
+    notes: optionalTrimmedString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
+export const createPackingSlipSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    assetIds: z.array(nonEmptyString).min(1),
+    projectId: nonEmptyString,
+    projectUnitId: optionalTrimmedString,
+    departmentId: optionalTrimmedString,
+    responsibleUserId: optionalTrimmedString,
+    returnDueAt: optionalTrimmedString,
+    notes: optionalTrimmedString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
+export const returnPackingSlipItemsSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    packingSlipId: nonEmptyString,
+    assetIds: z.array(nonEmptyString).optional(),
+    conditionIn: optionalTrimmedString,
+    notes: optionalTrimmedString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
+export const createProjectSchema = z
+  .object({
+    code: nonEmptyString,
+    name: nonEmptyString,
+    clientId: optionalTrimmedString,
+    clientName: optionalTrimmedString,
+    status: optionalTrimmedString,
+    description: optionalTrimmedString,
+    startDate: optionalTrimmedString,
+    endDate: optionalTrimmedString,
+    colorKey: optionalTrimmedString,
+  })
+  .strict();
+
+export const updateProjectSchema = createProjectSchema.extend({
+  projectId: nonEmptyString,
+});
+
+export const deleteProjectSchema = z
+  .object({
+    projectId: nonEmptyString,
+  })
+  .strict();
+
+const projectUnitSchema = z
+  .object({
+    projectId: nonEmptyString,
+    code: nonEmptyString,
+    name: nonEmptyString,
+    sortOrder: z.number().int().optional(),
+    colorKey: optionalTrimmedString,
+    startDate: optionalTrimmedString,
+    endDate: optionalTrimmedString,
+    notes: optionalTrimmedString,
+  })
+  .strict();
+
+export const createProjectUnitSchema = projectUnitSchema;
+
+export const updateProjectUnitSchema = projectUnitSchema.extend({
+    unitId: nonEmptyString,
+    sortOrder: z.number().int(),
+    statusAction: z.enum(["none", "mark_wrapped", "cancel", "reactivate"]).optional(),
+  });
+
+export const deleteProjectUnitSchema = z
+  .object({
+    projectId: nonEmptyString,
+    unitId: nonEmptyString,
+  })
+  .strict();
+
+export const assignCrewToProjectUnitSchema = z
+  .object({
+    projectId: nonEmptyString,
+    unitId: nonEmptyString,
+    crewMemberId: nonEmptyString,
+    roleLabel: optionalTrimmedString,
+    startDate: optionalTrimmedString,
+    endDate: optionalTrimmedString,
+    notes: optionalTrimmedString,
+  })
+  .strict();
+
+export const unassignCrewFromProjectUnitSchema = z
+  .object({
+    projectId: nonEmptyString,
+    unitId: nonEmptyString,
+    assignmentId: nonEmptyString,
+  })
+  .strict();
+
+const createCatalogLocationSchema = z
+  .object({
+    entityType: z.literal("location"),
+    code: nonEmptyString,
+    name: nonEmptyString,
+    locationType: nonEmptyString,
+    description: optionalTrimmedString,
+  })
+  .strict();
+
+const createCatalogDepartmentSchema = z
+  .object({
+    entityType: z.literal("department"),
+    code: nonEmptyString,
+    name: nonEmptyString,
+    description: optionalTrimmedString,
+  })
+  .strict();
+
+const createCatalogCrewSchema = z
+  .object({
+    entityType: z.literal("crew"),
+    fullName: nonEmptyString,
+    roleLabel: optionalTrimmedString,
+    email: optionalTrimmedString,
+    phone: optionalTrimmedString,
+    notes: optionalTrimmedString,
+  })
+  .strict();
+
+const createCatalogClientSchema = z
+  .object({
+    entityType: z.literal("client"),
+    name: nonEmptyString,
+    contactName: optionalTrimmedString,
+    email: optionalTrimmedString,
+    phone: optionalTrimmedString,
+    notes: optionalTrimmedString,
+  })
+  .strict();
+
+const createCatalogManufacturerSchema = z
+  .object({
+    entityType: z.literal("manufacturer"),
+    name: nonEmptyString,
+    contactName: optionalTrimmedString,
+    supportEmail: optionalTrimmedString,
+    phone: optionalTrimmedString,
+    notes: optionalTrimmedString,
+  })
+  .strict();
+
+const createCatalogCategorySchema = z
+  .object({
+    entityType: z.literal("category"),
+    code: nonEmptyString,
+    name: nonEmptyString,
+    description: optionalTrimmedString,
+  })
+  .strict();
+
+const createCatalogKitSchema = z
+  .object({
+    entityType: z.literal("kit"),
+    code: nonEmptyString,
+    name: nonEmptyString,
+    description: optionalTrimmedString,
+    notes: optionalTrimmedString,
+    assetIds: z.array(nonEmptyString).optional(),
+  })
+  .strict();
+
+export const createCatalogEntitySchema = z.discriminatedUnion("entityType", [
+  createCatalogLocationSchema,
+  createCatalogDepartmentSchema,
+  createCatalogCrewSchema,
+  createCatalogClientSchema,
+  createCatalogManufacturerSchema,
+  createCatalogCategorySchema,
+  createCatalogKitSchema,
+]);
+
+export const updateCatalogEntitySchema = z.discriminatedUnion("entityType", [
+  createCatalogLocationSchema.extend({ id: nonEmptyString }),
+  createCatalogDepartmentSchema.extend({ id: nonEmptyString }),
+  createCatalogCrewSchema.extend({ id: nonEmptyString }),
+  createCatalogClientSchema.extend({ id: nonEmptyString }),
+  createCatalogManufacturerSchema.extend({ id: nonEmptyString }),
+  createCatalogCategorySchema.extend({ id: nonEmptyString }),
+  createCatalogKitSchema.extend({ id: nonEmptyString }),
+]);
+
+export const deleteCatalogEntitySchema = z
+  .object({
+    entityType: z.enum(["location", "department", "crew", "client", "manufacturer", "category", "kit"]),
+    id: nonEmptyString,
+  })
+  .strict();
+
+const rmaCaseAssetSchema = z
+  .object({
+    assetId: nonEmptyString,
+    equipmentYear: optionalTrimmedString,
+    issueSummary: nonEmptyString,
+  })
+  .strict();
+
+export const createRmaCaseSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    manufacturerId: nonEmptyString,
+    supportEmail: optionalTrimmedString,
+    title: nonEmptyString,
+    problemSummary: nonEmptyString,
+    notes: optionalTrimmedString,
+    assetItems: z.array(rmaCaseAssetSchema).min(1),
+    actorType: nonEmptyString,
+    sourceChannel: nonEmptyString,
+  })
+  .strict();
+
+export const updateRmaCaseSchema = createRmaCaseSchema.extend({
+  rmaCaseId: nonEmptyString,
+  status: rmaStatusSchema,
+});

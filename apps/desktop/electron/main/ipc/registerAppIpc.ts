@@ -1,19 +1,124 @@
-import { app, ipcMain, shell } from "electron";
+import { app, dialog, ipcMain, shell } from "electron";
+import fs from "node:fs";
+import path from "node:path";
+import type { DatabaseSync } from "node:sqlite";
 
 import { ipcChannels } from "@contracts/ipc/channels";
+import { assertAllowedExternalUrl, assertTrustedIpcSender, sanitizeIpcError } from "../security/securityConfig";
 
 type RegisterAppIpcOptions = {
-  databasePath: string;
+  database: DatabaseSync;
+  getDiagnosticsSnapshot: () => import("@contracts").AppDiagnosticsSnapshot;
+  createBackupNow: () => import("@contracts").AppDiagnosticsSnapshot;
+  runIntegrityCheckNow: () => import("@contracts").AppDiagnosticsSnapshot;
 };
 
-export const registerAppIpc = ({ databasePath }: RegisterAppIpcOptions) => {
-  ipcMain.handle(ipcChannels.app.getInfo, () => ({
+const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) => {
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: "Export BukowskiOS data",
+    defaultPath: path.join(app.getPath("documents"), `bukowski-export-${new Date().toISOString().slice(0, 10)}.json`),
+    filters: [{ name: "JSON", extensions: ["json"] }],
+  });
+
+  if (canceled || !filePath) {
+    return {
+      saved: false,
+      fileName: null,
+      summary: "Export cancelled.",
+    };
+  }
+
+  const tables = database
+    .prepare(
+      `
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table'
+          AND name NOT LIKE 'sqlite_%'
+      `,
+    )
+    .all() as Array<{ name: string }>;
+
+  const payload = Object.fromEntries(
+    tables.map((table) => [
+      table.name,
+      database.prepare(`SELECT * FROM ${table.name}`).all(),
+    ]),
+  );
+
+  fs.writeFileSync(
+    filePath,
+    JSON.stringify(
+      {
+        exportedAt: new Date().toISOString(),
+        tables: payload,
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+
+  return {
+    saved: true,
+    fileName: path.basename(filePath),
+    summary: `Exported workspace data to ${path.basename(filePath)}.`,
+  };
+};
+
+export const registerAppIpc = ({ database, getDiagnosticsSnapshot, createBackupNow, runIntegrityCheckNow }: RegisterAppIpcOptions) => {
+  ipcMain.handle(ipcChannels.app.getInfo, (event) => {
+    assertTrustedIpcSender(event);
+
+    return {
     appName: "bukowskiOS",
     platform: process.platform,
     isPackaged: app.isPackaged,
     version: app.getVersion(),
     shellVersion: "foundation-v1",
-    databasePath,
-  }));
-  ipcMain.handle(ipcChannels.app.openExternal, (_event, url: string) => shell.openExternal(url));
+    };
+  });
+  ipcMain.handle(ipcChannels.app.getDiagnostics, (event) => {
+    assertTrustedIpcSender(event);
+    return getDiagnosticsSnapshot();
+  });
+  ipcMain.handle(ipcChannels.app.createBackup, (event) => {
+    try {
+      assertTrustedIpcSender(event);
+      return {
+        summary: "Backup created successfully.",
+        diagnostics: createBackupNow(),
+      };
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not create a backup.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.runIntegrityCheck, (event) => {
+    try {
+      assertTrustedIpcSender(event);
+      return {
+        summary: "Integrity check completed successfully.",
+        diagnostics: runIntegrityCheckNow(),
+      };
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not complete the integrity check.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.exportWorkspaceData, async (event) => {
+    try {
+      assertTrustedIpcSender(event);
+      return await exportDatabaseJson(database);
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not export local data.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.openExternal, (event, url: string) => {
+    try {
+      assertTrustedIpcSender(event);
+      assertAllowedExternalUrl(url);
+      return shell.openExternal(url);
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not open that external link.");
+    }
+  });
 };

@@ -2,11 +2,17 @@
   "name": "@bukowski/desktop",
   "private": true,
   "version": "0.1.0",
+  "description": "BukowskiOS desktop operations workspace",
+  "author": "BukowskiOS",
   "type": "module",
   "main": "dist-electron/app.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
+    "package:internal": "pnpm build && pnpm rebuild:electron && electron-builder --config electron-builder.config.cjs --publish never",
+    "package:mac": "pnpm build && pnpm rebuild:electron && electron-builder --config electron-builder.config.cjs --mac --publish never",
+    "verify:mac-build": "node ./build/verify-macos-build.cjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -18,9 +24,11 @@
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.0"
+    "react-router-dom": "^6.30.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
     "@types/better-sqlite3": "^7.6.13",
     "@types/bwip-js": "^3.2.3",
     "@types/node": "^22.14.0",
@@ -30,6 +38,7 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^35.2.0",
+    "electron-builder": "^26.8.1",
     "typescript": "^5.8.3",
     "vite": "^6.2.6",
     "vite-plugin-electron": "^0.29.0",

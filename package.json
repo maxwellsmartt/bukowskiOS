@@ -12,6 +12,7 @@
     "verify": "pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
-    "pnpm": "10.8.1"
+    "pnpm": "10.8.1",
+    "zod": "^4.3.6"
   }
 }

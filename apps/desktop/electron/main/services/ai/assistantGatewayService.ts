@@ -433,13 +433,13 @@ const buildHumanErrorResponse = (
   modelKey: string | null,
 ): AssistantGatewayResponse => ({
   status,
-  stateLabel: status === "needs_configuration" ? "Provider not ready" : "Assistant unavailable",
+  stateLabel: status === "needs_configuration" ? "Provider setup required" : "Assistant unavailable",
   stateBody: body,
   assistantMessage: body,
   routedAgentId: null,
   routedAgentName: "Supervisor Agent",
   intentLabel: "Routing unavailable",
-  commandStateLabel: "Command layer still idle",
+  commandStateLabel: "No changes applied",
   draftRunId: null,
   approvalDecision: null,
   approvalScope: null,
@@ -508,7 +508,7 @@ export const createAssistantGatewayService = (
     if (!supervisorProvider || supervisorProvider.enabled !== 1) {
       return buildHumanErrorResponse(
         "needs_configuration",
-        "OpenAI is not enabled yet. Configure the provider in Models before using chat.",
+        "Connect an AI provider in Models before using chat.",
         supervisorProviderKey,
         supervisorModelKey,
       );
@@ -519,7 +519,7 @@ export const createAssistantGatewayService = (
     if (!supervisorApiKey) {
       return buildHumanErrorResponse(
         "needs_configuration",
-        "This provider does not have a stored API key on this Mac yet.",
+        "Add an API key for this provider in Models before using chat.",
         supervisorProviderKey,
         supervisorModelKey,
       );
@@ -660,12 +660,11 @@ export const createAssistantGatewayService = (
             status: "tool_error",
             stateLabel: "Read-only query failed",
             stateBody: "A supervised lookup failed before any action could be prepared.",
-            assistantMessage:
-              "I could not finish that read-only lookup cleanly. No change was applied, and the command layer is still idle.",
+            assistantMessage: "I could not finish that read-only lookup cleanly. No changes were made.",
             routedAgentId: null,
             routedAgentName: "Supervisor Agent",
             intentLabel: "Intent classified",
-            commandStateLabel: "Command layer still idle",
+            commandStateLabel: "No changes applied",
             draftRunId: null,
             providerKey: supervisorProviderKey,
             modelKey: supervisorModelKey,
@@ -724,18 +723,18 @@ export const createAssistantGatewayService = (
         targetAgent: null,
         toolResultSummary: toolTraces[toolTraces.length - 1]?.summary ?? null,
         status: "structured_error",
-        error: "Structured response could not be parsed.",
+        error: "The assistant could not complete a valid structured response.",
       });
 
       return {
         status: "structured_error",
         stateLabel: "Supervisor answer unavailable",
         stateBody: "The provider answered, but the orchestration result was not shaped correctly.",
-        assistantMessage: "I could not finish that answer cleanly. No action was applied, and the command layer is still idle.",
+        assistantMessage: "I could not finish that answer cleanly. No changes were made.",
         routedAgentId: null,
         routedAgentName: "Supervisor Agent",
         intentLabel: "Intent classified",
-        commandStateLabel: "Command layer still idle",
+        commandStateLabel: "No changes applied",
         draftRunId: null,
         providerKey: supervisorProviderKey,
         modelKey: supervisorModelKey,
@@ -1014,12 +1013,12 @@ export const createAssistantGatewayService = (
       stateLabel: requiresApproval ? "Needs approval" : `Routed to ${typedOrchestration.targetAgentName}`,
       stateBody: draftRunId
         ? requiresApproval
-          ? "Prepared a supervised draft. This still needs approval before any change is applied."
+          ? "Action ready for review. Approval is still required before any change is applied."
           : approvalDecision === "approved_for_session"
-            ? "Prepared or completed this supervised follow-up under your session approval. No command-layer action was executed."
+            ? "Prepared or completed this supervised follow-up under your session approval. No changes were made."
             : approvalDecision === "approved"
-              ? "Completed the approved supervised follow-up. No command-layer action was executed."
-              : "Prepared a supervised draft. No command-layer action was executed."
+              ? "Completed the approved supervised follow-up. No changes were made."
+              : "Action ready for review. No changes were made."
         : typedOrchestration.toolCalls.length
           ? `${typedOrchestration.targetAgentName} answered after a read-only lookup.`
           : `${typedOrchestration.targetAgentName} answered directly from supervised routing.`,
@@ -1029,11 +1028,11 @@ export const createAssistantGatewayService = (
       intentLabel: `Intent classified · ${typedOrchestration.intent}`,
       commandStateLabel: draftRunId
         ? requiresApproval
-          ? "Prepared supervised draft · command layer still not executed"
+          ? "Action ready for review · no changes made"
           : approvalDecision === "approved_for_session"
-            ? "Session-approved follow-up · command layer still not executed"
-            : "Approved follow-up · command layer still not executed"
-        : "Read-only answer · command layer still not executed",
+            ? "Session-approved follow-up · no changes made"
+            : "Approved follow-up · no changes made"
+        : "Information only · no changes made",
       draftRunId,
       approvalDecision,
       approvalScope,

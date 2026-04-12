@@ -130,11 +130,11 @@ const deriveFallbackState = (thread: AssistantChatThreadRow): AssistantChatSessi
     return {
       tone: "sending",
       label: "Supervisor reviewing request",
-      body: "Routing intent and preparing a supervised draft. Command layer still not executed.",
+      body: "Routing intent and preparing a supervised response. No changes have been made.",
       routedAgentId: thread.lastRoutedAgentId,
       routedAgentName: "Supervisor Agent",
       intentLabel: thread.lastIntent ?? "Pending classification",
-      commandStateLabel: "Command layer still idle",
+      commandStateLabel: "No changes applied",
     };
   }
 
@@ -145,7 +145,7 @@ const deriveFallbackState = (thread: AssistantChatThreadRow): AssistantChatSessi
     routedAgentId: thread.lastRoutedAgentId,
     routedAgentName: "Supervisor Agent",
     intentLabel: thread.lastIntent ?? "Routing unavailable",
-    commandStateLabel: "Command layer still idle",
+    commandStateLabel: "No changes applied",
   };
 };
 

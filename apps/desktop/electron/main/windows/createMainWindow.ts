@@ -1,6 +1,7 @@
 import { BrowserWindow, shell } from "electron";
 import path from "node:path";
 
+import { assertAllowedExternalUrl } from "../security/securityConfig";
 import { bindWindowStatePersistence, getDefaultWindowBounds, readWindowState } from "./windowState";
 
 type CreateMainWindowOptions = {
@@ -37,6 +38,7 @@ export const createMainWindow = ({
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
   bindWindowStatePersistence(window);
@@ -48,7 +50,13 @@ export const createMainWindow = ({
   }
 
   window.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    try {
+      assertAllowedExternalUrl(url);
+      void shell.openExternal(url);
+    } catch {
+      // Ignore blocked external URLs and keep the navigation denied.
+    }
+
     return { action: "deny" };
   });
 

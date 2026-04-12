@@ -29,7 +29,7 @@ export default defineConfig(async () => {
             console.info(
               processWithElectron.electronApp ? "[dev] Electron main restart" : "[dev] Electron main start",
             );
-            await startup([".", "--no-sandbox"]);
+            await startup(["."]);
           },
           vite: {
             build: {

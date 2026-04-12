@@ -27,7 +27,7 @@ export const AssetDetailPage = () => {
   const [isArchivingAsset, setIsArchivingAsset] = useState(false);
 
   if (!data.asset) {
-    return <div className="empty-state">Asset not found in the local workspace.</div>;
+    return <div className="empty-state">This asset does not exist anymore or was removed from the workspace.</div>;
   }
 
   return (

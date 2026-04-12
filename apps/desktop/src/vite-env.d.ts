@@ -18,6 +18,9 @@ import type {
   AssignCrewToProjectUnitInput,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
+  AppActionResult,
+  AppDiagnosticsSnapshot,
+  AppExportResult,
   AppInfo,
   AssetsOverviewSnapshot,
   CreateAgentCommand,
@@ -91,6 +94,10 @@ declare global {
   interface Window {
     bukowskiApp?: {
       getAppInfo: () => Promise<AppInfo>;
+      getDiagnostics: () => Promise<AppDiagnosticsSnapshot>;
+      createBackup: () => Promise<AppActionResult>;
+      runIntegrityCheck: () => Promise<AppActionResult>;
+      exportWorkspaceData: () => Promise<AppExportResult>;
       openExternal: (url: string) => Promise<void>;
     };
     bukowskiShell?: {

@@ -18,6 +18,9 @@ import type {
   AssetListQuery,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
+  AppActionResult,
+  AppDiagnosticsSnapshot,
+  AppExportResult,
   AppInfo,
   AssetsOverviewSnapshot,
   CreateAgentCommand,
@@ -99,6 +102,10 @@ ipcRenderer.on(ipcChannels.shell.appAction, (_event, action: ShellAppAction) => 
 
 const bukowskiApp = {
   getAppInfo: () => ipcRenderer.invoke(ipcChannels.app.getInfo) as Promise<AppInfo>,
+  getDiagnostics: () => ipcRenderer.invoke(ipcChannels.app.getDiagnostics) as Promise<AppDiagnosticsSnapshot>,
+  createBackup: () => ipcRenderer.invoke(ipcChannels.app.createBackup) as Promise<AppActionResult>,
+  runIntegrityCheck: () => ipcRenderer.invoke(ipcChannels.app.runIntegrityCheck) as Promise<AppActionResult>,
+  exportWorkspaceData: () => ipcRenderer.invoke(ipcChannels.app.exportWorkspaceData) as Promise<AppExportResult>,
   openExternal: (url: string) => ipcRenderer.invoke(ipcChannels.app.openExternal, url) as Promise<void>,
 };
 

@@ -599,7 +599,7 @@ export const createAssistantChatService = (
       routedAgentId: null,
       routedAgentName: "Supervisor Agent",
       intentLabel: "Routing unavailable",
-      commandStateLabel: "Command layer still idle",
+      commandStateLabel: "No changes applied",
     };
 
     db.prepare(
@@ -854,18 +854,18 @@ export const createAssistantChatService = (
         const deniedMeta: AssistantChatMessageMeta = {
           tone: "approval",
           label: "Denied",
-          body: "You denied this supervised draft. No command-layer action was executed.",
+          body: "You denied this supervised draft. No changes were made.",
           routedAgentId: run.agent_id,
           routedAgentName: run.agent_display_name,
           intentLabel: "Approval decision recorded",
-          commandStateLabel: "Command layer still idle",
+          commandStateLabel: "No changes applied",
           draftRunId: run.id,
           approvalDecision: "denied",
           approvalScope: "run",
         };
         const { messageId } = createAssistantMessageRow(
           run.thread_id,
-          "Understood. I stopped this supervised follow-up. No command-layer action was executed.",
+          "Understood. I stopped this supervised follow-up. No changes were made.",
           "completed",
           deniedMeta,
         );
@@ -878,7 +878,7 @@ export const createAssistantChatService = (
             WHERE id = ?
           `,
         ).run(
-          buildSummaryText(summarySeed, "Understood. I stopped this supervised follow-up. No command-layer action was executed.", run.agent_display_name),
+          buildSummaryText(summarySeed, "Understood. I stopped this supervised follow-up. No changes were made.", run.agent_display_name),
           completedAt,
           run.thread_id,
         );
@@ -907,7 +907,7 @@ export const createAssistantChatService = (
         routedAgentId: run.agent_id,
         routedAgentName: run.agent_display_name,
         intentLabel: "Approval decision recorded",
-        commandStateLabel: "Command layer still idle",
+        commandStateLabel: "No changes applied",
         draftRunId: run.id,
         approvalDecision: input.decision === "approve_for_session" ? "approved_for_session" : "approved",
         approvalScope: input.decision === "approve_for_session" ? "session" : "run",

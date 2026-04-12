@@ -135,7 +135,7 @@ export const AgentsMissionControlPage = () => {
         reloadDetail();
       }
     } catch (error) {
-      setApprovalFeedback(error instanceof Error ? error.message : "No pude registrar esa decisión.");
+      setApprovalFeedback(error instanceof Error ? error.message : "I could not record that decision.");
     } finally {
       setProcessingRunId(null);
     }
@@ -146,7 +146,7 @@ export const AgentsMissionControlPage = () => {
       <SectionHeader
         title="Mission Control"
         titleTone="accent"
-        body="Supervisa agentes, actividad y trabajo pendiente desde una vista más clara."
+        body="Monitor agents, activity, and pending work from a clearer control view."
       />
 
       {error ? <div className="empty-state">Mission Control unavailable: {error}</div> : null}

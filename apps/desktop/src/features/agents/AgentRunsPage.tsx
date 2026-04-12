@@ -37,7 +37,7 @@ export const AgentRunsPage = () => {
       });
       setFeedback(result.summary);
     } catch (nextError) {
-      setFeedback(nextError instanceof Error ? nextError.message : "No pude registrar esa decisión.");
+      setFeedback(nextError instanceof Error ? nextError.message : "I could not record that decision.");
     } finally {
       setProcessingRunId(null);
     }
@@ -78,7 +78,7 @@ export const AgentRunsPage = () => {
                 <strong>{run.title}</strong>
                 <p>{run.summary}</p>
                 <p className="agent-run-note">
-                  Intent classified · {run.agentDisplayName || "Supervisor Agent"} · Command layer still not executed
+                  Intent classified · {run.agentDisplayName || "Supervisor Agent"} · No changes made
                 </p>
                 {run.status === "needs_approval" ? (
                   <div className="agent-run-approval-panel">

@@ -1,3 +1,40 @@
+import {
+  archiveAssetSchema,
+  assignAgentModelSchema,
+  assignCrewToProjectUnitSchema,
+  assignMoveAssetsSchema,
+  createAgentSchema,
+  createAssetSchema,
+  createAssistantThreadSchema,
+  createCatalogEntitySchema,
+  createDraftRunFromChatSchema,
+  createPackingSlipSchema,
+  createProjectSchema,
+  createProjectUnitSchema,
+  createRmaCaseSchema,
+  deleteAssistantThreadSchema,
+  deleteCatalogEntitySchema,
+  deleteProjectSchema,
+  deleteProjectUnitSchema,
+  recordRuntimeErrorSchema,
+  reportIncidentSchema,
+  returnPackingSlipItemsSchema,
+  reviewAgentRunSchema,
+  saveAiProviderConfigSchema,
+  sendAssistantChatTurnSchema,
+  setActiveAssistantThreadSchema,
+  setAgentApprovalModeSchema,
+  setAgentStatusSchema,
+  testAiProviderConnectionSchema,
+  unassignCrewFromProjectUnitSchema,
+  updateAgentSchema,
+  updateAssetSchema,
+  updateAssistantThreadPreferencesSchema,
+  updateCatalogEntitySchema,
+  updateProjectSchema,
+  updateProjectUnitSchema,
+  updateRmaCaseSchema,
+} from "@contracts";
 import type {
   AssistantChatSnapshot,
   AssignAgentModelCommand,
@@ -48,11 +85,11 @@ import type {
   UpdateRmaCaseCommand,
   UpdateAgentCommand,
 } from "@contracts";
-import { ipcMain } from "electron";
 
 import { ipcChannels } from "@contracts";
 
 import type { FoundationReadService } from "../services/data/foundationReadService";
+import { safeHandle, safeHandleRead } from "./ipcSafeHandler";
 
 type RegisterFoundationIpcOptions = {
   foundationReads: FoundationReadService;
@@ -132,143 +169,220 @@ export const registerFoundationIpc = ({
   agentMutations,
   runtimeDiagnostics,
 }: RegisterFoundationIpcOptions) => {
-  ipcMain.handle(ipcChannels.shell.getBootstrap, () => foundationReads.getShellBootstrap());
-  ipcMain.handle(ipcChannels.shell.searchGlobal, (_event, query: GlobalSearchQuery) => foundationReads.getGlobalSearch(query));
-  ipcMain.handle(ipcChannels.agents.getMissionControlSnapshot, () => agentReads.getMissionControlSnapshot());
-  ipcMain.handle(ipcChannels.agents.getAgentsList, () => agentReads.getAgentsList());
-  ipcMain.handle(ipcChannels.agents.getAgentDetail, (_event, agentId: string) => agentReads.getAgentDetail(agentId));
-  ipcMain.handle(ipcChannels.agents.getRunsList, () => agentReads.getRunsList());
-  ipcMain.handle(ipcChannels.agents.getModelsSnapshot, () => agentReads.getModelsSnapshot());
-  ipcMain.handle(ipcChannels.agents.getAIProviderConfigs, () => agentReads.getAIProviderConfigs());
-  ipcMain.handle(ipcChannels.agents.getConnectorsSnapshot, () => agentReads.getConnectorsSnapshot());
-  ipcMain.handle(ipcChannels.agents.getAssistantChatSnapshot, () => agentMutations.getAssistantChatSnapshot());
-  ipcMain.handle(ipcChannels.agents.create, (_event, input: CreateAgentCommand) => agentMutations.createAgent(input));
-  ipcMain.handle(ipcChannels.agents.update, (_event, input: UpdateAgentCommand) => agentMutations.updateAgent(input));
-  ipcMain.handle(ipcChannels.agents.setStatus, (_event, input: SetAgentStatusCommand) => agentMutations.setAgentStatus(input));
-  ipcMain.handle(
+  safeHandleRead(ipcChannels.shell.getBootstrap, () => foundationReads.getShellBootstrap(), "The app could not load the shell bootstrap.");
+  safeHandleRead(
+    ipcChannels.shell.searchGlobal,
+    (_event, query: GlobalSearchQuery) => foundationReads.getGlobalSearch(query),
+    "The app could not complete that search.",
+  );
+  safeHandleRead(
+    ipcChannels.agents.getMissionControlSnapshot,
+    () => agentReads.getMissionControlSnapshot(),
+    "The app could not load Mission Control.",
+  );
+  safeHandleRead(ipcChannels.agents.getAgentsList, () => agentReads.getAgentsList(), "The app could not load the agents list.");
+  safeHandleRead(
+    ipcChannels.agents.getAgentDetail,
+    (_event, agentId: string) => agentReads.getAgentDetail(agentId),
+    "The app could not load that agent.",
+  );
+  safeHandleRead(ipcChannels.agents.getRunsList, () => agentReads.getRunsList(), "The app could not load the run history.");
+  safeHandleRead(
+    ipcChannels.agents.getModelsSnapshot,
+    () => agentReads.getModelsSnapshot(),
+    "The app could not load the models snapshot.",
+  );
+  safeHandleRead(
+    ipcChannels.agents.getAIProviderConfigs,
+    () => agentReads.getAIProviderConfigs(),
+    "The app could not load AI provider settings.",
+  );
+  safeHandleRead(
+    ipcChannels.agents.getConnectorsSnapshot,
+    () => agentReads.getConnectorsSnapshot(),
+    "The app could not load the connectors snapshot.",
+  );
+  safeHandleRead(
+    ipcChannels.agents.getAssistantChatSnapshot,
+    () => agentMutations.getAssistantChatSnapshot(),
+    "The app could not load the assistant chat.",
+  );
+  safeHandle(ipcChannels.agents.create, createAgentSchema, (_event, input) => agentMutations.createAgent(input));
+  safeHandle(ipcChannels.agents.update, updateAgentSchema, (_event, input) => agentMutations.updateAgent(input));
+  safeHandle(ipcChannels.agents.setStatus, setAgentStatusSchema, (_event, input) => agentMutations.setAgentStatus(input));
+  safeHandle(
     ipcChannels.agents.setApprovalMode,
-    (_event, input: SetAgentApprovalModeCommand) => agentMutations.setAgentApprovalMode(input),
+    setAgentApprovalModeSchema,
+    (_event, input) => agentMutations.setAgentApprovalMode(input),
   );
-  ipcMain.handle(
+  safeHandle(
     ipcChannels.agents.saveAIProviderConfig,
-    (_event, input: SaveAIProviderConfigCommand) => agentMutations.saveAIProviderConfig(input),
+    saveAiProviderConfigSchema,
+    (_event, input) => agentMutations.saveAIProviderConfig(input),
   );
-  ipcMain.handle(
+  safeHandle(
     ipcChannels.agents.testAIProviderConnection,
-    (_event, input: TestAIProviderConnectionCommand) => agentMutations.testAIProviderConnection(input),
+    testAiProviderConnectionSchema,
+    (_event, input) => agentMutations.testAIProviderConnection(input),
   );
-  ipcMain.handle(
+  safeHandle(
     ipcChannels.agents.assignAgentModel,
-    (_event, input: AssignAgentModelCommand) => agentMutations.assignAgentModel(input),
+    assignAgentModelSchema,
+    (_event, input) => agentMutations.assignAgentModel(input),
   );
-  ipcMain.handle(
+  safeHandle(
     ipcChannels.agents.createAssistantThread,
-    (_event, input: CreateAssistantThreadCommand) => agentMutations.createAssistantThread(input),
+    createAssistantThreadSchema,
+    (_event, input) => agentMutations.createAssistantThread(input),
   );
-  ipcMain.handle(
+  safeHandle(
     ipcChannels.agents.deleteAssistantThread,
-    (_event, input: DeleteAssistantThreadCommand) => agentMutations.deleteAssistantThread(input),
+    deleteAssistantThreadSchema,
+    (_event, input) => agentMutations.deleteAssistantThread(input),
   );
-  ipcMain.handle(
+  safeHandle(
     ipcChannels.agents.setActiveAssistantThread,
-    (_event, input: SetActiveAssistantThreadCommand) => agentMutations.setActiveAssistantThread(input),
+    setActiveAssistantThreadSchema,
+    (_event, input) => agentMutations.setActiveAssistantThread(input),
   );
-  ipcMain.handle(
+  safeHandle(
     ipcChannels.agents.updateAssistantThreadPreferences,
-    (_event, input: UpdateAssistantThreadPreferencesCommand) => agentMutations.updateAssistantThreadPreferences(input),
+    updateAssistantThreadPreferencesSchema,
+    (_event, input) => agentMutations.updateAssistantThreadPreferences(input),
   );
-  ipcMain.handle(
+  safeHandle(
     ipcChannels.agents.sendAssistantChatTurn,
-    (_event, input: SendAssistantChatTurnCommand) => agentMutations.sendAssistantChatTurn(input),
+    sendAssistantChatTurnSchema,
+    (_event, input) => agentMutations.sendAssistantChatTurn(input),
   );
-  ipcMain.handle(ipcChannels.agents.reviewRun, (_event, input: ReviewAgentRunCommand) => agentMutations.reviewRun(input));
-  ipcMain.handle(
+  safeHandle(ipcChannels.agents.reviewRun, reviewAgentRunSchema, (_event, input) => agentMutations.reviewRun(input));
+  safeHandle(
     ipcChannels.agents.sendAssistantMessage,
-    (_event, input: AssistantGatewayRequest) => agentMutations.sendAssistantMessage(input),
+    sendAssistantChatTurnSchema,
+    (_event, input) => agentMutations.sendAssistantMessage(input),
   );
-  ipcMain.handle(
+  safeHandle(
     ipcChannels.agents.createDraftRunFromChat,
-    (_event, input: CreateDraftRunFromChatCommand) => agentMutations.createDraftRunFromChat(input),
+    createDraftRunFromChatSchema,
+    (_event, input) => agentMutations.createDraftRunFromChat(input),
   );
-  ipcMain.handle(
+  safeHandle(
     ipcChannels.app.reportRuntimeError,
-    (_event, input: RecordRuntimeErrorCommand) => runtimeDiagnostics.recordRuntimeError(input),
+    recordRuntimeErrorSchema,
+    (_event, input) => runtimeDiagnostics.recordRuntimeError(input),
   );
-  ipcMain.handle(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot());
-  ipcMain.handle(
+  safeHandleRead(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot(), "The app could not load the overview.");
+  safeHandleRead(
     ipcChannels.overview.getTimeline,
     (_event, range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate?: string) =>
       foundationReads.getScheduleTimeline(range, scale, anchorDate),
+    "The app could not load the schedule timeline.",
   );
-  ipcMain.handle(ipcChannels.assets.getList, (_event, query: AssetListQuery | undefined) => foundationReads.getAssets(query));
-  ipcMain.handle(ipcChannels.assets.getSummary, () => foundationReads.getAssetSummary());
-  ipcMain.handle(ipcChannels.assets.getOverview, () => foundationReads.getAssetsOverview());
-  ipcMain.handle(ipcChannels.assets.getDetail, (_event, assetId: string) => foundationReads.getAssetDetail(assetId));
-  ipcMain.handle(ipcChannels.assets.assignMove, (_event, input: AssignMoveAssetsInput) => assetMutations.assignMoveAssets(input));
-  ipcMain.handle(ipcChannels.assets.create, (_event, input: CreateAssetCommand) => assetMutations.createAsset(input));
-  ipcMain.handle(ipcChannels.assets.update, (_event, input: UpdateAssetCommand) => assetMutations.updateAsset(input));
-  ipcMain.handle(ipcChannels.assets.archive, (_event, input: ArchiveAssetCommand) => assetMutations.archiveAsset(input));
-  ipcMain.handle(ipcChannels.packing.getList, (_event, query: PackingSlipListQuery | undefined) => foundationReads.getPackingSlips(query));
-  ipcMain.handle(ipcChannels.packing.getDetail, (_event, packingSlipId: string) => foundationReads.getPackingSlipDetail(packingSlipId));
-  ipcMain.handle(ipcChannels.packing.create, (_event, input: CreatePackingSlipCommand) => packingMutations.createPackingSlip(input));
-  ipcMain.handle(ipcChannels.packing.returnItems, (_event, input: ReturnPackingSlipItemsCommand) =>
+  safeHandleRead(ipcChannels.assets.getList, (_event, query: AssetListQuery | undefined) => foundationReads.getAssets(query), "The app could not load assets.");
+  safeHandleRead(ipcChannels.assets.getSummary, () => foundationReads.getAssetSummary(), "The app could not load the asset summary.");
+  safeHandleRead(ipcChannels.assets.getOverview, () => foundationReads.getAssetsOverview(), "The app could not load the asset overview.");
+  safeHandleRead(
+    ipcChannels.assets.getDetail,
+    (_event, assetId: string) => foundationReads.getAssetDetail(assetId),
+    "The app could not load that asset.",
+  );
+  safeHandle(ipcChannels.assets.assignMove, assignMoveAssetsSchema, (_event, input) => assetMutations.assignMoveAssets(input));
+  safeHandle(ipcChannels.assets.create, createAssetSchema, (_event, input) => assetMutations.createAsset(input));
+  safeHandle(ipcChannels.assets.update, updateAssetSchema, (_event, input) => assetMutations.updateAsset(input));
+  safeHandle(ipcChannels.assets.archive, archiveAssetSchema, (_event, input) => assetMutations.archiveAsset(input));
+  safeHandleRead(
+    ipcChannels.packing.getList,
+    (_event, query: PackingSlipListQuery | undefined) => foundationReads.getPackingSlips(query),
+    "The app could not load packing slips.",
+  );
+  safeHandleRead(
+    ipcChannels.packing.getDetail,
+    (_event, packingSlipId: string) => foundationReads.getPackingSlipDetail(packingSlipId),
+    "The app could not load that packing slip.",
+  );
+  safeHandle(ipcChannels.packing.create, createPackingSlipSchema, (_event, input) => packingMutations.createPackingSlip(input));
+  safeHandle(ipcChannels.packing.returnItems, returnPackingSlipItemsSchema, (_event, input) =>
     packingMutations.returnPackingSlipItems(input),
   );
-  ipcMain.handle(ipcChannels.incidents.getList, (_event, query: IncidentListQuery | undefined) => foundationReads.getIncidents(query));
-  ipcMain.handle(ipcChannels.incidents.report, (_event, input: ReportIncidentCommand) => incidentMutations.reportIncident(input));
-  ipcMain.handle(ipcChannels.projects.getList, (_event, query: ProjectListQuery | undefined) => foundationReads.getProjects(query));
-  ipcMain.handle(ipcChannels.projects.getDetail, (_event, projectId: string) => foundationReads.getProjectDetail(projectId));
-  ipcMain.handle(ipcChannels.projects.getCatalog, () => foundationReads.getCatalogSnapshot());
-  ipcMain.handle(ipcChannels.projects.create, (_event, input: CreateProjectInput) => {
+  safeHandleRead(
+    ipcChannels.incidents.getList,
+    (_event, query: IncidentListQuery | undefined) => foundationReads.getIncidents(query),
+    "The app could not load incidents.",
+  );
+  safeHandle(ipcChannels.incidents.report, reportIncidentSchema, (_event, input) => incidentMutations.reportIncident(input));
+  safeHandleRead(
+    ipcChannels.projects.getList,
+    (_event, query: ProjectListQuery | undefined) => foundationReads.getProjects(query),
+    "The app could not load projects.",
+  );
+  safeHandleRead(
+    ipcChannels.projects.getDetail,
+    (_event, projectId: string) => foundationReads.getProjectDetail(projectId),
+    "The app could not load that project.",
+  );
+  safeHandleRead(ipcChannels.projects.getCatalog, () => foundationReads.getCatalogSnapshot(), "The app could not load the catalog.");
+  safeHandle(ipcChannels.projects.create, createProjectSchema, (_event, input) => {
     projectMutations.createProject(input);
     return foundationReads.getProjects();
   });
-  ipcMain.handle(ipcChannels.projects.update, (_event, input: UpdateProjectInput) => {
+  safeHandle(ipcChannels.projects.update, updateProjectSchema, (_event, input) => {
     projectMutations.updateProject(input);
     return foundationReads.getProjects();
   });
-  ipcMain.handle(ipcChannels.projects.delete, (_event, input: DeleteProjectInput) => {
+  safeHandle(ipcChannels.projects.delete, deleteProjectSchema, (_event, input) => {
     projectMutations.deleteProject(input);
     return foundationReads.getProjects();
   });
-  ipcMain.handle(ipcChannels.projects.createUnit, (_event, input: CreateProjectUnitInput) => {
+  safeHandle(ipcChannels.projects.createUnit, createProjectUnitSchema, (_event, input) => {
     projectMutations.createProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });
-  ipcMain.handle(ipcChannels.projects.updateUnit, (_event, input: UpdateProjectUnitInput) => {
+  safeHandle(ipcChannels.projects.updateUnit, updateProjectUnitSchema, (_event, input) => {
     projectMutations.updateProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });
-  ipcMain.handle(ipcChannels.projects.deleteUnit, (_event, input: DeleteProjectUnitInput) => {
+  safeHandle(ipcChannels.projects.deleteUnit, deleteProjectUnitSchema, (_event, input) => {
     projectMutations.deleteProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });
-  ipcMain.handle(ipcChannels.projects.assignCrewToUnit, (_event, input: AssignCrewToProjectUnitInput) => {
+  safeHandle(ipcChannels.projects.assignCrewToUnit, assignCrewToProjectUnitSchema, (_event, input) => {
     projectMutations.assignCrewToProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });
-  ipcMain.handle(ipcChannels.projects.unassignCrewFromUnit, (_event, input: UnassignCrewFromProjectUnitInput) => {
+  safeHandle(ipcChannels.projects.unassignCrewFromUnit, unassignCrewFromProjectUnitSchema, (_event, input) => {
     projectMutations.unassignCrewFromProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });
-  ipcMain.handle(ipcChannels.catalog.getSnapshot, (_event, query: CatalogListQuery | undefined) => foundationReads.getCatalogSnapshot(query));
-  ipcMain.handle(ipcChannels.catalog.create, (_event, input: CreateCatalogEntityInput) => {
+  safeHandleRead(
+    ipcChannels.catalog.getSnapshot,
+    (_event, query: CatalogListQuery | undefined) => foundationReads.getCatalogSnapshot(query),
+    "The app could not load the catalog snapshot.",
+  );
+  safeHandle(ipcChannels.catalog.create, createCatalogEntitySchema, (_event, input) => {
     catalogMutations.createEntity(input);
     return foundationReads.getCatalogSnapshot();
   });
-  ipcMain.handle(ipcChannels.catalog.update, (_event, input: UpdateCatalogEntityInput) => {
+  safeHandle(ipcChannels.catalog.update, updateCatalogEntitySchema, (_event, input) => {
     catalogMutations.updateEntity(input);
     return foundationReads.getCatalogSnapshot();
   });
-  ipcMain.handle(ipcChannels.catalog.delete, (_event, input: DeleteCatalogEntityInput) => {
+  safeHandle(ipcChannels.catalog.delete, deleteCatalogEntitySchema, (_event, input) => {
     catalogMutations.deleteEntity(input);
     return foundationReads.getCatalogSnapshot();
   });
-  ipcMain.handle(ipcChannels.rma.getSnapshot, () => foundationReads.getRmaSnapshot());
-  ipcMain.handle(ipcChannels.rma.getDetail, (_event, rmaCaseId: string) => foundationReads.getRmaCaseDetail(rmaCaseId));
-  ipcMain.handle(ipcChannels.rma.create, (_event, input: CreateRmaCaseCommand) => rmaMutations.createRmaCase(input));
-  ipcMain.handle(ipcChannels.rma.update, (_event, input: UpdateRmaCaseCommand) => rmaMutations.updateRmaCase(input));
-  ipcMain.handle(ipcChannels.finance.getOverview, () => foundationReads.getFinanceOverview());
-  ipcMain.handle(ipcChannels.finance.getCostLinks, () => foundationReads.getFinanceCostLinks());
-  ipcMain.handle(ipcChannels.finance.getEntries, (_event, query: FinanceEntryListQuery | undefined) => foundationReads.getFinanceEntries(query));
+  safeHandleRead(ipcChannels.rma.getSnapshot, () => foundationReads.getRmaSnapshot(), "The app could not load the RMA snapshot.");
+  safeHandleRead(
+    ipcChannels.rma.getDetail,
+    (_event, rmaCaseId: string) => foundationReads.getRmaCaseDetail(rmaCaseId),
+    "The app could not load that RMA case.",
+  );
+  safeHandle(ipcChannels.rma.create, createRmaCaseSchema, (_event, input) => rmaMutations.createRmaCase(input));
+  safeHandle(ipcChannels.rma.update, updateRmaCaseSchema, (_event, input) => rmaMutations.updateRmaCase(input));
+  safeHandleRead(ipcChannels.finance.getOverview, () => foundationReads.getFinanceOverview(), "The app could not load finance overview.");
+  safeHandleRead(ipcChannels.finance.getCostLinks, () => foundationReads.getFinanceCostLinks(), "The app could not load finance cost links.");
+  safeHandleRead(
+    ipcChannels.finance.getEntries,
+    (_event, query: FinanceEntryListQuery | undefined) => foundationReads.getFinanceEntries(query),
+    "The app could not load finance entries.",
+  );
 };

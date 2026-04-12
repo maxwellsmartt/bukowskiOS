@@ -1,6 +1,10 @@
 export const ipcChannels = {
   app: {
     getInfo: "bukowskiApp:getInfo",
+    getDiagnostics: "bukowskiApp:getDiagnostics",
+    createBackup: "bukowskiApp:createBackup",
+    runIntegrityCheck: "bukowskiApp:runIntegrityCheck",
+    exportWorkspaceData: "bukowskiApp:exportWorkspaceData",
     openExternal: "bukowskiApp:openExternal",
     reportRuntimeError: "bukowskiApp:reportRuntimeError",
   },

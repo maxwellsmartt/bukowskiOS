@@ -103,12 +103,12 @@ const readFileAsDataUrl = (file: File) =>
     const reader = new FileReader();
 
     reader.onerror = () => {
-      reject(new Error(`No pude leer ${file.name}.`));
+      reject(new Error(`I could not read ${file.name}.`));
     };
 
     reader.onload = () => {
       if (typeof reader.result !== "string") {
-        reject(new Error(`No pude convertir ${file.name} en una imagen utilizable.`));
+        reject(new Error(`I could not convert ${file.name} into a usable image.`));
         return;
       }
 
@@ -120,11 +120,11 @@ const readFileAsDataUrl = (file: File) =>
 
 const toImageAttachment = async (file: File): Promise<AssistantGatewayAttachment> => {
   if (!file.type.startsWith("image/")) {
-    throw new Error("Por ahora el chat solo admite imágenes.");
+    throw new Error("The chat currently supports image attachments only.");
   }
 
   if (file.size > maxImageAttachmentBytes) {
-    throw new Error(`${file.name} excede el límite de 6 MB por imagen.`);
+    throw new Error(`${file.name} exceeds the 6 MB limit for a single image.`);
   }
 
   return {
@@ -414,11 +414,11 @@ export const GlobalAssistantChat = () => {
     const pendingState = {
       tone: "sending",
       label: "Supervisor reviewing request",
-      body: "Routing intent and preparing a supervised draft. Command layer still not executed.",
+      body: "Routing intent and preparing a supervised response. No changes have been made.",
       routedAgentId: null,
       routedAgentName: "Supervisor Agent",
       intentLabel,
-      commandStateLabel: "Command layer still idle",
+      commandStateLabel: "No changes applied",
     } satisfies AssistantChatSessionState;
 
     open();
@@ -478,8 +478,8 @@ export const GlobalAssistantChat = () => {
           role: "assistant",
           body:
             decision === "approve_for_session"
-              ? "Perfecto. Estoy continuando este trabajo aprobado para toda la sesión."
-              : "Perfecto. Estoy continuando este trabajo aprobado bajo supervisión.",
+              ? "Understood. I am continuing this approved work for the whole session."
+              : "Understood. I am continuing this approved work under supervision.",
           state: {
             tone: "sending",
             label: decision === "approve_for_session" ? "Continuing approved work for this session" : "Continuing approved work",
@@ -490,7 +490,7 @@ export const GlobalAssistantChat = () => {
             routedAgentId: resolvedActiveSession.lastRoutedAgentId,
             routedAgentName: activeSessionState?.routedAgentName ?? "Supervisor Agent",
             intentLabel: "Approval decision recorded",
-            commandStateLabel: "Command layer still idle",
+            commandStateLabel: "No changes applied",
             draftRunId: runId,
             approvalDecision: decision === "approve_for_session" ? "approved_for_session" : "approved",
             approvalScope: decision === "approve_for_session" ? "session" : "run",
@@ -508,7 +508,7 @@ export const GlobalAssistantChat = () => {
       });
       await refresh();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "No pude registrar esa decisión todavía.");
+      setActionError(error instanceof Error ? error.message : "I could not record that decision yet.");
     } finally {
       setOptimisticAssistantMessage(null);
       setReviewingRunId(null);
@@ -537,7 +537,7 @@ export const GlobalAssistantChat = () => {
     const availableSlots = Math.max(0, maxImageAttachments - attachments.length);
 
     if (!availableSlots) {
-      setAttachmentError(`Solo puedes adjuntar hasta ${maxImageAttachments} imágenes por mensaje.`);
+      setAttachmentError(`You can attach up to ${maxImageAttachments} images per message.`);
       if (attachmentInputRef.current) {
         attachmentInputRef.current.value = "";
       }
@@ -550,10 +550,10 @@ export const GlobalAssistantChat = () => {
       const nextAttachments = await Promise.all(nextFiles.map((file) => toImageAttachment(file)));
       setAttachments((current) => [...current, ...nextAttachments]);
       setAttachmentError(
-        files.length > nextFiles.length ? `Solo se adjuntaron ${availableSlots} imágenes para mantener el mensaje ligero.` : null,
+        files.length > nextFiles.length ? `Only ${availableSlots} images were attached to keep this message lightweight.` : null,
       );
     } catch (error) {
-      setAttachmentError(error instanceof Error ? error.message : "No pude adjuntar esa imagen.");
+      setAttachmentError(error instanceof Error ? error.message : "I could not attach that image.");
     } finally {
       if (attachmentInputRef.current) {
         attachmentInputRef.current.value = "";
@@ -684,7 +684,7 @@ export const GlobalAssistantChat = () => {
                         <div className="assistant-chat-session-detail-row">
                           <span>Command</span>
                           <strong>
-                            {hasState ? session.latestState?.commandStateLabel ?? "Command layer still idle" : "Command layer still idle"}
+                            {hasState ? session.latestState?.commandStateLabel ?? "No changes applied" : "No changes applied"}
                           </strong>
                         </div>
                       </div>

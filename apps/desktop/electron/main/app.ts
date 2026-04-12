@@ -1,6 +1,7 @@
-import { app, BrowserWindow, Menu } from "electron";
+import { app, BrowserWindow, Menu, session } from "electron";
 import path from "node:path";
 
+import { buildContentSecurityPolicy } from "./security/securityConfig";
 import { registerAppIpc } from "./ipc/registerAppIpc";
 import { registerFoundationIpc } from "./ipc/registerFoundationIpc";
 import { buildAppMenu } from "./menus/buildAppMenu";
@@ -83,11 +84,46 @@ const attachProcessRuntimeTelemetry = (
 app.setName("bukowskiOS");
 app.setPath("userData", path.join(app.getPath("appData"), "@bukowski/desktop"));
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
+app.on("second-instance", () => {
+  const existingWindow = BrowserWindow.getAllWindows()[0];
+
+  if (!existingWindow) {
+    return;
+  }
+
+  if (existingWindow.isMinimized()) {
+    existingWindow.restore();
+  }
+
+  existingWindow.focus();
+});
+
 app.whenReady().then(() => {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      cancel: false,
+      responseHeaders: {
+        ...(details.responseHeaders ?? {}),
+        "Content-Security-Policy": [buildContentSecurityPolicy(devServerUrl)],
+      },
+    });
+  });
+
   const localDatabase = initializeLocalDatabase();
   attachProcessRuntimeTelemetry(localDatabase.runtimeDiagnostics);
 
-  registerAppIpc({ databasePath: localDatabase.databasePath });
+  registerAppIpc({
+    database: localDatabase.database,
+    getDiagnosticsSnapshot: localDatabase.getDiagnosticsSnapshot,
+    createBackupNow: localDatabase.createBackupNow,
+    runIntegrityCheckNow: localDatabase.runIntegrityCheckNow,
+  });
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,
     agentReads: localDatabase.agentReads,
@@ -110,16 +146,18 @@ app.whenReady().then(() => {
   });
 });
 
-process.on("message", (message) => {
-  if (message !== "electron-vite&type=hot-reload") {
-    return;
-  }
+if (!app.isPackaged) {
+  process.on("message", (message) => {
+    if (message !== "electron-vite&type=hot-reload") {
+      return;
+    }
 
-  console.info("[dev] Electron preload reload");
-  BrowserWindow.getAllWindows().forEach((window) => {
-    window.webContents.reload();
+    console.info("[dev] Electron preload reload");
+    BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.reload();
+    });
   });
-});
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

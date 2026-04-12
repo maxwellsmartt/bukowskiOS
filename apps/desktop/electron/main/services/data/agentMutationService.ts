@@ -162,7 +162,7 @@ const buildApprovalMeta = (
       routedAgentId,
       routedAgentName,
       intentLabel: "Approval decision recorded",
-      commandStateLabel: "Denied · command layer still idle",
+      commandStateLabel: "Denied · no changes applied",
       approvalDecision: "denied",
       approvalScope: "run",
     };
@@ -176,7 +176,7 @@ const buildApprovalMeta = (
       routedAgentId,
       routedAgentName,
       intentLabel: "Approval decision recorded",
-      commandStateLabel: "Session-approved · command layer still not executed",
+      commandStateLabel: "Session-approved · no changes made",
       approvalDecision: "approved_for_session",
       approvalScope: "session",
     };
@@ -189,7 +189,7 @@ const buildApprovalMeta = (
     routedAgentId,
     routedAgentName,
     intentLabel: "Approval decision recorded",
-    commandStateLabel: "Approved · command layer still not executed",
+    commandStateLabel: "Approved · no changes made",
     approvalDecision: "approved",
     approvalScope: "run",
   };
@@ -1039,7 +1039,7 @@ export const createAgentMutationService = (
     const routedAgentName = routedAgent?.display_name ?? "Supervisor Agent";
     const runId = `run-chat-${Date.now().toString(36)}`;
     const summary = requiresApproval
-      ? `Prepared a supervised draft for ${routedAgentName}. Approval is required before any command-layer execution.`
+      ? `Prepared an action draft for ${routedAgentName}. Approval is required before anything can continue.`
       : `Routed to ${routedAgentName}. Draft run prepared and waiting in queue.`;
 
     db.exec("BEGIN");

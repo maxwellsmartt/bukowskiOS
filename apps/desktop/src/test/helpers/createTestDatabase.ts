@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { foundationMigrationSql } from "@db";
+import { foundationMigrations } from "@db";
 
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "../../../electron/main/services/data/adminFoundationBootstrap";
 import {
@@ -17,6 +17,7 @@ import {
   applySchedulingFoundationMigration,
   bootstrapSchedulingFoundation,
 } from "../../../electron/main/services/data/schedulingFoundationBootstrap";
+import { applyTrackedSqlMigrations, applyTrackedStep } from "../../../electron/main/services/data/localDatabaseSupport";
 
 type TestDatabase = {
   cleanup: () => void;
@@ -29,10 +30,10 @@ export const createTestDatabase = (prefix: string): TestDatabase => {
   const database = new DatabaseSync(databasePath);
 
   database.exec("PRAGMA foreign_keys = ON;");
-  database.exec(foundationMigrationSql);
-  applyAdminFoundationMigration(database);
-  applySchedulingFoundationMigration(database);
-  applyAIGatewayFoundationMigration(database);
+  applyTrackedSqlMigrations(database, foundationMigrations);
+  applyTrackedStep(database, "runtime_admin_foundation_v1", () => applyAdminFoundationMigration(database));
+  applyTrackedStep(database, "runtime_scheduling_foundation_v1", () => applySchedulingFoundationMigration(database));
+  applyTrackedStep(database, "runtime_ai_gateway_foundation_v1", () => applyAIGatewayFoundationMigration(database));
   seedFoundationData(database);
   bootstrapAIGatewayFoundation(database);
   ensureProjectShellDefaults(database);

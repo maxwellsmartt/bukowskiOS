@@ -1,9 +1,10 @@
-import { app } from "electron";
+import { app, safeStorage } from "electron";
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 
-import { foundationMigrationSql } from "@db";
+import type { AppDiagnosticsSnapshot } from "@contracts";
+import { foundationMigrations } from "@db";
 
 import { createAssistantGatewayService } from "../ai/assistantGatewayService";
 import { createAssistantMemoryService } from "../ai/assistantMemoryService";
@@ -27,6 +28,13 @@ import { createProjectMutationService, ensureProjectShellDefaults } from "./proj
 import { createRmaMutationService } from "./rmaMutationService";
 import { createRuntimeDiagnosticsService, type RuntimeDiagnosticsService } from "./runtimeDiagnosticsService";
 import { applySchedulingFoundationMigration, bootstrapSchedulingFoundation } from "./schedulingFoundationBootstrap";
+import {
+  applyTrackedSqlMigrations,
+  applyTrackedStep,
+  createDatabaseBackup,
+  runIntegrityChecks,
+  shouldRefreshBackup,
+} from "./localDatabaseSupport";
 
 type ProjectMutationService = ReturnType<typeof createProjectMutationService>;
 type CatalogMutationService = ReturnType<typeof createCatalogMutationService>;
@@ -39,6 +47,7 @@ type AgentMutationService = ReturnType<typeof createAgentMutationService>;
 type LocalDatabaseRuntime = {
   database: DatabaseSync;
   databasePath: string;
+  backupPath: string;
   foundationReads: FoundationReadService;
   agentReads: AgentReadService;
   assistantChatService: AssistantChatService;
@@ -50,26 +59,121 @@ type LocalDatabaseRuntime = {
   rmaMutations: RmaMutationService;
   agentMutations: AgentMutationService;
   runtimeDiagnostics: RuntimeDiagnosticsService;
+  getDiagnosticsSnapshot: () => AppDiagnosticsSnapshot;
+  createBackupNow: () => AppDiagnosticsSnapshot;
+  runIntegrityCheckNow: () => AppDiagnosticsSnapshot;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
+let walCheckpointTimer: NodeJS.Timeout | null = null;
+let lastIntegrityCheckAt: string | null = null;
+let lastIntegrityCheckStatus: "healthy" | "failed" | "never" = "never";
+
+const backupMaxAgeMs = 24 * 60 * 60 * 1000;
+
+const withRecoveredDatabase = (databasePath: string, backupPath: string) => {
+  const openDatabase = () => {
+    const database = new DatabaseSync(databasePath);
+    database.exec("PRAGMA journal_mode = WAL;");
+    database.exec("PRAGMA foreign_keys = ON;");
+    return database;
+  };
+
+  let database = openDatabase();
+
+  try {
+    runIntegrityChecks(database);
+    lastIntegrityCheckAt = new Date().toISOString();
+    lastIntegrityCheckStatus = "healthy";
+    return database;
+  } catch (error) {
+    lastIntegrityCheckAt = new Date().toISOString();
+    lastIntegrityCheckStatus = "failed";
+    database.close();
+
+    if (!fs.existsSync(backupPath)) {
+      throw error;
+    }
+
+    fs.copyFileSync(backupPath, databasePath);
+    database = openDatabase();
+    runIntegrityChecks(database);
+    lastIntegrityCheckAt = new Date().toISOString();
+    lastIntegrityCheckStatus = "healthy";
+    return database;
+  }
+};
 
 const createRuntime = (): LocalDatabaseRuntime => {
   const databasePath = path.join(app.getPath("userData"), "bukowski-foundation.sqlite");
-  const database = new DatabaseSync(databasePath);
+  const backupPath = path.join(app.getPath("userData"), "bukowski-foundation.backup.sqlite");
+  const databaseAlreadyExisted = fs.existsSync(databasePath);
+  const database = withRecoveredDatabase(databasePath, backupPath);
 
-  database.exec("PRAGMA journal_mode = WAL;");
-  database.exec("PRAGMA foreign_keys = ON;");
-  database.exec(foundationMigrationSql);
-  applyAdminFoundationMigration(database);
-  applySchedulingFoundationMigration(database);
-  applyAIGatewayFoundationMigration(database);
+  if (databaseAlreadyExisted && shouldRefreshBackup(backupPath, backupMaxAgeMs)) {
+    createDatabaseBackup(database, backupPath);
+  }
+
+  applyTrackedSqlMigrations(database, foundationMigrations);
+  applyTrackedStep(database, "runtime_admin_foundation_v1", () => applyAdminFoundationMigration(database));
+  applyTrackedStep(database, "runtime_scheduling_foundation_v1", () => applySchedulingFoundationMigration(database));
+  applyTrackedStep(database, "runtime_ai_gateway_foundation_v1", () => applyAIGatewayFoundationMigration(database));
   seedFoundationData(database);
   bootstrapAIGatewayFoundation(database);
   ensureProjectShellDefaults(database);
   bootstrapLegacyRentmanDemo(database);
   bootstrapAdminFoundation(database);
   bootstrapSchedulingFoundation(database);
+  runIntegrityChecks(database);
+  lastIntegrityCheckAt = new Date().toISOString();
+  lastIntegrityCheckStatus = "healthy";
+
+  if (!databaseAlreadyExisted || shouldRefreshBackup(backupPath, backupMaxAgeMs)) {
+    createDatabaseBackup(database, backupPath);
+  }
+
+  const getDiagnosticsSnapshot = (): AppDiagnosticsSnapshot => {
+    const databaseStats = fs.existsSync(databasePath) ? fs.statSync(databasePath) : null;
+    const backupStats = fs.existsSync(backupPath) ? fs.statSync(backupPath) : null;
+    const distPackagedPath = path.join(process.cwd(), "apps/desktop/dist-packaged");
+    const internalBuildArtifacts = fs.existsSync(distPackagedPath)
+      ? fs
+          .readdirSync(distPackagedPath)
+          .filter((entry) => entry.endsWith(".dmg") || entry.endsWith(".zip"))
+          .sort()
+      : [];
+
+    return {
+      databaseSizeBytes: databaseStats?.size ?? 0,
+      backupSizeBytes: backupStats?.size ?? 0,
+      databaseExists: Boolean(databaseStats),
+      backupExists: Boolean(backupStats),
+      lastBackupAt: backupStats ? new Date(backupStats.mtimeMs).toISOString() : null,
+      lastIntegrityCheckAt,
+      lastIntegrityCheckStatus,
+      encryptionAvailable: safeStorage.isEncryptionAvailable(),
+      internalBuildArtifacts,
+    };
+  };
+
+  const createBackupNow = () => {
+    createDatabaseBackup(database, backupPath);
+    return getDiagnosticsSnapshot();
+  };
+
+  const runIntegrityCheckNow = () => {
+    try {
+      runIntegrityChecks(database);
+      lastIntegrityCheckAt = new Date().toISOString();
+      lastIntegrityCheckStatus = "healthy";
+    } catch (error) {
+      lastIntegrityCheckAt = new Date().toISOString();
+      lastIntegrityCheckStatus = "failed";
+      throw error;
+    }
+
+    return getDiagnosticsSnapshot();
+  };
 
   const secretStore = createAISecretStore();
   const openaiProviderService = createOpenAIProviderService();
@@ -96,10 +200,16 @@ const createRuntime = (): LocalDatabaseRuntime => {
   });
   const runtimeDiagnostics = createRuntimeDiagnosticsService(database);
   assistantChatService.reconcileInterruptedThreads();
+  walCheckpointTimer?.unref();
+  walCheckpointTimer = setInterval(() => {
+    database.exec("PRAGMA wal_checkpoint(TRUNCATE);");
+  }, 5 * 60 * 1000);
+  walCheckpointTimer.unref();
 
   return {
     database,
     databasePath,
+    backupPath,
     foundationReads,
     agentReads,
     assistantChatService,
@@ -110,6 +220,9 @@ const createRuntime = (): LocalDatabaseRuntime => {
     packingMutations: createPackingMutationService(database),
     rmaMutations: createRmaMutationService(database),
     runtimeDiagnostics,
+    getDiagnosticsSnapshot,
+    createBackupNow,
+    runIntegrityCheckNow,
     agentMutations: createAgentMutationService(database, {
       secretStore,
       openaiProviderService,

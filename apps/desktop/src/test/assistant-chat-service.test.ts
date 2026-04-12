@@ -63,7 +63,7 @@ describe("assistant chat service", () => {
           routedAgentId: "agent-supervisor",
           routedAgentName: "Supervisor Agent",
           intentLabel: "Image review request",
-          commandStateLabel: "Command layer still idle",
+          commandStateLabel: "No changes applied",
           draftRunId: null,
           providerKey: "openai",
           modelKey: "openai:gpt-5.4",

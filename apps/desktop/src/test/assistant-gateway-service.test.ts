@@ -274,7 +274,7 @@ describe("assistant gateway service", () => {
     expect(result.status).toBe("draft_created");
     expect(result.routedAgentName).toBe("Finance Agent");
     expect(result.toolTraces[0]?.toolName).toBe("search_projects");
-    expect(result.commandStateLabel).toContain("command layer still not executed");
+    expect(result.commandStateLabel).toContain("no changes made");
 
     const runRow = database
       .prepare("SELECT source, title, status FROM agent_runs WHERE id = ?")

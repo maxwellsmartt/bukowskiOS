@@ -4,5 +4,27 @@ export type AppInfo = {
   isPackaged: boolean;
   version: string;
   shellVersion: string;
-  databasePath: string;
+};
+
+export type AppDiagnosticsSnapshot = {
+  databaseSizeBytes: number;
+  backupSizeBytes: number;
+  databaseExists: boolean;
+  backupExists: boolean;
+  lastBackupAt: string | null;
+  lastIntegrityCheckAt: string | null;
+  lastIntegrityCheckStatus: "healthy" | "failed" | "never";
+  encryptionAvailable: boolean;
+  internalBuildArtifacts: string[];
+};
+
+export type AppActionResult = {
+  summary: string;
+  diagnostics: AppDiagnosticsSnapshot;
+};
+
+export type AppExportResult = {
+  saved: boolean;
+  fileName: string | null;
+  summary: string;
 };

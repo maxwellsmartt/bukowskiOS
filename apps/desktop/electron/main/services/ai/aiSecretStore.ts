@@ -30,6 +30,10 @@ const createSecretKey = (workspaceId: string, providerKey: string) => `${workspa
 
 export const createAISecretStore = () => ({
   hasProviderSecret(workspaceId: string, providerKey: string) {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return false;
+    }
+
     const manifest = loadManifest();
     return Boolean(manifest[createSecretKey(workspaceId, providerKey)]);
   },
