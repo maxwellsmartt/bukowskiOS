@@ -83,7 +83,26 @@
 ## Fase 1 — Operación visible
 
 ### Slice O1 — QR y barcode visibles en UI
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - dejar visibles los códigos escaneables más importantes sin depender de PDFs ni tooling externo
+- Área:
+  - frontend
+- Qué cambió:
+  - nuevo componente reutilizable para renderizar preview de `QR + Code128`
+  - preview visible en `Asset detail` para el código primario del asset
+  - preview visible en `Packing slip detail` para el código primario del slip
+  - acción simple `Print label` desde `Asset detail`
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - los códigos ya no quedan como texto plano en las superficies principales
+  - la impresión de etiqueta usa una ventana ligera con QR + barcode + título + código
+- Riesgos remanentes:
+  - `medio`: falta smoke manual visual para confirmar legibilidad física al imprimir
+  - `medio`: el warning de bundle grande sigue visible por chunking general del renderer; no bloquea este slice pero sigue siendo deuda de performance
 
 ### Slice O2 — Packing Slip PDF real
 - Estado: `planned`

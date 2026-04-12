@@ -5,9 +5,11 @@ import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
 import { useCatalogData } from "@features/projects/useProjectsData";
+import { ScannableCodePanel } from "@shared/components/ScannableCodePanel";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
 import { archiveAsset, updateAsset, useAssetDetail } from "./useAssetsData";
@@ -269,7 +271,24 @@ export const AssetDetailPage = () => {
 
           <SurfaceCard title="Codes" subtitle="Primary and secondary scan identities for this asset.">
             {data.scannableCodes.length ? (
-              <div className="queue-list">
+              <div className="page-stack">
+                {data.editor?.primaryCodeValue ? (
+                  <ScannableCodePanel
+                    codeValue={data.editor.primaryCodeValue}
+                    subtitle="Live QR and Code128 preview for the primary asset code."
+                    title={data.asset.name}
+                    onPrint={({ qrDataUrl, barcodeDataUrl }) =>
+                      printScannableLabel({
+                        title: data.asset!.name,
+                        subtitle: data.asset!.code,
+                        codeValue: data.editor!.primaryCodeValue,
+                        qrDataUrl,
+                        barcodeDataUrl,
+                      })
+                    }
+                  />
+                ) : null}
+                <div className="queue-list">
                 {data.scannableCodes.map((code) => (
                   <div key={code.id} className="queue-item">
                     <div className="identity-cell">
@@ -279,6 +298,7 @@ export const AssetDetailPage = () => {
                     <StatusBadge tone={code.isPrimary ? "success" : "info"}>{code.isPrimary ? "Primary" : "Secondary"}</StatusBadge>
                   </div>
                 ))}
+                </div>
               </div>
             ) : (
               <div className="empty-state">No scannable code has been generated yet.</div>

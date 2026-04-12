@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import type { PackingSlipDetailSnapshot } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
+import { ScannableCodePanel } from "@shared/components/ScannableCodePanel";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -102,6 +103,16 @@ export const PackingSlipDetailPanel = ({
           <span className="summary-value">{data.slip.notes}</span>
         </div>
       </div>
+
+      {data.slip.primaryCodeValue ? (
+        <ScannableCodePanel
+          codeValue={data.slip.primaryCodeValue}
+          subtitle="Slip-ready QR and Code128 preview for warehouse handoff and return tracking."
+          title={data.slip.number}
+          qrLabel="Slip QR"
+          barcodeLabel="Slip barcode"
+        />
+      ) : null}
 
       <div className="action-form-grid">
         <label className="action-field">
