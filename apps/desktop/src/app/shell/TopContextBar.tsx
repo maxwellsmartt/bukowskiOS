@@ -21,7 +21,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       <div className="top-context-group top-context-group-end">
         <button className="ghost-control search-control" onClick={onOpenSearch} type="button">
           <Search size={13} />
-          <span>Search</span>
+          <span>Search everything</span>
           <kbd>⌘K</kbd>
         </button>
         {scopeChipLabel ? (

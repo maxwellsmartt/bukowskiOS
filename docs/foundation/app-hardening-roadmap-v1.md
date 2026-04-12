@@ -186,9 +186,23 @@
   - `bajo`: todavía no hay archive masivo ni otras operaciones bulk secundarias
 
 ### Slice 9 — Onboarding ligero y empty states
-- Estado: `planned`
+- Estado: `done`
 - Objetivo: reducir fricción de primer uso
 - Área: `frontend`
+- Dependencias: Slice 6, Slice 8
+- Qué se probó:
+  - `typecheck`
+  - suite de tests completa
+  - `build`
+- Evidencia:
+  - nuevo `GuidedEmptyState` reutilizable para primer uso
+  - `Catalog` ahora aclara que es el punto de partida cuando el workspace está vacío
+  - `Assets` ahora explica el siguiente paso correcto cuando no hay inventario
+  - `Project detail` ya no cae en un vacío ambiguo cuando no hay proyecto seleccionado o no hay datos operativos
+  - la búsqueda global explica mejor qué se puede buscar y el top bar la hace más visible
+- Riesgos remanentes:
+  - `medio`: todavía no existe un onboarding guiado multi-step; este slice reduce fricción, pero no reemplaza una experiencia de primer arranque más completa
+  - `bajo`: quedan otros empty states secundarios fuera del flujo principal que todavía se pueden pulir más adelante
 
 ### Slice 10 — AI / Agents hardening acotado
 - Estado: `planned`

@@ -8,6 +8,7 @@ import { PackingSlipBuilderPanel, type PackingSlipBuilderDraft } from "@features
 import { createPackingSlip } from "@features/packing/usePackingData";
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
+import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -289,6 +290,34 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
       {actionFeedback ? <div className="action-feedback action-feedback-success">{actionFeedback}</div> : null}
 
+      {!error && !isLoading && assets.length === 0 ? (
+        <GuidedEmptyState
+          title={isProjectMode ? "No assets are assigned to this project yet" : "Your asset registry is still empty"}
+          body={
+            isProjectMode
+              ? "This project does not have inventory linked yet. Start from the global registry or assign existing assets into this scope."
+              : "Create the first asset once catalog basics like locations and categories are ready. After that you can assign, move, pack and report incidents from the same surface."
+          }
+          tips={
+            isProjectMode
+              ? ["Assign existing assets into this project", "Use bulk assign or move when you are ready"]
+              : ["Set locations and categories in Catalog first", "Then create assets with code, status and custody"]
+          }
+          actionLabel={isProjectMode ? "Open global assets" : "Create first asset"}
+          onAction={() => {
+            if (isProjectMode) {
+              navigate("/assets");
+              return;
+            }
+
+            setEditorMode("create");
+            setEditorError(null);
+          }}
+          secondaryActionLabel="Open Catalog"
+          onSecondaryAction={() => navigate("/catalog")}
+        />
+      ) : null}
+
       {selectedRowIds.length ? (
         <div className="selection-action-bar">
           <div className="selection-action-copy">
@@ -437,6 +466,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             activeRowId={selectedAssetId}
             autoScrollToActiveRow
             columns={assetColumns}
+            emptyMessage={
+              isProjectMode
+                ? "No assets are assigned to this project yet."
+                : "No assets yet. Create the first asset after setting Catalog basics."
+            }
             getRowId={(row) => row.id}
             maxHeight="min(66vh, 720px)"
             onRowClick={(row) => setSelectedAssetId(row.id)}

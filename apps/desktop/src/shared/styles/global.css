@@ -4228,6 +4228,65 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   font-size: 12px;
 }
 
+.guided-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(107, 79, 255, 0.08), transparent 36%),
+    rgba(255, 255, 255, 0.02);
+}
+
+.guided-empty-state-subtle {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.guided-empty-state-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guided-empty-state-title {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.guided-empty-state-body {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.guided-empty-state-tips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.guided-empty-state-tip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.guided-empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 @media (max-width: 1280px) {
   .metric-grid,
   .overview-operational-grid,

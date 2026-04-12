@@ -175,14 +175,14 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
           {!query.trim() ? (
             <div className="command-palette-empty">
               <Command size={16} />
-              <span>Jump to assets, projects, units, packing slips or incidents.</span>
+              <span>Search assets, projects, units, incidents, packing slips or agents. Try a code, QR, client or unit name.</span>
             </div>
           ) : null}
 
-          {isLoading ? <div className="command-palette-empty">Searching…</div> : null}
+          {isLoading ? <div className="command-palette-empty">Searching your local workspace…</div> : null}
           {error ? <div className="command-palette-empty">{error}</div> : null}
           {!isLoading && !error && query.trim() && !flattenedResults.length ? (
-            <div className="command-palette-empty">No matches for “{query.trim()}”.</div>
+            <div className="command-palette-empty">No matches for “{query.trim()}”. Try an asset code, project name, client or unit.</div>
           ) : null}
 
           {!isLoading && !error && flattenedResults.length ? (

@@ -6,6 +6,7 @@ import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
+import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
@@ -51,7 +52,15 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   }
 
   if (!data.project) {
-    return <div className="empty-state">Select a project to inspect assets, incidents, crew and budget.</div>;
+    return (
+      <GuidedEmptyState
+        title="Choose a project to inspect operations"
+        body="Project detail brings together assets, incidents, responsibles and budget context. Start by selecting a project from the sidebar or the projects registry."
+        tips={["Open a project to review units, inventory and issue exposure", "Use Project Info if you need to set up context before operations"]}
+        actionLabel="Open projects"
+        onAction={() => navigate("/projects")}
+      />
+    );
   }
 
   return (
@@ -199,7 +208,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               ))}
             </div>
           ) : (
-            <div className="empty-state">No units defined yet. Use Project Info to model Main, Second or Splinter work.</div>
+            <div className="empty-state">No units defined yet. Open Project Info to model the first unit before assigning crew or inventory.</div>
           )}
         </SurfaceCard>
 
@@ -225,7 +234,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               ))}
             </div>
           ) : (
-            <div className="empty-state">No responsibles linked yet. Assign assets to turn this project operational.</div>
+            <div className="empty-state">No responsibles linked yet. Once assets are assigned, the current holders and open issues will appear here.</div>
           )}
         </SurfaceCard>
 
@@ -290,6 +299,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             },
           ]}
           getRowId={(row) => row.id}
+          emptyMessage="No assets assigned yet. Add inventory from the asset registry to make this project operational."
           onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
           persistKey="project-detail-assets"
           rows={data.assets}
@@ -326,6 +336,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             { key: "status", label: "Status", width: 108, minWidth: 92, render: (row) => row.status },
           ]}
           getRowId={(row) => row.id}
+          emptyMessage="No incidents linked yet. Use the action above to report the first project incident."
           persistKey="project-detail-incidents"
           rows={data.incidents}
           shellClassName="table-shell-natural"

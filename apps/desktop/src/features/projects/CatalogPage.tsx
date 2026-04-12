@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import type { CatalogEntityType, CatalogListQuery, CatalogSnapshot, CatalogSortField } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
+import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -318,6 +319,17 @@ export const CatalogPage = () => {
   const selectedRow = activeTabConfig.rows.find((row) => row.id === selectedIds[activeTab]) ?? null;
   const showPreview = Boolean(selectedRow) && !editorMode;
   const showContextColumn = Boolean(editorMode) || showPreview;
+  const totalCatalogRecords = useMemo(
+    () =>
+      data.locations.length +
+      data.departments.length +
+      data.crewMembers.length +
+      data.clients.length +
+      data.manufacturers.length +
+      data.kits.length +
+      data.categories.length,
+    [data],
+  );
 
   const applyCatalogMutation = async (
     callback: () => Promise<CatalogSnapshot>,
@@ -348,6 +360,24 @@ export const CatalogPage = () => {
 
       {error ? <div className="empty-state">Catalog unavailable: {error}</div> : null}
       {!error && isLoading ? <div className="empty-state">Loading master data...</div> : null}
+
+      {!error && !isLoading && totalCatalogRecords === 0 ? (
+        <GuidedEmptyState
+          title="Start here before loading real operations"
+          body="Catalog is the shared foundation for locations, departments, crew, clients and categories. Filling it first keeps assets, projects and incidents consistent later."
+          tips={[
+            "Create locations before moving inventory",
+            "Add departments and crew before assigning work",
+            "Define categories before creating assets",
+          ]}
+          actionLabel="Create first location"
+          onAction={() => {
+            setActiveTab("location");
+            setEditorMode("create");
+            setEditorError(null);
+          }}
+        />
+      ) : null}
 
       <div className="catalog-tab-row">
         {catalogTabOrder.map((tabKey) => {
@@ -450,6 +480,7 @@ export const CatalogPage = () => {
           <DataTable
             activeRowId={selectedIds[activeTab]}
             columns={activeTabConfig.columns}
+            emptyMessage={`No ${activeTabConfig.label.toLowerCase()} yet. Create the first one to make this workspace operational.`}
             getRowId={(row) => String(row.id)}
             maxHeight="min(68vh, 760px)"
             onRowClick={(row) => setSelectedIds((current) => ({ ...current, [activeTab]: String(row.id) }))}
