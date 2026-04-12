@@ -24,9 +24,11 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
           <span>Search</span>
           <kbd>⌘K</kbd>
         </button>
-        <div className="context-chip">
-          <span>{scopeChipLabel}</span>
-        </div>
+        {scopeChipLabel ? (
+          <div className="context-chip">
+            <span>{scopeChipLabel}</span>
+          </div>
+        ) : null}
         <button className="ghost-control sync-control" type="button">
           <RefreshCcw size={13} />
           <span>{syncLabel}</span>

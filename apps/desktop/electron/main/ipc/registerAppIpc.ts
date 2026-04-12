@@ -1,4 +1,4 @@
-import { app, ipcMain } from "electron";
+import { app, ipcMain, shell } from "electron";
 
 import { ipcChannels } from "@contracts/ipc/channels";
 
@@ -15,4 +15,5 @@ export const registerAppIpc = ({ databasePath }: RegisterAppIpcOptions) => {
     shellVersion: "foundation-v1",
     databasePath,
   }));
+  ipcMain.handle(ipcChannels.app.openExternal, (_event, url: string) => shell.openExternal(url));
 };

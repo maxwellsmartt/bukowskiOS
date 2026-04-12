@@ -267,11 +267,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     <div className="page-stack">
       <SectionHeader
         eyebrow={isProjectMode ? "Project / Assets" : "Assets"}
-        title={isProjectMode ? "Assigned assets" : "Inventory"}
+        title={isProjectMode ? "Assigned assets" : "Asset registry"}
         body={
           isProjectMode
             ? "Assets currently linked to this project for supervision, reassignment, packing and issue reporting."
-            : "Current asset inventory with live status, quantity and location."
+            : "Live inventory with current status, custody and location."
         }
         contextLabel={sectionScopeLabel}
       />
@@ -281,13 +281,9 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       <div className="chip-row">
         <StatusBadge tone="success">{assets.filter((asset) => hasItem("asset", asset.id)).length} in compare</StatusBadge>
-        <StatusBadge>
-          {selectedRowIds.length
-            ? `${selectedRowIds.length} selected`
-            : isProjectMode
-              ? effectiveProjectName ?? "Project scope"
-              : "Workspace-wide"}
-        </StatusBadge>
+        {selectedRowIds.length || isProjectMode ? (
+          <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : effectiveProjectName ?? "Project scope"}</StatusBadge>
+        ) : null}
       </div>
 
       {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
@@ -409,11 +405,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       <div className={`list-layout${activeAsset ? " has-preview" : ""}`}>
         <SurfaceCard
           title="Asset registry"
-          subtitle={
-            isProjectMode
-              ? "Single click previews. Double click opens detail. This view is scoped to the current project."
-              : "Single click previews. Double click opens detail."
-          }
+          subtitle={isProjectMode ? "This view is scoped to the current project." : undefined}
           aside={
             <button
               className="ghost-control"

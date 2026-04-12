@@ -1,12 +1,28 @@
 import type {
+  AssistantChatSnapshot,
+  AssignAgentModelCommand,
+  CreateAssistantThreadCommand,
+  AssistantGatewayRequest,
+  SaveAIProviderConfigCommand,
+  TestAIProviderConnectionCommand,
+  AssistantGatewayResponse,
+  DeleteAssistantThreadCommand,
+  CreateAgentCommand,
   ArchiveAssetCommand,
+  CreateDraftRunFromChatCommand,
+  ReviewAgentRunCommand,
+  SendAssistantChatTurnCommand,
   AssetListQuery,
+  SetActiveAssistantThreadCommand,
+  SetAgentApprovalModeCommand,
+  SetAgentStatusCommand,
   AssignMoveAssetsInput,
   AssignCrewToProjectUnitInput,
   CatalogListQuery,
   CreateAssetCommand,
   CreateCatalogEntityInput,
   CreatePackingSlipCommand,
+  CreateRmaCaseCommand,
   CreateProjectInput,
   CreateProjectUnitInput,
   DeleteCatalogEntityInput,
@@ -27,6 +43,8 @@ import type {
   UpdateCatalogEntityInput,
   UpdateProjectInput,
   UpdateProjectUnitInput,
+  UpdateRmaCaseCommand,
+  UpdateAgentCommand,
 } from "@contracts";
 import { ipcMain } from "electron";
 
@@ -36,6 +54,15 @@ import type { FoundationReadService } from "../services/data/foundationReadServi
 
 type RegisterFoundationIpcOptions = {
   foundationReads: FoundationReadService;
+  agentReads: {
+    getMissionControlSnapshot: () => unknown;
+    getAgentsList: () => unknown;
+    getAgentDetail: (agentId: string) => unknown;
+    getRunsList: () => unknown;
+    getModelsSnapshot: () => unknown;
+    getAIProviderConfigs: () => unknown;
+    getConnectorsSnapshot: () => unknown;
+  };
   projectMutations: {
     createProject: (input: CreateProjectInput) => void;
     updateProject: (input: UpdateProjectInput) => void;
@@ -64,18 +91,94 @@ type RegisterFoundationIpcOptions = {
     createPackingSlip: (input: CreatePackingSlipCommand) => unknown;
     returnPackingSlipItems: (input: ReturnPackingSlipItemsCommand) => unknown;
   };
+  rmaMutations: {
+    createRmaCase: (input: CreateRmaCaseCommand) => unknown;
+    updateRmaCase: (input: UpdateRmaCaseCommand) => unknown;
+  };
+  agentMutations: {
+    createAgent: (input: CreateAgentCommand) => unknown;
+    updateAgent: (input: UpdateAgentCommand) => unknown;
+    setAgentStatus: (input: SetAgentStatusCommand) => unknown;
+    setAgentApprovalMode: (input: SetAgentApprovalModeCommand) => unknown;
+    saveAIProviderConfig: (input: SaveAIProviderConfigCommand) => unknown;
+    testAIProviderConnection: (input: TestAIProviderConnectionCommand) => unknown;
+    assignAgentModel: (input: AssignAgentModelCommand) => unknown;
+    getAssistantChatSnapshot: () => AssistantChatSnapshot;
+    createAssistantThread: (input: CreateAssistantThreadCommand) => AssistantChatSnapshot;
+    deleteAssistantThread: (input: DeleteAssistantThreadCommand) => AssistantChatSnapshot;
+    setActiveAssistantThread: (input: SetActiveAssistantThreadCommand) => AssistantChatSnapshot;
+    sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
+    reviewRun: (input: ReviewAgentRunCommand) => unknown;
+    sendAssistantMessage: (input: AssistantGatewayRequest) => Promise<AssistantGatewayResponse>;
+    createDraftRunFromChat: (input: CreateDraftRunFromChatCommand) => unknown;
+  };
 };
 
 export const registerFoundationIpc = ({
   foundationReads,
+  agentReads,
   projectMutations,
   catalogMutations,
   assetMutations,
   incidentMutations,
   packingMutations,
+  rmaMutations,
+  agentMutations,
 }: RegisterFoundationIpcOptions) => {
   ipcMain.handle(ipcChannels.shell.getBootstrap, () => foundationReads.getShellBootstrap());
   ipcMain.handle(ipcChannels.shell.searchGlobal, (_event, query: GlobalSearchQuery) => foundationReads.getGlobalSearch(query));
+  ipcMain.handle(ipcChannels.agents.getMissionControlSnapshot, () => agentReads.getMissionControlSnapshot());
+  ipcMain.handle(ipcChannels.agents.getAgentsList, () => agentReads.getAgentsList());
+  ipcMain.handle(ipcChannels.agents.getAgentDetail, (_event, agentId: string) => agentReads.getAgentDetail(agentId));
+  ipcMain.handle(ipcChannels.agents.getRunsList, () => agentReads.getRunsList());
+  ipcMain.handle(ipcChannels.agents.getModelsSnapshot, () => agentReads.getModelsSnapshot());
+  ipcMain.handle(ipcChannels.agents.getAIProviderConfigs, () => agentReads.getAIProviderConfigs());
+  ipcMain.handle(ipcChannels.agents.getConnectorsSnapshot, () => agentReads.getConnectorsSnapshot());
+  ipcMain.handle(ipcChannels.agents.getAssistantChatSnapshot, () => agentMutations.getAssistantChatSnapshot());
+  ipcMain.handle(ipcChannels.agents.create, (_event, input: CreateAgentCommand) => agentMutations.createAgent(input));
+  ipcMain.handle(ipcChannels.agents.update, (_event, input: UpdateAgentCommand) => agentMutations.updateAgent(input));
+  ipcMain.handle(ipcChannels.agents.setStatus, (_event, input: SetAgentStatusCommand) => agentMutations.setAgentStatus(input));
+  ipcMain.handle(
+    ipcChannels.agents.setApprovalMode,
+    (_event, input: SetAgentApprovalModeCommand) => agentMutations.setAgentApprovalMode(input),
+  );
+  ipcMain.handle(
+    ipcChannels.agents.saveAIProviderConfig,
+    (_event, input: SaveAIProviderConfigCommand) => agentMutations.saveAIProviderConfig(input),
+  );
+  ipcMain.handle(
+    ipcChannels.agents.testAIProviderConnection,
+    (_event, input: TestAIProviderConnectionCommand) => agentMutations.testAIProviderConnection(input),
+  );
+  ipcMain.handle(
+    ipcChannels.agents.assignAgentModel,
+    (_event, input: AssignAgentModelCommand) => agentMutations.assignAgentModel(input),
+  );
+  ipcMain.handle(
+    ipcChannels.agents.createAssistantThread,
+    (_event, input: CreateAssistantThreadCommand) => agentMutations.createAssistantThread(input),
+  );
+  ipcMain.handle(
+    ipcChannels.agents.deleteAssistantThread,
+    (_event, input: DeleteAssistantThreadCommand) => agentMutations.deleteAssistantThread(input),
+  );
+  ipcMain.handle(
+    ipcChannels.agents.setActiveAssistantThread,
+    (_event, input: SetActiveAssistantThreadCommand) => agentMutations.setActiveAssistantThread(input),
+  );
+  ipcMain.handle(
+    ipcChannels.agents.sendAssistantChatTurn,
+    (_event, input: SendAssistantChatTurnCommand) => agentMutations.sendAssistantChatTurn(input),
+  );
+  ipcMain.handle(ipcChannels.agents.reviewRun, (_event, input: ReviewAgentRunCommand) => agentMutations.reviewRun(input));
+  ipcMain.handle(
+    ipcChannels.agents.sendAssistantMessage,
+    (_event, input: AssistantGatewayRequest) => agentMutations.sendAssistantMessage(input),
+  );
+  ipcMain.handle(
+    ipcChannels.agents.createDraftRunFromChat,
+    (_event, input: CreateDraftRunFromChatCommand) => agentMutations.createDraftRunFromChat(input),
+  );
   ipcMain.handle(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot());
   ipcMain.handle(
     ipcChannels.overview.getTimeline,
@@ -83,6 +186,8 @@ export const registerFoundationIpc = ({
       foundationReads.getScheduleTimeline(range, scale, anchorDate),
   );
   ipcMain.handle(ipcChannels.assets.getList, (_event, query: AssetListQuery | undefined) => foundationReads.getAssets(query));
+  ipcMain.handle(ipcChannels.assets.getSummary, () => foundationReads.getAssetSummary());
+  ipcMain.handle(ipcChannels.assets.getOverview, () => foundationReads.getAssetsOverview());
   ipcMain.handle(ipcChannels.assets.getDetail, (_event, assetId: string) => foundationReads.getAssetDetail(assetId));
   ipcMain.handle(ipcChannels.assets.assignMove, (_event, input: AssignMoveAssetsInput) => assetMutations.assignMoveAssets(input));
   ipcMain.handle(ipcChannels.assets.create, (_event, input: CreateAssetCommand) => assetMutations.createAsset(input));
@@ -144,6 +249,10 @@ export const registerFoundationIpc = ({
     catalogMutations.deleteEntity(input);
     return foundationReads.getCatalogSnapshot();
   });
+  ipcMain.handle(ipcChannels.rma.getSnapshot, () => foundationReads.getRmaSnapshot());
+  ipcMain.handle(ipcChannels.rma.getDetail, (_event, rmaCaseId: string) => foundationReads.getRmaCaseDetail(rmaCaseId));
+  ipcMain.handle(ipcChannels.rma.create, (_event, input: CreateRmaCaseCommand) => rmaMutations.createRmaCase(input));
+  ipcMain.handle(ipcChannels.rma.update, (_event, input: UpdateRmaCaseCommand) => rmaMutations.updateRmaCase(input));
   ipcMain.handle(ipcChannels.finance.getOverview, () => foundationReads.getFinanceOverview());
   ipcMain.handle(ipcChannels.finance.getCostLinks, () => foundationReads.getFinanceCostLinks());
   ipcMain.handle(ipcChannels.finance.getEntries, (_event, query: FinanceEntryListQuery | undefined) => foundationReads.getFinanceEntries(query));

@@ -32,7 +32,7 @@ export const createMainWindow = ({
     backgroundColor: "#0f1113",
     title: "bukowskiOS",
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 16 },
+    trafficLightPosition: { x: 16, y: 13 },
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,

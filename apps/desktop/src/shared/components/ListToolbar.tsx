@@ -50,22 +50,24 @@ export const ListToolbar = <TSort extends string,>({
 
     <div className="list-toolbar-controls">
       <div className="list-toolbar-sort-group">
-        <div className="list-toolbar-sort-select">
+        <span className="list-toolbar-pill list-toolbar-pill-label">
           <ArrowUpDown aria-hidden size={14} />
-          <SelectField
-            aria-label="Sort rows"
-            className="list-toolbar-sort-control"
-            onChange={(event) => onSortByChange(event.target.value as TSort)}
-            value={sortBy}
-            wrapperClassName="list-toolbar-select-shell"
-          >
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </SelectField>
-        </div>
+          <span>Sort</span>
+        </span>
+
+        <SelectField
+          aria-label="Sort rows"
+          className="list-toolbar-sort-control"
+          onChange={(event) => onSortByChange(event.target.value as TSort)}
+          value={sortBy}
+          wrapperClassName="list-toolbar-select-shell"
+        >
+          {sortOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </SelectField>
 
         <button
           aria-label={sortDirection === "asc" ? "Switch to descending order" : "Switch to ascending order"}
@@ -79,7 +81,7 @@ export const ListToolbar = <TSort extends string,>({
       </div>
 
       <div className="list-toolbar-meta">
-        {activeSortLabel ? <span className="list-toolbar-pill">Sorted by {activeSortLabel}</span> : null}
+        {activeSortLabel ? <span className="list-toolbar-pill">By {activeSortLabel}</span> : null}
         {typeof resultCount === "number" ? (
           <span className="list-toolbar-count">
             {resultCount} {resultCount === 1 ? resultLabel.replace(/s$/, "") : resultLabel}

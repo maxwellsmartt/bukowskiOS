@@ -7,5 +7,5 @@ export const useSectionScopeLabel = () => {
     return `${activeProject.code} · ${activeProject.name}`;
   }
 
-  return "Global workspace";
+  return undefined;
 };

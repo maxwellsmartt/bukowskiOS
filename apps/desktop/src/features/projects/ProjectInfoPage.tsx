@@ -95,12 +95,7 @@ export const ProjectInfoPage = () => {
 
   return (
     <div className="page-stack page-stack-project">
-      <SectionHeader
-        eyebrow="Project / Info"
-        title={`${currentProject.name} info`}
-        body="Base project context, canonical dates, timeline color and unit structure for this workspace."
-        contextLabel={project ? `${project.code} · ${project.name}` : "Project workspace"}
-      />
+      <SectionHeader title="Info" />
 
       <div className="project-workspace-scroll">
         {saveFeedback ? <div className="action-feedback action-feedback-success">{saveFeedback}</div> : null}
@@ -110,7 +105,6 @@ export const ProjectInfoPage = () => {
           <SurfaceCard
             className="project-scroll-card"
             title="Project base"
-            subtitle="Client, schedule and color live here so the timeline and workspace stay aligned."
             aside={<StatusBadge>{currentProject.status}</StatusBadge>}
           >
             <div className="action-form-grid">
@@ -190,7 +184,6 @@ export const ProjectInfoPage = () => {
           <SurfaceCard
             className="project-scroll-card"
             title="Schedule summary"
-            subtitle="This block keeps the timeline semantics readable before you even open Global Overview."
           >
             <div className="summary-grid">
               <div className="summary-row">

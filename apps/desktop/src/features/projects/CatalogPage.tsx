@@ -30,13 +30,14 @@ type CatalogTabConfig = {
   }>;
 };
 
-const catalogTabOrder: CatalogEntityType[] = ["location", "department", "crew", "client", "kit", "category"];
+const catalogTabOrder: CatalogEntityType[] = ["location", "department", "crew", "client", "manufacturer", "kit", "category"];
 
 const emptySelectedState: Record<CatalogEntityType, string | null> = {
   location: null,
   department: null,
   crew: null,
   client: null,
+  manufacturer: null,
   category: null,
   kit: null,
 };
@@ -46,6 +47,7 @@ const singularLabelMap: Record<CatalogEntityType, string> = {
   department: "department",
   crew: "crew member",
   client: "client",
+  manufacturer: "manufacturer",
   category: "category",
   kit: "kit",
 };
@@ -56,6 +58,8 @@ const resolveCatalogPreviewTitle = (entityType: CatalogEntityType, row: Record<s
       return (row.fullName as string) || "Crew member";
     case "client":
       return (row.name as string) || "Client";
+    case "manufacturer":
+      return (row.name as string) || "Manufacturer";
     case "kit":
       return (row.name as string) || "Kit";
     case "location":
@@ -91,6 +95,12 @@ const buildCatalogPreviewRows = (entityType: CatalogEntityType, row: Record<stri
       return [
         { label: "Contact", value: String(row.contactName ?? "—") },
         { label: "Email", value: String(row.email ?? "—") },
+        { label: "Phone", value: String(row.phone ?? "—") },
+      ];
+    case "manufacturer":
+      return [
+        { label: "Contact", value: String(row.contactName ?? "—") },
+        { label: "Support email", value: String(row.supportEmail ?? "—") },
         { label: "Phone", value: String(row.phone ?? "—") },
       ];
     case "kit":
@@ -135,6 +145,13 @@ const catalogSortOptionsByEntityType: Record<CatalogEntityType, Array<ListSortOp
     { value: "name", label: "Client", columnKey: "name" },
     { value: "contactName", label: "Contact", columnKey: "contactName" },
     { value: "email", label: "Email", columnKey: "email" },
+    { value: "phone", label: "Phone", columnKey: "phone" },
+    { value: "status", label: "Status" },
+  ],
+  manufacturer: [
+    { value: "name", label: "Manufacturer", columnKey: "name" },
+    { value: "contactName", label: "Contact", columnKey: "contactName" },
+    { value: "supportEmail", label: "Support email", columnKey: "supportEmail" },
     { value: "phone", label: "Phone", columnKey: "phone" },
     { value: "status", label: "Status" },
   ],
@@ -248,6 +265,19 @@ export const CatalogPage = () => {
         ],
       },
       {
+        key: "manufacturer",
+        label: "Manufacturers",
+        title: "Manufacturers",
+        subtitle: "Support contacts reused by RMA so escalations stay consistent and faster to prepare.",
+        rows: data.manufacturers as Array<Record<string, unknown>>,
+        columns: [
+          { key: "name", label: "Manufacturer", width: 180, minWidth: 144, render: (row) => row.name as string },
+          { key: "contactName", label: "Contact", width: 150, minWidth: 120, render: (row) => (row.contactName as string) || "—" },
+          { key: "supportEmail", label: "Support email", width: 200, minWidth: 160, render: (row) => (row.supportEmail as string) || "—" },
+          { key: "phone", label: "Phone", width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
+        ],
+      },
+      {
         key: "kit",
         label: "Kits",
         title: "Kits",
@@ -312,7 +342,7 @@ export const CatalogPage = () => {
       <SectionHeader
         eyebrow="Catalog"
         title="Master data"
-        body="Global records for locations, departments, crew, clients, kits and categories."
+        body="Global records for locations, departments, crew, clients, manufacturers, kits and categories."
         contextLabel={sectionScopeLabel}
       />
 

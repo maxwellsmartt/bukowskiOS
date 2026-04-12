@@ -1,20 +1,12 @@
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
-import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 export const SettingsPage = () => {
-  const sectionScopeLabel = useSectionScopeLabel();
-
   return (
     <div className="page-stack">
-      <SectionHeader
-        eyebrow="Admin / Settings"
-        title="Settings"
-        body="Workspace configuration and desktop preferences."
-        contextLabel={sectionScopeLabel}
-      />
+      <SectionHeader title="Settings" />
 
-      <SurfaceCard title="Workspace settings" subtitle="Permissions, sync controls and app behavior will live here.">
+      <SurfaceCard title="Settings">
         <div className="summary-grid">
           <div className="summary-row">
             <span className="summary-label">Roles & permissions</span>

@@ -74,6 +74,25 @@ const assertUniqueClientName = (db: DatabaseSync, name: string, currentId?: stri
   }
 };
 
+const assertUniqueManufacturerName = (db: DatabaseSync, name: string, currentId?: string) => {
+  const existing = db
+    .prepare(
+      `
+        SELECT id
+        FROM manufacturers
+        WHERE workspace_id = ?
+          AND lower(name) = lower(?)
+          AND (? IS NULL OR id != ?)
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, name, currentId ?? null, currentId ?? null) as { id: string } | undefined;
+
+  if (existing) {
+    throw new Error(`Manufacturer ${name} already exists.`);
+  }
+};
+
 const assertAssetIdsExist = (db: DatabaseSync, assetIds: string[]) => {
   if (!assetIds.length) {
     return;
@@ -142,6 +161,11 @@ const getDeleteGuardCount = (db: DatabaseSync, input: DeleteCatalogEntityInput) 
 
     case "client": {
       const row = db.prepare("SELECT COUNT(*) AS count FROM projects WHERE client_id = ?").get(input.id) as { count: number };
+      return row.count;
+    }
+
+    case "manufacturer": {
+      const row = db.prepare("SELECT COUNT(*) AS count FROM rma_cases WHERE manufacturer_id = ?").get(input.id) as { count: number };
       return row.count;
     }
 
@@ -261,6 +285,31 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               name,
               optionalValue(input.contactName),
               optionalValue(input.email),
+              optionalValue(input.phone),
+              optionalValue(input.notes),
+              now,
+              now,
+            );
+            break;
+          }
+
+          case "manufacturer": {
+            const name = ensureValue(input.name, "Manufacturer name");
+            assertUniqueManufacturerName(db, name);
+
+            db.prepare(
+              `
+                INSERT INTO manufacturers (
+                  id, workspace_id, name, contact_name, support_email, phone, notes, is_active, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+              `,
+            ).run(
+              `manufacturer-${slugify(name)}-${Date.now().toString(36)}`,
+              workspaceId,
+              name,
+              optionalValue(input.contactName),
+              optionalValue(input.supportEmail),
               optionalValue(input.phone),
               optionalValue(input.notes),
               now,
@@ -424,6 +473,35 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             break;
           }
 
+          case "manufacturer": {
+            const name = ensureValue(input.name, "Manufacturer name");
+            assertUniqueManufacturerName(db, name, input.id);
+            const result = db.prepare(
+              `
+                UPDATE manufacturers
+                SET name = ?, contact_name = ?, support_email = ?, phone = ?, notes = ?, updated_at = ?
+                WHERE id = ?
+              `,
+            ).run(
+              name,
+              optionalValue(input.contactName),
+              optionalValue(input.supportEmail),
+              optionalValue(input.phone),
+              optionalValue(input.notes),
+              now,
+              input.id,
+            );
+            if (!result.changes) {
+              throw new Error("Manufacturer not found.");
+            }
+
+            db.prepare("UPDATE rma_cases SET support_email = COALESCE(?, support_email) WHERE manufacturer_id = ? AND (support_email IS NULL OR trim(support_email) = '')").run(
+              optionalValue(input.supportEmail),
+              input.id,
+            );
+            break;
+          }
+
           case "category": {
             const code = ensureValue(input.code, "Category code").toUpperCase();
             assertUniqueCode(db, "asset_categories", code, input.id);
@@ -517,6 +595,13 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const result = db.prepare("DELETE FROM clients WHERE id = ?").run(input.id);
             if (!result.changes) {
               throw new Error("Client not found.");
+            }
+            break;
+          }
+          case "manufacturer": {
+            const result = db.prepare("DELETE FROM manufacturers WHERE id = ?").run(input.id);
+            if (!result.changes) {
+              throw new Error("Manufacturer not found.");
             }
             break;
           }

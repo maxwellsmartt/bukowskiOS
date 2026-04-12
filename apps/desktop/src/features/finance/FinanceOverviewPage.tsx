@@ -4,23 +4,16 @@ import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
-import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { useFinanceOverview } from "./useFinanceData";
 
 export const FinanceOverviewPage = () => {
   const { data, error } = useFinanceOverview();
-  const sectionScopeLabel = useSectionScopeLabel();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        eyebrow="Finance"
-        title="Operational exposure"
-        body="Replacement risk, incident cost and project exposure in one view."
-        contextLabel={sectionScopeLabel}
-      />
+      <SectionHeader title="Finance" />
 
       {error ? <div className="empty-state">Finance overview unavailable: {error}</div> : null}
 
@@ -34,7 +27,7 @@ export const FinanceOverviewPage = () => {
       </div>
 
       <div className="split-layout">
-        <SurfaceCard title="Exposure by project" subtitle="Projects with active operational risk and linked cost visibility.">
+        <SurfaceCard title="Exposure by project">
           <DataTable
             getRowId={(row) => row.project}
             maxHeight="min(48vh, 520px)"
@@ -52,7 +45,7 @@ export const FinanceOverviewPage = () => {
           />
         </SurfaceCard>
 
-        <SurfaceCard title="Cost-link queue" subtitle="Incidents that already carry financial context or still need it.">
+        <SurfaceCard title="Cost-link queue">
           <div className="queue-list">
             {data.costLinks.map((row) => (
               <div key={row.incident} className="queue-item">

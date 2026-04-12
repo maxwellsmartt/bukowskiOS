@@ -172,6 +172,16 @@ export type CatalogClientRow = {
   isActive: boolean;
 };
 
+export type CatalogManufacturerRow = {
+  id: string;
+  name: string;
+  contactName: string;
+  supportEmail: string;
+  phone: string;
+  notes: string;
+  isActive: boolean;
+};
+
 export type CatalogCategoryRow = {
   id: string;
   code: string;
@@ -206,6 +216,7 @@ export type CatalogSnapshot = {
   users: CatalogUserRow[];
   crewMembers: CatalogCrewRow[];
   clients: CatalogClientRow[];
+  manufacturers: CatalogManufacturerRow[];
   categories: CatalogCategoryRow[];
   kits: CatalogKitRow[];
   assetOptions: CatalogAssetOptionRow[];

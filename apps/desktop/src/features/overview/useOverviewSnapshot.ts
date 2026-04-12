@@ -1,11 +1,33 @@
-import type {
-  OverviewSnapshot,
-  ScheduleTimelineSnapshot,
-} from "@contracts";
+import type { OverviewSnapshot, ScheduleTimelineRange, ScheduleTimelineScale, ScheduleTimelineSnapshot } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 
 const emptySnapshot: OverviewSnapshot = {
-  metrics: [],
+  cards: {
+    overdueReturns: {
+      label: "Overdue returns",
+      value: "—",
+      subtitle: "Slips nearing or past due return need review.",
+      tone: "warning",
+    },
+    openPackingSlips: {
+      label: "Open packing slips",
+      value: "—",
+      subtitle: "Issued slips still active across warehouse and set.",
+      tone: "warning",
+    },
+    activeIncidents: {
+      label: "Active incidents",
+      value: "—",
+      subtitle: "Open issues with pending follow-up or missing estimates.",
+      tone: "critical",
+    },
+    maintenanceWatch: {
+      label: "Maintenance watch",
+      value: "—",
+      subtitle: "Assets flagged for bench review or spare-part follow-up.",
+      tone: "success",
+    },
+  },
   recentMovements: [],
 };
 
@@ -33,15 +55,19 @@ export const useOverviewSnapshot = () =>
     [],
   );
 
-export const useOverviewTimeline = () =>
+export const useOverviewTimeline = (
+  range: ScheduleTimelineRange = "90d",
+  scale: ScheduleTimelineScale = "week",
+  anchorDate?: string,
+) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiOverview) {
         return emptyTimeline;
       }
 
-      return window.bukowskiOverview.getTimeline("90d", "week");
+      return window.bukowskiOverview.getTimeline(range, scale, anchorDate);
     },
     emptyTimeline,
-    [],
+    [range, scale, anchorDate ?? ""],
   );

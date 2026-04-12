@@ -177,13 +177,34 @@ type DragState = {
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
+  timeZone: "UTC",
 });
 
 const monthLabelFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
+  timeZone: "UTC",
 });
 
-const todayDateOnly = () => new Date().toISOString().slice(0, 10);
+const dayLabelFormatter = new Intl.DateTimeFormat("en-US", {
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+const formatLocalDateOnly = (value = new Date()) => {
+  const year = value.getFullYear();
+  const month = `${value.getMonth() + 1}`.padStart(2, "0");
+  const day = `${value.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getMillisecondsUntilNextLocalDay = () => {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(24, 0, 1, 0);
+  return Math.max(next.getTime() - now.getTime(), 1_000);
+};
+
+const todayDateOnly = () => formatLocalDateOnly();
 
 const parseDateOnly = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
@@ -266,6 +287,26 @@ const formatRangeLabel = (startDate: string | null, endDate: string | null) => {
 
 const formatPlayheadLabel = (value: string) => (value === todayDateOnly() ? "Today" : shortDateFormatter.format(parseDateOnly(value)));
 
+const extractRgb = (color: string) => {
+  const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+
+  if (!match) {
+    return null;
+  }
+
+  return [Number.parseInt(match[1] ?? "0", 10), Number.parseInt(match[2] ?? "0", 10), Number.parseInt(match[3] ?? "0", 10)] as const;
+};
+
+const withAlpha = (color: string, alpha: number) => {
+  const rgb = extractRgb(color);
+
+  if (!rgb) {
+    return color;
+  }
+
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+};
+
 const resolveStatusTone = (status: string) => {
   const normalized = status.toLowerCase();
 
@@ -295,7 +336,12 @@ const resolveDateLeft = (date: string, rangeStart: string, rangeEnd: string) => 
   return (diffDays(rangeStart, clampDate(date, rangeStart, rangeEnd)) / totalDays) * 100;
 };
 
-const resolveBarGeometry = (row: TimelineBarRow, rangeStart: string, rangeEnd: string): TimelineBarGeometry | null => {
+const resolveBarGeometry = (
+  row: TimelineBarRow,
+  rangeStart: string,
+  rangeEnd: string,
+  paletteOverride?: (typeof colorMap)[keyof typeof colorMap],
+): TimelineBarGeometry | null => {
   const totalDays = Math.max(diffDaysInclusive(rangeStart, rangeEnd), 1);
   const startDate = row.startDate ?? rangeStart;
   const endDate = row.endDate ?? rangeEnd;
@@ -311,7 +357,7 @@ const resolveBarGeometry = (row: TimelineBarRow, rangeStart: string, rangeEnd: s
 
   return {
     left: (leftDays / totalDays) * 100,
-    palette: resolveTimelinePalette(row.colorKey),
+    palette: paletteOverride ?? resolveTimelinePalette(row.colorKey),
     width: Math.max((visibleDays / totalDays) * 100, 0.9),
   };
 };
@@ -373,7 +419,7 @@ const buildDayBands = (rangeStart: string, rangeEnd: string) => {
 
   return Array.from({ length: totalDays }, (_, index) => {
     const date = addDays(rangeStart, index);
-    return resolveBand(date, date, rangeStart, rangeEnd, new Intl.DateTimeFormat("en-US", { day: "numeric" }).format(parseDateOnly(date)));
+    return resolveBand(date, date, rangeStart, rangeEnd, dayLabelFormatter.format(parseDateOnly(date)));
   });
 };
 
@@ -452,6 +498,21 @@ const resolveDateFromClientX = (clientX: number, rect: DOMRect, rangeStart: stri
 
 const shiftAnchorDate = (anchorDate: string, deltaDays: number) => addDays(anchorDate, deltaDays);
 
+const deriveUnitPalette = (
+  projectPalette: (typeof colorMap)[keyof typeof colorMap],
+  unitIndex: number,
+) => {
+  const alphaVariants = [0.68, 0.56, 0.46, 0.38];
+  const alpha = alphaVariants[unitIndex % alphaVariants.length] ?? 0.56;
+
+  return {
+    ...projectPalette,
+    border: withAlpha(projectPalette.projectFill, Math.max(0.2, alpha * 0.58)),
+    focusRing: withAlpha(projectPalette.projectFill, Math.max(0.14, alpha * 0.34)),
+    unitFill: withAlpha(projectPalette.projectFill, alpha),
+  };
+};
+
 const TimelineGrid = ({
   bands,
   scale,
@@ -508,7 +569,8 @@ const TimelineLane = ({
   rangeStart: string;
   scale: ScheduleTimelineScale;
 }) => {
-  const projectBar = resolveBarGeometry(project, rangeStart, rangeEnd);
+  const projectPalette = resolveTimelinePalette(project.colorKey);
+  const projectBar = resolveBarGeometry(project, rangeStart, rangeEnd, projectPalette);
 
   return (
     <div className="timeline-lane-block">
@@ -529,7 +591,7 @@ const TimelineLane = ({
               <StatusBadge tone={resolveStatusTone(project.status)}>{project.status}</StatusBadge>
             </div>
             <span className="timeline-lane-subtitle">
-              {project.client} · {formatRangeLabel(project.startDate, project.endDate)}
+              {formatRangeLabel(project.startDate, project.endDate)}
               {project.units.length ? ` · ${project.units.length} units` : ""}
             </span>
           </div>
@@ -538,7 +600,6 @@ const TimelineLane = ({
         <div className="timeline-track">
           <div
             className="timeline-track-grid"
-            onClick={interactionHandlers.onClick}
             onPointerCancel={interactionHandlers.onPointerCancel}
             onPointerDown={interactionHandlers.onPointerDown}
             onPointerMove={interactionHandlers.onPointerMove}
@@ -571,15 +632,27 @@ const TimelineLane = ({
 
       {isExpanded && project.units.length ? (
         <div className="timeline-unit-list">
-          {project.units.map((unit) => {
-            const unitBar = resolveBarGeometry(unit, rangeStart, rangeEnd);
+          {project.units.map((unit, unitIndex) => {
+            const unitPalette = deriveUnitPalette(projectPalette, unitIndex);
+            const unitBar = resolveBarGeometry(unit, rangeStart, rangeEnd, unitPalette);
 
             return (
               <div key={unit.id} className="timeline-lane-row timeline-lane-row-unit">
                 <div className="timeline-lane-meta timeline-lane-meta-unit">
                   <div className="timeline-lane-copy">
                     <div className="timeline-lane-title-row">
-                      <span className="timeline-unit-code">{unit.code}</span>
+                      <span
+                        className="timeline-unit-code"
+                        style={
+                          {
+                            "--timeline-unit-chip-bg": withAlpha(unitPalette.unitFill, 0.22),
+                            "--timeline-unit-chip-border": unitPalette.border,
+                            "--timeline-unit-chip-text": withAlpha(projectPalette.projectFill, 0.94),
+                          } as CSSProperties
+                        }
+                      >
+                        {unit.code}
+                      </span>
                       <strong className="timeline-lane-title">{unit.name}</strong>
                       <StatusBadge tone={resolveStatusTone(unit.status)}>{unit.status}</StatusBadge>
                     </div>
@@ -590,7 +663,6 @@ const TimelineLane = ({
                 <div className="timeline-track">
                   <div
                     className="timeline-track-grid"
-                    onClick={interactionHandlers.onClick}
                     onPointerCancel={interactionHandlers.onPointerCancel}
                     onPointerDown={interactionHandlers.onPointerDown}
                     onPointerMove={interactionHandlers.onPointerMove}
@@ -665,7 +737,7 @@ export const OverviewScheduleTimeline = ({
     readJsonPreference<string[]>(uiPreferenceKeys.overviewTimelineExpandedProjects, []),
   );
   const [isPanning, setIsPanning] = useState(false);
-  const [playheadDate, setPlayheadDate] = useState(todayDateOnly());
+  const [currentDate, setCurrentDate] = useState(todayDateOnly());
   const [previewAnchorDate, setPreviewAnchorDate] = useState(anchorDate || todayDateOnly());
   const [tooltip, setTooltip] = useState<TimelineTooltipState | null>(null);
 
@@ -685,6 +757,39 @@ export const OverviewScheduleTimeline = ({
     }
   }, [anchorDate, isPanning]);
 
+  useEffect(() => {
+    let timeoutId = 0;
+
+    const syncCurrentDate = () => {
+      const nextDate = todayDateOnly();
+      setCurrentDate((previousDate) => (previousDate === nextDate ? previousDate : nextDate));
+    };
+
+    const scheduleNextSync = () => {
+      timeoutId = window.setTimeout(() => {
+        syncCurrentDate();
+        scheduleNextSync();
+      }, getMillisecondsUntilNextLocalDay());
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncCurrentDate();
+      }
+    };
+
+    syncCurrentDate();
+    scheduleNextSync();
+    window.addEventListener("focus", syncCurrentDate);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("focus", syncCurrentDate);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
   const effectiveAnchorDate = previewAnchorDate || anchorDate || todayDateOnly();
   const visibleWindow = useMemo(
     () => resolveTimelineWindow(range, scale, effectiveAnchorDate),
@@ -693,14 +798,14 @@ export const OverviewScheduleTimeline = ({
   const visibleWindowDays = diffDaysInclusive(visibleWindow.start, visibleWindow.end);
   const clampedPlayheadDate =
     visibleWindow.start && visibleWindow.end
-      ? clampDate(playheadDate, visibleWindow.start, visibleWindow.end)
-      : playheadDate;
+      ? clampDate(currentDate, visibleWindow.start, visibleWindow.end)
+      : currentDate;
   const playheadLeft =
     visibleWindow.start && visibleWindow.end
       ? resolveDateLeft(clampedPlayheadDate, visibleWindow.start, visibleWindow.end)
       : 0;
   const renderedPlayheadLeft = Math.min(99.2, Math.max(0.8, playheadLeft));
-  const playheadLabel = formatPlayheadLabel(playheadDate);
+  const playheadLabel = formatPlayheadLabel(currentDate);
   const bands = useMemo(() => {
     if (!visibleWindow.start || !visibleWindow.end) {
       return emptyBands;
@@ -719,11 +824,9 @@ export const OverviewScheduleTimeline = ({
   );
 
   const setTodayAnchor = () => {
-    const today = todayDateOnly();
-    setPreviewAnchorDate(today);
-    previewAnchorDateRef.current = today;
-    onAnchorDateChange(today);
-    setPlayheadDate(today);
+    setPreviewAnchorDate(currentDate);
+    previewAnchorDateRef.current = currentDate;
+    onAnchorDateChange(currentDate);
   };
 
   const shiftWindow = (direction: -1 | 1) => {
@@ -833,15 +936,10 @@ export const OverviewScheduleTimeline = ({
     releaseDrag();
   };
 
-  const handleTrackClick = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const handleTrackClick = (_event: ReactPointerEvent<HTMLDivElement>) => {
     if (ignoreNextClickRef.current) {
       ignoreNextClickRef.current = false;
-      return;
     }
-
-    const rect = event.currentTarget.getBoundingClientRect();
-    const nextDate = resolveDateFromClientX(event.clientX, rect, visibleWindow.start, visibleWindow.end);
-    setPlayheadDate(nextDate);
   };
 
   const handleTrackWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
@@ -873,7 +971,6 @@ export const OverviewScheduleTimeline = ({
     <SurfaceCard
       className="timeline-surface"
       title="Schedule"
-      subtitle="Projects and units across the active planning window."
       aside={
         <div className="timeline-toolbar">
           <div className="timeline-control-group">

@@ -22,6 +22,7 @@ const emptyCatalog: CatalogSnapshot = {
   users: [],
   crewMembers: [],
   clients: [],
+  manufacturers: [],
   categories: [],
   kits: [],
   assetOptions: [],

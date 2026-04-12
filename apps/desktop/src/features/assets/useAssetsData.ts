@@ -4,6 +4,8 @@ import type {
   AssetEditorMutationResult,
   AssetListQuery,
   AssetListRow,
+  AssetsOverviewSnapshot,
+  AssetSummarySnapshot,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   CreateAssetCommand,
@@ -12,6 +14,42 @@ import type {
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 
 const emptyAssetList: AssetListRow[] = [];
+const emptyAssetSummary: AssetSummarySnapshot = {
+  totalAssets: "—",
+  assignedAssets: "—",
+};
+
+const emptyAssetsOverview: AssetsOverviewSnapshot = {
+  totalAssets: "—",
+  assignedAssets: "—",
+  cards: {
+    overdueReturns: {
+      label: "Overdue returns",
+      value: "—",
+      subtitle: "Slips nearing or past due return need review.",
+      tone: "warning",
+    },
+    openPackingSlips: {
+      label: "Open packing slips",
+      value: "—",
+      subtitle: "Issued slips still active across warehouse and set.",
+      tone: "warning",
+    },
+    activeIncidents: {
+      label: "Active incidents",
+      value: "—",
+      subtitle: "Open issues with pending follow-up or missing estimates.",
+      tone: "critical",
+    },
+    maintenanceWatch: {
+      label: "Maintenance watch",
+      value: "—",
+      subtitle: "Assets flagged for bench review or spare-part follow-up.",
+      tone: "success",
+    },
+  },
+  recentMovements: [],
+};
 
 const emptyAssetDetail: AssetDetailSnapshot = {
   asset: null,
@@ -40,6 +78,32 @@ export const useAssetsList = (query: AssetListQuery = defaultAssetListQuery) =>
     },
     emptyAssetList,
     [query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
+  );
+
+export const useAssetSummary = () =>
+  useAsyncValue(
+    async () => {
+      if (!window.bukowskiAssets) {
+        return emptyAssetSummary;
+      }
+
+      return window.bukowskiAssets.getSummary();
+    },
+    emptyAssetSummary,
+    [],
+  );
+
+export const useAssetsOverview = () =>
+  useAsyncValue(
+    async () => {
+      if (!window.bukowskiAssets) {
+        return emptyAssetsOverview;
+      }
+
+      return window.bukowskiAssets.getOverview();
+    },
+    emptyAssetsOverview,
+    [],
   );
 
 export const useAssetDetail = (assetId: string | undefined) =>

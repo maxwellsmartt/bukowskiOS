@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
-import { matchPath, useLocation } from "react-router-dom";
+import { matchPath, useLocation, useNavigate } from "react-router-dom";
 
 import { resolveActiveRoute } from "@app/routing/route-meta";
 import { AppRoutes } from "@app/routing/routes";
@@ -8,12 +8,14 @@ import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared
 import { pushRecentEntityKey } from "@shared/lib/recentEntities";
 
 import { CompareTrayBar } from "./CompareTrayBar";
+import { GlobalAssistantChat } from "./GlobalAssistantChat";
 import { GlobalSearchPalette } from "./GlobalSearchPalette";
-import { assetsSubnav, buildProjectSubnav, financeSubnav } from "./navigation";
+import { agentsSubnav, assetsSubnav, buildProjectSubnav, financeSubnav } from "./navigation";
 import { ShellErrorBoundary } from "./ShellErrorBoundary";
 import { ShellSidebar } from "./ShellSidebar";
 import { SubnavTabs } from "./SubnavTabs";
 import { TopContextBar } from "./TopContextBar";
+import { WindowTitleBar } from "./WindowTitleBar";
 
 const sidebarWidthMin = 220;
 const sidebarWidthMax = 420;
@@ -23,9 +25,12 @@ const clampSidebarWidth = (width: number) => Math.min(sidebarWidthMax, Math.max(
 
 export const AppShell = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { activeProjectId, activeProjectRouteSection, isScopeReady } = useShellContext();
   const activeRoute = resolveActiveRoute(location.pathname);
-  const [sidebarWidth, setSidebarWidth] = useState(sidebarWidthDefault);
+  const [sidebarWidth, setSidebarWidth] = useState(() =>
+    clampSidebarWidth(readNumberPreference(uiPreferenceKeys.shellSidebarWidth, sidebarWidthDefault)),
+  );
   const [searchOpen, setSearchOpen] = useState(false);
 
   const subnavItems = useMemo(() => {
@@ -37,20 +42,16 @@ export const AppShell = () => {
       return financeSubnav;
     }
 
+    if (activeRoute.domain === "agents") {
+      return agentsSubnav;
+    }
+
     if (activeRoute.domain === "assets") {
       return assetsSubnav;
     }
 
     return [];
   }, [activeProjectId, activeRoute.domain, activeRoute.scopeMode]);
-
-  useEffect(() => {
-    setSidebarWidth(clampSidebarWidth(readNumberPreference(uiPreferenceKeys.shellSidebarWidth, sidebarWidthDefault)));
-  }, []);
-
-  useEffect(() => {
-    writePreference(uiPreferenceKeys.shellSidebarWidth, String(sidebarWidth));
-  }, [sidebarWidth]);
 
   useEffect(() => {
     if (location.pathname !== "/") {
@@ -115,6 +116,23 @@ export const AppShell = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!window.bukowskiShell?.onAppAction) {
+      return undefined;
+    }
+
+    return window.bukowskiShell.onAppAction((action) => {
+      if (action.type === "open-search") {
+        setSearchOpen(true);
+        return;
+      }
+
+      if (action.type === "navigate") {
+        navigate(action.path);
+      }
+    });
+  }, [navigate]);
+
   useEffect(
     () => () => {
       document.body.classList.remove("is-resizing-sidebar");
@@ -127,15 +145,17 @@ export const AppShell = () => {
 
     const startX = event.clientX;
     const initialWidth = sidebarWidth;
+    let nextWidth = initialWidth;
     document.body.classList.add("is-resizing-sidebar");
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const nextWidth = clampSidebarWidth(initialWidth + moveEvent.clientX - startX);
+      nextWidth = clampSidebarWidth(initialWidth + moveEvent.clientX - startX);
       setSidebarWidth(nextWidth);
     };
 
     const handleMouseUp = () => {
       document.body.classList.remove("is-resizing-sidebar");
+      writePreference(uiPreferenceKeys.shellSidebarWidth, String(nextWidth));
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
@@ -150,33 +170,38 @@ export const AppShell = () => {
 
   return (
     <div className="app-shell" style={shellStyle}>
-      <ShellSidebar />
-      <div
-        aria-label="Resize sidebar"
-        className="shell-sidebar-resize-handle"
-        onMouseDown={handleSidebarResizeStart}
-        role="separator"
-      />
+      <WindowTitleBar />
 
-      <div className="shell-main">
-        <TopContextBar onOpenSearch={() => setSearchOpen(true)} />
-        {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
-        <main className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}`}>
-          {!isScopeReady ? (
-            <div className="shell-loading-state">
-              <div className="empty-state">
-                Validating project workspace before restoring the last route.
+      <div className="app-shell-body">
+        <ShellSidebar />
+        <div
+          aria-label="Resize sidebar"
+          className="shell-sidebar-resize-handle"
+          onMouseDown={handleSidebarResizeStart}
+          role="separator"
+        />
+
+        <div className="shell-main">
+          <TopContextBar onOpenSearch={() => setSearchOpen(true)} />
+          {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
+          <main className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}`}>
+            {!isScopeReady ? (
+              <div className="shell-loading-state">
+                <div className="empty-state">
+                  Validating project workspace before restoring the last route.
+                </div>
               </div>
-            </div>
-          ) : (
-            <ShellErrorBoundary>
-              <AppRoutes />
-            </ShellErrorBoundary>
-          )}
-        </main>
-        <CompareTrayBar />
+            ) : (
+              <ShellErrorBoundary>
+                <AppRoutes />
+              </ShellErrorBoundary>
+            )}
+          </main>
+          <CompareTrayBar />
+        </div>
       </div>
       <GlobalSearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <GlobalAssistantChat />
     </div>
   );
 };

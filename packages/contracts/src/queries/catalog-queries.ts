@@ -6,6 +6,7 @@ import type {
   CatalogDepartmentRow,
   CatalogKitRow,
   CatalogLocationRow,
+  CatalogManufacturerRow,
 } from "./operations-queries";
 import type { ListSortDirection } from "./list-controls-queries";
 
@@ -18,6 +19,7 @@ export type CatalogSortField =
   | "description"
   | "roleLabel"
   | "contactName"
+  | "supportEmail"
   | "email"
   | "phone"
   | "assetCount";
@@ -34,6 +36,7 @@ export type CatalogListRowMap = {
   department: CatalogDepartmentRow;
   crew: CatalogCrewRow;
   client: CatalogClientRow;
+  manufacturer: CatalogManufacturerRow;
   category: CatalogCategoryRow;
   kit: CatalogKitRow;
 };

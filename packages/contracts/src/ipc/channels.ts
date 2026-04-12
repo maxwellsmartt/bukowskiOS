@@ -1,10 +1,36 @@
 export const ipcChannels = {
   app: {
     getInfo: "bukowskiApp:getInfo",
+    openExternal: "bukowskiApp:openExternal",
   },
   shell: {
     getBootstrap: "bukowskiShell:getBootstrap",
     searchGlobal: "bukowskiShell:searchGlobal",
+    appAction: "bukowskiShell:appAction",
+  },
+  agents: {
+    getMissionControlSnapshot: "bukowskiAgents:getMissionControlSnapshot",
+    getAgentsList: "bukowskiAgents:getAgentsList",
+    getAgentDetail: "bukowskiAgents:getAgentDetail",
+    getRunsList: "bukowskiAgents:getRunsList",
+    getModelsSnapshot: "bukowskiAgents:getModelsSnapshot",
+    getAIProviderConfigs: "bukowskiAgents:getAIProviderConfigs",
+    getConnectorsSnapshot: "bukowskiAgents:getConnectorsSnapshot",
+    getAssistantChatSnapshot: "bukowskiAgents:getAssistantChatSnapshot",
+    create: "bukowskiAgents:create",
+    update: "bukowskiAgents:update",
+    setStatus: "bukowskiAgents:setStatus",
+    setApprovalMode: "bukowskiAgents:setApprovalMode",
+    saveAIProviderConfig: "bukowskiAgents:saveAIProviderConfig",
+    testAIProviderConnection: "bukowskiAgents:testAIProviderConnection",
+    assignAgentModel: "bukowskiAgents:assignAgentModel",
+    createAssistantThread: "bukowskiAgents:createAssistantThread",
+    deleteAssistantThread: "bukowskiAgents:deleteAssistantThread",
+    setActiveAssistantThread: "bukowskiAgents:setActiveAssistantThread",
+    sendAssistantChatTurn: "bukowskiAgents:sendAssistantChatTurn",
+    reviewRun: "bukowskiAgents:reviewRun",
+    sendAssistantMessage: "bukowskiAgents:sendAssistantMessage",
+    createDraftRunFromChat: "bukowskiAgents:createDraftRunFromChat",
   },
   overview: {
     getSnapshot: "bukowskiOverview:getSnapshot",
@@ -12,6 +38,8 @@ export const ipcChannels = {
   },
   assets: {
     getList: "bukowskiAssets:getList",
+    getSummary: "bukowskiAssets:getSummary",
+    getOverview: "bukowskiAssets:getOverview",
     getDetail: "bukowskiAssets:getDetail",
     assignMove: "bukowskiAssets:assignMove",
     create: "bukowskiAssets:create",
@@ -46,6 +74,12 @@ export const ipcChannels = {
     create: "bukowskiCatalog:create",
     update: "bukowskiCatalog:update",
     delete: "bukowskiCatalog:delete",
+  },
+  rma: {
+    getSnapshot: "bukowskiRma:getSnapshot",
+    getDetail: "bukowskiRma:getDetail",
+    create: "bukowskiRma:create",
+    update: "bukowskiRma:update",
   },
   finance: {
     getOverview: "bukowskiFinance:getOverview",

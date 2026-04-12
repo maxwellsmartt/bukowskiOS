@@ -50,6 +50,11 @@ const categories = [
   ["cat-support", "SUP", "Support", "Tripods and support gear"],
 ] as const;
 
+const manufacturers = [
+  ["manufacturer-sachtler", "Sachtler", "Service Desk", "support@sachtler.test", "+1 809 555 0401", "Tripods and support systems"],
+  ["manufacturer-smallhd", "SmallHD", "Monitor Support", "support@smallhd.test", "+1 809 555 0402", "Displays and monitor accessories"],
+] as const;
+
 const assets = [
   [
     "asset-smallhd-cine7",
@@ -212,6 +217,333 @@ const financialEntries = [
   ["entry-replacement-risk", "exposure", "Asset risk", 2299, "USD", 1, 2299, "Linked", "project-aurora", "asset-smallhd-cine7", null, "user-paola", "2026-04-08", "Replacement value at risk for MON-014", "Linked from active assignment"],
 ] as const;
 
+const rmaCases = [
+  [
+    "rma-flowtech-latch",
+    "manufacturer-sachtler",
+    "Flowtech latch review",
+    "support@sachtler.test",
+    "Latch is not locking correctly under load and needs manufacturer review.",
+    "Bench review completed. Ready to share with manufacturer.",
+    "Ready",
+    "user-ops",
+    "2026-04-09T09:20:00.000Z",
+    "2026-04-10T15:40:00.000Z",
+    null,
+    null,
+  ],
+] as const;
+
+const rmaCaseAssets = [
+  ["rma-flowtech-latch-asset-1", "rma-flowtech-latch", "asset-sachtler-flowtech", "2023", "Latch not locking under load on spreader side."],
+] as const;
+
+const agents = [
+  [
+    "agent-supervisor",
+    "supervisor-agent",
+    "Supervisor Agent",
+    "◎",
+    "Receives global intent, routes work and keeps approval discipline.",
+    "control",
+    "openai",
+    "openai:gpt-5.4",
+    "GPT-5.4",
+    "active",
+    "supervised",
+    JSON.stringify(["workspace.search", "runs.create", "routing.review"]),
+    JSON.stringify(["assets", "finance", "incidents", "projects", "connectors"]),
+    "Primary orchestrator for BukowskiOS. Commands stay behind the command layer.",
+    1,
+    0,
+  ],
+  [
+    "agent-assets",
+    "assets-agent",
+    "Assets Agent",
+    "▣",
+    "Keeps inventory, movement context and packing operations organized.",
+    "assets",
+    "openai",
+    "openai:gpt-5.4-mini",
+    "GPT-5.4 Mini",
+    "active",
+    "needs_approval",
+    JSON.stringify(["assets.read", "packing.read", "compare.prepare"]),
+    JSON.stringify(["assets", "packing_slips", "catalog"]),
+    "Prepared to assist with registry, movements and packing review.",
+    0,
+    1,
+  ],
+  [
+    "agent-incidents",
+    "incidents-maintenance-agent",
+    "Incidents & Maintenance Agent",
+    "◈",
+    "Tracks incidents, maintenance queues and RMA-related follow-up.",
+    "incidents",
+    "anthropic",
+    "anthropic:sonnet-4",
+    "Claude Sonnet 4",
+    "active",
+    "supervised",
+    JSON.stringify(["incidents.read", "maintenance.watch", "rma.prepare"]),
+    JSON.stringify(["incidents", "maintenance", "rma"]),
+    "Best for structured follow-up and approvals around maintenance workflows.",
+    0,
+    2,
+  ],
+  [
+    "agent-finance",
+    "finance-agent",
+    "Finance Agent",
+    "◌",
+    "Prepares financial context, exposure summaries and cost-link drafts.",
+    "finance",
+    "openai",
+    "openai:gpt-5.4-mini",
+    "GPT-5.4 Mini",
+    "active",
+    "needs_approval",
+    JSON.stringify(["finance.read", "entries.review", "cost-links.review"]),
+    JSON.stringify(["finance"]),
+    "Focused on visibility before any financial mutation is approved.",
+    0,
+    3,
+  ],
+  [
+    "agent-communications",
+    "communications-agent",
+    "Communications Agent",
+    "✦",
+    "Prepares outbound drafts for email, notifications and connectors.",
+    "communications",
+    "openclaw",
+    "openclaw:command",
+    "OpenClaw Command",
+    "paused",
+    "needs_approval",
+    JSON.stringify(["connector.email", "connector.notifications", "draft.compose"]),
+    JSON.stringify(["connectors", "notifications"]),
+    "Held in paused mode until outbound connectors are fully enabled.",
+    0,
+    4,
+  ],
+  [
+    "agent-projects",
+    "projects-scheduling-agent",
+    "Projects & Scheduling Agent",
+    "◇",
+    "Reviews project timing, unit coordination and schedule conflicts.",
+    "projects",
+    "anthropic",
+    "anthropic:sonnet-4",
+    "Claude Sonnet 4",
+    "active",
+    "supervised",
+    JSON.stringify(["projects.read", "timeline.review", "unit.conflicts"]),
+    JSON.stringify(["projects", "schedule", "units"]),
+    "Strong fit for cross-project schedule and unit planning questions.",
+    0,
+    5,
+  ],
+] as const;
+
+const aiProviderConfigs = [
+  [
+    "provider-openai",
+    "openai",
+    "OpenAI",
+    1,
+    0,
+    "openai:gpt-5.4-mini",
+    "",
+    30000,
+    1,
+    "not_configured",
+    "First live AI provider for supervised routing.",
+  ],
+  [
+    "provider-anthropic",
+    "anthropic",
+    "Anthropic",
+    0,
+    0,
+    "anthropic:sonnet-4",
+    "",
+    30000,
+    1,
+    "not_configured",
+    "Provider shell staged for future expansion.",
+  ],
+  [
+    "provider-openclaw",
+    "openclaw",
+    "OpenClaw",
+    0,
+    0,
+    "openclaw:command",
+    "",
+    30000,
+    1,
+    "not_configured",
+    "Provider shell staged for future expansion.",
+  ],
+  [
+    "provider-custom",
+    "custom",
+    "Custom / Gateway",
+    0,
+    0,
+    "custom:gateway-default",
+    "",
+    30000,
+    1,
+    "not_configured",
+    "Provider shell staged for future gateway routing.",
+  ],
+] as const;
+
+const agentRuns = [
+  [
+    "run-assets-overdue",
+    "agent-assets",
+    "agent-supervisor",
+    "chat",
+    "Review overdue returns for the next 48 hours",
+    "User asked for a return-risk sweep across active packing slips.",
+    "Prepared a draft return watchlist grouped by project and responsible person.",
+    "done",
+    "needs_approval",
+    1,
+    "2026-04-10T12:10:00.000Z",
+    "2026-04-10T12:18:00.000Z",
+  ],
+  [
+    "run-incidents-rma",
+    "agent-incidents",
+    "agent-supervisor",
+    "chat",
+    "Prepare RMA follow-up for maintenance assets",
+    "User requested a maintenance and manufacturer outreach summary.",
+    "Routed to maintenance review and waiting for approval before drafting outreach.",
+    "needs_approval",
+    "supervised",
+    1,
+    "2026-04-10T13:02:00.000Z",
+    "2026-04-10T13:05:00.000Z",
+  ],
+  [
+    "run-finance-exposure",
+    "agent-finance",
+    "agent-supervisor",
+    "system",
+    "Summarize current open incident exposure",
+    "Mission Control requested a quick finance snapshot for open incidents.",
+    "Exposure summary prepared from incident-linked reserves and replacement risk.",
+    "running",
+    "needs_approval",
+    0,
+    "2026-04-10T13:18:00.000Z",
+    "2026-04-10T13:24:00.000Z",
+  ],
+  [
+    "run-projects-conflicts",
+    "agent-projects",
+    "agent-supervisor",
+    "chat",
+    "Check project and unit conflicts for next week",
+    "User asked whether any unit overlaps or schedule conflicts are coming up.",
+    "Routing project windows and unit lane conflicts through scheduling context.",
+    "queued",
+    "supervised",
+    0,
+    "2026-04-10T13:40:00.000Z",
+    "2026-04-10T13:40:00.000Z",
+  ],
+  [
+    "run-connectors-audit",
+    "agent-communications",
+    "agent-supervisor",
+    "system",
+    "Audit connector readiness",
+    "Mission Control requested a connector readiness audit.",
+    "Outbound connectors are still staged and remain disabled for live execution.",
+    "paused",
+    "needs_approval",
+    1,
+    "2026-04-10T11:30:00.000Z",
+    "2026-04-10T11:44:00.000Z",
+  ],
+] as const;
+
+const agentActivityEvents = [
+  [
+    "agent-activity-1",
+    "agent-supervisor",
+    "run-assets-overdue",
+    "routing",
+    "Assets request routed",
+    "Supervisor routed an overdue-return review to Assets Agent.",
+    "info",
+    "2026-04-10T12:11:00.000Z",
+  ],
+  [
+    "agent-activity-2",
+    "agent-assets",
+    "run-assets-overdue",
+    "done",
+    "Return watchlist prepared",
+    "Assets Agent completed a draft watchlist and marked it ready for review.",
+    "success",
+    "2026-04-10T12:18:00.000Z",
+  ],
+  [
+    "agent-activity-3",
+    "agent-incidents",
+    "run-incidents-rma",
+    "approval",
+    "Approval requested",
+    "Incidents & Maintenance Agent needs approval before preparing outbound RMA messaging.",
+    "warning",
+    "2026-04-10T13:05:00.000Z",
+  ],
+  [
+    "agent-activity-4",
+    "agent-finance",
+    "run-finance-exposure",
+    "running",
+    "Exposure summary in progress",
+    "Finance Agent is building a current incident exposure summary.",
+    "info",
+    "2026-04-10T13:24:00.000Z",
+  ],
+  [
+    "agent-activity-5",
+    "agent-communications",
+    "run-connectors-audit",
+    "paused",
+    "Connector work paused",
+    "Communications Agent remains paused until outbound connectors are configured.",
+    "neutral",
+    "2026-04-10T11:44:00.000Z",
+  ],
+] as const;
+
+const agentModelConfigs = [
+  ["agent-model-openai", "openai", "OpenAI", "assigned", "Assigned to Supervisor and Assets agents."],
+  ["agent-model-anthropic", "anthropic", "Anthropic", "assigned", "Assigned to scheduling and maintenance reasoning."],
+  ["agent-model-openclaw", "openclaw", "OpenClaw", "available", "Prepared for connector and command-facing workflows."],
+  ["agent-model-custom", "custom", "Custom / Future", "unassigned", "Reserved for future gateways and private backends."],
+] as const;
+
+const agentConnectorConfigs = [
+  ["agent-connector-whatsapp", "whatsapp", "WhatsApp", "not_configured", "Inbound and outbound production messaging."],
+  ["agent-connector-telegram", "telegram", "Telegram", "disabled", "Fast operator messaging and alert routing."],
+  ["agent-connector-email", "email", "Email / Notifications", "configured", "Drafts, support outreach and internal notices."],
+  ["agent-connector-webhook", "webhook", "Webhook / Future", "not_configured", "Future integrations and gateway automations."],
+] as const;
+
 type SeedRow = readonly (string | number | null)[];
 
 const runSeedRows = (db: DatabaseSync, sql: string, rows: readonly SeedRow[]) => {
@@ -335,6 +667,35 @@ export const seedFoundationData = (db: DatabaseSync) => {
         VALUES (?, 'workspace-metadata', NULL, ?, ?, ?, ?)
       `,
       categories.map((category) => [category[0], category[1], category[2], category[3], now]),
+    );
+
+    runSeedRows(
+      db,
+      `
+        INSERT INTO manufacturers (
+          id,
+          workspace_id,
+          name,
+          contact_name,
+          support_email,
+          phone,
+          notes,
+          is_active,
+          created_at,
+          updated_at
+        )
+        VALUES (?, 'workspace-metadata', ?, ?, ?, ?, ?, 1, ?, ?)
+      `,
+      manufacturers.map((manufacturer) => [
+        manufacturer[0],
+        manufacturer[1],
+        manufacturer[2],
+        manufacturer[3],
+        manufacturer[4],
+        manufacturer[5],
+        now,
+        now,
+      ]),
     );
 
     runSeedRows(
@@ -580,6 +941,178 @@ export const seedFoundationData = (db: DatabaseSync) => {
         VALUES (?, 'workspace-metadata', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       financialEntries.map((entry) => [...entry, now, now]),
+    );
+
+    runSeedRows(
+      db,
+      `
+        INSERT INTO rma_cases (
+          id,
+          workspace_id,
+          manufacturer_id,
+          title,
+          support_email,
+          problem_summary,
+          notes,
+          status,
+          created_by_user_id,
+          created_at,
+          updated_at,
+          sent_at,
+          closed_at
+        )
+        VALUES (?, 'workspace-metadata', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      rmaCases,
+    );
+
+    runSeedRows(
+      db,
+      `
+        INSERT INTO rma_case_assets (
+          id,
+          rma_case_id,
+          asset_id,
+          equipment_year,
+          issue_summary,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      rmaCaseAssets.map((row) => [...row, now, now]),
+    );
+
+    runSeedRows(
+      db,
+      `
+        INSERT INTO agents (
+          id,
+          workspace_id,
+          agent_key,
+          display_name,
+          emoji,
+          role_summary,
+          domain_key,
+          provider_key,
+          model_key,
+          model_label,
+          status,
+          approval_mode,
+          allowed_tools_json,
+          allowed_domains_json,
+          notes,
+          is_supervisor,
+          sort_order,
+          created_at,
+          updated_at
+        )
+        VALUES (?, 'workspace-metadata', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      agents.map((agent) => [...agent, now, now]),
+    );
+
+    runSeedRows(
+      db,
+      `
+        INSERT INTO ai_provider_configs (
+          id,
+          workspace_id,
+          provider_key,
+          display_name,
+          supports_live_requests,
+          enabled,
+          default_model_key,
+          base_url,
+          timeout_ms,
+          retry_count,
+          status,
+          notes,
+          created_at,
+          updated_at
+        )
+        VALUES (?, 'workspace-metadata', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      aiProviderConfigs.map((row) => [...row, now, now]),
+    );
+
+    runSeedRows(
+      db,
+      `
+        INSERT INTO agent_runs (
+          id,
+          workspace_id,
+          agent_id,
+          routed_by_agent_id,
+          source_channel,
+          title,
+          input_summary,
+          output_summary,
+          status,
+          approval_mode,
+          approval_required,
+          created_at,
+          updated_at
+        )
+        VALUES (?, 'workspace-metadata', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      agentRuns,
+    );
+
+    runSeedRows(
+      db,
+      `
+        INSERT INTO agent_activity_events (
+          id,
+          workspace_id,
+          agent_id,
+          run_id,
+          kind,
+          title,
+          body,
+          tone,
+          created_at
+        )
+        VALUES (?, 'workspace-metadata', ?, ?, ?, ?, ?, ?, ?)
+      `,
+      agentActivityEvents,
+    );
+
+    runSeedRows(
+      db,
+      `
+        INSERT INTO agent_model_configs (
+          id,
+          workspace_id,
+          provider_key,
+          display_name,
+          status,
+          notes,
+          created_at,
+          updated_at
+        )
+        VALUES (?, 'workspace-metadata', ?, ?, ?, ?, ?, ?)
+      `,
+      agentModelConfigs.map((row) => [...row, now, now]),
+    );
+
+    runSeedRows(
+      db,
+      `
+        INSERT INTO agent_connector_configs (
+          id,
+          workspace_id,
+          connector_key,
+          display_name,
+          status,
+          capability_summary,
+          notes,
+          created_at,
+          updated_at
+        )
+        VALUES (?, 'workspace-metadata', ?, ?, ?, ?, '', ?, ?)
+      `,
+      agentConnectorConfigs.map((row) => [...row, now, now]),
     );
 
     db.exec("COMMIT");

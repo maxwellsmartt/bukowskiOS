@@ -26,11 +26,14 @@ app.whenReady().then(() => {
   registerAppIpc({ databasePath: localDatabase.databasePath });
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,
+    agentReads: localDatabase.agentReads,
     projectMutations: localDatabase.projectMutations,
     catalogMutations: localDatabase.catalogMutations,
     assetMutations: localDatabase.assetMutations,
     incidentMutations: localDatabase.incidentMutations,
     packingMutations: localDatabase.packingMutations,
+    rmaMutations: localDatabase.rmaMutations,
+    agentMutations: localDatabase.agentMutations,
   });
   Menu.setApplicationMenu(buildAppMenu());
   createAppWindow();

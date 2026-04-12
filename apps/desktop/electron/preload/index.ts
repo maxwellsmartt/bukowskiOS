@@ -2,20 +2,39 @@ import { contextBridge, ipcRenderer } from "electron";
 
 import { ipcChannels } from "@contracts/ipc/channels";
 import type {
+  AIProviderMutationResult,
+  AssistantChatSnapshot,
+  AssistantGatewayRequest,
+  AssistantGatewayResponse,
+  AgentConnectorRow,
+  AgentDetailSnapshot,
+  AgentModelRow,
+  AgentModelsSnapshot,
+  AgentMutationResult,
+  AgentRosterRow,
+  AgentRunRow,
+  AssignAgentModelCommand,
   ArchiveAssetCommand,
   AssetListQuery,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppInfo,
+  AssetsOverviewSnapshot,
+  CreateAgentCommand,
+  CreateAssistantThreadCommand,
   AssetDetailSnapshot,
   AssetEditorMutationResult,
   AssetListRow,
+  AssetSummarySnapshot,
   CatalogListQuery,
   CatalogSnapshot,
   CreateAssetCommand,
   CreateCatalogEntityInput,
+  CreateDraftRunFromChatCommand,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
+  CreateRmaCaseCommand,
+  DeleteAssistantThreadCommand,
   CreateProjectInput,
   CreateProjectUnitInput,
   DeleteCatalogEntityInput,
@@ -43,22 +62,54 @@ import type {
   ScheduleTimelineRange,
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
+  ShellAppAction,
   ShellBootstrap,
+  SetAgentApprovalModeCommand,
+  SetActiveAssistantThreadCommand,
+  SetAgentStatusCommand,
+  SaveAIProviderConfigCommand,
+  MissionControlSnapshot,
+  TestAIProviderConnectionCommand,
   AssignCrewToProjectUnitInput,
   UnassignCrewFromProjectUnitInput,
   UpdateAssetCommand,
   UpdateCatalogEntityInput,
+  UpdateAgentCommand,
   UpdateProjectInput,
   UpdateProjectUnitInput,
-} from "@contracts";
+  UpdateRmaCaseCommand,
+  RmaCaseDetailSnapshot,
+  RmaCaseMutationResult,
+  RmaSnapshot,
+  ReviewAgentRunCommand,
+  AgentRunReviewResult,
+  DraftRunFromChatResult,
+  SendAssistantChatTurnCommand,
+  } from "@contracts";
+
+const shellActionListeners = new Set<(action: ShellAppAction) => void>();
+
+ipcRenderer.on(ipcChannels.shell.appAction, (_event, action: ShellAppAction) => {
+  shellActionListeners.forEach((listener) => {
+    listener(action);
+  });
+});
 
 const bukowskiApp = {
   getAppInfo: () => ipcRenderer.invoke(ipcChannels.app.getInfo) as Promise<AppInfo>,
+  openExternal: (url: string) => ipcRenderer.invoke(ipcChannels.app.openExternal, url) as Promise<void>,
 };
 
 const bukowskiShell = {
   getBootstrap: () => ipcRenderer.invoke(ipcChannels.shell.getBootstrap) as Promise<ShellBootstrap>,
   searchGlobal: (query: GlobalSearchQuery) => ipcRenderer.invoke(ipcChannels.shell.searchGlobal, query) as Promise<GlobalSearchGroup[]>,
+  onAppAction: (listener: (action: ShellAppAction) => void) => {
+    shellActionListeners.add(listener);
+
+    return () => {
+      shellActionListeners.delete(listener);
+    };
+  },
 };
 
 const bukowskiOverview = {
@@ -67,8 +118,48 @@ const bukowskiOverview = {
     ipcRenderer.invoke(ipcChannels.overview.getTimeline, range, scale, anchorDate) as Promise<ScheduleTimelineSnapshot>,
 };
 
+const bukowskiAgents = {
+  getMissionControlSnapshot: () =>
+    ipcRenderer.invoke(ipcChannels.agents.getMissionControlSnapshot) as Promise<MissionControlSnapshot>,
+  getAgentsList: () => ipcRenderer.invoke(ipcChannels.agents.getAgentsList) as Promise<AgentRosterRow[]>,
+  getAgentDetail: (agentId: string) => ipcRenderer.invoke(ipcChannels.agents.getAgentDetail, agentId) as Promise<AgentDetailSnapshot>,
+  getRunsList: () => ipcRenderer.invoke(ipcChannels.agents.getRunsList) as Promise<AgentRunRow[]>,
+  getModelsSnapshot: () => ipcRenderer.invoke(ipcChannels.agents.getModelsSnapshot) as Promise<AgentModelsSnapshot>,
+  getAIProviderConfigs: () => ipcRenderer.invoke(ipcChannels.agents.getAIProviderConfigs) as Promise<AgentModelRow[]>,
+  getConnectorsSnapshot: () => ipcRenderer.invoke(ipcChannels.agents.getConnectorsSnapshot) as Promise<AgentConnectorRow[]>,
+  getAssistantChatSnapshot: () => ipcRenderer.invoke(ipcChannels.agents.getAssistantChatSnapshot) as Promise<AssistantChatSnapshot>,
+  create: (input: CreateAgentCommand) => ipcRenderer.invoke(ipcChannels.agents.create, input) as Promise<AgentMutationResult>,
+  update: (input: UpdateAgentCommand) => ipcRenderer.invoke(ipcChannels.agents.update, input) as Promise<AgentMutationResult>,
+  setStatus: (input: SetAgentStatusCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.setStatus, input) as Promise<AgentMutationResult>,
+  setApprovalMode: (input: SetAgentApprovalModeCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.setApprovalMode, input) as Promise<AgentMutationResult>,
+  saveAIProviderConfig: (input: SaveAIProviderConfigCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.saveAIProviderConfig, input) as Promise<AIProviderMutationResult>,
+  testAIProviderConnection: (input: TestAIProviderConnectionCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.testAIProviderConnection, input) as Promise<AIProviderMutationResult>,
+  assignAgentModel: (input: AssignAgentModelCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.assignAgentModel, input) as Promise<AgentMutationResult>,
+  createAssistantThread: (input: CreateAssistantThreadCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.createAssistantThread, input) as Promise<AssistantChatSnapshot>,
+  deleteAssistantThread: (input: DeleteAssistantThreadCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.deleteAssistantThread, input) as Promise<AssistantChatSnapshot>,
+  setActiveAssistantThread: (input: SetActiveAssistantThreadCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.setActiveAssistantThread, input) as Promise<AssistantChatSnapshot>,
+  sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.sendAssistantChatTurn, input) as Promise<AssistantChatSnapshot>,
+  reviewRun: (input: ReviewAgentRunCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.reviewRun, input) as Promise<AgentRunReviewResult>,
+  sendAssistantMessage: (input: AssistantGatewayRequest) =>
+    ipcRenderer.invoke(ipcChannels.agents.sendAssistantMessage, input) as Promise<AssistantGatewayResponse>,
+  createDraftRunFromChat: (input: CreateDraftRunFromChatCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.createDraftRunFromChat, input) as Promise<DraftRunFromChatResult>,
+};
+
 const bukowskiAssets = {
   getList: (query?: AssetListQuery) => ipcRenderer.invoke(ipcChannels.assets.getList, query) as Promise<AssetListRow[]>,
+  getSummary: () => ipcRenderer.invoke(ipcChannels.assets.getSummary) as Promise<AssetSummarySnapshot>,
+  getOverview: () => ipcRenderer.invoke(ipcChannels.assets.getOverview) as Promise<AssetsOverviewSnapshot>,
   getDetail: (assetId: string) =>
     ipcRenderer.invoke(ipcChannels.assets.getDetail, assetId) as Promise<AssetDetailSnapshot>,
   assignMove: (input: AssignMoveAssetsInput) =>
@@ -129,8 +220,16 @@ const bukowskiCatalog = {
   remove: (input: DeleteCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.delete, input) as Promise<CatalogSnapshot>,
 };
 
+const bukowskiRma = {
+  getSnapshot: () => ipcRenderer.invoke(ipcChannels.rma.getSnapshot) as Promise<RmaSnapshot>,
+  getDetail: (rmaCaseId: string) => ipcRenderer.invoke(ipcChannels.rma.getDetail, rmaCaseId) as Promise<RmaCaseDetailSnapshot>,
+  create: (input: CreateRmaCaseCommand) => ipcRenderer.invoke(ipcChannels.rma.create, input) as Promise<RmaCaseMutationResult>,
+  update: (input: UpdateRmaCaseCommand) => ipcRenderer.invoke(ipcChannels.rma.update, input) as Promise<RmaCaseMutationResult>,
+};
+
 contextBridge.exposeInMainWorld("bukowskiApp", bukowskiApp);
 contextBridge.exposeInMainWorld("bukowskiShell", bukowskiShell);
+contextBridge.exposeInMainWorld("bukowskiAgents", bukowskiAgents);
 contextBridge.exposeInMainWorld("bukowskiOverview", bukowskiOverview);
 contextBridge.exposeInMainWorld("bukowskiAssets", bukowskiAssets);
 contextBridge.exposeInMainWorld("bukowskiPacking", bukowskiPacking);
@@ -138,3 +237,4 @@ contextBridge.exposeInMainWorld("bukowskiIncidents", bukowskiIncidents);
 contextBridge.exposeInMainWorld("bukowskiProjects", bukowskiProjects);
 contextBridge.exposeInMainWorld("bukowskiFinance", bukowskiFinance);
 contextBridge.exposeInMainWorld("bukowskiCatalog", bukowskiCatalog);
+contextBridge.exposeInMainWorld("bukowskiRma", bukowskiRma);

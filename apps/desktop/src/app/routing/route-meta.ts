@@ -3,10 +3,10 @@ import { matchPath } from "react-router-dom";
 import { readStringPreference, uiPreferenceKeys } from "@shared/lib/preferences";
 
 export type ScopeMode = "global" | "project";
-export type GlobalDomainKey = "overview" | "assets" | "finance" | "utility";
+export type GlobalDomainKey = "assets" | "finance" | "agents" | "utility";
 export type ProjectRouteSection = "overview" | "assets" | "packing" | "incidents" | "budget" | "info";
 export type DomainKey = GlobalDomainKey | "project";
-export type PrimaryNavKey = "overview" | "assets" | "finance";
+export type PrimaryNavKey = "assets" | "finance" | "agents";
 
 export type AppRouteMeta = {
   path: string;
@@ -21,16 +21,22 @@ export type ResolvedRouteMeta = AppRouteMeta & {
 };
 
 export const globalRouteMeta: AppRouteMeta[] = [
-  { path: "/overview", label: "Overview", scopeMode: "global", domain: "overview" },
+  { path: "/assets/overview", label: "Assets Overview", scopeMode: "global", domain: "assets" },
   { path: "/assets", label: "Assets", scopeMode: "global", domain: "assets" },
   { path: "/assets/:assetId", label: "Asset Detail", scopeMode: "global", domain: "assets" },
   { path: "/packing-slips", label: "Packing Slips", scopeMode: "global", domain: "assets" },
   { path: "/incidents", label: "Incidents", scopeMode: "global", domain: "assets" },
   { path: "/projects", label: "Projects", scopeMode: "global", domain: "assets" },
+  { path: "/rma", label: "RMA", scopeMode: "global", domain: "assets" },
   { path: "/catalog", label: "Catalog", scopeMode: "global", domain: "assets" },
   { path: "/finance", label: "Finance Overview", scopeMode: "global", domain: "finance" },
   { path: "/finance/cost-links", label: "Cost Links", scopeMode: "global", domain: "finance" },
   { path: "/finance/entries", label: "Entries", scopeMode: "global", domain: "finance" },
+  { path: "/agents/mission-control", label: "Mission Control", scopeMode: "global", domain: "agents" },
+  { path: "/agents", label: "Agents Directory", scopeMode: "global", domain: "agents" },
+  { path: "/agents/runs", label: "Agent Runs", scopeMode: "global", domain: "agents" },
+  { path: "/agents/models", label: "Agent Models", scopeMode: "global", domain: "agents" },
+  { path: "/agents/connectors", label: "Agent Connectors", scopeMode: "global", domain: "agents" },
   { path: "/settings", label: "Settings", scopeMode: "global", domain: "utility" },
 ];
 
@@ -82,6 +88,14 @@ export const projectRouteMeta: AppRouteMeta[] = [
 export const appRouteMeta: AppRouteMeta[] = [...globalRouteMeta, ...projectRouteMeta];
 export const projectRouteSections: ProjectRouteSection[] = ["overview", "assets", "packing", "incidents", "budget", "info"];
 
+const normalizeLegacyGlobalPath = (pathname: string | null) => {
+  if (!pathname || pathname === "/overview") {
+    return "/assets/overview";
+  }
+
+  return pathname;
+};
+
 const toResolvedRoute = (route: AppRouteMeta, projectId: string | null = null): ResolvedRouteMeta => ({
   ...route,
   projectId,
@@ -103,23 +117,25 @@ const isGlobalRoutePath = (pathname: string) =>
   globalRouteMeta.some((route) => matchPath({ path: route.path, end: true }, pathname));
 
 export const resolveRememberedGlobalPath = () => {
-  const rememberedPath = readStringPreference(uiPreferenceKeys.lastGlobalRoutePath, "/overview");
+  const rememberedPath = normalizeLegacyGlobalPath(
+    readStringPreference(uiPreferenceKeys.lastGlobalRoutePath, "/assets/overview"),
+  );
 
   if (!rememberedPath) {
-    return "/overview";
+    return "/assets/overview";
   }
 
-  return isGlobalRoutePath(rememberedPath) ? rememberedPath : "/overview";
+  return isGlobalRoutePath(rememberedPath) ? rememberedPath : "/assets/overview";
 };
 
 export const resolveInitialPath = () => {
   const rememberedPath =
-    readStringPreference(uiPreferenceKeys.lastRoutePath) ??
+    normalizeLegacyGlobalPath(readStringPreference(uiPreferenceKeys.lastRoutePath)) ??
     readStringPreference(uiPreferenceKeys.lastProjectRoutePath) ??
     resolveRememberedGlobalPath();
 
   if (!rememberedPath) {
-    return "/overview";
+    return "/assets/overview";
   }
 
   return findMatchingRoute(rememberedPath) ? rememberedPath : resolveRememberedGlobalPath();
@@ -135,16 +151,16 @@ export const resolvePrimaryNavKey = (pathname: string): PrimaryNavKey | null => 
     return null;
   }
 
-  if (activeRoute.domain === "overview") {
-    return "overview";
-  }
-
   if (activeRoute.domain === "assets") {
     return "assets";
   }
 
   if (activeRoute.domain === "finance") {
     return "finance";
+  }
+
+  if (activeRoute.domain === "agents") {
+    return "agents";
   }
 
   return null;

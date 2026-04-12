@@ -10,7 +10,7 @@ type ShellContextValue = {
   appInfo: AppInfo | null;
   workspaceName: string;
   scopeMode: ScopeMode;
-  scopeChipLabel: string;
+  scopeChipLabel: string | null;
   syncLabel: string;
   projects: ProjectCardRow[];
   isScopeReady: boolean;
@@ -217,7 +217,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       ? activeProject
         ? `Project · ${activeProject.code} / ${activeProject.name}`
         : "Project mode"
-      : "Global workspace";
+      : null;
 
   const value = useMemo<ShellContextValue>(
     () => ({

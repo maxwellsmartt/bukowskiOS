@@ -1,64 +1,125 @@
 /// <reference types="vite/client" />
 
 import type {
+  AIProviderMutationResult,
+  AssistantChatSnapshot,
+  AssistantGatewayRequest,
+  AssistantGatewayResponse,
+  AgentConnectorRow,
+  AgentDetailSnapshot,
+  AgentModelRow,
+  AgentModelsSnapshot,
+  AgentMutationResult,
+  AgentRosterRow,
+  AgentRunRow,
   ArchiveAssetCommand,
   AssetListQuery,
+  AssignAgentModelCommand,
   AssignCrewToProjectUnitInput,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppInfo,
+  AssetsOverviewSnapshot,
+  CreateAgentCommand,
+  CreateAssistantThreadCommand,
   AssetDetailSnapshot,
   AssetEditorMutationResult,
   AssetListRow,
+  AssetSummarySnapshot,
   CatalogListQuery,
   CatalogSnapshot,
   CreateAssetCommand,
   CreateCatalogEntityInput,
+  CreateDraftRunFromChatCommand,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
   CreateProjectInput,
   CreateProjectUnitInput,
+  CreateRmaCaseCommand,
+  DeleteAssistantThreadCommand,
   DeleteCatalogEntityInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
-  FinanceEntryListQuery,
+  DraftRunFromChatResult,
   FinanceCostLinkRow,
+  FinanceEntryListQuery,
   FinanceEntryRow,
   FinanceOverviewSnapshot,
   GlobalSearchGroup,
   GlobalSearchQuery,
   IncidentListQuery,
   IncidentListRow,
+  MissionControlSnapshot,
   OverviewSnapshot,
   PackingSlipDetailSnapshot,
   PackingSlipListQuery,
   PackingSlipRow,
-  ProjectListQuery,
   ProjectCardRow,
   ProjectDetailSnapshot,
+  ProjectListQuery,
   ReportIncidentCommand,
   ReportIncidentResult,
+  ReviewAgentRunCommand,
+  AgentRunReviewResult,
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
+  RmaCaseDetailSnapshot,
+  RmaCaseMutationResult,
+  RmaSnapshot,
+  SaveAIProviderConfigCommand,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
+  SetAgentApprovalModeCommand,
+  SetActiveAssistantThreadCommand,
+  SetAgentStatusCommand,
+  ShellAppAction,
   ShellBootstrap,
+  SendAssistantChatTurnCommand,
+  TestAIProviderConnectionCommand,
   UnassignCrewFromProjectUnitInput,
+  UpdateAgentCommand,
   UpdateAssetCommand,
   UpdateCatalogEntityInput,
   UpdateProjectInput,
   UpdateProjectUnitInput,
+  UpdateRmaCaseCommand,
 } from "@contracts";
 
 declare global {
   interface Window {
     bukowskiApp?: {
       getAppInfo: () => Promise<AppInfo>;
+      openExternal: (url: string) => Promise<void>;
     };
     bukowskiShell?: {
       getBootstrap: () => Promise<ShellBootstrap>;
       searchGlobal: (query: GlobalSearchQuery) => Promise<GlobalSearchGroup[]>;
+      onAppAction: (listener: (action: ShellAppAction) => void) => () => void;
+    };
+    bukowskiAgents?: {
+      getMissionControlSnapshot: () => Promise<MissionControlSnapshot>;
+      getAgentsList: () => Promise<AgentRosterRow[]>;
+      getAgentDetail: (agentId: string) => Promise<AgentDetailSnapshot>;
+      getRunsList: () => Promise<AgentRunRow[]>;
+      getModelsSnapshot: () => Promise<AgentModelsSnapshot>;
+      getAIProviderConfigs: () => Promise<AgentModelRow[]>;
+      getConnectorsSnapshot: () => Promise<AgentConnectorRow[]>;
+      getAssistantChatSnapshot: () => Promise<AssistantChatSnapshot>;
+      create: (input: CreateAgentCommand) => Promise<AgentMutationResult>;
+      update: (input: UpdateAgentCommand) => Promise<AgentMutationResult>;
+      setStatus: (input: SetAgentStatusCommand) => Promise<AgentMutationResult>;
+      setApprovalMode: (input: SetAgentApprovalModeCommand) => Promise<AgentMutationResult>;
+      saveAIProviderConfig: (input: SaveAIProviderConfigCommand) => Promise<AIProviderMutationResult>;
+      testAIProviderConnection: (input: TestAIProviderConnectionCommand) => Promise<AIProviderMutationResult>;
+      assignAgentModel: (input: AssignAgentModelCommand) => Promise<AgentMutationResult>;
+      createAssistantThread: (input: CreateAssistantThreadCommand) => Promise<AssistantChatSnapshot>;
+      deleteAssistantThread: (input: DeleteAssistantThreadCommand) => Promise<AssistantChatSnapshot>;
+      setActiveAssistantThread: (input: SetActiveAssistantThreadCommand) => Promise<AssistantChatSnapshot>;
+      sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
+      reviewRun: (input: ReviewAgentRunCommand) => Promise<AgentRunReviewResult>;
+      sendAssistantMessage: (input: AssistantGatewayRequest) => Promise<AssistantGatewayResponse>;
+      createDraftRunFromChat: (input: CreateDraftRunFromChatCommand) => Promise<DraftRunFromChatResult>;
     };
     bukowskiOverview?: {
       getSnapshot: () => Promise<OverviewSnapshot>;
@@ -66,6 +127,8 @@ declare global {
     };
     bukowskiAssets?: {
       getList: (query?: AssetListQuery) => Promise<AssetListRow[]>;
+      getSummary: () => Promise<AssetSummarySnapshot>;
+      getOverview: () => Promise<AssetsOverviewSnapshot>;
       getDetail: (assetId: string) => Promise<AssetDetailSnapshot>;
       assignMove: (input: AssignMoveAssetsInput) => Promise<AssignMoveAssetsResult>;
       create: (input: CreateAssetCommand) => Promise<AssetEditorMutationResult>;
@@ -105,6 +168,12 @@ declare global {
       create: (input: CreateCatalogEntityInput) => Promise<CatalogSnapshot>;
       update: (input: UpdateCatalogEntityInput) => Promise<CatalogSnapshot>;
       remove: (input: DeleteCatalogEntityInput) => Promise<CatalogSnapshot>;
+    };
+    bukowskiRma?: {
+      getSnapshot: () => Promise<RmaSnapshot>;
+      getDetail: (rmaCaseId: string) => Promise<RmaCaseDetailSnapshot>;
+      create: (input: CreateRmaCaseCommand) => Promise<RmaCaseMutationResult>;
+      update: (input: UpdateRmaCaseCommand) => Promise<RmaCaseMutationResult>;
     };
   }
 }

@@ -9,7 +9,6 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useShellContext } from "@shared/hooks/useShellContext";
-import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { ProjectDetailPanel } from "./ProjectDetailPanel";
 import { useProjectDetail, useProjectsRegistry } from "./useProjectsData";
@@ -57,24 +56,18 @@ export const ProjectsPage = () => {
   const { data, error } = useProjectsRegistry(projectControls.query);
   const { activeProjectId, openProject, setActiveProjectId } = useShellContext();
   const { addItems, hasItem } = useCompareTray();
-  const sectionScopeLabel = useSectionScopeLabel();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = useProjectDetail(activeProjectId);
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        eyebrow="Projects"
-        title="Project registry"
-        body="Open project workspaces and review schedule, exposure and current load across the workspace."
-        contextLabel={sectionScopeLabel}
-      />
+      <SectionHeader title="Projects" />
 
       {error ? <div className="empty-state">Projects unavailable: {error}</div> : null}
 
       <div className="chip-row">
         <StatusBadge tone="success">{data.filter((project) => hasItem("project", project.id)).length} in compare</StatusBadge>
-        <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : "Workspace scope"}</StatusBadge>
+        {selectedRowIds.length ? <StatusBadge>{`${selectedRowIds.length} selected`}</StatusBadge> : null}
       </div>
 
       {selectedRowIds.length ? (
@@ -110,7 +103,7 @@ export const ProjectsPage = () => {
       ) : null}
 
       <div className="projects-layout">
-        <SurfaceCard title="Projects" subtitle="Single click inspects the registry. Double click opens the project workspace.">
+        <SurfaceCard title="Projects">
           <ListToolbar
             activeSortLabel={projectControls.activeSortOption?.label}
             onSearchValueChange={projectControls.setSearchValue}

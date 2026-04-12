@@ -35,6 +35,7 @@ const getPanelTitle = (entityType: CatalogEntityType, mode: "create" | "edit") =
     department: "department",
     crew: "crew member",
     client: "client",
+    manufacturer: "manufacturer",
     category: "category",
     kit: "kit",
   };
@@ -52,6 +53,8 @@ const getPanelSubtitle = (entityType: CatalogEntityType) => {
       return "Crew is a reusable operational catalog, separate from auth users and permissions.";
     case "client":
       return "Clients now live as central records so projects stop depending on loose text fields.";
+    case "manufacturer":
+      return "Manufacturers keep support contacts reusable so RMA cases stay consistent and audit-ready.";
     case "category":
       return "Categories stay global to keep the registry consistent as inventory grows.";
     case "kit":
@@ -121,6 +124,17 @@ export const CatalogEditorPanel = ({
           name: name.trim(),
           contactName: normalizeOptional(contactName),
           email: normalizeOptional(email),
+          phone: normalizeOptional(phone),
+          notes: normalizeOptional(notes),
+        } as CreateCatalogEntityInput | UpdateCatalogEntityInput);
+        return;
+      case "manufacturer":
+        await onSubmit({
+          entityType,
+          ...baseId,
+          name: name.trim(),
+          contactName: normalizeOptional(contactName),
+          supportEmail: normalizeOptional(email),
           phone: normalizeOptional(phone),
           notes: normalizeOptional(notes),
         } as CreateCatalogEntityInput | UpdateCatalogEntityInput);
@@ -200,14 +214,14 @@ export const CatalogEditorPanel = ({
           </>
         ) : null}
 
-        {entityType === "client" ? (
+        {entityType === "client" || entityType === "manufacturer" ? (
           <>
             <label className="action-field">
               <span className="action-field-label">Contact</span>
               <input className="action-field-control" onChange={(event) => setContactName(event.target.value)} value={contactName} />
             </label>
             <label className="action-field">
-              <span className="action-field-label">Email</span>
+              <span className="action-field-label">{entityType === "manufacturer" ? "Support email" : "Email"}</span>
               <input className="action-field-control" onChange={(event) => setEmail(event.target.value)} value={email} />
             </label>
             <label className="action-field">
@@ -229,7 +243,7 @@ export const CatalogEditorPanel = ({
           </label>
         ) : null}
 
-        {entityType === "crew" || entityType === "client" || entityType === "kit" ? (
+        {entityType === "crew" || entityType === "client" || entityType === "manufacturer" || entityType === "kit" ? (
           <label className="action-field action-field-wide">
             <span className="action-field-label">Notes</span>
             <textarea className="action-field-control action-textarea" onChange={(event) => setNotes(event.target.value)} rows={3} value={notes} />

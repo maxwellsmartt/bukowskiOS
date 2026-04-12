@@ -6,9 +6,15 @@ describe("foundation read service", () => {
   it("hydrates shell, imported assets and finance snapshots from the local foundation database", () => {
     const { cleanup, database } = createTestDatabase("bukowski-foundation-test");
     const reads = createFoundationReadService(database);
+    const overviewSnapshot = reads.getOverviewSnapshot();
 
     expect(reads.getShellBootstrap().workspaceName).toBe("Metadata Cine");
-    expect(reads.getOverviewSnapshot().metrics).toHaveLength(5);
+    expect(overviewSnapshot.cards.overdueReturns.label).toBe("Overdue returns");
+    expect(overviewSnapshot.cards.openPackingSlips.label).toBe("Open packing slips");
+    expect(overviewSnapshot.cards.activeIncidents.label).toBe("Active incidents");
+    expect(overviewSnapshot.cards.maintenanceWatch.label).toBe("Maintenance watch");
+    expect(reads.getAssetSummary().totalAssets).toBeTruthy();
+    expect(reads.getAssetSummary().assignedAssets).toBeTruthy();
     expect(reads.getAssets().length).toBeGreaterThan(780);
     expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.code).toBe("485");
     expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.quantity).toBe(2);

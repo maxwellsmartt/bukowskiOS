@@ -4,6 +4,15 @@ export type ShellBootstrap = {
   syncLabel: string;
 };
 
+export type ShellAppAction =
+  | {
+      type: "open-search";
+    }
+  | {
+      type: "navigate";
+      path: string;
+    };
+
 export type GlobalSearchEntityType = "asset" | "project" | "project_unit" | "packing_slip" | "incident";
 
 export type GlobalSearchQuery = {

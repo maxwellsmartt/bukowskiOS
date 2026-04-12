@@ -1,6 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
+  AssetsOverviewSnapshot,
+  AssetSummarySnapshot,
   AssetListQuery,
   AssetSortField,
   AssetDetailSnapshot,
@@ -44,10 +46,14 @@ import type {
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
   ShellBootstrap,
+  RmaCaseDetailSnapshot,
+  RmaSnapshot,
 } from "@contracts";
 
 import { createCatalogReadService } from "./catalogReadService";
 import { deriveProjectUnitStatus, resolveScheduleWindowLabel } from "./projectScheduling";
+
+const workspaceId = "workspace-metadata";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -76,6 +82,32 @@ type AmountRow = {
 
 const formatCurrency = (amount: number | null | undefined) =>
   typeof amount === "number" ? currencyFormatter.format(amount) : "Pending";
+
+const parseJsonObject = (value: string | null | undefined) => {
+  if (!value) {
+    return null as Record<string, unknown> | null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+
+const parseJsonStringArray = (value: string | null | undefined) => {
+  if (!value) {
+    return [] as string[];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
+  } catch {
+    return [];
+  }
+};
 
 const normalizeSearchText = (value: string | null | undefined) =>
   (value ?? "")
@@ -381,6 +413,14 @@ const mapEventTitle = (eventType: string) => {
     default:
       return "Status updated";
   }
+};
+
+const toIsoDate = (value?: string | null) => {
+  if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  return todayDateOnly();
 };
 
 const resolvePackingStatus = (storedStatus: string, dueDate: string | null, itemCount: number, returnedCount: number) => {
@@ -907,15 +947,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
   },
 
   getOverviewSnapshot(): OverviewSnapshot {
-    const totalAssets = db.prepare("SELECT COUNT(*) AS count FROM assets WHERE is_active = 1").get() as CountRow;
-    const assignedAssets = db
-      .prepare(
-        `
-          SELECT COUNT(*) AS count
-          FROM asset_current_state
-          WHERE custody_status IN ('checked_out', 'assigned')
-        `,
-      )
+    const overdueReturns = db
+      .prepare("SELECT COUNT(*) AS count FROM packing_slips WHERE status IN ('Partial return', 'Overdue')")
       .get() as CountRow;
     const activeIncidents = db
       .prepare("SELECT COUNT(*) AS count FROM incidents WHERE status IN ('Open', 'In review')")
@@ -926,14 +959,6 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     const maintenanceWatch = db
       .prepare("SELECT COUNT(*) AS count FROM asset_current_state WHERE operational_status = 'maintenance'")
       .get() as CountRow;
-
-    const metrics: OverviewMetric[] = [
-      { label: "Total assets", value: String(totalAssets.count), tone: "neutral" },
-      { label: "Assigned assets", value: String(assignedAssets.count), tone: "info" },
-      { label: "Active incidents", value: String(activeIncidents.count), tone: "critical" },
-      { label: "Open packing slips", value: String(openPackingSlips.count), tone: "warning" },
-      { label: "Maintenance watch", value: String(maintenanceWatch.count), tone: "success" },
-    ];
 
     const recentMovements = db
       .prepare(
@@ -967,7 +992,32 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     }>;
 
     return {
-      metrics,
+      cards: {
+        overdueReturns: {
+          label: "Overdue returns",
+          value: String(overdueReturns.count),
+          subtitle: "Slips nearing or past due return need review.",
+          tone: "warning",
+        },
+        openPackingSlips: {
+          label: "Open packing slips",
+          value: String(openPackingSlips.count),
+          subtitle: "Issued slips still active across warehouse and set.",
+          tone: "warning",
+        },
+        activeIncidents: {
+          label: "Active incidents",
+          value: String(activeIncidents.count),
+          subtitle: "Open issues with pending follow-up or missing estimates.",
+          tone: "critical",
+        },
+        maintenanceWatch: {
+          label: "Maintenance watch",
+          value: String(maintenanceWatch.count),
+          subtitle: "Assets flagged for bench review or spare-part follow-up.",
+          tone: "success",
+        },
+      },
       recentMovements: recentMovements.map((row) => ({
         asset: row.asset,
         code: row.code,
@@ -975,6 +1025,226 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         to: row.to_location,
         actor: row.actor,
         timestamp: eventTimeFormatter.format(new Date(row.event_timestamp)),
+      })),
+    };
+  },
+
+  getAssetSummary(): AssetSummarySnapshot {
+    const totalAssets = db.prepare("SELECT COUNT(*) AS count FROM assets WHERE is_active = 1").get() as CountRow;
+    const assignedAssets = db
+      .prepare(
+        `
+          SELECT COUNT(*) AS count
+          FROM asset_current_state
+          WHERE custody_status IN ('checked_out', 'assigned')
+        `,
+      )
+      .get() as CountRow;
+
+    return {
+      totalAssets: String(totalAssets.count),
+      assignedAssets: String(assignedAssets.count),
+    };
+  },
+
+  getAssetsOverview(): AssetsOverviewSnapshot {
+    const overviewSnapshot = this.getOverviewSnapshot();
+    const assetSummary = this.getAssetSummary();
+
+    return {
+      totalAssets: assetSummary.totalAssets,
+      assignedAssets: assetSummary.assignedAssets,
+      cards: overviewSnapshot.cards,
+      recentMovements: overviewSnapshot.recentMovements,
+    };
+  },
+
+  getRmaSnapshot(): RmaSnapshot {
+    const maintenanceAssets = db
+      .prepare(
+        `
+          SELECT
+            assets.id,
+            assets.name,
+            COALESCE(assets.brand, '') AS brand,
+            COALESCE(assets.model, '') AS model,
+            COALESCE(assets.serial_number, '') AS serial_number,
+            COALESCE(locations.name, '—') AS location,
+            COALESCE((
+              SELECT incidents.title
+              FROM incidents
+              WHERE incidents.asset_id = assets.id
+                AND incidents.status IN ('Open', 'In review')
+              ORDER BY incidents.reported_at DESC
+              LIMIT 1
+            ), 'Maintenance review pending summary.') AS latest_issue
+          FROM asset_current_state
+          JOIN assets ON assets.id = asset_current_state.asset_id
+          LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
+          WHERE asset_current_state.operational_status = 'maintenance'
+            AND assets.is_active = 1
+          ORDER BY assets.name
+        `,
+      )
+      .all() as Array<{
+      id: string;
+      name: string;
+      brand: string;
+      model: string;
+      serial_number: string;
+      location: string;
+      latest_issue: string;
+    }>;
+
+    const rmaCases = db
+      .prepare(
+        `
+          SELECT
+            rma_cases.id,
+            rma_cases.title,
+            COALESCE(manufacturers.name, '—') AS manufacturer_name,
+            COALESCE(rma_cases.support_email, COALESCE(manufacturers.support_email, ''), '') AS support_email,
+            rma_cases.status,
+            rma_cases.updated_at,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM rma_case_assets
+              WHERE rma_case_assets.rma_case_id = rma_cases.id
+            ), 0) AS asset_count
+          FROM rma_cases
+          LEFT JOIN manufacturers ON manufacturers.id = rma_cases.manufacturer_id
+          WHERE rma_cases.workspace_id = ?
+          ORDER BY rma_cases.updated_at DESC, rma_cases.title
+        `,
+      )
+      .all(workspaceId) as Array<{
+      id: string;
+      title: string;
+      manufacturer_name: string;
+      support_email: string;
+      status: "Draft" | "Ready" | "Sent" | "Closed";
+      updated_at: string;
+      asset_count: number;
+    }>;
+
+    return {
+      cases: rmaCases.map((row) => ({
+        id: row.id,
+        title: row.title,
+        manufacturerName: row.manufacturer_name,
+        supportEmail: row.support_email,
+        status: row.status,
+        assetCount: row.asset_count,
+        updatedAtLabel: formatTimelineTimestamp(row.updated_at),
+      })),
+      maintenanceAssets: maintenanceAssets.map((row) => ({
+        id: row.id,
+        name: row.name,
+        brand: row.brand,
+        model: row.model,
+        serialNumber: row.serial_number,
+        location: row.location,
+        latestIssue: row.latest_issue,
+      })),
+      manufacturers: catalogReads.getSnapshot().manufacturers,
+    };
+  },
+
+  getRmaCaseDetail(rmaCaseId: string): RmaCaseDetailSnapshot {
+    const caseRecord = db
+      .prepare(
+        `
+          SELECT
+            rma_cases.id,
+            rma_cases.manufacturer_id,
+            rma_cases.title,
+            COALESCE(manufacturers.name, '—') AS manufacturer_name,
+            COALESCE(manufacturers.contact_name, '') AS contact_name,
+            COALESCE(rma_cases.support_email, COALESCE(manufacturers.support_email, ''), '') AS support_email,
+            COALESCE(manufacturers.phone, '') AS phone,
+            rma_cases.problem_summary,
+            COALESCE(rma_cases.notes, '') AS notes,
+            rma_cases.status,
+            rma_cases.created_at,
+            rma_cases.updated_at
+          FROM rma_cases
+          LEFT JOIN manufacturers ON manufacturers.id = rma_cases.manufacturer_id
+          WHERE rma_cases.id = ?
+          LIMIT 1
+        `,
+      )
+      .get(rmaCaseId) as {
+      id: string;
+      manufacturer_id: string;
+      title: string;
+      manufacturer_name: string;
+      contact_name: string;
+      support_email: string;
+      phone: string;
+      problem_summary: string;
+      notes: string;
+      status: "Draft" | "Ready" | "Sent" | "Closed";
+      created_at: string;
+      updated_at: string;
+    } | undefined;
+
+    if (!caseRecord) {
+      return {
+        caseRecord: null,
+        assets: [],
+      };
+    }
+
+    const assets = db
+      .prepare(
+        `
+          SELECT
+            rma_case_assets.asset_id,
+            assets.name AS asset_name,
+            COALESCE(assets.brand, '') AS brand,
+            COALESCE(assets.model, '') AS model,
+            COALESCE(assets.serial_number, '') AS serial_number,
+            COALESCE(rma_case_assets.equipment_year, '') AS equipment_year,
+            rma_case_assets.issue_summary
+          FROM rma_case_assets
+          JOIN assets ON assets.id = rma_case_assets.asset_id
+          WHERE rma_case_assets.rma_case_id = ?
+          ORDER BY assets.name
+        `,
+      )
+      .all(rmaCaseId) as Array<{
+      asset_id: string;
+      asset_name: string;
+      brand: string;
+      model: string;
+      serial_number: string;
+      equipment_year: string;
+      issue_summary: string;
+    }>;
+
+    return {
+      caseRecord: {
+        id: caseRecord.id,
+        manufacturerId: caseRecord.manufacturer_id,
+        title: caseRecord.title,
+        manufacturerName: caseRecord.manufacturer_name,
+        contactName: caseRecord.contact_name,
+        supportEmail: caseRecord.support_email,
+        phone: caseRecord.phone,
+        problemSummary: caseRecord.problem_summary,
+        notes: caseRecord.notes,
+        status: caseRecord.status,
+        createdAtLabel: formatTimelineTimestamp(caseRecord.created_at),
+        updatedAtLabel: formatTimelineTimestamp(caseRecord.updated_at),
+      },
+      assets: assets.map((row) => ({
+        assetId: row.asset_id,
+        assetName: row.asset_name,
+        brand: row.brand,
+        model: row.model,
+        serialNumber: row.serial_number,
+        equipmentYear: row.equipment_year,
+        issueSummary: row.issue_summary,
       })),
     };
   },
@@ -2300,6 +2570,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             return compareTextValue(String(left.roleLabel ?? ""), String(right.roleLabel ?? ""), query.sortDirection);
           case "contactName":
             return compareTextValue(String(left.contactName ?? ""), String(right.contactName ?? ""), query.sortDirection);
+          case "supportEmail":
+            return compareTextValue(String(left.supportEmail ?? ""), String(right.supportEmail ?? ""), query.sortDirection);
           case "email":
             return compareTextValue(String(left.email ?? ""), String(right.email ?? ""), query.sortDirection);
           case "phone":
@@ -2340,6 +2612,13 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           ...snapshot,
           clients: sortCatalogRows(
             filterCatalogRows(snapshot.clients, (row) => [row.name, row.contactName, row.email, row.phone, row.notes]),
+          ),
+        };
+      case "manufacturer":
+        return {
+          ...snapshot,
+          manufacturers: sortCatalogRows(
+            filterCatalogRows(snapshot.manufacturers, (row) => [row.name, row.contactName, row.supportEmail, row.phone, row.notes]),
           ),
         };
       case "kit":
@@ -2538,6 +2817,1018 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       mappedRows,
       resolveFinanceEntryComparator(query.sortBy ?? defaultFinanceEntryListQuery.sortBy, query.sortDirection ?? defaultFinanceEntryListQuery.sortDirection),
     ).map(({ amountValue: _amountValue, dateValue: _dateValue, ...row }) => row);
+  },
+
+  getAgentCapabilitiesSnapshot() {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            id,
+            agent_key,
+            display_name,
+            status,
+            approval_mode,
+            provider_key,
+            model_label,
+            role_summary,
+            COALESCE(mission, role_summary) AS mission,
+            allowed_tools_json,
+            allowed_domains_json,
+            is_supervisor
+          FROM agents
+          WHERE workspace_id = ?
+          ORDER BY is_supervisor DESC, sort_order ASC, display_name
+        `,
+      )
+      .all(workspaceId) as Array<{
+      id: string;
+      agent_key: string;
+      display_name: string;
+      status: string;
+      approval_mode: string;
+      provider_key: string | null;
+      model_label: string;
+      role_summary: string;
+      mission: string;
+      allowed_tools_json: string | null;
+      allowed_domains_json: string | null;
+      is_supervisor: number;
+    }>;
+
+    return rows.map((row) => {
+      const tools = parseJsonStringArray(row.allowed_tools_json);
+      const domains = parseJsonStringArray(row.allowed_domains_json);
+
+      return {
+        id: row.id,
+        agentKey: row.agent_key,
+        displayName: row.display_name,
+        status: row.status,
+        approvalMode: row.approval_mode,
+        providerKey: row.provider_key ?? "openai",
+        modelLabel: row.model_label,
+        role: row.role_summary,
+        mission: row.mission,
+        toolCount: tools.length,
+        tools,
+        domains,
+        isSupervisor: row.is_supervisor === 1,
+      };
+    });
+  },
+
+  getPendingApprovals(limit = 8) {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            agent_runs.id,
+            agent_runs.title,
+            agent_runs.updated_at,
+            agent_runs.thread_id,
+            COALESCE(agents.display_name, 'Supervisor Agent') AS agent_name
+          FROM agent_runs
+          LEFT JOIN agents ON agents.id = agent_runs.agent_id
+          WHERE agent_runs.workspace_id = ?
+            AND agent_runs.status = 'needs_approval'
+          ORDER BY agent_runs.updated_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(workspaceId, limit) as Array<{
+      id: string;
+      title: string;
+      updated_at: string;
+      thread_id: string | null;
+      agent_name: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      agent: row.agent_name,
+      threadId: row.thread_id,
+      updatedAt: formatTimelineTimestamp(row.updated_at),
+    }));
+  },
+
+  getAgentRunsSnapshot(agentKey?: string | null, status?: string | null, limit = 8) {
+    const clauses = ["agent_runs.workspace_id = ?"];
+    const params: Array<string | number> = [workspaceId];
+
+    if (agentKey) {
+      clauses.push("agents.agent_key = ?");
+      params.push(agentKey);
+    }
+
+    if (status) {
+      clauses.push("agent_runs.status = ?");
+      params.push(status);
+    }
+
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            agent_runs.id,
+            agent_runs.title,
+            agent_runs.status,
+            agent_runs.updated_at,
+            agent_runs.approval_required,
+            COALESCE(agents.display_name, 'Supervisor Agent') AS agent_name
+          FROM agent_runs
+          LEFT JOIN agents ON agents.id = agent_runs.agent_id
+          WHERE ${clauses.join(" AND ")}
+          ORDER BY agent_runs.updated_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(...params, limit) as Array<{
+      id: string;
+      title: string;
+      status: string;
+      updated_at: string;
+      approval_required: number;
+      agent_name: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      status: row.status,
+      approvalRequired: row.approval_required === 1,
+      agent: row.agent_name,
+      updatedAt: formatTimelineTimestamp(row.updated_at),
+    }));
+  },
+
+  getAgentHealthStatus() {
+    const providers = db
+      .prepare(
+        `
+          SELECT provider_key, display_name, status, enabled, last_error_summary
+          FROM ai_provider_configs
+          WHERE workspace_id = ?
+          ORDER BY supports_live_requests DESC, display_name
+        `,
+      )
+      .all(workspaceId) as Array<{
+      provider_key: string;
+      display_name: string;
+      status: string;
+      enabled: number;
+      last_error_summary: string | null;
+    }>;
+
+    const agentCounts = db
+      .prepare(
+        `
+          SELECT
+            SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_count,
+            SUM(CASE WHEN status = 'paused' THEN 1 ELSE 0 END) AS paused_count
+          FROM agents
+          WHERE workspace_id = ?
+        `,
+      )
+      .get(workspaceId) as { active_count: number | null; paused_count: number | null };
+
+    const runCounts = db
+      .prepare(
+        `
+          SELECT
+            SUM(CASE WHEN status = 'needs_approval' THEN 1 ELSE 0 END) AS approvals,
+            SUM(CASE WHEN status IN ('failed', 'denied') THEN 1 ELSE 0 END) AS blocked_runs
+          FROM agent_runs
+          WHERE workspace_id = ?
+        `,
+      )
+      .get(workspaceId) as { approvals: number | null; blocked_runs: number | null };
+
+    return {
+      activeAgents: agentCounts.active_count ?? 0,
+      pausedAgents: agentCounts.paused_count ?? 0,
+      pendingApprovals: runCounts.approvals ?? 0,
+      blockedRuns: runCounts.blocked_runs ?? 0,
+      providers: providers.map((row) => ({
+        providerKey: row.provider_key,
+        label: row.display_name,
+        status: row.status,
+        enabled: row.enabled === 1,
+        lastErrorSummary: row.last_error_summary ?? "",
+      })),
+    };
+  },
+
+  getProjectConflicts(input?: { projectId?: string | null; rangeStart?: string | null; rangeEnd?: string | null }) {
+    const rangeStart = toIsoDate(input?.rangeStart);
+    const rangeEnd = toIsoDate(input?.rangeEnd ?? addDays(rangeStart, 30));
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            project_units.id,
+            project_units.project_id,
+            project_units.name,
+            project_units.start_date,
+            project_units.end_date,
+            projects.name AS project_name
+          FROM project_units
+          JOIN projects ON projects.id = project_units.project_id
+          WHERE project_units.start_date IS NOT NULL
+            AND project_units.end_date IS NOT NULL
+            AND project_units.end_date >= ?
+            AND project_units.start_date <= ?
+            AND (? IS NULL OR project_units.project_id = ?)
+          ORDER BY project_units.start_date, project_units.name
+        `,
+      )
+      .all(rangeStart, rangeEnd, input?.projectId ?? null, input?.projectId ?? null) as Array<{
+      id: string;
+      project_id: string;
+      name: string;
+      start_date: string;
+      end_date: string;
+      project_name: string;
+    }>;
+
+    const conflicts: Array<{
+      leftProjectId: string;
+      leftProject: string;
+      leftUnitId: string;
+      leftUnit: string;
+      rightProjectId: string;
+      rightProject: string;
+      rightUnitId: string;
+      rightUnit: string;
+      overlapStart: string;
+      overlapEnd: string;
+    }> = [];
+
+    for (let index = 0; index < rows.length; index += 1) {
+      for (let nextIndex = index + 1; nextIndex < rows.length; nextIndex += 1) {
+        const left = rows[index];
+        const right = rows[nextIndex];
+
+        if (left.project_id === right.project_id && left.id === right.id) {
+          continue;
+        }
+
+        const overlaps = left.start_date <= right.end_date && right.start_date <= left.end_date;
+
+        if (!overlaps) {
+          continue;
+        }
+
+        conflicts.push({
+          leftProjectId: left.project_id,
+          leftProject: left.project_name,
+          leftUnitId: left.id,
+          leftUnit: left.name,
+          rightProjectId: right.project_id,
+          rightProject: right.project_name,
+          rightUnitId: right.id,
+          rightUnit: right.name,
+          overlapStart: left.start_date > right.start_date ? left.start_date : right.start_date,
+          overlapEnd: left.end_date < right.end_date ? left.end_date : right.end_date,
+        });
+      }
+    }
+
+    return conflicts;
+  },
+
+  getProjectCrewAllocations(projectId: string) {
+    const detail = this.getProjectDetail(projectId);
+
+    if (!detail.project) {
+      return {
+        project: null,
+        units: [],
+      };
+    }
+
+    return {
+      project: {
+        id: detail.project.id,
+        name: detail.project.name,
+      },
+      units: detail.units.map((unit) => ({
+        id: unit.id,
+        name: unit.name,
+        status: unit.status,
+        startDate: unit.startDate,
+        endDate: unit.endDate,
+        crewAssignments: unit.crewAssignments.map((assignment) => ({
+          id: assignment.id,
+          crewMemberId: assignment.crewMemberId,
+          fullName: assignment.fullName,
+          roleLabel: assignment.roleLabel,
+          startDate: assignment.startDate,
+          endDate: assignment.endDate,
+        })),
+      })),
+    };
+  },
+
+  getAssetAvailability(input?: { assetId?: string | null; query?: string | null; rangeStart?: string | null; rangeEnd?: string | null; limit?: number }) {
+    const rangeStart = toIsoDate(input?.rangeStart);
+    const rangeEnd = toIsoDate(input?.rangeEnd ?? addDays(rangeStart, 30));
+    const rows = this.getAssets({
+      scopeProjectId: null,
+      search: input?.assetId ? undefined : input?.query ?? "",
+      sortBy: "name",
+      sortDirection: "asc",
+    })
+      .filter((row) => !input?.assetId || row.id === input.assetId)
+      .slice(0, input?.limit ?? 8);
+
+    return rows.map((row) => {
+      const reservations = db
+        .prepare(
+          `
+            SELECT COUNT(*) AS count
+            FROM asset_assignments
+            WHERE asset_id = ?
+              AND returned_at IS NULL
+              AND assignment_status IN ('reserved', 'assigned', 'checked_out')
+              AND (
+                expected_return_at IS NULL
+                OR expected_return_at >= ?
+              )
+              AND created_at <= ?
+          `,
+        )
+        .get(row.id, rangeStart, `${rangeEnd}T23:59:59.000Z`) as CountRow;
+
+      return {
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        status: row.status,
+        location: row.location,
+        project: row.project,
+        projectUnit: row.projectUnit,
+        reservationsInWindow: reservations.count,
+        availableNow: row.status === "Available" && reservations.count === 0,
+        rangeStart,
+        rangeEnd,
+      };
+    });
+  },
+
+  getAssetLocation(assetId: string) {
+    const detail = this.getAssetDetail(assetId);
+
+    if (!detail.asset) {
+      return { asset: null };
+    }
+
+    return {
+      asset: {
+        id: detail.asset.id,
+        name: detail.asset.name,
+        code: detail.asset.code,
+        location: detail.asset.location,
+        project: detail.asset.project,
+        responsible: detail.asset.responsible,
+        status: detail.asset.status,
+        custody: detail.asset.custody,
+      },
+    };
+  },
+
+  getAssetMovements(assetId: string, limit = 8) {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            asset_events.id,
+            asset_events.event_type,
+            asset_events.event_timestamp,
+            COALESCE(users.full_name, '—') AS performed_by,
+            COALESCE(projects.name, '—') AS project_name,
+            COALESCE(from_locations.name, '—') AS from_location,
+            COALESCE(to_locations.name, '—') AS to_location,
+            COALESCE(asset_events.notes, '') AS notes
+          FROM asset_events
+          LEFT JOIN users ON users.id = asset_events.performed_by_user_id
+          LEFT JOIN projects ON projects.id = asset_events.project_id
+          LEFT JOIN locations AS from_locations ON from_locations.id = asset_events.from_location_id
+          LEFT JOIN locations AS to_locations ON to_locations.id = asset_events.to_location_id
+          WHERE asset_events.asset_id = ?
+          ORDER BY asset_events.event_timestamp DESC
+          LIMIT ?
+        `,
+      )
+      .all(assetId, limit) as Array<{
+      id: string;
+      event_type: string;
+      event_timestamp: string;
+      performed_by: string;
+      project_name: string;
+      from_location: string;
+      to_location: string;
+      notes: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      type: row.event_type,
+      title: mapEventTitle(row.event_type),
+      timestamp: formatTimelineTimestamp(row.event_timestamp),
+      performedBy: row.performed_by,
+      project: row.project_name,
+      fromLocation: row.from_location,
+      toLocation: row.to_location,
+      notes: row.notes,
+    }));
+  },
+
+  getAssetReservations(input?: { assetId?: string | null; query?: string | null; rangeStart?: string | null; rangeEnd?: string | null; limit?: number }) {
+    const rangeStart = toIsoDate(input?.rangeStart);
+    const rangeEnd = toIsoDate(input?.rangeEnd ?? addDays(rangeStart, 30));
+    const clauses = [
+      "asset_assignments.returned_at IS NULL",
+      "asset_assignments.assignment_status IN ('reserved', 'assigned', 'checked_out')",
+      "COALESCE(asset_assignments.expected_return_at, '9999-12-31T23:59:59.000Z') >= ?",
+      "asset_assignments.created_at <= ?",
+    ];
+    const params: Array<string | number | null> = [rangeStart, `${rangeEnd}T23:59:59.000Z`];
+
+    if (input?.assetId) {
+      clauses.push("assets.id = ?");
+      params.push(input.assetId);
+    }
+
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            asset_assignments.id,
+            assets.id AS asset_id,
+            assets.name AS asset_name,
+            COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS asset_code,
+            COALESCE(projects.name, '—') AS project_name,
+            COALESCE(users.full_name, '—') AS assigned_to,
+            asset_assignments.assignment_status,
+            asset_assignments.checked_out_at,
+            asset_assignments.expected_return_at,
+            asset_assignments.returned_at
+          FROM asset_assignments
+          JOIN assets ON assets.id = asset_assignments.asset_id
+          LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
+          LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
+          LEFT JOIN projects ON projects.id = asset_assignments.project_id
+          LEFT JOIN users ON users.id = asset_assignments.assigned_to_user_id
+          WHERE ${clauses.join(" AND ")}
+          ORDER BY COALESCE(asset_assignments.expected_return_at, asset_assignments.created_at) ASC
+          LIMIT ?
+        `,
+      )
+      .all(...params, input?.limit ?? 10) as Array<{
+      id: string;
+      asset_id: string;
+      asset_name: string;
+      asset_code: string;
+      project_name: string;
+      assigned_to: string;
+      assignment_status: string;
+      checked_out_at: string | null;
+      expected_return_at: string | null;
+      returned_at: string | null;
+    }>;
+
+    return rows
+      .filter((row) =>
+        matchesSearch(input?.query ?? "", [row.asset_name, row.asset_code, row.project_name, row.assigned_to, row.assignment_status]),
+      )
+      .map((row) => ({
+        id: row.id,
+        assetId: row.asset_id,
+        asset: row.asset_name,
+        code: row.asset_code,
+        project: row.project_name,
+        assignedTo: row.assigned_to,
+        status: row.assignment_status,
+        checkedOutAt: row.checked_out_at ? formatTimelineTimestamp(row.checked_out_at) : "Not checked out",
+        expectedReturnAt: row.expected_return_at ? formatTimelineTimestamp(row.expected_return_at) : "Open-ended",
+        returnedAt: row.returned_at ? formatTimelineTimestamp(row.returned_at) : "Pending return",
+      }));
+  },
+
+  getKitContents(input?: { kitId?: string | null; query?: string | null; limit?: number }) {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            kits.id AS kit_id,
+            kits.code AS kit_code,
+            kits.name AS kit_name,
+            COALESCE(kits.description, '') AS kit_description,
+            assets.id AS asset_id,
+            assets.name AS asset_name,
+            COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS asset_code
+          FROM kits
+          LEFT JOIN kit_assets ON kit_assets.kit_id = kits.id
+          LEFT JOIN assets ON assets.id = kit_assets.asset_id
+          LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
+          LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
+          WHERE kits.is_active = 1
+            AND (? IS NULL OR kits.id = ?)
+          ORDER BY kits.name, assets.name
+        `,
+      )
+      .all(input?.kitId ?? null, input?.kitId ?? null) as Array<{
+      kit_id: string;
+      kit_code: string;
+      kit_name: string;
+      kit_description: string;
+      asset_id: string | null;
+      asset_name: string | null;
+      asset_code: string | null;
+    }>;
+
+    const byKit = new Map<
+      string,
+      {
+        id: string;
+        code: string;
+        name: string;
+        description: string;
+        assets: Array<{ id: string; name: string; code: string }>;
+      }
+    >();
+
+    rows.forEach((row) => {
+      const current =
+        byKit.get(row.kit_id) ??
+        {
+          id: row.kit_id,
+          code: row.kit_code,
+          name: row.kit_name,
+          description: row.kit_description,
+          assets: [],
+        };
+
+      if (!byKit.has(row.kit_id)) {
+        byKit.set(row.kit_id, current);
+      }
+
+      if (row.asset_id && row.asset_name && row.asset_code) {
+        current.assets.push({
+          id: row.asset_id,
+          name: row.asset_name,
+          code: row.asset_code,
+        });
+      }
+    });
+
+    return Array.from(byKit.values())
+      .filter((row) => matchesSearch(input?.query ?? "", [row.code, row.name, row.description, ...row.assets.map((asset) => asset.name)]))
+      .slice(0, input?.limit ?? 6);
+  },
+
+  getIncidentDetail(incidentId: string) {
+    const row = db
+      .prepare(
+        `
+          SELECT
+            incidents.id,
+            incidents.title,
+            incidents.incident_type,
+            incidents.severity,
+            incidents.status,
+            incidents.description,
+            incidents.reported_at,
+            incidents.resolved_at,
+            incidents.cost_estimate,
+            incidents.currency,
+            COALESCE(incidents.financial_status, 'Unlinked') AS financial_status,
+            COALESCE(incidents.notes, '') AS notes,
+            COALESCE(assets.id, '') AS asset_id,
+            COALESCE(assets.name, '—') AS asset_name,
+            COALESCE(assets.internal_code, '—') AS asset_code,
+            COALESCE(projects.id, '') AS project_id,
+            COALESCE(projects.name, '—') AS project_name,
+            COALESCE(project_units.id, '') AS project_unit_id,
+            COALESCE(project_units.name, '—') AS project_unit_name,
+            COALESCE(users.full_name, '—') AS owner_name,
+            COALESCE(reporters.full_name, '—') AS reporter_name,
+            COALESCE(departments.name, '—') AS department_name
+          FROM incidents
+          LEFT JOIN assets ON assets.id = incidents.asset_id
+          LEFT JOIN projects ON projects.id = incidents.project_id
+          LEFT JOIN project_units ON project_units.id = incidents.project_unit_id
+          LEFT JOIN users ON users.id = incidents.responsible_user_id
+          LEFT JOIN users AS reporters ON reporters.id = incidents.reported_by_user_id
+          LEFT JOIN departments ON departments.id = incidents.department_id
+          WHERE incidents.id = ?
+          LIMIT 1
+        `,
+      )
+      .get(incidentId) as
+      | {
+          id: string;
+          title: string;
+          incident_type: string;
+          severity: string;
+          status: string;
+          description: string;
+          reported_at: string;
+          resolved_at: string | null;
+          cost_estimate: number | null;
+          currency: string | null;
+          financial_status: string;
+          notes: string;
+          asset_id: string;
+          asset_name: string;
+          asset_code: string;
+          project_id: string;
+          project_name: string;
+          project_unit_id: string;
+          project_unit_name: string;
+          owner_name: string;
+          reporter_name: string;
+          department_name: string;
+        }
+      | undefined;
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      title: row.title,
+      type: row.incident_type,
+      severity: row.severity,
+      status: row.status,
+      description: row.description,
+      reportedAt: formatTimelineTimestamp(row.reported_at),
+      resolvedAt: row.resolved_at ? formatTimelineTimestamp(row.resolved_at) : "Still open",
+      costEstimate: formatCurrency(row.cost_estimate),
+      currency: row.currency ?? "USD",
+      financialStatus: row.financial_status,
+      notes: row.notes,
+      assetId: row.asset_id || null,
+      asset: row.asset_name,
+      assetCode: row.asset_code,
+      projectId: row.project_id || null,
+      project: row.project_name,
+      projectUnitId: row.project_unit_id || null,
+      projectUnit: row.project_unit_name,
+      owner: row.owner_name,
+      reporter: row.reporter_name,
+      department: row.department_name,
+    };
+  },
+
+  getIncidentTimeline(incidentId: string, limit = 8) {
+    const incident = this.getIncidentDetail(incidentId);
+
+    if (!incident) {
+      return [];
+    }
+
+    const assetEvents = incident.assetId
+      ? (db
+          .prepare(
+            `
+              SELECT
+                id,
+                event_type,
+                event_timestamp,
+                COALESCE(notes, '') AS notes,
+                metadata_json
+              FROM asset_events
+              WHERE asset_id = ?
+              ORDER BY event_timestamp DESC
+              LIMIT 20
+            `,
+          )
+          .all(incident.assetId) as Array<{
+          id: string;
+          event_type: string;
+          event_timestamp: string;
+          notes: string;
+          metadata_json: string | null;
+        }>)
+      : [];
+
+    const linkedEvents = assetEvents
+      .filter((row) => {
+        const metadata = parseJsonObject(row.metadata_json);
+        return metadata?.incidentId === incidentId;
+      })
+      .map((row) => ({
+        id: row.id,
+        title: mapEventTitle(row.event_type),
+        timestamp: formatTimelineTimestamp(row.event_timestamp),
+        body: row.notes || "Operational asset event linked to this incident.",
+      }));
+
+    const timeline = [
+      {
+        id: `${incidentId}-reported`,
+        title: "Incident reported",
+        timestamp: incident.reportedAt,
+        body: incident.description,
+      },
+      ...linkedEvents,
+      ...(incident.resolvedAt !== "Still open"
+        ? [
+            {
+              id: `${incidentId}-resolved`,
+              title: "Incident resolved",
+              timestamp: incident.resolvedAt,
+              body: "The incident was marked as resolved in the registry.",
+            },
+          ]
+        : []),
+    ];
+
+    return timeline.slice(0, limit);
+  },
+
+  getIncidentEstimates(input?: { incidentId?: string | null; projectId?: string | null; limit?: number }) {
+    const rows = this.getIncidents({
+      scopeProjectId: input?.projectId ?? null,
+      search: undefined,
+      sortBy: "reportedAt",
+      sortDirection: "desc",
+    })
+      .filter((row) => !input?.incidentId || row.id === input.incidentId)
+      .slice(0, input?.limit ?? 12);
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      project: row.project,
+      severity: row.severity,
+      status: row.status,
+      costEstimate: row.costEstimate,
+      hasEstimate: row.costEstimate !== "Pending",
+    }));
+  },
+
+  getMaintenanceQueue(limit = 8) {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            assets.id,
+            assets.name,
+            COALESCE(assets.internal_code, '—') AS asset_code,
+            COALESCE(locations.name, '—') AS location_name,
+            COALESCE((
+              SELECT incidents.title
+              FROM incidents
+              WHERE incidents.asset_id = assets.id
+                AND incidents.status IN ('Open', 'In review')
+              ORDER BY incidents.reported_at DESC
+              LIMIT 1
+            ), 'No linked incident') AS latest_incident,
+            asset_current_state.updated_at
+          FROM asset_current_state
+          JOIN assets ON assets.id = asset_current_state.asset_id
+          LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
+          WHERE asset_current_state.operational_status = 'maintenance'
+            AND assets.is_active = 1
+          ORDER BY asset_current_state.updated_at DESC, assets.name
+          LIMIT ?
+        `,
+      )
+      .all(limit) as Array<{
+      id: string;
+      name: string;
+      asset_code: string;
+      location_name: string;
+      latest_incident: string;
+      updated_at: string;
+    }>;
+
+    return rows.map((row) => ({
+      assetId: row.id,
+      asset: row.name,
+      code: row.asset_code,
+      location: row.location_name,
+      latestIncident: row.latest_incident,
+      updatedAt: formatTimelineTimestamp(row.updated_at),
+    }));
+  },
+
+  getAssetMaintenanceHistory(assetId: string, limit = 8) {
+    const maintenanceEvents = db
+      .prepare(
+        `
+          SELECT id, event_type, event_timestamp, COALESCE(notes, '') AS notes
+          FROM asset_events
+          WHERE asset_id = ?
+            AND event_type IN ('maintenance_started', 'maintenance_completed')
+          ORDER BY event_timestamp DESC
+          LIMIT ?
+        `,
+      )
+      .all(assetId, limit) as Array<{
+      id: string;
+      event_type: string;
+      event_timestamp: string;
+      notes: string;
+    }>;
+
+    const incidents = db
+      .prepare(
+        `
+          SELECT id, title, reported_at, status
+          FROM incidents
+          WHERE asset_id = ?
+          ORDER BY reported_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(assetId, limit) as Array<{
+      id: string;
+      title: string;
+      reported_at: string;
+      status: string;
+    }>;
+
+    return {
+      events: maintenanceEvents.map((row) => ({
+        id: row.id,
+        title: mapEventTitle(row.event_type),
+        timestamp: formatTimelineTimestamp(row.event_timestamp),
+        notes: row.notes,
+      })),
+      incidents: incidents.map((row) => ({
+        id: row.id,
+        title: row.title,
+        status: row.status,
+        reportedAt: formatTimelineTimestamp(row.reported_at),
+      })),
+    };
+  },
+
+  getProjectFinancials(projectId: string) {
+    const detail = this.getProjectDetail(projectId);
+    const entries = this.getFinanceEntries({
+      search: detail.project?.name ?? "",
+      sortBy: "date",
+      sortDirection: "desc",
+    }).slice(0, 8);
+
+    if (!detail.project) {
+      return {
+        project: null,
+        budget: null,
+        recentEntries: [],
+      };
+    }
+
+    return {
+      project: {
+        id: detail.project.id,
+        name: detail.project.name,
+        status: detail.project.status,
+      },
+      budget: detail.budget,
+      recentEntries: entries.filter((entry) => entry.project === detail.project?.name),
+    };
+  },
+
+  getIncidentCosts(input?: { incidentId?: string | null; projectId?: string | null; limit?: number }) {
+    return this.getFinanceCostLinks()
+      .filter((row) => !input?.projectId || row.project === (this.getProjectDetail(input.projectId).project?.name ?? row.project))
+      .filter((row) => !input?.incidentId || row.incident === (this.getIncidentDetail(input.incidentId)?.title ?? row.incident))
+      .slice(0, input?.limit ?? 8);
+  },
+
+  getAssetExposure(assetId: string) {
+    const detail = this.getAssetDetail(assetId);
+
+    if (!detail.asset) {
+      return null;
+    }
+
+    const linkedFinance = db
+      .prepare(
+        `
+          SELECT
+            id,
+            entry_type,
+            category,
+            amount,
+            status,
+            entry_date
+          FROM financial_entries
+          WHERE asset_id = ?
+          ORDER BY entry_date DESC
+          LIMIT 8
+        `,
+      )
+      .all(assetId) as Array<{
+      id: string;
+      entry_type: string;
+      category: string;
+      amount: number;
+      status: string;
+      entry_date: string;
+    }>;
+
+    return {
+      asset: detail.asset,
+      linkedIncidents: detail.linkedIncidents,
+      financeEntries: linkedFinance.map((row) => ({
+        id: row.id,
+        type: row.entry_type,
+        category: row.category,
+        amount: formatCurrency(row.amount),
+        status: row.status,
+        date: formatShortDate(row.entry_date),
+      })),
+    };
+  },
+
+  getOpenInvoices(limit = 8) {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            financial_entries.id,
+            financial_entries.entry_date,
+            financial_entries.amount,
+            financial_entries.status,
+            COALESCE(projects.name, '—') AS project_name,
+            COALESCE(financial_entries.description, financial_entries.category, financial_entries.id) AS label
+          FROM financial_entries
+          LEFT JOIN projects ON projects.id = financial_entries.project_id
+          WHERE financial_entries.entry_type = 'invoice'
+            AND financial_entries.status NOT IN ('Paid', 'Cancelled')
+          ORDER BY financial_entries.entry_date DESC
+          LIMIT ?
+        `,
+      )
+      .all(limit) as Array<{
+      id: string;
+      entry_date: string;
+      amount: number;
+      status: string;
+      project_name: string;
+      label: string;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      date: formatShortDate(row.entry_date),
+      amount: formatCurrency(row.amount),
+      status: row.status,
+      project: row.project_name,
+      label: row.label,
+    }));
+  },
+
+  getReservesStatus(projectId?: string | null) {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            financial_entries.id,
+            financial_entries.entry_date,
+            financial_entries.amount,
+            financial_entries.status,
+            COALESCE(projects.name, '—') AS project_name,
+            COALESCE(financial_entries.description, financial_entries.category, financial_entries.id) AS label
+          FROM financial_entries
+          LEFT JOIN projects ON projects.id = financial_entries.project_id
+          WHERE financial_entries.entry_type = 'reserve'
+            AND (? IS NULL OR financial_entries.project_id = ?)
+          ORDER BY financial_entries.entry_date DESC
+          LIMIT 12
+        `,
+      )
+      .all(projectId ?? null, projectId ?? null) as Array<{
+      id: string;
+      entry_date: string;
+      amount: number;
+      status: string;
+      project_name: string;
+      label: string;
+    }>;
+
+    const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+
+    return {
+      totalReserve: formatCurrency(totalAmount),
+      items: rows.map((row) => ({
+        id: row.id,
+        date: formatShortDate(row.entry_date),
+        amount: formatCurrency(row.amount),
+        status: row.status,
+        project: row.project_name,
+        label: row.label,
+      })),
+    };
   },
 };
 };

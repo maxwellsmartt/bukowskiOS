@@ -6,6 +6,13 @@ export type OverviewMetric = {
   tone: MetricTone;
 };
 
+export type OverviewOperationalCard = {
+  label: string;
+  value: string;
+  subtitle: string;
+  tone: MetricTone;
+};
+
 export type RecentMovementRow = {
   asset: string;
   code: string;
@@ -72,6 +79,11 @@ export type ScheduleTimelineSnapshot = {
 };
 
 export type OverviewSnapshot = {
-  metrics: OverviewMetric[];
+  cards: {
+    overdueReturns: OverviewOperationalCard;
+    openPackingSlips: OverviewOperationalCard;
+    activeIncidents: OverviewOperationalCard;
+    maintenanceWatch: OverviewOperationalCard;
+  };
   recentMovements: RecentMovementRow[];
 };

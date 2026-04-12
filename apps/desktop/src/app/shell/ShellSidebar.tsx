@@ -21,7 +21,7 @@ export const ShellSidebar = () => {
           <span className="shell-nav-label">Global</span>
           {primaryNav.map((item) => {
             const Icon = item.icon;
-            const navKey = item.path === "/overview" ? "overview" : item.path === "/assets" ? "assets" : "finance";
+            const navKey = item.path.startsWith("/finance") ? "finance" : item.path.startsWith("/agents") ? "agents" : "assets";
             const isActive = primaryNavKey === navKey;
 
             return (
@@ -38,7 +38,6 @@ export const ShellSidebar = () => {
 
       <div className="shell-sidebar-utility-zone">
         <nav className="shell-nav">
-          <span className="shell-nav-label">Utility</span>
           {utilityNav.map((item) => {
             const Icon = item.icon;
             const isActive = activeRoute.domain === "utility" && activeRoute.scopeMode === "global";

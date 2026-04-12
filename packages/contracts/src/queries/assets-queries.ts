@@ -1,4 +1,5 @@
 import type { ListSortDirection } from "./list-controls-queries";
+import type { OverviewOperationalCard, RecentMovementRow } from "./overview-queries";
 
 export type AssetListRow = {
   id: string;
@@ -46,6 +47,23 @@ export type AssetListQuery = {
   search?: string;
   sortBy: AssetSortField;
   sortDirection: ListSortDirection;
+};
+
+export type AssetSummarySnapshot = {
+  totalAssets: string;
+  assignedAssets: string;
+};
+
+export type AssetsOverviewSnapshot = {
+  totalAssets: string;
+  assignedAssets: string;
+  cards: {
+    overdueReturns: OverviewOperationalCard;
+    openPackingSlips: OverviewOperationalCard;
+    activeIncidents: OverviewOperationalCard;
+    maintenanceWatch: OverviewOperationalCard;
+  };
+  recentMovements: RecentMovementRow[];
 };
 
 export type AssetTimelineItem = {

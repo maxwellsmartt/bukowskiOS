@@ -8,7 +8,6 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
-import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { useFinanceEntries } from "./useFinanceData";
 
@@ -43,23 +42,17 @@ export const FinanceEntriesPage = () => {
   });
   const { data, error } = useFinanceEntries(financeControls.query);
   const { addItems, hasItem } = useCompareTray();
-  const sectionScopeLabel = useSectionScopeLabel();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        eyebrow="Finance / Entries"
-        title="Entries"
-        body="Financial entries linked to operational events, incidents and projects."
-        contextLabel={sectionScopeLabel}
-      />
+      <SectionHeader title="Entries" />
 
       {error ? <div className="empty-state">Entries unavailable: {error}</div> : null}
 
       <div className="chip-row">
         <StatusBadge tone="success">{data.filter((entry) => hasItem("financial_entry", entry.id)).length} in compare</StatusBadge>
-        <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : "Workspace scope"}</StatusBadge>
+        {selectedRowIds.length ? <StatusBadge>{`${selectedRowIds.length} selected`}</StatusBadge> : null}
       </div>
 
       {selectedRowIds.length ? (
@@ -94,7 +87,7 @@ export const FinanceEntriesPage = () => {
         </div>
       ) : null}
 
-      <SurfaceCard title="Entry register" subtitle="Current financial entries linked to projects, assets and incidents.">
+      <SurfaceCard title="Entry register">
         <ListToolbar
           activeSortLabel={financeControls.activeSortOption?.label}
           onSearchValueChange={financeControls.setSearchValue}

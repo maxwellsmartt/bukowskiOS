@@ -6,6 +6,10 @@ import { DatabaseSync } from "node:sqlite";
 import { foundationMigrationSql } from "@db";
 
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "../../../electron/main/services/data/adminFoundationBootstrap";
+import {
+  applyAIGatewayFoundationMigration,
+  bootstrapAIGatewayFoundation,
+} from "../../../electron/main/services/data/aiGatewayFoundationBootstrap";
 import { seedFoundationData } from "../../../electron/main/services/data/foundationSeed";
 import { bootstrapLegacyRentmanDemo } from "../../../electron/main/services/data/legacyRentmanDemo";
 import { ensureProjectShellDefaults } from "../../../electron/main/services/data/projectMutationService";
@@ -28,7 +32,9 @@ export const createTestDatabase = (prefix: string): TestDatabase => {
   database.exec(foundationMigrationSql);
   applyAdminFoundationMigration(database);
   applySchedulingFoundationMigration(database);
+  applyAIGatewayFoundationMigration(database);
   seedFoundationData(database);
+  bootstrapAIGatewayFoundation(database);
   ensureProjectShellDefaults(database);
   bootstrapLegacyRentmanDemo(database);
   bootstrapAdminFoundation(database);

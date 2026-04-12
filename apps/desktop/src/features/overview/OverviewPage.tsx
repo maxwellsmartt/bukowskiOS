@@ -1,43 +1,25 @@
-import { ArrowUpRight, ShieldAlert, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { ScheduleTimelineRange, ScheduleTimelineScale } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
-import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
-import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 import { OverviewScheduleTimeline } from "./OverviewScheduleTimeline";
 import { useOverviewSnapshot, useOverviewTimeline } from "./useOverviewSnapshot";
 
-const queueCards = [
-  {
-    title: "Overdue returns",
-    subtitle: "Slips nearing or past due return need review.",
-    icon: ArrowUpRight,
-    tone: "warning" as const,
-  },
-  {
-    title: "Active incidents",
-    subtitle: "Open issues with pending follow-up or missing estimates.",
-    icon: ShieldAlert,
-    tone: "critical" as const,
-  },
-  {
-    title: "Maintenance watch",
-    subtitle: "Assets flagged for bench review or spare-part follow-up.",
-    icon: Wrench,
-    tone: "success" as const,
-  },
-];
-
 export const OverviewPage = () => (
   <OverviewContent />
 );
 
-const todayDateOnly = () => new Date().toISOString().slice(0, 10);
+const todayDateOnly = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = `${today.getMonth() + 1}`.padStart(2, "0");
+  const day = `${today.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const isTimelineRange = (value: string | null): value is ScheduleTimelineRange =>
   value === "30d" || value === "90d" || value === "6m";
@@ -46,8 +28,7 @@ const isTimelineScale = (value: string | null): value is ScheduleTimelineScale =
   value === "day" || value === "week" || value === "month";
 
 const OverviewContent = () => {
-  const sectionScopeLabel = useSectionScopeLabel();
-  const { data, error, isLoading } = useOverviewSnapshot();
+  const { data, error } = useOverviewSnapshot();
   const [timelineRange, setTimelineRange] = useState<ScheduleTimelineRange>(() => {
     const storedValue = readStringPreference(uiPreferenceKeys.overviewTimelineRange, "90d");
     return isTimelineRange(storedValue) ? storedValue : "90d";
@@ -59,7 +40,17 @@ const OverviewContent = () => {
   const [timelineAnchorDate, setTimelineAnchorDate] = useState(() =>
     readStringPreference(uiPreferenceKeys.overviewTimelineAnchorDate, todayDateOnly()) ?? todayDateOnly(),
   );
-  const { data: timelineSnapshot, isLoading: timelineLoading } = useOverviewTimeline();
+  const { data: timelineSnapshot, isLoading: timelineLoading } = useOverviewTimeline(
+    timelineRange,
+    timelineScale,
+    timelineAnchorDate,
+  );
+  const operationalCards = [
+    data.cards.overdueReturns,
+    data.cards.openPackingSlips,
+    data.cards.activeIncidents,
+    data.cards.maintenanceWatch,
+  ];
 
   useEffect(() => {
     writePreference(uiPreferenceKeys.overviewTimelineRange, timelineRange);
@@ -79,38 +70,17 @@ const OverviewContent = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        eyebrow="Operations"
-        title="Today at a glance"
-        body="Availability, incidents, maintenance pressure and recent movement across warehouse and set."
-        contextLabel={sectionScopeLabel}
-      />
+      <SectionHeader title="Overview" titleTone="accent" />
 
       {error ? <div className="empty-state">Overview unavailable: {error}</div> : null}
 
-      <div className="metric-grid">
-        {data.metrics.map((metric) => (
-          <SurfaceCard key={metric.label}>
-            <span className={`metric-value metric-tone-${metric.tone}`}>{metric.value}</span>
-            <p className="metric-label">{metric.label}</p>
+      <div className="overview-operational-grid">
+        {operationalCards.map((card) => (
+          <SurfaceCard key={card.label} className="overview-operational-card" title={card.label}>
+            <span className={`overview-operational-value metric-tone-${card.tone}`}>{card.value}</span>
+            <p className="overview-operational-subtitle">{card.subtitle}</p>
           </SurfaceCard>
         ))}
-        {!data.metrics.length && isLoading ? (
-          <SurfaceCard>
-            <p className="metric-label">Loading local workspace metrics...</p>
-          </SurfaceCard>
-        ) : null}
-      </div>
-
-      <div className="queue-grid">
-        {queueCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <SurfaceCard key={card.title} title={card.title} subtitle={card.subtitle} aside={<Icon size={16} />}>
-              <StatusBadge tone={card.tone}>{card.tone}</StatusBadge>
-            </SurfaceCard>
-          );
-        })}
       </div>
 
       <OverviewScheduleTimeline
@@ -126,7 +96,6 @@ const OverviewContent = () => {
 
       <SurfaceCard
         title="Recent movements"
-        subtitle="Latest operational activity across locations, projects and responsible teams."
       >
         <DataTable
           columns={[
