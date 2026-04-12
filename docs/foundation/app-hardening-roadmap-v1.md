@@ -113,6 +113,52 @@
   - `medio`: la top bar refresca por polling simple, no por eventos en tiempo real
   - `medio`: todavía no hay acciones masivas más finas como retry por tipo de entidad o purge selectivo
 
+### Slice A5 — Runtime polling y performance hardening fino
+- Estado: `done`
+- Objetivo:
+  - bajar trabajo innecesario cuando la app está en background y reducir refreshes agresivos en superficies pesadas sin rehacer arquitectura
+- Área:
+  - frontend
+- Alcance inicial:
+  - polling visible-aware para superficies con refresh periódico
+  - limitar recargas cuando la ventana no está enfocada o no está visible
+  - mantener la UI viva cuando vuelve al frente
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - nuevo hook compartido `useVisiblePolling`
+  - `Mission Control`, la top bar y el polling del chat en vivo ya no siguen refrescando igual cuando la app está fuera de foco
+  - la app fuerza un refresh oportuno al volver a primer plano, sin dejar al usuario con estado viejo
+- Riesgos remanentes:
+  - `medio`: esto reduce trabajo desperdiciado, pero no reemplaza profiling profundo con datasets masivos ni virtualización más agresiva
+  - `bajo`: el modelo sigue siendo polling, no eventos push; solo quedó bastante menos costoso
+
+### Slice A6 — Sync operability completion
+- Estado: `done`
+- Objetivo:
+  - hacer la cola local más operable y más fácil de debuggear por subconjuntos concretos, sin obligar al usuario a revisar payloads uno por uno
+- Área:
+  - frontend
+- Alcance inicial:
+  - filtro por `entityType`
+  - `retry visible`
+  - búsqueda diferida para payloads grandes
+  - deep-link fino a `finance` desde filas del outbox
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - `/settings/sync` ahora filtra por estado y por tipo de entidad
+  - existe `retry visible` para reencolar solo el subconjunto filtrado que necesita atención
+  - la búsqueda usa un valor diferido para no recalcular payloads grandes en cada tecla
+  - `financial_entry` ya abre `Finance Entries` con `focus` fino sobre la entry
+- Riesgos remanentes:
+  - `medio`: `retry visible` hace retries secuenciales a través del bridge actual; si la cola crece mucho convendrá mover esto a una acción bulk nativa en main
+  - `medio`: todavía no hay filtros por `operationType` ni export puntual del payload/error desde la vista
+
 ## P0 — Crítico ahora mismo
 
 ### Slice 1 — Electron Security Hardening

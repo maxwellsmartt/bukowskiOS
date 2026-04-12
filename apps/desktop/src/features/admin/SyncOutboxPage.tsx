@@ -1,12 +1,13 @@
 import type { AppActionResult, AppDiagnosticsSnapshot, AppSyncOutboxRow } from "@contracts";
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 
 const emptyDiagnostics: AppDiagnosticsSnapshot = {
   databaseSizeBytes: 0,
@@ -29,6 +30,7 @@ const emptyDiagnostics: AppDiagnosticsSnapshot = {
 };
 
 type SyncFilter = "all" | "pending" | "processing" | "failed" | "sent";
+type SyncEntityFilter = "all" | string;
 
 const syncFilters: Array<{ value: SyncFilter; label: string }> = [
   { value: "all", label: "All" },
@@ -79,7 +81,7 @@ const resolveEntityNavigationPath = (row: AppSyncOutboxRow) => {
   }
 
   if (row.entityType === "financial_entry") {
-    return "/finance/entries";
+    return `/finance/entries?focus=${row.entityId}`;
   }
 
   return null;
@@ -100,11 +102,14 @@ export const SyncOutboxPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [filter, setFilter] = useState<SyncFilter>("all");
+  const [entityFilter, setEntityFilter] = useState<SyncEntityFilter>("all");
   const [search, setSearch] = useState("");
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
   const [retryingRowId, setRetryingRowId] = useState<string | null>(null);
   const [isRetryingAllFailed, setIsRetryingAllFailed] = useState(false);
+  const [isRetryingVisible, setIsRetryingVisible] = useState(false);
   const [isRunningLocalSync, setIsRunningLocalSync] = useState(false);
+  const deferredSearch = useDeferredValue(search);
 
   const load = async () => {
     if (!window.bukowskiApp) {
@@ -124,9 +129,12 @@ export const SyncOutboxPage = () => {
     }
   };
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useVisiblePolling(
+    () => {
+      void load();
+    },
+    { intervalMs: 10_000 },
+  );
 
   useEffect(() => {
     if (!rows.length) {
@@ -141,11 +149,20 @@ export const SyncOutboxPage = () => {
     setActiveRowId(rows[0]?.id ?? null);
   }, [activeRowId, rows]);
 
+  const entityFilters = useMemo(
+    () => ["all", ...Array.from(new Set(rows.map((row) => row.entityType))).sort()],
+    [rows],
+  );
+
   const visibleRows = useMemo(() => {
-    const query = normalizeText(search);
+    const query = normalizeText(deferredSearch);
 
     return rows.filter((row) => {
       if (filter !== "all" && row.status !== filter) {
+        return false;
+      }
+
+      if (entityFilter !== "all" && row.entityType !== entityFilter) {
         return false;
       }
 
@@ -158,9 +175,13 @@ export const SyncOutboxPage = () => {
         .toLowerCase()
         .includes(query);
     });
-  }, [filter, rows, search]);
+  }, [deferredSearch, entityFilter, filter, rows]);
 
   const activeRow = useMemo(() => visibleRows.find((row) => row.id === activeRowId) ?? null, [activeRowId, visibleRows]);
+  const visibleRetryableRows = useMemo(
+    () => visibleRows.filter((row) => row.status === "failed" || row.status === "processing"),
+    [visibleRows],
+  );
 
   const runAction = async (action: () => Promise<AppActionResult>, setPending: (value: boolean) => void) => {
     try {
@@ -198,6 +219,33 @@ export const SyncOutboxPage = () => {
     }
   };
 
+  const retryVisibleRows = async () => {
+    if (!window.bukowskiApp || !visibleRetryableRows.length) {
+      return;
+    }
+
+    try {
+      setIsRetryingVisible(true);
+      let lastResult: AppActionResult | null = null;
+
+      for (const row of visibleRetryableRows) {
+        lastResult = await window.bukowskiApp.retrySyncOutboxRow(row.id);
+      }
+
+      if (lastResult) {
+        setFeedback(`${visibleRetryableRows.length} visible rows queued again locally.`);
+        setDiagnostics(lastResult.diagnostics);
+      }
+      setError(null);
+      const nextRows = await window.bukowskiApp.getSyncOutboxRows();
+      setRows(nextRows);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "The app could not retry the visible local sync rows.");
+    } finally {
+      setIsRetryingVisible(false);
+    }
+  };
+
   return (
     <div className="page-stack">
       <SectionHeader
@@ -215,6 +263,7 @@ export const SyncOutboxPage = () => {
         </StatusBadge>
         <StatusBadge tone="warning">{`${diagnostics.syncOutboxPendingCount} pending`}</StatusBadge>
         <StatusBadge tone="info">{`${diagnostics.syncOutboxProcessingCount} processing`}</StatusBadge>
+        <StatusBadge>{`${visibleRows.length} visible`}</StatusBadge>
         <StatusBadge>{formatDateLabel(diagnostics.lastSyncRunAt)}</StatusBadge>
       </div>
 
@@ -234,6 +283,14 @@ export const SyncOutboxPage = () => {
           type="button"
         >
           {isRetryingAllFailed ? "Retrying failed rows..." : "Retry all failed"}
+        </button>
+        <button
+          className="ghost-control"
+          disabled={!visibleRetryableRows.length || isRetryingVisible}
+          onClick={() => void retryVisibleRows()}
+          type="button"
+        >
+          {isRetryingVisible ? "Retrying visible rows..." : `Retry visible (${visibleRetryableRows.length})`}
         </button>
         <button className="ghost-control" onClick={() => navigate("/settings")} type="button">
           Back to settings
@@ -255,10 +312,22 @@ export const SyncOutboxPage = () => {
                 </button>
               ))}
             </div>
+            <div className="sync-outbox-filter-row">
+              {entityFilters.map((item) => (
+                <button
+                  key={item}
+                  className={`filter-chip${entityFilter === item ? " active" : ""}`}
+                  onClick={() => setEntityFilter(item)}
+                  type="button"
+                >
+                  {item === "all" ? "All entities" : item}
+                </button>
+              ))}
+            </div>
             <input
               className="text-input sync-outbox-search"
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search entity, operation or error"
+              placeholder="Search entity, operation, payload or error"
               type="search"
               value={search}
             />

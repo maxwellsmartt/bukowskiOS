@@ -1,8 +1,9 @@
 import { Bell, RefreshCcw, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import type { AppDiagnosticsSnapshot } from "@contracts";
 
 type TopContextBarProps = {
@@ -13,37 +14,34 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { scopeChipLabel, syncLabel, workspaceName } = useShellContext();
   const navigate = useNavigate();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot | null>(null);
+  const isMountedRef = useRef(true);
 
-  useEffect(() => {
-    if (!window.bukowskiApp) {
-      return undefined;
-    }
+  useEffect(
+    () => () => {
+      isMountedRef.current = false;
+    },
+    [],
+  );
 
-    let cancelled = false;
+  useVisiblePolling(
+    async () => {
+      if (!window.bukowskiApp) {
+        return;
+      }
 
-    const loadDiagnostics = async () => {
       try {
-        const nextDiagnostics = await window.bukowskiApp!.getDiagnostics();
-        if (!cancelled) {
+        const nextDiagnostics = await window.bukowskiApp.getDiagnostics();
+        if (isMountedRef.current) {
           setDiagnostics(nextDiagnostics);
         }
       } catch {
-        if (!cancelled) {
+        if (isMountedRef.current) {
           setDiagnostics(null);
         }
       }
-    };
-
-    void loadDiagnostics();
-    const interval = window.setInterval(() => {
-      void loadDiagnostics();
-    }, 15_000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, []);
+    },
+    { intervalMs: 15_000 },
+  );
 
   const syncState = useMemo(() => {
     if (!diagnostics) {

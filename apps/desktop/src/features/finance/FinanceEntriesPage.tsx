@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import type { FinanceEntryListQuery, FinanceEntrySortField } from "@contracts";
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
@@ -30,6 +31,7 @@ const financeEntrySortOptions: Array<ListSortOption<FinanceEntrySortField>> = [
 const workspaceId = DEFAULT_WORKSPACE_ID;
 
 export const FinanceEntriesPage = () => {
+  const [searchParams] = useSearchParams();
   const financeControls = useListControls<FinanceEntrySortField, FinanceEntryListQuery>({
     viewKey: "finance-entries-list",
     defaults: {
@@ -59,8 +61,20 @@ export const FinanceEntriesPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const focusedEntryId = searchParams.get("focus");
 
   const editingEntry = useMemo(() => data.find((entry) => entry.id === editingEntryId) ?? null, [data, editingEntryId]);
+
+  useEffect(() => {
+    if (!focusedEntryId || !data.some((entry) => entry.id === focusedEntryId)) {
+      return;
+    }
+
+    setEditingEntryId(focusedEntryId);
+    setSubmitError(null);
+    setFeedback(null);
+    setIsEditorOpen(true);
+  }, [data, focusedEntryId]);
 
   const handleSubmit = async (draft: FinanceEntryEditorDraft) => {
     try {

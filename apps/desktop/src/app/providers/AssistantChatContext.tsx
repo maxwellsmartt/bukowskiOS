@@ -20,6 +20,7 @@ import {
   setActiveAssistantThread,
   updateAssistantThreadPreferences,
 } from "@features/agents/useAgentsData";
+import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 
 export type AssistantChatSessionState = AssistantChatMessageMeta;
 
@@ -226,20 +227,14 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
     void refresh();
   }, [refresh]);
 
-  useEffect(() => {
-    const hasLiveWork =
-      snapshot?.threads.some((thread) => thread.state === "pending" || thread.state === "streaming") ?? false;
+  const hasLiveWork = snapshot?.threads.some((thread) => thread.state === "pending" || thread.state === "streaming") ?? false;
 
-    if (!hasLiveWork) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
+  useVisiblePolling(
+    () => {
       void refresh();
-    }, 1500);
-
-    return () => window.clearInterval(interval);
-  }, [refresh, snapshot]);
+    },
+    { enabled: hasLiveWork, intervalMs: 1500 },
+  );
 
   const sessions = useMemo(() => {
     const rows = snapshot?.threads.map(normalizeThread) ?? [];

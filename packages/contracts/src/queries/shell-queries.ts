@@ -13,7 +13,7 @@ export type ShellAppAction =
       path: string;
     };
 
-export type GlobalSearchEntityType = "asset" | "project" | "project_unit" | "packing_slip" | "incident";
+export type GlobalSearchEntityType = "asset" | "project" | "project_unit" | "packing_slip" | "incident" | "financial_entry";
 
 export type GlobalSearchQuery = {
   query: string;

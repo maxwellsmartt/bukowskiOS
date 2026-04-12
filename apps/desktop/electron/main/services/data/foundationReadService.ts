@@ -786,6 +786,7 @@ const resolveFinanceEntryComparator = (
 
 const globalSearchGroupLabels: Record<GlobalSearchEntityType, string> = {
   asset: "Assets",
+  financial_entry: "Finance entries",
   project: "Projects",
   project_unit: "Units",
   packing_slip: "Packing slips",

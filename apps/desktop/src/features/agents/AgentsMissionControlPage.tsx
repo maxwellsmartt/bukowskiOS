@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 
 import { AgentWizardPanel } from "./AgentWizardPanel";
 import { reviewAgentRun, setAgentApprovalMode, setAgentStatus, useAgentDetail, useMissionControlSnapshot } from "./useAgentsData";
@@ -33,16 +34,15 @@ export const AgentsMissionControlPage = () => {
   });
   const { data: detail, reload: reloadDetail } = useAgentDetail(selectedAgentId);
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
+  useVisiblePolling(
+    () => {
       reload();
       if (selectedAgentId) {
         reloadDetail();
       }
-    }, 2000);
-
-    return () => window.clearInterval(interval);
-  }, [reload, reloadDetail, selectedAgentId]);
+    },
+    { intervalMs: 2000 },
+  );
 
   useEffect(() => {
     const focusedAgentId = searchParams.get("agent");

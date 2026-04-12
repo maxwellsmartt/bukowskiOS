@@ -99,6 +99,14 @@ export const AppShell = () => {
       if (focusedIncidentId) {
         pushRecentEntityKey("incident", focusedIncidentId);
       }
+      return;
+    }
+
+    if (location.pathname === "/finance/entries") {
+      const focusedEntryId = searchParams.get("focus");
+      if (focusedEntryId) {
+        pushRecentEntityKey("financial_entry", focusedEntryId);
+      }
     }
   }, [activeRoute.projectId, activeRoute.scopeMode, location.pathname, location.search]);
 
