@@ -323,7 +323,23 @@
 ## P3 — Deuda técnica y escalabilidad
 
 ### Slice 15 — Read Layer Refactor
-- Estado: `planned`
+- Estado: `in_progress`
+- Objetivo:
+  - dividir `foundationReadService` por dominios sin cambiar contratos visibles ni romper IPC o snapshots existentes
+- Área: `backend`
+- Dependencias: Slice 10, Slice 12
+- Qué se probó:
+  - `typecheck`
+  - suite de tests completa
+  - `build`
+- Evidencia:
+  - se extrajeron `projectReadService.ts` y `financeReadService.ts` como primeros servicios de dominio reales
+  - `foundationReadService` ahora ya funciona como facade parcial para `projects/schedule` y `finance`
+  - los tests de `foundation-read-service`, `agent-tool-registry` y el resto de snapshots siguen pasando sin cambios de contrato
+- Riesgos remanentes:
+  - `medio`: el monolito bajó presión, pero `assets` y otros reads cross-domain siguen dentro de `foundationReadService`
+  - `medio`: conviene seguir con la extracción de `assetReadService` antes de marcar este slice como `done`
+  - `bajo`: no hay regresiones funcionales visibles en los tests actuales, pero todavía falta smoke manual de rutas que mezclan varios snapshots
 
 ### Slice 16 — Timeline Scalability
 - Estado: `planned`
