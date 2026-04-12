@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { Suspense, useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
 
 import { resolveActiveRoute } from "@app/routing/route-meta";
@@ -191,7 +191,15 @@ export const AppShell = () => {
               </div>
             ) : (
               <ShellErrorBoundary>
-                <AppRoutes />
+                <Suspense
+                  fallback={
+                    <div className="shell-loading-state">
+                      <div className="empty-state">Loading the next workspace view…</div>
+                    </div>
+                  }
+                >
+                  <AppRoutes />
+                </Suspense>
               </ShellErrorBoundary>
             )}
           </main>

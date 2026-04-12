@@ -13,6 +13,59 @@
 - Runtime diagnostics iniciales para errores de `main`, `renderer` y `webContents`
 - Tooling más útil para `Bugs Agent`
 
+## Siguiente fase — Alpha Hardening Operativo
+
+### Slice A1 — Smoke y E2E críticos
+- Estado: `done`
+- Objetivo:
+  - detectar regresiones visibles de arranque, navegación y pantallas críticas antes de seguir ampliando features
+- Área:
+  - frontend / infra
+- Alcance inicial:
+  - Playwright para Electron sobre el build real
+  - smoke de shell bootstrap
+  - smoke de `Mission Control`, `Runs` y `Settings`
+  - checklist manual de alpha interna
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop test:e2e`
+  - arranque real de Electron sobre build compilado
+  - navegación a `Mission Control`, `Runs` y `Settings`
+- Evidencia:
+  - harness E2E de Playwright para Electron añadido
+  - helper con `HOME` temporal y bypass controlado de single-instance para runs de test
+  - checklist manual de smoke para alpha interna documentado
+- Riesgos remanentes:
+  - `medio`: todavía no cubre flujos largos de operación ni approvals end-to-end completos
+  - `medio`: sigue faltando smoke manual del build empaquetado en Mac arm64 limpia
+
+### Slice A2 — Bundle y performance hardening
+- Estado: `done`
+- Objetivo:
+  - bajar el peso inicial del renderer y eliminar warnings de bundle grande sin reescribir la app
+- Área:
+  - frontend / infra
+- Alcance inicial:
+  - lazy-loading por rutas
+  - chunking básico de vendors
+  - validación E2E después del split
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+  - `corepack pnpm run test:e2e` desde `apps/desktop`
+- Evidencia:
+  - `AppRoutes` ahora carga páginas pesadas con `React.lazy`
+  - `AppShell` renderiza fallback controlado durante transiciones de ruta
+  - el build dejó de emitir el warning de chunk > `500 kB`
+  - el bundle inicial del renderer bajó desde ~`560 kB` minificados en un solo chunk a una base repartida entre `index`, `vendor`, `react-vendor` y chunks por página
+  - se corrigió además una colisión real de IDs en `agent_activity_events` descubierta durante la validación
+- Riesgos remanentes:
+  - `medio`: todavía no hay profiling fino de runtime en vistas muy pesadas como timeline o Mission Control con datasets grandes
+  - `medio`: el bundle de `main` (`dist-electron/app.js`) sigue siendo grande, aunque eso no impacta igual que el renderer en UX percibida
+
+### Slice A3 — Sync worker local para outbox
+- Estado: `planned`
+
 ## P0 — Crítico ahora mismo
 
 ### Slice 1 — Electron Security Hardening

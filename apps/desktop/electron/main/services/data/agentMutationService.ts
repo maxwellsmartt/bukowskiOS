@@ -151,6 +151,8 @@ const createActivityEvent = (
   );
 };
 
+const createActivityEventId = () => `agent-activity-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
 const buildApprovalMeta = (
   decision: ReviewAgentRunCommand["decision"],
   routedAgentId: string | null,
@@ -365,7 +367,7 @@ export const createAgentMutationService = (
     );
 
     createActivityEvent(db, {
-      id: `agent-activity-${Date.now().toString(36)}`,
+      id: createActivityEventId(),
       agentId: id,
       runId: null,
       kind: "agent_created",
@@ -451,7 +453,7 @@ export const createAgentMutationService = (
     }
 
     createActivityEvent(db, {
-      id: `agent-activity-${Date.now().toString(36)}`,
+      id: createActivityEventId(),
       agentId: input.id,
       runId: null,
       kind: "agent_updated",
@@ -483,7 +485,7 @@ export const createAgentMutationService = (
     );
 
     createActivityEvent(db, {
-      id: `agent-activity-${Date.now().toString(36)}`,
+      id: createActivityEventId(),
       agentId: input.id,
       runId: null,
       kind: "status_changed",
@@ -515,7 +517,7 @@ export const createAgentMutationService = (
     );
 
     createActivityEvent(db, {
-      id: `agent-activity-${Date.now().toString(36)}`,
+      id: createActivityEventId(),
       agentId: input.id,
       runId: null,
       kind: "approval_mode_changed",
@@ -617,7 +619,7 @@ export const createAgentMutationService = (
     );
 
     createActivityEvent(db, {
-      id: `agent-activity-${Date.now().toString(36)}`,
+      id: createActivityEventId(),
       agentId: null,
       runId: null,
       kind: "provider_config_saved",
@@ -721,7 +723,7 @@ export const createAgentMutationService = (
     );
 
     createActivityEvent(db, {
-      id: `agent-activity-${Date.now().toString(36)}`,
+      id: createActivityEventId(),
       agentId: null,
       runId: null,
       kind: "provider_connection_tested",
@@ -778,7 +780,7 @@ export const createAgentMutationService = (
     ).run(providerKey, modelKey, modelLabel, now, workspaceId, input.agentId);
 
     createActivityEvent(db, {
-      id: `agent-activity-${Date.now().toString(36)}`,
+      id: createActivityEventId(),
       agentId: input.agentId,
       runId: null,
       kind: "agent_model_assigned",
@@ -960,7 +962,7 @@ export const createAgentMutationService = (
             : `${run.title} was approved for supervised follow-up.`;
 
       createActivityEvent(db, {
-        id: `agent-activity-${Date.now().toString(36)}`,
+        id: createActivityEventId(),
         agentId: run.agent_id,
         runId: run.id,
         kind: "run_approval_reviewed",
@@ -988,7 +990,7 @@ export const createAgentMutationService = (
           });
         } catch (continuationError) {
           createActivityEvent(db, {
-            id: `agent-activity-${Date.now().toString(36)}`,
+            id: createActivityEventId(),
             agentId: run.agent_id,
             runId: run.id,
             kind: "run_review_followup_failed",
@@ -1090,7 +1092,7 @@ export const createAgentMutationService = (
       );
 
       createActivityEvent(db, {
-        id: `agent-activity-${Date.now().toString(36)}`,
+        id: createActivityEventId(),
         agentId: routedAgent?.id ?? null,
         runId,
         kind: "chat_routed",

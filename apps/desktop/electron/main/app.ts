@@ -10,6 +10,7 @@ import { initializeLocalDatabase } from "./services/data/localDatabase";
 import { createMainWindow } from "./windows/createMainWindow";
 
 const { devServerUrl, preloadPath, rendererDist } = getDesktopEnvironment(import.meta.url);
+const isE2E = process.env.BUKOWSKI_E2E === "1";
 
 const createAppWindow = () =>
   createMainWindow({
@@ -84,25 +85,27 @@ const attachProcessRuntimeTelemetry = (
 app.setName("bukowskiOS");
 app.setPath("userData", path.join(app.getPath("appData"), "@bukowski/desktop"));
 
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!isE2E) {
+  const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
-if (!hasSingleInstanceLock) {
-  app.quit();
+  if (!hasSingleInstanceLock) {
+    app.quit();
+  }
+
+  app.on("second-instance", () => {
+    const existingWindow = BrowserWindow.getAllWindows()[0];
+
+    if (!existingWindow) {
+      return;
+    }
+
+    if (existingWindow.isMinimized()) {
+      existingWindow.restore();
+    }
+
+    existingWindow.focus();
+  });
 }
-
-app.on("second-instance", () => {
-  const existingWindow = BrowserWindow.getAllWindows()[0];
-
-  if (!existingWindow) {
-    return;
-  }
-
-  if (existingWindow.isMinimized()) {
-    existingWindow.restore();
-  }
-
-  existingWindow.focus();
-});
 
 app.whenReady().then(() => {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

@@ -1,31 +1,44 @@
+import { lazy, type ComponentType } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
-import { SettingsPage } from "@features/admin/SettingsPage";
-import { AgentConnectorsPage } from "@features/agents/AgentConnectorsPage";
-import { AgentModelsPage } from "@features/agents/AgentModelsPage";
-import { AgentRunsPage } from "@features/agents/AgentRunsPage";
-import { AgentsMissionControlPage } from "@features/agents/AgentsMissionControlPage";
-import { AgentsPage } from "@features/agents/AgentsPage";
-import { AssetDetailPage } from "@features/assets/AssetDetailPage";
-import { AssetsOverviewPage } from "@features/assets/AssetsOverviewPage";
-import { AssetsPage } from "@features/assets/AssetsPage";
-import { CompareView } from "@features/compare/CompareView";
-import { FinanceCostLinksPage } from "@features/finance/FinanceCostLinksPage";
-import { FinanceEntriesPage } from "@features/finance/FinanceEntriesPage";
-import { FinanceOverviewPage } from "@features/finance/FinanceOverviewPage";
-import { IncidentsPage } from "@features/incidents/IncidentsPage";
-import { PackingPage } from "@features/packing/PackingPage";
-import { CatalogPage } from "@features/projects/CatalogPage";
-import { ProjectAssetsPage } from "@features/projects/ProjectAssetsPage";
-import { ProjectBudgetPage } from "@features/projects/ProjectBudgetPage";
-import { ProjectIncidentsPage } from "@features/projects/ProjectIncidentsPage";
-import { ProjectInfoPage } from "@features/projects/ProjectInfoPage";
-import { ProjectOverviewPage } from "@features/projects/ProjectOverviewPage";
-import { ProjectPackingPage } from "@features/projects/ProjectPackingPage";
-import { ProjectsPage } from "@features/projects/ProjectsPage";
-import { RmaPage } from "@features/rma/RmaPage";
-
 import { appRouteMeta, resolveInitialPath } from "./route-meta";
+
+const lazyPage = <TModule extends Record<string, ComponentType<object>>, TKey extends keyof TModule>(
+  loader: () => Promise<TModule>,
+  key: TKey,
+) =>
+  lazy(async () => {
+    const module = await loader();
+    return { default: module[key] };
+  });
+
+const SettingsPage = lazyPage(() => import("@features/admin/SettingsPage"), "SettingsPage");
+const AgentConnectorsPage = lazyPage(() => import("@features/agents/AgentConnectorsPage"), "AgentConnectorsPage");
+const AgentModelsPage = lazyPage(() => import("@features/agents/AgentModelsPage"), "AgentModelsPage");
+const AgentRunsPage = lazyPage(() => import("@features/agents/AgentRunsPage"), "AgentRunsPage");
+const AgentsMissionControlPage = lazyPage(
+  () => import("@features/agents/AgentsMissionControlPage"),
+  "AgentsMissionControlPage",
+);
+const AgentsPage = lazyPage(() => import("@features/agents/AgentsPage"), "AgentsPage");
+const AssetDetailPage = lazyPage(() => import("@features/assets/AssetDetailPage"), "AssetDetailPage");
+const AssetsOverviewPage = lazyPage(() => import("@features/assets/AssetsOverviewPage"), "AssetsOverviewPage");
+const AssetsPage = lazyPage(() => import("@features/assets/AssetsPage"), "AssetsPage");
+const CompareView = lazyPage(() => import("@features/compare/CompareView"), "CompareView");
+const FinanceCostLinksPage = lazyPage(() => import("@features/finance/FinanceCostLinksPage"), "FinanceCostLinksPage");
+const FinanceEntriesPage = lazyPage(() => import("@features/finance/FinanceEntriesPage"), "FinanceEntriesPage");
+const FinanceOverviewPage = lazyPage(() => import("@features/finance/FinanceOverviewPage"), "FinanceOverviewPage");
+const IncidentsPage = lazyPage(() => import("@features/incidents/IncidentsPage"), "IncidentsPage");
+const PackingPage = lazyPage(() => import("@features/packing/PackingPage"), "PackingPage");
+const CatalogPage = lazyPage(() => import("@features/projects/CatalogPage"), "CatalogPage");
+const ProjectAssetsPage = lazyPage(() => import("@features/projects/ProjectAssetsPage"), "ProjectAssetsPage");
+const ProjectBudgetPage = lazyPage(() => import("@features/projects/ProjectBudgetPage"), "ProjectBudgetPage");
+const ProjectIncidentsPage = lazyPage(() => import("@features/projects/ProjectIncidentsPage"), "ProjectIncidentsPage");
+const ProjectInfoPage = lazyPage(() => import("@features/projects/ProjectInfoPage"), "ProjectInfoPage");
+const ProjectOverviewPage = lazyPage(() => import("@features/projects/ProjectOverviewPage"), "ProjectOverviewPage");
+const ProjectPackingPage = lazyPage(() => import("@features/projects/ProjectPackingPage"), "ProjectPackingPage");
+const ProjectsPage = lazyPage(() => import("@features/projects/ProjectsPage"), "ProjectsPage");
+const RmaPage = lazyPage(() => import("@features/rma/RmaPage"), "RmaPage");
 
 const routeElements = {
   "/overview": <Navigate to="/assets/overview" replace />,
