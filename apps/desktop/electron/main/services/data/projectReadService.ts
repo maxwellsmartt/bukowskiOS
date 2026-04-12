@@ -10,6 +10,7 @@ import type {
   ProjectListQuery,
   ProjectResponsibleRow,
   ProjectSortField,
+  ScheduleTimelinePagination,
   ProjectUnitRow,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
@@ -45,7 +46,12 @@ type ProjectReadDeps = {
 };
 
 export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps) => ({
-  getScheduleTimeline(range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate?: string): ScheduleTimelineSnapshot {
+  getScheduleTimeline(
+    range: ScheduleTimelineRange,
+    scale: ScheduleTimelineScale,
+    anchorDate?: string,
+    pagination?: ScheduleTimelinePagination,
+  ): ScheduleTimelineSnapshot {
     const window = deps.resolveTimelineWindow(range, scale, anchorDate);
     const rows = db
       .prepare(
@@ -208,14 +214,23 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
 
     unscheduled.sort((left, right) => left.code.localeCompare(right.code));
 
+    const offset = Math.max(0, pagination?.offset ?? 0);
+    const limit = Math.max(1, pagination?.limit ?? 24);
+    const pagedProjects = scheduledProjects.slice(offset, offset + limit);
+
     return {
       range,
       scale,
       anchorDate: window.anchorDate,
       rangeStart: window.start,
       rangeEnd: window.end,
+      limit,
+      offset,
+      totalProjects: scheduledProjects.length,
+      visibleProjects: pagedProjects.length,
+      hasMoreProjects: offset + pagedProjects.length < scheduledProjects.length,
       markers,
-      projects: scheduledProjects,
+      projects: pagedProjects,
       unscheduled,
     };
   },

@@ -10,6 +10,8 @@ import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared
 
 import { useAssetsOverview } from "./useAssetsData";
 
+const timelinePageSize = 24;
+
 const todayDateOnly = () => {
   const today = new Date();
   const year = today.getFullYear();
@@ -37,10 +39,12 @@ export const AssetsOverviewPage = () => {
   const [timelineAnchorDate, setTimelineAnchorDate] = useState(() =>
     readStringPreference(uiPreferenceKeys.overviewTimelineAnchorDate, todayDateOnly()) ?? todayDateOnly(),
   );
+  const [timelineProjectLimit, setTimelineProjectLimit] = useState(timelinePageSize);
   const { data: timelineSnapshot, isLoading: timelineLoading } = useOverviewTimeline(
     timelineRange,
     timelineScale,
     timelineAnchorDate,
+    { limit: timelineProjectLimit, offset: 0 },
   );
 
   useEffect(() => {
@@ -58,6 +62,10 @@ export const AssetsOverviewPage = () => {
 
     return () => window.clearTimeout(timer);
   }, [timelineAnchorDate]);
+
+  useEffect(() => {
+    setTimelineProjectLimit(timelinePageSize);
+  }, [timelineRange, timelineScale, timelineAnchorDate]);
 
   const overviewCards = [
     {
@@ -97,6 +105,7 @@ export const AssetsOverviewPage = () => {
         anchorDate={timelineAnchorDate}
         isLoading={timelineLoading}
         onAnchorDateChange={setTimelineAnchorDate}
+        onLoadMoreProjects={() => setTimelineProjectLimit((current) => current + timelinePageSize)}
         onRangeChange={setTimelineRange}
         onScaleChange={setTimelineScale}
         range={timelineRange}

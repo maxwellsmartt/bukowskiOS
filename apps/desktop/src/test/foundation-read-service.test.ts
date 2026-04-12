@@ -48,6 +48,7 @@ describe("foundation read service", () => {
     const dailyTimeline = reads.getScheduleTimeline("30d", "day", "2026-04-10");
     const monthlyTimeline = reads.getScheduleTimeline("6m", "month", "2026-06-15");
     const shiftedTimeline = reads.getScheduleTimeline("90d", "week", "2026-07-10");
+    const pagedTimeline = reads.getScheduleTimeline("90d", "week", "2026-04-10", { limit: 1, offset: 1 });
 
     expect(weeklyTimeline.anchorDate).toBe("2026-04-10");
     expect(weeklyTimeline.scale).toBe("week");
@@ -60,6 +61,16 @@ describe("foundation read service", () => {
     expect(shiftedTimeline.rangeStart).not.toBe(weeklyTimeline.rangeStart);
     expect(shiftedTimeline.projects).toHaveLength(weeklyTimeline.projects.length);
     expect(shiftedTimeline.unscheduled).toHaveLength(weeklyTimeline.unscheduled.length);
+    expect(weeklyTimeline.limit).toBe(24);
+    expect(weeklyTimeline.offset).toBe(0);
+    expect(weeklyTimeline.totalProjects).toBe(weeklyTimeline.projects.length);
+    expect(weeklyTimeline.visibleProjects).toBe(weeklyTimeline.projects.length);
+    expect(weeklyTimeline.hasMoreProjects).toBe(false);
+    expect(pagedTimeline.limit).toBe(1);
+    expect(pagedTimeline.offset).toBe(1);
+    expect(pagedTimeline.visibleProjects).toBe(1);
+    expect(pagedTimeline.totalProjects).toBeGreaterThanOrEqual(pagedTimeline.visibleProjects);
+    expect(pagedTimeline.hasMoreProjects).toBe(pagedTimeline.totalProjects > pagedTimeline.offset + pagedTimeline.visibleProjects);
 
     cleanup();
   });

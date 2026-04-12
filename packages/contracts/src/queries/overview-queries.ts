@@ -25,6 +25,11 @@ export type RecentMovementRow = {
 export type ScheduleTimelineRange = "30d" | "90d" | "6m";
 export type ScheduleTimelineScale = "day" | "week" | "month";
 
+export type ScheduleTimelinePagination = {
+  limit?: number;
+  offset?: number;
+};
+
 export type ScheduleTimelineMarker = {
   key: string;
   label: string;
@@ -73,6 +78,11 @@ export type ScheduleTimelineSnapshot = {
   anchorDate: string;
   rangeStart: string;
   rangeEnd: string;
+  limit: number;
+  offset: number;
+  totalProjects: number;
+  visibleProjects: number;
+  hasMoreProjects: boolean;
   markers: ScheduleTimelineMarker[];
   projects: ScheduleTimelineProjectLane[];
   unscheduled: ScheduleTimelineUnscheduledRow[];

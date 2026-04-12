@@ -1,4 +1,10 @@
-import type { OverviewSnapshot, ScheduleTimelineRange, ScheduleTimelineScale, ScheduleTimelineSnapshot } from "@contracts";
+import type {
+  OverviewSnapshot,
+  ScheduleTimelinePagination,
+  ScheduleTimelineRange,
+  ScheduleTimelineScale,
+  ScheduleTimelineSnapshot,
+} from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 
 const emptySnapshot: OverviewSnapshot = {
@@ -37,6 +43,11 @@ const emptyTimeline: ScheduleTimelineSnapshot = {
   anchorDate: "",
   rangeStart: "",
   rangeEnd: "",
+  limit: 24,
+  offset: 0,
+  totalProjects: 0,
+  visibleProjects: 0,
+  hasMoreProjects: false,
   markers: [],
   projects: [],
   unscheduled: [],
@@ -59,6 +70,7 @@ export const useOverviewTimeline = (
   range: ScheduleTimelineRange = "90d",
   scale: ScheduleTimelineScale = "week",
   anchorDate?: string,
+  pagination?: ScheduleTimelinePagination,
 ) =>
   useAsyncValue(
     async () => {
@@ -66,8 +78,8 @@ export const useOverviewTimeline = (
         return emptyTimeline;
       }
 
-      return window.bukowskiOverview.getTimeline(range, scale, anchorDate);
+      return window.bukowskiOverview.getTimeline(range, scale, anchorDate, pagination);
     },
     emptyTimeline,
-    [range, scale, anchorDate ?? ""],
+    [range, scale, anchorDate ?? "", pagination?.limit ?? 24, pagination?.offset ?? 0],
   );

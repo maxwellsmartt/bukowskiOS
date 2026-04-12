@@ -81,6 +81,7 @@ import type {
   ReportIncidentCommand,
   ResolveIncidentCommand,
   ReturnPackingSlipItemsCommand,
+  ScheduleTimelinePagination,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
@@ -290,8 +291,13 @@ export const registerFoundationIpc = ({
   safeHandleRead(ipcChannels.overview.getSnapshot, () => foundationReads.getOverviewSnapshot(), "The app could not load the overview.");
   safeHandleRead(
     ipcChannels.overview.getTimeline,
-    (_event, range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate?: string) =>
-      foundationReads.getScheduleTimeline(range, scale, anchorDate),
+    (
+      _event,
+      range: ScheduleTimelineRange,
+      scale: ScheduleTimelineScale,
+      anchorDate?: string,
+      pagination?: ScheduleTimelinePagination,
+    ) => foundationReads.getScheduleTimeline(range, scale, anchorDate, pagination),
     "The app could not load the schedule timeline.",
   );
   safeHandleRead(ipcChannels.assets.getList, (_event, query: AssetListQuery | undefined) => foundationReads.getAssets(query), "The app could not load assets.");

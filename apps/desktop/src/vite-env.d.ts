@@ -75,6 +75,7 @@ import type {
   RmaCaseMutationResult,
   RmaSnapshot,
   SaveAIProviderConfigCommand,
+  ScheduleTimelinePagination,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
@@ -139,7 +140,12 @@ declare global {
     };
     bukowskiOverview?: {
       getSnapshot: () => Promise<OverviewSnapshot>;
-      getTimeline: (range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate?: string) => Promise<ScheduleTimelineSnapshot>;
+      getTimeline: (
+        range: ScheduleTimelineRange,
+        scale: ScheduleTimelineScale,
+        anchorDate?: string,
+        pagination?: ScheduleTimelinePagination,
+      ) => Promise<ScheduleTimelineSnapshot>;
     };
     bukowskiAssets?: {
       getList: (query?: AssetListQuery) => Promise<AssetListRow[]>;

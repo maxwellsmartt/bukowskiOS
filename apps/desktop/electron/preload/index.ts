@@ -69,6 +69,7 @@ import type {
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
   ScheduleTimelineRange,
+  ScheduleTimelinePagination,
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
   ShellAppAction,
@@ -130,8 +131,13 @@ const bukowskiShell = {
 
 const bukowskiOverview = {
   getSnapshot: () => ipcRenderer.invoke(ipcChannels.overview.getSnapshot) as Promise<OverviewSnapshot>,
-  getTimeline: (range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate?: string) =>
-    ipcRenderer.invoke(ipcChannels.overview.getTimeline, range, scale, anchorDate) as Promise<ScheduleTimelineSnapshot>,
+  getTimeline: (
+    range: ScheduleTimelineRange,
+    scale: ScheduleTimelineScale,
+    anchorDate?: string,
+    pagination?: ScheduleTimelinePagination,
+  ) =>
+    ipcRenderer.invoke(ipcChannels.overview.getTimeline, range, scale, anchorDate, pagination) as Promise<ScheduleTimelineSnapshot>,
 };
 
 const bukowskiAgents = {

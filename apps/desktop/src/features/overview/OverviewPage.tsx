@@ -9,6 +9,8 @@ import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared
 import { OverviewScheduleTimeline } from "./OverviewScheduleTimeline";
 import { useOverviewSnapshot, useOverviewTimeline } from "./useOverviewSnapshot";
 
+const timelinePageSize = 24;
+
 export const OverviewPage = () => (
   <OverviewContent />
 );
@@ -40,10 +42,12 @@ const OverviewContent = () => {
   const [timelineAnchorDate, setTimelineAnchorDate] = useState(() =>
     readStringPreference(uiPreferenceKeys.overviewTimelineAnchorDate, todayDateOnly()) ?? todayDateOnly(),
   );
+  const [timelineProjectLimit, setTimelineProjectLimit] = useState(timelinePageSize);
   const { data: timelineSnapshot, isLoading: timelineLoading } = useOverviewTimeline(
     timelineRange,
     timelineScale,
     timelineAnchorDate,
+    { limit: timelineProjectLimit, offset: 0 },
   );
   const operationalCards = [
     data.cards.overdueReturns,
@@ -68,6 +72,10 @@ const OverviewContent = () => {
     return () => window.clearTimeout(timer);
   }, [timelineAnchorDate]);
 
+  useEffect(() => {
+    setTimelineProjectLimit(timelinePageSize);
+  }, [timelineRange, timelineScale, timelineAnchorDate]);
+
   return (
     <div className="page-stack">
       <SectionHeader title="Overview" titleTone="accent" />
@@ -87,6 +95,7 @@ const OverviewContent = () => {
         anchorDate={timelineAnchorDate}
         isLoading={timelineLoading}
         onAnchorDateChange={setTimelineAnchorDate}
+        onLoadMoreProjects={() => setTimelineProjectLimit((current) => current + timelinePageSize)}
         onRangeChange={setTimelineRange}
         onScaleChange={setTimelineScale}
         range={timelineRange}

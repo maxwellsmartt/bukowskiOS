@@ -342,7 +342,45 @@
   - `bajo`: no hay regresiones funcionales visibles en tests, pero aún conviene hacer smoke manual en rutas que mezclan snapshots de varios dominios
 
 ### Slice 16 — Timeline Scalability
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - bajar la presión de render y lectura de la timeline antes de entrar en virtualización completa
+- Dependencias:
+  - `Slice 15 — Read Layer Refactor`
+- Área:
+  - backend / frontend
+- Archivos tocados:
+  - `packages/contracts/src/queries/overview-queries.ts`
+  - `apps/desktop/electron/main/services/data/projectReadService.ts`
+  - `apps/desktop/electron/main/ipc/registerFoundationIpc.ts`
+  - `apps/desktop/electron/preload/index.ts`
+  - `apps/desktop/src/vite-env.d.ts`
+  - `apps/desktop/src/features/overview/useOverviewSnapshot.ts`
+  - `apps/desktop/src/features/overview/OverviewPage.tsx`
+  - `apps/desktop/src/features/assets/AssetsOverviewPage.tsx`
+  - `apps/desktop/src/features/overview/OverviewScheduleTimeline.tsx`
+  - `apps/desktop/src/shared/styles/global.css`
+  - `apps/desktop/src/test/foundation-read-service.test.ts`
+- Backend:
+  - `projectReadService.getScheduleTimeline(...)` ahora soporta paginación con `limit` y `offset`
+  - el snapshot de timeline ahora devuelve metadata explícita: `totalProjects`, `visibleProjects`, `hasMoreProjects`, `limit`, `offset`
+  - IPC y preload quedaron alineados con el nuevo contrato sin romper el resto de surfaces
+- Frontend:
+  - la timeline ahora carga proyectos por lotes y expone un `Show more projects`
+  - `Overview` y `Assets Overview` reinician el límite cuando cambia rango, escala o anchor date
+  - la UI muestra claramente cuántos proyectos programados se están renderizando
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - `typecheck` OK
+  - `test` OK, `46/46`
+  - `build` OK
+- Riesgos remanentes:
+  - `medio`: este slice resuelve paginación/incremental load, pero no virtualiza lanes todavía; con datasets mucho más grandes seguirá siendo deseable una segunda pasada
+  - `medio`: el warning de chunk grande sigue visible en build y ya empieza a ser una deuda real de performance de bundle, separada de la timeline
+  - `bajo`: falta smoke manual con un dataset más voluminoso para medir la mejora perceptible al hacer `Show more`
 
 ### Slice 17 — Multi-workspace, sync y retention
 - Estado: `planned`

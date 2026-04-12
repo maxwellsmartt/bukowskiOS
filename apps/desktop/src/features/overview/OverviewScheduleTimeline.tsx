@@ -704,6 +704,7 @@ type OverviewScheduleTimelineProps = {
   anchorDate: string;
   isLoading: boolean;
   onAnchorDateChange: (anchorDate: string) => void;
+  onLoadMoreProjects: () => void;
   onRangeChange: (range: ScheduleTimelineRange) => void;
   onScaleChange: (scale: ScheduleTimelineScale) => void;
   range: ScheduleTimelineRange;
@@ -715,6 +716,7 @@ export const OverviewScheduleTimeline = ({
   anchorDate,
   isLoading,
   onAnchorDateChange,
+  onLoadMoreProjects,
   onRangeChange,
   onScaleChange,
   range,
@@ -756,6 +758,10 @@ export const OverviewScheduleTimeline = ({
       previewAnchorDateRef.current = nextAnchorDate;
     }
   }, [anchorDate, isPanning]);
+
+  useEffect(() => {
+    setExpandedProjectIds((current) => current.filter((projectId) => snapshot.projects.some((project) => project.id === projectId)));
+  }, [snapshot.projects]);
 
   useEffect(() => {
     let timeoutId = 0;
@@ -1011,6 +1017,11 @@ export const OverviewScheduleTimeline = ({
               <ArrowRight size={14} />
             </button>
           </div>
+
+          <div className="timeline-summary">
+            <strong>{snapshot.visibleProjects}</strong>
+            <span>of {snapshot.totalProjects} scheduled projects</span>
+          </div>
         </div>
       }
     >
@@ -1092,6 +1103,18 @@ export const OverviewScheduleTimeline = ({
               />
             ))}
           </div>
+
+          {snapshot.hasMoreProjects ? (
+            <div className="timeline-load-more-row">
+              <button
+                className="timeline-load-more-button"
+                onClick={onLoadMoreProjects}
+                type="button"
+              >
+                Show more projects
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {snapshot.unscheduled.length ? (

@@ -1921,6 +1921,22 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   justify-content: flex-end;
 }
 
+.timeline-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.timeline-summary strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .timeline-control-group {
   gap: 4px;
   padding: 3px;
@@ -2064,6 +2080,38 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .timeline-lanes {
   gap: 1px;
+}
+
+.timeline-load-more-row {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+}
+
+.timeline-load-more-button {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  font-size: 11px;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.timeline-load-more-button:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-primary);
+}
+
+.timeline-load-more-button:focus-visible {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  outline: none;
 }
 
 .timeline-lane-block {
