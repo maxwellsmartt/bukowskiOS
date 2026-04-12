@@ -106,11 +106,12 @@
   - `corepack pnpm run test:e2e` desde `apps/desktop`
 - Evidencia:
   - el icono de sync en la shell ahora refleja estado `healthy/active/failed` con badge de cola
-  - `Settings` expone listado de rows del outbox con estado, attempts, next retry y `last_error`
-  - existe retry manual por fila sin tocar SQL a mano
+  - existe una vista dedicada en `/settings/sync` con filtros por estado, retry por fila, retry masivo y detalle de payload
+  - `Settings` quedó como resumen y punto de entrada a la cola local
+  - existe retry manual por fila y `retry all failed` sin tocar SQL a mano
 - Riesgos remanentes:
-  - `medio`: todavía no existe una vista dedicada del outbox ni filtros más finos por estado o entidad
   - `medio`: la top bar refresca por polling simple, no por eventos en tiempo real
+  - `medio`: todavía no hay acciones masivas más finas como retry por tipo de entidad o purge selectivo
 
 ## P0 — Crítico ahora mismo
 

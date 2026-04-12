@@ -154,7 +154,8 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
               attempt_count,
               last_error,
               next_retry_at,
-              updated_at
+              updated_at,
+              payload_json
             FROM sync_outbox
             ORDER BY updated_at DESC, created_at DESC
             LIMIT ?
@@ -170,6 +171,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
         last_error: string | null;
         next_retry_at: string | null;
         updated_at: string;
+        payload_json: string;
       }>;
 
       return rows.map((row) => ({
@@ -182,6 +184,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
         lastError: row.last_error,
         nextRetryAt: row.next_retry_at,
         updatedAt: row.updated_at,
+        payloadJson: row.payload_json,
       }));
     },
 
@@ -203,6 +206,25 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
         .run(timestamp, id);
 
       return result.changes > 0;
+    },
+
+    retryAllFailedRows() {
+      const timestamp = now();
+      const result = db
+        .prepare(
+          `
+            UPDATE sync_outbox
+            SET
+              status = 'pending',
+              last_error = NULL,
+              next_retry_at = NULL,
+              updated_at = ?
+            WHERE status = 'failed'
+          `,
+        )
+        .run(timestamp);
+
+      return Number(result.changes);
     },
 
     runDueEntries(): SyncOutboxWorkerSummary {

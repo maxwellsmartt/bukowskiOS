@@ -129,6 +129,7 @@ app.whenReady().then(() => {
     runLocalSyncNow: localDatabase.runLocalSyncNow,
     getSyncOutboxRows: localDatabase.getSyncOutboxRows,
     retrySyncOutboxRow: localDatabase.retrySyncOutboxRow,
+    retryAllFailedSyncOutboxRows: localDatabase.retryAllFailedSyncOutboxRows,
   });
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,

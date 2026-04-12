@@ -109,6 +109,7 @@ declare global {
       runLocalSync: () => Promise<AppActionResult>;
       getSyncOutboxRows: () => Promise<AppSyncOutboxRow[]>;
       retrySyncOutboxRow: (id: string) => Promise<AppActionResult>;
+      retryAllFailedSyncOutboxRows: () => Promise<AppActionResult>;
       exportWorkspaceData: () => Promise<AppExportResult>;
       openExternal: (url: string) => Promise<void>;
     };

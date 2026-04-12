@@ -1,0 +1,356 @@
+import type { AppActionResult, AppDiagnosticsSnapshot, AppSyncOutboxRow } from "@contracts";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import { DataTable } from "@shared/components/DataTable";
+import { SectionHeader } from "@shared/components/SectionHeader";
+import { StatusBadge } from "@shared/components/StatusBadge";
+import { SurfaceCard } from "@shared/components/SurfaceCard";
+
+const emptyDiagnostics: AppDiagnosticsSnapshot = {
+  databaseSizeBytes: 0,
+  backupSizeBytes: 0,
+  databaseExists: false,
+  backupExists: false,
+  lastBackupAt: null,
+  lastIntegrityCheckAt: null,
+  lastIntegrityCheckStatus: "never",
+  lastRetentionRunAt: null,
+  lastRetentionSummary: null,
+  lastSyncRunAt: null,
+  lastSyncSummary: null,
+  lastSyncStatus: "idle",
+  syncOutboxPendingCount: 0,
+  syncOutboxProcessingCount: 0,
+  syncOutboxFailedCount: 0,
+  encryptionAvailable: false,
+  internalBuildArtifacts: [],
+};
+
+type SyncFilter = "all" | "pending" | "processing" | "failed" | "sent";
+
+const syncFilters: Array<{ value: SyncFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "pending", label: "Pending" },
+  { value: "processing", label: "Processing" },
+  { value: "failed", label: "Failed" },
+  { value: "sent", label: "Sent" },
+];
+
+const formatDateLabel = (value: string | null) => {
+  if (!value) {
+    return "Never";
+  }
+
+  const parsedDate = new Date(value);
+  return Number.isNaN(parsedDate.getTime()) ? value : parsedDate.toLocaleString();
+};
+
+const formatSyncStatusTone = (status: AppSyncOutboxRow["status"]) => {
+  if (status === "sent") {
+    return "success" as const;
+  }
+
+  if (status === "failed") {
+    return "critical" as const;
+  }
+
+  if (status === "processing") {
+    return "info" as const;
+  }
+
+  return "warning" as const;
+};
+
+const normalizeText = (value: string) => value.trim().toLowerCase();
+
+const resolveEntityNavigationPath = (row: AppSyncOutboxRow) => {
+  if (row.entityType === "asset_event") {
+    return `/assets/${row.entityId}`;
+  }
+
+  if (row.entityType === "packing_slip") {
+    return `/packing-slips?focus=${row.entityId}`;
+  }
+
+  if (row.entityType === "incident") {
+    return `/incidents?focus=${row.entityId}`;
+  }
+
+  if (row.entityType === "financial_entry") {
+    return "/finance/entries";
+  }
+
+  return null;
+};
+
+const summarizeSelection = (row: AppSyncOutboxRow | null) => {
+  if (!row) {
+    return "Select any row to inspect payload, status and related entity.";
+  }
+
+  return `${row.entityType} · ${row.operationType} · workspace ${DEFAULT_WORKSPACE_ID}`;
+};
+
+export const SyncOutboxPage = () => {
+  const navigate = useNavigate();
+  const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
+  const [rows, setRows] = useState<AppSyncOutboxRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [filter, setFilter] = useState<SyncFilter>("all");
+  const [search, setSearch] = useState("");
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
+  const [retryingRowId, setRetryingRowId] = useState<string | null>(null);
+  const [isRetryingAllFailed, setIsRetryingAllFailed] = useState(false);
+  const [isRunningLocalSync, setIsRunningLocalSync] = useState(false);
+
+  const load = async () => {
+    if (!window.bukowskiApp) {
+      return;
+    }
+
+    try {
+      const [nextDiagnostics, nextRows] = await Promise.all([
+        window.bukowskiApp.getDiagnostics(),
+        window.bukowskiApp.getSyncOutboxRows(),
+      ]);
+      setDiagnostics(nextDiagnostics);
+      setRows(nextRows);
+      setError(null);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "The app could not load the local sync queue.");
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  useEffect(() => {
+    if (!rows.length) {
+      setActiveRowId(null);
+      return;
+    }
+
+    if (activeRowId && rows.some((row) => row.id === activeRowId)) {
+      return;
+    }
+
+    setActiveRowId(rows[0]?.id ?? null);
+  }, [activeRowId, rows]);
+
+  const visibleRows = useMemo(() => {
+    const query = normalizeText(search);
+
+    return rows.filter((row) => {
+      if (filter !== "all" && row.status !== filter) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return [row.entityType, row.entityId, row.operationType, row.lastError ?? "", row.payloadJson]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [filter, rows, search]);
+
+  const activeRow = useMemo(() => visibleRows.find((row) => row.id === activeRowId) ?? null, [activeRowId, visibleRows]);
+
+  const runAction = async (action: () => Promise<AppActionResult>, setPending: (value: boolean) => void) => {
+    try {
+      setPending(true);
+      const result = await action();
+      setFeedback(result.summary);
+      setDiagnostics(result.diagnostics);
+      setError(null);
+      const nextRows = await window.bukowskiApp!.getSyncOutboxRows();
+      setRows(nextRows);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "The app could not complete that local sync action.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const retrySingleRow = async (rowId: string) => {
+    if (!window.bukowskiApp) {
+      return;
+    }
+
+    try {
+      setRetryingRowId(rowId);
+      const result = await window.bukowskiApp.retrySyncOutboxRow(rowId);
+      setFeedback(result.summary);
+      setDiagnostics(result.diagnostics);
+      setError(null);
+      const nextRows = await window.bukowskiApp.getSyncOutboxRows();
+      setRows(nextRows);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "The app could not retry that local sync row.");
+    } finally {
+      setRetryingRowId(null);
+    }
+  };
+
+  return (
+    <div className="page-stack">
+      <SectionHeader
+        eyebrow="Operations / Sync"
+        title="Local sync queue"
+        body="Inspect pending, failed or already acknowledged outbox rows, retry failures, and jump directly to the affected entity."
+      />
+
+      {error ? <div className="form-inline-error">{error}</div> : null}
+      {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
+
+      <div className="chip-row">
+        <StatusBadge tone={diagnostics.syncOutboxFailedCount ? "critical" : "success"}>
+          {diagnostics.syncOutboxFailedCount ? `${diagnostics.syncOutboxFailedCount} failed` : "Queue healthy"}
+        </StatusBadge>
+        <StatusBadge tone="warning">{`${diagnostics.syncOutboxPendingCount} pending`}</StatusBadge>
+        <StatusBadge tone="info">{`${diagnostics.syncOutboxProcessingCount} processing`}</StatusBadge>
+        <StatusBadge>{formatDateLabel(diagnostics.lastSyncRunAt)}</StatusBadge>
+      </div>
+
+      <div className="action-panel-actions action-panel-actions-start">
+        <button
+          className="action-primary-button"
+          disabled={isRunningLocalSync}
+          onClick={() => void runAction(() => window.bukowskiApp!.runLocalSync(), setIsRunningLocalSync)}
+          type="button"
+        >
+          {isRunningLocalSync ? "Running local sync..." : "Run local sync now"}
+        </button>
+        <button
+          className="ghost-control"
+          disabled={!diagnostics.syncOutboxFailedCount || isRetryingAllFailed}
+          onClick={() => void runAction(() => window.bukowskiApp!.retryAllFailedSyncOutboxRows(), setIsRetryingAllFailed)}
+          type="button"
+        >
+          {isRetryingAllFailed ? "Retrying failed rows..." : "Retry all failed"}
+        </button>
+        <button className="ghost-control" onClick={() => navigate("/settings")} type="button">
+          Back to settings
+        </button>
+      </div>
+
+      <div className="split-layout">
+        <SurfaceCard title="Outbox rows" subtitle="Filter by status and inspect the rows that still need attention.">
+          <div className="sync-outbox-toolbar">
+            <div className="sync-outbox-filter-row">
+              {syncFilters.map((item) => (
+                <button
+                  key={item.value}
+                  className={`filter-chip${filter === item.value ? " active" : ""}`}
+                  onClick={() => setFilter(item.value)}
+                  type="button"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <input
+              className="text-input sync-outbox-search"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search entity, operation or error"
+              type="search"
+              value={search}
+            />
+          </div>
+
+          <DataTable
+            activeRowId={activeRowId}
+            getRowId={(row) => row.id}
+            maxHeight="min(60vh, 680px)"
+            onRowClick={(row) => setActiveRowId(row.id)}
+            persistKey="sync-outbox"
+            columns={[
+              {
+                key: "status",
+                label: "Status",
+                render: (row) => <StatusBadge tone={formatSyncStatusTone(row.status)}>{row.status}</StatusBadge>,
+              },
+              { key: "entityType", label: "Entity", render: (row) => row.entityType },
+              { key: "entityId", label: "Entity ID", render: (row) => row.entityId },
+              { key: "operationType", label: "Operation", render: (row) => row.operationType },
+              { key: "attemptCount", label: "Attempts", align: "right", render: (row) => row.attemptCount },
+              { key: "updatedAt", label: "Updated", render: (row) => formatDateLabel(row.updatedAt) },
+            ]}
+            emptyMessage="No outbox rows match the current filter."
+            rows={visibleRows}
+          />
+        </SurfaceCard>
+
+        <SurfaceCard title="Row detail" subtitle={summarizeSelection(activeRow)}>
+          {!activeRow ? (
+            <div className="empty-state">Select any outbox row to inspect it.</div>
+          ) : (
+            <div className="sync-outbox-detail-stack">
+              <div className="summary-grid">
+                <div className="summary-row">
+                  <span className="summary-label">Status</span>
+                  <span className="summary-value">{activeRow.status}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Entity</span>
+                  <span className="summary-value">{activeRow.entityType}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Entity ID</span>
+                  <span className="summary-value">{activeRow.entityId}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Operation</span>
+                  <span className="summary-value">{activeRow.operationType}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Attempts</span>
+                  <span className="summary-value">{activeRow.attemptCount}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Next retry</span>
+                  <span className="summary-value">{formatDateLabel(activeRow.nextRetryAt)}</span>
+                </div>
+              </div>
+
+              {activeRow.lastError ? (
+                <div className="form-inline-error">Last error: {activeRow.lastError}</div>
+              ) : null}
+
+              <div className="action-panel-actions action-panel-actions-start">
+                <button
+                  className="ghost-control"
+                  disabled={retryingRowId === activeRow.id || (activeRow.status !== "failed" && activeRow.status !== "processing")}
+                  onClick={() => void retrySingleRow(activeRow.id)}
+                  type="button"
+                >
+                  {retryingRowId === activeRow.id ? "Retrying row..." : "Retry row"}
+                </button>
+                {resolveEntityNavigationPath(activeRow) ? (
+                  <button
+                    className="ghost-control"
+                    onClick={() => navigate(resolveEntityNavigationPath(activeRow)!)}
+                    type="button"
+                  >
+                    Open entity
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="sync-outbox-payload-block">
+                <span className="summary-label">Payload</span>
+                <pre className="sync-outbox-payload">{activeRow.payloadJson}</pre>
+              </div>
+            </div>
+          )}
+        </SurfaceCard>
+      </div>
+    </div>
+  );
+};

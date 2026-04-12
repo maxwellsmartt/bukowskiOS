@@ -118,6 +118,8 @@ const bukowskiApp = {
   getSyncOutboxRows: () => ipcRenderer.invoke(ipcChannels.app.getSyncOutboxRows) as Promise<AppSyncOutboxRow[]>,
   retrySyncOutboxRow: (id: string) =>
     ipcRenderer.invoke(ipcChannels.app.retrySyncOutboxRow, id) as Promise<AppActionResult>,
+  retryAllFailedSyncOutboxRows: () =>
+    ipcRenderer.invoke(ipcChannels.app.retryAllFailedSyncOutboxRows) as Promise<AppActionResult>,
   exportWorkspaceData: () => ipcRenderer.invoke(ipcChannels.app.exportWorkspaceData) as Promise<AppExportResult>,
   openExternal: (url: string) => ipcRenderer.invoke(ipcChannels.app.openExternal, url) as Promise<void>,
 };

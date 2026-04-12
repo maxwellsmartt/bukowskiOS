@@ -70,6 +70,7 @@ type LocalDatabaseRuntime = {
   runLocalSyncNow: () => AppDiagnosticsSnapshot;
   getSyncOutboxRows: () => AppSyncOutboxRow[];
   retrySyncOutboxRow: (id: string) => AppDiagnosticsSnapshot;
+  retryAllFailedSyncOutboxRows: () => AppDiagnosticsSnapshot;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -231,6 +232,11 @@ const createRuntime = (): LocalDatabaseRuntime => {
     return runLocalSyncNow();
   };
 
+  const retryAllFailedSyncOutboxRows = () => {
+    syncOutboxWorker.retryAllFailedRows();
+    return runLocalSyncNow();
+  };
+
   const secretStore = createAISecretStore();
   const openaiProviderService = createOpenAIProviderService();
   const foundationReads = createFoundationReadService(database);
@@ -321,6 +327,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     runLocalSyncNow,
     getSyncOutboxRows,
     retrySyncOutboxRow,
+    retryAllFailedSyncOutboxRows,
     agentMutations: createAgentMutationService(database, {
       secretStore,
       openaiProviderService,

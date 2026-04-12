@@ -36,6 +36,7 @@ export type AppSyncOutboxRow = {
   lastError: string | null;
   nextRetryAt: string | null;
   updatedAt: string;
+  payloadJson: string;
 };
 
 export type AppActionResult = {

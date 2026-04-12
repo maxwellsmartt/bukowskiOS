@@ -7,6 +7,7 @@ export const ipcChannels = {
     runLocalSync: "bukowskiApp:runLocalSync",
     getSyncOutboxRows: "bukowskiApp:getSyncOutboxRows",
     retrySyncOutboxRow: "bukowskiApp:retrySyncOutboxRow",
+    retryAllFailedSyncOutboxRows: "bukowskiApp:retryAllFailedSyncOutboxRows",
     exportWorkspaceData: "bukowskiApp:exportWorkspaceData",
     openExternal: "bukowskiApp:openExternal",
     reportRuntimeError: "bukowskiApp:reportRuntimeError",

@@ -1,5 +1,6 @@
 import type { AppActionResult, AppDiagnosticsSnapshot, AppExportResult, AppSyncOutboxRow } from "@contracts";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -23,22 +24,6 @@ const emptyDiagnostics: AppDiagnosticsSnapshot = {
   syncOutboxFailedCount: 0,
   encryptionAvailable: false,
   internalBuildArtifacts: [],
-};
-
-const formatSyncRowStatus = (status: AppSyncOutboxRow["status"]) => {
-  if (status === "sent") {
-    return "Sent";
-  }
-
-  if (status === "failed") {
-    return "Failed";
-  }
-
-  if (status === "processing") {
-    return "Processing";
-  }
-
-  return "Pending";
 };
 
 const formatBytes = (value: number) => {
@@ -84,6 +69,7 @@ const resolveIntegrityLabel = (status: AppDiagnosticsSnapshot["lastIntegrityChec
 
 export const SettingsPage = () => {
   const { appInfo } = useShellContext();
+  const navigate = useNavigate();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -92,7 +78,6 @@ export const SettingsPage = () => {
   const [isRunningLocalSync, setIsRunningLocalSync] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [syncRows, setSyncRows] = useState<AppSyncOutboxRow[]>([]);
-  const [retryingRowId, setRetryingRowId] = useState<string | null>(null);
 
   const loadDiagnostics = async () => {
     if (!window.bukowskiApp) {
@@ -109,26 +94,6 @@ export const SettingsPage = () => {
       setError(null);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Settings are unavailable right now.");
-    }
-  };
-
-  const retrySyncRow = async (id: string) => {
-    if (!window.bukowskiApp) {
-      return;
-    }
-
-    try {
-      setRetryingRowId(id);
-      const result = await window.bukowskiApp.retrySyncOutboxRow(id);
-      setFeedback(result.summary);
-      setDiagnostics(result.diagnostics);
-      setError(null);
-      const nextRows = await window.bukowskiApp.getSyncOutboxRows();
-      setSyncRows(nextRows);
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "The app could not retry that local sync row.");
-    } finally {
-      setRetryingRowId(null);
     }
   };
 
@@ -324,47 +289,45 @@ export const SettingsPage = () => {
         </div>
       </SurfaceCard>
 
-      <SurfaceCard
-        title="Local sync queue"
-        subtitle="Review pending or failed outbox rows before the future remote transport layer is introduced."
-      >
-        {!syncRows.length ? (
-          <div className="empty-state">The local sync queue is empty right now.</div>
-        ) : (
-          <div className="sync-outbox-list">
-            {syncRows.map((row) => (
-              <div key={row.id} className="sync-outbox-row">
-                <div className="sync-outbox-row-main">
-                  <div className="sync-outbox-row-head">
-                    <span className={`sync-outbox-status sync-outbox-status-${row.status}`}>
-                      {formatSyncRowStatus(row.status)}
-                    </span>
-                    <span className="sync-outbox-entity">
-                      {row.entityType} · {row.entityId}
-                    </span>
-                  </div>
-                  <div className="sync-outbox-row-meta">
-                    <span>Operation: {row.operationType}</span>
-                    <span>Attempts: {row.attemptCount}</span>
-                    <span>Updated: {formatDateLabel(row.updatedAt)}</span>
-                    <span>Next retry: {formatDateLabel(row.nextRetryAt)}</span>
-                  </div>
-                  {row.lastError ? <div className="sync-outbox-error">{row.lastError}</div> : null}
-                </div>
-                <div className="sync-outbox-row-actions">
-                  <button
-                    className="ghost-control"
-                    disabled={retryingRowId === row.id || (row.status !== "failed" && row.status !== "processing")}
-                    onClick={() => void retrySyncRow(row.id)}
-                    type="button"
-                  >
-                    {retryingRowId === row.id ? "Retrying..." : "Retry row"}
-                  </button>
-                </div>
-              </div>
-            ))}
+      <SurfaceCard title="Local sync queue" subtitle="Open the dedicated outbox view to inspect failures, retry rows and drill into related entities.">
+        <div className="summary-grid">
+          <div className="summary-row">
+            <span className="summary-label">Visible rows</span>
+            <span className="summary-value">{syncRows.length}</span>
           </div>
-        )}
+          <div className="summary-row">
+            <span className="summary-label">Failed rows</span>
+            <span className="summary-value">{diagnostics.syncOutboxFailedCount}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Pending rows</span>
+            <span className="summary-value">{diagnostics.syncOutboxPendingCount}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Processing rows</span>
+            <span className="summary-value">{diagnostics.syncOutboxProcessingCount}</span>
+          </div>
+        </div>
+
+        <div className="action-panel-actions action-panel-actions-start">
+          <button className="action-primary-button" onClick={() => navigate("/settings/sync")} type="button">
+            Open local sync queue
+          </button>
+          <button
+            className="ghost-control"
+            disabled={!diagnostics.syncOutboxFailedCount || isRunningLocalSync}
+            onClick={async () => {
+              if (!window.bukowskiApp) {
+                return;
+              }
+
+              await runAction(() => window.bukowskiApp!.retryAllFailedSyncOutboxRows(), setIsRunningLocalSync);
+            }}
+            type="button"
+          >
+            Retry all failed
+          </button>
+        </div>
       </SurfaceCard>
     </div>
   );

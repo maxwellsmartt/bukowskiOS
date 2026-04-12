@@ -178,6 +178,29 @@ describe("sync outbox worker service", () => {
       },
     ]);
 
+    expect(service.retryAllFailedRows()).toBe(1);
+
+    const retriedRow = database
+      .prepare(
+        `
+          SELECT status, last_error, next_retry_at
+          FROM sync_outbox
+          WHERE id = 'outbox-invalid'
+          LIMIT 1
+        `,
+      )
+      .get() as {
+      status: string;
+      last_error: string | null;
+      next_retry_at: string | null;
+    };
+
+    expect(retriedRow).toEqual({
+      status: "pending",
+      last_error: null,
+      next_retry_at: null,
+    });
+
     cleanup();
   });
 });

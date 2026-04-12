@@ -30,6 +30,10 @@ test.describe("desktop smoke", () => {
       await openRoute(app.page, "#/settings", "Settings");
       await expect(app.page.getByText("Run integrity check")).toBeVisible();
       await expect(app.page.getByText("Export all data as JSON")).toBeVisible();
+
+      await app.page.getByRole("button", { name: "Open local sync queue", exact: true }).click();
+      await expect(app.page.locator("main").getByRole("heading", { name: "Local sync queue", exact: true }).first()).toBeVisible();
+      await expect(app.page.getByText("Retry all failed")).toBeVisible();
     } finally {
       await app.cleanup();
     }

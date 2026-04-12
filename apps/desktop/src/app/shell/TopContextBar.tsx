@@ -102,7 +102,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
         <button
           aria-label={syncState.label}
           className={`icon-ghost-control sync-control ${syncState.className}`}
-          onClick={() => navigate("/settings")}
+          onClick={() => navigate("/settings/sync")}
           title={syncState.label}
           type="button"
         >

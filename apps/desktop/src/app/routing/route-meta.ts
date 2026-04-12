@@ -39,6 +39,7 @@ export const globalRouteMeta: AppRouteMeta[] = [
   { path: "/agents/models", label: "Agent Models", scopeMode: "global", domain: "agents" },
   { path: "/agents/connectors", label: "Agent Connectors", scopeMode: "global", domain: "agents" },
   { path: "/settings", label: "Settings", scopeMode: "global", domain: "utility" },
+  { path: "/settings/sync", label: "Local Sync Queue", scopeMode: "global", domain: "utility" },
 ];
 
 export const projectRouteMeta: AppRouteMeta[] = [

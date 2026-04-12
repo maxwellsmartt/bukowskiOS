@@ -14,6 +14,7 @@ type RegisterAppIpcOptions = {
   runLocalSyncNow: () => import("@contracts").AppDiagnosticsSnapshot;
   getSyncOutboxRows: () => import("@contracts").AppSyncOutboxRow[];
   retrySyncOutboxRow: (id: string) => import("@contracts").AppDiagnosticsSnapshot;
+  retryAllFailedSyncOutboxRows: () => import("@contracts").AppDiagnosticsSnapshot;
 };
 
 const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) => {
@@ -77,6 +78,7 @@ export const registerAppIpc = ({
   runLocalSyncNow,
   getSyncOutboxRows,
   retrySyncOutboxRow,
+  retryAllFailedSyncOutboxRows,
 }: RegisterAppIpcOptions) => {
   ipcMain.handle(ipcChannels.app.getInfo, (event) => {
     assertTrustedIpcSender(event);
@@ -143,6 +145,17 @@ export const registerAppIpc = ({
       };
     } catch (error) {
       throw sanitizeIpcError(error, "The app could not retry that local sync row.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.retryAllFailedSyncOutboxRows, (event) => {
+    try {
+      assertTrustedIpcSender(event);
+      return {
+        summary: "All failed sync rows were queued again locally.",
+        diagnostics: retryAllFailedSyncOutboxRows(),
+      };
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not retry the failed local sync rows.");
     }
   });
   ipcMain.handle(ipcChannels.app.exportWorkspaceData, async (event) => {
