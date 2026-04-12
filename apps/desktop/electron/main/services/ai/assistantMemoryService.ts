@@ -33,6 +33,11 @@ const normalizeKey = (kind: MemoryKind, agentId: string | null, projectId: strin
 
 const truncate = (value: string, max = 220) => (value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value);
 
+const queryFragment = (value: string) => {
+  const normalized = normalizeWhitespace(value);
+  return normalized ? `%${normalized.toLowerCase()}%` : null;
+};
+
 const addEvent = (
   db: DatabaseSync,
   args: {
@@ -127,6 +132,64 @@ const matchCandidate = (message: string, context: { activeProjectId?: string | n
 };
 
 export const createAssistantMemoryService = (db: DatabaseSync) => {
+  const selectEntries = (args: {
+    query: string;
+    limit: number;
+    where: string;
+    params: Array<string | null>;
+  }) =>
+    db
+      .prepare(
+        `
+          SELECT
+            id,
+            body,
+            kind,
+            agent_id,
+            project_id,
+            source_reason,
+            confidence,
+            updated_at
+          FROM assistant_memory_entries
+          WHERE workspace_id = ?
+            AND status = 'active'
+            AND ${args.where}
+            AND (? IS NULL OR lower(body) LIKE ?)
+          ORDER BY updated_at DESC
+          LIMIT ${args.limit}
+        `,
+      )
+      .all(workspaceId, ...args.params, queryFragment(args.query), queryFragment(args.query)) as Array<{
+      id: string;
+      body: string;
+      kind: MemoryKind;
+      agent_id: string | null;
+      project_id: string | null;
+      source_reason: MemorySourceReason;
+      confidence: number;
+      updated_at: string;
+    }>;
+
+  const toEntry = (row: {
+    id: string;
+    body: string;
+    kind: MemoryKind;
+    agent_id: string | null;
+    project_id: string | null;
+    source_reason: MemorySourceReason;
+    confidence: number;
+    updated_at: string;
+  }): MemoryEntry => ({
+    id: row.id,
+    body: row.body,
+    kind: row.kind,
+    agentId: row.agent_id,
+    projectId: row.project_id,
+    sourceReason: row.source_reason,
+    confidence: row.confidence,
+    updatedAt: row.updated_at,
+  });
+
   const upsertMemory = (candidate: MemoryCandidate, source: { threadId: string; messageId: string | null }) => {
     const normalized = normalizeKey(candidate.kind, candidate.agentId, candidate.projectId, candidate.body);
     const existing = db
@@ -266,77 +329,28 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
       limit?: number;
     }) {
       const limit = Math.max(1, Math.min(args.limit ?? 6, 12));
-      const rows = db
-        .prepare(
-          `
-            SELECT
-              id,
-              body,
-              kind,
-              agent_id,
-              project_id,
-              source_reason,
-              confidence,
-              updated_at
-            FROM assistant_memory_entries
-            WHERE workspace_id = ?
-              AND status = 'active'
-            ORDER BY updated_at DESC
-          `,
-        )
-        .all(workspaceId) as Array<{
-        id: string;
-        body: string;
-        kind: MemoryKind;
-        agent_id: string | null;
-        project_id: string | null;
-        source_reason: MemorySourceReason;
-        confidence: number;
-        updated_at: string;
-      }>;
-
-      const matchesQuery = (body: string) => {
-        const normalizedQuery = normalizeWhitespace(args.query).toLowerCase();
-        if (!normalizedQuery) {
-          return true;
-        }
-
-        return body.toLowerCase().includes(normalizedQuery);
-      };
-
-      const toEntry = (row: {
-        id: string;
-        body: string;
-        kind: MemoryKind;
-        agent_id: string | null;
-        project_id: string | null;
-        source_reason: MemorySourceReason;
-        confidence: number;
-        updated_at: string;
-      }): MemoryEntry => ({
-        id: row.id,
-        body: row.body,
-        kind: row.kind,
-        agentId: row.agent_id,
-        projectId: row.project_id,
-        sourceReason: row.source_reason,
-        confidence: row.confidence,
-        updatedAt: row.updated_at,
-      });
-
-      const agentEntries = rows
-        .filter((row) => row.agent_id === args.agentId && row.project_id === null && matchesQuery(row.body))
-        .slice(0, Math.min(2, limit))
-        .map(toEntry);
-      const workspaceEntries = rows
-        .filter((row) => row.agent_id === null && row.project_id === null && matchesQuery(row.body))
-        .slice(0, Math.min(2, limit))
-        .map(toEntry);
+      const agentEntries =
+        args.agentId === null
+          ? []
+          : selectEntries({
+              query: args.query,
+              limit: Math.min(2, limit),
+              where: "agent_id = ? AND project_id IS NULL",
+              params: [args.agentId],
+            }).map(toEntry);
+      const workspaceEntries = selectEntries({
+        query: args.query,
+        limit: Math.min(2, limit),
+        where: "agent_id IS NULL AND project_id IS NULL",
+        params: [],
+      }).map(toEntry);
       const projectEntries = args.projectId
-        ? rows
-            .filter((row) => row.project_id === args.projectId && matchesQuery(row.body))
-            .slice(0, Math.min(2, limit))
-            .map(toEntry)
+        ? selectEntries({
+            query: args.query,
+            limit: Math.min(2, limit),
+            where: "project_id = ?",
+            params: [args.projectId],
+          }).map(toEntry)
         : [];
 
       return {
@@ -345,6 +359,59 @@ export const createAssistantMemoryService = (db: DatabaseSync) => {
         projectEntries,
         all: [...agentEntries, ...workspaceEntries, ...projectEntries].slice(0, limit),
       };
+    },
+    pruneStaleEntries(args?: {
+      maxAgeDays?: number;
+      maxCount?: number;
+      minConfidence?: number;
+    }) {
+      const maxAgeDays = Math.max(1, args?.maxAgeDays ?? 30);
+      const maxCount = Math.max(50, args?.maxCount ?? 500);
+      const minConfidence = args?.minConfidence ?? 0.5;
+      const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000).toISOString();
+      const now = new Date().toISOString();
+
+      db.prepare(
+        `
+          UPDATE assistant_memory_entries
+          SET status = 'archived',
+              updated_at = ?
+          WHERE workspace_id = ?
+            AND status = 'active'
+            AND confidence < ?
+            AND updated_at < ?
+        `,
+      ).run(now, workspaceId, minConfidence, cutoff);
+
+      const activeRows = db
+        .prepare(
+          `
+            SELECT id
+            FROM assistant_memory_entries
+            WHERE workspace_id = ?
+              AND status = 'active'
+            ORDER BY updated_at DESC
+          `,
+        )
+        .all(workspaceId) as Array<{ id: string }>;
+
+      if (activeRows.length <= maxCount) {
+        return;
+      }
+
+      const rowsToArchive = activeRows.slice(maxCount);
+      const archiveStatement = db.prepare(
+        `
+          UPDATE assistant_memory_entries
+          SET status = 'archived',
+              updated_at = ?
+          WHERE id = ?
+        `,
+      );
+
+      rowsToArchive.forEach((row) => {
+        archiveStatement.run(now, row.id);
+      });
     },
   };
 };

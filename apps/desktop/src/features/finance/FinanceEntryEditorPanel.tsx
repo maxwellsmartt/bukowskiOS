@@ -1,0 +1,265 @@
+import { Save, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+import type { AssetListRow, FinanceEntryRow, IncidentListRow, ProjectCardRow } from "@contracts";
+import { SelectField } from "@shared/components/SelectField";
+import { StatusBadge } from "@shared/components/StatusBadge";
+import { SurfaceCard } from "@shared/components/SurfaceCard";
+
+export type FinanceEntryEditorDraft = {
+  entryType: string;
+  category: string;
+  amount: number;
+  currency: string;
+  status: string;
+  projectId?: string | null;
+  assetId?: string | null;
+  incidentId?: string | null;
+  entryDate: string;
+  description?: string | null;
+  notes?: string | null;
+};
+
+type FinanceEntryEditorPanelProps = {
+  assets: AssetListRow[];
+  incidents: IncidentListRow[];
+  projects: ProjectCardRow[];
+  error: string | null;
+  feedback: string | null;
+  initialValue?: FinanceEntryRow | null;
+  isSubmitting: boolean;
+  mode: "create" | "edit";
+  onClose: () => void;
+  onSubmit: (value: FinanceEntryEditorDraft) => Promise<void>;
+};
+
+const entryTypeOptions = ["reserve", "exposure", "invoice", "incident_cost", "estimated_cost", "replacement_value"];
+const statusOptions = ["Draft", "Linked", "Approved", "Booked", "Paid", "Cancelled"];
+
+const normalizeOptional = (value: string) => {
+  const nextValue = value.trim();
+  return nextValue ? nextValue : null;
+};
+
+const resolveDefaultDate = () => new Date().toISOString().slice(0, 10);
+
+export const FinanceEntryEditorPanel = ({
+  assets,
+  incidents,
+  projects,
+  error,
+  feedback,
+  initialValue,
+  isSubmitting,
+  mode,
+  onClose,
+  onSubmit,
+}: FinanceEntryEditorPanelProps) => {
+  const [entryType, setEntryType] = useState("reserve");
+  const [category, setCategory] = useState("");
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [status, setStatus] = useState("Draft");
+  const [projectId, setProjectId] = useState("");
+  const [assetId, setAssetId] = useState("");
+  const [incidentId, setIncidentId] = useState("");
+  const [entryDate, setEntryDate] = useState(resolveDefaultDate);
+  const [description, setDescription] = useState("");
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (!initialValue) {
+      setEntryType("reserve");
+      setCategory("");
+      setAmount("");
+      setCurrency("USD");
+      setStatus("Draft");
+      setProjectId("");
+      setAssetId("");
+      setIncidentId("");
+      setEntryDate(resolveDefaultDate());
+      setDescription("");
+      setNotes("");
+      return;
+    }
+
+    setEntryType(initialValue.type);
+    setCategory(initialValue.category);
+    setAmount(initialValue.amountValue !== undefined ? String(initialValue.amountValue) : "");
+    setCurrency(initialValue.currency ?? "USD");
+    setStatus(initialValue.status);
+    setProjectId(initialValue.projectId ?? "");
+    setAssetId(initialValue.assetId ?? "");
+    setIncidentId(initialValue.incidentId ?? "");
+    setEntryDate(initialValue.date);
+    setDescription(initialValue.description ?? "");
+    setNotes(initialValue.notes ?? "");
+  }, [initialValue]);
+
+  const selectedProjectLabel = useMemo(
+    () => projects.find((project) => project.id === projectId)?.name ?? null,
+    [projectId, projects],
+  );
+
+  return (
+    <SurfaceCard
+      aside={
+        <button aria-label="Close finance editor" className="surface-card-action" onClick={onClose} type="button">
+          <X size={14} />
+        </button>
+      }
+      title={mode === "create" ? "New finance entry" : "Edit finance entry"}
+      subtitle="Track reserves, exposure and invoice visibility without leaving the finance register."
+    >
+      <div className="chip-row">
+        <StatusBadge tone={mode === "create" ? "success" : "info"}>{mode === "create" ? "Create" : "Edit"}</StatusBadge>
+        {selectedProjectLabel ? <StatusBadge>{selectedProjectLabel}</StatusBadge> : null}
+      </div>
+
+      {error ? <div className="form-inline-error">{error}</div> : null}
+      {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
+
+      <div className="action-form-grid">
+        <label className="action-field">
+          <span className="action-field-label">Entry type</span>
+          <SelectField onChange={(event) => setEntryType(event.target.value)} value={entryType}>
+            {entryTypeOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </SelectField>
+        </label>
+
+        <label className="action-field">
+          <span className="action-field-label">Status</span>
+          <SelectField onChange={(event) => setStatus(event.target.value)} value={status}>
+            {statusOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </SelectField>
+        </label>
+
+        <label className="action-field action-field-wide">
+          <span className="action-field-label">Category</span>
+          <input
+            className="action-field-control"
+            onChange={(event) => setCategory(event.target.value)}
+            placeholder="Repair, Asset risk, Invoice, Travel, etc."
+            value={category}
+          />
+        </label>
+
+        <label className="action-field">
+          <span className="action-field-label">Amount</span>
+          <input
+            className="action-field-control"
+            inputMode="decimal"
+            onChange={(event) => setAmount(event.target.value)}
+            placeholder="0.00"
+            value={amount}
+          />
+        </label>
+
+        <label className="action-field">
+          <span className="action-field-label">Currency</span>
+          <input className="action-field-control" onChange={(event) => setCurrency(event.target.value)} value={currency} />
+        </label>
+
+        <label className="action-field">
+          <span className="action-field-label">Entry date</span>
+          <input className="action-field-control" onChange={(event) => setEntryDate(event.target.value)} type="date" value={entryDate} />
+        </label>
+
+        <label className="action-field">
+          <span className="action-field-label">Project</span>
+          <SelectField onChange={(event) => setProjectId(event.target.value)} value={projectId}>
+            <option value="">Unlinked</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.code} · {project.name}
+              </option>
+            ))}
+          </SelectField>
+        </label>
+
+        <label className="action-field">
+          <span className="action-field-label">Asset</span>
+          <SelectField onChange={(event) => setAssetId(event.target.value)} value={assetId}>
+            <option value="">Unlinked</option>
+            {assets.map((asset) => (
+              <option key={asset.id} value={asset.id}>
+                {asset.code} · {asset.name}
+              </option>
+            ))}
+          </SelectField>
+        </label>
+
+        <label className="action-field">
+          <span className="action-field-label">Incident</span>
+          <SelectField onChange={(event) => setIncidentId(event.target.value)} value={incidentId}>
+            <option value="">Unlinked</option>
+            {incidents.map((incident) => (
+              <option key={incident.id} value={incident.id}>
+                {incident.title}
+              </option>
+            ))}
+          </SelectField>
+        </label>
+
+        <label className="action-field action-field-wide">
+          <span className="action-field-label">Description</span>
+          <textarea
+            className="action-field-control action-textarea"
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="What does this entry represent and why does it exist?"
+            rows={3}
+            value={description}
+          />
+        </label>
+
+        <label className="action-field action-field-wide">
+          <span className="action-field-label">Notes</span>
+          <textarea
+            className="action-field-control action-textarea"
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Optional internal notes for audit and follow-up."
+            rows={3}
+            value={notes}
+          />
+        </label>
+      </div>
+
+      <div className="action-panel-actions">
+        <button
+          className="action-primary-button"
+          disabled={isSubmitting}
+          onClick={() =>
+            void onSubmit({
+              entryType,
+              category,
+              amount: Number(amount || 0),
+              currency,
+              status,
+              projectId: normalizeOptional(projectId),
+              assetId: normalizeOptional(assetId),
+              incidentId: normalizeOptional(incidentId),
+              entryDate,
+              description: normalizeOptional(description),
+              notes: normalizeOptional(notes),
+            })
+          }
+          type="button"
+        >
+          <Save size={14} />
+          <span>{isSubmitting ? "Saving..." : mode === "create" ? "Create entry" : "Save changes"}</span>
+        </button>
+        <button className="ghost-control" disabled={isSubmitting} onClick={onClose} type="button">
+          Cancel
+        </button>
+      </div>
+    </SurfaceCard>
+  );
+};

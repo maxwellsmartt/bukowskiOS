@@ -2919,7 +2919,13 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             financial_entries.entry_type,
             financial_entries.category,
             financial_entries.amount,
+            financial_entries.currency,
             financial_entries.status,
+            financial_entries.project_id,
+            financial_entries.asset_id,
+            financial_entries.incident_id,
+            financial_entries.description,
+            financial_entries.notes,
             COALESCE(projects.name, '—') AS project,
             COALESCE(incidents.title, assets.internal_code, financial_entries.id) AS reference
           FROM financial_entries
@@ -2934,7 +2940,13 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       entry_type: string;
       category: string;
       amount: number;
+      currency: string;
       status: string;
+      project_id: string | null;
+      asset_id: string | null;
+      incident_id: string | null;
+      description: string | null;
+      notes: string | null;
       project: string;
       reference: string;
     }>;
@@ -2950,6 +2962,12 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         amount: formatCurrency(row.amount),
         status: row.status,
         amountValue: row.amount,
+        currency: row.currency,
+        projectId: row.project_id,
+        assetId: row.asset_id,
+        incidentId: row.incident_id,
+        description: row.description,
+        notes: row.notes,
         dateValue: row.entry_date,
       }))
       .filter((row) => matchesSearch(query.search, [row.reference, row.project, row.category, row.type, row.status]));
@@ -2957,7 +2975,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     return sortRows(
       mappedRows,
       resolveFinanceEntryComparator(query.sortBy ?? defaultFinanceEntryListQuery.sortBy, query.sortDirection ?? defaultFinanceEntryListQuery.sortDirection),
-    ).map(({ amountValue: _amountValue, dateValue: _dateValue, ...row }) => row);
+    ).map(({ dateValue: _dateValue, ...row }) => row);
   },
 
   getAgentCapabilitiesSnapshot() {

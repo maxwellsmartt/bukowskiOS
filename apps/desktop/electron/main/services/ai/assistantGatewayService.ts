@@ -14,7 +14,8 @@ import type { OpenAIProviderService } from "./openaiProviderService";
 import type { AssistantGatewaySessionStore } from "./assistantGatewaySessionStore";
 
 const workspaceId = "workspace-metadata";
-const maxToolCalls = 2;
+const maxToolCalls = 5;
+const maxToolPayloadChars = 4000;
 
 const orchestrationSchema = {
   type: "json_schema",
@@ -88,6 +89,24 @@ const summarizeAttachments = (attachments: AssistantGatewayAttachment[]) =>
     name: attachment.name,
     mimeType: attachment.mimeType,
   }));
+
+const truncateText = (value: string, max: number) => (value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value);
+
+const createEventId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const serializeToolPayload = (payload: unknown) => {
+  const serialized = JSON.stringify(payload);
+
+  if (serialized.length <= maxToolPayloadChars) {
+    return serialized;
+  }
+
+  return JSON.stringify({
+    _truncated: true,
+    originalType: Array.isArray(payload) ? "array" : typeof payload,
+    preview: truncateText(serialized, maxToolPayloadChars - 160),
+  });
+};
 
 const summarizeMessageForSession = (request: AssistantGatewayRequest) => {
   const trimmedMessage = request.message.trim();
@@ -636,7 +655,7 @@ export const createAssistantGatewayService = (
           outputs.push({
             type: "function_call_output",
             call_id: call.call_id,
-            output: JSON.stringify(execution.result.payload),
+            output: serializeToolPayload(execution.result.payload),
           });
           toolCallsUsed += 1;
         } catch (error) {
@@ -928,7 +947,7 @@ export const createAssistantGatewayService = (
       );
 
       createActivityEvent(db, {
-        id: `agent-activity-${Date.now().toString(36)}`,
+        id: createEventId("agent-activity"),
         agentId: target?.id ?? null,
         runId: draftRunId,
         kind: requiresApproval ? "ai_run_still_waiting_for_approval" : "ai_run_completed_after_approval",
@@ -961,7 +980,7 @@ export const createAssistantGatewayService = (
       draftRunId = createdRun.runId;
 
       createActivityEvent(db, {
-        id: `agent-activity-${Date.now().toString(36)}`,
+        id: createEventId("agent-activity"),
         agentId: target?.id ?? null,
         runId: draftRunId,
         kind: "ai_draft_run_created",
@@ -974,7 +993,7 @@ export const createAssistantGatewayService = (
       });
     } else {
       createActivityEvent(db, {
-        id: `agent-activity-${Date.now().toString(36)}`,
+        id: createEventId("agent-activity"),
         agentId: target?.id ?? null,
         runId: null,
         kind: "ai_request_routed",

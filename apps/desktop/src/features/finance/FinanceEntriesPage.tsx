@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { Plus } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import type { FinanceEntryListQuery, FinanceEntrySortField } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
+import { useAssetsList } from "@features/assets/useAssetsData";
+import { useIncidentsData } from "@features/incidents/useIncidentsData";
+import { useProjectsRegistry } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -9,7 +13,8 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 
-import { useFinanceEntries } from "./useFinanceData";
+import { FinanceEntryEditorPanel, type FinanceEntryEditorDraft } from "./FinanceEntryEditorPanel";
+import { createFinanceEntry, updateFinanceEntry, useFinanceEntries } from "./useFinanceData";
 
 const financeEntrySortOptions: Array<ListSortOption<FinanceEntrySortField>> = [
   { value: "date", label: "Entry date", columnKey: "date" },
@@ -40,19 +45,81 @@ export const FinanceEntriesPage = () => {
       sortDirection,
     }),
   });
-  const { data, error } = useFinanceEntries(financeControls.query);
+  const { data, error, reload } = useFinanceEntries(financeControls.query);
+  const { data: projects } = useProjectsRegistry();
+  const { data: assets } = useAssetsList();
+  const { data: incidents } = useIncidentsData();
   const { addItems, hasItem } = useCompareTray();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const editingEntry = useMemo(() => data.find((entry) => entry.id === editingEntryId) ?? null, [data, editingEntryId]);
+
+  const handleSubmit = async (draft: FinanceEntryEditorDraft) => {
+    try {
+      setIsSubmitting(true);
+      setSubmitError(null);
+      const result = editingEntry
+        ? await updateFinanceEntry({
+            commandId: crypto.randomUUID(),
+            workspaceId: "workspace-metadata",
+            entryId: editingEntry.id,
+            actorType: "user",
+            sourceChannel: "desktop",
+            ...draft,
+          })
+        : await createFinanceEntry({
+            commandId: crypto.randomUUID(),
+            workspaceId: "workspace-metadata",
+            actorType: "user",
+            sourceChannel: "desktop",
+            ...draft,
+          });
+
+      setFeedback(result.summary);
+      setIsEditorOpen(false);
+      setEditingEntryId(null);
+      reload();
+    } catch (nextError) {
+      setSubmitError(nextError instanceof Error ? nextError.message : "The app could not save that finance entry.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Entries" />
+      <SectionHeader
+        title="Entries"
+        body="Keep reserves, exposure and invoice tracking editable from the register instead of treating Finance as read-only."
+      />
 
       {error ? <div className="empty-state">Entries unavailable: {error}</div> : null}
 
       <div className="chip-row">
         <StatusBadge tone="success">{data.filter((entry) => hasItem("financial_entry", entry.id)).length} in compare</StatusBadge>
         {selectedRowIds.length ? <StatusBadge>{`${selectedRowIds.length} selected`}</StatusBadge> : null}
+        {feedback ? <StatusBadge tone="info">{feedback}</StatusBadge> : null}
+      </div>
+
+      <div className="action-panel-actions action-panel-actions-start">
+        <button
+          className="action-primary-button"
+          onClick={() => {
+            setEditingEntryId(null);
+            setSubmitError(null);
+            setFeedback(null);
+            setIsEditorOpen(true);
+          }}
+          type="button"
+        >
+          <Plus size={14} />
+          <span>New entry</span>
+        </button>
       </div>
 
       {selectedRowIds.length ? (
@@ -87,6 +154,25 @@ export const FinanceEntriesPage = () => {
         </div>
       ) : null}
 
+      {isEditorOpen ? (
+        <FinanceEntryEditorPanel
+          assets={assets}
+          error={submitError}
+          feedback={feedback}
+          incidents={incidents}
+          initialValue={editingEntry}
+          isSubmitting={isSubmitting}
+          mode={editingEntry ? "edit" : "create"}
+          onClose={() => {
+            setIsEditorOpen(false);
+            setEditingEntryId(null);
+            setSubmitError(null);
+          }}
+          onSubmit={handleSubmit}
+          projects={projects}
+        />
+      ) : null}
+
       <SurfaceCard title="Entry register">
         <ListToolbar
           activeSortLabel={financeControls.activeSortOption?.label}
@@ -102,8 +188,15 @@ export const FinanceEntriesPage = () => {
           sortOptions={financeEntrySortOptions}
         />
         <DataTable
+          activeRowId={editingEntryId}
           getRowId={(row) => row.id}
           maxHeight="min(56vh, 620px)"
+          onRowClick={(row) => {
+            setEditingEntryId(row.id);
+            setSubmitError(null);
+            setFeedback(null);
+            setIsEditorOpen(true);
+          }}
           onSortRequest={financeControls.handleColumnSortRequest}
           persistKey="finance-entries"
           columns={[

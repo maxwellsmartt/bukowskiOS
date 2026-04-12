@@ -9,6 +9,23 @@ const agentStatusSchema = z.enum(["active", "paused"]);
 const agentApprovalModeSchema = z.enum(["auto", "supervised", "needs_approval"]);
 const assistantApprovalPreferenceSchema = z.enum(["supervised", "needs_approval", "unsupervised"]);
 const rmaStatusSchema = z.enum(["Draft", "Ready", "Sent", "Closed"]);
+const financeEntrySchema = z
+  .object({
+    entryType: nonEmptyString,
+    category: nonEmptyString,
+    amount: z.number().finite().nonnegative(),
+    currency: optionalTrimmedString,
+    exchangeRate: z.number().finite().positive().nullable().optional(),
+    baseCurrencyAmount: z.number().finite().nonnegative().nullable().optional(),
+    status: nonEmptyString,
+    projectId: optionalNullableString,
+    assetId: optionalNullableString,
+    incidentId: optionalNullableString,
+    entryDate: nonEmptyString,
+    description: optionalNullableString,
+    notes: optionalNullableString,
+  })
+  .strict();
 
 export const createAgentSchema = z
   .object({
@@ -287,6 +304,17 @@ export const resolveIncidentSchema = z
     sourceChannel: commandSourceChannelSchema,
   })
   .strict();
+
+export const createFinancialEntrySchema = financeEntrySchema.extend({
+  commandId: nonEmptyString,
+  workspaceId: nonEmptyString,
+  actorType: commandActorTypeSchema,
+  sourceChannel: commandSourceChannelSchema,
+});
+
+export const updateFinancialEntrySchema = createFinancialEntrySchema.extend({
+  entryId: nonEmptyString,
+});
 
 export const createPackingSlipSchema = z
   .object({

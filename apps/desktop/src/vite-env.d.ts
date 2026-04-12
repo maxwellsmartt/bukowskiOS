@@ -33,6 +33,7 @@ import type {
   CatalogSnapshot,
   CreateAssetCommand,
   CreateCatalogEntityInput,
+  CreateFinancialEntryCommand,
   CreateDraftRunFromChatCommand,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
@@ -46,6 +47,7 @@ import type {
   DraftRunFromChatResult,
   FinanceCostLinkRow,
   FinanceEntryListQuery,
+  FinanceEntryMutationResult,
   FinanceEntryRow,
   FinanceOverviewSnapshot,
   GlobalSearchGroup,
@@ -88,6 +90,7 @@ import type {
   UpdateAssetCommand,
   UpdateAssistantThreadPreferencesCommand,
   UpdateCatalogEntityInput,
+  UpdateFinancialEntryCommand,
   UpdateIncidentCommand,
   UpdateProjectInput,
   UpdateProjectUnitInput,
@@ -178,6 +181,8 @@ declare global {
       getOverview: () => Promise<FinanceOverviewSnapshot>;
       getCostLinks: () => Promise<FinanceCostLinkRow[]>;
       getEntries: (query?: FinanceEntryListQuery) => Promise<FinanceEntryRow[]>;
+      create: (input: CreateFinancialEntryCommand) => Promise<FinanceEntryMutationResult>;
+      update: (input: UpdateFinancialEntryCommand) => Promise<FinanceEntryMutationResult>;
     };
     bukowskiCatalog?: {
       getSnapshot: (query?: CatalogListQuery) => Promise<CatalogSnapshot>;

@@ -296,6 +296,168 @@ describe("assistant gateway service", () => {
     cleanup();
   });
 
+  it("supports more tool calls and truncates oversized tool payloads before the second pass", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-tool-budget");
+    const secrets = new Map<string, string>();
+    const secretStore = {
+      hasProviderSecret: (workspaceId: string, providerKey: string) => secrets.has(`${workspaceId}:${providerKey}`),
+      getProviderSecret: (workspaceId: string, providerKey: string) => secrets.get(`${workspaceId}:${providerKey}`) ?? null,
+      setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => {
+        secrets.set(`${workspaceId}:${providerKey}`, secret);
+      },
+      clearProviderSecret: (workspaceId: string, providerKey: string) => {
+        secrets.delete(`${workspaceId}:${providerKey}`);
+      },
+    };
+
+    const configMutations = createAgentMutationService(database, {
+      secretStore,
+      openaiProviderService: {
+        createResponse: async () => ({
+          ok: true as const,
+          responseId: "noop",
+          status: "completed",
+          outputText: "{}",
+          functionCalls: [],
+        }),
+        testConnection: async () => ({
+          ok: true as const,
+          status: "healthy" as const,
+          summary: "OpenAI responded successfully.",
+        }),
+      },
+      assistantGatewayService: {
+        sendMessage: async () => {
+          throw new Error("Not used while setting provider config.");
+        },
+        continueApprovedRun: async () => {
+          throw new Error("Not used while setting provider config.");
+        },
+      },
+    });
+
+    configMutations.saveAIProviderConfig({
+      commandId: "cmd-openai-config-tool-budget",
+      workspaceId: "workspace-metadata",
+      providerKey: "openai",
+      enabled: true,
+      apiKey: "sk-test",
+      defaultModelKey: "openai:gpt-5.4",
+      timeoutMs: 20000,
+      retryCount: 1,
+      baseUrl: "",
+    });
+
+    const calls: Array<{
+      input: string | Array<Record<string, unknown>>;
+      previousResponseId?: string | null;
+    }> = [];
+
+    const gateway = createAssistantGatewayService(database, {
+      secretStore,
+      sessionStore: createAssistantGatewaySessionStore(),
+      toolRegistry: {
+        definitions: [
+          {
+            type: "function" as const,
+            name: "tool.alpha",
+            description: "Synthetic tool for truncation coverage.",
+            parameters: { type: "object", additionalProperties: true },
+          },
+        ],
+        execute: (name: string) => ({
+          trace: {
+            toolName: name,
+            status: "completed" as const,
+            summary: `${name} completed`,
+          },
+          result: {
+            payload: {
+              huge: "x".repeat(5000),
+            },
+            summary: `${name} returned an oversized payload.`,
+          },
+        }),
+      },
+      memoryService: {
+        extractAndPersist: () => undefined,
+        getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        pruneStaleEntries: () => undefined,
+        recordFailure: () => undefined,
+      },
+      openaiProviderService: {
+        createResponse: async (_config, input) => {
+          calls.push({
+            input: input.input,
+            previousResponseId: input.previousResponseId ?? null,
+          });
+
+          if (calls.length === 1) {
+            return {
+              ok: true as const,
+              responseId: "resp-tool-pass-1",
+              status: "completed",
+              outputText: "",
+              functionCalls: [
+                { id: "fc-1", type: "function_call" as const, name: "tool.alpha", arguments: "{}", call_id: "call-1" },
+                { id: "fc-2", type: "function_call" as const, name: "tool.beta", arguments: "{}", call_id: "call-2" },
+                { id: "fc-3", type: "function_call" as const, name: "tool.gamma", arguments: "{}", call_id: "call-3" },
+              ],
+            };
+          }
+
+          return {
+            ok: true as const,
+            responseId: "resp-tool-pass-2",
+            status: "completed",
+            outputText: JSON.stringify({
+              intent: "summarize_tools",
+              target_agent: "supervisor-agent",
+              confidence: 0.88,
+              requires_approval: false,
+              tool_call_requested: false,
+              user_facing_summary: "Supervisor completed the read-only tool chain.",
+              answer_kind: "informational",
+              draft_run_title: null,
+              draft_run_description: null,
+            }),
+            functionCalls: [],
+          };
+        },
+        testConnection: async () => ({
+          ok: true as const,
+          status: "healthy" as const,
+          summary: "OpenAI responded successfully.",
+        }),
+      },
+    });
+
+    const result = await gateway.sendMessage({
+      commandId: "cmd-tool-budget-turn",
+      workspaceId: "workspace-metadata",
+      threadId: "thread-tool-budget",
+      message: "Chain enough tools to inspect this.",
+      attachments: [],
+      context: {
+        workspaceId: "workspace-metadata",
+        activePath: "/assets",
+        currentView: "Assets",
+      },
+    });
+
+    expect(result.status).toBe("answered");
+    expect(calls).toHaveLength(3);
+    expect(Array.isArray(calls[1]?.input)).toBe(true);
+
+    const secondPassOutputs = calls[1]?.input as Array<{ output: string }>;
+    expect(secondPassOutputs).toHaveLength(3);
+    secondPassOutputs.forEach((output) => {
+      expect(output.output).toContain("\"_truncated\":true");
+    });
+
+    cleanup();
+  });
+
   it("supports approve for this session and reuses that approval in the same thread", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-session-approval");
     const secrets = new Map<string, string>();
@@ -392,6 +554,7 @@ describe("assistant gateway service", () => {
       memoryService: {
         extractAndPersist: () => [],
         getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        pruneStaleEntries: () => undefined,
         recordFailure: () => undefined,
       },
     });

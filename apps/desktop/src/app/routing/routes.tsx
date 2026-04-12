@@ -9,6 +9,7 @@ import { AgentsPage } from "@features/agents/AgentsPage";
 import { AssetDetailPage } from "@features/assets/AssetDetailPage";
 import { AssetsOverviewPage } from "@features/assets/AssetsOverviewPage";
 import { AssetsPage } from "@features/assets/AssetsPage";
+import { CompareView } from "@features/compare/CompareView";
 import { FinanceCostLinksPage } from "@features/finance/FinanceCostLinksPage";
 import { FinanceEntriesPage } from "@features/finance/FinanceEntriesPage";
 import { FinanceOverviewPage } from "@features/finance/FinanceOverviewPage";
@@ -36,6 +37,7 @@ const routeElements = {
   "/projects": <ProjectsPage />,
   "/rma": <RmaPage />,
   "/catalog": <CatalogPage />,
+  "/compare": <CompareView />,
   "/finance": <FinanceOverviewPage />,
   "/finance/cost-links": <FinanceCostLinksPage />,
   "/finance/entries": <FinanceEntriesPage />,

@@ -205,17 +205,64 @@
   - `bajo`: quedan otros empty states secundarios fuera del flujo principal que todavía se pueden pulir más adelante
 
 ### Slice 10 — AI / Agents hardening acotado
-- Estado: `planned`
+- Estado: `done`
 - Objetivo: mejorar calidad sin abrir otro frente grande
 - Área: `backend` + `frontend`
+- Dependencias: Slice 9
+- Qué se probó:
+  - `typecheck`
+  - suite de tests completa
+  - `build`
+- Evidencia:
+  - `maxToolCalls` subió a `5`, lo que permite respuestas cross-domain menos superficiales
+  - los payloads grandes de tools ahora se truncan antes de volver al modelo, con marca explícita `_truncated`
+  - `assistantMemoryService` ahora filtra por scope directamente en SQL y ya no carga todo para recortar en JavaScript
+  - se añadió pruning de memory para archivar entradas viejas de baja confianza y limitar crecimiento de la capa activa
+  - `Bugs Agent` y `Product Agent` ahora tienen `visibility = internal` y se ocultan de superficies visibles cuando el app corre fuera de contexto interno
+- Riesgos remanentes:
+  - `medio`: el truncado protege contexto y tokens, pero todavía no hay una capa de resumen semántico de tool payloads; hoy es truncación segura, no compresión inteligente
+  - `medio`: los agentes internos siguen existiendo para routing y diagnóstico, así que cualquier cambio futuro en visibilidad debe preservar esa separación
+  - `bajo`: el bundle del renderer sigue dando warning de chunk grande en build; no bloquea este slice, pero conviene atacarlo en una fase de polish/performance
 
 ## P2 — Profundidad funcional y polish
 
 ### Slice 11 — Compare Completion
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - convertir el compare tray en una feature real con destino claro y comparación side-by-side
+- Área: `frontend`
+- Dependencias: Slice 9
+- Qué se probó:
+  - `typecheck`
+  - suite de tests completa
+  - `build`
+- Evidencia:
+  - se creó la vista `/compare` con comparación side-by-side para `assets`, `projects` y `financial_entry`
+  - el botón `Compare` del tray ahora navega a una vista real cuando hay al menos dos items compatibles
+  - la comparación resalta diferencias por campo y permite quitar items sin salir de la vista
+- Riesgos remanentes:
+  - `medio`: la vista todavía depende del tray activo en memoria y no persiste una comparación como entidad propia
+  - `bajo`: todavía no hay affordance fuerte de “agregar a compare” fuera de los flujos ya existentes de selección/tray
 
 ### Slice 12 — Finance Mutations
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - dejar de tratar Finance como lectura pura y abrir creación/edición auditables de entries desde la UI
+- Área: `backend` + `frontend`
+- Dependencias: Slice 11
+- Qué se probó:
+  - `typecheck`
+  - suite de tests completa
+  - `build`
+- Evidencia:
+  - se añadió `financeMutationService` con `createEntry` y `updateEntry`, idempotencia por `command_receipts` y registro en `sync_outbox`
+  - IPC y preload ya exponen `bukowskiFinance.create(...)` y `bukowskiFinance.update(...)` con validación runtime vía Zod
+  - `Finance Entries` ahora permite crear y editar entries desde un panel dedicado sin salir del registro
+  - los read models de finance ahora exponen los campos necesarios para edición (`amountValue`, `currency`, `projectId`, `assetId`, `incidentId`, `description`, `notes`)
+- Riesgos remanentes:
+  - `medio`: todavía no existe `delete/archive` para finance entries; en esta fase solo abrimos creación y edición segura
+  - `medio`: la UI actual permite links opcionales a proyecto/asset/incidente, pero todavía no guía o restringe reglas contables más avanzadas
+  - `bajo`: la edición usa catálogos cargados en cliente para selects; si el dataset crece mucho, convendrá pasar a búsqueda remota o lazy loading
 
 ### Slice 13 — UX Polish Avanzado
 - Estado: `planned`

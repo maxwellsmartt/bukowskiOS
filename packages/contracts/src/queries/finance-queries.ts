@@ -28,6 +28,13 @@ export type FinanceEntryRow = {
   project: string;
   amount: string;
   status: string;
+  amountValue?: number;
+  currency?: string;
+  projectId?: string | null;
+  assetId?: string | null;
+  incidentId?: string | null;
+  description?: string | null;
+  notes?: string | null;
 };
 
 export type FinanceEntrySortField = "date" | "type" | "category" | "reference" | "project" | "amount" | "status";

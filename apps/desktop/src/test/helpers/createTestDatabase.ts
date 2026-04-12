@@ -33,7 +33,7 @@ export const createTestDatabase = (prefix: string): TestDatabase => {
   applyTrackedSqlMigrations(database, foundationMigrations);
   applyTrackedStep(database, "runtime_admin_foundation_v1", () => applyAdminFoundationMigration(database));
   applyTrackedStep(database, "runtime_scheduling_foundation_v1", () => applySchedulingFoundationMigration(database));
-  applyTrackedStep(database, "runtime_ai_gateway_foundation_v1", () => applyAIGatewayFoundationMigration(database));
+  applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database));
   seedFoundationData(database);
   bootstrapAIGatewayFoundation(database);
   ensureProjectShellDefaults(database);

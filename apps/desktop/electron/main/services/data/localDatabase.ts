@@ -20,6 +20,7 @@ import { createFoundationReadService, type FoundationReadService } from "./found
 import { createAssetMutationService } from "./assetMutationService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
+import { createFinanceMutationService } from "./financeMutationService";
 import { createIncidentMutationService } from "./incidentMutationService";
 import { createPackingMutationService } from "./packingMutationService";
 import { seedFoundationData } from "./foundationSeed";
@@ -40,6 +41,7 @@ type ProjectMutationService = ReturnType<typeof createProjectMutationService>;
 type CatalogMutationService = ReturnType<typeof createCatalogMutationService>;
 type AssetMutationService = ReturnType<typeof createAssetMutationService>;
 type IncidentMutationService = ReturnType<typeof createIncidentMutationService>;
+type FinanceMutationService = ReturnType<typeof createFinanceMutationService>;
 type PackingMutationService = ReturnType<typeof createPackingMutationService>;
 type RmaMutationService = ReturnType<typeof createRmaMutationService>;
 type AgentMutationService = ReturnType<typeof createAgentMutationService>;
@@ -55,6 +57,7 @@ type LocalDatabaseRuntime = {
   catalogMutations: CatalogMutationService;
   assetMutations: AssetMutationService;
   incidentMutations: IncidentMutationService;
+  financeMutations: FinanceMutationService;
   packingMutations: PackingMutationService;
   rmaMutations: RmaMutationService;
   agentMutations: AgentMutationService;
@@ -117,7 +120,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   applyTrackedSqlMigrations(database, foundationMigrations);
   applyTrackedStep(database, "runtime_admin_foundation_v1", () => applyAdminFoundationMigration(database));
   applyTrackedStep(database, "runtime_scheduling_foundation_v1", () => applySchedulingFoundationMigration(database));
-  applyTrackedStep(database, "runtime_ai_gateway_foundation_v1", () => applyAIGatewayFoundationMigration(database));
+  applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database));
   seedFoundationData(database);
   bootstrapAIGatewayFoundation(database);
   ensureProjectShellDefaults(database);
@@ -184,6 +187,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     getRunsList: () => agentReads.getRunsList(),
   });
   const memoryService = createAssistantMemoryService(database);
+  memoryService.pruneStaleEntries();
   const assistantGatewayService = createAssistantGatewayService(database, {
     secretStore,
     openaiProviderService,
@@ -217,6 +221,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     catalogMutations: createCatalogMutationService(database),
     assetMutations: createAssetMutationService(database),
     incidentMutations: createIncidentMutationService(database),
+    financeMutations: createFinanceMutationService(database),
     packingMutations: createPackingMutationService(database),
     rmaMutations: createRmaMutationService(database),
     runtimeDiagnostics,

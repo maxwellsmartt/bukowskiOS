@@ -26,6 +26,7 @@ describe("assistant chat service", () => {
       memoryService: {
         extractAndPersist: () => [],
         getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        pruneStaleEntries: () => undefined,
         recordFailure: () => undefined,
       },
     });
@@ -89,6 +90,7 @@ describe("assistant chat service", () => {
       memoryService: {
         extractAndPersist: () => [],
         getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        pruneStaleEntries: () => undefined,
         recordFailure: () => undefined,
       },
     });
@@ -182,6 +184,7 @@ describe("assistant chat service", () => {
       memoryService: {
         extractAndPersist: () => [],
         getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        pruneStaleEntries: () => undefined,
         recordFailure: () => undefined,
       },
     });
@@ -253,6 +256,7 @@ describe("assistant chat service", () => {
       memoryService: {
         extractAndPersist: () => [],
         getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        pruneStaleEntries: () => undefined,
         recordFailure: () => undefined,
       },
     });

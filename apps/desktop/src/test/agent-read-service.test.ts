@@ -45,4 +45,29 @@ describe("agent read service", () => {
 
     cleanup();
   });
+
+  it("hides internal agents from visible surfaces in production mode", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousShowInternal = process.env.BUKOWSKI_SHOW_INTERNAL_AGENTS;
+    process.env.NODE_ENV = "production";
+    delete process.env.BUKOWSKI_SHOW_INTERNAL_AGENTS;
+
+    const { cleanup, database } = createTestDatabase("bukowski-agents-visibility-test");
+    const reads = createAgentReadService(database);
+    const visibleAgents = reads.getAgentsList();
+    const missionControl = reads.getMissionControlSnapshot();
+
+    expect(visibleAgents.some((agent) => agent.displayName === "Bugs Agent")).toBe(false);
+    expect(visibleAgents.some((agent) => agent.displayName === "Product Agent")).toBe(false);
+    expect(missionControl.subagents.some((agent) => agent.displayName === "Bugs Agent")).toBe(false);
+    expect(missionControl.subagents.some((agent) => agent.displayName === "Product Agent")).toBe(false);
+
+    cleanup();
+    process.env.NODE_ENV = previousNodeEnv;
+    if (previousShowInternal === undefined) {
+      delete process.env.BUKOWSKI_SHOW_INTERNAL_AGENTS;
+    } else {
+      process.env.BUKOWSKI_SHOW_INTERNAL_AGENTS = previousShowInternal;
+    }
+  });
 });

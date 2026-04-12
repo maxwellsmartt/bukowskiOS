@@ -1,4 +1,5 @@
 import { Scale, Trash2, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 
@@ -9,6 +10,7 @@ const typeLabelMap = {
 } as const;
 
 export const CompareTrayBar = () => {
+  const navigate = useNavigate();
   const { clear, compatibleItems, compatibleType, groups, items, reasonDisabled, removeItem } = useCompareTray();
 
   if (!items.length) {
@@ -28,6 +30,13 @@ export const CompareTrayBar = () => {
             className="ghost-control"
             disabled={!compatibleType || compatibleItems.length < 2}
             title={reasonDisabled ?? "Comparison view is not available yet."}
+            onClick={() => {
+              if (!compatibleType || compatibleItems.length < 2) {
+                return;
+              }
+
+              navigate(`/compare?type=${compatibleType}`);
+            }}
             type="button"
           >
             <Scale size={14} />

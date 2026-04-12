@@ -1,4 +1,12 @@
-import type { FinanceCostLinkRow, FinanceEntryListQuery, FinanceEntryRow, FinanceOverviewSnapshot } from "@contracts";
+import type {
+  CreateFinancialEntryCommand,
+  FinanceCostLinkRow,
+  FinanceEntryListQuery,
+  FinanceEntryMutationResult,
+  FinanceEntryRow,
+  FinanceOverviewSnapshot,
+  UpdateFinancialEntryCommand,
+} from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 
 const emptyOverview: FinanceOverviewSnapshot = {
@@ -54,3 +62,19 @@ export const useFinanceEntries = (query: FinanceEntryListQuery = defaultFinanceE
     emptyEntries,
     [query.search, query.sortBy, query.sortDirection],
   );
+
+export const createFinanceEntry = async (input: CreateFinancialEntryCommand): Promise<FinanceEntryMutationResult> => {
+  if (!window.bukowskiFinance) {
+    throw new Error("Finance bridge unavailable");
+  }
+
+  return window.bukowskiFinance.create(input);
+};
+
+export const updateFinanceEntry = async (input: UpdateFinancialEntryCommand): Promise<FinanceEntryMutationResult> => {
+  if (!window.bukowskiFinance) {
+    throw new Error("Finance bridge unavailable");
+  }
+
+  return window.bukowskiFinance.update(input);
+};

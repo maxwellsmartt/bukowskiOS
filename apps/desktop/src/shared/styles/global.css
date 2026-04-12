@@ -1737,6 +1737,67 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   line-height: 1.45;
 }
 
+.compare-page-actions,
+.compare-overview-row,
+.compare-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.compare-card {
+  min-height: 0;
+}
+
+.compare-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.compare-field-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+}
+
+.compare-field-row.is-different {
+  border-color: rgba(255, 188, 109, 0.2);
+  background: rgba(255, 188, 109, 0.08);
+}
+
+.compare-field-row.is-emphasized {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    rgba(255, 255, 255, 0.024);
+}
+
+.compare-field-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.compare-field-value {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
 .compare-tray-actions,
 .compare-tray-groups {
   display: flex;

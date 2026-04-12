@@ -131,6 +131,7 @@ app.whenReady().then(() => {
     catalogMutations: localDatabase.catalogMutations,
     assetMutations: localDatabase.assetMutations,
     incidentMutations: localDatabase.incidentMutations,
+    financeMutations: localDatabase.financeMutations,
     packingMutations: localDatabase.packingMutations,
     rmaMutations: localDatabase.rmaMutations,
     agentMutations: localDatabase.agentMutations,

@@ -65,6 +65,7 @@ describe("foundation navigation shell", () => {
   it("registers assets overview and rma routes", () => {
     expect(appRoutes.some((route) => route.path === "/assets/overview")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/rma")).toBe(true);
+    expect(appRoutes.some((route) => route.path === "/compare")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/agents/mission-control")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/agents/connectors")).toBe(true);
   });

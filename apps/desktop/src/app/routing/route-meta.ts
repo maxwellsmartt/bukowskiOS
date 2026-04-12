@@ -29,6 +29,7 @@ export const globalRouteMeta: AppRouteMeta[] = [
   { path: "/projects", label: "Projects", scopeMode: "global", domain: "assets" },
   { path: "/rma", label: "RMA", scopeMode: "global", domain: "assets" },
   { path: "/catalog", label: "Catalog", scopeMode: "global", domain: "assets" },
+  { path: "/compare", label: "Compare", scopeMode: "global", domain: "utility" },
   { path: "/finance", label: "Finance Overview", scopeMode: "global", domain: "finance" },
   { path: "/finance/cost-links", label: "Cost Links", scopeMode: "global", domain: "finance" },
   { path: "/finance/entries", label: "Entries", scopeMode: "global", domain: "finance" },

@@ -33,6 +33,7 @@ import type {
   CatalogSnapshot,
   CreateAssetCommand,
   CreateCatalogEntityInput,
+  CreateFinancialEntryCommand,
   CreateDraftRunFromChatCommand,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
@@ -44,6 +45,7 @@ import type {
   DeleteProjectInput,
   DeleteProjectUnitInput,
   FinanceEntryListQuery,
+  FinanceEntryMutationResult,
   FinanceCostLinkRow,
   FinanceEntryRow,
   FinanceOverviewSnapshot,
@@ -81,6 +83,7 @@ import type {
   UnassignCrewFromProjectUnitInput,
   UpdateAssetCommand,
   UpdateCatalogEntityInput,
+  UpdateFinancialEntryCommand,
   UpdateAgentCommand,
   UpdateProjectInput,
   UpdateProjectUnitInput,
@@ -232,6 +235,10 @@ const bukowskiFinance = {
   getOverview: () => ipcRenderer.invoke(ipcChannels.finance.getOverview) as Promise<FinanceOverviewSnapshot>,
   getCostLinks: () => ipcRenderer.invoke(ipcChannels.finance.getCostLinks) as Promise<FinanceCostLinkRow[]>,
   getEntries: (query?: FinanceEntryListQuery) => ipcRenderer.invoke(ipcChannels.finance.getEntries, query) as Promise<FinanceEntryRow[]>,
+  create: (input: CreateFinancialEntryCommand) =>
+    ipcRenderer.invoke(ipcChannels.finance.create, input) as Promise<FinanceEntryMutationResult>,
+  update: (input: UpdateFinancialEntryCommand) =>
+    ipcRenderer.invoke(ipcChannels.finance.update, input) as Promise<FinanceEntryMutationResult>,
 };
 
 const bukowskiCatalog = {

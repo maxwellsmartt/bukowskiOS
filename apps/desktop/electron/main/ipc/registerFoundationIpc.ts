@@ -8,6 +8,7 @@ import {
   createAssistantThreadSchema,
   createCatalogEntitySchema,
   createDraftRunFromChatSchema,
+  createFinancialEntrySchema,
   createPackingSlipSchema,
   createProjectSchema,
   createProjectUnitSchema,
@@ -33,6 +34,7 @@ import {
   updateAssistantThreadPreferencesSchema,
   updateCatalogEntitySchema,
   updateIncidentSchema,
+  updateFinancialEntrySchema,
   updateProjectSchema,
   updateProjectUnitSchema,
   updateRmaCaseSchema,
@@ -62,6 +64,7 @@ import type {
   CatalogListQuery,
   CreateAssetCommand,
   CreateCatalogEntityInput,
+  CreateFinancialEntryCommand,
   CreatePackingSlipCommand,
   CreateRmaCaseCommand,
   CreateProjectInput,
@@ -70,6 +73,7 @@ import type {
   DeleteProjectInput,
   DeleteProjectUnitInput,
   FinanceEntryListQuery,
+  FinanceEntryMutationResult,
   GlobalSearchQuery,
   IncidentListQuery,
   PackingSlipListQuery,
@@ -83,6 +87,7 @@ import type {
   UnassignCrewFromProjectUnitInput,
   UpdateAssetCommand,
   UpdateCatalogEntityInput,
+  UpdateFinancialEntryCommand,
   UpdateIncidentCommand,
   UpdateProjectInput,
   UpdateProjectUnitInput,
@@ -132,6 +137,10 @@ type RegisterFoundationIpcOptions = {
     updateIncident: (input: UpdateIncidentCommand) => unknown;
     resolveIncident: (input: ResolveIncidentCommand) => unknown;
   };
+  financeMutations: {
+    createEntry: (input: CreateFinancialEntryCommand) => FinanceEntryMutationResult;
+    updateEntry: (input: UpdateFinancialEntryCommand) => FinanceEntryMutationResult;
+  };
   packingMutations: {
     createPackingSlip: (input: CreatePackingSlipCommand) => unknown;
     returnPackingSlipItems: (input: ReturnPackingSlipItemsCommand) => unknown;
@@ -169,8 +178,9 @@ export const registerFoundationIpc = ({
   projectMutations,
   catalogMutations,
   assetMutations,
-  incidentMutations,
-  packingMutations,
+    incidentMutations,
+    financeMutations,
+    packingMutations,
   rmaMutations,
   agentMutations,
   runtimeDiagnostics,
@@ -398,4 +408,6 @@ export const registerFoundationIpc = ({
     (_event, query: FinanceEntryListQuery | undefined) => foundationReads.getFinanceEntries(query),
     "The app could not load finance entries.",
   );
+  safeHandle(ipcChannels.finance.create, createFinancialEntrySchema, (_event, input) => financeMutations.createEntry(input));
+  safeHandle(ipcChannels.finance.update, updateFinancialEntrySchema, (_event, input) => financeMutations.updateEntry(input));
 };

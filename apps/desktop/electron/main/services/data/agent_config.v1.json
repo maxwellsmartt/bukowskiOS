@@ -13,6 +13,7 @@
     "can_execute_write_actions",
     "can_create_draft_runs",
     "is_system_agent",
+    "visibility",
     "seed_version",
     "sort_order"
   ],
@@ -91,6 +92,7 @@
       "can_create_draft_runs": true,
       "can_execute_write_actions": false,
       "is_system_agent": true,
+      "visibility": "public",
       "is_supervisor": true,
       "sort_order": 1
     },
@@ -140,6 +142,7 @@
       "can_create_draft_runs": true,
       "can_execute_write_actions": false,
       "is_system_agent": true,
+      "visibility": "public",
       "is_supervisor": false,
       "sort_order": 2
     },
@@ -189,6 +192,7 @@
       "can_create_draft_runs": true,
       "can_execute_write_actions": false,
       "is_system_agent": true,
+      "visibility": "public",
       "is_supervisor": false,
       "sort_order": 3
     },
@@ -237,6 +241,7 @@
       "can_create_draft_runs": true,
       "can_execute_write_actions": false,
       "is_system_agent": true,
+      "visibility": "public",
       "is_supervisor": false,
       "sort_order": 4
     },
@@ -289,6 +294,7 @@
       "can_create_draft_runs": true,
       "can_execute_write_actions": false,
       "is_system_agent": true,
+      "visibility": "public",
       "is_supervisor": false,
       "sort_order": 5
     },
@@ -337,6 +343,7 @@
       "can_create_draft_runs": true,
       "can_execute_write_actions": false,
       "is_system_agent": true,
+      "visibility": "public",
       "is_supervisor": false,
       "sort_order": 6
     },
@@ -390,6 +397,7 @@
       "can_create_draft_runs": true,
       "can_execute_write_actions": false,
       "is_system_agent": true,
+      "visibility": "internal",
       "is_supervisor": false,
       "sort_order": 7
     },
@@ -441,6 +449,7 @@
       "can_create_draft_runs": true,
       "can_execute_write_actions": false,
       "is_system_agent": true,
+      "visibility": "internal",
       "is_supervisor": false,
       "sort_order": 8
     }

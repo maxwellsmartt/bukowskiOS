@@ -94,5 +94,7 @@ export const ipcChannels = {
     getOverview: "bukowskiFinance:getOverview",
     getCostLinks: "bukowskiFinance:getCostLinks",
     getEntries: "bukowskiFinance:getEntries",
+    create: "bukowskiFinance:create",
+    update: "bukowskiFinance:update",
   },
 } as const;

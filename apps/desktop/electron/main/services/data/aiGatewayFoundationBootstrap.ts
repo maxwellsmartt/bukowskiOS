@@ -127,6 +127,7 @@ const buildSystemAgentRecord = (agent: AgentConfigRecord) => ({
   canExecuteWriteActions: agent.can_execute_write_actions ? 1 : 0,
   isSystemAgent: agent.is_system_agent ? 1 : 0,
   isSupervisor: agent.is_supervisor ? 1 : 0,
+  visibility: agent.visibility ?? "public",
   seedVersion: agentConfig.version,
   sortOrder: agent.sort_order,
 });
@@ -143,6 +144,7 @@ export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
   ensureColumn(db, "agents", "can_create_draft_runs", "INTEGER DEFAULT 1");
   ensureColumn(db, "agents", "can_execute_write_actions", "INTEGER DEFAULT 0");
   ensureColumn(db, "agents", "is_system_agent", "INTEGER DEFAULT 0");
+  ensureColumn(db, "agents", "visibility", "TEXT DEFAULT 'public'");
   ensureColumn(db, "agents", "seed_version", "TEXT");
   ensureColumn(db, "agent_runs", "source", "TEXT DEFAULT 'manual'");
   ensureColumn(db, "agent_runs", "details_json", "TEXT");
@@ -176,6 +178,8 @@ export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
 };
 
 export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
+  applyAIGatewayFoundationMigration(db);
+
   const workspaceRows = db.prepare("SELECT id FROM workspaces").all() as Array<{ id: string }>;
 
   if (!workspaceRows.length) {
@@ -249,12 +253,13 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
       can_create_draft_runs,
       can_execute_write_actions,
       is_system_agent,
+      visibility,
       is_supervisor,
       seed_version,
       sort_order,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const updateSystemAgent = db.prepare(`
@@ -272,6 +277,7 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
       can_create_draft_runs = ?,
       can_execute_write_actions = ?,
       is_system_agent = ?,
+      visibility = ?,
       is_supervisor = ?,
       seed_version = ?,
       sort_order = ?,
@@ -309,6 +315,7 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
         agent.canCreateDraftRuns,
         agent.canExecuteWriteActions,
         agent.isSystemAgent,
+        agent.visibility,
         agent.isSupervisor,
         agent.seedVersion,
         agent.sortOrder,
@@ -329,6 +336,7 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
         agent.canCreateDraftRuns,
         agent.canExecuteWriteActions,
         agent.isSystemAgent,
+        agent.visibility,
         agent.isSupervisor,
         agent.seedVersion,
         agent.sortOrder,

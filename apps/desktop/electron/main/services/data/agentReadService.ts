@@ -93,7 +93,12 @@ type AgentRow = {
   allowed_domains_json: string;
   notes: string | null;
   is_supervisor: number;
+  visibility: "public" | "internal";
 };
+
+const shouldShowInternalAgents = () => process.env.BUKOWSKI_SHOW_INTERNAL_AGENTS === "1" || process.env.NODE_ENV !== "production";
+
+const isVisibleAgent = (row: AgentRow) => shouldShowInternalAgents() || row.visibility !== "internal";
 
 const loadAgentRows = (db: DatabaseSync) =>
   db
@@ -114,13 +119,15 @@ const loadAgentRows = (db: DatabaseSync) =>
           allowed_tools_json,
           allowed_domains_json,
           notes,
-          is_supervisor
+          is_supervisor,
+          COALESCE(visibility, 'public') AS visibility
         FROM agents
         WHERE workspace_id = ?
         ORDER BY is_supervisor DESC, sort_order ASC, display_name COLLATE NOCASE ASC
       `,
     )
-    .all(workspaceId) as AgentRow[];
+    .all(workspaceId)
+    .filter((row) => isVisibleAgent(row as AgentRow)) as AgentRow[];
 
 const toRosterRow = (row: AgentRow): AgentRosterRow => {
   const tools = parseJsonArray(row.allowed_tools_json);
@@ -294,7 +301,8 @@ const loadRuns = (db: DatabaseSync, limit?: number, agentId?: string) => {
       agent_runs.details_json,
       agent_runs.created_at,
       agent_runs.updated_at,
-      COALESCE(agents.display_name, 'Supervisor Agent') AS agent_display_name
+      COALESCE(agents.display_name, 'Supervisor Agent') AS agent_display_name,
+      COALESCE(agents.visibility, 'public') AS agent_visibility
     FROM agent_runs
     LEFT JOIN agents ON agents.id = agent_runs.agent_id
     WHERE ${clauses.join(" AND ")}
@@ -320,6 +328,7 @@ const loadRuns = (db: DatabaseSync, limit?: number, agentId?: string) => {
     created_at: string;
     updated_at: string;
     agent_display_name: string;
+    agent_visibility: "public" | "internal";
   }>;
 };
 
@@ -361,7 +370,8 @@ const loadActivity = (db: DatabaseSync, limit = 6) =>
           agent_activity_events.body,
           agent_activity_events.tone,
           agent_activity_events.created_at,
-          COALESCE(agents.display_name, 'Mission Control') AS agent_display_name
+          COALESCE(agents.display_name, 'Mission Control') AS agent_display_name,
+          COALESCE(agents.visibility, 'public') AS agent_visibility
         FROM agent_activity_events
         LEFT JOIN agents ON agents.id = agent_activity_events.agent_id
         WHERE agent_activity_events.workspace_id = ?
@@ -377,6 +387,7 @@ const loadActivity = (db: DatabaseSync, limit = 6) =>
     tone: AgentActivityRow["tone"];
     created_at: string;
     agent_display_name: string;
+    agent_visibility: "public" | "internal";
   }>;
 
 const toActivityRow = (row: ReturnType<typeof loadActivity>[number]): AgentActivityRow => ({
@@ -388,6 +399,11 @@ const toActivityRow = (row: ReturnType<typeof loadActivity>[number]): AgentActiv
   agentDisplayName: row.agent_display_name,
   timestampLabel: formatTimestampLabel(row.created_at),
 });
+
+const isVisibleRunRow = (row: ReturnType<typeof loadRuns>[number]) => shouldShowInternalAgents() || row.agent_visibility !== "internal";
+
+const isVisibleActivityRow = (row: ReturnType<typeof loadActivity>[number]) =>
+  shouldShowInternalAgents() || row.agent_visibility !== "internal";
 
 const buildProviderRows = (
   db: DatabaseSync,
@@ -499,8 +515,8 @@ export const createAgentReadService = (
           unhealthyProviderKeys: attentionContext.providerKeys,
         }),
       ),
-      queue: loadRuns(db, 5).map(toRunRow),
-      activity: loadActivity(db, 6).map(toActivityRow),
+      queue: loadRuns(db, 5).filter(isVisibleRunRow).map(toRunRow),
+      activity: loadActivity(db, 6).filter(isVisibleActivityRow).map(toActivityRow),
       health: {
         activeAgents: String(activeCount),
         pausedAgents: String(pausedCount),
@@ -545,7 +561,7 @@ export const createAgentReadService = (
   },
 
   getRunsList(): AgentRunRow[] {
-    return loadRuns(db).map(toRunRow);
+    return loadRuns(db).filter(isVisibleRunRow).map(toRunRow);
   },
 
   getModelsSnapshot(): AgentModelsSnapshot {
