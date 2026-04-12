@@ -47,5 +47,34 @@ export type AppActionResult = {
 export type AppExportResult = {
   saved: boolean;
   fileName: string | null;
+  savedPath: string | null;
   summary: string;
+};
+
+export type AppLogFileSummary = {
+  name: string;
+  sizeBytes: number;
+  updatedAt: string;
+};
+
+export type AppSupportEventSummary = {
+  id: string;
+  occurredAt: string;
+  sourceKind: "main" | "renderer" | "webcontents";
+  processLabel: string;
+  errorName: string;
+  message: string;
+  severity: "low" | "medium" | "critical";
+  fingerprint: string;
+};
+
+export type AppSupportSnapshot = {
+  diagnostics: AppDiagnosticsSnapshot;
+  appInfo: AppInfo;
+  recentLogFiles: AppLogFileSummary[];
+  logStorageLabel: string;
+  lastCrash: AppSupportEventSummary | null;
+  lastError: AppSupportEventSummary | null;
+  lastLoadFailure: AppSupportEventSummary | null;
+  recentCriticalEvents: AppSupportEventSummary[];
 };

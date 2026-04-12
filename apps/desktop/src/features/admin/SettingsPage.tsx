@@ -1,4 +1,11 @@
-import type { AppActionResult, AppDiagnosticsSnapshot, AppExportResult, AppSyncOutboxRow } from "@contracts";
+import type {
+  AppActionResult,
+  AppDiagnosticsSnapshot,
+  AppExportResult,
+  AppSupportEventSummary,
+  AppSupportSnapshot,
+  AppSyncOutboxRow,
+} from "@contracts";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -24,6 +31,23 @@ const emptyDiagnostics: AppDiagnosticsSnapshot = {
   syncOutboxFailedCount: 0,
   encryptionAvailable: false,
   internalBuildArtifacts: [],
+};
+
+const emptySupportSnapshot: AppSupportSnapshot = {
+  diagnostics: emptyDiagnostics,
+  appInfo: {
+    appName: "bukowskiOS",
+    platform: "unknown",
+    isPackaged: false,
+    version: "Unknown",
+    shellVersion: "Unknown",
+  },
+  recentLogFiles: [],
+  logStorageLabel: "Stored in the local desktop app support directory.",
+  lastCrash: null,
+  lastError: null,
+  lastLoadFailure: null,
+  recentCriticalEvents: [],
 };
 
 const formatBytes = (value: number) => {
@@ -71,12 +95,15 @@ export const SettingsPage = () => {
   const { appInfo } = useShellContext();
   const navigate = useNavigate();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
+  const [supportSnapshot, setSupportSnapshot] = useState<AppSupportSnapshot>(emptySupportSnapshot);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [isRunningLocalSync, setIsRunningLocalSync] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingSupportBundle, setIsExportingSupportBundle] = useState(false);
+  const [isExportingLogs, setIsExportingLogs] = useState(false);
   const [syncRows, setSyncRows] = useState<AppSyncOutboxRow[]>([]);
 
   const loadDiagnostics = async () => {
@@ -85,11 +112,13 @@ export const SettingsPage = () => {
     }
 
     try {
-      const [nextDiagnostics, nextSyncRows] = await Promise.all([
+      const [nextDiagnostics, nextSupportSnapshot, nextSyncRows] = await Promise.all([
         window.bukowskiApp.getDiagnostics(),
+        window.bukowskiApp.getSupportSnapshot(),
         window.bukowskiApp.getSyncOutboxRows(),
       ]);
       setDiagnostics(nextDiagnostics);
+      setSupportSnapshot(nextSupportSnapshot);
       setSyncRows(nextSyncRows);
       setError(null);
     } catch (nextError) {
@@ -114,8 +143,12 @@ export const SettingsPage = () => {
       if ("diagnostics" in result) {
         setDiagnostics(result.diagnostics);
         if (window.bukowskiApp) {
-          const nextSyncRows = await window.bukowskiApp.getSyncOutboxRows();
+          const [nextSyncRows, nextSupportSnapshot] = await Promise.all([
+            window.bukowskiApp.getSyncOutboxRows(),
+            window.bukowskiApp.getSupportSnapshot(),
+          ]);
           setSyncRows(nextSyncRows);
+          setSupportSnapshot(nextSupportSnapshot);
         }
       } else {
         await loadDiagnostics();
@@ -192,6 +225,23 @@ export const SettingsPage = () => {
       },
     ],
     [diagnostics],
+  );
+
+  const formatSupportEvent = (event: AppSupportEventSummary | null, emptyLabel: string) =>
+    event ? `${event.processLabel} · ${event.errorName} · ${formatDateLabel(event.occurredAt)}` : emptyLabel;
+
+  const supportSummaryText = useMemo(
+    () =>
+      [
+        `App: ${supportSnapshot.appInfo.appName} ${supportSnapshot.appInfo.version}`,
+        `Platform: ${supportSnapshot.appInfo.platform}`,
+        `Build: ${supportSnapshot.appInfo.isPackaged ? "Packaged build" : "Development build"}`,
+        `Last crash: ${formatSupportEvent(supportSnapshot.lastCrash, "None captured yet")}`,
+        `Last error: ${formatSupportEvent(supportSnapshot.lastError, "None captured yet")}`,
+        `Last load failure: ${formatSupportEvent(supportSnapshot.lastLoadFailure, "None captured yet")}`,
+        `Recent log files: ${supportSnapshot.recentLogFiles.map((file) => file.name).join(", ") || "None"}`,
+      ].join("\n"),
+    [supportSnapshot],
   );
 
   return (
@@ -285,6 +335,77 @@ export const SettingsPage = () => {
             type="button"
           >
             {isExporting ? "Exporting..." : "Export all data as JSON"}
+          </button>
+        </div>
+      </SurfaceCard>
+
+      <SurfaceCard title="Support" subtitle="Export diagnostics and recent logs when an internal alpha build needs debugging.">
+        <div className="summary-grid">
+          <div className="summary-row">
+            <span className="summary-label">Last crash</span>
+            <span className="summary-value">{formatSupportEvent(supportSnapshot.lastCrash, "None captured yet")}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Last strong error</span>
+            <span className="summary-value">{formatSupportEvent(supportSnapshot.lastError, "None captured yet")}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Last load failure</span>
+            <span className="summary-value">
+              {formatSupportEvent(supportSnapshot.lastLoadFailure, "No did-fail-load or render-process-gone yet")}
+            </span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Logs</span>
+            <span className="summary-value">{supportSnapshot.logStorageLabel}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Recent log files</span>
+            <span className="summary-value">
+              {supportSnapshot.recentLogFiles.length
+                ? supportSnapshot.recentLogFiles
+                    .map((file) => `${file.name} (${formatBytes(file.sizeBytes)})`)
+                    .join(", ")
+                : "No log files yet"}
+            </span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Critical events tracked</span>
+            <span className="summary-value">{supportSnapshot.recentCriticalEvents.length}</span>
+          </div>
+        </div>
+
+        <div className="action-panel-actions action-panel-actions-start">
+          <button
+            className="action-primary-button"
+            disabled={isExportingSupportBundle}
+            onClick={() => void runAction(() => window.bukowskiApp!.exportSupportBundle(), setIsExportingSupportBundle)}
+            type="button"
+          >
+            {isExportingSupportBundle ? "Exporting support bundle..." : "Export support bundle"}
+          </button>
+          <button
+            className="ghost-control"
+            disabled={isExportingLogs}
+            onClick={() => void runAction(() => window.bukowskiApp!.exportRecentLogs(), setIsExportingLogs)}
+            type="button"
+          >
+            {isExportingLogs ? "Exporting logs..." : "Export recent logs"}
+          </button>
+          <button
+            className="ghost-control"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(supportSummaryText);
+                setFeedback("Copied the diagnostics summary to your clipboard.");
+                setError(null);
+              } catch (copyError) {
+                setError(copyError instanceof Error ? copyError.message : "The app could not copy the diagnostics summary.");
+              }
+            }}
+            type="button"
+          >
+            Copy diagnostics summary
           </button>
         </div>
       </SurfaceCard>

@@ -24,6 +24,13 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
   const debouncedQuery = useDebouncedValue(query.trim(), 100);
 
   const flattenedResults = useMemo(() => groups.flatMap((group) => group.results), [groups]);
+  const resultIndexMap = useMemo(
+    () =>
+      new Map(
+        flattenedResults.map((result, index) => [`${result.entityType}:${result.entityId}`, index]),
+      ),
+    [flattenedResults],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -192,9 +199,7 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
                   <div className="command-palette-group-label">{group.label}</div>
                   <div className="command-palette-result-list">
                     {group.results.map((result) => {
-                      const resultIndex = flattenedResults.findIndex(
-                        (candidate) => candidate.entityType === result.entityType && candidate.entityId === result.entityId,
-                      );
+                      const resultIndex = resultIndexMap.get(`${result.entityType}:${result.entityId}`) ?? 0;
 
                       return (
                         <button

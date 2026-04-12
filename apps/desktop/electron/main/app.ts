@@ -7,10 +7,12 @@ import { registerFoundationIpc } from "./ipc/registerFoundationIpc";
 import { buildAppMenu } from "./menus/buildAppMenu";
 import { getDesktopEnvironment } from "./services/appEnvironment";
 import { initializeLocalDatabase } from "./services/data/localDatabase";
+import { getDesktopLogger, initializeDesktopLogger } from "./services/logger";
 import { createMainWindow } from "./windows/createMainWindow";
 
 const { devServerUrl, preloadPath, rendererDist } = getDesktopEnvironment(import.meta.url);
 const isE2E = process.env.BUKOWSKI_E2E === "1";
+const logger = getDesktopLogger("app");
 
 const createAppWindow = () =>
   createMainWindow({
@@ -59,6 +61,7 @@ const attachProcessRuntimeTelemetry = (
   runtimeDiagnostics: ReturnType<typeof initializeLocalDatabase>["runtimeDiagnostics"],
 ) => {
   process.on("uncaughtException", (error) => {
+    logger.error("Main process uncaught exception.", error);
     runtimeDiagnostics.recordRuntimeError({
       sourceKind: "main",
       processLabel: "Electron main",
@@ -71,6 +74,7 @@ const attachProcessRuntimeTelemetry = (
 
   process.on("unhandledRejection", (reason) => {
     const error = reason instanceof Error ? reason : new Error(String(reason));
+    logger.error("Main process unhandled rejection.", error);
     runtimeDiagnostics.recordRuntimeError({
       sourceKind: "main",
       processLabel: "Electron main",
@@ -108,6 +112,8 @@ if (!isE2E) {
 }
 
 app.whenReady().then(() => {
+  initializeDesktopLogger();
+  logger.info("Electron main ready.");
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       cancel: false,
@@ -124,12 +130,15 @@ app.whenReady().then(() => {
   registerAppIpc({
     database: localDatabase.database,
     getDiagnosticsSnapshot: localDatabase.getDiagnosticsSnapshot,
+    getSupportSnapshot: localDatabase.getSupportSnapshot,
     createBackupNow: localDatabase.createBackupNow,
     runIntegrityCheckNow: localDatabase.runIntegrityCheckNow,
     runLocalSyncNow: localDatabase.runLocalSyncNow,
     getSyncOutboxRows: localDatabase.getSyncOutboxRows,
     retrySyncOutboxRow: localDatabase.retrySyncOutboxRow,
     retryAllFailedSyncOutboxRows: localDatabase.retryAllFailedSyncOutboxRows,
+    exportRecentLogs: localDatabase.exportRecentLogs,
+    exportSupportBundle: localDatabase.exportSupportBundle,
   });
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,
@@ -161,6 +170,7 @@ if (!app.isPackaged) {
     }
 
     console.info("[dev] Electron preload reload");
+    logger.info("Electron preload reload.");
     BrowserWindow.getAllWindows().forEach((window) => {
       window.webContents.reload();
     });

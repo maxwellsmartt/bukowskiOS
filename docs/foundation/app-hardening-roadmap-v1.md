@@ -159,6 +159,29 @@
   - `medio`: `retry visible` hace retries secuenciales a través del bridge actual; si la cola crece mucho convendrá mover esto a una acción bulk nativa en main
   - `medio`: todavía no hay filtros por `operationType` ni export puntual del payload/error desde la vista
 
+### Slice A7 — Profiling real con dataset pesado
+- Estado: `done`
+- Objetivo:
+  - medir las superficies más pesadas con una carga local reproducible y dejar mejoras pequeñas pero reales en los puntos más obvios
+- Área:
+  - frontend / backend / infra
+- Alcance inicial:
+  - dataset sintético pesado activable por entorno
+  - spec E2E de performance para shell real
+  - optimización puntual en `Global Search`
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - nuevo seed opcional `BUKOWSKI_PROFILE_DATASET=1` para timeline, Mission Control, search y chat
+  - nuevo baseline documentado en `docs/foundation/performance-profile-baseline-v1.md`
+  - nueva spec `e2e/perf/runtime-profile.spec.ts`
+  - `GlobalSearchPalette` ya no hace búsqueda `findIndex` por cada resultado renderizado; usa un índice memoizado
+- Riesgos remanentes:
+  - `medio`: todavía falta correr el baseline perf completo de forma estable sobre una Mac arm64 limpia para fijar thresholds más estrictos
+  - `medio`: este slice deja medición reproducible y una optimización puntual, pero no reemplaza profiling profundo de CPU/memoria
+
 ## P0 — Crítico ahora mismo
 
 ### Slice 1 — Electron Security Hardening

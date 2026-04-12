@@ -1,6 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { AppSyncOutboxRow } from "@contracts";
 
+import { getDesktopLogger } from "../logger";
+
 type SyncOutboxStatus = "pending" | "processing" | "failed" | "sent";
 
 type SyncOutboxRow = {
@@ -35,6 +37,8 @@ type SyncOutboxWorkerOptions = {
   batchSize?: number;
   staleProcessingMinutes?: number;
 };
+
+const logger = getDesktopLogger("sync-outbox-worker");
 
 const addMinutes = (value: string, minutes: number) => {
   const date = new Date(value);
@@ -224,7 +228,9 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
         )
         .run(timestamp);
 
-      return Number(result.changes);
+      const retriedCount = Number(result.changes);
+      logger.info("Marked failed sync rows as pending again.", { retriedCount });
+      return retriedCount;
     },
 
     runDueEntries(): SyncOutboxWorkerSummary {
@@ -319,6 +325,11 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
               )
               .run(now(), claimedRow.id);
             sentRows += 1;
+            logger.debug("Acknowledged sync row locally.", {
+              id: claimedRow.id,
+              entityType: claimedRow.entity_type,
+              operationType: claimedRow.operation_type,
+            });
           } catch (error) {
             const retryTimestamp = now();
             const retryDelayMinutes = resolveRetryDelayMinutes(claimedRow.attempt_count);
@@ -341,12 +352,20 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
                 claimedRow.id,
               );
             failedRows += 1;
+            logger.warn("Sync row failed and was scheduled for retry.", {
+              id: claimedRow.id,
+              entityType: claimedRow.entity_type,
+              operationType: claimedRow.operation_type,
+              attemptCount: claimedRow.attempt_count,
+              nextRetryAt: addMinutes(retryTimestamp, retryDelayMinutes),
+              error: error instanceof Error ? error.message : String(error),
+            });
           }
         });
 
         const counts = getCounts();
 
-        return {
+        const summary = {
           recoveredStaleRows,
           processedRows,
           sentRows,
@@ -356,6 +375,10 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
           processingAfter: counts.processing,
           failedAfter: counts.failed,
         };
+
+        logger.info("Finished local sync worker pass.", summary);
+
+        return summary;
       } finally {
         isRunning = false;
       }

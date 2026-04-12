@@ -9,12 +9,15 @@ import { assertAllowedExternalUrl, assertTrustedIpcSender, sanitizeIpcError } fr
 type RegisterAppIpcOptions = {
   database: DatabaseSync;
   getDiagnosticsSnapshot: () => import("@contracts").AppDiagnosticsSnapshot;
+  getSupportSnapshot: () => import("@contracts").AppSupportSnapshot;
   createBackupNow: () => import("@contracts").AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => import("@contracts").AppDiagnosticsSnapshot;
   runLocalSyncNow: () => import("@contracts").AppDiagnosticsSnapshot;
   getSyncOutboxRows: () => import("@contracts").AppSyncOutboxRow[];
   retrySyncOutboxRow: (id: string) => import("@contracts").AppDiagnosticsSnapshot;
   retryAllFailedSyncOutboxRows: () => import("@contracts").AppDiagnosticsSnapshot;
+  exportRecentLogs: (filePath: string) => import("@contracts").AppExportResult;
+  exportSupportBundle: (directoryPath: string) => import("@contracts").AppExportResult;
 };
 
 const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) => {
@@ -28,6 +31,7 @@ const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) =
     return {
       saved: false,
       fileName: null,
+      savedPath: null,
       summary: "Export cancelled.",
     };
   }
@@ -66,6 +70,7 @@ const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) =
   return {
     saved: true,
     fileName: path.basename(filePath),
+    savedPath: filePath,
     summary: `Exported workspace data to ${path.basename(filePath)}.`,
   };
 };
@@ -73,12 +78,15 @@ const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) =
 export const registerAppIpc = ({
   database,
   getDiagnosticsSnapshot,
+  getSupportSnapshot,
   createBackupNow,
   runIntegrityCheckNow,
   runLocalSyncNow,
   getSyncOutboxRows,
   retrySyncOutboxRow,
   retryAllFailedSyncOutboxRows,
+  exportRecentLogs,
+  exportSupportBundle,
 }: RegisterAppIpcOptions) => {
   ipcMain.handle(ipcChannels.app.getInfo, (event) => {
     assertTrustedIpcSender(event);
@@ -94,6 +102,10 @@ export const registerAppIpc = ({
   ipcMain.handle(ipcChannels.app.getDiagnostics, (event) => {
     assertTrustedIpcSender(event);
     return getDiagnosticsSnapshot();
+  });
+  ipcMain.handle(ipcChannels.app.getSupportSnapshot, (event) => {
+    assertTrustedIpcSender(event);
+    return getSupportSnapshot();
   });
   ipcMain.handle(ipcChannels.app.createBackup, (event) => {
     try {
@@ -164,6 +176,57 @@ export const registerAppIpc = ({
       return await exportDatabaseJson(database);
     } catch (error) {
       throw sanitizeIpcError(error, "The app could not export local data.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.exportRecentLogs, async (event) => {
+    try {
+      assertTrustedIpcSender(event);
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: "Export recent BukowskiOS logs",
+        defaultPath: path.join(app.getPath("documents"), `bukowski-logs-${new Date().toISOString().slice(0, 10)}.txt`),
+        filters: [{ name: "Text", extensions: ["txt"] }],
+      });
+
+      if (canceled || !filePath) {
+        return {
+          saved: false,
+          fileName: null,
+          savedPath: null,
+          summary: "Log export cancelled.",
+        };
+      }
+
+      return exportRecentLogs(filePath);
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not export recent logs.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.exportSupportBundle, async (event) => {
+    try {
+      assertTrustedIpcSender(event);
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: "Choose where to save the BukowskiOS support bundle",
+        buttonLabel: "Save support bundle here",
+        properties: ["openDirectory", "createDirectory"],
+      });
+
+      if (canceled || !filePaths[0]) {
+        return {
+          saved: false,
+          fileName: null,
+          savedPath: null,
+          summary: "Support bundle export cancelled.",
+        };
+      }
+
+      const bundleDirectory = path.join(
+        filePaths[0],
+        `bukowski-support-${new Date().toISOString().replace(/[:.]/g, "-")}`,
+      );
+
+      return exportSupportBundle(bundleDirectory);
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not export the support bundle.");
     }
   });
   ipcMain.handle(ipcChannels.app.openExternal, (event, url: string) => {

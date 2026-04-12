@@ -17,11 +17,13 @@
     "verify:mac-build": "node ./build/verify-macos-build.cjs",
     "test": "vitest run",
     "test:e2e": "pnpm build && playwright test -c playwright.electron.config.ts",
+    "test:e2e:perf": "pnpm build && BUKOWSKI_PROFILE_DATASET=1 playwright test -c playwright.electron.config.ts e2e/perf",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",
     "bwip-js": "^4.9.0",
+    "electron-log": "^5.4.3",
     "lucide-react": "^0.511.0",
     "pdfkit": "^0.18.0",
     "qrcode": "^1.5.4",

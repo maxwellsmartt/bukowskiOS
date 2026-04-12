@@ -14,10 +14,12 @@ import type { OpenAIProviderService } from "./openaiProviderService";
 import type { AssistantGatewaySessionStore } from "./assistantGatewaySessionStore";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { getDesktopLogger } from "../logger";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
 const maxToolCalls = 5;
 const maxToolPayloadChars = 4000;
+const logger = getDesktopLogger("assistant-gateway");
 
 const orchestrationSchema = {
   type: "json_schema",
@@ -102,6 +104,11 @@ const serializeToolPayload = (payload: unknown) => {
   if (serialized.length <= maxToolPayloadChars) {
     return serialized;
   }
+
+  logger.warn("Truncated oversized tool payload before second model pass.", {
+    originalLength: serialized.length,
+    maxToolPayloadChars,
+  });
 
   return JSON.stringify({
     _truncated: true,

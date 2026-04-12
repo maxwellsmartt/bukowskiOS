@@ -22,6 +22,7 @@ import type {
   AppDiagnosticsSnapshot,
   AppExportResult,
   AppInfo,
+  AppSupportSnapshot,
   AppSyncOutboxRow,
   AssetsOverviewSnapshot,
   CreateAgentCommand,
@@ -104,6 +105,7 @@ declare global {
     bukowskiApp?: {
       getAppInfo: () => Promise<AppInfo>;
       getDiagnostics: () => Promise<AppDiagnosticsSnapshot>;
+      getSupportSnapshot: () => Promise<AppSupportSnapshot>;
       createBackup: () => Promise<AppActionResult>;
       runIntegrityCheck: () => Promise<AppActionResult>;
       runLocalSync: () => Promise<AppActionResult>;
@@ -111,6 +113,8 @@ declare global {
       retrySyncOutboxRow: (id: string) => Promise<AppActionResult>;
       retryAllFailedSyncOutboxRows: () => Promise<AppActionResult>;
       exportWorkspaceData: () => Promise<AppExportResult>;
+      exportSupportBundle: () => Promise<AppExportResult>;
+      exportRecentLogs: () => Promise<AppExportResult>;
       openExternal: (url: string) => Promise<void>;
     };
     bukowskiShell?: {

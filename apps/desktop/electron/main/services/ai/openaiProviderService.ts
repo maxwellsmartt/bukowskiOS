@@ -1,3 +1,7 @@
+import { getDesktopLogger } from "../logger";
+
+const logger = getDesktopLogger("openai-provider");
+
 export type OpenAIProviderConfig = {
   apiKey: string;
   baseUrl?: string;
@@ -159,6 +163,12 @@ export const createOpenAIProviderService = () => ({
 
       if (!response.ok) {
         const summary = await mapErrorSummary(response);
+        logger.warn("OpenAI request failed.", {
+          status: response.status,
+          baseUrl: resolveBaseUrl(config.baseUrl),
+          model: resolveModel(input.model),
+          summary,
+        });
         return {
           ok: false,
           status: response.status === 401 || response.status === 403 ? "invalid_key" : "unavailable",
@@ -176,6 +186,11 @@ export const createOpenAIProviderService = () => ({
       };
     } catch (error) {
       const summary = error instanceof Error ? error.message : "OpenAI request failed.";
+      logger.error("OpenAI request threw before completion.", {
+        baseUrl: resolveBaseUrl(config.baseUrl),
+        model: resolveModel(input.model),
+        summary,
+      });
 
       return {
         ok: false,

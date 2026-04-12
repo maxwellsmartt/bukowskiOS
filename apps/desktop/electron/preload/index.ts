@@ -22,6 +22,7 @@ import type {
   AppDiagnosticsSnapshot,
   AppExportResult,
   AppInfo,
+  AppSupportSnapshot,
   AppSyncOutboxRow,
   AssetsOverviewSnapshot,
   CreateAgentCommand,
@@ -112,6 +113,7 @@ ipcRenderer.on(ipcChannels.shell.appAction, (_event, action: ShellAppAction) => 
 const bukowskiApp = {
   getAppInfo: () => ipcRenderer.invoke(ipcChannels.app.getInfo) as Promise<AppInfo>,
   getDiagnostics: () => ipcRenderer.invoke(ipcChannels.app.getDiagnostics) as Promise<AppDiagnosticsSnapshot>,
+  getSupportSnapshot: () => ipcRenderer.invoke(ipcChannels.app.getSupportSnapshot) as Promise<AppSupportSnapshot>,
   createBackup: () => ipcRenderer.invoke(ipcChannels.app.createBackup) as Promise<AppActionResult>,
   runIntegrityCheck: () => ipcRenderer.invoke(ipcChannels.app.runIntegrityCheck) as Promise<AppActionResult>,
   runLocalSync: () => ipcRenderer.invoke(ipcChannels.app.runLocalSync) as Promise<AppActionResult>,
@@ -121,6 +123,8 @@ const bukowskiApp = {
   retryAllFailedSyncOutboxRows: () =>
     ipcRenderer.invoke(ipcChannels.app.retryAllFailedSyncOutboxRows) as Promise<AppActionResult>,
   exportWorkspaceData: () => ipcRenderer.invoke(ipcChannels.app.exportWorkspaceData) as Promise<AppExportResult>,
+  exportSupportBundle: () => ipcRenderer.invoke(ipcChannels.app.exportSupportBundle) as Promise<AppExportResult>,
+  exportRecentLogs: () => ipcRenderer.invoke(ipcChannels.app.exportRecentLogs) as Promise<AppExportResult>,
   openExternal: (url: string) => ipcRenderer.invoke(ipcChannels.app.openExternal, url) as Promise<void>,
 };
 

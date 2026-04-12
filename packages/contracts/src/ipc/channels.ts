@@ -2,6 +2,7 @@ export const ipcChannels = {
   app: {
     getInfo: "bukowskiApp:getInfo",
     getDiagnostics: "bukowskiApp:getDiagnostics",
+    getSupportSnapshot: "bukowskiApp:getSupportSnapshot",
     createBackup: "bukowskiApp:createBackup",
     runIntegrityCheck: "bukowskiApp:runIntegrityCheck",
     runLocalSync: "bukowskiApp:runLocalSync",
@@ -9,6 +10,8 @@ export const ipcChannels = {
     retrySyncOutboxRow: "bukowskiApp:retrySyncOutboxRow",
     retryAllFailedSyncOutboxRows: "bukowskiApp:retryAllFailedSyncOutboxRows",
     exportWorkspaceData: "bukowskiApp:exportWorkspaceData",
+    exportSupportBundle: "bukowskiApp:exportSupportBundle",
+    exportRecentLogs: "bukowskiApp:exportRecentLogs",
     openExternal: "bukowskiApp:openExternal",
     reportRuntimeError: "bukowskiApp:reportRuntimeError",
   },
