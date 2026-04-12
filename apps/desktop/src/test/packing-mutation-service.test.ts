@@ -16,7 +16,7 @@ describe("packing mutation service", () => {
       assetIds: ["asset-legacy-rentman-1", "asset-legacy-rentman-2"],
       projectId: "project-archipielago",
       responsibleUserId: "user-paola",
-      returnDueAt: "2026-04-12T18:00:00.000Z",
+      returnDueAt: "2030-04-12T18:00:00.000Z",
       notes: "Issued from packing test coverage.",
       actorType: "user",
       sourceChannel: "desktop",
