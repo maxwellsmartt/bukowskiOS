@@ -90,6 +90,33 @@ export type IncidentListQuery = {
   sortDirection: ListSortDirection;
 };
 
+export type IncidentDetailSnapshot = {
+  incident: {
+    id: string;
+    assetId: string | null;
+    asset: string;
+    projectId: string | null;
+    project: string;
+    departmentId: string | null;
+    department: string;
+    assignmentId: string | null;
+    responsibleUserId: string | null;
+    responsible: string;
+    incidentType: string;
+    severity: string;
+    status: string;
+    title: string;
+    description: string;
+    reportedAt: string;
+    resolvedAt: string | null;
+    costEstimate: string;
+    costEstimateValue: number | null;
+    currency: string | null;
+    financialStatus: string;
+    notes: string | null;
+  } | null;
+};
+
 export type ProjectCardRow = {
   id: string;
   code: string;

@@ -84,7 +84,7 @@ export const AssetAssignMovePanel = ({
         </button>
       }
       title="Assign / move"
-      subtitle="Run a real operational command against the selected assets. This writes timeline events and updates current state."
+      subtitle="Run one auditable operational command against the full selection. This writes timeline events and updates current state together."
     >
       <div className="chip-row">
         <span className="action-panel-selection">{selectedLabel}</span>

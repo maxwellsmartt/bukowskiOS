@@ -256,6 +256,38 @@ export const reportIncidentSchema = z
   })
   .strict();
 
+export const updateIncidentSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    incidentId: nonEmptyString,
+    title: optionalTrimmedString,
+    description: optionalTrimmedString,
+    severity: optionalTrimmedString,
+    status: optionalTrimmedString,
+    responsibleUserId: optionalNullableString,
+    costEstimate: z.number().finite().nonnegative().nullable().optional(),
+    financialStatus: optionalNullableString,
+    notes: optionalNullableString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
+export const resolveIncidentSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    incidentId: nonEmptyString,
+    resolutionNotes: optionalTrimmedString,
+    costEstimate: z.number().finite().nonnegative().optional(),
+    financialStatus: optionalTrimmedString,
+    resolvedByUserId: optionalTrimmedString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
 export const createPackingSlipSchema = z
   .object({
     commandId: nonEmptyString,

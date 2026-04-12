@@ -49,6 +49,8 @@ import type {
   FinanceOverviewSnapshot,
   GlobalSearchGroup,
   GlobalSearchQuery,
+  IncidentDetailSnapshot,
+  IncidentMutationResult,
   IncidentListQuery,
   IncidentListRow,
   OverviewSnapshot,
@@ -60,6 +62,7 @@ import type {
   ProjectDetailSnapshot,
   ReportIncidentCommand,
   ReportIncidentResult,
+  ResolveIncidentCommand,
   RecordRuntimeErrorCommand,
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
@@ -82,6 +85,7 @@ import type {
   UpdateProjectInput,
   UpdateProjectUnitInput,
   UpdateRmaCaseCommand,
+  UpdateIncidentCommand,
   RmaCaseDetailSnapshot,
   RmaCaseMutationResult,
   RmaSnapshot,
@@ -195,8 +199,14 @@ const bukowskiPacking = {
 
 const bukowskiIncidents = {
   getList: (query?: IncidentListQuery) => ipcRenderer.invoke(ipcChannels.incidents.getList, query) as Promise<IncidentListRow[]>,
+  getDetail: (incidentId: string) =>
+    ipcRenderer.invoke(ipcChannels.incidents.getDetail, incidentId) as Promise<IncidentDetailSnapshot>,
   report: (input: ReportIncidentCommand) =>
     ipcRenderer.invoke(ipcChannels.incidents.report, input) as Promise<ReportIncidentResult>,
+  update: (input: UpdateIncidentCommand) =>
+    ipcRenderer.invoke(ipcChannels.incidents.update, input) as Promise<IncidentMutationResult>,
+  resolve: (input: ResolveIncidentCommand) =>
+    ipcRenderer.invoke(ipcChannels.incidents.resolve, input) as Promise<IncidentMutationResult>,
 };
 
 const bukowskiProjects = {

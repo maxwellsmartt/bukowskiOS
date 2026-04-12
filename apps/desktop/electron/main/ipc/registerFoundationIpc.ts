@@ -18,6 +18,7 @@ import {
   deleteProjectUnitSchema,
   recordRuntimeErrorSchema,
   reportIncidentSchema,
+  resolveIncidentSchema,
   returnPackingSlipItemsSchema,
   reviewAgentRunSchema,
   saveAiProviderConfigSchema,
@@ -31,6 +32,7 @@ import {
   updateAssetSchema,
   updateAssistantThreadPreferencesSchema,
   updateCatalogEntitySchema,
+  updateIncidentSchema,
   updateProjectSchema,
   updateProjectUnitSchema,
   updateRmaCaseSchema,
@@ -73,6 +75,7 @@ import type {
   PackingSlipListQuery,
   ProjectListQuery,
   ReportIncidentCommand,
+  ResolveIncidentCommand,
   ReturnPackingSlipItemsCommand,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
@@ -80,6 +83,7 @@ import type {
   UnassignCrewFromProjectUnitInput,
   UpdateAssetCommand,
   UpdateCatalogEntityInput,
+  UpdateIncidentCommand,
   UpdateProjectInput,
   UpdateProjectUnitInput,
   UpdateRmaCaseCommand,
@@ -125,6 +129,8 @@ type RegisterFoundationIpcOptions = {
   };
   incidentMutations: {
     reportIncident: (input: ReportIncidentCommand) => unknown;
+    updateIncident: (input: UpdateIncidentCommand) => unknown;
+    resolveIncident: (input: ResolveIncidentCommand) => unknown;
   };
   packingMutations: {
     createPackingSlip: (input: CreatePackingSlipCommand) => unknown;
@@ -309,7 +315,14 @@ export const registerFoundationIpc = ({
     (_event, query: IncidentListQuery | undefined) => foundationReads.getIncidents(query),
     "The app could not load incidents.",
   );
+  safeHandleRead(
+    ipcChannels.incidents.getDetail,
+    (_event, incidentId: string) => foundationReads.getIncidentDetail(incidentId),
+    "The app could not load that incident.",
+  );
   safeHandle(ipcChannels.incidents.report, reportIncidentSchema, (_event, input) => incidentMutations.reportIncident(input));
+  safeHandle(ipcChannels.incidents.update, updateIncidentSchema, (_event, input) => incidentMutations.updateIncident(input));
+  safeHandle(ipcChannels.incidents.resolve, resolveIncidentSchema, (_event, input) => incidentMutations.resolveIncident(input));
   safeHandleRead(
     ipcChannels.projects.getList,
     (_event, query: ProjectListQuery | undefined) => foundationReads.getProjects(query),

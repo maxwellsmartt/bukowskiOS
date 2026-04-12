@@ -45,6 +45,41 @@ export type ReportIncidentResult = {
   summary: string;
 };
 
+export type UpdateIncidentCommand = {
+  commandId: string;
+  workspaceId: string;
+  incidentId: string;
+  title?: string;
+  description?: string;
+  severity?: string;
+  status?: string;
+  responsibleUserId?: string | null;
+  costEstimate?: number | null;
+  financialStatus?: string | null;
+  notes?: string | null;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+};
+
+export type ResolveIncidentCommand = {
+  commandId: string;
+  workspaceId: string;
+  incidentId: string;
+  resolutionNotes?: string;
+  costEstimate?: number;
+  financialStatus?: string;
+  resolvedByUserId?: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+};
+
+export type IncidentMutationResult = {
+  commandId: string;
+  incidentId: string;
+  repeated: boolean;
+  summary: string;
+};
+
 export type AssignMoveAssetsInput = {
   commandId: string;
   workspaceId: string;

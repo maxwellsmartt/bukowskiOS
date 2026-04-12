@@ -1,6 +1,12 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import type { ReportIncidentCommand, ReportIncidentResult } from "@contracts";
+import type {
+  IncidentMutationResult,
+  ReportIncidentCommand,
+  ReportIncidentResult,
+  ResolveIncidentCommand,
+  UpdateIncidentCommand,
+} from "@contracts";
 
 const defaultActorUserId = "user-ops";
 
@@ -122,6 +128,83 @@ const buildFailedCommandMessage = (label: string, previousError?: string | null)
     ? `This command id already failed once for ${label}: ${previousError}`
     : `This command id already failed once for ${label}. Generate a new action and retry.`;
 
+const normalizeOptionalText = (value?: string | null) => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  const nextValue = value.trim();
+  return nextValue ? nextValue : null;
+};
+
+const createCommandReceiptHelpers = (db: DatabaseSync) => ({
+  getExistingReceipt(commandId: string) {
+    return db
+      .prepare(
+        `
+          SELECT outcome_status, error_message
+          FROM command_receipts
+          WHERE command_id = ?
+          LIMIT 1
+        `,
+      )
+      .get(commandId) as { outcome_status: string; error_message: string | null } | undefined;
+  },
+  insertReceipt: db.prepare(
+    `
+      INSERT OR REPLACE INTO command_receipts (
+        command_id,
+        workspace_id,
+        actor_user_id,
+        actor_type,
+        source_channel,
+        executed_at,
+        outcome_status,
+        error_message
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+  ),
+});
+
+const loadIncidentRecord = (db: DatabaseSync, workspaceId: string, incidentId: string) =>
+  db
+    .prepare(
+      `
+        SELECT
+          id,
+          responsible_user_id,
+          status,
+          title,
+          description,
+          resolved_at,
+          notes,
+          cost_estimate,
+          financial_status
+        FROM incidents
+        WHERE workspace_id = ?
+          AND id = ?
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, incidentId) as
+    | {
+        id: string;
+        responsible_user_id: string | null;
+        status: string;
+        title: string;
+        description: string;
+        resolved_at: string | null;
+        notes: string | null;
+        cost_estimate: number | null;
+        financial_status: string | null;
+      }
+    | undefined;
+
 export const createIncidentMutationService = (db: DatabaseSync) => ({
   reportIncident(input: ReportIncidentCommand): ReportIncidentResult {
     const title = ensureValue(input.title, "Incident title");
@@ -133,16 +216,8 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
       throw new Error("Incident reporting needs at least an asset or project context.");
     }
 
-    const existingReceipt = db
-      .prepare(
-        `
-          SELECT outcome_status
-          FROM command_receipts
-          WHERE command_id = ?
-          LIMIT 1
-        `,
-      )
-      .get(input.commandId) as { outcome_status: string; error_message: string | null } | undefined;
+    const receiptHelpers = createCommandReceiptHelpers(db);
+    const existingReceipt = receiptHelpers.getExistingReceipt(input.commandId);
 
     if (existingReceipt?.outcome_status === "success") {
       return {
@@ -233,22 +308,6 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
     const eventId = input.assetId ? `event-${input.commandId}` : null;
     const assetName = input.assetId ? assetMap.get(input.assetId) : undefined;
     const projectName = nextProjectId ? projectMap.get(nextProjectId) : undefined;
-
-    const insertReceipt = db.prepare(
-      `
-        INSERT OR REPLACE INTO command_receipts (
-          command_id,
-          workspace_id,
-          actor_user_id,
-          actor_type,
-          source_channel,
-          executed_at,
-          outcome_status,
-          error_message
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    );
 
     db.exec("BEGIN");
 
@@ -423,7 +482,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
         now,
       );
 
-      insertReceipt.run(
+      receiptHelpers.insertReceipt.run(
         input.commandId,
         input.workspaceId,
         defaultActorUserId,
@@ -445,7 +504,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
     } catch (error) {
       db.exec("ROLLBACK");
 
-      insertReceipt.run(
+      receiptHelpers.insertReceipt.run(
         input.commandId,
         input.workspaceId,
         defaultActorUserId,
@@ -458,5 +517,136 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
 
       throw error;
     }
+  },
+
+  updateIncident(input: UpdateIncidentCommand): IncidentMutationResult {
+    const receiptHelpers = createCommandReceiptHelpers(db);
+    const existingReceipt = receiptHelpers.getExistingReceipt(input.commandId);
+
+    if (existingReceipt?.outcome_status === "success") {
+      return {
+        commandId: input.commandId,
+        incidentId: input.incidentId,
+        repeated: true,
+        summary: "This incident update was already applied.",
+      };
+    }
+
+    if (existingReceipt?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage("incident update", existingReceipt.error_message));
+    }
+
+    const incident = loadIncidentRecord(db, input.workspaceId, input.incidentId);
+    if (!incident) {
+      throw new Error("Incident not found.");
+    }
+
+    const nextResponsibleUserId =
+      input.responsibleUserId === undefined ? incident.responsible_user_id : normalizeOptionalText(input.responsibleUserId);
+    const userMap = loadUserMap(db, uniqueValues([nextResponsibleUserId, defaultActorUserId]));
+    ensureEntityExists(nextResponsibleUserId ?? undefined, "Responsible user", userMap);
+    ensureEntityExists(defaultActorUserId, "Actor user", userMap);
+
+    const nextTitle = input.title?.trim() ? input.title.trim() : incident.title;
+    const nextDescription = input.description?.trim() ? input.description.trim() : incident.description;
+    const nextSeverity = input.severity?.trim() ? input.severity.trim() : undefined;
+    const nextStatus = input.status?.trim() ? input.status.trim() : incident.status;
+    const nextNotes = input.notes === undefined ? incident.notes : normalizeOptionalText(input.notes);
+    const nextCostEstimate = input.costEstimate === undefined ? incident.cost_estimate : input.costEstimate;
+    const nextFinancialStatus =
+      input.financialStatus === undefined ? incident.financial_status : normalizeOptionalText(input.financialStatus);
+    const now = new Date().toISOString();
+    const nextResolvedAt = nextStatus === "Resolved" ? incident.resolved_at ?? now : null;
+
+    db.exec("BEGIN");
+
+    try {
+      db.prepare(
+        `
+          UPDATE incidents
+          SET
+            responsible_user_id = ?,
+            severity = COALESCE(?, severity),
+            status = ?,
+            title = ?,
+            description = ?,
+            notes = ?,
+            cost_estimate = ?,
+            financial_status = ?,
+            resolved_at = ?,
+            updated_at = ?
+          WHERE workspace_id = ?
+            AND id = ?
+        `,
+      ).run(
+        nextResponsibleUserId ?? null,
+        nextSeverity ?? null,
+        nextStatus,
+        nextTitle,
+        nextDescription,
+        nextNotes ?? null,
+        nextCostEstimate,
+        nextFinancialStatus ?? null,
+        nextResolvedAt,
+        now,
+        input.workspaceId,
+        input.incidentId,
+      );
+
+      receiptHelpers.insertReceipt.run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        "success",
+        null,
+      );
+
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      receiptHelpers.insertReceipt.run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        "failed",
+        error instanceof Error ? error.message : "Unknown incident update error",
+      );
+      throw error;
+    }
+
+    return {
+      commandId: input.commandId,
+      incidentId: input.incidentId,
+      repeated: false,
+      summary: nextStatus === "Resolved" ? "Incident resolved successfully." : "Incident updated successfully.",
+    };
+  },
+
+  resolveIncident(input: ResolveIncidentCommand): IncidentMutationResult {
+    const incident = loadIncidentRecord(db, input.workspaceId, input.incidentId);
+    if (!incident) {
+      throw new Error("Incident not found.");
+    }
+
+    const mergedNotes = [incident.notes?.trim(), input.resolutionNotes?.trim()].filter(Boolean).join("\n\n");
+
+    return this.updateIncident({
+      commandId: input.commandId,
+      workspaceId: input.workspaceId,
+      incidentId: input.incidentId,
+      status: "Resolved",
+      responsibleUserId: input.resolvedByUserId ?? incident.responsible_user_id,
+      costEstimate: input.costEstimate ?? incident.cost_estimate,
+      financialStatus: input.financialStatus ?? incident.financial_status ?? "Resolved",
+      notes: mergedNotes || incident.notes,
+      actorType: input.actorType,
+      sourceChannel: input.sourceChannel,
+    });
   },
 });

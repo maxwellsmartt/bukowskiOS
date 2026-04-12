@@ -50,6 +50,8 @@ import type {
   FinanceOverviewSnapshot,
   GlobalSearchGroup,
   GlobalSearchQuery,
+  IncidentDetailSnapshot,
+  IncidentMutationResult,
   IncidentListQuery,
   IncidentListRow,
   MissionControlSnapshot,
@@ -62,6 +64,7 @@ import type {
   ProjectListQuery,
   ReportIncidentCommand,
   ReportIncidentResult,
+  ResolveIncidentCommand,
   ReviewAgentRunCommand,
   AgentRunReviewResult,
   ReturnPackingSlipItemsCommand,
@@ -85,6 +88,7 @@ import type {
   UpdateAssetCommand,
   UpdateAssistantThreadPreferencesCommand,
   UpdateCatalogEntityInput,
+  UpdateIncidentCommand,
   UpdateProjectInput,
   UpdateProjectUnitInput,
   UpdateRmaCaseCommand,
@@ -152,7 +156,10 @@ declare global {
     };
     bukowskiIncidents?: {
       getList: (query?: IncidentListQuery) => Promise<IncidentListRow[]>;
+      getDetail: (incidentId: string) => Promise<IncidentDetailSnapshot>;
       report: (input: ReportIncidentCommand) => Promise<ReportIncidentResult>;
+      update: (input: UpdateIncidentCommand) => Promise<IncidentMutationResult>;
+      resolve: (input: ResolveIncidentCommand) => Promise<IncidentMutationResult>;
     };
     bukowskiProjects?: {
       getList: (query?: ProjectListQuery) => Promise<ProjectCardRow[]>;

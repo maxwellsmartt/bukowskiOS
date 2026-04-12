@@ -62,4 +62,72 @@ describe("incident mutation service", () => {
 
     cleanup();
   });
+
+  it("updates and resolves incidents while keeping receipts and read models in sync", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-incident-lifecycle-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createIncidentMutationService(database);
+
+    const created = mutations.reportIncident({
+      commandId: "cmd-test-incident-lifecycle-create",
+      workspaceId: "workspace-metadata",
+      assetId: "asset-smallhd-cine7",
+      incidentType: "malfunction",
+      severity: "High",
+      title: "Monitor input failure",
+      description: "The SDI input drops signal during movement.",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    const updated = mutations.updateIncident({
+      commandId: "cmd-test-incident-lifecycle-update",
+      workspaceId: "workspace-metadata",
+      incidentId: created.incidentId,
+      status: "In review",
+      severity: "Medium",
+      responsibleUserId: "user-paola",
+      costEstimate: 185,
+      financialStatus: "Estimate linked",
+      notes: "Bench review scheduled for tomorrow.",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(updated.repeated).toBe(false);
+    expect(updated.summary).toContain("updated");
+
+    let incident = reads.getIncidentDetail(created.incidentId).incident;
+    expect(incident?.status).toBe("In review");
+    expect(incident?.severity).toBe("Medium");
+    expect(incident?.responsible).toBe("Paola Rivas");
+    expect(incident?.costEstimate).toBe("$185");
+
+    const resolved = mutations.resolveIncident({
+      commandId: "cmd-test-incident-lifecycle-resolve",
+      workspaceId: "workspace-metadata",
+      incidentId: created.incidentId,
+      resolutionNotes: "Replaced the faulty SDI plate and validated on set.",
+      costEstimate: 210,
+      financialStatus: "Resolved",
+      resolvedByUserId: "user-paola",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(resolved.repeated).toBe(false);
+    expect(resolved.summary).toContain("resolved");
+
+    incident = reads.getIncidentDetail(created.incidentId).incident;
+    expect(incident?.status).toBe("Resolved");
+    expect(incident?.resolvedAt).not.toBeNull();
+    expect(incident?.notes).toContain("Replaced the faulty SDI plate");
+
+    const receipt = database
+      .prepare("SELECT outcome_status FROM command_receipts WHERE command_id = ?")
+      .get("cmd-test-incident-lifecycle-resolve") as { outcome_status: string } | undefined;
+    expect(receipt?.outcome_status).toBe("success");
+
+    cleanup();
+  });
 });

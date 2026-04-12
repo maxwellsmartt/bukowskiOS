@@ -117,6 +117,42 @@ describe("asset mutation service", () => {
     cleanup();
   });
 
+  it("updates multiple assets in a single assignment transaction", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-bulk-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createAssetMutationService(database);
+
+    const result = mutations.assignMoveAssets({
+      commandId: "cmd-test-asset-bulk-assign",
+      workspaceId: "workspace-metadata",
+      assetIds: ["asset-aputure-600d", "asset-teradek-bolt"],
+      mode: "assign",
+      projectId: "project-aurora",
+      assignedToUserId: "user-paola",
+      targetLocationId: "loc-video-village",
+      notes: "Bulk assignment from test coverage.",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(result.processedAssetIds).toHaveLength(2);
+    expect(result.summary).toContain("2 assets");
+
+    const firstDetail = reads.getAssetDetail("asset-aputure-600d");
+    const secondDetail = reads.getAssetDetail("asset-teradek-bolt");
+    expect(firstDetail.asset?.responsible).toBe("Paola Rivas");
+    expect(secondDetail.asset?.responsible).toBe("Paola Rivas");
+    expect(firstDetail.asset?.location).toBe("Set / Video Village");
+    expect(secondDetail.asset?.location).toBe("Set / Video Village");
+
+    const receipt = database
+      .prepare("SELECT outcome_status FROM command_receipts WHERE command_id = ?")
+      .get("cmd-test-asset-bulk-assign") as { outcome_status: string } | undefined;
+    expect(receipt?.outcome_status).toBe("success");
+
+    cleanup();
+  });
+
   it("creates, updates and archives editable assets with scan-ready codes", () => {
     const { cleanup, database } = createTestDatabase("bukowski-asset-mutation-test");
     const reads = createFoundationReadService(database);

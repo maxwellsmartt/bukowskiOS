@@ -149,16 +149,41 @@
   - `medio`: falta smoke manual del export con archivo grande y cancelación del diálogo
 
 ### Slice 7 — Incident Lifecycle
-- Estado: `planned`
+- Estado: `done`
 - Objetivo: `resolveIncident` + `updateIncident`
 - Área: `backend` + `frontend`
 - Dependencias: Slice 2
+- Qué se probó:
+  - `typecheck`
+  - suite de tests completa
+  - `build`
+- Evidencia:
+  - contratos, schemas IPC y preload para incidentes resueltos/actualizados
+  - panel de detalle de incidentes con edición y resolución desde la misma pantalla
+  - read model `getIncidentDetail` reutilizable para UI y tools internos
+- Riesgos remanentes:
+  - `medio`: todavía no existe adjunto de archivos en incidentes
+  - `medio`: falta smoke manual del flujo visual completo en Electron
+  - `bajo`: la UI actual prioriza edición/resolución rápida, no un workflow más complejo de escalación
+  - `bajo`: no se añadió notificación automática al resolver o cambiar estado
 
 ### Slice 8 — Bulk Asset Operations
-- Estado: `planned`
+- Estado: `done`
 - Objetivo: assign/move masivo con transacción única
 - Área: `backend` + `frontend`
 - Dependencias: Slice 2
+- Qué se probó:
+  - `typecheck`
+  - test específico de asignación multi-asset
+  - suite de tests completa
+  - `build`
+- Evidencia:
+  - el mutation service ya opera sobre `assetIds[]` en una sola transacción
+  - se añadió cobertura explícita para múltiples assets
+  - el panel de assign/move deja más claro que la operación aplica al lote completo en un solo comando auditable
+- Riesgos remanentes:
+  - `medio`: falta confirmar visualmente el flujo de selección múltiple y feedback final con datasets grandes
+  - `bajo`: todavía no hay archive masivo ni otras operaciones bulk secundarias
 
 ### Slice 9 — Onboarding ligero y empty states
 - Estado: `planned`

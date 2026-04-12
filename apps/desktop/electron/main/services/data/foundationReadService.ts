@@ -21,6 +21,7 @@ import type {
   GlobalSearchGroup,
   GlobalSearchQuery,
   GlobalSearchResult,
+  IncidentDetailSnapshot,
   IncidentListQuery,
   IncidentListRow,
   IncidentSortField,
@@ -3529,7 +3530,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       .slice(0, input?.limit ?? 6);
   },
 
-  getIncidentDetail(incidentId: string) {
+  getIncidentDetail(incidentId: string): IncidentDetailSnapshot {
     const row = db
       .prepare(
         `
@@ -3540,6 +3541,9 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             incidents.severity,
             incidents.status,
             incidents.description,
+            incidents.assignment_id,
+            incidents.department_id,
+            incidents.responsible_user_id,
             incidents.reported_at,
             incidents.resolved_at,
             incidents.cost_estimate,
@@ -3575,6 +3579,9 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           severity: string;
           status: string;
           description: string;
+          assignment_id: string | null;
+          department_id: string | null;
+          responsible_user_id: string | null;
           reported_at: string;
           resolved_at: string | null;
           cost_estimate: number | null;
@@ -3595,37 +3602,39 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       | undefined;
 
     if (!row) {
-      return null;
+      return { incident: null };
     }
 
     return {
-      id: row.id,
-      title: row.title,
-      type: row.incident_type,
-      severity: row.severity,
-      status: row.status,
-      description: row.description,
-      reportedAt: formatTimelineTimestamp(row.reported_at),
-      resolvedAt: row.resolved_at ? formatTimelineTimestamp(row.resolved_at) : "Still open",
-      costEstimate: formatCurrency(row.cost_estimate),
-      currency: row.currency ?? "USD",
-      financialStatus: row.financial_status,
-      notes: row.notes,
-      assetId: row.asset_id || null,
-      asset: row.asset_name,
-      assetCode: row.asset_code,
-      projectId: row.project_id || null,
-      project: row.project_name,
-      projectUnitId: row.project_unit_id || null,
-      projectUnit: row.project_unit_name,
-      owner: row.owner_name,
-      reporter: row.reporter_name,
-      department: row.department_name,
+      incident: {
+        id: row.id,
+        assetId: row.asset_id || null,
+        asset: row.asset_code,
+        projectId: row.project_id || null,
+        project: row.project_name,
+        departmentId: row.department_id,
+        department: row.department_name,
+        assignmentId: row.assignment_id,
+        responsibleUserId: row.responsible_user_id,
+        responsible: row.owner_name,
+        incidentType: row.incident_type,
+        severity: row.severity,
+        status: row.status,
+        title: row.title,
+        description: row.description,
+        reportedAt: formatTimelineTimestamp(row.reported_at),
+        resolvedAt: row.resolved_at ? formatTimelineTimestamp(row.resolved_at) : null,
+        costEstimate: formatCurrency(row.cost_estimate),
+        costEstimateValue: row.cost_estimate,
+        currency: row.currency ?? "USD",
+        financialStatus: row.financial_status,
+        notes: row.notes,
+      },
     };
   },
 
   getIncidentTimeline(incidentId: string, limit = 8) {
-    const incident = this.getIncidentDetail(incidentId);
+    const incident = this.getIncidentDetail(incidentId).incident;
 
     if (!incident) {
       return [];
@@ -4951,7 +4960,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
   getIncidentCosts(input?: { incidentId?: string | null; projectId?: string | null; limit?: number }) {
     return this.getFinanceCostLinks()
       .filter((row) => !input?.projectId || row.project === (this.getProjectDetail(input.projectId).project?.name ?? row.project))
-      .filter((row) => !input?.incidentId || row.incident === (this.getIncidentDetail(input.incidentId)?.title ?? row.incident))
+      .filter((row) => !input?.incidentId || row.incident === (this.getIncidentDetail(input.incidentId).incident?.title ?? row.incident))
       .slice(0, input?.limit ?? 8);
   },
 

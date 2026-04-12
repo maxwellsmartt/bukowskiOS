@@ -17,7 +17,8 @@ import { useShellContext } from "@shared/hooks/useShellContext";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { IncidentReportPanel } from "./IncidentReportPanel";
-import { reportIncident, useIncidentsData } from "./useIncidentsData";
+import { IncidentDetailPanel } from "./IncidentDetailPanel";
+import { reportIncident, resolveIncident, updateIncident, useIncidentDetail, useIncidentsData } from "./useIncidentsData";
 
 type IncidentsPageProps = {
   projectId?: string | null;
@@ -117,6 +118,9 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
   const [activeIncidentId, setActiveIncidentId] = useState<string | null>(null);
+  const [incidentDetailFeedback, setIncidentDetailFeedback] = useState<string | null>(null);
+  const [incidentDetailError, setIncidentDetailError] = useState<string | null>(null);
+  const [isSubmittingIncidentDetail, setIsSubmittingIncidentDetail] = useState(false);
   const [activeRmaCaseId, setActiveRmaCaseId] = useState<string | null>(null);
   const [pendingRmaCaseId, setPendingRmaCaseId] = useState<string | null>(null);
   const [rmaEditorMode, setRmaEditorMode] = useState<"create" | "edit" | null>(null);
@@ -124,6 +128,11 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
   const [rmaFeedback, setRmaFeedback] = useState<string | null>(null);
   const [isSubmittingRma, setIsSubmittingRma] = useState(false);
   const { data: rmaDetail, error: rmaDetailError, isLoading: rmaDetailLoading, reload: reloadRmaDetail } = useRmaCaseDetail(activeRmaCaseId);
+  const {
+    data: activeIncidentDetail,
+    error: activeIncidentDetailLoadError,
+    reload: reloadIncidentDetail,
+  } = useIncidentDetail(activeIncidentId);
   const focusedIncidentId = searchParams.get("focus");
 
   useEffect(() => {
@@ -334,6 +343,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
               setReportOpen(false);
               setReportError(null);
               setReportFeedback(result.summary);
+              setIncidentDetailFeedback(null);
             } catch (nextError) {
               setReportError(nextError instanceof Error ? nextError.message : "Unable to create incident.");
             } finally {
@@ -364,7 +374,11 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           autoScrollToActiveRow
           getRowId={(row) => row.id}
           maxHeight="min(60vh, 640px)"
-          onRowClick={(row) => setActiveIncidentId(row.id)}
+          onRowClick={(row) => {
+            setActiveIncidentId(row.id);
+            setIncidentDetailError(null);
+            setIncidentDetailFeedback(null);
+          }}
           onSortRequest={incidentControls.handleColumnSortRequest}
           persistKey="incidents-queue"
           columns={[
@@ -410,6 +424,79 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           onSelectedRowIdsChange={setSelectedRowIds}
         />
       </SurfaceCard>
+
+      <IncidentDetailPanel
+        detail={activeIncidentDetail}
+        error={incidentDetailError ?? activeIncidentDetailLoadError}
+        feedback={incidentDetailFeedback}
+        isSubmitting={isSubmittingIncidentDetail}
+        onClose={() => {
+          setActiveIncidentId(null);
+          setIncidentDetailError(null);
+          setIncidentDetailFeedback(null);
+        }}
+        onResolve={async (value) => {
+          if (!activeIncidentId) {
+            return;
+          }
+
+          try {
+            setIsSubmittingIncidentDetail(true);
+            const result = await resolveIncident({
+              commandId: crypto.randomUUID(),
+              workspaceId: "workspace-metadata",
+              incidentId: activeIncidentId,
+              resolutionNotes: value.resolutionNotes,
+              costEstimate: value.costEstimate,
+              financialStatus: value.financialStatus,
+              resolvedByUserId: value.resolvedByUserId,
+              actorType: "user",
+              sourceChannel: "desktop",
+            });
+
+            await Promise.all([reload(), refreshProjects(), reloadIncidentDetail()]);
+            setIncidentDetailError(null);
+            setIncidentDetailFeedback(result.summary);
+          } catch (nextError) {
+            setIncidentDetailError(nextError instanceof Error ? nextError.message : "Unable to resolve incident.");
+          } finally {
+            setIsSubmittingIncidentDetail(false);
+          }
+        }}
+        onUpdate={async (value) => {
+          if (!activeIncidentId) {
+            return;
+          }
+
+          try {
+            setIsSubmittingIncidentDetail(true);
+            const result = await updateIncident({
+              commandId: crypto.randomUUID(),
+              workspaceId: "workspace-metadata",
+              incidentId: activeIncidentId,
+              title: value.title,
+              description: value.description,
+              severity: value.severity,
+              status: value.status,
+              responsibleUserId: value.responsibleUserId,
+              costEstimate: value.costEstimate,
+              financialStatus: value.financialStatus,
+              notes: value.notes,
+              actorType: "user",
+              sourceChannel: "desktop",
+            });
+
+            await Promise.all([reload(), refreshProjects(), reloadIncidentDetail()]);
+            setIncidentDetailError(null);
+            setIncidentDetailFeedback(result.summary);
+          } catch (nextError) {
+            setIncidentDetailError(nextError instanceof Error ? nextError.message : "Unable to update incident.");
+          } finally {
+            setIsSubmittingIncidentDetail(false);
+          }
+        }}
+        users={catalog.users}
+      />
 
       {!isProjectMode ? (
         <>

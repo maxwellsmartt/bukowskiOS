@@ -726,11 +726,12 @@ export const createAgentToolRegistry = (
       },
       execute: (args) => {
         const payload = foundationReads.getIncidentDetail(asString(args.incident_id));
+        const incident = payload.incident;
 
         return {
-          summary: payload ? `Loaded incident detail for ${payload.title}.` : "Incident was not found.",
+          summary: incident ? `Loaded incident detail for ${incident.title}.` : "Incident was not found.",
           payload: {
-            incident: payload,
+            incident,
           },
         };
       },

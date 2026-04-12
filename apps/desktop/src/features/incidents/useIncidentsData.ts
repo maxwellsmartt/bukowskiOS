@@ -1,4 +1,13 @@
-import type { IncidentListQuery, IncidentListRow, ReportIncidentCommand, ReportIncidentResult } from "@contracts";
+import type {
+  IncidentDetailSnapshot,
+  IncidentListQuery,
+  IncidentListRow,
+  IncidentMutationResult,
+  ReportIncidentCommand,
+  ReportIncidentResult,
+  ResolveIncidentCommand,
+  UpdateIncidentCommand,
+} from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 
 const emptyIncidents: IncidentListRow[] = [];
@@ -8,6 +17,10 @@ const defaultIncidentListQuery: IncidentListQuery = {
   search: "",
   sortBy: "reportedAt",
   sortDirection: "desc",
+};
+
+const emptyIncidentDetail: IncidentDetailSnapshot = {
+  incident: null,
 };
 
 export const useIncidentsData = (query: IncidentListQuery = defaultIncidentListQuery) =>
@@ -23,10 +36,39 @@ export const useIncidentsData = (query: IncidentListQuery = defaultIncidentListQ
     [query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
   );
 
+export const useIncidentDetail = (incidentId: string | null) =>
+  useAsyncValue(
+    async () => {
+      if (!window.bukowskiIncidents || !incidentId) {
+        return emptyIncidentDetail;
+      }
+
+      return window.bukowskiIncidents.getDetail(incidentId);
+    },
+    emptyIncidentDetail,
+    [incidentId],
+  );
+
 export const reportIncident = async (input: ReportIncidentCommand): Promise<ReportIncidentResult> => {
   if (!window.bukowskiIncidents) {
     throw new Error("Incidents bridge unavailable");
   }
 
   return window.bukowskiIncidents.report(input);
+};
+
+export const updateIncident = async (input: UpdateIncidentCommand): Promise<IncidentMutationResult> => {
+  if (!window.bukowskiIncidents) {
+    throw new Error("Incidents bridge unavailable");
+  }
+
+  return window.bukowskiIncidents.update(input);
+};
+
+export const resolveIncident = async (input: ResolveIncidentCommand): Promise<IncidentMutationResult> => {
+  if (!window.bukowskiIncidents) {
+    throw new Error("Incidents bridge unavailable");
+  }
+
+  return window.bukowskiIncidents.resolve(input);
 };
