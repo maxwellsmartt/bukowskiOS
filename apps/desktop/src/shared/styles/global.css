@@ -553,7 +553,36 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .sync-control {
+  position: relative;
   color: var(--text-primary);
+}
+
+.sync-control-healthy {
+  color: rgba(129, 199, 132, 0.92);
+}
+
+.sync-control-active {
+  color: rgba(255, 213, 79, 0.96);
+}
+
+.sync-control-failed {
+  color: rgba(255, 138, 128, 0.98);
+}
+
+.sync-control-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(255, 138, 128, 0.96);
+  color: #111315;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
 }
 
 .subnav-tabs {
@@ -1709,6 +1738,90 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .summary-value {
   color: var(--text-primary);
   font-size: 13px;
+}
+
+.sync-outbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sync-outbox-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sync-outbox-row-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sync-outbox-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-outbox-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.sync-outbox-status-pending {
+  background: rgba(255, 213, 79, 0.14);
+  color: rgba(255, 213, 79, 0.96);
+}
+
+.sync-outbox-status-processing {
+  background: rgba(79, 195, 247, 0.14);
+  color: rgba(129, 212, 250, 0.98);
+}
+
+.sync-outbox-status-failed {
+  background: rgba(255, 138, 128, 0.14);
+  color: rgba(255, 138, 128, 0.98);
+}
+
+.sync-outbox-status-sent {
+  background: rgba(129, 199, 132, 0.14);
+  color: rgba(165, 214, 167, 0.98);
+}
+
+.sync-outbox-entity {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.sync-outbox-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.sync-outbox-error {
+  color: rgba(255, 138, 128, 0.98);
+  font-size: 12px;
+}
+
+.sync-outbox-row-actions {
+  flex-shrink: 0;
 }
 
 .split-layout {

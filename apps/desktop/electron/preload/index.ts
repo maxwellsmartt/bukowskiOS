@@ -22,6 +22,7 @@ import type {
   AppDiagnosticsSnapshot,
   AppExportResult,
   AppInfo,
+  AppSyncOutboxRow,
   AssetsOverviewSnapshot,
   CreateAgentCommand,
   CreateAssistantThreadCommand,
@@ -113,6 +114,10 @@ const bukowskiApp = {
   getDiagnostics: () => ipcRenderer.invoke(ipcChannels.app.getDiagnostics) as Promise<AppDiagnosticsSnapshot>,
   createBackup: () => ipcRenderer.invoke(ipcChannels.app.createBackup) as Promise<AppActionResult>,
   runIntegrityCheck: () => ipcRenderer.invoke(ipcChannels.app.runIntegrityCheck) as Promise<AppActionResult>,
+  runLocalSync: () => ipcRenderer.invoke(ipcChannels.app.runLocalSync) as Promise<AppActionResult>,
+  getSyncOutboxRows: () => ipcRenderer.invoke(ipcChannels.app.getSyncOutboxRows) as Promise<AppSyncOutboxRow[]>,
+  retrySyncOutboxRow: (id: string) =>
+    ipcRenderer.invoke(ipcChannels.app.retrySyncOutboxRow, id) as Promise<AppActionResult>,
   exportWorkspaceData: () => ipcRenderer.invoke(ipcChannels.app.exportWorkspaceData) as Promise<AppExportResult>,
   openExternal: (url: string) => ipcRenderer.invoke(ipcChannels.app.openExternal, url) as Promise<void>,
 };

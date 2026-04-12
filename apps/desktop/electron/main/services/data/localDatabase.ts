@@ -3,7 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 
-import type { AppDiagnosticsSnapshot } from "@contracts";
+import type { AppDiagnosticsSnapshot, AppSyncOutboxRow } from "@contracts";
 import { foundationMigrations } from "@db";
 
 import { createAssistantGatewayService } from "../ai/assistantGatewayService";
@@ -30,6 +30,7 @@ import { createProjectMutationService, ensureProjectShellDefaults } from "./proj
 import { createRmaMutationService } from "./rmaMutationService";
 import { createRuntimeDiagnosticsService, type RuntimeDiagnosticsService } from "./runtimeDiagnosticsService";
 import { applySchedulingFoundationMigration, bootstrapSchedulingFoundation } from "./schedulingFoundationBootstrap";
+import { createSyncOutboxWorkerService, summarizeSyncOutboxWorker } from "./syncOutboxWorkerService";
 import {
   applyTrackedSqlMigrations,
   applyTrackedStep,
@@ -66,15 +67,22 @@ type LocalDatabaseRuntime = {
   getDiagnosticsSnapshot: () => AppDiagnosticsSnapshot;
   createBackupNow: () => AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => AppDiagnosticsSnapshot;
+  runLocalSyncNow: () => AppDiagnosticsSnapshot;
+  getSyncOutboxRows: () => AppSyncOutboxRow[];
+  retrySyncOutboxRow: (id: string) => AppDiagnosticsSnapshot;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
 let walCheckpointTimer: NodeJS.Timeout | null = null;
 let retentionTimer: NodeJS.Timeout | null = null;
+let syncOutboxTimer: NodeJS.Timeout | null = null;
 let lastIntegrityCheckAt: string | null = null;
 let lastIntegrityCheckStatus: "healthy" | "failed" | "never" = "never";
 let lastRetentionRunAt: string | null = null;
 let lastRetentionSummary: string | null = null;
+let lastSyncRunAt: string | null = null;
+let lastSyncSummary: string | null = null;
+let lastSyncStatus: "healthy" | "failed" | "idle" = "idle";
 
 const backupMaxAgeMs = 24 * 60 * 60 * 1000;
 
@@ -150,6 +158,16 @@ const createRuntime = (): LocalDatabaseRuntime => {
           .sort()
       : [];
 
+    const syncOutboxCounts = {
+      pending: (database.prepare("SELECT COUNT(*) AS count FROM sync_outbox WHERE status = 'pending'").get() as { count: number })
+        .count,
+      processing: (
+        database.prepare("SELECT COUNT(*) AS count FROM sync_outbox WHERE status = 'processing'").get() as { count: number }
+      ).count,
+      failed: (database.prepare("SELECT COUNT(*) AS count FROM sync_outbox WHERE status = 'failed'").get() as { count: number })
+        .count,
+    };
+
     return {
       databaseSizeBytes: databaseStats?.size ?? 0,
       backupSizeBytes: backupStats?.size ?? 0,
@@ -160,6 +178,12 @@ const createRuntime = (): LocalDatabaseRuntime => {
       lastIntegrityCheckStatus,
       lastRetentionRunAt,
       lastRetentionSummary,
+      lastSyncRunAt,
+      lastSyncSummary,
+      lastSyncStatus,
+      syncOutboxPendingCount: syncOutboxCounts.pending,
+      syncOutboxProcessingCount: syncOutboxCounts.processing,
+      syncOutboxFailedCount: syncOutboxCounts.failed,
       encryptionAvailable: safeStorage.isEncryptionAvailable(),
       internalBuildArtifacts,
     };
@@ -182,6 +206,29 @@ const createRuntime = (): LocalDatabaseRuntime => {
     }
 
     return getDiagnosticsSnapshot();
+  };
+
+  const syncOutboxWorker = createSyncOutboxWorkerService(database);
+
+  const runLocalSyncNow = () => {
+    const syncSummary = syncOutboxWorker.runDueEntries();
+    lastSyncRunAt = new Date().toISOString();
+    lastSyncSummary = summarizeSyncOutboxWorker(syncSummary);
+    lastSyncStatus = syncSummary.failedRows > 0 ? "failed" : "healthy";
+
+    return getDiagnosticsSnapshot();
+  };
+
+  const getSyncOutboxRows = () => syncOutboxWorker.listRows();
+
+  const retrySyncOutboxRow = (id: string) => {
+    const retried = syncOutboxWorker.retryRow(id);
+
+    if (!retried) {
+      throw new Error("That outbox row is not retryable anymore.");
+    }
+
+    return runLocalSyncNow();
   };
 
   const secretStore = createAISecretStore();
@@ -218,6 +265,13 @@ const createRuntime = (): LocalDatabaseRuntime => {
   } catch {
     // Retention must not block startup for an internal alpha build.
   }
+  try {
+    runLocalSyncNow();
+  } catch {
+    lastSyncRunAt = new Date().toISOString();
+    lastSyncStatus = "failed";
+    lastSyncSummary = "The local sync worker failed during startup.";
+  }
   walCheckpointTimer?.unref();
   walCheckpointTimer = setInterval(() => {
     database.exec("PRAGMA wal_checkpoint(TRUNCATE);");
@@ -234,6 +288,17 @@ const createRuntime = (): LocalDatabaseRuntime => {
     }
   }, 12 * 60 * 60 * 1000);
   retentionTimer.unref();
+  syncOutboxTimer?.unref();
+  syncOutboxTimer = setInterval(() => {
+    try {
+      runLocalSyncNow();
+    } catch {
+      lastSyncRunAt = new Date().toISOString();
+      lastSyncStatus = "failed";
+      lastSyncSummary = "The scheduled local sync pass failed.";
+    }
+  }, 60 * 1000);
+  syncOutboxTimer.unref();
 
   return {
     database,
@@ -253,6 +318,9 @@ const createRuntime = (): LocalDatabaseRuntime => {
     getDiagnosticsSnapshot,
     createBackupNow,
     runIntegrityCheckNow,
+    runLocalSyncNow,
+    getSyncOutboxRows,
+    retrySyncOutboxRow,
     agentMutations: createAgentMutationService(database, {
       secretStore,
       openaiProviderService,

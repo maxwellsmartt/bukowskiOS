@@ -126,6 +126,9 @@ app.whenReady().then(() => {
     getDiagnosticsSnapshot: localDatabase.getDiagnosticsSnapshot,
     createBackupNow: localDatabase.createBackupNow,
     runIntegrityCheckNow: localDatabase.runIntegrityCheckNow,
+    runLocalSyncNow: localDatabase.runLocalSyncNow,
+    getSyncOutboxRows: localDatabase.getSyncOutboxRows,
+    retrySyncOutboxRow: localDatabase.retrySyncOutboxRow,
   });
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,

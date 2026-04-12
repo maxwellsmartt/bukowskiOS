@@ -22,6 +22,7 @@ import type {
   AppDiagnosticsSnapshot,
   AppExportResult,
   AppInfo,
+  AppSyncOutboxRow,
   AssetsOverviewSnapshot,
   CreateAgentCommand,
   CreateAssistantThreadCommand,
@@ -105,6 +106,9 @@ declare global {
       getDiagnostics: () => Promise<AppDiagnosticsSnapshot>;
       createBackup: () => Promise<AppActionResult>;
       runIntegrityCheck: () => Promise<AppActionResult>;
+      runLocalSync: () => Promise<AppActionResult>;
+      getSyncOutboxRows: () => Promise<AppSyncOutboxRow[]>;
+      retrySyncOutboxRow: (id: string) => Promise<AppActionResult>;
       exportWorkspaceData: () => Promise<AppExportResult>;
       openExternal: (url: string) => Promise<void>;
     };

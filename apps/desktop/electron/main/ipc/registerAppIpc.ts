@@ -11,6 +11,9 @@ type RegisterAppIpcOptions = {
   getDiagnosticsSnapshot: () => import("@contracts").AppDiagnosticsSnapshot;
   createBackupNow: () => import("@contracts").AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => import("@contracts").AppDiagnosticsSnapshot;
+  runLocalSyncNow: () => import("@contracts").AppDiagnosticsSnapshot;
+  getSyncOutboxRows: () => import("@contracts").AppSyncOutboxRow[];
+  retrySyncOutboxRow: (id: string) => import("@contracts").AppDiagnosticsSnapshot;
 };
 
 const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) => {
@@ -66,7 +69,15 @@ const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) =
   };
 };
 
-export const registerAppIpc = ({ database, getDiagnosticsSnapshot, createBackupNow, runIntegrityCheckNow }: RegisterAppIpcOptions) => {
+export const registerAppIpc = ({
+  database,
+  getDiagnosticsSnapshot,
+  createBackupNow,
+  runIntegrityCheckNow,
+  runLocalSyncNow,
+  getSyncOutboxRows,
+  retrySyncOutboxRow,
+}: RegisterAppIpcOptions) => {
   ipcMain.handle(ipcChannels.app.getInfo, (event) => {
     assertTrustedIpcSender(event);
 
@@ -102,6 +113,36 @@ export const registerAppIpc = ({ database, getDiagnosticsSnapshot, createBackupN
       };
     } catch (error) {
       throw sanitizeIpcError(error, "The app could not complete the integrity check.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.runLocalSync, (event) => {
+    try {
+      assertTrustedIpcSender(event);
+      return {
+        summary: "Local sync pass completed.",
+        diagnostics: runLocalSyncNow(),
+      };
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not complete the local sync pass.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.getSyncOutboxRows, (event) => {
+    try {
+      assertTrustedIpcSender(event);
+      return getSyncOutboxRows();
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not load the local sync queue.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.retrySyncOutboxRow, (event, id: string) => {
+    try {
+      assertTrustedIpcSender(event);
+      return {
+        summary: "Sync row retried locally.",
+        diagnostics: retrySyncOutboxRow(id),
+      };
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not retry that local sync row.");
     }
   });
   ipcMain.handle(ipcChannels.app.exportWorkspaceData, async (event) => {

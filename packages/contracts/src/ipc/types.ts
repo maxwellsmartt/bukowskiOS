@@ -16,8 +16,26 @@ export type AppDiagnosticsSnapshot = {
   lastIntegrityCheckStatus: "healthy" | "failed" | "never";
   lastRetentionRunAt: string | null;
   lastRetentionSummary: string | null;
+  lastSyncRunAt: string | null;
+  lastSyncSummary: string | null;
+  lastSyncStatus: "healthy" | "failed" | "idle";
+  syncOutboxPendingCount: number;
+  syncOutboxProcessingCount: number;
+  syncOutboxFailedCount: number;
   encryptionAvailable: boolean;
   internalBuildArtifacts: string[];
+};
+
+export type AppSyncOutboxRow = {
+  id: string;
+  entityType: string;
+  entityId: string;
+  operationType: string;
+  status: "pending" | "processing" | "failed" | "sent";
+  attemptCount: number;
+  lastError: string | null;
+  nextRetryAt: string | null;
+  updatedAt: string;
 };
 
 export type AppActionResult = {

@@ -64,7 +64,53 @@
   - `medio`: el bundle de `main` (`dist-electron/app.js`) sigue siendo grande, aunque eso no impacta igual que el renderer en UX percibida
 
 ### Slice A3 — Sync worker local para outbox
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - activar `sync_outbox` como cola local real, con retries y estado visible, sin depender todavía de un backend remoto
+- Área:
+  - backend / frontend
+- Alcance inicial:
+  - worker local para `pending -> processing -> sent/failed`
+  - recuperación de rows atascadas en `processing`
+  - backoff exponencial simple
+  - acción manual desde `Settings`
+  - métricas visibles en diagnóstico local
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - nuevo `syncOutboxWorkerService` local y auditable
+  - integración en startup y timer periódico del runtime local
+  - `Settings` ahora muestra último sync local, estado del worker y counts de `pending/processing/failed`
+  - botón `Run local sync now` para debug rápido sin tocar la base directamente
+- Riesgos remanentes:
+  - `medio`: este worker solo reconoce rows localmente; no existe todavía transporte remoto ni reconciliación con servidor
+  - `medio`: el `shell` principal todavía muestra `Local-first` y no refleja counts del outbox en tiempo real
+  - `bajo`: si más adelante añadimos varios workers o procesos, habrá que endurecer más la lógica de claim para concurrencia real multi-proceso
+
+### Slice A4 — Surface operacional del sync
+- Estado: `done`
+- Objetivo:
+  - hacer visible y debugeable el estado del outbox sin obligar al usuario a inspeccionar la base de datos o depender solo de logs
+- Área:
+  - frontend / backend
+- Alcance inicial:
+  - señal rápida del sync en la top bar
+  - detalle de filas del outbox en `Settings`
+  - retry manual por fila
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+  - `corepack pnpm run test:e2e` desde `apps/desktop`
+- Evidencia:
+  - el icono de sync en la shell ahora refleja estado `healthy/active/failed` con badge de cola
+  - `Settings` expone listado de rows del outbox con estado, attempts, next retry y `last_error`
+  - existe retry manual por fila sin tocar SQL a mano
+- Riesgos remanentes:
+  - `medio`: todavía no existe una vista dedicada del outbox ni filtros más finos por estado o entidad
+  - `medio`: la top bar refresca por polling simple, no por eventos en tiempo real
 
 ## P0 — Crítico ahora mismo
 

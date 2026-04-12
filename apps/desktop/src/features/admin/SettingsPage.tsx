@@ -1,4 +1,4 @@
-import type { AppActionResult, AppDiagnosticsSnapshot, AppExportResult } from "@contracts";
+import type { AppActionResult, AppDiagnosticsSnapshot, AppExportResult, AppSyncOutboxRow } from "@contracts";
 import { useEffect, useMemo, useState } from "react";
 
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -15,8 +15,30 @@ const emptyDiagnostics: AppDiagnosticsSnapshot = {
   lastIntegrityCheckStatus: "never",
   lastRetentionRunAt: null,
   lastRetentionSummary: null,
+  lastSyncRunAt: null,
+  lastSyncSummary: null,
+  lastSyncStatus: "idle",
+  syncOutboxPendingCount: 0,
+  syncOutboxProcessingCount: 0,
+  syncOutboxFailedCount: 0,
   encryptionAvailable: false,
   internalBuildArtifacts: [],
+};
+
+const formatSyncRowStatus = (status: AppSyncOutboxRow["status"]) => {
+  if (status === "sent") {
+    return "Sent";
+  }
+
+  if (status === "failed") {
+    return "Failed";
+  }
+
+  if (status === "processing") {
+    return "Processing";
+  }
+
+  return "Pending";
 };
 
 const formatBytes = (value: number) => {
@@ -67,7 +89,10 @@ export const SettingsPage = () => {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  const [isRunningLocalSync, setIsRunningLocalSync] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [syncRows, setSyncRows] = useState<AppSyncOutboxRow[]>([]);
+  const [retryingRowId, setRetryingRowId] = useState<string | null>(null);
 
   const loadDiagnostics = async () => {
     if (!window.bukowskiApp) {
@@ -75,11 +100,35 @@ export const SettingsPage = () => {
     }
 
     try {
-      const nextDiagnostics = await window.bukowskiApp.getDiagnostics();
+      const [nextDiagnostics, nextSyncRows] = await Promise.all([
+        window.bukowskiApp.getDiagnostics(),
+        window.bukowskiApp.getSyncOutboxRows(),
+      ]);
       setDiagnostics(nextDiagnostics);
+      setSyncRows(nextSyncRows);
       setError(null);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Settings are unavailable right now.");
+    }
+  };
+
+  const retrySyncRow = async (id: string) => {
+    if (!window.bukowskiApp) {
+      return;
+    }
+
+    try {
+      setRetryingRowId(id);
+      const result = await window.bukowskiApp.retrySyncOutboxRow(id);
+      setFeedback(result.summary);
+      setDiagnostics(result.diagnostics);
+      setError(null);
+      const nextRows = await window.bukowskiApp.getSyncOutboxRows();
+      setSyncRows(nextRows);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "The app could not retry that local sync row.");
+    } finally {
+      setRetryingRowId(null);
     }
   };
 
@@ -99,6 +148,10 @@ export const SettingsPage = () => {
 
       if ("diagnostics" in result) {
         setDiagnostics(result.diagnostics);
+        if (window.bukowskiApp) {
+          const nextSyncRows = await window.bukowskiApp.getSyncOutboxRows();
+          setSyncRows(nextSyncRows);
+        }
       } else {
         await loadDiagnostics();
       }
@@ -138,6 +191,35 @@ export const SettingsPage = () => {
       {
         label: "Retention result",
         value: diagnostics.lastRetentionSummary ?? "No retention pass has run yet",
+      },
+      {
+        label: "Last local sync pass",
+        value: formatDateLabel(diagnostics.lastSyncRunAt),
+      },
+      {
+        label: "Local sync status",
+        value:
+          diagnostics.lastSyncStatus === "healthy"
+            ? "Healthy"
+            : diagnostics.lastSyncStatus === "failed"
+              ? "Failed"
+              : "Not run yet",
+      },
+      {
+        label: "Local sync result",
+        value: diagnostics.lastSyncSummary ?? "No local sync pass has run yet",
+      },
+      {
+        label: "Outbox pending",
+        value: String(diagnostics.syncOutboxPendingCount),
+      },
+      {
+        label: "Outbox processing",
+        value: String(diagnostics.syncOutboxProcessingCount),
+      },
+      {
+        label: "Outbox failed",
+        value: String(diagnostics.syncOutboxFailedCount),
       },
       {
         label: "Secure local encryption",
@@ -209,6 +291,14 @@ export const SettingsPage = () => {
           >
             {isCreatingBackup ? "Creating backup..." : "Create backup now"}
           </button>
+          <button
+            className="ghost-control"
+            disabled={isRunningLocalSync}
+            onClick={() => void runAction(() => window.bukowskiApp!.runLocalSync(), setIsRunningLocalSync)}
+            type="button"
+          >
+            {isRunningLocalSync ? "Running local sync..." : "Run local sync now"}
+          </button>
         </div>
       </SurfaceCard>
 
@@ -232,6 +322,49 @@ export const SettingsPage = () => {
             {isExporting ? "Exporting..." : "Export all data as JSON"}
           </button>
         </div>
+      </SurfaceCard>
+
+      <SurfaceCard
+        title="Local sync queue"
+        subtitle="Review pending or failed outbox rows before the future remote transport layer is introduced."
+      >
+        {!syncRows.length ? (
+          <div className="empty-state">The local sync queue is empty right now.</div>
+        ) : (
+          <div className="sync-outbox-list">
+            {syncRows.map((row) => (
+              <div key={row.id} className="sync-outbox-row">
+                <div className="sync-outbox-row-main">
+                  <div className="sync-outbox-row-head">
+                    <span className={`sync-outbox-status sync-outbox-status-${row.status}`}>
+                      {formatSyncRowStatus(row.status)}
+                    </span>
+                    <span className="sync-outbox-entity">
+                      {row.entityType} · {row.entityId}
+                    </span>
+                  </div>
+                  <div className="sync-outbox-row-meta">
+                    <span>Operation: {row.operationType}</span>
+                    <span>Attempts: {row.attemptCount}</span>
+                    <span>Updated: {formatDateLabel(row.updatedAt)}</span>
+                    <span>Next retry: {formatDateLabel(row.nextRetryAt)}</span>
+                  </div>
+                  {row.lastError ? <div className="sync-outbox-error">{row.lastError}</div> : null}
+                </div>
+                <div className="sync-outbox-row-actions">
+                  <button
+                    className="ghost-control"
+                    disabled={retryingRowId === row.id || (row.status !== "failed" && row.status !== "processing")}
+                    onClick={() => void retrySyncRow(row.id)}
+                    type="button"
+                  >
+                    {retryingRowId === row.id ? "Retrying..." : "Retry row"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </SurfaceCard>
     </div>
   );
