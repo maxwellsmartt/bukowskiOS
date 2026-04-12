@@ -12,7 +12,9 @@ import {
   useAgentModels,
 } from "./useAgentsData";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const providerStatusLabelMap: Record<AgentModelRow["status"], string> = {
   not_configured: "Not configured",

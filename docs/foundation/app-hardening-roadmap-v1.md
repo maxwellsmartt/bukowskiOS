@@ -383,7 +383,50 @@
   - `bajo`: falta smoke manual con un dataset más voluminoso para medir la mejora perceptible al hacer `Show more`
 
 ### Slice 17 — Multi-workspace, sync y retention
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - preparar el código vivo para dejar de depender de strings sueltos de workspace
+  - documentar el roadmap formal de sync
+  - añadir una política básica de retention que no comprometa datos activos
+- Dependencias:
+  - `Slice 15 — Read Layer Refactor`
+  - `Slice 6 — Settings MVP`
+- Área:
+  - backend / frontend / infra
+- Archivos tocados:
+  - `packages/contracts/src/constants.ts`
+  - `packages/contracts/src/index.ts`
+  - `packages/contracts/src/ipc/types.ts`
+  - `apps/desktop/electron/main/services/data/dataRetentionService.ts`
+  - `apps/desktop/electron/main/services/data/localDatabase.ts`
+  - `apps/desktop/src/features/admin/SettingsPage.tsx`
+  - `docs/foundation/sync-roadmap.md`
+  - múltiples servicios y superficies activas que ahora importan `DEFAULT_WORKSPACE_ID`
+- Backend:
+  - se añadió `DEFAULT_WORKSPACE_ID` como contrato compartido en lugar de seguir replicando el string en runtime
+  - se creó `dataRetentionService` con una política conservadora:
+    - archiva memory entries viejas y de baja confianza
+    - purga `sync_outbox` en estado `sent`
+    - recorta `runtime_error_events`
+    - recorta `assistant_memory_events`
+    - purga threads borrados hace tiempo y limpia adjuntos en disco antes de borrar
+  - `localDatabase` ahora ejecuta retention en startup y periódicamente sin bloquear el arranque si algo falla
+- Frontend:
+  - Settings ahora muestra el último retention pass y su resultado resumido
+  - superficies activas de agents, chat y varios flows operativos ya usan la constante compartida de workspace
+- Infra / documentación:
+  - `docs/foundation/sync-roadmap.md` documenta el plan real de sync por fases, límites y dependencias
+- Qué se probó:
+  - `typecheck`
+  - `test`
+  - `build`
+- Evidencia:
+  - nueva prueba dedicada para retention de DB, outbox, runtime errors, memory y limpieza de adjuntos
+  - el código vivo ya no depende de `workspace-metadata` en servicios y superficies operativas activas; el hardcode queda acotado al seed demo
+- Riesgos remanentes:
+  - `medio`: `foundationSeed` sigue usando el id demo fijo; eso es aceptable por ahora, pero sigue siendo deuda si más adelante sembramos workspaces reales
+  - `medio`: esto no implementa multi-workspace real, solo preparación segura
+  - `medio`: todavía no existe worker de sync ni reconciliación remota; el roadmap ya quedó definido, no ejecutado
 
 ## Criterio de actualización
 Cada slice se actualiza al arrancar y al cerrar con:

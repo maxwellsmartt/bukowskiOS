@@ -20,6 +20,7 @@ import { createFoundationReadService, type FoundationReadService } from "./found
 import { createAssetMutationService } from "./assetMutationService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
+import { createDataRetentionService, summarizeDataRetention } from "./dataRetentionService";
 import { createFinanceMutationService } from "./financeMutationService";
 import { createIncidentMutationService } from "./incidentMutationService";
 import { createPackingMutationService } from "./packingMutationService";
@@ -69,8 +70,11 @@ type LocalDatabaseRuntime = {
 
 let runtime: LocalDatabaseRuntime | null = null;
 let walCheckpointTimer: NodeJS.Timeout | null = null;
+let retentionTimer: NodeJS.Timeout | null = null;
 let lastIntegrityCheckAt: string | null = null;
 let lastIntegrityCheckStatus: "healthy" | "failed" | "never" = "never";
+let lastRetentionRunAt: string | null = null;
+let lastRetentionSummary: string | null = null;
 
 const backupMaxAgeMs = 24 * 60 * 60 * 1000;
 
@@ -154,6 +158,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
       lastBackupAt: backupStats ? new Date(backupStats.mtimeMs).toISOString() : null,
       lastIntegrityCheckAt,
       lastIntegrityCheckStatus,
+      lastRetentionRunAt,
+      lastRetentionSummary,
       encryptionAvailable: safeStorage.isEncryptionAvailable(),
       internalBuildArtifacts,
     };
@@ -203,12 +209,31 @@ const createRuntime = (): LocalDatabaseRuntime => {
     attachmentsRootPath,
   });
   const runtimeDiagnostics = createRuntimeDiagnosticsService(database);
+  const dataRetention = createDataRetentionService(database);
   assistantChatService.reconcileInterruptedThreads();
+  try {
+    const retentionSummary = dataRetention.run();
+    lastRetentionRunAt = new Date().toISOString();
+    lastRetentionSummary = summarizeDataRetention(retentionSummary);
+  } catch {
+    // Retention must not block startup for an internal alpha build.
+  }
   walCheckpointTimer?.unref();
   walCheckpointTimer = setInterval(() => {
     database.exec("PRAGMA wal_checkpoint(TRUNCATE);");
   }, 5 * 60 * 1000);
   walCheckpointTimer.unref();
+  retentionTimer?.unref();
+  retentionTimer = setInterval(() => {
+    try {
+      const retentionSummary = dataRetention.run();
+      lastRetentionRunAt = new Date().toISOString();
+      lastRetentionSummary = summarizeDataRetention(retentionSummary);
+    } catch {
+      // Best effort maintenance only.
+    }
+  }, 12 * 60 * 60 * 1000);
+  retentionTimer.unref();
 
   return {
     database,

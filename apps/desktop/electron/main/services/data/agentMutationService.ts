@@ -32,7 +32,9 @@ import type { AssistantGatewayService } from "../ai/assistantGatewayService";
 import type { AISecretStore } from "../ai/aiSecretStore";
 import type { OpenAIProviderService } from "../ai/openaiProviderService";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const ensureValue = (value: string | undefined, label: string) => {
   const nextValue = value?.trim() ?? "";

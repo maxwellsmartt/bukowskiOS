@@ -1,7 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
 import agentConfig from "./agent_config.v1.json";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 const now = "2026-04-09T16:00:00.000Z";
 
 const providerDefaults = [

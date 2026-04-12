@@ -14,6 +14,8 @@ export type AppDiagnosticsSnapshot = {
   lastBackupAt: string | null;
   lastIntegrityCheckAt: string | null;
   lastIntegrityCheckStatus: "healthy" | "failed" | "never";
+  lastRetentionRunAt: string | null;
+  lastRetentionSummary: string | null;
   encryptionAvailable: boolean;
   internalBuildArtifacts: string[];
 };

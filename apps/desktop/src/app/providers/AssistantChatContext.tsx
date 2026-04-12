@@ -11,6 +11,7 @@ import type {
   AssistantChatThreadState,
   SendAssistantChatTurnCommand,
 } from "@contracts";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import {
   createAssistantThread,
   deleteAssistantThread,
@@ -69,7 +70,7 @@ type AssistantChatContextValue = {
 
 const AssistantChatContext = createContext<AssistantChatContextValue | null>(null);
 
-const workspaceId = "workspace-metadata";
+const workspaceId = DEFAULT_WORKSPACE_ID;
 const fallbackWelcomeBody =
   "Supervisor ready. Ask for context, routing, or a draft run. Nothing touches the command layer from chat without review.";
 

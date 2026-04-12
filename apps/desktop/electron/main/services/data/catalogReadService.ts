@@ -2,7 +2,9 @@ import type { DatabaseSync } from "node:sqlite";
 
 import type { CatalogSnapshot } from "@contracts";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const mapAssetStatus = (operationalStatus: string, custodyStatus: string) => {
   if (operationalStatus === "maintenance") {

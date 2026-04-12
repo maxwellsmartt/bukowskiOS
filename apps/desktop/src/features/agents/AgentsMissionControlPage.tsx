@@ -8,7 +8,9 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { AgentWizardPanel } from "./AgentWizardPanel";
 import { reviewAgentRun, setAgentApprovalMode, setAgentStatus, useAgentDetail, useMissionControlSnapshot } from "./useAgentsData";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const statusLabelMap = {
   active: "Active",

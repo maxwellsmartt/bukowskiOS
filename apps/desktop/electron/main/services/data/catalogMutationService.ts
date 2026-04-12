@@ -4,7 +4,9 @@ import type { CreateCatalogEntityInput, DeleteCatalogEntityInput, UpdateCatalogE
 
 import { createCodeGenerationService } from "./codeGenerationService";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const slugify = (value: string) =>
   value

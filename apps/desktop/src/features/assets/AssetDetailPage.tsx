@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
 import { useCatalogData } from "@features/projects/useProjectsData";
@@ -10,6 +11,8 @@ import { useShellContext } from "@shared/hooks/useShellContext";
 
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
 import { archiveAsset, updateAsset, useAssetDetail } from "./useAssetsData";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 export const AssetDetailPage = () => {
   const { assetId } = useParams();
@@ -114,7 +117,7 @@ export const AssetDetailPage = () => {
               setIsArchivingAsset(true);
               const result = await archiveAsset({
                 commandId: crypto.randomUUID(),
-                workspaceId: "workspace-metadata",
+                workspaceId,
                 assetId: data.asset!.id,
                 actorType: "user",
                 sourceChannel: "desktop",
@@ -139,7 +142,7 @@ export const AssetDetailPage = () => {
               setIsSubmittingEditor(true);
               const result = await updateAsset({
                 commandId: crypto.randomUUID(),
-                workspaceId: "workspace-metadata",
+                workspaceId,
                 assetId: data.asset!.id,
                 actorType: "user",
                 sourceChannel: "desktop",
@@ -186,7 +189,7 @@ export const AssetDetailPage = () => {
               setIsSubmitting(true);
               const result = await reportIncident({
                 commandId: crypto.randomUUID(),
-                workspaceId: "workspace-metadata",
+                workspaceId,
                 assetId: value.assetId,
                 projectId: value.projectId,
                 projectUnitId: value.projectUnitId,

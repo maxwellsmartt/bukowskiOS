@@ -9,7 +9,9 @@ import { AgentDomainInsightPanel } from "./AgentDomainInsightPanel";
 import { AgentWizardPanel } from "./AgentWizardPanel";
 import { setAgentStatus, useAgentDetail, useAgentsList, useMissionControlSnapshot } from "./useAgentsData";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 export const AgentsPage = () => {
   const { data, error } = useAgentsList();

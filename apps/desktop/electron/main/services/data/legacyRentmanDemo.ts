@@ -8,7 +8,9 @@ import {
   type LegacyRentmanSeedRow,
 } from "@db";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 const importedAt = "2026-04-09T18:30:00.000Z";
 const actorUserId = "user-ops";
 const fallbackLocationId = "loc-legacy-unassigned";

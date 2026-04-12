@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import type { AssetListQuery, IncidentListQuery, IncidentSortField, RmaCaseDetailSnapshot, RmaCaseStatus } from "@contracts";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { useAssetsList } from "@features/assets/useAssetsData";
 import { buildAvailableRmaAssets, RmaCaseEditorPanel, type RmaCaseEditorDraft } from "@features/rma/RmaCaseEditorPanel";
 import { createRmaCase, updateRmaCase, useRmaCaseDetail, useRmaSnapshot } from "@features/rma/useRmaData";
@@ -35,6 +36,8 @@ const incidentSortOptions: Array<ListSortOption<IncidentSortField>> = [
   { value: "costEstimate", label: "Cost estimate", columnKey: "cost" },
   { value: "status", label: "Status", columnKey: "status" },
 ];
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const resolveRmaStatusTone = (status: RmaCaseStatus) => {
   if (status === "Closed") {
@@ -180,7 +183,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       if (rmaEditorMode === "edit" && rmaDetail.caseRecord) {
         const result = await updateRmaCase({
           commandId: crypto.randomUUID(),
-          workspaceId: "workspace-metadata",
+          workspaceId,
           rmaCaseId: rmaDetail.caseRecord.id,
           manufacturerId: draft.manufacturerId,
           supportEmail: draft.supportEmail,
@@ -198,7 +201,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       } else {
         const result = await createRmaCase({
           commandId: crypto.randomUUID(),
-          workspaceId: "workspace-metadata",
+          workspaceId,
           manufacturerId: draft.manufacturerId,
           supportEmail: draft.supportEmail,
           title: draft.title,
@@ -233,7 +236,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       setIsSubmittingRma(true);
       const result = await updateRmaCase({
         commandId: crypto.randomUUID(),
-        workspaceId: "workspace-metadata",
+        workspaceId,
         rmaCaseId: rmaDetail.caseRecord.id,
         manufacturerId: rmaDetail.caseRecord.manufacturerId,
         supportEmail: rmaDetail.caseRecord.supportEmail,
@@ -323,7 +326,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
               setIsSubmittingIncident(true);
               const result = await reportIncident({
                 commandId: crypto.randomUUID(),
-                workspaceId: "workspace-metadata",
+                workspaceId,
                 assetId: value.assetId,
                 projectId: value.projectId,
                 projectUnitId: value.projectUnitId,
@@ -444,7 +447,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
             setIsSubmittingIncidentDetail(true);
             const result = await resolveIncident({
               commandId: crypto.randomUUID(),
-              workspaceId: "workspace-metadata",
+              workspaceId,
               incidentId: activeIncidentId,
               resolutionNotes: value.resolutionNotes,
               costEstimate: value.costEstimate,
@@ -472,7 +475,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
             setIsSubmittingIncidentDetail(true);
             const result = await updateIncident({
               commandId: crypto.randomUUID(),
-              workspaceId: "workspace-metadata",
+              workspaceId,
               incidentId: activeIncidentId,
               title: value.title,
               description: value.description,

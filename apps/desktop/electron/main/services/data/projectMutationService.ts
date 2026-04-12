@@ -18,7 +18,9 @@ import {
   todayDateOnly,
 } from "./projectScheduling";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 const placeholderTimestamp = "2026-04-09T18:45:00.000Z";
 
 const placeholderProjects = [

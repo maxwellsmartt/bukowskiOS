@@ -13,7 +13,9 @@ import type { AgentToolRegistry } from "./agentToolRegistry";
 import type { OpenAIProviderService } from "./openaiProviderService";
 import type { AssistantGatewaySessionStore } from "./assistantGatewaySessionStore";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 const maxToolCalls = 5;
 const maxToolPayloadChars = 4000;
 

@@ -13,6 +13,8 @@ const emptyDiagnostics: AppDiagnosticsSnapshot = {
   lastBackupAt: null,
   lastIntegrityCheckAt: null,
   lastIntegrityCheckStatus: "never",
+  lastRetentionRunAt: null,
+  lastRetentionSummary: null,
   encryptionAvailable: false,
   internalBuildArtifacts: [],
 };
@@ -128,6 +130,14 @@ export const SettingsPage = () => {
       {
         label: "Last integrity check",
         value: formatDateLabel(diagnostics.lastIntegrityCheckAt),
+      },
+      {
+        label: "Last retention pass",
+        value: formatDateLabel(diagnostics.lastRetentionRunAt),
+      },
+      {
+        label: "Retention result",
+        value: diagnostics.lastRetentionSummary ?? "No retention pass has run yet",
       },
       {
         label: "Secure local encryption",

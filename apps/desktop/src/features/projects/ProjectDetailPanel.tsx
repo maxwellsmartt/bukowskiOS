@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { ProjectDetailSnapshot } from "@contracts";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
 import { useCatalogData } from "@features/projects/useProjectsData";
@@ -18,6 +19,8 @@ type ProjectDetailPanelProps = {
   isLoading: boolean;
   onIncidentCreated: () => void | Promise<void>;
 };
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const toneForStatus = (status: string) => {
   switch (status) {
@@ -147,7 +150,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               setIsSubmitting(true);
               const result = await reportIncident({
                 commandId: crypto.randomUUID(),
-                workspaceId: "workspace-metadata",
+                workspaceId,
                 assetId: value.assetId,
                 projectId: value.projectId ?? data.project?.id,
                 projectUnitId: value.projectUnitId,

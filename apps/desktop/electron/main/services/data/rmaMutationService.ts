@@ -2,7 +2,9 @@ import type { DatabaseSync } from "node:sqlite";
 
 import type { CreateRmaCaseCommand, RmaCaseAssetInput, RmaCaseMutationResult, UpdateRmaCaseCommand } from "@contracts";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const ensureValue = (value: string | undefined, label: string) => {
   const nextValue = value?.trim() ?? "";

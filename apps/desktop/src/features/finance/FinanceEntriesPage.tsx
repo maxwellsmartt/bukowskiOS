@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { FinanceEntryListQuery, FinanceEntrySortField } from "@contracts";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { useAssetsList } from "@features/assets/useAssetsData";
 import { useIncidentsData } from "@features/incidents/useIncidentsData";
@@ -25,6 +26,8 @@ const financeEntrySortOptions: Array<ListSortOption<FinanceEntrySortField>> = [
   { value: "amount", label: "Amount", columnKey: "amount" },
   { value: "status", label: "Status", columnKey: "status" },
 ];
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 export const FinanceEntriesPage = () => {
   const financeControls = useListControls<FinanceEntrySortField, FinanceEntryListQuery>({
@@ -66,7 +69,7 @@ export const FinanceEntriesPage = () => {
       const result = editingEntry
         ? await updateFinanceEntry({
             commandId: crypto.randomUUID(),
-            workspaceId: "workspace-metadata",
+            workspaceId,
             entryId: editingEntry.id,
             actorType: "user",
             sourceChannel: "desktop",
@@ -74,7 +77,7 @@ export const FinanceEntriesPage = () => {
           })
         : await createFinanceEntry({
             commandId: crypto.randomUUID(),
-            workspaceId: "workspace-metadata",
+            workspaceId,
             actorType: "user",
             sourceChannel: "desktop",
             ...draft,

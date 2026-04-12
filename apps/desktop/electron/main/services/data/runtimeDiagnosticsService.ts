@@ -1,6 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 export type RecordRuntimeErrorInput = {
   sourceKind: "main" | "renderer" | "webcontents";

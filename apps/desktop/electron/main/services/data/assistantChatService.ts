@@ -22,7 +22,9 @@ import type {
 import type { AssistantMemoryService } from "../ai/assistantMemoryService";
 import type { AssistantGatewayService } from "../ai/assistantGatewayService";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 const defaultThreadTitle = "New thread";
 const interruptedMessage = "This response was interrupted before completion.";
 

@@ -2,6 +2,7 @@ export * from "./queries/assets-queries";
 export * from "./queries/agent-queries";
 export * from "./queries/catalog-queries";
 export * from "./queries/compare-queries";
+export * from "./constants";
 export * from "./queries/finance-queries";
 export * from "./queries/list-controls-queries";
 export * from "./queries/operations-queries";

@@ -8,7 +8,9 @@ import { useAssistantChat } from "@app/providers/AssistantChatContext";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { reviewAgentRun } from "@features/agents/useAgentsData";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 const modelOptions = ["GPT-5.4", "Claude Sonnet", "OpenClaw Balanced"];
 const reasoningOptions = ["Low", "Medium", "High"];
 const approvalOptions: Array<{ label: string; value: AssistantApprovalPreference }> = [

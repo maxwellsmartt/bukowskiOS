@@ -5,7 +5,9 @@ import type { AgentApprovalMode, AgentRosterRow, AgentStatus } from "@contracts"
 
 import { createAgent, updateAgent } from "./useAgentsData";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const slugify = (value: string) =>
   value

@@ -57,7 +57,9 @@ import { createFinanceReadService } from "./financeReadService";
 import { createProjectReadService } from "./projectReadService";
 import { deriveProjectUnitStatus, resolveScheduleWindowLabel } from "./projectScheduling";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -890,7 +892,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         `
           SELECT name
           FROM projects
-          WHERE workspace_id = 'workspace-metadata'
+          WHERE workspace_id = ?
           ORDER BY CASE status
             WHEN 'Active' THEN 0
             WHEN 'Prep' THEN 1
@@ -899,7 +901,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           LIMIT 1
         `,
       )
-      .get() as { name: string } | undefined;
+      .get(workspaceId) as { name: string } | undefined;
 
     return {
       workspaceName: workspace?.name ?? "Metadata Cine",

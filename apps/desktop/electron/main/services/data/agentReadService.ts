@@ -12,7 +12,9 @@ import type {
   MissionControlSnapshot,
 } from "@contracts";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const relativeFormatter = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" });
 const absoluteFormatter = new Intl.DateTimeFormat("en-US", {

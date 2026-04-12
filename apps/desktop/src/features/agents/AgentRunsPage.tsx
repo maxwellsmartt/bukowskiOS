@@ -5,7 +5,9 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 
 import { reviewAgentRun, useAgentRuns } from "./useAgentsData";
 
-const workspaceId = "workspace-metadata";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
+const workspaceId = DEFAULT_WORKSPACE_ID;
 
 export const AgentRunsPage = () => {
   const { data, error } = useAgentRuns();

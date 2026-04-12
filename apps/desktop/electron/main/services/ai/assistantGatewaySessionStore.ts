@@ -1,5 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
 const defaultTimeoutMs = 60 * 60 * 1000;
 
 type SessionSummary = {
@@ -192,7 +194,7 @@ export const createAssistantGatewaySessionStore = (db: DatabaseSync | null = nul
                 LIMIT 1
               `,
             )
-            .get("workspace-metadata", nextValue.lastTargetAgent) as { id: string } | undefined)?.id ?? null)
+            .get(DEFAULT_WORKSPACE_ID, nextValue.lastTargetAgent) as { id: string } | undefined)?.id ?? null)
         : null;
 
     db.prepare(
