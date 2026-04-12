@@ -9,9 +9,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
+    "rebuild:electron": "mkdir -p \"${TMPDIR:-/tmp}/bukowski-electron-home\" && HOME=\"${TMPDIR:-/tmp}/bukowski-electron-home\" npm_config_devdir=\"${TMPDIR:-/tmp}/bukowski-electron-home/.electron-gyp\" electron-rebuild -f -w better-sqlite3",
     "package:internal": "pnpm build && pnpm rebuild:electron && electron-builder --config electron-builder.config.cjs --publish never",
     "package:mac": "pnpm build && pnpm rebuild:electron && electron-builder --config electron-builder.config.cjs --mac --publish never",
+    "package:mac:release": "pnpm build && pnpm rebuild:electron && BUKOWSKI_RELEASE_SIGNING=1 electron-builder --config electron-builder.config.cjs --mac --publish never",
+    "release:github": "pnpm build && pnpm rebuild:electron && BUKOWSKI_RELEASE_SIGNING=1 electron-builder --config electron-builder.config.cjs --mac --publish always",
     "verify:mac-build": "node ./build/verify-macos-build.cjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

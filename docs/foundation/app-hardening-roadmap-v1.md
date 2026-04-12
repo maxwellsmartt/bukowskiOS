@@ -286,7 +286,39 @@
   - `bajo`: el renderer sigue mostrando warning por chunk grande en build; no bloquea este slice, pero entra en deuda visible de performance/polish
 
 ### Slice 14 — Shipping más serio
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - endurecer la ruta de packaging para builds internas y dejar una base real para release signing, notarization y publicación formal sin romper el flujo actual de internal alpha
+- Área: `infra`
+- Dependencias: Slice 4, Slice 13
+- Qué se probó:
+  - `typecheck`
+  - suite de tests completa
+  - `build`
+  - `package:mac`
+  - `verify:mac-build`
+- Evidencia:
+  - el packaging macOS ahora distingue entre dos lanes:
+    - internal alpha con ad-hoc signing profundo y verificación local
+    - release signing habilitable por entorno con `BUKOWSKI_RELEASE_SIGNING=1`
+  - se añadió `notarize-macos.cjs` para encapsular detección de credenciales Apple, notarization con `xcrun notarytool` y stapling
+  - se añadió `after-all-artifact-build.cjs` para ejecutar notarization/stapling solo cuando realmente hay credenciales y release signing activo
+  - `electron-builder.config.cjs` ahora soporta:
+    - `afterAllArtifactBuild`
+    - `hardenedRuntime` en release signing
+    - identidad automática cuando existe signing real
+    - configuración opcional de publicación a GitHub Releases
+  - `package.json` ahora incluye scripts separados para:
+    - `package:mac`
+    - `package:mac:release`
+    - `release:github`
+  - el rebuild nativo dejó de depender de escribir en `~/.electron-gyp`; ahora usa un `HOME` temporal controlado y `npm_config_devdir` local a `/tmp`, lo que evita fallos de permisos en entornos más restringidos
+  - se añadió documentación operativa en `docs/foundation/macos-release-flow.md`
+- Riesgos remanentes:
+  - `medio`: el build interno queda bien empaquetado y firmado ad-hoc, pero sigue sin notarization real hasta que se inyecten credenciales Apple válidas en el entorno
+  - `medio`: la publicación a GitHub Releases quedó preparada, pero todavía falta probarla con versionado/release discipline real
+  - `medio`: auto-update runtime todavía no está conectado; este slice deja la base de distribución más seria, no el circuito completo de updates
+  - `bajo`: `spctl` puede seguir rechazando el bundle ad-hoc interno en algunas máquinas, lo cual es esperado mientras no exista signing/notarization de distribución
 
 ## P3 — Deuda técnica y escalabilidad
 

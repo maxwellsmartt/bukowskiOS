@@ -1,38 +1,10 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { execFileSync } = require("node:child_process");
-
-const parseEnvBoolean = (value, fallback = false) => {
-  if (value === undefined || value === null) return fallback;
-  const normalized = String(value).trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) return true;
-  if (["0", "false", "no", "off"].includes(normalized)) return false;
-  return fallback;
-};
-
-const runCommand = (command, args = [], { allowFailure = false } = {}) => {
-  try {
-    const output = execFileSync(command, args, {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    return {
-      ok: true,
-      output: (output || "").toString().trim(),
-    };
-  } catch (error) {
-    const stdout = (error?.stdout || "").toString().trim();
-    const stderr = (error?.stderr || "").toString().trim();
-    const message = [stdout, stderr].filter(Boolean).join("\n").trim() || error?.message || "command failed";
-    if (allowFailure) {
-      return {
-        ok: false,
-        output: message,
-      };
-    }
-    throw new Error(`${command} ${args.join(" ")} failed:\n${message}`);
-  }
-};
+const {
+  hasExplicitDeveloperSigning,
+  isReleaseSigningEnabled,
+  runCommand,
+} = require("./notarize-macos.cjs");
 
 const resolveAppPath = (context) => {
   const appOutDir = context?.appOutDir;
@@ -43,14 +15,6 @@ const resolveAppPath = (context) => {
 
   return path.join(appOutDir, `${productFilename}.app`);
 };
-
-const hasExplicitDeveloperSigning = () =>
-  Boolean(
-    process.env.CSC_LINK ||
-      process.env.CSC_NAME ||
-      process.env.CSC_KEY_PASSWORD ||
-      process.env.CSC_INSTALLER_LINK,
-  );
 
 module.exports = async function afterSign(context) {
   const platform = context?.electronPlatformName || process.platform;
@@ -64,17 +28,17 @@ module.exports = async function afterSign(context) {
     return;
   }
 
-  const forceAdhoc = parseEnvBoolean(process.env.FORCE_ADHOC_SIGN, false);
-  const enableAdhoc = parseEnvBoolean(process.env.ENABLE_ADHOC_SIGN, true);
-  const strictSpctl = parseEnvBoolean(process.env.STRICT_SPCTL, false);
+  const forceAdhoc = ["1", "true", "yes", "on"].includes(String(process.env.FORCE_ADHOC_SIGN || "").trim().toLowerCase());
+  const enableAdhoc = !["0", "false", "no", "off"].includes(String(process.env.ENABLE_ADHOC_SIGN ?? "true").trim().toLowerCase());
+  const strictSpctl = ["1", "true", "yes", "on"].includes(String(process.env.STRICT_SPCTL || "").trim().toLowerCase());
 
   if (!forceAdhoc && !enableAdhoc) {
     console.log("[adhoc-sign] Skipped because ENABLE_ADHOC_SIGN=false.");
     return;
   }
 
-  if (!forceAdhoc && hasExplicitDeveloperSigning()) {
-    console.log("[adhoc-sign] Skipped because explicit developer signing credentials were detected.");
+  if (!forceAdhoc && isReleaseSigningEnabled()) {
+    console.log("[adhoc-sign] Skipped because release signing is enabled and a developer identity is expected.");
     return;
   }
 
