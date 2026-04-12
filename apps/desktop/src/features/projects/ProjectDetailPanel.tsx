@@ -9,6 +9,7 @@ import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 
 type ProjectDetailPanelProps = {
@@ -48,7 +49,11 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   }
 
   if (isLoading) {
-    return <div className="empty-state">Loading project detail...</div>;
+    return (
+      <SurfaceCard title="Project detail" subtitle="Loading the selected project workspace.">
+        <TableSkeleton body="Preparing project context, linked assets, open incidents and budget signals." columns={5} />
+      </SurfaceCard>
+    );
   }
 
   if (!data.project) {

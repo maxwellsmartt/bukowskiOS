@@ -2,6 +2,7 @@ import { Archive, Save, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { AssetEditorSnapshot, CatalogSnapshot } from "@contracts";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -59,6 +60,7 @@ export const AssetEditorPanel = ({
   onClose,
   onSubmit,
 }: AssetEditorPanelProps) => {
+  const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
   const [name, setName] = useState(initialValue?.name ?? "");
   const [internalCode, setInternalCode] = useState(initialValue?.internalCode ?? "");
   const [categoryId, setCategoryId] = useState(initialValue?.categoryId ?? categories[0]?.id ?? "");
@@ -227,7 +229,7 @@ export const AssetEditorPanel = ({
 
       <div className="action-panel-actions">
         {mode === "edit" && onArchive ? (
-          <button className="ghost-control" disabled={isArchiving} onClick={() => void onArchive()} type="button">
+          <button className="ghost-control" disabled={isArchiving} onClick={() => setConfirmArchiveOpen(true)} type="button">
             <Archive size={14} />
             <span>{isArchiving ? "Archiving..." : "Archive asset"}</span>
           </button>
@@ -263,6 +265,20 @@ export const AssetEditorPanel = ({
           <span>{isSubmitting ? "Saving..." : mode === "create" ? "Create asset" : "Save asset"}</span>
         </button>
       </div>
+
+      <ConfirmDialog
+        body="Archive this asset from the active registry? The record stays auditable, but it will stop showing as an active operational item."
+        confirmLabel="Archive asset"
+        isOpen={confirmArchiveOpen}
+        isSubmitting={isArchiving}
+        onCancel={() => setConfirmArchiveOpen(false)}
+        onConfirm={async () => {
+          await onArchive?.();
+          setConfirmArchiveOpen(false);
+        }}
+        title="Archive asset"
+        tone="danger"
+      />
     </SurfaceCard>
   );
 };

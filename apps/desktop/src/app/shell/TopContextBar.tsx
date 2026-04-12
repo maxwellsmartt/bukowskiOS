@@ -21,7 +21,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       <div className="top-context-group top-context-group-end">
         <button className="ghost-control search-control" onClick={onOpenSearch} type="button">
           <Search size={13} />
-          <span>Search everything</span>
+          <span>Search</span>
           <kbd>⌘K</kbd>
         </button>
         {scopeChipLabel ? (
@@ -29,11 +29,10 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
             <span>{scopeChipLabel}</span>
           </div>
         ) : null}
-        <button className="ghost-control sync-control" type="button">
-          <RefreshCcw size={13} />
-          <span>{syncLabel}</span>
+        <button aria-label={syncLabel} className="icon-ghost-control sync-control" title={syncLabel} type="button">
+          <RefreshCcw size={14} />
         </button>
-        <button className="icon-control" type="button" aria-label="Alerts">
+        <button aria-label="Alerts" className="icon-ghost-control" type="button">
           <Bell size={14} />
         </button>
       </div>

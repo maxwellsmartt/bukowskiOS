@@ -2,6 +2,7 @@ import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import { useCatalogData } from "@features/projects/useProjectsData";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { SelectField } from "@shared/components/SelectField";
 import { useShellContext } from "@shared/hooks/useShellContext";
 
@@ -25,6 +26,7 @@ export const ShellProjectsPanel = () => {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingDeleteProject, setPendingDeleteProject] = useState<{ id: string; name: string } | null>(null);
 
   const activeDraftProject = projects.find((project) => project.id === editingProjectId) ?? null;
 
@@ -86,13 +88,7 @@ export const ShellProjectsPanel = () => {
     setActionError(null);
   };
 
-  const handleDelete = async (projectId: string, projectName: string) => {
-    const confirmed = window.confirm(`Delete project "${projectName}"? This only works if it has no linked operational records.`);
-
-    if (!confirmed) {
-      return;
-    }
-
+  const handleDelete = async (projectId: string) => {
     try {
       await deleteProject(projectId);
       setActionError(null);
@@ -189,16 +185,42 @@ export const ShellProjectsPanel = () => {
             </div>
 
             <div className="shell-project-item-actions" onClick={(event) => event.stopPropagation()}>
-              <button className="shell-project-action" onClick={() => beginEdit(project.id)} type="button">
+              <button className="shell-project-action" onClick={() => beginEdit(project.id)} title="Edit project" type="button">
                 <Pencil size={12} />
               </button>
-              <button className="shell-project-action" onClick={() => handleDelete(project.id, project.name)} type="button">
+              <button
+                className="shell-project-action"
+                onClick={() => setPendingDeleteProject({ id: project.id, name: project.name })}
+                title="Delete project"
+                type="button"
+              >
                 <Trash2 size={12} />
               </button>
             </div>
           </div>
         ))}
       </div>
+
+      <ConfirmDialog
+        body={
+          pendingDeleteProject
+            ? `Delete "${pendingDeleteProject.name}"? This only works when the project has no linked operational records.`
+            : ""
+        }
+        confirmLabel="Delete project"
+        isOpen={Boolean(pendingDeleteProject)}
+        onCancel={() => setPendingDeleteProject(null)}
+        onConfirm={async () => {
+          if (!pendingDeleteProject) {
+            return;
+          }
+
+          await handleDelete(pendingDeleteProject.id);
+          setPendingDeleteProject(null);
+        }}
+        title="Delete project"
+        tone="danger"
+      />
     </section>
   );
 };

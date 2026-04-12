@@ -265,7 +265,25 @@
   - `bajo`: la edición usa catálogos cargados en cliente para selects; si el dataset crece mucho, convendrá pasar a búsqueda remota o lazy loading
 
 ### Slice 13 — UX Polish Avanzado
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - bajar fricción visual en superficies principales, reemplazar loaders de texto por skeletons y unificar confirmaciones destructivas
+- Área: `frontend`
+- Dependencias: Slice 12
+- Qué se probó:
+  - `typecheck`
+  - suite de tests completa
+  - `build`
+- Evidencia:
+  - se añadieron `ConfirmDialog` y `TableSkeleton` como componentes compartidos para confirmaciones destructivas y loading states más claros
+  - `ShellProjectsPanel`, `CatalogPage` y `AssetEditorPanel` ya no usan confirmaciones nativas inconsistentes; ahora muestran diálogos de confirmación más claros
+  - `Assets`, `Catalog`, `Project detail`, `Project budget` y `Packing detail` dejaron de mostrar textos de loading ambiguos y ahora usan skeletons
+  - el sidebar de proyectos simplificó sus acciones: los botones de editar/borrar viven en hover/focus y con menos ruido visual
+  - `TopContextBar` y `Compare tray` redujeron botones con recuadros innecesarios y dejaron acciones secundarias en formato icon-only cuando aporta limpieza
+- Riesgos remanentes:
+  - `medio`: el app ya se siente bastante más limpio, pero todavía hay otras superficies con botones pill heredados que convendría revisar en una fase de polish más fina
+  - `medio`: los skeletons nuevos cubren los flujos principales, no absolutamente todos los estados de carga del producto
+  - `bajo`: el renderer sigue mostrando warning por chunk grande en build; no bloquea este slice, pero entra en deuda visible de performance/polish
 
 ### Slice 14 — Shipping más serio
 - Estado: `planned`

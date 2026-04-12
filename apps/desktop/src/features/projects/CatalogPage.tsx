@@ -3,12 +3,14 @@ import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { CatalogEntityType, CatalogListQuery, CatalogSnapshot, CatalogSortField } from "@contracts";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
@@ -197,6 +199,7 @@ export const CatalogPage = () => {
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const tabs = useMemo<CatalogTabConfig[]>(
     () => [
@@ -359,7 +362,11 @@ export const CatalogPage = () => {
       />
 
       {error ? <div className="empty-state">Catalog unavailable: {error}</div> : null}
-      {!error && isLoading ? <div className="empty-state">Loading master data...</div> : null}
+      {!error && isLoading ? (
+        <SurfaceCard title="Catalog" subtitle="Loading your shared operational references.">
+          <TableSkeleton body="Preparing locations, departments, crew, clients and categories from the local workspace." columns={4} />
+        </SurfaceCard>
+      ) : null}
 
       {!error && !isLoading && totalCatalogRecords === 0 ? (
         <GuidedEmptyState
@@ -426,24 +433,7 @@ export const CatalogPage = () => {
                 className="ghost-control"
                 disabled={!selectedRow}
                 onClick={() => {
-                  if (!selectedRow || typeof selectedRow.id !== "string") {
-                    return;
-                  }
-
-                  const singularLabel = singularLabelMap[activeTab];
-                  const confirmed = window.confirm(`Delete this ${singularLabel}?`);
-                  if (!confirmed) {
-                    return;
-                  }
-
-                  void applyCatalogMutation(
-                    () =>
-                      deleteCatalogEntity({
-                        entityType: activeTab,
-                        id: selectedRow.id as string,
-                      }),
-                    null,
-                  );
+                  setConfirmDeleteOpen(true);
                 }}
                 type="button"
               >
@@ -547,6 +537,34 @@ export const CatalogPage = () => {
           </SurfaceCard>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        body={
+          selectedRow
+            ? `Delete this ${singularLabelMap[activeTab]} from Catalog? Existing operations that still depend on it may block the action.`
+            : ""
+        }
+        confirmLabel="Delete"
+        isOpen={confirmDeleteOpen && Boolean(selectedRow)}
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={async () => {
+          if (!selectedRow || typeof selectedRow.id !== "string") {
+            return;
+          }
+
+          await applyCatalogMutation(
+            () =>
+              deleteCatalogEntity({
+                entityType: activeTab,
+                id: selectedRow.id as string,
+              }),
+            null,
+          );
+          setConfirmDeleteOpen(false);
+        }}
+        title={`Delete ${singularLabelMap[activeTab]}`}
+        tone="danger"
+      />
     </div>
   );
 };

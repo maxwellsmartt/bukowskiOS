@@ -2,6 +2,7 @@ import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { TableSkeleton } from "@shared/components/TableSkeleton";
 
 import { useProjectMode } from "./useProjectMode";
 import { useProjectDetail } from "./useProjectsData";
@@ -15,7 +16,11 @@ export const ProjectBudgetPage = () => {
   }
 
   if (isLoading) {
-    return <div className="empty-state">Loading project budget shell...</div>;
+    return (
+      <SurfaceCard title="Budget" subtitle="Loading project-linked entries, reserve and exposure context.">
+        <TableSkeleton body="Preparing budget shell and cost-bearing incidents for this project." columns={4} />
+      </SurfaceCard>
+    );
   }
 
   if (!data.project) {

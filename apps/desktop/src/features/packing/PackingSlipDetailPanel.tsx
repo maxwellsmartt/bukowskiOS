@@ -6,6 +6,7 @@ import { DataTable } from "@shared/components/DataTable";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { TableSkeleton } from "@shared/components/TableSkeleton";
 
 type PackingSlipDetailPanelProps = {
   data: PackingSlipDetailSnapshot;
@@ -35,7 +36,7 @@ export const PackingSlipDetailPanel = ({
   if (isLoading) {
     return (
       <SurfaceCard title="Packing detail" subtitle="Loading selected slip...">
-        <div className="empty-state">Preparing local packing detail...</div>
+        <TableSkeleton body="Preparing outgoing items, return state and document context for the selected slip." columns={5} />
       </SurfaceCard>
     );
   }

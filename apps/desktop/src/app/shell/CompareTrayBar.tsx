@@ -46,9 +46,8 @@ export const CompareTrayBar = () => {
                 : "Compare unavailable"}
             </span>
           </button>
-          <button className="ghost-control" onClick={clear} type="button">
+          <button aria-label="Clear compare tray" className="icon-ghost-control" onClick={clear} title="Clear tray" type="button">
             <Trash2 size={14} />
-            <span>Clear</span>
           </button>
         </div>
       </div>

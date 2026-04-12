@@ -13,6 +13,7 @@ import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
@@ -278,7 +279,18 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       />
 
       {error ? <div className="empty-state">Assets unavailable: {error}</div> : null}
-      {!error && isLoading ? <div className="empty-state">Loading asset registry...</div> : null}
+      {!error && isLoading ? (
+        <SurfaceCard title={isProjectMode ? "Assigned assets" : "Asset registry"} subtitle="Loading the latest local inventory snapshot.">
+          <TableSkeleton
+            body={
+              isProjectMode
+                ? "Preparing assets already linked to this project, including custody and issue state."
+                : "Preparing current status, custody and location across the local registry."
+            }
+            columns={6}
+          />
+        </SurfaceCard>
+      ) : null}
 
       <div className="chip-row">
         <StatusBadge tone="success">{assets.filter((asset) => hasItem("asset", asset.id)).length} in compare</StatusBadge>
