@@ -74,7 +74,7 @@ const OverviewContent = () => {
 
   useEffect(() => {
     setTimelineProjectLimit(timelinePageSize);
-  }, [timelineRange, timelineScale, timelineAnchorDate]);
+  }, [timelineRange, timelineScale]);
 
   return (
     <div className="page-stack">

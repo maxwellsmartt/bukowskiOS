@@ -16,6 +16,7 @@ import type {
   ProjectUnitRow,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
+  ScheduleTimelineSignalDetailItem,
   ScheduleTimelineSnapshot,
   StagingPackingSlipRow,
 } from "@contracts";
@@ -162,6 +163,13 @@ const windowsOverlap = (
   leftWindows.some((leftWindow) =>
     rightWindows.some((rightWindow) => datesOverlap(leftWindow.startDate, leftWindow.endDate, rightWindow.startDate, rightWindow.endDate)),
   );
+
+const createEmptySignalDetails = () => ({
+  assets: [] as ScheduleTimelineSignalDetailItem[],
+  crew: [] as ScheduleTimelineSignalDetailItem[],
+  conflicts: [] as ScheduleTimelineSignalDetailItem[],
+  incidents: [] as ScheduleTimelineSignalDetailItem[],
+});
 
 const overlapWindow = (
   leftWindows: Array<{ startDate: string | null; endDate: string | null }>,
@@ -332,6 +340,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         crewConflictCount: number;
         assetConflictCount: number;
         incidentMarkers: ScheduleTimelineSnapshot["projects"][number]["incidentMarkers"];
+        signalDetails: ScheduleTimelineSnapshot["projects"][number]["signalDetails"];
         units: ScheduleTimelineSnapshot["projects"][number]["units"];
       }
     >();
@@ -376,6 +385,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           crewConflictCount: 0,
           assetConflictCount: 0,
           incidentMarkers: [],
+          signalDetails: createEmptySignalDetails(),
           units: [],
         };
 
@@ -434,6 +444,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           crewConflictCount: 0,
           assetConflictCount: 0,
           incidentMarkers: [],
+          signalDetails: createEmptySignalDetails(),
         });
       }
     });
@@ -597,12 +608,97 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             .all(...pagedUnitIds) as Array<{ project_unit_id: string; crew_count: number }>)
         : [];
 
+      const projectAssetDetails = db
+        .prepare(
+          `
+            SELECT
+              asset_current_state.current_project_id AS project_id,
+              asset_current_state.project_unit_id AS unit_id,
+              COALESCE(project_units.name, 'Main Unit') AS unit_name,
+              assets.id AS asset_id,
+              COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS asset_code,
+              assets.name AS asset_name
+            FROM asset_current_state
+            JOIN assets ON assets.id = asset_current_state.asset_id
+            LEFT JOIN project_units ON project_units.id = asset_current_state.project_unit_id
+            LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
+            LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
+            WHERE asset_current_state.current_project_id IN (${projectIdPlaceholders})
+            ORDER BY assets.name
+          `,
+        )
+        .all(...pagedProjectIds) as Array<{
+        project_id: string;
+        unit_id: string | null;
+        unit_name: string;
+        asset_id: string;
+        asset_code: string;
+        asset_name: string;
+      }>;
+
+      const projectCrewDetails = db
+        .prepare(
+          `
+            SELECT
+              project_units.project_id AS project_id,
+              project_unit_crew_assignments.project_unit_id AS unit_id,
+              COALESCE(project_units.name, 'Main Unit') AS unit_name,
+              project_unit_crew_assignments.id AS assignment_id,
+              COALESCE(crew_members.full_name, 'Crew') AS full_name,
+              COALESCE(project_unit_crew_assignments.role_label, COALESCE(crew_members.role_label, 'Role pending')) AS role_label,
+              COALESCE(departments.name, '') AS department_name
+            FROM project_unit_crew_assignments
+            JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
+            LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
+            LEFT JOIN departments ON departments.id = project_unit_crew_assignments.department_id
+            WHERE project_units.project_id IN (${projectIdPlaceholders})
+            ORDER BY crew_members.full_name
+          `,
+        )
+        .all(...pagedProjectIds) as Array<{
+        project_id: string;
+        unit_id: string | null;
+        unit_name: string;
+        assignment_id: string;
+        full_name: string;
+        role_label: string;
+        department_name: string;
+      }>;
+
       const projectAssetCountMap = new Map(projectAssetCounts.map((row) => [row.project_id, row.asset_count]));
       const projectCrewCountMap = new Map(projectCrewCounts.map((row) => [row.project_id, row.crew_count]));
       const unitAssetCountMap = new Map(unitAssetCounts.map((row) => [row.project_unit_id, row.asset_count]));
       const unitCrewCountMap = new Map(unitCrewCounts.map((row) => [row.project_unit_id, row.crew_count]));
+      const assetDetailsByProject = new Map<string, typeof projectAssetDetails>();
+      const assetDetailsByUnit = new Map<string, typeof projectAssetDetails>();
+      const crewDetailsByProject = new Map<string, typeof projectCrewDetails>();
+      const crewDetailsByUnit = new Map<string, typeof projectCrewDetails>();
       const incidentsByProject = new Map<string, typeof activeIncidentRows>();
       const incidentsByUnit = new Map<string, typeof activeIncidentRows>();
+
+      projectAssetDetails.forEach((row) => {
+        const projectList = assetDetailsByProject.get(row.project_id) ?? [];
+        projectList.push(row);
+        assetDetailsByProject.set(row.project_id, projectList);
+
+        if (row.unit_id) {
+          const unitList = assetDetailsByUnit.get(row.unit_id) ?? [];
+          unitList.push(row);
+          assetDetailsByUnit.set(row.unit_id, unitList);
+        }
+      });
+
+      projectCrewDetails.forEach((row) => {
+        const projectList = crewDetailsByProject.get(row.project_id) ?? [];
+        projectList.push(row);
+        crewDetailsByProject.set(row.project_id, projectList);
+
+        if (row.unit_id) {
+          const unitList = crewDetailsByUnit.get(row.unit_id) ?? [];
+          unitList.push(row);
+          crewDetailsByUnit.set(row.unit_id, unitList);
+        }
+      });
 
       activeIncidentRows.forEach((row) => {
         const projectList = incidentsByProject.get(row.project_id) ?? [];
@@ -618,6 +714,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
 
       pagedProjects.forEach((project) => {
         const projectIncidents = incidentsByProject.get(project.id) ?? [];
+        const projectAssets = assetDetailsByProject.get(project.id) ?? [];
+        const projectCrew = crewDetailsByProject.get(project.id) ?? [];
         project.assignedAssetCount = projectAssetCountMap.get(project.id) ?? 0;
         project.crewAssignmentCount = projectCrewCountMap.get(project.id) ?? 0;
         project.activeIncidentCount = projectIncidents.length;
@@ -627,9 +725,26 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           severity: incident.severity,
           reportedAt: incident.reported_at.slice(0, 10),
         }));
+        project.signalDetails.assets = projectAssets.slice(0, 6).map((asset) => ({
+          id: asset.asset_id,
+          label: `${asset.asset_code} · ${asset.asset_name}`,
+          meta: asset.unit_name,
+        }));
+        project.signalDetails.crew = projectCrew.slice(0, 6).map((assignment) => ({
+          id: assignment.assignment_id,
+          label: assignment.full_name,
+          meta: `${assignment.role_label}${assignment.department_name ? ` · ${assignment.department_name}` : ""}${assignment.unit_name ? ` · ${assignment.unit_name}` : ""}`,
+        }));
+        project.signalDetails.incidents = projectIncidents.slice(0, 6).map((incident) => ({
+          id: incident.id,
+          label: incident.title,
+          meta: `${incident.severity}${incident.project_unit_id ? ` · ${project.units.find((unit) => unit.id === incident.project_unit_id)?.name ?? "Unit"}` : ""}`,
+        }));
 
         project.units.forEach((unit) => {
           const unitIncidents = incidentsByUnit.get(unit.id) ?? [];
+          const unitAssets = assetDetailsByUnit.get(unit.id) ?? [];
+          const unitCrew = crewDetailsByUnit.get(unit.id) ?? [];
           const unitConflict = summarizeUnitConflicts(crewConflictMap.get(unit.id)?.size ?? 0, 0);
           unit.assignedAssetCount = unitAssetCountMap.get(unit.id) ?? 0;
           unit.crewAssignmentCount = unitCrewCountMap.get(unit.id) ?? 0;
@@ -643,11 +758,32 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             severity: incident.severity,
             reportedAt: incident.reported_at.slice(0, 10),
           }));
+          unit.signalDetails.assets = unitAssets.slice(0, 6).map((asset) => ({
+            id: asset.asset_id,
+            label: `${asset.asset_code} · ${asset.asset_name}`,
+            meta: null,
+          }));
+          unit.signalDetails.crew = unitCrew.slice(0, 6).map((assignment) => ({
+            id: assignment.assignment_id,
+            label: assignment.full_name,
+            meta: `${assignment.role_label}${assignment.department_name ? ` · ${assignment.department_name}` : ""}`,
+          }));
+          unit.signalDetails.incidents = unitIncidents.slice(0, 6).map((incident) => ({
+            id: incident.id,
+            label: incident.title,
+            meta: incident.severity,
+          }));
+          unit.signalDetails.conflicts = Array.from(crewConflictMap.get(unit.id) ?? []).slice(0, 6).map((summary, index) => ({
+            id: `${unit.id}-conflict-${index}`,
+            label: summary,
+            meta: null,
+          }));
         });
 
         project.crewConflictCount = project.units.reduce((sum, unit) => sum + unit.crewConflictCount, 0);
         project.assetConflictCount = project.units.reduce((sum, unit) => sum + unit.assetConflictCount, 0);
         project.conflictCount = project.units.reduce((sum, unit) => sum + unit.conflictCount, 0);
+        project.signalDetails.conflicts = project.units.flatMap((unit) => unit.signalDetails.conflicts).slice(0, 6);
       });
     }
 

@@ -20,6 +20,8 @@ import type {
   ScheduleTimelineRange,
   ScheduleTimelineScale,
   ScheduleTimelineSegment,
+  ScheduleTimelineSignalDetailItem,
+  ScheduleTimelineSignalDetails,
   ScheduleTimelineSnapshot,
   ScheduleTimelineUnitLane,
 } from "@contracts";
@@ -130,11 +132,21 @@ type TimelineBand = {
   width: number;
 };
 
+type TimelineGridDensity = "compact" | "balanced" | "expanded";
+
 type TimelineTooltipState = {
   label: string;
   left: number;
   status: string;
   subtitle: string;
+  top: number;
+};
+
+type TimelineSignalPopoverState = {
+  items: ScheduleTimelineSignalDetailItem[];
+  left: number;
+  remainingCount: number;
+  title: string;
   top: number;
 };
 
@@ -154,10 +166,12 @@ type TimelineGridProps = {
     months: TimelineBand[];
     weeks: TimelineBand[];
   };
+  density: TimelineGridDensity;
   scale: ScheduleTimelineScale;
 };
 
 type TimelineBarGeometry = {
+  isCompactLabel: boolean;
   left: number;
   segment: ScheduleTimelineSegment;
   palette: (typeof colorMap)[keyof typeof colorMap];
@@ -191,6 +205,14 @@ const dayLabelFormatter = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
   timeZone: "UTC",
 });
+
+const getIsoWeekNumber = (value: string) => {
+  const date = parseDateOnly(value);
+  const dayNumber = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNumber);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date.getTime() - yearStart.getTime()) / dayInMilliseconds) + 1) / 7);
+};
 
 const formatLocalDateOnly = (value = new Date()) => {
   const year = value.getFullYear();
@@ -242,14 +264,21 @@ const resolveTimelineRangeLength = (range: ScheduleTimelineRange) => {
   return 90;
 };
 
-const resolveTimelineWindow = (range: ScheduleTimelineRange, scale: ScheduleTimelineScale, anchorDate: string) => {
+const resolveRenderedTimelineWindow = (
+  range: ScheduleTimelineRange,
+  scale: ScheduleTimelineScale,
+  anchorDate: string,
+  density: TimelineGridDensity,
+) => {
   const totalDays = resolveTimelineRangeLength(range);
-  const lookbackDays = Math.max(1, Math.floor(totalDays * 0.2));
+  const densityFactor = density === "compact" ? 1 : density === "expanded" ? 0.62 : 0.82;
+  const visibleDays = Math.max(Math.round(totalDays * densityFactor), scale === "month" ? 28 : 14);
+  const lookbackDays = Math.max(1, Math.floor(visibleDays * 0.2));
   const rawStart = addDays(anchorDate, -lookbackDays);
   const alignedStart = scale === "month" ? startOfMonth(rawStart) : scale === "week" ? startOfWeek(rawStart) : rawStart;
 
   return {
-    end: addDays(alignedStart, totalDays - 1),
+    end: addDays(alignedStart, visibleDays - 1),
     start: alignedStart,
   };
 };
@@ -287,7 +316,8 @@ const formatRangeLabel = (startDate: string | null, endDate: string | null) => {
   return `Until ${shortDateFormatter.format(parseDateOnly(endDate ?? ""))}`;
 };
 
-const formatPlayheadLabel = (value: string) => (value === todayDateOnly() ? "Today" : shortDateFormatter.format(parseDateOnly(value)));
+const formatPlayheadDisplayLabel = (value: string) =>
+  value === todayDateOnly() ? `Today · ${shortDateFormatter.format(parseDateOnly(value))}` : shortDateFormatter.format(parseDateOnly(value));
 
 const extractRgb = (color: string) => {
   const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
@@ -373,6 +403,7 @@ const resolveBarGeometry = (
   const visibleDays = Math.max(diffDaysInclusive(clampedStart, clampedEnd), 1);
 
   return {
+    isCompactLabel: (segment?.kind === "preproduction" ? Math.max((visibleDays / totalDays) * 100, 0.9) : 0) < 3.8,
     left: (leftDays / totalDays) * 100,
     segment:
       segment ??
@@ -411,22 +442,109 @@ const resolveSegmentGeometries = (
     .filter((geometry): geometry is TimelineBarGeometry => Boolean(geometry));
 };
 
-const formatSegmentsLabel = (segments: ScheduleTimelineSegment[]) => {
-  const visible = segments.filter((segment) => segment.startDate || segment.endDate);
-  if (!visible.length) {
-    return "Dates pending";
-  }
+const resolveWindowSegments = (segments: ScheduleTimelineSegment[]) =>
+  segments
+    .filter((segment) => segment.startDate || segment.endDate)
+    .sort((left, right) => {
+      if (left.kind === "preproduction" && right.kind !== "preproduction") {
+        return -1;
+      }
 
-  const labels = visible.map((segment) => {
-    const prefix = segment.kind === "preproduction" ? "Pre · " : "";
-    return `${prefix}${formatRangeLabel(segment.startDate, segment.endDate)}`;
+      if (right.kind === "preproduction" && left.kind !== "preproduction") {
+        return 1;
+      }
+
+      const leftStart = left.startDate ?? "";
+      const rightStart = right.startDate ?? "";
+      return leftStart.localeCompare(rightStart);
+    });
+
+const formatWindowSegmentChip = (segment: ScheduleTimelineSegment) => {
+  const baseLabel = formatRangeLabel(segment.startDate, segment.endDate);
+  return segment.kind === "preproduction" ? `Pre · ${baseLabel}` : baseLabel;
+};
+
+const isHeaderBandVisible = (
+  band: TimelineBand,
+  density: TimelineGridDensity,
+  tier: "month" | "secondary" | "day",
+  scale: ScheduleTimelineScale,
+) => {
+  const threshold =
+    tier === "month"
+      ? density === "compact"
+        ? 9
+        : density === "expanded"
+          ? 5
+          : 7
+      : tier === "day"
+        ? density === "compact"
+          ? 1.35
+          : density === "expanded"
+            ? 0.72
+            : 0.98
+      : scale === "day"
+        ? density === "compact"
+          ? 5.6
+          : density === "expanded"
+            ? 2.4
+            : 3.6
+        : density === "compact"
+          ? 6.2
+          : density === "expanded"
+            ? 3.4
+            : 4.4;
+
+  return band.width >= threshold;
+};
+
+const filterHeaderBandsForDisplay = (
+  bands: TimelineBand[],
+  density: TimelineGridDensity,
+  tier: "month" | "secondary" | "day",
+  scale: ScheduleTimelineScale,
+) => {
+  const minGap =
+    tier === "month"
+      ? density === "compact"
+        ? 1.8
+        : density === "expanded"
+          ? 0.8
+          : 1.2
+      : tier === "day"
+        ? density === "compact"
+          ? 0.95
+          : density === "expanded"
+            ? 0.2
+            : 0.55
+      : scale === "day"
+        ? density === "compact"
+          ? 1.5
+          : density === "expanded"
+            ? 0.6
+            : 0.9
+        : density === "compact"
+          ? 1.8
+          : density === "expanded"
+            ? 0.8
+            : 1.1;
+
+  let lastRight = -Infinity;
+
+  return bands.filter((band) => {
+    if (!isHeaderBandVisible(band, density, tier, scale)) {
+      return false;
+    }
+
+    const left = band.left;
+    const right = band.left + band.width;
+    if (left - lastRight < minGap) {
+      return false;
+    }
+
+    lastRight = right;
+    return true;
   });
-
-  if (labels.length === 1) {
-    return labels[0] ?? "Dates pending";
-  }
-
-  return `${labels.length} windows · ${labels.slice(0, 3).join(", ")}${labels.length > 3 ? "…" : ""}`;
 };
 
 const resolveBand = (startDate: string, endDate: string, rangeStart: string, rangeEnd: string, label: string): TimelineBand => {
@@ -472,7 +590,7 @@ const buildWeekBands = (rangeStart: string, rangeEnd: string) => {
     const weekEnd = addDays(cursor, 6);
 
     if (weekEnd >= rangeStart) {
-      bands.push(resolveBand(cursor, weekEnd, rangeStart, rangeEnd, shortDateFormatter.format(parseDateOnly(clampDate(cursor, rangeStart, rangeEnd)))));
+      bands.push(resolveBand(cursor, weekEnd, rangeStart, rangeEnd, `W${getIsoWeekNumber(cursor)}`));
     }
 
     cursor = addDays(cursor, 7);
@@ -518,13 +636,15 @@ const buildSparseHeaderBands = (
   });
 };
 
-const buildTimelineBands = (rangeStart: string, rangeEnd: string, scale: ScheduleTimelineScale) => {
+const buildTimelineBands = (rangeStart: string, rangeEnd: string, scale: ScheduleTimelineScale, density: TimelineGridDensity) => {
   const months = buildMonthBands(rangeStart, rangeEnd);
   const weeks = buildWeekBands(rangeStart, rangeEnd);
-  const days = scale === "day" ? buildDayBands(rangeStart, rangeEnd) : [];
+  const days = buildDayBands(rangeStart, rangeEnd);
 
   if (scale === "day") {
-    const dayStride = days.length > 150 ? 6 : days.length > 120 ? 5 : days.length > 90 ? 3 : days.length > 60 ? 2 : 1;
+    const baseDayStride = days.length > 150 ? 6 : days.length > 120 ? 5 : days.length > 90 ? 3 : days.length > 60 ? 2 : 1;
+    const dayStride =
+      density === "compact" ? Math.max(baseDayStride + 1, 2) : density === "expanded" ? Math.max(baseDayStride - 1, 1) : baseDayStride;
     return {
       days,
       header: buildSparseHeaderBands(
@@ -541,14 +661,16 @@ const buildTimelineBands = (rangeStart: string, rangeEnd: string, scale: Schedul
 
   if (scale === "month") {
     return {
-      days,
+      days: density === "expanded" ? days : [],
       header: [],
       months,
       weeks,
     };
   }
 
-  const weekStride = weeks.length > 18 ? 2 : 1;
+  const baseWeekStride = weeks.length > 18 ? 2 : 1;
+  const weekStride =
+    density === "compact" ? Math.max(baseWeekStride + 1, 2) : density === "expanded" ? Math.max(baseWeekStride - 1, 1) : baseWeekStride;
   return {
     days,
     header: weeks.filter((_, index) => index % weekStride === 0),
@@ -582,17 +704,25 @@ const deriveUnitPalette = (
 
 const TimelineGrid = ({
   bands,
+  density,
   scale,
-}: TimelineGridProps) => (
-  <div className={`timeline-grid-shell timeline-grid-shell-${scale}`}>
-    {bands.days.map((band) => (
+}: TimelineGridProps) => {
+  const monthBoundaryDates = new Set(bands.months.map((band) => band.startDate));
+  const weekBoundaryDates = new Set(bands.weeks.map((band) => band.startDate).filter((date) => !monthBoundaryDates.has(date)));
+  const dayBands = bands.days.filter((band) => !monthBoundaryDates.has(band.startDate) && !weekBoundaryDates.has(band.startDate));
+
+  return (
+  <div className={`timeline-grid-shell timeline-grid-shell-${scale} timeline-grid-shell-density-${density}`}>
+    {dayBands.map((band) => (
       <span
         key={`day-${band.key}`}
         className="timeline-grid-line timeline-grid-line-day"
         style={{ left: `${band.left}%` }}
       />
     ))}
-    {bands.weeks.map((band) => (
+    {bands.weeks
+      .filter((band) => !monthBoundaryDates.has(band.startDate))
+      .map((band) => (
       <span
         key={`week-${band.key}`}
         className="timeline-grid-line timeline-grid-line-week"
@@ -607,27 +737,113 @@ const TimelineGrid = ({
       />
     ))}
   </div>
-);
+  );
+};
 
 const TimelineSignalRow = ({
+  details,
   incidents,
   assets,
   crew,
   conflicts,
+  onChipHover,
+  onChipLeave,
 }: {
+  details: ScheduleTimelineSignalDetails;
   incidents: number;
   assets: number;
   crew: number;
   conflicts: number;
+  onChipHover: (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    title: string,
+    items: ScheduleTimelineSignalDetailItem[],
+    total: number,
+  ) => void;
+  onChipLeave: () => void;
 }) => (
   <div className="timeline-signal-row">
-    {conflicts ? <span className="timeline-signal-chip is-warning">{conflicts} conflicts</span> : null}
-    {incidents ? <span className="timeline-signal-chip is-critical">{incidents} incidents</span> : null}
-    {assets ? <span className="timeline-signal-chip">{assets} assets</span> : null}
-    {crew ? <span className="timeline-signal-chip is-info">{crew} crew</span> : null}
+    {conflicts ? (
+      <button
+        className="timeline-signal-chip is-warning"
+        onPointerEnter={(event) => onChipHover(event, "Conflicts", details.conflicts, conflicts)}
+        onPointerLeave={onChipLeave}
+        onPointerMove={(event) => onChipHover(event, "Conflicts", details.conflicts, conflicts)}
+        type="button"
+      >
+        {conflicts} conflicts
+      </button>
+    ) : null}
+    {incidents ? (
+      <button
+        className="timeline-signal-chip is-critical"
+        onPointerEnter={(event) => onChipHover(event, "Incidents", details.incidents, incidents)}
+        onPointerLeave={onChipLeave}
+        onPointerMove={(event) => onChipHover(event, "Incidents", details.incidents, incidents)}
+        type="button"
+      >
+        {incidents} incidents
+      </button>
+    ) : null}
+    {assets ? (
+      <button
+        className="timeline-signal-chip"
+        onPointerEnter={(event) => onChipHover(event, "Assets assigned", details.assets, assets)}
+        onPointerLeave={onChipLeave}
+        onPointerMove={(event) => onChipHover(event, "Assets assigned", details.assets, assets)}
+        type="button"
+      >
+        {assets} assets
+      </button>
+    ) : null}
+    {crew ? (
+      <button
+        className="timeline-signal-chip is-info"
+        onPointerEnter={(event) => onChipHover(event, "Crew assigned", details.crew, crew)}
+        onPointerLeave={onChipLeave}
+        onPointerMove={(event) => onChipHover(event, "Crew assigned", details.crew, crew)}
+        type="button"
+      >
+        {crew} crew
+      </button>
+    ) : null}
     {!conflicts && !incidents && !assets && !crew ? <span className="timeline-signal-chip is-muted">No live load</span> : null}
   </div>
 );
+
+const TimelineWindowPills = ({
+  segments,
+}: {
+  segments: ScheduleTimelineSegment[];
+}) => {
+  const visibleSegments = resolveWindowSegments(segments);
+
+  if (!visibleSegments.length) {
+    return <span className="timeline-lane-subtitle">Dates pending</span>;
+  }
+
+  return (
+    <div className={`timeline-window-pill-row${visibleSegments.length > 1 ? " is-multi" : ""}`}>
+      {visibleSegments.map((segment, index) => (
+        <span
+          key={segment.id}
+          className={`timeline-window-pill${segment.kind === "preproduction" ? " is-preproduction" : ""}`}
+          style={
+            segment.kind === "preproduction"
+              ? undefined
+              : ({
+                  background: `hsla(${(index * 41 + 212) % 360} 72% 58% / 0.12)`,
+                  borderColor: `hsla(${(index * 41 + 212) % 360} 72% 68% / 0.28)`,
+                  color: `hsla(${(index * 41 + 212) % 360} 76% 82% / 0.98)`,
+                } as CSSProperties)
+          }
+        >
+          {formatWindowSegmentChip(segment)}
+        </span>
+      ))}
+    </div>
+  );
+};
 
 const TimelineIncidentMarkers = ({
   markers,
@@ -662,10 +878,13 @@ const TimelineLane = ({
   isExpanded,
   onBarHover,
   onBarLeave,
+  onSignalHover,
+  onSignalLeave,
   onToggle,
   project,
   rangeEnd,
   rangeStart,
+  density,
   scale,
 }: {
   bands: ReturnType<typeof buildTimelineBands>;
@@ -677,10 +896,18 @@ const TimelineLane = ({
     parentName?: string,
   ) => void;
   onBarLeave: () => void;
+  onSignalHover: (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    title: string,
+    items: ScheduleTimelineSignalDetailItem[],
+    total: number,
+  ) => void;
+  onSignalLeave: () => void;
   onToggle: () => void;
   project: ScheduleTimelineProjectLane;
   rangeEnd: string;
   rangeStart: string;
+  density: TimelineGridDensity;
   scale: ScheduleTimelineScale;
 }) => {
   const projectPalette = resolveTimelinePalette(project.colorKey);
@@ -704,15 +931,18 @@ const TimelineLane = ({
                       <strong className="timeline-lane-title">{project.name}</strong>
                       <StatusBadge tone={resolveStatusTone(project.status)}>{project.status}</StatusBadge>
                     </div>
-                    <span className="timeline-lane-subtitle">
-                      {formatSegmentsLabel(project.segments)}
-                      {project.units.length ? ` · ${project.units.length} units` : ""}
-                    </span>
+                    <div className="timeline-lane-subtitle-group">
+                      <TimelineWindowPills segments={project.segments} />
+                      {project.units.length ? <span className="timeline-lane-subtitle-accent">{project.units.length} units</span> : null}
+                    </div>
                     <TimelineSignalRow
                       assets={project.assignedAssetCount}
                       conflicts={project.conflictCount}
                       crew={project.crewAssignmentCount}
+                      details={project.signalDetails}
                       incidents={project.activeIncidentCount}
+                      onChipHover={onSignalHover}
+                      onChipLeave={onSignalLeave}
                     />
                   </div>
                 </div>
@@ -728,12 +958,13 @@ const TimelineLane = ({
           >
             <TimelineGrid
               bands={bands}
+              density={density}
               scale={scale}
             />
             {projectBars.map((projectBar) => (
               <div
                 key={projectBar.segment.id}
-                className={`timeline-bar${project.conflictCount ? " timeline-bar-conflict" : ""}${projectBar.segment.kind === "preproduction" ? " timeline-bar-preproduction" : ""}`}
+                className={`timeline-bar${project.conflictCount ? " timeline-bar-conflict" : ""}${projectBar.segment.kind === "preproduction" ? " timeline-bar-preproduction" : ""}${projectBar.isCompactLabel ? " timeline-bar-preproduction-compact" : ""}`}
                 onPointerEnter={(event) =>
                   onBarHover(
                     event,
@@ -768,7 +999,7 @@ const TimelineLane = ({
                   } as CSSProperties
                 }
               >
-                {projectBar.segment.label ? <span className="timeline-bar-label">{projectBar.segment.label}</span> : null}
+                {projectBar.segment.label ? <span className="timeline-bar-label">{projectBar.isCompactLabel ? "P" : projectBar.segment.label}</span> : null}
               </div>
             ))}
             <TimelineIncidentMarkers
@@ -820,12 +1051,17 @@ const TimelineLane = ({
                       <strong className="timeline-lane-title">{unit.name}</strong>
                       <StatusBadge tone={resolveStatusTone(unit.status)}>{unit.status}</StatusBadge>
                     </div>
-                    <span className="timeline-lane-subtitle">{formatSegmentsLabel(unit.segments)}</span>
+                    <div className="timeline-lane-subtitle-group">
+                      <TimelineWindowPills segments={unit.segments} />
+                    </div>
                     <TimelineSignalRow
                       assets={unit.assignedAssetCount}
                       conflicts={unit.conflictCount}
                       crew={unit.crewAssignmentCount}
+                      details={unit.signalDetails}
                       incidents={unit.activeIncidentCount}
+                      onChipHover={onSignalHover}
+                      onChipLeave={onSignalLeave}
                     />
                   </div>
                 </div>
@@ -841,6 +1077,7 @@ const TimelineLane = ({
                   >
                     <TimelineGrid
                       bands={bands}
+                      density={density}
                       scale={scale}
                     />
                     {unitBars.map((unitBar) => (
@@ -948,14 +1185,32 @@ export const OverviewScheduleTimeline = ({
   const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>(() =>
     readJsonPreference<string[]>(uiPreferenceKeys.overviewTimelineExpandedProjects, []),
   );
+  const [gridDensity, setGridDensity] = useState<TimelineGridDensity>(() =>
+    readJsonPreference<TimelineGridDensity>(uiPreferenceKeys.overviewTimelineGridDensity, "balanced"),
+  );
   const [isPanning, setIsPanning] = useState(false);
+  const [isAdjustingGridDensity, setIsAdjustingGridDensity] = useState(false);
   const [currentDate, setCurrentDate] = useState(todayDateOnly());
   const [previewAnchorDate, setPreviewAnchorDate] = useState(anchorDate || todayDateOnly());
   const [tooltip, setTooltip] = useState<TimelineTooltipState | null>(null);
+  const [signalPopover, setSignalPopover] = useState<TimelineSignalPopoverState | null>(null);
 
   useEffect(() => {
     writeJsonPreference(uiPreferenceKeys.overviewTimelineExpandedProjects, expandedProjectIds);
   }, [expandedProjectIds]);
+
+  useEffect(() => {
+    writeJsonPreference(uiPreferenceKeys.overviewTimelineGridDensity, gridDensity);
+  }, [gridDensity]);
+
+  useEffect(() => {
+    if (!isPanning && !isAdjustingGridDensity) {
+      return;
+    }
+
+    setTooltip(null);
+    setSignalPopover(null);
+  }, [isAdjustingGridDensity, isPanning]);
 
   useEffect(() => {
     previewAnchorDateRef.current = previewAnchorDate;
@@ -1008,8 +1263,8 @@ export const OverviewScheduleTimeline = ({
 
   const effectiveAnchorDate = previewAnchorDate || anchorDate || todayDateOnly();
   const visibleWindow = useMemo(
-    () => resolveTimelineWindow(range, scale, effectiveAnchorDate),
-    [effectiveAnchorDate, range, scale],
+    () => resolveRenderedTimelineWindow(range, scale, effectiveAnchorDate, gridDensity),
+    [effectiveAnchorDate, gridDensity, range, scale],
   );
   const visibleWindowDays = diffDaysInclusive(visibleWindow.start, visibleWindow.end);
   const clampedPlayheadDate =
@@ -1021,14 +1276,26 @@ export const OverviewScheduleTimeline = ({
       ? resolveDateLeft(clampedPlayheadDate, visibleWindow.start, visibleWindow.end)
       : 0;
   const renderedPlayheadLeft = Math.min(99.2, Math.max(0.8, playheadLeft));
-  const playheadLabel = formatPlayheadLabel(currentDate);
+  const playheadLabel = formatPlayheadDisplayLabel(currentDate);
   const bands = useMemo(() => {
     if (!visibleWindow.start || !visibleWindow.end) {
       return emptyBands;
     }
 
-    return buildTimelineBands(visibleWindow.start, visibleWindow.end, scale);
-  }, [scale, visibleWindow.end, visibleWindow.start]);
+    return buildTimelineBands(visibleWindow.start, visibleWindow.end, scale, gridDensity);
+  }, [gridDensity, scale, visibleWindow.end, visibleWindow.start]);
+  const visibleMonthBands = useMemo(
+    () => filterHeaderBandsForDisplay(bands.months, gridDensity, "month", scale),
+    [bands.months, gridDensity, scale],
+  );
+  const visibleSecondaryBands = useMemo(
+    () => filterHeaderBandsForDisplay(bands.header, gridDensity, "secondary", scale),
+    [bands.header, gridDensity, scale],
+  );
+  const visibleDayBands = useMemo(
+    () => filterHeaderBandsForDisplay(bands.days, gridDensity, "day", scale),
+    [bands.days, gridDensity, scale],
+  );
 
   const sharedPlayheadStyle = useMemo(
     () => ({
@@ -1052,6 +1319,9 @@ export const OverviewScheduleTimeline = ({
     onAnchorDateChange(nextAnchorDate);
   };
 
+  const gridDensityValue = gridDensity === "compact" ? 0 : gridDensity === "expanded" ? 2 : 1;
+  const isTimelineInteracting = isPanning || isAdjustingGridDensity;
+
   const updateTooltip = (
     event: ReactPointerEvent<HTMLDivElement>,
     row: ScheduleTimelineProjectLane | ScheduleTimelineUnitLane,
@@ -1073,6 +1343,37 @@ export const OverviewScheduleTimeline = ({
   };
 
   const clearTooltip = () => setTooltip(null);
+
+  const updateSignalPopover = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    title: string,
+    items: ScheduleTimelineSignalDetailItem[],
+    total: number,
+  ) => {
+    const containerRect = timelineRootRef.current?.getBoundingClientRect();
+    if (!containerRect) {
+      return;
+    }
+
+    setSignalPopover({
+      items:
+        items.length > 0
+          ? items
+          : [
+              {
+                id: `${title.toLowerCase().replace(/\s+/g, "-")}-empty`,
+                label: "Details unavailable",
+                meta: null,
+              },
+            ],
+      left: event.clientX - containerRect.left + 14,
+      remainingCount: Math.max(total - items.length, 0),
+      title,
+      top: event.clientY - containerRect.top + 14,
+    });
+  };
+
+  const clearSignalPopover = () => setSignalPopover(null);
 
   const handleTrackPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) {
@@ -1228,16 +1529,30 @@ export const OverviewScheduleTimeline = ({
             </button>
           </div>
 
-          <div className="timeline-summary">
-            <strong>{snapshot.visibleProjects}</strong>
-            <span>of {snapshot.totalProjects} scheduled projects</span>
+          <div className="timeline-control-group timeline-control-group-grid">
+            <input
+              aria-label="Timeline grid density"
+              className="timeline-grid-density-slider"
+              max={2}
+              min={0}
+              onPointerCancel={() => setIsAdjustingGridDensity(false)}
+              onPointerDown={() => setIsAdjustingGridDensity(true)}
+              onPointerUp={() => setIsAdjustingGridDensity(false)}
+              onChange={(event) => {
+                const nextValue = Number.parseInt(event.target.value, 10);
+                setGridDensity(nextValue <= 0 ? "compact" : nextValue >= 2 ? "expanded" : "balanced");
+              }}
+              step={1}
+              type="range"
+              value={gridDensityValue}
+            />
           </div>
         </div>
       }
     >
-      {isLoading ? <div className="empty-state">Loading schedule...</div> : null}
+      {isLoading && !snapshot.projects.length && !snapshot.unscheduled.length ? <div className="empty-state">Loading schedule...</div> : null}
 
-      <div className="timeline-layout" ref={timelineRootRef}>
+      <div className={`timeline-layout${isTimelineInteracting ? " is-interacting" : ""}`} ref={timelineRootRef}>
         <div className="timeline-main">
           <div className="timeline-shared-playhead" style={sharedPlayheadStyle} />
           <div className="timeline-shared-playhead-chip" style={sharedPlayheadStyle}>
@@ -1259,7 +1574,7 @@ export const OverviewScheduleTimeline = ({
               onWheel={interactionHandlers.onWheel}
             >
               <div className="timeline-header-bands timeline-header-bands-months">
-                {bands.months.map((band) => (
+                {visibleMonthBands.map((band) => (
                   <div
                     key={`header-month-${band.key}`}
                     className="timeline-header-band timeline-header-band-month"
@@ -1272,7 +1587,7 @@ export const OverviewScheduleTimeline = ({
 
               {scale !== "month" ? (
                 <div className="timeline-header-bands timeline-header-bands-secondary">
-                  {bands.header.map((band) => (
+                  {visibleSecondaryBands.map((band) => (
                     <div
                       key={`header-secondary-${band.key}`}
                       className={`timeline-header-band timeline-header-band-${scale}`}
@@ -1286,7 +1601,21 @@ export const OverviewScheduleTimeline = ({
                 <div className="timeline-header-bands timeline-header-bands-secondary is-empty" />
               )}
 
-              <TimelineGrid bands={bands} scale={scale} />
+              {scale !== "month" ? (
+                <div className="timeline-header-bands timeline-header-bands-tertiary">
+                  {visibleDayBands.map((band) => (
+                    <div
+                      key={`header-day-${band.key}`}
+                      className="timeline-header-band timeline-header-band-day"
+                      style={{ left: `${band.left}%`, width: `${band.width}%` }}
+                    >
+                      {band.label}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <TimelineGrid bands={bands} density={gridDensity} scale={scale} />
             </div>
           </div>
 
@@ -1299,6 +1628,8 @@ export const OverviewScheduleTimeline = ({
                 isExpanded={expandedProjectIds.includes(project.id)}
                 onBarHover={updateTooltip}
                 onBarLeave={clearTooltip}
+                onSignalHover={updateSignalPopover}
+                onSignalLeave={clearSignalPopover}
                 onToggle={() =>
                   setExpandedProjectIds((current) =>
                     current.includes(project.id)
@@ -1309,6 +1640,7 @@ export const OverviewScheduleTimeline = ({
                 project={project}
                 rangeEnd={visibleWindow.end}
                 rangeStart={visibleWindow.start}
+                density={gridDensity}
                 scale={scale}
               />
             ))}
@@ -1353,6 +1685,23 @@ export const OverviewScheduleTimeline = ({
             <strong>{tooltip.label}</strong>
             <span>{tooltip.subtitle}</span>
             <span>{tooltip.status}</span>
+          </div>
+        ) : null}
+
+        {signalPopover ? (
+          <div className="timeline-signal-popover" style={{ left: `${signalPopover.left}px`, top: `${signalPopover.top}px` }}>
+            <strong>{signalPopover.title}</strong>
+            <div className="timeline-signal-popover-list">
+              {signalPopover.items.map((item) => (
+                <div key={item.id} className="timeline-signal-popover-item">
+                  <span className="timeline-signal-popover-label">{item.label}</span>
+                  {item.meta ? <span className="timeline-signal-popover-meta">{item.meta}</span> : null}
+                </div>
+              ))}
+            </div>
+            {signalPopover.remainingCount ? (
+              <span className="timeline-signal-popover-more">+{signalPopover.remainingCount} more</span>
+            ) : null}
           </div>
         ) : null}
       </div>

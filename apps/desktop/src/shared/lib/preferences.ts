@@ -8,6 +8,7 @@ export const uiPreferenceKeys = {
   lastRoutePath: "last-route-path",
   overviewTimelineAnchorDate: "overview-timeline-anchor-date",
   overviewTimelineExpandedProjects: "overview-timeline-expanded-projects",
+  overviewTimelineGridDensity: "overview-timeline-grid-density",
   overviewTimelineRange: "overview-timeline-range",
   overviewTimelineScale: "overview-timeline-scale",
   recentEntityKeys: "recent-entity-keys",

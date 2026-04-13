@@ -45,6 +45,19 @@ export type ScheduleTimelineSegment = {
   label?: string | null;
 };
 
+export type ScheduleTimelineSignalDetailItem = {
+  id: string;
+  label: string;
+  meta?: string | null;
+};
+
+export type ScheduleTimelineSignalDetails = {
+  assets: ScheduleTimelineSignalDetailItem[];
+  crew: ScheduleTimelineSignalDetailItem[];
+  conflicts: ScheduleTimelineSignalDetailItem[];
+  incidents: ScheduleTimelineSignalDetailItem[];
+};
+
 export type ScheduleTimelineUnitLane = {
   id: string;
   code: string;
@@ -68,6 +81,7 @@ export type ScheduleTimelineUnitLane = {
     severity: string;
     reportedAt: string;
   }>;
+  signalDetails: ScheduleTimelineSignalDetails;
 };
 
 export type ScheduleTimelineProjectLane = {
@@ -93,6 +107,7 @@ export type ScheduleTimelineProjectLane = {
     severity: string;
     reportedAt: string;
   }>;
+  signalDetails: ScheduleTimelineSignalDetails;
   units: ScheduleTimelineUnitLane[];
 };
 

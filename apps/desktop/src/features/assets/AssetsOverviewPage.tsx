@@ -65,7 +65,7 @@ export const AssetsOverviewPage = () => {
 
   useEffect(() => {
     setTimelineProjectLimit(timelinePageSize);
-  }, [timelineRange, timelineScale, timelineAnchorDate]);
+  }, [timelineRange, timelineScale]);
 
   const overviewCards = [
     {
