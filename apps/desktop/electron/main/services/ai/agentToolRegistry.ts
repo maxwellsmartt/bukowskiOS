@@ -901,6 +901,97 @@ export const createAgentToolRegistry = (
       },
     },
     {
+      name: "get_budget_vs_actual",
+      description: "Return project spend, reserve and exposure against the current finance baseline.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          project_id: { type: "string" },
+        },
+        required: ["project_id"],
+      },
+      execute: (args) => {
+        const payload = foundationReads.getBudgetVsActual(asString(args.project_id));
+
+        return {
+          summary: payload.project ? `Loaded budget versus actual context for ${payload.project.name}.` : "Project budget context was not found.",
+          payload,
+        };
+      },
+    },
+    {
+      name: "get_monthly_burn_rate",
+      description: "Return monthly spend rhythm and average burn rate for the workspace or one project.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          project_id: { type: "string" },
+          months: { type: "number" },
+        },
+      },
+      execute: (args, context) => {
+        const payload = foundationReads.getMonthlyBurnRate({
+          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          months: asInteger(args.months, 6),
+        });
+
+        return {
+          summary: `Loaded ${payload.months} months of burn-rate context.`,
+          payload,
+        };
+      },
+    },
+    {
+      name: "get_expense_breakdown",
+      description: "Return category-level expense distribution for the workspace or one project.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          project_id: { type: "string" },
+          period: { type: "string" },
+        },
+      },
+      execute: (args, context) => {
+        const period = asOptionalString(args.period);
+        const payload = foundationReads.getExpenseBreakdown({
+          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          query: period ? { period: ["month", "quarter", "year", "custom"].includes(period) ? (period as "month" | "quarter" | "year" | "custom") : "month" } : undefined,
+        });
+
+        return {
+          summary: payload.items.length ? `Loaded ${payload.items.length} expense categories.` : "No expense breakdown rows were found.",
+          payload,
+        };
+      },
+    },
+    {
+      name: "get_financial_health",
+      description: "Return a compact financial health summary for the workspace or one project.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          project_id: { type: "string" },
+          period: { type: "string" },
+        },
+      },
+      execute: (args, context) => {
+        const period = asOptionalString(args.period);
+        const payload = foundationReads.getFinancialHealth({
+          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          query: period ? { period: ["month", "quarter", "year", "custom"].includes(period) ? (period as "month" | "quarter" | "year" | "custom") : "month" } : undefined,
+        });
+
+        return {
+          summary: "Loaded a compact financial health summary.",
+          payload,
+        };
+      },
+    },
+    {
       name: "get_schedule_conflicts",
       description: "Return overlapping unit windows and crew scheduling conflicts in the next 30 days.",
       parameters: {

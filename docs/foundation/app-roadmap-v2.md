@@ -322,7 +322,35 @@
   - `bajo`: si este módulo crece mucho, convendrá una vista dedicada de documentos financieros en vez de dejar todo dentro del editor
 
 ### Slice F4 — Agent tools financieros ampliados
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - dejar al `finance-agent` respondiendo con reads financieros reales y no solo con exposición básica
+- Área:
+  - backend / AI
+- Qué cambió:
+  - nuevos reads financieros en `financeReadService`:
+    - `getBudgetVsActual(projectId)`
+    - `getMonthlyBurnRate({ projectId, months })`
+    - `getExpenseBreakdown({ projectId, query })`
+    - `getFinancialHealth({ projectId, query })`
+  - `agentToolRegistry` ahora expone:
+    - `get_budget_vs_actual`
+    - `get_monthly_burn_rate`
+    - `get_expense_breakdown`
+    - `get_financial_health`
+  - `finance-agent` amplió su `allowed_tools_json` para usar estos tools junto con `get_project_financials`
+  - el supervisor ahora recibe un snapshot financiero compacto cuando la conversación parte desde `/finance`
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test -- --run src/test/agent-tool-registry.test.ts`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - `agent-tool-registry.test.ts` actualizado para comprobar que los tools nuevos existen y devuelven payloads útiles
+  - el `finance-agent` ya tiene cobertura mejor para burn rate, breakdown, salud financiera y contexto por proyecto
+- Riesgos remanentes:
+  - `medio`: `get_budget_vs_actual` sigue siendo honesto sobre una limitación del modelo actual: todavía no existe `budget cap` explícito por proyecto
+  - `medio`: el supervisor recibe contexto financiero útil, pero todavía no hay inyección especializada equivalente para todos los agentes no financieros
+  - `bajo`: el warning de chunking del renderer sigue pendiente fuera de este slice
 
 ## Fase 3 — UX estructural
 

@@ -563,6 +563,25 @@ export const createAssistantGatewayService = (
         query: request.message,
         limit: 5,
       }) ?? { agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] };
+    const financeContextHint =
+      request.context.activePath?.startsWith("/finance")
+        ? (() => {
+            try {
+              const result = options.toolRegistry.execute("get_financial_health", "{}", request.context);
+              const payload = result.result.payload as {
+                trackedSpend?: string;
+                reserve?: string;
+                exposure?: string;
+                burnRateAverage?: string;
+                scope?: string;
+              };
+
+              return `Active finance context: scope=${payload.scope ?? "workspace"} | trackedSpend=${payload.trackedSpend ?? "—"} | reserve=${payload.reserve ?? "—"} | exposure=${payload.exposure ?? "—"} | burnRate=${payload.burnRateAverage ?? "—"}`;
+            } catch {
+              return "Active finance context: unavailable";
+            }
+          })()
+        : null;
 
     const supervisorInstructions = [
       supervisor.base_prompt || "You are the BukowskiOS Supervisor Agent.",
@@ -583,6 +602,7 @@ export const createAssistantGatewayService = (
       supervisorMemoryOverlay.projectEntries.length
         ? `Project memory:\n${supervisorMemoryOverlay.projectEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`
         : "Project memory: none",
+      financeContextHint ?? null,
     ].join("\n");
 
     const initialPrompt = buildGatewayInput(request, sessionSnapshot.recentUserMessages);

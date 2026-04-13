@@ -40,6 +40,10 @@ describe("agent tool registry", () => {
         "get_maintenance_queue",
         "get_asset_maintenance_history",
         "get_project_financials",
+        "get_budget_vs_actual",
+        "get_monthly_burn_rate",
+        "get_expense_breakdown",
+        "get_financial_health",
         "get_incident_costs",
         "get_asset_exposure",
         "get_open_invoices",
@@ -294,6 +298,42 @@ describe("agent tool registry", () => {
         currentView: "Finance",
       },
     );
+    const budgetVsActual = registry.execute(
+      "get_budget_vs_actual",
+      JSON.stringify({ project_id: "project-aurora" }),
+      {
+        workspaceId: "workspace-metadata",
+        activePath: "/finance",
+        currentView: "Finance",
+      },
+    );
+    const burnRate = registry.execute(
+      "get_monthly_burn_rate",
+      JSON.stringify({ project_id: "project-aurora", months: 4 }),
+      {
+        workspaceId: "workspace-metadata",
+        activePath: "/finance",
+        currentView: "Finance",
+      },
+    );
+    const expenseBreakdown = registry.execute(
+      "get_expense_breakdown",
+      JSON.stringify({ project_id: "project-aurora", period: "quarter" }),
+      {
+        workspaceId: "workspace-metadata",
+        activePath: "/finance",
+        currentView: "Finance",
+      },
+    );
+    const financialHealth = registry.execute(
+      "get_financial_health",
+      JSON.stringify({ project_id: "project-aurora", period: "month" }),
+      {
+        workspaceId: "workspace-metadata",
+        activePath: "/finance",
+        currentView: "Finance",
+      },
+    );
     const recipients = registry.execute(
       "list_recipients",
       JSON.stringify({ limit: 5 }),
@@ -461,6 +501,11 @@ describe("agent tool registry", () => {
     expect((reservations.result.payload.items as Array<unknown>).length).toBeGreaterThanOrEqual(0);
     expect((incidentDetail.result.payload.incident as { title?: string } | null)?.title).toBeTruthy();
     expect((finance.result.payload.project as { name?: string } | null)?.name).toContain("Aurora");
+    expect((budgetVsActual.result.payload.project as { name?: string } | null)?.name).toContain("Aurora");
+    expect((budgetVsActual.result.payload.hasExplicitBudget as boolean)).toBe(false);
+    expect((burnRate.result.payload.series as Array<unknown>).length).toBe(4);
+    expect((expenseBreakdown.result.payload.items as Array<unknown>).length).toBeGreaterThan(0);
+    expect((financialHealth.result.payload.scope as string).length).toBeGreaterThan(0);
     expect((recipients.result.payload.items as Array<unknown>).length).toBeGreaterThan(0);
     expect((threadContext.result.payload.thread as { title?: string } | null)?.title).toContain("Comms");
     expect((preview.result.payload.reachableTargets as number) + (preview.result.payload.missingContactTargets as number)).toBeGreaterThanOrEqual(0);

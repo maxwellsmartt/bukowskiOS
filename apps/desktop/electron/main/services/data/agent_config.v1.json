@@ -214,8 +214,13 @@
       "approval_mode": "supervised",
       "allowed_tools_json": [
         "get_financial_exposure_summary",
+        "get_budget_vs_actual",
+        "get_monthly_burn_rate",
+        "get_expense_breakdown",
+        "get_financial_health",
         "get_incidents_missing_cost_estimate",
         "search_projects",
+        "get_project_financials",
         "get_asset_detail"
       ],
       "allowed_domains_json": [

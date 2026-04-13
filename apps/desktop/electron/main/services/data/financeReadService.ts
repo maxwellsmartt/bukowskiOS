@@ -441,4 +441,196 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
       };
     });
   },
+
+  getBudgetVsActual(projectId: string) {
+    const project = db
+      .prepare(
+        `
+          SELECT id, name
+          FROM projects
+          WHERE id = ?
+          LIMIT 1
+        `,
+      )
+      .get(projectId) as { id: string; name: string } | undefined;
+
+    if (!project) {
+      return {
+        project: null,
+      };
+    }
+
+    const row = db
+      .prepare(
+        `
+          SELECT
+            COALESCE(SUM(amount), 0) AS total_entries,
+            COALESCE(SUM(CASE WHEN entry_type = 'reserve' THEN amount ELSE 0 END), 0) AS reserve_amount,
+            COALESCE(SUM(CASE WHEN status IN ('Approved', 'Linked', 'Booked', 'Paid') THEN amount ELSE 0 END), 0) AS committed_amount
+          FROM financial_entries
+          WHERE project_id = ?
+        `,
+      )
+      .get(projectId) as {
+      total_entries: number;
+      reserve_amount: number;
+      committed_amount: number;
+    };
+
+    const exposureRow = db
+      .prepare(
+        `
+          SELECT COALESCE(SUM(cost_estimate), 0) AS amount
+          FROM incidents
+          WHERE project_id = ?
+            AND status IN ('Open', 'In review')
+        `,
+      )
+      .get(projectId) as AmountRow;
+
+    return {
+      project: {
+        id: project.id,
+        name: project.name,
+      },
+      hasExplicitBudget: false,
+      budgetCap: null,
+      actualSpend: deps.formatCurrency(row.committed_amount),
+      actualSpendValue: row.committed_amount,
+      totalEntries: deps.formatCurrency(row.total_entries),
+      totalEntriesValue: row.total_entries,
+      reserve: deps.formatCurrency(row.reserve_amount),
+      reserveValue: row.reserve_amount,
+      exposure: deps.formatCurrency(exposureRow.amount),
+      exposureValue: exposureRow.amount ?? 0,
+      varianceToBudget: null,
+      summary:
+        row.total_entries > 0
+          ? "No explicit budget cap is configured yet, so BukowskiOS is comparing actual spend against current reserves and exposure only."
+          : "This project still has no financial entries. Configure entries first before asking for budget versus actual.",
+    };
+  },
+
+  getMonthlyBurnRate(input?: { projectId?: string | null; months?: number }) {
+    const months = Math.max(1, Math.min(input?.months ?? 6, 12));
+    const series = buildMonthlyWindows(months).map((entry) => {
+      const amount = (db
+        .prepare(
+          `
+            SELECT COALESCE(SUM(amount), 0) AS amount
+            FROM financial_entries
+            WHERE entry_date >= ?
+              AND entry_date <= ?
+              AND (? IS NULL OR project_id = ?)
+          `,
+        )
+        .get(entry.startDate, entry.endDate, input?.projectId ?? null, input?.projectId ?? null) as AmountRow).amount ?? 0;
+
+      return {
+        month: entry.key,
+        amount: deps.formatCurrency(amount),
+        amountValue: amount,
+      };
+    });
+
+    const average = series.length ? series.reduce((sum, row) => sum + row.amountValue, 0) / series.length : 0;
+
+    return {
+      months,
+      average: deps.formatCurrency(average),
+      averageValue: average,
+      series,
+    };
+  },
+
+  getExpenseBreakdown(input?: { projectId?: string | null; query?: FinanceOverviewQuery }) {
+    const window = resolveFinanceOverviewWindow(input?.query);
+    const rows = db
+      .prepare(
+        `
+          SELECT category, COALESCE(SUM(amount), 0) AS amount
+          FROM financial_entries
+          WHERE entry_date >= ?
+            AND entry_date <= ?
+            AND (? IS NULL OR project_id = ?)
+          GROUP BY category
+          ORDER BY amount DESC, category
+        `,
+      )
+      .all(window.startDate, window.endDate, input?.projectId ?? null, input?.projectId ?? null) as Array<{
+      category: string;
+      amount: number;
+    }>;
+
+    const total = rows.reduce((sum, row) => sum + row.amount, 0);
+
+    return {
+      periodLabel: window.label,
+      total: deps.formatCurrency(total),
+      totalValue: total,
+      items: rows.map((row) => ({
+        category: row.category,
+        amount: deps.formatCurrency(row.amount),
+        amountValue: row.amount,
+        share: total > 0 ? Number(((row.amount / total) * 100).toFixed(1)) : 0,
+      })),
+    };
+  },
+
+  getFinancialHealth(input?: { projectId?: string | null; query?: FinanceOverviewQuery }) {
+    if (input?.projectId) {
+      const budget = this.getBudgetVsActual(input.projectId);
+      const breakdown = this.getExpenseBreakdown({
+        projectId: input.projectId,
+        query: input.query,
+      });
+      const missingEstimates = (db
+        .prepare(
+          `
+            SELECT COUNT(*) AS count
+            FROM incidents
+            WHERE project_id = ?
+              AND status IN ('Open', 'In review')
+              AND cost_estimate IS NULL
+          `,
+        )
+        .get(input.projectId) as CountRow).count;
+
+      return {
+        scope: budget.project?.name ?? "Unknown project",
+        trackedSpend: budget.totalEntries,
+        reserve: budget.reserve,
+        exposure: budget.exposure,
+        missingEstimates,
+        topCategory: breakdown.items[0] ?? null,
+        summary: budget.project
+          ? `Project ${budget.project.name} is carrying ${budget.exposure} in open exposure, ${budget.reserve} in reserves and ${budget.totalEntries} across tracked entries.`
+          : "Project financial health is unavailable.",
+      };
+    }
+
+    const overview = this.getFinanceOverview(input?.query);
+    const missingEstimates = (db
+      .prepare(
+        `
+          SELECT COUNT(*) AS count
+          FROM incidents
+          WHERE status IN ('Open', 'In review')
+            AND cost_estimate IS NULL
+        `,
+      )
+      .get() as CountRow).count;
+
+    return {
+      scope: "Workspace",
+      trackedSpend: overview.totals.trackedSpend,
+      reserve: overview.totals.reserve,
+      exposure: overview.totals.incidentExposure,
+      burnRateAverage: overview.totals.burnRateAverage,
+      missingEstimates,
+      topProject: overview.exposureByProject[0] ?? null,
+      topCategory: overview.categoryBreakdown[0] ?? null,
+      summary: `Workspace finance is carrying ${overview.totals.incidentExposure} in incident exposure, ${overview.totals.reserve} in reserves and ${overview.totals.trackedSpend} in tracked spend for ${overview.activePeriodLabel.toLowerCase()}.`,
+    };
+  },
 });
