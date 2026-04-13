@@ -29,6 +29,41 @@ type PackingSlipPdfPayload = {
   }>;
 };
 
+type FinanceReportPdfPayload = {
+  reportTitle: string;
+  periodLabel: string;
+  generatedAt: string;
+  workspaceLabel: string;
+  executiveSummary: string;
+  metrics: Array<{
+    label: string;
+    value: string;
+  }>;
+  totals: Array<{
+    label: string;
+    value: string;
+    tone?: "info" | "warning" | "critical" | "neutral";
+  }>;
+  exposureByProject: Array<{
+    project: string;
+    exposure: string;
+    incidentCount: number;
+    assetsOut: string;
+  }>;
+  categoryBreakdown: Array<{
+    category: string;
+    amount: string;
+    percentage: number;
+  }>;
+  pendingCostLinks: Array<{
+    incident: string;
+    project: string;
+    severity: string;
+    costEstimate: string;
+    financialStatus: string;
+  }>;
+};
+
 const collectPdfBuffer = (document: PDFKit.PDFDocument) =>
   new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -260,6 +295,249 @@ export const createDocumentGenerationService = () => ({
 
     return {
       fileName: `${payload.slipNumber}.pdf`,
+      mimeType: "application/pdf" as const,
+      buffer: await bufferPromise,
+    };
+  },
+
+  async createFinanceReportPdf(payload: FinanceReportPdfPayload) {
+    const document = new PDFDocument({
+      margin: 40,
+      size: "A4",
+    });
+    const bufferPromise = collectPdfBuffer(document);
+    const pageWidth = document.page.width - document.page.margins.left - document.page.margins.right;
+    const cardLeft = document.page.margins.left;
+    const surfaceBorder = "#d7dbe2";
+    const surfaceMuted = "#6c7585";
+    const surfaceText = "#1a2029";
+    const surfaceBackground = "#f7f8fa";
+    const accentBackground = "#141619";
+    const accentSoft = "#efe8dc";
+    const columnGap = 14;
+    let cursorY = document.page.margins.top;
+
+    const ensurePageSpace = (spaceNeeded: number) => {
+      if (cursorY + spaceNeeded <= document.page.height - document.page.margins.bottom) {
+        return;
+      }
+
+      document.addPage();
+      cursorY = document.page.margins.top;
+    };
+
+    const drawSectionHeading = (title: string, subtitle?: string) => {
+      ensurePageSpace(42);
+      document.fillColor(surfaceText).fontSize(13).text(title, cardLeft, cursorY, { width: pageWidth });
+      cursorY += 18;
+
+      if (subtitle) {
+        document.fillColor(surfaceMuted).fontSize(10).text(subtitle, cardLeft, cursorY, { width: pageWidth });
+        cursorY += 18;
+      }
+    };
+
+    const drawMetricCards = (rows: FinanceReportPdfPayload["totals"]) => {
+      const cardWidth = Math.floor((pageWidth - columnGap * 2) / 3);
+      const toneMap = {
+        critical: "#b94f52",
+        info: "#5176b9",
+        neutral: "#596273",
+        warning: "#a1723a",
+      } as const;
+
+      for (let index = 0; index < rows.length; index += 3) {
+        const slice = rows.slice(index, index + 3);
+        ensurePageSpace(80);
+
+        slice.forEach((row, offset) => {
+          const x = cardLeft + offset * (cardWidth + columnGap);
+          document.roundedRect(x, cursorY, cardWidth, 62, 14).fillAndStroke(surfaceBackground, surfaceBorder);
+          document
+            .fillColor(surfaceMuted)
+            .fontSize(9)
+            .text(row.label.toUpperCase(), x + 14, cursorY + 12, { width: cardWidth - 28, characterSpacing: 0.9 });
+          document
+            .fillColor(toneMap[row.tone ?? "neutral"])
+            .fontSize(18)
+            .text(row.value, x + 14, cursorY + 28, { width: cardWidth - 28 });
+        });
+
+        cursorY += 76;
+      }
+    };
+
+    const drawSimpleTable = (
+      columns: Array<{ label: string; width: number; align?: "left" | "right" }>,
+      rows: string[][],
+      emptyLabel: string,
+    ) => {
+      const headerHeight = 26;
+      const rowHeight = 34;
+      const drawHeader = () => {
+        document.roundedRect(cardLeft, cursorY, pageWidth, headerHeight, 10).fill(accentBackground);
+        let x = cardLeft + 10;
+        columns.forEach((column) => {
+          document.fillColor("#aab2bf").fontSize(9).text(column.label.toUpperCase(), x, cursorY + 8, {
+            width: column.width - 10,
+            align: column.align ?? "left",
+            characterSpacing: 0.8,
+          });
+          x += column.width;
+        });
+        cursorY += headerHeight + 8;
+      };
+
+      ensurePageSpace(40);
+      drawHeader();
+
+      if (!rows.length) {
+        document
+          .roundedRect(cardLeft, cursorY - 2, pageWidth, 42, 10)
+          .fillAndStroke(surfaceBackground, surfaceBorder);
+        document.fillColor(surfaceMuted).fontSize(10).text(emptyLabel, cardLeft + 14, cursorY + 12, {
+          width: pageWidth - 28,
+        });
+        cursorY += 54;
+        return;
+      }
+
+      rows.forEach((row, index) => {
+        ensurePageSpace(48);
+        if (cursorY + rowHeight > document.page.height - document.page.margins.bottom) {
+          document.addPage();
+          cursorY = document.page.margins.top;
+          drawHeader();
+        }
+
+        if (index % 2 === 0) {
+          document.roundedRect(cardLeft, cursorY - 4, pageWidth, rowHeight, 10).fill(surfaceBackground);
+        }
+
+        let x = cardLeft + 10;
+        row.forEach((cell, cellIndex) => {
+          document.fillColor(surfaceText).fontSize(10).text(cell, x, cursorY + 4, {
+            width: columns[cellIndex]!.width - 12,
+            align: columns[cellIndex]!.align ?? "left",
+            ellipsis: true,
+          });
+          x += columns[cellIndex]!.width;
+        });
+        cursorY += rowHeight;
+      });
+
+      cursorY += 10;
+    };
+
+    document.roundedRect(cardLeft, cursorY, pageWidth, 120, 18).fillAndStroke(accentBackground, "#22262c");
+    document.fillColor("#7d8595").fontSize(10).text("FINANCE REPORT", cardLeft + 24, cursorY + 16, {
+      width: 220,
+      characterSpacing: 1.2,
+    });
+    document.fillColor("#f4f5f7").fontSize(24).text(payload.reportTitle, cardLeft + 24, cursorY + 34, {
+      width: pageWidth - 48,
+    });
+    document.fillColor("#c2c7d0").fontSize(11).text(payload.periodLabel, cardLeft + 24, cursorY + 68, {
+      width: 260,
+    });
+    document.fillColor("#8f98a8").fontSize(10).text(payload.generatedAt, cardLeft + 24, cursorY + 90, {
+      width: 260,
+    });
+    document
+      .roundedRect(cardLeft + pageWidth - 160, cursorY + 20, 136, 74, 14)
+      .fill(accentSoft);
+    document.fillColor("#5d4a2d").fontSize(9).text("WORKSPACE", cardLeft + pageWidth - 144, cursorY + 34, {
+      width: 108,
+      characterSpacing: 0.9,
+    });
+    document.fillColor("#1f2126").fontSize(14).text(payload.workspaceLabel, cardLeft + pageWidth - 144, cursorY + 50, {
+      width: 108,
+    });
+
+    cursorY += 142;
+
+    drawSectionHeading("Executive summary");
+    document
+      .roundedRect(cardLeft, cursorY, pageWidth, 62, 14)
+      .fillAndStroke(surfaceBackground, surfaceBorder);
+    document.fillColor(surfaceText).fontSize(11).text(payload.executiveSummary, cardLeft + 16, cursorY + 16, {
+      width: pageWidth - 32,
+      height: 32,
+    });
+    cursorY += 78;
+
+    drawSectionHeading("Core metrics", "Snapshot values taken from the active finance window.");
+    drawMetricCards(payload.totals);
+
+    drawSectionHeading("Operational metrics");
+    drawSimpleTable(
+      [
+        { label: "Metric", width: 220 },
+        { label: "Value", width: pageWidth - 220, align: "right" },
+      ],
+      payload.metrics.map((metric) => [metric.label, metric.value]),
+      "No operational finance metrics are available for this period.",
+    );
+
+    drawSectionHeading("Project exposure", "Projects carrying the most linked incident pressure in the selected window.");
+    drawSimpleTable(
+      [
+        { label: "Project", width: 220 },
+        { label: "Exposure", width: 108, align: "right" },
+        { label: "Incidents", width: 74, align: "right" },
+        { label: "Assets out", width: 120, align: "right" },
+      ],
+      payload.exposureByProject.slice(0, 12).map((row) => [
+        row.project,
+        row.exposure,
+        String(row.incidentCount),
+        row.assetsOut,
+      ]),
+      "No projects are carrying measurable exposure in this period.",
+    );
+
+    drawSectionHeading("Category mix", "Tracked spend grouped by category for the selected period.");
+    drawSimpleTable(
+      [
+        { label: "Category", width: 220 },
+        { label: "Amount", width: 120, align: "right" },
+        { label: "Share", width: 80, align: "right" },
+      ],
+      payload.categoryBreakdown.slice(0, 10).map((row) => [row.category, row.amount, `${row.percentage}%`]),
+      "No tracked spend categories are available for this period.",
+    );
+
+    drawSectionHeading("Pending cost-link queue", "Incidents still waiting on financial follow-through.");
+    drawSimpleTable(
+      [
+        { label: "Incident", width: 170 },
+        { label: "Project", width: 150 },
+        { label: "Severity", width: 74 },
+        { label: "Estimate", width: 100, align: "right" },
+        { label: "Status", width: 80, align: "right" },
+      ],
+      payload.pendingCostLinks.slice(0, 10).map((row) => [
+        row.incident,
+        row.project,
+        row.severity,
+        row.costEstimate,
+        row.financialStatus,
+      ]),
+      "No pending cost-link items are waiting in the selected finance queue.",
+    );
+
+    document
+      .fontSize(9)
+      .fillColor("#8f98a8")
+      .text("Generated by BukowskiOS internal alpha finance reporting.", cardLeft, document.page.height - 52, {
+        width: pageWidth,
+        align: "left",
+      });
+
+    document.end();
+
+    return {
+      fileName: "bukowski-finance-report.pdf",
       mimeType: "application/pdf" as const,
       buffer: await bufferPromise,
     };

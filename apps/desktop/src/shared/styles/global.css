@@ -1373,6 +1373,14 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   gap: 8px;
 }
 
+.finance-overview-aside {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .finance-period-chip.is-active {
   border-color: rgba(214, 179, 122, 0.24);
   background: rgba(214, 179, 122, 0.12);

@@ -50,3 +50,48 @@ test("document generation service creates a packing slip pdf buffer", async () =
   expect(result.buffer.length).toBeGreaterThan(1000);
   expect(result.buffer.subarray(0, 4).toString("utf8")).toBe("%PDF");
 });
+
+test("document generation service creates a finance report pdf buffer", async () => {
+  const service = createDocumentGenerationService();
+
+  const result = await service.createFinanceReportPdf({
+    reportTitle: "Finance operating report",
+    periodLabel: "This quarter",
+    generatedAt: "Generated 2026-04-12 21:02",
+    workspaceLabel: "Internal alpha",
+    executiveSummary: "$24,200 tracked spend, $12,800 incident exposure and $6,000 reserve coverage in this quarter.",
+    metrics: [
+      { label: "Incident exposure", value: "$12,800" },
+      { label: "Replacement at risk", value: "$36,400" },
+      { label: "Tracked spend", value: "$24,200" },
+    ],
+    totals: [
+      { label: "Tracked spend", value: "$24,200", tone: "info" },
+      { label: "Incident exposure", value: "$12,800", tone: "critical" },
+      { label: "Reserve coverage", value: "$6,000", tone: "warning" },
+      { label: "Average burn rate", value: "$8,066", tone: "neutral" },
+    ],
+    exposureByProject: [
+      { project: "Aurora Campaign", exposure: "$9,200", incidentCount: 3, assetsOut: "$18,000" },
+      { project: "Archipielado", exposure: "$3,600", incidentCount: 1, assetsOut: "$8,200" },
+    ],
+    categoryBreakdown: [
+      { category: "Transport", amount: "$11,000", percentage: 45.5 },
+      { category: "Repair", amount: "$7,800", percentage: 32.2 },
+    ],
+    pendingCostLinks: [
+      {
+        incident: "Lens replacement",
+        project: "Aurora Campaign",
+        severity: "High",
+        costEstimate: "$3,600",
+        financialStatus: "Missing entry",
+      },
+    ],
+  });
+
+  expect(result.fileName).toBe("bukowski-finance-report.pdf");
+  expect(result.mimeType).toBe("application/pdf");
+  expect(result.buffer.length).toBeGreaterThan(1000);
+  expect(result.buffer.subarray(0, 4).toString("utf8")).toBe("%PDF");
+});

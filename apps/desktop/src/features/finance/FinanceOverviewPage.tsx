@@ -1,3 +1,4 @@
+import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Bar,
@@ -22,7 +23,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 
-import { useFinanceOverview } from "./useFinanceData";
+import { exportFinanceReportPdf, useFinanceOverview } from "./useFinanceData";
 
 const periodOptions: Array<{ label: string; value: FinanceOverviewPeriodPreset }> = [
   { label: "Month", value: "month" },
@@ -76,6 +77,9 @@ export const FinanceOverviewPage = () => {
   const [period, setPeriod] = useState<FinanceOverviewPeriodPreset>("month");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const isCustomRangeReady = period !== "custom" || (Boolean(customStartDate) && Boolean(customEndDate));
 
   const overviewQuery = useMemo<FinanceOverviewQuery>(
@@ -106,6 +110,20 @@ export const FinanceOverviewPage = () => {
     ? data.categoryBreakdown
     : [{ category: "No tracked spend", amount: "$0", amountValue: 0, percentage: 100 }];
 
+  const handleExportPdf = async () => {
+    try {
+      setIsExportingPdf(true);
+      const result = await exportFinanceReportPdf(overviewQuery);
+      setExportError(null);
+      setExportFeedback(result.summary);
+    } catch (nextError) {
+      setExportFeedback(null);
+      setExportError(nextError instanceof Error ? nextError.message : "Unable to export finance report PDF.");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   return (
     <div className="page-stack">
       <SectionHeader
@@ -115,11 +133,21 @@ export const FinanceOverviewPage = () => {
       />
 
       {error ? <div className="empty-state">Finance overview unavailable: {error}</div> : null}
+      {exportFeedback ? <div className="action-feedback action-feedback-success">{exportFeedback}</div> : null}
+      {exportError ? <div className="action-feedback action-feedback-error">{exportError}</div> : null}
 
       <SurfaceCard
         title="Period"
         subtitle="Switch the reporting window without losing operational context."
-        aside={<StatusBadge tone="info">{data.activePeriodLabel}</StatusBadge>}
+        aside={
+          <div className="finance-overview-aside">
+            <StatusBadge tone="info">{data.activePeriodLabel}</StatusBadge>
+            <button className="ghost-control" disabled={isExportingPdf} onClick={() => void handleExportPdf()} type="button">
+              <Download size={14} />
+              <span>{isExportingPdf ? "Exporting PDF..." : "Export PDF"}</span>
+            </button>
+          </div>
+        }
       >
         <div className="finance-period-toolbar">
           {periodOptions.map((option) => (

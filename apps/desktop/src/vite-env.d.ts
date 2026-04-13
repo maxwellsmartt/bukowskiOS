@@ -201,6 +201,7 @@ declare global {
     };
     bukowskiFinance?: {
       getOverview: (query?: FinanceOverviewQuery) => Promise<FinanceOverviewSnapshot>;
+      exportReportPdf: (query?: FinanceOverviewQuery) => Promise<AppExportResult>;
       getCostLinks: () => Promise<FinanceCostLinkRow[]>;
       getEntries: (query?: FinanceEntryListQuery) => Promise<FinanceEntryRow[]>;
       create: (input: CreateFinancialEntryCommand) => Promise<FinanceEntryMutationResult>;

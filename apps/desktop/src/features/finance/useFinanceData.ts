@@ -1,4 +1,5 @@
 import type {
+  AppExportResult,
   CreateFinancialEntryCommand,
   FinanceCostLinkRow,
   FinanceEntryListQuery,
@@ -91,4 +92,12 @@ export const updateFinanceEntry = async (input: UpdateFinancialEntryCommand): Pr
   }
 
   return window.bukowskiFinance.update(input);
+};
+
+export const exportFinanceReportPdf = async (query?: FinanceOverviewQuery): Promise<AppExportResult> => {
+  if (!window.bukowskiFinance) {
+    throw new Error("Finance bridge unavailable");
+  }
+
+  return window.bukowskiFinance.exportReportPdf(query);
 };

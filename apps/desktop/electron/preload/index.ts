@@ -261,6 +261,8 @@ const bukowskiProjects = {
 const bukowskiFinance = {
   getOverview: (query?: FinanceOverviewQuery) =>
     ipcRenderer.invoke(ipcChannels.finance.getOverview, query) as Promise<FinanceOverviewSnapshot>,
+  exportReportPdf: (query?: FinanceOverviewQuery) =>
+    ipcRenderer.invoke(ipcChannels.finance.exportReportPdf, query) as Promise<AppExportResult>,
   getCostLinks: () => ipcRenderer.invoke(ipcChannels.finance.getCostLinks) as Promise<FinanceCostLinkRow[]>,
   getEntries: (query?: FinanceEntryListQuery) => ipcRenderer.invoke(ipcChannels.finance.getEntries, query) as Promise<FinanceEntryRow[]>,
   create: (input: CreateFinancialEntryCommand) =>

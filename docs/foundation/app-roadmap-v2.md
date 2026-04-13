@@ -262,7 +262,33 @@
   - `bajo`: el estado vacío del dashboard todavía puede aceptar una pasada fina de copy/polish visual
 
 ### Slice F2 — Reportes financieros exportables
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - permitir exportar un reporte financiero profesional y consistente con la ventana visible del dashboard
+- Área:
+  - backend / frontend
+- Qué cambió:
+  - `documentGenerationService` ahora genera `Finance operating report` en PDF con:
+    - resumen ejecutivo
+    - métricas operativas
+    - totales clave
+    - exposición por proyecto
+    - mezcla por categoría
+    - cola pendiente de cost links
+  - nuevo canal seguro `finance.exportReportPdf`
+  - bridge actualizado en preload y tipos del renderer
+  - `FinanceOverviewPage` ahora expone `Export PDF` usando la misma ventana temporal activa del dashboard
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test -- --run src/test/document-generation-service.test.ts`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - prueba nueva del servicio de documentos cubriendo también el PDF financiero
+  - el export usa el mismo query activo de Finance (`month`, `quarter`, `year`, `custom`) para evitar reportes inconsistentes
+- Riesgos remanentes:
+  - `medio`: el PDF v1 es claro y profesional, pero todavía no incluye charts embebidos ni branding configurable por workspace
+  - `medio`: el warning de chunking del renderer sigue visible y `vendor` se mantiene grande
+  - `bajo`: el feedback del export vive en la misma página; si luego el flujo de reportes crece, convendrá una superficie dedicada de reporting
 
 ### Slice F3 — Documentos financieros adjuntos
 - Estado: `planned`

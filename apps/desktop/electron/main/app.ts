@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Menu, session } from "electron";
 import path from "node:path";
+import { format } from "date-fns";
 
 import { buildContentSecurityPolicy } from "./security/securityConfig";
 import { registerAppIpc } from "./ipc/registerAppIpc";
@@ -152,6 +153,40 @@ app.whenReady().then(() => {
     incidentMutations: localDatabase.incidentMutations,
     financeMutations: localDatabase.financeMutations,
     packingMutations: localDatabase.packingMutations,
+    exportFinanceReportPdf: async (query, targetFilePath) => {
+      const overview = localDatabase.foundationReads.getFinanceOverview(query);
+      const pdf = await documentGeneration.createFinanceReportPdf({
+        reportTitle: "Finance operating report",
+        periodLabel: overview.activePeriodLabel,
+        generatedAt: `Generated ${format(new Date(), "yyyy-MM-dd HH:mm")}`,
+        workspaceLabel: "Internal alpha",
+        executiveSummary: `${overview.totals.trackedSpend} tracked spend, ${overview.totals.incidentExposure} incident exposure, and ${overview.totals.reserve} reserve coverage in ${overview.activePeriodLabel.toLowerCase()}.`,
+        metrics: overview.metrics.map((metric) => ({
+          label: metric.label,
+          value: metric.value,
+        })),
+        totals: [
+          { label: "Tracked spend", value: overview.totals.trackedSpend, tone: "info" },
+          { label: "Incident exposure", value: overview.totals.incidentExposure, tone: "critical" },
+          { label: "Reserve coverage", value: overview.totals.reserve, tone: "warning" },
+          { label: "Average burn rate", value: overview.totals.burnRateAverage, tone: "neutral" },
+        ],
+        exposureByProject: overview.exposureByProject,
+        categoryBreakdown: overview.categoryBreakdown,
+        pendingCostLinks: overview.costLinks.map((row) => ({
+          incident: row.incident,
+          project: row.project,
+          severity: row.severity,
+          costEstimate: row.costEstimate,
+          financialStatus: row.financialStatus,
+        })),
+      });
+
+      return {
+        ...pdf,
+        targetFilePath,
+      };
+    },
     exportPackingSlipPdf: async (packingSlipId, targetFilePath) => {
       const detail = localDatabase.foundationReads.getPackingSlipDetail(packingSlipId);
       if (!detail.slip) {

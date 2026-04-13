@@ -104,6 +104,7 @@ export const ipcChannels = {
   },
   finance: {
     getOverview: "bukowskiFinance:getOverview",
+    exportReportPdf: "bukowskiFinance:exportReportPdf",
     getCostLinks: "bukowskiFinance:getCostLinks",
     getEntries: "bukowskiFinance:getEntries",
     create: "bukowskiFinance:create",

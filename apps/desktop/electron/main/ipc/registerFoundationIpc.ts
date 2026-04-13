@@ -177,6 +177,15 @@ type RegisterFoundationIpcOptions = {
     buffer: Buffer;
     targetFilePath: string;
   }>;
+  exportFinanceReportPdf: (
+    query: FinanceOverviewQuery | undefined,
+    targetFilePath: string,
+  ) => Promise<{
+    fileName: string;
+    mimeType: "application/pdf";
+    buffer: Buffer;
+    targetFilePath: string;
+  }>;
   rmaMutations: {
     createRmaCase: (input: CreateRmaCaseCommand) => unknown;
     updateRmaCase: (input: UpdateRmaCaseCommand) => unknown;
@@ -214,6 +223,7 @@ export const registerFoundationIpc = ({
     incidentMutations,
     financeMutations,
     packingMutations,
+  exportFinanceReportPdf,
   exportPackingSlipPdf,
   rmaMutations,
   agentMutations,
@@ -590,6 +600,38 @@ export const registerFoundationIpc = ({
     financeOverviewReadArgsSchema,
     (_event, query: FinanceOverviewQuery | undefined) => foundationReads.getFinanceOverview(query),
     "The app could not load finance overview.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.finance.exportReportPdf,
+    financeOverviewReadArgsSchema,
+    async (_event, query: FinanceOverviewQuery | undefined) => {
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: "Export finance report PDF",
+        defaultPath: path.join(app.getPath("documents"), `finance-report-${dateStamp}.pdf`),
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+
+      if (canceled || !filePath) {
+        return {
+          saved: false,
+          fileName: null,
+          savedPath: null,
+          summary: "Finance report PDF export cancelled.",
+        };
+      }
+
+      const pdf = await exportFinanceReportPdf(query, filePath);
+      fs.writeFileSync(filePath, pdf.buffer);
+
+      return {
+        saved: true,
+        fileName: path.basename(filePath),
+        savedPath: filePath,
+        summary: `Exported ${pdf.fileName} to ${path.basename(filePath)}.`,
+      };
+    },
+    "The app could not export the finance report PDF.",
   );
   safeHandleRead(ipcChannels.finance.getCostLinks, () => foundationReads.getFinanceCostLinks(), "The app could not load finance cost links.");
   safeHandleReadWithSchema(
