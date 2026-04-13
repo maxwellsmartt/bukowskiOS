@@ -533,10 +533,24 @@ export const createAssistantGatewayService = (
 
     const supervisorProvider = loadProviderConfig(db, supervisorProviderKey);
 
-    if (!supervisorProvider || supervisorProvider.enabled !== 1) {
+    if (!supervisorProvider) {
       return buildHumanErrorResponse(
         "needs_configuration",
         "Connect an AI provider in Models before using chat.",
+        supervisorProviderKey,
+        supervisorModelKey,
+      );
+    }
+
+    if (supervisorProvider.enabled !== 1) {
+      const disabledMessage =
+        supervisorProvider.status === "healthy" || supervisorProvider.status === "configured"
+          ? `${supervisorProvider.display_name} is configured but still disabled in Models. Enable it before using chat.`
+          : "Connect an AI provider in Models before using chat.";
+
+      return buildHumanErrorResponse(
+        "needs_configuration",
+        disabledMessage,
         supervisorProviderKey,
         supervisorModelKey,
       );

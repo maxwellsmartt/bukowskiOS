@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { bootstrapAIGatewayFoundation } from "../../electron/main/services/data/aiGatewayFoundationBootstrap";
 import { applyAIGatewayFoundationMigration } from "../../electron/main/services/data/aiGatewayFoundationBootstrap";
+import { reconcileLiveProviderEnablement } from "../../electron/main/services/data/aiGatewayFoundationBootstrap";
 import { createAgentMutationService } from "../../electron/main/services/data/agentMutationService";
 import { createAgentReadService } from "../../electron/main/services/data/agentReadService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
@@ -126,6 +127,56 @@ describe("agent provider config", () => {
     expect(openaiProvider?.lastSuccessAtLabel).not.toBe("Never");
     expect(assetsAssignment?.providerKey).toBe("openai");
     expect(assetsAssignment?.modelKey).toBe("openai:gpt-5.4");
+
+    cleanup();
+  });
+
+  it("re-enables healthy live providers on startup when a secret is already stored", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-provider-enablement-repair");
+    const secrets = new Map<string, string>();
+    const secretStore = {
+      hasProviderSecret: (workspaceId: string, providerKey: string) => secrets.has(`${workspaceId}:${providerKey}`),
+      getProviderSecret: (_workspaceId: string, _providerKey: string) => null,
+      setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => {
+        secrets.set(`${workspaceId}:${providerKey}`, secret);
+      },
+      clearProviderSecret: (workspaceId: string, providerKey: string) => {
+        secrets.delete(`${workspaceId}:${providerKey}`);
+      },
+    };
+
+    database
+      .prepare(
+        `
+          UPDATE ai_provider_configs
+          SET enabled = 0,
+              status = 'healthy',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE workspace_id = ?
+            AND provider_key = 'openai'
+        `,
+      )
+      .run("workspace-metadata");
+
+    secretStore.setProviderSecret("workspace-metadata", "openai", "sk-test");
+
+    reconcileLiveProviderEnablement(database, secretStore);
+
+    const row = database
+      .prepare(
+        `
+          SELECT enabled, status
+          FROM ai_provider_configs
+          WHERE workspace_id = ?
+            AND provider_key = 'openai'
+        `,
+      )
+      .get("workspace-metadata") as { enabled: number; status: string } | undefined;
+
+    expect(row).toEqual({
+      enabled: 1,
+      status: "healthy",
+    });
 
     cleanup();
   });

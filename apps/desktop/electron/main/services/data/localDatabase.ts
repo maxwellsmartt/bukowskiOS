@@ -15,7 +15,11 @@ import { createOpenAIProviderService } from "../ai/openaiProviderService";
 import { createAssistantChatService, type AssistantChatService } from "./assistantChatService";
 import { createAgentMutationService } from "./agentMutationService";
 import { createAgentReadService, type AgentReadService } from "./agentReadService";
-import { applyAIGatewayFoundationMigration, bootstrapAIGatewayFoundation } from "./aiGatewayFoundationBootstrap";
+import {
+  applyAIGatewayFoundationMigration,
+  bootstrapAIGatewayFoundation,
+  reconcileLiveProviderEnablement,
+} from "./aiGatewayFoundationBootstrap";
 import { createFoundationReadService, type FoundationReadService } from "./foundationReadService";
 import { createAssetMutationService } from "./assetMutationService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
@@ -279,6 +283,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   };
 
   const secretStore = createAISecretStore();
+  reconcileLiveProviderEnablement(database, secretStore);
   const openaiProviderService = createOpenAIProviderService();
   const foundationReads = createFoundationReadService(database);
   const agentReads = createAgentReadService(database, secretStore);

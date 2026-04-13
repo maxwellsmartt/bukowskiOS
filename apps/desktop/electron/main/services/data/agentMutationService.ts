@@ -644,7 +644,7 @@ export const createAgentMutationService = (
     const config = db
       .prepare(
         `
-          SELECT display_name, supports_live_requests, default_model_key, base_url, timeout_ms
+          SELECT display_name, supports_live_requests, enabled, default_model_key, base_url, timeout_ms
           FROM ai_provider_configs
           WHERE workspace_id = ?
             AND provider_key = ?
@@ -655,6 +655,7 @@ export const createAgentMutationService = (
       | {
           display_name: string;
           supports_live_requests: number;
+          enabled: number;
           default_model_key: string;
           base_url: string;
           timeout_ms: number;
@@ -703,6 +704,10 @@ export const createAgentMutationService = (
       `
         UPDATE ai_provider_configs
         SET status = ?,
+            enabled = CASE
+              WHEN ? = 'healthy' AND supports_live_requests = 1 THEN 1
+              ELSE enabled
+            END,
             last_tested_at = ?,
             last_success_at = CASE WHEN ? = 'healthy' THEN ? ELSE last_success_at END,
             last_error_summary = CASE WHEN ? = 'healthy' THEN NULL ELSE ? END,
@@ -711,6 +716,7 @@ export const createAgentMutationService = (
           AND provider_key = ?
       `,
     ).run(
+      result.status,
       result.status,
       now,
       result.status,
@@ -736,7 +742,10 @@ export const createAgentMutationService = (
     return {
       providerKey,
       status: result.status,
-      summary: result.summary,
+      summary:
+        result.ok && config.enabled !== 1
+          ? `${result.summary} ${config.display_name} is now enabled for chat.`
+          : result.summary,
     };
   },
 

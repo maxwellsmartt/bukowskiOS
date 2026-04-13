@@ -10,6 +10,74 @@ import { createAssistantChatService } from "../../electron/main/services/data/as
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("assistant gateway service", () => {
+  it("explains when a provider is healthy but still disabled for chat", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-disabled-provider");
+    const secrets = new Map<string, string>();
+    const secretStore = {
+      hasProviderSecret: (workspaceId: string, providerKey: string) => secrets.has(`${workspaceId}:${providerKey}`),
+      getProviderSecret: (workspaceId: string, providerKey: string) => secrets.get(`${workspaceId}:${providerKey}`) ?? null,
+      setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => {
+        secrets.set(`${workspaceId}:${providerKey}`, secret);
+      },
+      clearProviderSecret: (workspaceId: string, providerKey: string) => {
+        secrets.delete(`${workspaceId}:${providerKey}`);
+      },
+    };
+
+    database
+      .prepare(
+        `
+          UPDATE ai_provider_configs
+          SET status = 'healthy',
+              enabled = 0,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE workspace_id = ?
+            AND provider_key = 'openai'
+        `,
+      )
+      .run("workspace-metadata");
+    secretStore.setProviderSecret("workspace-metadata", "openai", "sk-test");
+
+    const gateway = createAssistantGatewayService(database, {
+      secretStore,
+      sessionStore: createAssistantGatewaySessionStore(),
+      toolRegistry: createAgentToolRegistry(createFoundationReadService(database), {
+        getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+      }),
+      openaiProviderService: {
+        createResponse: async () => ({
+          ok: true as const,
+          responseId: "noop",
+          status: "completed",
+          outputText: "{}",
+          functionCalls: [],
+        }),
+        testConnection: async () => ({
+          ok: true as const,
+          status: "healthy" as const,
+          summary: "OpenAI responded successfully.",
+        }),
+      },
+    });
+
+    const result = await gateway.sendMessage({
+      commandId: "cmd-chat-disabled-provider",
+      workspaceId: "workspace-metadata",
+      threadId: "thread-disabled-provider",
+      message: "Hello",
+      context: {
+        workspaceId: "workspace-metadata",
+        activePath: "/agents/chat",
+        currentView: "Agents chat",
+      },
+    });
+
+    expect(result.status).toBe("needs_configuration");
+    expect(result.stateBody).toContain("configured but still disabled");
+
+    cleanup();
+  });
+
   it("sends image attachments to OpenAI as multimodal input", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-images");
     const secrets = new Map<string, string>();

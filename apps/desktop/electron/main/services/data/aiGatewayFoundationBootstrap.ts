@@ -349,3 +349,47 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
     });
   });
 };
+
+export const reconcileLiveProviderEnablement = (
+  db: DatabaseSync,
+  secretStore: { hasProviderSecret: (workspaceId: string, providerKey: string) => boolean },
+) => {
+  const providerRows = db
+    .prepare(
+      `
+        SELECT workspace_id, provider_key, display_name, supports_live_requests, enabled, status
+        FROM ai_provider_configs
+        WHERE supports_live_requests = 1
+      `,
+    )
+    .all() as Array<{
+      workspace_id: string;
+      provider_key: string;
+      display_name: string;
+      supports_live_requests: number;
+      enabled: number;
+      status: string;
+    }>;
+
+  providerRows.forEach((row) => {
+    const hasStoredSecret = secretStore.hasProviderSecret(row.workspace_id, row.provider_key);
+    const shouldEnable =
+      row.enabled !== 1 &&
+      hasStoredSecret &&
+      (row.status === "healthy" || row.status === "configured");
+
+    if (!shouldEnable) {
+      return;
+    }
+
+    db.prepare(
+      `
+        UPDATE ai_provider_configs
+        SET enabled = 1,
+            updated_at = ?
+        WHERE workspace_id = ?
+          AND provider_key = ?
+      `,
+    ).run(new Date().toISOString(), row.workspace_id, row.provider_key);
+  });
+};
