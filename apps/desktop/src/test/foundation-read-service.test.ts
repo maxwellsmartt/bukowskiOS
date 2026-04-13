@@ -34,7 +34,10 @@ describe("foundation read service", () => {
     expect(reads.getCatalogSnapshot().clients.length).toBeGreaterThan(0);
     expect(reads.getCatalogSnapshot().crewMembers.length).toBeGreaterThan(0);
     expect(reads.getCatalogSnapshot().categories.length).toBeGreaterThan(0);
-    expect(reads.getFinanceOverview().metrics).toHaveLength(4);
+    expect(reads.getFinanceOverview().metrics).toHaveLength(5);
+    expect(reads.getFinanceOverview().activePeriodLabel).toBeTruthy();
+    expect(reads.getFinanceOverview().monthlyBurn).toHaveLength(6);
+    expect(Array.isArray(reads.getFinanceOverview().categoryBreakdown)).toBe(true);
     expect(reads.getFinanceEntries()).toHaveLength(2);
 
     cleanup();

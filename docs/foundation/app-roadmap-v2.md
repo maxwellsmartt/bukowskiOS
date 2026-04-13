@@ -228,7 +228,38 @@
 ## Fase 2 — Finance visible y útil
 
 ### Slice F1 — Dashboard financiero con gráficos
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - volver `Finance Overview` una superficie de lectura útil, visual y accionable sin abrir todavía banca ni contabilidad pesada
+- Área:
+  - backend / frontend
+- Qué cambió:
+  - instalación de `recharts`, `date-fns` y `dinero.js` para soportar visualización y ventanas temporales más sólidas
+  - `finance.getOverview` ahora acepta un query runtime-safe con `period` (`month`, `quarter`, `year`, `custom`) y rango custom validado
+  - `financeReadService` ahora devuelve:
+    - `activePeriodLabel`
+    - `totals` para tracked spend, reserves, burn rate e incident exposure
+    - serie `monthlyBurn`
+    - `categoryBreakdown`
+    - `exposureByProject` enriquecido con valores numéricos
+  - `FinanceOverviewPage` quedó convertida en dashboard con:
+    - selector de período
+    - bar chart de exposición por proyecto
+    - line chart de burn rate mensual
+    - pie chart de mezcla por categoría
+    - tabla operativa de exposición por proyecto
+  - el panel de insights de agentes ya resume mejor el estado financiero visible
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - dashboard financiero ya renderiza métricas, gráficos y filtros temporales sin romper contratos existentes
+  - `foundation-read-service.test.ts` actualizado para cubrir burn series, category breakdown y etiqueta de período activa
+- Riesgos remanentes:
+  - `medio`: el warning de chunking del renderer sigue visible y ahora `vendor` volvió a crecer con la librería de gráficos
+  - `medio`: el dataset actual sigue siendo operativo, no contable; los gráficos son útiles para visibilidad, pero no sustituyen reportes financieros formales
+  - `bajo`: el estado vacío del dashboard todavía puede aceptar una pasada fina de copy/polish visual
 
 ### Slice F2 — Reportes financieros exportables
 - Estado: `planned`

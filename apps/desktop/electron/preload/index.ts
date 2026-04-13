@@ -48,6 +48,7 @@ import type {
   DeleteProjectInput,
   DeleteProjectUnitInput,
   FinanceEntryListQuery,
+  FinanceOverviewQuery,
   FinanceEntryMutationResult,
   FinanceCostLinkRow,
   FinanceEntryRow,
@@ -258,7 +259,8 @@ const bukowskiProjects = {
 };
 
 const bukowskiFinance = {
-  getOverview: () => ipcRenderer.invoke(ipcChannels.finance.getOverview) as Promise<FinanceOverviewSnapshot>,
+  getOverview: (query?: FinanceOverviewQuery) =>
+    ipcRenderer.invoke(ipcChannels.finance.getOverview, query) as Promise<FinanceOverviewSnapshot>,
   getCostLinks: () => ipcRenderer.invoke(ipcChannels.finance.getCostLinks) as Promise<FinanceCostLinkRow[]>,
   getEntries: (query?: FinanceEntryListQuery) => ipcRenderer.invoke(ipcChannels.finance.getEntries, query) as Promise<FinanceEntryRow[]>,
   create: (input: CreateFinancialEntryCommand) =>

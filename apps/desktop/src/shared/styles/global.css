@@ -1291,6 +1291,98 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+.finance-grid-secondary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.finance-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-md);
+}
+
+.finance-chart-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 280px;
+}
+
+.finance-chart-shell-pie {
+  min-height: 320px;
+}
+
+.finance-chart-tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 132px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(12, 15, 20, 0.94);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+}
+
+.finance-chart-tooltip strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.finance-chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.finance-chart-tooltip-dot,
+.finance-pie-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.finance-pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.finance-pie-legend-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.finance-pie-legend-label {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.finance-pie-legend-meta {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.finance-period-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.finance-period-chip.is-active {
+  border-color: rgba(214, 179, 122, 0.24);
+  background: rgba(214, 179, 122, 0.12);
+  color: rgba(255, 240, 219, 0.94);
+}
+
+.finance-period-grid {
+  margin-top: 12px;
+}
+
 .overview-operational-card {
   gap: 8px;
   min-height: 96px;
@@ -5000,6 +5092,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   .overview-operational-grid,
   .queue-grid,
   .finance-grid,
+  .finance-grid-secondary,
+  .finance-dashboard-grid,
   .project-grid,
   .projects-layout,
   .project-detail-support-grid,

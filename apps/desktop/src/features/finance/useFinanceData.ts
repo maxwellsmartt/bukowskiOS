@@ -4,15 +4,29 @@ import type {
   FinanceEntryListQuery,
   FinanceEntryMutationResult,
   FinanceEntryRow,
+  FinanceOverviewQuery,
   FinanceOverviewSnapshot,
   UpdateFinancialEntryCommand,
 } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 
 const emptyOverview: FinanceOverviewSnapshot = {
+  activePeriodLabel: "This month",
   metrics: [],
+  totals: {
+    trackedSpend: "$0",
+    trackedSpendValue: 0,
+    reserve: "$0",
+    reserveValue: 0,
+    incidentExposure: "$0",
+    incidentExposureValue: 0,
+    burnRateAverage: "$0",
+    burnRateAverageValue: 0,
+  },
   exposureByProject: [],
   costLinks: [],
+  monthlyBurn: [],
+  categoryBreakdown: [],
 };
 
 const emptyCostLinks: FinanceCostLinkRow[] = [];
@@ -24,17 +38,17 @@ const defaultFinanceEntryListQuery: FinanceEntryListQuery = {
   sortDirection: "desc",
 };
 
-export const useFinanceOverview = () =>
+export const useFinanceOverview = (query?: FinanceOverviewQuery) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiFinance) {
         return emptyOverview;
       }
 
-      return window.bukowskiFinance.getOverview();
+      return window.bukowskiFinance.getOverview(query);
     },
     emptyOverview,
-    [],
+    [query?.period, query?.customStartDate, query?.customEndDate],
   );
 
 export const useFinanceCostLinks = () =>

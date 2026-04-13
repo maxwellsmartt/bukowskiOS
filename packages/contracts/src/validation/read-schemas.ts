@@ -62,6 +62,7 @@ const projectSortFieldSchema = z.enum([
 ]);
 
 const financeEntrySortFieldSchema = z.enum(["date", "type", "category", "reference", "project", "amount", "status"]);
+const financeOverviewPeriodSchema = z.enum(["month", "quarter", "year", "custom"]);
 const catalogEntityTypeSchema = z.enum(["location", "department", "crew", "client", "manufacturer", "category", "kit"]);
 const catalogSortFieldSchema = z.enum([
   "code",
@@ -144,6 +145,37 @@ export const financeEntryListQuerySchema = z.object({
 });
 
 export const financeEntryListReadArgsSchema = z.tuple([financeEntryListQuerySchema.optional()]);
+
+export const financeOverviewQuerySchema = z
+  .object({
+    period: financeOverviewPeriodSchema,
+    customStartDate: isoDateSchema.nullable().optional(),
+    customEndDate: isoDateSchema.nullable().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.period !== "custom") {
+      return;
+    }
+
+    if (!value.customStartDate || !value.customEndDate) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Custom finance overview periods require both start and end dates.",
+        path: ["customStartDate"],
+      });
+      return;
+    }
+
+    if (value.customStartDate > value.customEndDate) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Custom finance overview start date must be before or equal to the end date.",
+        path: ["customStartDate"],
+      });
+    }
+  });
+
+export const financeOverviewReadArgsSchema = z.tuple([financeOverviewQuerySchema.optional()]);
 
 export const catalogListQuerySchema = z.object({
   entityType: catalogEntityTypeSchema,

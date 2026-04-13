@@ -139,7 +139,7 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
     title = "Finance context";
     subtitle = "Exposure and cost-link visibility available to this agent today.";
     insights = [
-      `${financeOverview.metrics[0]?.value ?? "—"} total financial entries in the current shell`,
+      `${financeOverview.totals.trackedSpend} tracked spend in ${financeOverview.activePeriodLabel.toLowerCase()}`,
       `${financeOverview.exposureByProject.length} projects currently represented in exposure tracking`,
       `${financeOverview.costLinks.length} cost-link items still waiting on follow-through`,
     ];

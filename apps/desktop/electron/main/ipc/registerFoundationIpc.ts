@@ -24,6 +24,7 @@ import {
   deleteProjectUnitSchema,
   emptyReadArgsSchema,
   financeEntryListReadArgsSchema,
+  financeOverviewReadArgsSchema,
   globalSearchReadArgsSchema,
   assetListReadArgsSchema,
   incidentListReadArgsSchema,
@@ -87,6 +88,7 @@ import type {
   DeleteProjectInput,
   DeleteProjectUnitInput,
   FinanceEntryListQuery,
+  FinanceOverviewQuery,
   FinanceEntryMutationResult,
   GlobalSearchQuery,
   IncidentListQuery,
@@ -583,7 +585,12 @@ export const registerFoundationIpc = ({
   );
   safeHandle(ipcChannels.rma.create, createRmaCaseSchema, (_event, input) => rmaMutations.createRmaCase(input));
   safeHandle(ipcChannels.rma.update, updateRmaCaseSchema, (_event, input) => rmaMutations.updateRmaCase(input));
-  safeHandleRead(ipcChannels.finance.getOverview, () => foundationReads.getFinanceOverview(), "The app could not load finance overview.");
+  safeHandleReadWithSchema(
+    ipcChannels.finance.getOverview,
+    financeOverviewReadArgsSchema,
+    (_event, query: FinanceOverviewQuery | undefined) => foundationReads.getFinanceOverview(query),
+    "The app could not load finance overview.",
+  );
   safeHandleRead(ipcChannels.finance.getCostLinks, () => foundationReads.getFinanceCostLinks(), "The app could not load finance cost links.");
   safeHandleReadWithSchema(
     ipcChannels.finance.getEntries,

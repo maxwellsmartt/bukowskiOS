@@ -52,6 +52,7 @@ import type {
   FinanceEntryListQuery,
   FinanceEntryMutationResult,
   FinanceEntryRow,
+  FinanceOverviewQuery,
   FinanceOverviewSnapshot,
   GlobalSearchGroup,
   GlobalSearchQuery,
@@ -199,7 +200,7 @@ declare global {
       unassignCrewFromUnit: (input: UnassignCrewFromProjectUnitInput) => Promise<ProjectDetailSnapshot>;
     };
     bukowskiFinance?: {
-      getOverview: () => Promise<FinanceOverviewSnapshot>;
+      getOverview: (query?: FinanceOverviewQuery) => Promise<FinanceOverviewSnapshot>;
       getCostLinks: () => Promise<FinanceCostLinkRow[]>;
       getEntries: (query?: FinanceEntryListQuery) => Promise<FinanceEntryRow[]>;
       create: (input: CreateFinancialEntryCommand) => Promise<FinanceEntryMutationResult>;

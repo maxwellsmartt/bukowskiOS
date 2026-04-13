@@ -1,11 +1,21 @@
 import type { OverviewMetric } from "./overview-queries";
 import type { ListSortDirection } from "./list-controls-queries";
 
+export type FinanceOverviewPeriodPreset = "month" | "quarter" | "year" | "custom";
+
+export type FinanceOverviewQuery = {
+  period: FinanceOverviewPeriodPreset;
+  customStartDate?: string | null;
+  customEndDate?: string | null;
+};
+
 export type ProjectExposureRow = {
   project: string;
   exposure: string;
+  exposureValue: number;
   incidentCount: number;
   assetsOut: string;
+  assetsOutValue: number;
 };
 
 export type FinanceCostLinkRow = {
@@ -47,6 +57,28 @@ export type FinanceEntryListQuery = {
 
 export type FinanceOverviewSnapshot = {
   metrics: OverviewMetric[];
+  activePeriodLabel: string;
+  totals: {
+    trackedSpend: string;
+    trackedSpendValue: number;
+    reserve: string;
+    reserveValue: number;
+    incidentExposure: string;
+    incidentExposureValue: number;
+    burnRateAverage: string;
+    burnRateAverageValue: number;
+  };
   exposureByProject: ProjectExposureRow[];
   costLinks: FinanceCostLinkRow[];
+  monthlyBurn: Array<{
+    month: string;
+    amount: string;
+    amountValue: number;
+  }>;
+  categoryBreakdown: Array<{
+    category: string;
+    amount: string;
+    amountValue: number;
+    percentage: number;
+  }>;
 };

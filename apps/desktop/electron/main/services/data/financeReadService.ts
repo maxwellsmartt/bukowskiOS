@@ -5,10 +5,12 @@ import type {
   FinanceEntryListQuery,
   FinanceEntryRow,
   FinanceEntrySortField,
+  FinanceOverviewQuery,
   FinanceOverviewSnapshot,
   ListSortDirection,
   ProjectExposureRow,
 } from "@contracts";
+import { endOfMonth, endOfQuarter, endOfYear, format, startOfMonth, startOfQuarter, startOfYear, subMonths } from "date-fns";
 
 type SortRows = <T>(rows: T[], comparator: (left: T, right: T) => number) => T[];
 
@@ -31,17 +33,66 @@ type AmountRow = {
   amount: number | null;
 };
 
+const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
+
+const resolveFinanceOverviewWindow = (query?: FinanceOverviewQuery) => {
+  const now = new Date();
+
+  if (query?.period === "custom" && query.customStartDate && query.customEndDate) {
+    return {
+      endDate: query.customEndDate,
+      label: `${query.customStartDate} to ${query.customEndDate}`,
+      startDate: query.customStartDate,
+    };
+  }
+
+  if (query?.period === "quarter") {
+    return {
+      endDate: toIsoDate(endOfQuarter(now)),
+      label: "This quarter",
+      startDate: toIsoDate(startOfQuarter(now)),
+    };
+  }
+
+  if (query?.period === "year") {
+    return {
+      endDate: toIsoDate(endOfYear(now)),
+      label: "This year",
+      startDate: toIsoDate(startOfYear(now)),
+    };
+  }
+
+  return {
+    endDate: toIsoDate(endOfMonth(now)),
+    label: "This month",
+    startDate: toIsoDate(startOfMonth(now)),
+  };
+};
+
+const buildMonthlyWindows = (months: number) =>
+  Array.from({ length: months }, (_value, index) => {
+    const anchor = subMonths(new Date(), months - 1 - index);
+    return {
+      endDate: toIsoDate(endOfMonth(anchor)),
+      key: format(anchor, "MMM yyyy"),
+      startDate: toIsoDate(startOfMonth(anchor)),
+    };
+  });
+
 export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps) => ({
-  getFinanceOverview(): FinanceOverviewSnapshot {
+  getFinanceOverview(query?: FinanceOverviewQuery): FinanceOverviewSnapshot {
+    const window = resolveFinanceOverviewWindow(query);
     const incidentExposure = db
       .prepare(
         `
           SELECT COALESCE(SUM(cost_estimate), 0) AS amount
           FROM incidents
           WHERE status IN ('Open', 'In review')
+            AND reported_at >= ?
+            AND reported_at <= ?
         `,
       )
-      .get() as AmountRow;
+      .get(window.startDate, `${window.endDate}T23:59:59.999Z`) as AmountRow;
     const replacementAtRisk = db
       .prepare(
         `
@@ -60,24 +111,100 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
         `
           SELECT COUNT(*) AS count
           FROM incidents
-          WHERE status IN ('Open', 'In review') AND cost_estimate IS NULL
+          WHERE status IN ('Open', 'In review')
+            AND reported_at >= ?
+            AND reported_at <= ?
+            AND cost_estimate IS NULL
         `,
       )
-      .get() as CountRow;
+      .get(window.startDate, `${window.endDate}T23:59:59.999Z`) as CountRow;
+    const trackedSpend = db
+      .prepare(
+        `
+          SELECT COALESCE(SUM(amount), 0) AS amount
+          FROM financial_entries
+          WHERE entry_date >= ?
+            AND entry_date <= ?
+        `,
+      )
+      .get(window.startDate, window.endDate) as AmountRow;
+    const reserveAmount = db
+      .prepare(
+        `
+          SELECT COALESCE(SUM(amount), 0) AS amount
+          FROM financial_entries
+          WHERE entry_type = 'reserve'
+            AND entry_date >= ?
+            AND entry_date <= ?
+        `,
+      )
+      .get(window.startDate, window.endDate) as AmountRow;
+    const monthlyBurn = buildMonthlyWindows(6).map((entry) => {
+      const amount = (db
+        .prepare(
+          `
+            SELECT COALESCE(SUM(amount), 0) AS amount
+            FROM financial_entries
+            WHERE entry_date >= ?
+              AND entry_date <= ?
+          `,
+        )
+        .get(entry.startDate, entry.endDate) as AmountRow).amount ?? 0;
+
+      return {
+        amount: deps.formatCurrency(amount),
+        amountValue: amount,
+        month: entry.key,
+      };
+    });
+    const totalBurnValue = monthlyBurn.reduce((sum, row) => sum + row.amountValue, 0);
+    const burnRateAverageValue = monthlyBurn.length ? totalBurnValue / monthlyBurn.length : 0;
+    const categoryBreakdownRows = db
+      .prepare(
+        `
+          SELECT category, COALESCE(SUM(amount), 0) AS amount
+          FROM financial_entries
+          WHERE entry_date >= ?
+            AND entry_date <= ?
+          GROUP BY category
+          ORDER BY amount DESC, category
+        `,
+      )
+      .all(window.startDate, window.endDate) as Array<{ category: string; amount: number }>;
+    const totalCategoryAmount = categoryBreakdownRows.reduce((sum, row) => sum + row.amount, 0);
 
     return {
+      activePeriodLabel: window.label,
       metrics: [
         { label: "Incident exposure", value: deps.formatCurrency(incidentExposure.amount), tone: "critical" },
         { label: "Replacement at risk", value: deps.formatCurrency(replacementAtRisk.amount), tone: "warning" },
-        { label: "Maintenance queue", value: `${maintenanceQueue.count} assets`, tone: "info" },
+        { label: "Tracked spend", value: deps.formatCurrency(trackedSpend.amount), tone: "info" },
         { label: "Missing estimates", value: `${missingEstimates.count} incidents`, tone: "neutral" },
+        { label: "Maintenance queue", value: `${maintenanceQueue.count} assets`, tone: "warning" },
       ],
-      exposureByProject: this.getFinanceProjectExposure(),
+      totals: {
+        trackedSpend: deps.formatCurrency(trackedSpend.amount),
+        trackedSpendValue: trackedSpend.amount ?? 0,
+        reserve: deps.formatCurrency(reserveAmount.amount),
+        reserveValue: reserveAmount.amount ?? 0,
+        incidentExposure: deps.formatCurrency(incidentExposure.amount),
+        incidentExposureValue: incidentExposure.amount ?? 0,
+        burnRateAverage: deps.formatCurrency(burnRateAverageValue),
+        burnRateAverageValue,
+      },
+      exposureByProject: this.getFinanceProjectExposure(window.startDate, window.endDate),
       costLinks: this.getFinanceCostLinks(),
+      monthlyBurn,
+      categoryBreakdown: categoryBreakdownRows.map((row) => ({
+        amount: deps.formatCurrency(row.amount),
+        amountValue: row.amount,
+        category: row.category,
+        percentage: totalCategoryAmount > 0 ? Number(((row.amount / totalCategoryAmount) * 100).toFixed(1)) : 0,
+      })),
     };
   },
 
-  getFinanceProjectExposure(): ProjectExposureRow[] {
+  getFinanceProjectExposure(startDate?: string, endDate?: string): ProjectExposureRow[] {
     const rows = db
       .prepare(
         `
@@ -87,11 +214,15 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
               SELECT SUM(cost_estimate)
               FROM incidents
               WHERE incidents.project_id = projects.id
+                AND (? IS NULL OR incidents.reported_at >= ?)
+                AND (? IS NULL OR incidents.reported_at <= ?)
             ), 0) AS exposure,
             COALESCE((
               SELECT COUNT(*)
               FROM incidents
               WHERE incidents.project_id = projects.id
+                AND (? IS NULL OR incidents.reported_at >= ?)
+                AND (? IS NULL OR incidents.reported_at <= ?)
             ), 0) AS incident_count,
             COALESCE((
               SELECT SUM(assets.replacement_value)
@@ -103,7 +234,16 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
           ORDER BY exposure DESC, projects.name
         `,
       )
-      .all() as Array<{
+      .all(
+        startDate ?? null,
+        startDate ?? null,
+        endDate ? `${endDate}T23:59:59.999Z` : null,
+        endDate ? `${endDate}T23:59:59.999Z` : null,
+        startDate ?? null,
+        startDate ?? null,
+        endDate ? `${endDate}T23:59:59.999Z` : null,
+        endDate ? `${endDate}T23:59:59.999Z` : null,
+      ) as Array<{
       project: string;
       exposure: number;
       incident_count: number;
@@ -113,8 +253,10 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
     return rows.map((row) => ({
       project: row.project,
       exposure: deps.formatCurrency(row.exposure),
+      exposureValue: row.exposure,
       incidentCount: row.incident_count,
       assetsOut: deps.formatCurrency(row.assets_out),
+      assetsOutValue: row.assets_out,
     }));
   },
 
