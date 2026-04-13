@@ -1,6 +1,12 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
+import {
+  ProjectSetupWizard,
+  createEmptyProjectSetupDraft,
+  type ProjectSetupDraft,
+  type WizardTab,
+} from "@features/projects/ProjectSetupWizard";
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { SelectField } from "@shared/components/SelectField";
@@ -20,11 +26,13 @@ const emptyDraft: ProjectDraft = {
 
 export const ShellProjectsPanel = () => {
   const { data: catalog } = useCatalogData();
-  const { activeProjectId, createProject, deleteProject, openProject, projects, projectsError, scopeMode, updateProject } =
+  const { activeProjectId, deleteProject, openProject, projects, projectsError, scopeMode, updateProject } =
     useShellContext();
   const [draft, setDraft] = useState<ProjectDraft>(emptyDraft);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardTab, setWizardTab] = useState<WizardTab>("general");
+  const [wizardDraft, setWizardDraft] = useState<ProjectSetupDraft>(createEmptyProjectSetupDraft());
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingDeleteProject, setPendingDeleteProject] = useState<{ id: string; name: string } | null>(null);
 
@@ -32,22 +40,7 @@ export const ShellProjectsPanel = () => {
 
   const resetDraft = () => {
     setDraft(emptyDraft);
-    setCreateOpen(false);
     setEditingProjectId(null);
-  };
-
-  const handleCreate = async () => {
-    try {
-      await createProject({
-        code: draft.code,
-        name: draft.name,
-        clientId: draft.clientId || undefined,
-      });
-      setActionError(null);
-      resetDraft();
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to create project.");
-    }
   };
 
   const handleUpdate = async () => {
@@ -78,7 +71,6 @@ export const ShellProjectsPanel = () => {
       return;
     }
 
-    setCreateOpen(false);
     setEditingProjectId(projectId);
     setDraft({
       code: project.code,
@@ -108,8 +100,8 @@ export const ShellProjectsPanel = () => {
           className="shell-project-action"
           onClick={() => {
             setEditingProjectId(null);
-            setCreateOpen((current) => !current);
-            setDraft(emptyDraft);
+            setWizardOpen(true);
+            setWizardTab("general");
             setActionError(null);
           }}
           type="button"
@@ -118,7 +110,7 @@ export const ShellProjectsPanel = () => {
         </button>
       </div>
 
-      {createOpen || editingProjectId ? (
+      {editingProjectId ? (
         <div className="shell-project-editor">
           <input
             className="shell-project-input shell-project-code"
@@ -147,7 +139,7 @@ export const ShellProjectsPanel = () => {
           </SelectField>
 
           <div className="shell-project-editor-actions">
-            <button className="shell-project-action shell-project-action-confirm" onClick={editingProjectId ? handleUpdate : handleCreate} type="button">
+            <button className="shell-project-action shell-project-action-confirm" onClick={handleUpdate} type="button">
               <Check size={12} />
             </button>
             <button className="shell-project-action" onClick={resetDraft} type="button">
@@ -220,6 +212,19 @@ export const ShellProjectsPanel = () => {
         }}
         title="Delete project"
         tone="danger"
+      />
+
+      <ProjectSetupWizard
+        activeTab={wizardTab}
+        draft={wizardDraft}
+        onChangeDraft={setWizardDraft}
+        onChangeTab={setWizardTab}
+        onClose={() => setWizardOpen(false)}
+        onDiscardDraft={() => {
+          setWizardDraft(createEmptyProjectSetupDraft());
+          setWizardTab("general");
+        }}
+        open={wizardOpen}
       />
     </section>
   );

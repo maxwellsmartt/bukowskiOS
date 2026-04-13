@@ -30,9 +30,13 @@ export const ProjectInfoPage = () => {
   const [name, setName] = useState("");
   const [status, setStatus] = useState("Prep");
   const [clientId, setClientId] = useState("");
+  const [productionCompanyId, setProductionCompanyId] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [hasPreproduction, setHasPreproduction] = useState(false);
+  const [preproductionStartDate, setPreproductionStartDate] = useState("");
+  const [preproductionEndDate, setPreproductionEndDate] = useState("");
   const [colorKey, setColorKey] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
@@ -48,9 +52,13 @@ export const ProjectInfoPage = () => {
     setName(data.project.name);
     setStatus(data.project.status);
     setClientId(data.project.clientId ?? "");
+    setProductionCompanyId(data.project.productionCompanyId ?? "");
     setDescription(data.project.description);
     setStartDate(data.project.startDate ?? "");
     setEndDate(data.project.endDate ?? "");
+    setHasPreproduction(data.project.hasPreproduction);
+    setPreproductionStartDate(data.project.preproductionStartDate ?? "");
+    setPreproductionEndDate(data.project.preproductionEndDate ?? "");
     setColorKey(data.project.colorKey ?? "");
   }, [data.project]);
 
@@ -76,10 +84,14 @@ export const ProjectInfoPage = () => {
         code,
         name,
         clientId: normalizeOptional(clientId),
+        productionCompanyId: normalizeOptional(productionCompanyId),
         status,
         description,
         startDate: normalizeOptional(startDate),
         endDate: normalizeOptional(endDate),
+        hasPreproduction,
+        preproductionStartDate: hasPreproduction ? normalizeOptional(preproductionStartDate) : undefined,
+        preproductionEndDate: hasPreproduction ? normalizeOptional(preproductionEndDate) : undefined,
         colorKey: normalizeOptional(colorKey),
       });
       await Promise.all([reload(), refreshProjects()]);
@@ -142,6 +154,18 @@ export const ProjectInfoPage = () => {
               </label>
 
               <label className="action-field">
+                <span className="action-field-label">Production company</span>
+                <SelectField onChange={(event) => setProductionCompanyId(event.target.value)} value={productionCompanyId}>
+                  <option value="">No production company linked</option>
+                  {catalog.productionCompanies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </SelectField>
+              </label>
+
+              <label className="action-field">
                 <span className="action-field-label">Start date</span>
                 <input className="action-field-control" onChange={(event) => setStartDate(event.target.value)} type="date" value={startDate} />
               </label>
@@ -150,6 +174,37 @@ export const ProjectInfoPage = () => {
                 <span className="action-field-label">End date</span>
                 <input className="action-field-control" onChange={(event) => setEndDate(event.target.value)} type="date" value={endDate} />
               </label>
+
+              <label className="project-setup-toggle">
+                <input checked={hasPreproduction} onChange={(event) => setHasPreproduction(event.target.checked)} type="checkbox" />
+                <span>Includes pre-production window</span>
+              </label>
+
+              <div />
+
+              {hasPreproduction ? (
+                <>
+                  <label className="action-field">
+                    <span className="action-field-label">Pre-production start</span>
+                    <input
+                      className="action-field-control"
+                      onChange={(event) => setPreproductionStartDate(event.target.value)}
+                      type="date"
+                      value={preproductionStartDate}
+                    />
+                  </label>
+
+                  <label className="action-field">
+                    <span className="action-field-label">Pre-production end</span>
+                    <input
+                      className="action-field-control"
+                      onChange={(event) => setPreproductionEndDate(event.target.value)}
+                      type="date"
+                      value={preproductionEndDate}
+                    />
+                  </label>
+                </>
+              ) : null}
 
               <label className="action-field">
                 <span className="action-field-label">Timeline color</span>
@@ -212,6 +267,12 @@ export const ProjectInfoPage = () => {
               <StatusBadge tone="info">{data.schedule?.startDate ?? "No start date"}</StatusBadge>
               <StatusBadge tone="warning">{data.schedule?.endDate ?? "Open-ended"}</StatusBadge>
               <StatusBadge>{data.schedule?.colorKey ?? "Default color"}</StatusBadge>
+              {currentProject.productionCompany !== "—" ? <StatusBadge>{currentProject.productionCompany}</StatusBadge> : null}
+              {currentProject.hasPreproduction ? (
+                <StatusBadge tone="info">
+                  {currentProject.preproductionStartDate ?? "Open"} - {currentProject.preproductionEndDate ?? "Open"}
+                </StatusBadge>
+              ) : null}
             </div>
           </SurfaceCard>
         </div>

@@ -968,6 +968,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             projects.name AS project_name
           FROM project_units
           JOIN projects ON projects.id = project_units.project_id
+          WHERE COALESCE(project_units.is_primary, 0) = 0
         `,
       )
       .all() as Array<{
@@ -1415,6 +1416,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           SELECT
             packing_slips.id,
             packing_slips.status,
+            COALESCE(packing_slips.lifecycle_state, 'operational') AS lifecycle_state,
             packing_slips.issue_date,
             packing_slips.return_due_date,
             packing_slips.project_id,
@@ -1424,13 +1426,14 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             COUNT(packing_slip_items.id) AS item_count,
             SUM(CASE WHEN packing_slip_items.returned_at IS NOT NULL THEN 1 ELSE 0 END) AS returned_count
           FROM packing_slips
-          JOIN projects ON projects.id = packing_slips.project_id
+          LEFT JOIN projects ON projects.id = packing_slips.project_id
           LEFT JOIN departments ON departments.id = packing_slips.department_id
           LEFT JOIN users ON users.id = packing_slips.responsible_user_id
           LEFT JOIN packing_slip_items ON packing_slip_items.packing_slip_id = packing_slips.id
           GROUP BY
             packing_slips.id,
             packing_slips.status,
+            packing_slips.lifecycle_state,
             packing_slips.issue_date,
             packing_slips.return_due_date,
             packing_slips.project_id,
@@ -1442,10 +1445,11 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       .all() as Array<{
       id: string;
       status: string;
+      lifecycle_state: "operational" | "staging";
       issue_date: string;
       return_due_date: string | null;
-      project_id: string;
-      project: string;
+      project_id: string | null;
+      project: string | null;
       department: string;
       responsible: string;
       item_count: number;
@@ -1457,7 +1461,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         id: row.id,
         number: row.id.replace("packing-", "PS-"),
         projectId: row.project_id,
-        project: row.project,
+        project: row.project ?? "Unassigned staging",
         department: row.department,
         responsible: row.responsible,
         issuedDate: formatShortDate(row.issue_date),
@@ -1465,9 +1469,11 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         itemCount: row.item_count,
         returnedCount: row.returned_count ?? 0,
         status: resolvePackingStatus(row.status, row.return_due_date, row.item_count, row.returned_count ?? 0),
+        lifecycleState: row.lifecycle_state,
         issueDateRaw: row.issue_date,
         dueDateRaw: row.return_due_date,
       }))
+      .filter((row) => row.lifecycleState !== "staging")
       .filter((row) => !query.scopeProjectId || row.projectId === query.scopeProjectId)
       .filter((row) => matchesSearch(query.search, [row.number, row.project, row.department, row.responsible, row.status]));
 
@@ -1484,10 +1490,12 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           SELECT
             packing_slips.id,
             packing_slips.status,
+            COALESCE(packing_slips.lifecycle_state, 'operational') AS lifecycle_state,
             packing_slips.issue_date,
             packing_slips.return_due_date,
             COALESCE(packing_slips.notes, 'No operational notes yet.') AS notes,
-            projects.name AS project,
+            packing_slips.project_id,
+            COALESCE(projects.name, 'Unassigned staging') AS project,
             COALESCE(departments.name, '—') AS department,
             COALESCE(responsible.full_name, '—') AS responsible,
             COALESCE(prepared.full_name, '—') AS prepared_by,
@@ -1502,7 +1510,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             COUNT(packing_slip_items.id) AS item_count,
             SUM(CASE WHEN packing_slip_items.returned_at IS NOT NULL THEN 1 ELSE 0 END) AS returned_count
           FROM packing_slips
-          JOIN projects ON projects.id = packing_slips.project_id
+          LEFT JOIN projects ON projects.id = packing_slips.project_id
           LEFT JOIN departments ON departments.id = packing_slips.department_id
           LEFT JOIN users AS responsible ON responsible.id = packing_slips.responsible_user_id
           LEFT JOIN users AS prepared ON prepared.id = packing_slips.prepared_by_user_id
@@ -1511,9 +1519,11 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           GROUP BY
             packing_slips.id,
             packing_slips.status,
+            packing_slips.lifecycle_state,
             packing_slips.issue_date,
             packing_slips.return_due_date,
             packing_slips.notes,
+            packing_slips.project_id,
             projects.name,
             departments.name,
             responsible.full_name,
@@ -1525,9 +1535,11 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       | {
           id: string;
           status: string;
+          lifecycle_state: "operational" | "staging";
           issue_date: string;
           return_due_date: string | null;
           notes: string;
+          project_id: string | null;
           project: string;
           department: string;
           responsible: string;
@@ -1602,6 +1614,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       slip: {
         id: slip.id,
         number: slip.id.replace("packing-", "PS-"),
+        projectId: slip.project_id,
         project: slip.project,
         department: slip.department,
         responsible: slip.responsible,
@@ -1614,6 +1627,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         returnedCount,
         pendingCount: Math.max(0, slip.item_count - returnedCount),
         primaryCodeValue: slip.primary_code_value,
+        lifecycleState: slip.lifecycle_state,
       },
       items: itemRows,
     };
@@ -1742,6 +1756,13 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           ...snapshot,
           clients: sortCatalogRows(
             filterCatalogRows(snapshot.clients, (row) => [row.name, row.contactName, row.email, row.phone, row.notes]),
+          ),
+        };
+      case "production_company":
+        return {
+          ...snapshot,
+          productionCompanies: sortCatalogRows(
+            filterCatalogRows(snapshot.productionCompanies, (row) => [row.name, row.contactName, row.email, row.phone, row.notes]),
           ),
         };
       case "manufacturer":

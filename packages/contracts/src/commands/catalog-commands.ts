@@ -1,4 +1,12 @@
-export type CatalogEntityType = "location" | "department" | "crew" | "client" | "manufacturer" | "category" | "kit";
+export type CatalogEntityType =
+  | "location"
+  | "department"
+  | "crew"
+  | "client"
+  | "production_company"
+  | "manufacturer"
+  | "category"
+  | "kit";
 
 export type CreateCatalogLocationInput = {
   entityType: "location";
@@ -26,6 +34,15 @@ export type CreateCatalogCrewInput = {
 
 export type CreateCatalogClientInput = {
   entityType: "client";
+  name: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+};
+
+export type CreateCatalogProductionCompanyInput = {
+  entityType: "production_company";
   name: string;
   contactName?: string;
   email?: string;
@@ -63,6 +80,7 @@ export type CreateCatalogEntityInput =
   | CreateCatalogDepartmentInput
   | CreateCatalogCrewInput
   | CreateCatalogClientInput
+  | CreateCatalogProductionCompanyInput
   | CreateCatalogManufacturerInput
   | CreateCatalogCategoryInput
   | CreateCatalogKitInput;
@@ -83,6 +101,10 @@ export type UpdateCatalogClientInput = CreateCatalogClientInput & {
   id: string;
 };
 
+export type UpdateCatalogProductionCompanyInput = CreateCatalogProductionCompanyInput & {
+  id: string;
+};
+
 export type UpdateCatalogManufacturerInput = CreateCatalogManufacturerInput & {
   id: string;
 };
@@ -100,6 +122,7 @@ export type UpdateCatalogEntityInput =
   | UpdateCatalogDepartmentInput
   | UpdateCatalogCrewInput
   | UpdateCatalogClientInput
+  | UpdateCatalogProductionCompanyInput
   | UpdateCatalogManufacturerInput
   | UpdateCatalogCategoryInput
   | UpdateCatalogKitInput;

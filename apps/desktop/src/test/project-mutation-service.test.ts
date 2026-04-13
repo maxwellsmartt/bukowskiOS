@@ -97,4 +97,65 @@ describe("project mutation service", () => {
 
     cleanup();
   });
+
+  it("creates a project blueprint with a hidden main unit and visible additional units", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-blueprint-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database);
+    const catalog = reads.getCatalogSnapshot();
+    const client = catalog.clients.find((row) => row.name === "Internal");
+
+    mutations.createProjectBlueprint({
+      generalInfo: {
+        code: "BLUE",
+        name: "Blueprint Launch",
+        clientId: client?.id,
+        productionCompanyName: "Altitude Pictures",
+        status: "Prep",
+        startDate: "2026-05-01",
+        endDate: "2026-05-10",
+        hasPreproduction: true,
+        preproductionStartDate: "2026-04-25",
+        preproductionEndDate: "2026-04-30",
+        colorKey: "teal",
+        description: "Blueprint creation test",
+      },
+      mainUnit: {
+        name: "Main Unit",
+        assetIds: ["asset-aputure-600d"],
+        crewAssignments: [{ crewMemberId: "crew-user-paola", roleLabel: "Lead" }],
+      },
+      additionalUnits: [
+        {
+          name: "Second Unit",
+          code: "BLUE-2U",
+          startDate: "2026-05-03",
+          endDate: "2026-05-06",
+          assetIds: ["asset-sachtler-flowtech"],
+          crewAssignments: [{ crewMemberId: "crew-user-miguel", roleLabel: "AC" }],
+        },
+      ],
+      packingSelection: {
+        mode: "none",
+      },
+    });
+
+    const project = reads.getProjects().find((row) => row.code === "BLUE");
+    expect(project?.productionCompanyId).toBeTruthy();
+    expect(project?.productionCompany).toBe("Altitude Pictures");
+    expect(project?.hasPreproduction).toBe(true);
+    expect(project?.activeUnitCount).toBe(0);
+
+    const detail = reads.getProjectDetail(project!.id);
+    expect(detail.units).toHaveLength(1);
+    expect(detail.units[0]?.name).toBe("Second Unit");
+    expect(detail.units[0]?.crewAssignments).toHaveLength(1);
+
+    const timeline = reads.getScheduleTimeline("90d", "week");
+    const timelineProject = timeline.projects.find((row) => row.id === project!.id);
+    expect(timelineProject?.units).toHaveLength(1);
+    expect(timelineProject?.units[0]?.name).toBe("Second Unit");
+
+    cleanup();
+  });
 });

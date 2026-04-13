@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createProjectBlueprintSchema } from "./mutation-schemas";
 
 const nonEmptyId = z.string().trim().min(1).max(160);
 const boundedSearch = z.string().trim().max(200);
@@ -63,7 +64,7 @@ const projectSortFieldSchema = z.enum([
 
 const financeEntrySortFieldSchema = z.enum(["date", "type", "category", "reference", "project", "amount", "status"]);
 const financeOverviewPeriodSchema = z.enum(["month", "quarter", "year", "custom"]);
-const catalogEntityTypeSchema = z.enum(["location", "department", "crew", "client", "manufacturer", "category", "kit"]);
+const catalogEntityTypeSchema = z.enum(["location", "department", "crew", "client", "production_company", "manufacturer", "category", "kit"]);
 const catalogSortFieldSchema = z.enum([
   "code",
   "name",
@@ -185,3 +186,5 @@ export const catalogListQuerySchema = z.object({
 });
 
 export const catalogListReadArgsSchema = z.tuple([catalogListQuerySchema.optional()]);
+
+export const createProjectBlueprintReadArgsSchema = z.tuple([createProjectBlueprintSchema]);

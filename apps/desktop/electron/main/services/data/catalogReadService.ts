@@ -127,6 +127,32 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       is_active: number;
     }>;
 
+    const productionCompanies = db
+      .prepare(
+        `
+          SELECT
+            id,
+            name,
+            COALESCE(contact_name, '') AS contact_name,
+            COALESCE(email, '') AS email,
+            COALESCE(phone, '') AS phone,
+            COALESCE(notes, '') AS notes,
+            is_active
+          FROM production_companies
+          WHERE workspace_id = ?
+          ORDER BY is_active DESC, name
+        `,
+      )
+      .all(workspaceId) as Array<{
+      id: string;
+      name: string;
+      contact_name: string;
+      email: string;
+      phone: string;
+      notes: string;
+      is_active: number;
+    }>;
+
     const manufacturers = db
       .prepare(
         `
@@ -284,6 +310,15 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         linkedUserId: row.linked_user_id,
       })),
       clients: clients.map((row) => ({
+        id: row.id,
+        name: row.name,
+        contactName: row.contact_name,
+        email: row.email,
+        phone: row.phone,
+        notes: row.notes,
+        isActive: Boolean(row.is_active),
+      })),
+      productionCompanies: productionCompanies.map((row) => ({
         id: row.id,
         name: row.name,
         contactName: row.contact_name,

@@ -7,6 +7,7 @@ import type {
   CatalogKitRow,
   CatalogLocationRow,
   CatalogManufacturerRow,
+  CatalogProductionCompanyRow,
 } from "./operations-queries";
 import type { ListSortDirection } from "./list-controls-queries";
 
@@ -36,6 +37,7 @@ export type CatalogListRowMap = {
   department: CatalogDepartmentRow;
   crew: CatalogCrewRow;
   client: CatalogClientRow;
+  production_company: CatalogProductionCompanyRow;
   manufacturer: CatalogManufacturerRow;
   category: CatalogCategoryRow;
   kit: CatalogKitRow;

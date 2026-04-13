@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import type {
   AssignCrewToProjectUnitInput,
+  CreateProjectBlueprintInput,
   CreateProjectInput,
   CreateProjectUnitInput,
   DeleteProjectInput,
@@ -81,6 +82,11 @@ const normalizeColorKey = (value?: string | null) => {
   return nextValue ? nextValue : null;
 };
 
+const normalizeOptionalText = (value?: string | null) => {
+  const nextValue = value?.trim();
+  return nextValue ? nextValue : null;
+};
+
 const resolveClientReference = (db: DatabaseSync, input: { clientId?: string; clientName?: string }) => {
   const directClientId = input.clientId?.trim();
 
@@ -143,6 +149,172 @@ const resolveClientReference = (db: DatabaseSync, input: { clientId?: string; cl
     id: clientId,
     name: clientName,
   };
+};
+
+const resolveProductionCompanyReference = (
+  db: DatabaseSync,
+  input: { productionCompanyId?: string; productionCompanyName?: string },
+) => {
+  const directId = input.productionCompanyId?.trim();
+
+  if (directId) {
+    const existing = db
+      .prepare("SELECT id, name FROM production_companies WHERE id = ? LIMIT 1")
+      .get(directId) as { id: string; name: string } | undefined;
+
+    if (!existing) {
+      throw new Error("Selected production company was not found.");
+    }
+
+    return existing;
+  }
+
+  const companyName = input.productionCompanyName?.trim();
+
+  if (!companyName) {
+    return null;
+  }
+
+  const existing = db
+    .prepare(
+      `
+        SELECT id, name
+        FROM production_companies
+        WHERE workspace_id = ?
+          AND lower(name) = lower(?)
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, companyName) as { id: string; name: string } | undefined;
+
+  if (existing) {
+    return existing;
+  }
+
+  const productionCompanyId = `production-company-${slugify(companyName)}-${Date.now().toString(36)}`;
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `
+      INSERT INTO production_companies (
+        id,
+        workspace_id,
+        name,
+        contact_name,
+        email,
+        phone,
+        notes,
+        is_active,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, NULL, NULL, NULL, 'Created from project setup.', 1, ?, ?)
+    `,
+  ).run(productionCompanyId, workspaceId, companyName, now, now);
+
+  return {
+    id: productionCompanyId,
+    name: companyName,
+  };
+};
+
+const assertPreproductionWindow = (
+  hasPreproduction: boolean,
+  preproductionStartDate: string | null,
+  preproductionEndDate: string | null,
+  projectStartDate: string | null,
+) => {
+  if (!hasPreproduction) {
+    if (preproductionStartDate || preproductionEndDate) {
+      throw new Error("Pre-production dates require the pre-production toggle to be enabled.");
+    }
+
+    return;
+  }
+
+  assertDateWindow(preproductionStartDate, preproductionEndDate, "Pre-production");
+
+  if (!preproductionStartDate || !preproductionEndDate) {
+    throw new Error("Pre-production start and end dates are required when pre-production is enabled.");
+  }
+
+  if (projectStartDate && preproductionEndDate > projectStartDate) {
+    throw new Error("Pre-production must end on or before the project start date.");
+  }
+};
+
+const ensureUserExists = (db: DatabaseSync, userId: string | undefined, label: string) => {
+  if (!userId) {
+    return;
+  }
+
+  const row = db.prepare("SELECT id FROM users WHERE id = ? LIMIT 1").get(userId) as { id: string } | undefined;
+
+  if (!row) {
+    throw new Error(`${label} was not found.`);
+  }
+};
+
+const ensureDepartmentExists = (db: DatabaseSync, departmentId: string | undefined, label: string) => {
+  if (!departmentId) {
+    return;
+  }
+
+  const row = db.prepare("SELECT id FROM departments WHERE id = ? LIMIT 1").get(departmentId) as { id: string } | undefined;
+
+  if (!row) {
+    throw new Error(`${label} was not found.`);
+  }
+};
+
+const ensureAssetIdsExist = (db: DatabaseSync, assetIds: string[]) => {
+  if (!assetIds.length) {
+    return;
+  }
+
+  const placeholders = assetIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(`SELECT id FROM assets WHERE id IN (${placeholders}) AND workspace_id = ?`)
+    .all(...assetIds, workspaceId) as Array<{ id: string }>;
+
+  if (rows.length !== assetIds.length) {
+    throw new Error("One or more selected assets are no longer available.");
+  }
+};
+
+const uniqueValues = (values: string[]) => [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+
+const parsePackingSequence = (value: string) => {
+  const match = value.match(/(\d+)$/);
+  return match ? Number.parseInt(match[1], 10) : 0;
+};
+
+const getNextPackingSequence = (db: DatabaseSync) => {
+  const rows = db.prepare("SELECT id FROM packing_slips").all() as Array<{ id: string }>;
+  const currentMax = rows.reduce((highest, row) => Math.max(highest, parsePackingSequence(row.id)), 0);
+  return currentMax + 1;
+};
+
+const buildPackingIdentifiers = (sequence: number) => {
+  const serial = String(sequence).padStart(4, "0");
+
+  return {
+    packingSlipId: `packing-${serial}`,
+    slipNumber: `PS-${serial}`,
+  };
+};
+
+const resolveDateOverlap = (
+  leftStartDate: string | null,
+  leftEndDate: string | null,
+  rightStartDate: string | null,
+  rightEndDate: string | null,
+) => {
+  if (!leftStartDate || !leftEndDate || !rightStartDate || !rightEndDate) {
+    return false;
+  }
+
+  return leftStartDate <= rightEndDate && rightStartDate <= leftEndDate;
 };
 
 const assertCodeAvailability = (db: DatabaseSync, code: string, currentProjectId?: string) => {
@@ -255,6 +427,7 @@ const getProjectRow = (db: DatabaseSync, projectId: string) =>
     .prepare(
       `
         SELECT id, start_date, end_date, color_key, description, status
+             , production_company_id, production_company_name, has_preproduction, preproduction_start_date, preproduction_end_date
         FROM projects
         WHERE id = ?
         LIMIT 1
@@ -268,6 +441,11 @@ const getProjectRow = (db: DatabaseSync, projectId: string) =>
         color_key: string | null;
         description: string | null;
         status: string;
+        production_company_id: string | null;
+        production_company_name: string | null;
+        has_preproduction: number;
+        preproduction_start_date: string | null;
+        preproduction_end_date: string | null;
       }
     | undefined;
 
@@ -446,11 +624,16 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
     const name = ensureValue(input.name, "Project name");
     const now = new Date().toISOString();
     const client = resolveClientReference(db, input);
+    const productionCompany = resolveProductionCompanyReference(db, input);
     const startDate = normalizeDateOnly(input.startDate);
     const endDate = normalizeDateOnly(input.endDate);
+    const hasPreproduction = Boolean(input.hasPreproduction);
+    const preproductionStartDate = normalizeDateOnly(input.preproductionStartDate);
+    const preproductionEndDate = normalizeDateOnly(input.preproductionEndDate);
     const colorKey = normalizeColorKey(input.colorKey);
 
     assertDateWindow(startDate, endDate, "Project");
+    assertPreproductionWindow(hasPreproduction, preproductionStartDate, preproductionEndDate, startDate);
     assertCodeAvailability(db, code);
 
     const projectId = `project-${slugify(code)}-${Date.now().toString(36)}`;
@@ -464,15 +647,20 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
           name,
           client_id,
           client_name,
+          production_company_id,
+          production_company_name,
           status,
           start_date,
           end_date,
+          has_preproduction,
+          preproduction_start_date,
+          preproduction_end_date,
           color_key,
           description,
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     ).run(
       projectId,
@@ -481,9 +669,14 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
       name,
       client?.id ?? null,
       client?.name ?? input.clientName?.trim() ?? null,
+      productionCompany?.id ?? null,
+      productionCompany?.name ?? input.productionCompanyName?.trim() ?? null,
       input.status?.trim() || "Prep",
       startDate,
       endDate,
+      hasPreproduction ? 1 : 0,
+      preproductionStartDate,
+      preproductionEndDate,
       colorKey,
       input.description?.trim() || "Project created from the sidebar shell.",
       now,
@@ -491,20 +684,646 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
     );
   },
 
+  createProjectBlueprint(input: CreateProjectBlueprintInput) {
+    const now = new Date().toISOString();
+    const code = ensureValue(input.generalInfo.code, "Project code").toUpperCase();
+    const name = ensureValue(input.generalInfo.name, "Project name");
+    const client = resolveClientReference(db, input.generalInfo);
+    const productionCompany = resolveProductionCompanyReference(db, input.generalInfo);
+    const startDate = normalizeDateOnly(input.generalInfo.startDate);
+    const endDate = normalizeDateOnly(input.generalInfo.endDate);
+    const hasPreproduction = Boolean(input.generalInfo.hasPreproduction);
+    const preproductionStartDate = normalizeDateOnly(input.generalInfo.preproductionStartDate);
+    const preproductionEndDate = normalizeDateOnly(input.generalInfo.preproductionEndDate);
+    const colorKey = normalizeColorKey(input.generalInfo.colorKey);
+    const mainUnitStartDate = startDate;
+    const mainUnitEndDate = endDate;
+    const mainUnitAssetIds = uniqueValues(input.mainUnit.assetIds);
+    const draftSlipAssetIds =
+      input.packingSelection.mode === "existing"
+        ? (() => {
+            const rows = db
+              .prepare("SELECT asset_id FROM packing_slip_items WHERE packing_slip_id = ? ORDER BY asset_id")
+              .all(input.packingSelection.packingSlipId) as Array<{ asset_id: string }>;
+            return rows.map((row) => row.asset_id);
+          })()
+        : [];
+    const combinedMainUnitAssetIds = uniqueValues(
+      (input.packingSelection.mode === "existing" ? draftSlipAssetIds : []).concat(mainUnitAssetIds),
+    );
+    const projectId = `project-${slugify(code)}-${Date.now().toString(36)}`;
+    const mainUnitId = `unit-${slugify(projectId)}-main`;
+    const defaultActorUserId = "user-ops";
+    const defaultCommandId = `project-setup-${Date.now().toString(36)}`;
+
+    assertDateWindow(startDate, endDate, "Project");
+    assertPreproductionWindow(hasPreproduction, preproductionStartDate, preproductionEndDate, startDate);
+    assertCodeAvailability(db, code);
+    ensureAssetIdsExist(db, combinedMainUnitAssetIds);
+
+    const normalizedAdditionalUnits = input.additionalUnits.map((unit, index) => {
+      const unitStartDate = normalizeDateOnly(unit.startDate);
+      const unitEndDate = normalizeDateOnly(unit.endDate);
+      const resolvedCode = ensureValue(unit.code?.trim() || `${code}-${index + 2}U`, "Unit code").toUpperCase();
+
+      assertDateWindow(unitStartDate, unitEndDate, "Project unit");
+      assertUnitWithinProjectWindow(startDate, endDate, unitStartDate, unitEndDate);
+
+      ensureAssetIdsExist(db, uniqueValues(unit.assetIds));
+      assertProjectUnitCodeAvailability(db, projectId, resolvedCode);
+
+      return {
+        ...unit,
+        assetIds: uniqueValues(unit.assetIds),
+        code: resolvedCode,
+        id: unit.id?.trim() || `unit-${slugify(projectId)}-${slugify(resolvedCode)}-${Date.now().toString(36)}-${index}`,
+        sortOrder: unit.sortOrder ?? index + 1,
+        startDate: unitStartDate,
+        endDate: unitEndDate,
+      };
+    });
+
+    const crewAssignmentDrafts = [
+      ...input.mainUnit.crewAssignments.map((assignment) => ({
+        ...assignment,
+        unitId: mainUnitId,
+        unitName: "Main Unit",
+        unitStartDate: mainUnitStartDate,
+        unitEndDate: mainUnitEndDate,
+      })),
+      ...normalizedAdditionalUnits.flatMap((unit) =>
+        unit.crewAssignments.map((assignment) => ({
+          ...assignment,
+          unitId: unit.id!,
+          unitName: unit.name,
+          unitStartDate: unit.startDate ?? null,
+          unitEndDate: unit.endDate ?? null,
+        })),
+      ),
+    ];
+
+    crewAssignmentDrafts.forEach((assignment) => {
+      ensureCrewMemberExists(db, assignment.crewMemberId);
+      const assignmentStartDate = normalizeDateOnly(assignment.startDate);
+      const assignmentEndDate = normalizeDateOnly(assignment.endDate);
+      assertDateWindow(assignmentStartDate, assignmentEndDate, "Crew assignment");
+      assertUnitWithinProjectWindow(
+        assignment.unitStartDate,
+        assignment.unitEndDate,
+        assignmentStartDate,
+        assignmentEndDate,
+      );
+    });
+
+    const conflictingProjectsByAsset = combinedMainUnitAssetIds.concat(...normalizedAdditionalUnits.flatMap((unit) => unit.assetIds));
+    if (conflictingProjectsByAsset.length) {
+      const placeholders = conflictingProjectsByAsset.map(() => "?").join(", ");
+      const assetRows = db
+        .prepare(
+          `
+            SELECT
+              asset_current_state.asset_id,
+              assets.name AS asset_name,
+              projects.name AS project_name,
+              projects.status AS project_status,
+              project_units.status AS unit_status,
+              COALESCE(project_units.start_date, projects.start_date) AS start_date,
+              COALESCE(project_units.end_date, projects.end_date) AS end_date
+            FROM asset_current_state
+            JOIN assets ON assets.id = asset_current_state.asset_id
+            LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
+            LEFT JOIN project_units ON project_units.id = asset_current_state.project_unit_id
+            WHERE asset_current_state.asset_id IN (${placeholders})
+              AND asset_current_state.current_project_id IS NOT NULL
+          `,
+        )
+        .all(...conflictingProjectsByAsset) as Array<{
+        asset_id: string;
+        asset_name: string;
+        project_name: string | null;
+        project_status: string | null;
+        unit_status: string | null;
+        start_date: string | null;
+        end_date: string | null;
+      }>;
+
+      const allUnitWindows = [
+        { name: "Main Unit", assetIds: combinedMainUnitAssetIds, startDate: mainUnitStartDate, endDate: mainUnitEndDate },
+        ...normalizedAdditionalUnits.map((unit) => ({
+          name: unit.name,
+          assetIds: unit.assetIds,
+          startDate: unit.startDate ?? null,
+          endDate: unit.endDate ?? null,
+        })),
+      ];
+
+      const conflictingAsset = assetRows.find((row) => {
+        if (!row.project_status || !row.project_name || row.project_status === "Wrapped" || row.unit_status === "cancelled" || row.unit_status === "wrapped") {
+          return false;
+        }
+
+        return allUnitWindows.some((unit) => unit.assetIds.includes(row.asset_id) && resolveDateOverlap(unit.startDate, unit.endDate, row.start_date, row.end_date));
+      });
+
+      if (conflictingAsset) {
+        throw new Error(`${conflictingAsset.asset_name} overlaps with ${conflictingAsset.project_name}. Resolve that asset conflict first.`);
+      }
+    }
+
+    if (crewAssignmentDrafts.length) {
+      const placeholders = crewAssignmentDrafts.map(() => "?").join(", ");
+      const crewRows = db
+        .prepare(
+          `
+            SELECT
+              project_unit_crew_assignments.crew_member_id,
+              COALESCE(crew_members.full_name, 'Crew member') AS crew_name,
+              projects.name AS project_name,
+              projects.status AS project_status,
+              project_units.name AS unit_name,
+              project_units.status AS unit_status,
+              COALESCE(project_unit_crew_assignments.start_date, project_units.start_date, projects.start_date) AS start_date,
+              COALESCE(project_unit_crew_assignments.end_date, project_units.end_date, projects.end_date) AS end_date
+            FROM project_unit_crew_assignments
+            JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
+            JOIN projects ON projects.id = project_units.project_id
+            LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
+            WHERE project_unit_crew_assignments.crew_member_id IN (${placeholders})
+          `,
+        )
+        .all(...crewAssignmentDrafts.map((assignment) => assignment.crewMemberId)) as Array<{
+        crew_member_id: string;
+        crew_name: string;
+        project_name: string;
+        project_status: string;
+        unit_name: string;
+        unit_status: string;
+        start_date: string | null;
+        end_date: string | null;
+      }>;
+
+      const conflictingCrew = crewRows.find((row) => {
+        if (row.project_status === "Wrapped" || row.unit_status === "cancelled" || row.unit_status === "wrapped") {
+          return false;
+        }
+
+        return crewAssignmentDrafts.some((assignment) => {
+          const assignmentStartDate = normalizeDateOnly(assignment.startDate);
+          const assignmentEndDate = normalizeDateOnly(assignment.endDate);
+          const fallbackStartDate = assignment.unitStartDate;
+          const fallbackEndDate = assignment.unitEndDate;
+          return (
+            assignment.crewMemberId === row.crew_member_id &&
+            resolveDateOverlap(
+              assignmentStartDate ?? fallbackStartDate,
+              assignmentEndDate ?? fallbackEndDate,
+              row.start_date,
+              row.end_date,
+            )
+          );
+        });
+      });
+
+      if (conflictingCrew) {
+        throw new Error(`${conflictingCrew.crew_name} overlaps with ${conflictingCrew.project_name} / ${conflictingCrew.unit_name}. Resolve that crew conflict first.`);
+      }
+    }
+
+    db.exec("BEGIN");
+
+    try {
+      db.prepare(
+        `
+          INSERT INTO projects (
+            id,
+            workspace_id,
+            code,
+            name,
+            client_id,
+            client_name,
+            production_company_id,
+            production_company_name,
+            status,
+            start_date,
+            end_date,
+            has_preproduction,
+            preproduction_start_date,
+            preproduction_end_date,
+            color_key,
+            description,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      ).run(
+        projectId,
+        workspaceId,
+        code,
+        name,
+        client?.id ?? null,
+        client?.name ?? normalizeOptionalText(input.generalInfo.clientName),
+        productionCompany?.id ?? null,
+        productionCompany?.name ?? normalizeOptionalText(input.generalInfo.productionCompanyName),
+        normalizeOptionalText(input.generalInfo.status) ?? "Prep",
+        startDate,
+        endDate,
+        hasPreproduction ? 1 : 0,
+        preproductionStartDate,
+        preproductionEndDate,
+        colorKey,
+        normalizeOptionalText(input.generalInfo.description) ?? "Project created from setup wizard.",
+        now,
+        now,
+      );
+
+      const insertUnit = db.prepare(
+        `
+          INSERT INTO project_units (
+            id,
+            workspace_id,
+            project_id,
+            code,
+            name,
+            sort_order,
+            status,
+            status_source,
+            color_key,
+            start_date,
+            end_date,
+            notes,
+            is_primary,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      );
+
+      const mainDerived = resolveDerivedStatusRow(mainUnitStartDate, mainUnitEndDate, null, null);
+      insertUnit.run(
+        mainUnitId,
+        workspaceId,
+        projectId,
+        "MAIN",
+        "Main Unit",
+        0,
+        mainDerived.status,
+        mainDerived.statusSource,
+        colorKey,
+        mainUnitStartDate,
+        mainUnitEndDate,
+        normalizeOptionalText(input.mainUnit.notes),
+        1,
+        now,
+        now,
+      );
+
+      normalizedAdditionalUnits.forEach((unit) => {
+        const derived = resolveDerivedStatusRow(unit.startDate ?? null, unit.endDate ?? null, null, null);
+        insertUnit.run(
+          unit.id,
+          workspaceId,
+          projectId,
+          unit.code,
+          ensureValue(unit.name, "Unit name"),
+          unit.sortOrder,
+          derived.status,
+          derived.statusSource,
+          normalizeColorKey(unit.colorKey),
+          unit.startDate ?? null,
+          unit.endDate ?? null,
+          normalizeOptionalText(unit.notes),
+          0,
+          now,
+          now,
+        );
+      });
+
+      const insertCrewAssignment = db.prepare(
+        `
+          INSERT INTO project_unit_crew_assignments (
+            id,
+            workspace_id,
+            project_unit_id,
+            crew_member_id,
+            role_label,
+            start_date,
+            end_date,
+            notes,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      );
+
+      crewAssignmentDrafts.forEach((assignment, index) => {
+        insertCrewAssignment.run(
+          `unit-crew-${Date.now().toString(36)}-${index}`,
+          workspaceId,
+          assignment.unitId,
+          assignment.crewMemberId,
+          normalizeOptionalText(assignment.roleLabel),
+          normalizeDateOnly(assignment.startDate) ?? assignment.unitStartDate,
+          normalizeDateOnly(assignment.endDate) ?? assignment.unitEndDate,
+          normalizeOptionalText(assignment.notes),
+          now,
+          now,
+        );
+      });
+
+      const assetRows = db
+        .prepare(
+          `
+            SELECT
+              asset_current_state.asset_id,
+              asset_current_state.current_location_id,
+              asset_current_state.current_department_id,
+              asset_current_state.current_responsible_user_id,
+              asset_current_state.active_assignment_id,
+              asset_current_state.condition_status,
+              asset_current_state.operational_status,
+              asset_current_state.custody_status
+            FROM asset_current_state
+            WHERE asset_current_state.asset_id IN (${uniqueValues(combinedMainUnitAssetIds.concat(...normalizedAdditionalUnits.flatMap((unit) => unit.assetIds))).map(() => "?").join(", ")})
+          `,
+        )
+        .all(...uniqueValues(combinedMainUnitAssetIds.concat(...normalizedAdditionalUnits.flatMap((unit) => unit.assetIds)))) as Array<{
+        asset_id: string;
+        current_location_id: string | null;
+        current_department_id: string | null;
+        current_responsible_user_id: string | null;
+        active_assignment_id: string | null;
+        condition_status: string;
+        operational_status: string;
+        custody_status: string;
+      }>;
+      const assetRowMap = new Map(assetRows.map((row) => [row.asset_id, row] as const));
+      const closeAssignment = db.prepare("UPDATE asset_assignments SET assignment_status = 'reassigned', updated_at = ? WHERE id = ?");
+      const insertAssignment = db.prepare(
+        `
+          INSERT INTO asset_assignments (
+            id,
+            workspace_id,
+            asset_id,
+            project_id,
+            department_id,
+            project_unit_id,
+            assigned_to_user_id,
+            assigned_by_user_id,
+            source_location_id,
+            target_location_id,
+            assignment_status,
+            checked_out_at,
+            expected_return_at,
+            returned_at,
+            notes,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?)
+        `,
+      );
+      const insertEvent = db.prepare(
+        `
+          INSERT INTO asset_events (
+            id,
+            workspace_id,
+            asset_id,
+            assignment_id,
+            project_id,
+            department_id,
+            performed_by_user_id,
+            event_type,
+            location_id,
+            from_location_id,
+            to_location_id,
+            event_timestamp,
+            command_id,
+            actor_type,
+            source_channel,
+            notes,
+            metadata_json,
+            created_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      );
+      const updateAssetState = db.prepare(
+        `
+          UPDATE asset_current_state
+          SET
+            current_project_id = ?,
+            project_unit_id = ?,
+            active_assignment_id = ?,
+            last_event_id = ?,
+            custody_status = 'assigned',
+            updated_at = ?,
+            version = version + 1
+          WHERE asset_id = ?
+        `,
+      );
+
+      const unitsForAssets = [
+        { id: mainUnitId, assetIds: combinedMainUnitAssetIds, endDate: mainUnitEndDate },
+        ...normalizedAdditionalUnits.map((unit) => ({ id: unit.id!, assetIds: unit.assetIds, endDate: unit.endDate ?? endDate })),
+      ];
+
+      unitsForAssets.forEach((unit, unitIndex) => {
+        unit.assetIds.forEach((assetId, assetIndex) => {
+          const assetRow = assetRowMap.get(assetId);
+
+          if (!assetRow) {
+            throw new Error("One or more selected assets are no longer available.");
+          }
+
+          if (assetRow.custody_status === "checked_out") {
+            throw new Error(`Asset ${assetId} is currently checked out and cannot be used in this project setup.`);
+          }
+
+          if (assetRow.active_assignment_id) {
+            closeAssignment.run(now, assetRow.active_assignment_id);
+          }
+
+          const assignmentId = `assignment-${slugify(assetId)}-${Date.now().toString(36)}-${unitIndex}-${assetIndex}`;
+          const eventId = `asset-event-${slugify(assetId)}-${Date.now().toString(36)}-${unitIndex}-${assetIndex}`;
+
+          insertAssignment.run(
+            assignmentId,
+            workspaceId,
+            assetId,
+            projectId,
+            assetRow.current_department_id,
+            unit.id,
+            assetRow.current_responsible_user_id,
+            defaultActorUserId,
+            assetRow.current_location_id,
+            assetRow.current_location_id,
+            "assigned",
+            unit.endDate,
+            "Assigned during project setup wizard.",
+            now,
+            now,
+          );
+
+          insertEvent.run(
+            eventId,
+            workspaceId,
+            assetId,
+            assignmentId,
+            projectId,
+            assetRow.current_department_id,
+            defaultActorUserId,
+            "assigned",
+            assetRow.current_location_id,
+            assetRow.current_location_id,
+            assetRow.current_location_id,
+            now,
+            defaultCommandId,
+            "system",
+            "desktop",
+            "Assigned during project setup wizard.",
+            null,
+            now,
+          );
+
+          updateAssetState.run(projectId, unit.id, assignmentId, eventId, now, assetId);
+        });
+      });
+
+      const syncPackingSlipItems = (packingSlipId: string, assetIds: string[]) => {
+        db.prepare("DELETE FROM packing_slip_items WHERE packing_slip_id = ?").run(packingSlipId);
+        const insertPackingItem = db.prepare(
+          `
+            INSERT INTO packing_slip_items (
+              id,
+              packing_slip_id,
+              asset_id,
+              quantity,
+              condition_out,
+              condition_in,
+              returned_at,
+              notes
+            )
+            VALUES (?, ?, ?, 1, 'Good', NULL, NULL, NULL)
+          `,
+        );
+
+        assetIds.forEach((assetId, index) => {
+          insertPackingItem.run(`packing-item-${Date.now().toString(36)}-${index}`, packingSlipId, assetId);
+        });
+      };
+
+      if (input.packingSelection.mode === "existing") {
+        const existingSlip = db
+          .prepare(
+            `
+              SELECT id
+              FROM packing_slips
+              WHERE id = ?
+                AND COALESCE(lifecycle_state, 'operational') = 'staging'
+              LIMIT 1
+            `,
+          )
+          .get(input.packingSelection.packingSlipId) as { id: string } | undefined;
+
+        if (!existingSlip) {
+          throw new Error("Selected staging packing slip was not found.");
+        }
+
+        db.prepare(
+          `
+            UPDATE packing_slips
+            SET
+              project_id = ?,
+              project_unit_id = ?,
+              lifecycle_state = 'operational',
+              status = 'Issued',
+              issue_date = ?,
+              updated_at = ?
+            WHERE id = ?
+          `,
+        ).run(projectId, mainUnitId, todayDateOnly(), now, existingSlip.id);
+
+        syncPackingSlipItems(existingSlip.id, combinedMainUnitAssetIds);
+      } else if (input.packingSelection.mode === "draft" && combinedMainUnitAssetIds.length > 0) {
+        ensureDepartmentExists(db, input.packingSelection.departmentId, "Selected department");
+        ensureUserExists(db, input.packingSelection.responsibleUserId, "Selected responsible user");
+        const nextPackingIdentifiers = buildPackingIdentifiers(getNextPackingSequence(db));
+
+        db.prepare(
+          `
+            INSERT INTO packing_slips (
+              id,
+              workspace_id,
+              project_id,
+              project_unit_id,
+              department_id,
+              prepared_by_user_id,
+              approved_by_user_id,
+              responsible_user_id,
+              lifecycle_state,
+              status,
+              issue_date,
+              return_due_date,
+              notes,
+              created_at,
+              updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'operational', 'Issued', ?, ?, ?, ?, ?)
+          `,
+        ).run(
+          nextPackingIdentifiers.packingSlipId,
+          workspaceId,
+          projectId,
+          mainUnitId,
+          input.packingSelection.departmentId?.trim() || null,
+          defaultActorUserId,
+          input.packingSelection.responsibleUserId?.trim() || null,
+          todayDateOnly(),
+          endDate,
+          normalizeOptionalText(input.packingSelection.notes) ?? "Created during project setup wizard.",
+          now,
+          now,
+        );
+
+        syncPackingSlipItems(nextPackingIdentifiers.packingSlipId, combinedMainUnitAssetIds);
+      }
+
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  },
+
   updateProject(input: UpdateProjectInput) {
     const code = ensureValue(input.code, "Project code").toUpperCase();
     const name = ensureValue(input.name, "Project name");
     const now = new Date().toISOString();
     const client = resolveClientReference(db, input);
+    const productionCompany = resolveProductionCompanyReference(db, input);
     const currentProject = ensureProjectExists(db, input.projectId);
 
     assertCodeAvailability(db, code, input.projectId);
 
     const startDate = input.startDate === undefined ? currentProject.start_date : normalizeDateOnly(input.startDate);
     const endDate = input.endDate === undefined ? currentProject.end_date : normalizeDateOnly(input.endDate);
+    const hasPreproduction =
+      input.hasPreproduction === undefined ? Boolean(currentProject.has_preproduction) : Boolean(input.hasPreproduction);
+    const preproductionStartDate =
+      input.preproductionStartDate === undefined
+        ? currentProject.preproduction_start_date
+        : normalizeDateOnly(input.preproductionStartDate);
+    const preproductionEndDate =
+      input.preproductionEndDate === undefined
+        ? currentProject.preproduction_end_date
+        : normalizeDateOnly(input.preproductionEndDate);
     const colorKey = input.colorKey === undefined ? currentProject.color_key : normalizeColorKey(input.colorKey);
 
     assertDateWindow(startDate, endDate, "Project");
+    assertPreproductionWindow(hasPreproduction, preproductionStartDate, preproductionEndDate, startDate);
     assertExistingUnitsWithinProjectWindow(db, input.projectId, startDate, endDate);
 
     const result = db.prepare(
@@ -515,9 +1334,14 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
           name = ?,
           client_id = ?,
           client_name = ?,
+          production_company_id = ?,
+          production_company_name = ?,
           status = ?,
           start_date = ?,
           end_date = ?,
+          has_preproduction = ?,
+          preproduction_start_date = ?,
+          preproduction_end_date = ?,
           color_key = ?,
           description = ?,
           updated_at = ?
@@ -528,9 +1352,14 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
       name,
       client?.id ?? null,
       client?.name ?? input.clientName?.trim() ?? null,
+      productionCompany?.id ?? null,
+      productionCompany?.name ?? input.productionCompanyName?.trim() ?? null,
       input.status?.trim() || currentProject.status || "Prep",
       startDate,
       endDate,
+      hasPreproduction ? 1 : 0,
+      preproductionStartDate,
+      preproductionEndDate,
       colorKey,
       input.description?.trim() || null,
       now,

@@ -40,6 +40,7 @@ import type {
   CreateDraftRunFromChatCommand,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
+  CreateProjectBlueprintInput,
   CreateProjectInput,
   CreateProjectUnitInput,
   CreateRmaCaseCommand,
@@ -67,6 +68,7 @@ import type {
   PackingSlipListQuery,
   PackingSlipRow,
   ProjectCardRow,
+  ProjectCreationConflictsSnapshot,
   ProjectDetailSnapshot,
   ProjectListQuery,
   ReportIncidentCommand,
@@ -101,6 +103,7 @@ import type {
   UpdateProjectInput,
   UpdateProjectUnitInput,
   UpdateRmaCaseCommand,
+  StagingPackingSlipRow,
 } from "@contracts";
 
 declare global {
@@ -191,7 +194,11 @@ declare global {
       getList: (query?: ProjectListQuery) => Promise<ProjectCardRow[]>;
       getDetail: (projectId: string) => Promise<ProjectDetailSnapshot>;
       getCatalog: () => Promise<CatalogSnapshot>;
+      getStagingPackingSlips: () => Promise<StagingPackingSlipRow[]>;
+      getCreationConflicts: (input: CreateProjectBlueprintInput) => Promise<ProjectCreationConflictsSnapshot>;
       create: (input: CreateProjectInput) => Promise<ProjectCardRow[]>;
+      createBlueprint: (input: CreateProjectBlueprintInput) => Promise<ProjectCardRow[]>;
+      exportBlueprintPdf: (input: CreateProjectBlueprintInput) => Promise<AppExportResult>;
       update: (input: UpdateProjectInput) => Promise<ProjectCardRow[]>;
       remove: (input: DeleteProjectInput) => Promise<ProjectCardRow[]>;
       createUnit: (input: CreateProjectUnitInput) => Promise<ProjectDetailSnapshot>;

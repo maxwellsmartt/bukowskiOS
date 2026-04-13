@@ -40,6 +40,7 @@ import type {
   CreateDraftRunFromChatCommand,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
+  CreateProjectBlueprintInput,
   CreateRmaCaseCommand,
   DeleteAssistantThreadCommand,
   CreateProjectInput,
@@ -66,6 +67,7 @@ import type {
   PackingSlipRow,
   ProjectListQuery,
   ProjectCardRow,
+  ProjectCreationConflictsSnapshot,
   ProjectDetailSnapshot,
   ReportIncidentCommand,
   ReportIncidentResult,
@@ -103,7 +105,8 @@ import type {
   DraftRunFromChatResult,
   SendAssistantChatTurnCommand,
   UpdateAssistantThreadPreferencesCommand,
-  } from "@contracts";
+  StagingPackingSlipRow,
+} from "@contracts";
 
 const shellActionListeners = new Set<(action: ShellAppAction) => void>();
 
@@ -244,7 +247,15 @@ const bukowskiProjects = {
   getList: (query?: ProjectListQuery) => ipcRenderer.invoke(ipcChannels.projects.getList, query) as Promise<ProjectCardRow[]>,
   getDetail: (projectId: string) => ipcRenderer.invoke(ipcChannels.projects.getDetail, projectId) as Promise<ProjectDetailSnapshot>,
   getCatalog: () => ipcRenderer.invoke(ipcChannels.projects.getCatalog) as Promise<CatalogSnapshot>,
+  getStagingPackingSlips: () =>
+    ipcRenderer.invoke(ipcChannels.projects.getStagingPackingSlips) as Promise<StagingPackingSlipRow[]>,
+  getCreationConflicts: (input: CreateProjectBlueprintInput) =>
+    ipcRenderer.invoke(ipcChannels.projects.getCreationConflicts, input) as Promise<ProjectCreationConflictsSnapshot>,
   create: (input: CreateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.create, input) as Promise<ProjectCardRow[]>,
+  createBlueprint: (input: CreateProjectBlueprintInput) =>
+    ipcRenderer.invoke(ipcChannels.projects.createBlueprint, input) as Promise<ProjectCardRow[]>,
+  exportBlueprintPdf: (input: CreateProjectBlueprintInput) =>
+    ipcRenderer.invoke(ipcChannels.projects.exportBlueprintPdf, input) as Promise<AppExportResult>,
   update: (input: UpdateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.update, input) as Promise<ProjectCardRow[]>,
   remove: (input: DeleteProjectInput) => ipcRenderer.invoke(ipcChannels.projects.delete, input) as Promise<ProjectCardRow[]>,
   createUnit: (input: CreateProjectUnitInput) =>

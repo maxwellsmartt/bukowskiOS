@@ -76,6 +76,25 @@ const assertUniqueClientName = (db: DatabaseSync, name: string, currentId?: stri
   }
 };
 
+const assertUniqueProductionCompanyName = (db: DatabaseSync, name: string, currentId?: string) => {
+  const existing = db
+    .prepare(
+      `
+        SELECT id
+        FROM production_companies
+        WHERE workspace_id = ?
+          AND lower(name) = lower(?)
+          AND (? IS NULL OR id != ?)
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, name, currentId ?? null, currentId ?? null) as { id: string } | undefined;
+
+  if (existing) {
+    throw new Error(`Production company ${name} already exists.`);
+  }
+};
+
 const assertUniqueManufacturerName = (db: DatabaseSync, name: string, currentId?: string) => {
   const existing = db
     .prepare(
@@ -163,6 +182,13 @@ const getDeleteGuardCount = (db: DatabaseSync, input: DeleteCatalogEntityInput) 
 
     case "client": {
       const row = db.prepare("SELECT COUNT(*) AS count FROM projects WHERE client_id = ?").get(input.id) as { count: number };
+      return row.count;
+    }
+
+    case "production_company": {
+      const row = db
+        .prepare("SELECT COUNT(*) AS count FROM projects WHERE production_company_id = ?")
+        .get(input.id) as { count: number };
       return row.count;
     }
 
@@ -283,6 +309,31 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               `,
             ).run(
               `client-${slugify(name)}-${Date.now().toString(36)}`,
+              workspaceId,
+              name,
+              optionalValue(input.contactName),
+              optionalValue(input.email),
+              optionalValue(input.phone),
+              optionalValue(input.notes),
+              now,
+              now,
+            );
+            break;
+          }
+
+          case "production_company": {
+            const name = ensureValue(input.name, "Production company name");
+            assertUniqueProductionCompanyName(db, name);
+
+            db.prepare(
+              `
+                INSERT INTO production_companies (
+                  id, workspace_id, name, contact_name, email, phone, notes, is_active, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+              `,
+            ).run(
+              `production-company-${slugify(name)}-${Date.now().toString(36)}`,
               workspaceId,
               name,
               optionalValue(input.contactName),
@@ -475,6 +526,33 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             break;
           }
 
+          case "production_company": {
+            const name = ensureValue(input.name, "Production company name");
+            assertUniqueProductionCompanyName(db, name, input.id);
+            const result = db.prepare(
+              `
+                UPDATE production_companies
+                SET name = ?, contact_name = ?, email = ?, phone = ?, notes = ?, updated_at = ?
+                WHERE id = ?
+              `,
+            ).run(
+              name,
+              optionalValue(input.contactName),
+              optionalValue(input.email),
+              optionalValue(input.phone),
+              optionalValue(input.notes),
+              now,
+              input.id,
+            );
+
+            if (!result.changes) {
+              throw new Error("Production company not found.");
+            }
+
+            db.prepare("UPDATE projects SET production_company_name = ? WHERE production_company_id = ?").run(name, input.id);
+            break;
+          }
+
           case "manufacturer": {
             const name = ensureValue(input.name, "Manufacturer name");
             assertUniqueManufacturerName(db, name, input.id);
@@ -597,6 +675,13 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const result = db.prepare("DELETE FROM clients WHERE id = ?").run(input.id);
             if (!result.changes) {
               throw new Error("Client not found.");
+            }
+            break;
+          }
+          case "production_company": {
+            const result = db.prepare("DELETE FROM production_companies WHERE id = ?").run(input.id);
+            if (!result.changes) {
+              throw new Error("Production company not found.");
             }
             break;
           }

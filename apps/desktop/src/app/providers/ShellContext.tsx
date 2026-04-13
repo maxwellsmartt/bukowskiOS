@@ -1,7 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import type { AppInfo, CreateProjectInput, ProjectCardRow, ShellBootstrap, UpdateProjectInput } from "@contracts";
+import type {
+  AppInfo,
+  CreateProjectBlueprintInput,
+  CreateProjectInput,
+  ProjectCardRow,
+  ShellBootstrap,
+  UpdateProjectInput,
+} from "@contracts";
 import type { ProjectRouteSection, ScopeMode } from "@app/routing/route-meta";
 import { resolveActiveRoute, resolveRememberedGlobalPath } from "@app/routing/route-meta";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
@@ -22,6 +29,7 @@ type ShellContextValue = {
   openProject: (projectId: string, section?: ProjectRouteSection) => void;
   refreshProjects: () => Promise<void>;
   createProject: (input: CreateProjectInput) => Promise<void>;
+  createProjectBlueprint: (input: CreateProjectBlueprintInput) => Promise<ProjectCardRow | null>;
   updateProject: (input: UpdateProjectInput) => Promise<void>;
   deleteProject: (projectId: string) => Promise<void>;
 };
@@ -184,6 +192,25 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     setRememberedProjectId(createdProject?.id ?? nextProjects[0]?.id ?? null);
   };
 
+  const createProjectBlueprint = async (input: CreateProjectBlueprintInput) => {
+    if (!window.bukowskiProjects) {
+      throw new Error("Projects bridge unavailable");
+    }
+
+    const nextProjects = await window.bukowskiProjects.createBlueprint(input);
+    setProjects(nextProjects);
+    setProjectsError(null);
+
+    const createdProject =
+      nextProjects.find(
+        (project) =>
+          project.code === input.generalInfo.code.trim().toUpperCase() && project.name === input.generalInfo.name.trim(),
+      ) ?? null;
+
+    setRememberedProjectId(createdProject?.id ?? nextProjects[0]?.id ?? null);
+    return createdProject;
+  };
+
   const updateProject = async (input: UpdateProjectInput) => {
     if (!window.bukowskiProjects) {
       throw new Error("Projects bridge unavailable");
@@ -236,6 +263,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       openProject,
       refreshProjects,
       createProject,
+      createProjectBlueprint,
       updateProject,
       deleteProject,
     }),
@@ -250,6 +278,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       projects,
       projectsError,
       refreshProjects,
+      createProjectBlueprint,
       scopeChipLabel,
       shellBootstrap,
     ],

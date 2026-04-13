@@ -1,11 +1,14 @@
 import type {
   AssignCrewToProjectUnitInput,
   CatalogListQuery,
+  CreateProjectBlueprintInput,
   CreateCatalogEntityInput,
   CreateProjectUnitInput,
   DeleteCatalogEntityInput,
   DeleteProjectUnitInput,
+  ProjectCreationConflictsSnapshot,
   ProjectListQuery,
+  StagingPackingSlipRow,
   UnassignCrewFromProjectUnitInput,
   UpdateCatalogEntityInput,
   UpdateProjectUnitInput,
@@ -22,6 +25,7 @@ const emptyCatalog: CatalogSnapshot = {
   users: [],
   crewMembers: [],
   clients: [],
+  productionCompanies: [],
   manufacturers: [],
   categories: [],
   kits: [],
@@ -175,4 +179,30 @@ export const unassignCrewFromProjectUnit = async (
   }
 
   return window.bukowskiProjects.unassignCrewFromUnit(input);
+};
+
+export const getStagingPackingSlips = async (): Promise<StagingPackingSlipRow[]> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.getStagingPackingSlips();
+};
+
+export const getProjectCreationConflicts = async (
+  input: CreateProjectBlueprintInput,
+): Promise<ProjectCreationConflictsSnapshot> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.getCreationConflicts(input);
+};
+
+export const exportProjectBlueprintPdf = async (input: CreateProjectBlueprintInput) => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.exportBlueprintPdf(input);
 };

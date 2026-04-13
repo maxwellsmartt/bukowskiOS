@@ -33,13 +33,14 @@ type CatalogTabConfig = {
   }>;
 };
 
-const catalogTabOrder: CatalogEntityType[] = ["location", "department", "crew", "client", "manufacturer", "kit", "category"];
+const catalogTabOrder: CatalogEntityType[] = ["location", "department", "crew", "client", "production_company", "manufacturer", "kit", "category"];
 
 const emptySelectedState: Record<CatalogEntityType, string | null> = {
   location: null,
   department: null,
   crew: null,
   client: null,
+  production_company: null,
   manufacturer: null,
   category: null,
   kit: null,
@@ -50,6 +51,7 @@ const singularLabelMap: Record<CatalogEntityType, string> = {
   department: "department",
   crew: "crew member",
   client: "client",
+  production_company: "production company",
   manufacturer: "manufacturer",
   category: "category",
   kit: "kit",
@@ -61,6 +63,8 @@ const resolveCatalogPreviewTitle = (entityType: CatalogEntityType, row: Record<s
       return (row.fullName as string) || "Crew member";
     case "client":
       return (row.name as string) || "Client";
+    case "production_company":
+      return (row.name as string) || "Production company";
     case "manufacturer":
       return (row.name as string) || "Manufacturer";
     case "kit":
@@ -95,6 +99,12 @@ const buildCatalogPreviewRows = (entityType: CatalogEntityType, row: Record<stri
         { label: "Phone", value: String(row.phone ?? "—") },
       ];
     case "client":
+      return [
+        { label: "Contact", value: String(row.contactName ?? "—") },
+        { label: "Email", value: String(row.email ?? "—") },
+        { label: "Phone", value: String(row.phone ?? "—") },
+      ];
+    case "production_company":
       return [
         { label: "Contact", value: String(row.contactName ?? "—") },
         { label: "Email", value: String(row.email ?? "—") },
@@ -146,6 +156,13 @@ const catalogSortOptionsByEntityType: Record<CatalogEntityType, Array<ListSortOp
   ],
   client: [
     { value: "name", label: "Client", columnKey: "name" },
+    { value: "contactName", label: "Contact", columnKey: "contactName" },
+    { value: "email", label: "Email", columnKey: "email" },
+    { value: "phone", label: "Phone", columnKey: "phone" },
+    { value: "status", label: "Status" },
+  ],
+  production_company: [
+    { value: "name", label: "Production company", columnKey: "name" },
     { value: "contactName", label: "Contact", columnKey: "contactName" },
     { value: "email", label: "Email", columnKey: "email" },
     { value: "phone", label: "Phone", columnKey: "phone" },
@@ -266,6 +283,26 @@ export const CatalogPage = () => {
           { key: "contactName", label: "Contact", width: 150, minWidth: 120, render: (row) => (row.contactName as string) || "—" },
           { key: "email", label: "Email", width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
           { key: "phone", label: "Phone", width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
+        ],
+      },
+      {
+        key: "production_company",
+        label: "Production Companies",
+        title: "Production Companies",
+        subtitle: "Reusable production houses that projects can reference while preserving a historical snapshot.",
+        rows: data.productionCompanies as Array<Record<string, unknown>>,
+        columns: [
+          { key: "name", label: "Company", width: 200, minWidth: 150, render: (row) => row.name as string },
+          { key: "contactName", label: "Contact", width: 160, minWidth: 130, render: (row) => (row.contactName as string) || "—" },
+          { key: "email", label: "Email", width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
+          { key: "phone", label: "Phone", width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
+          {
+            key: "status",
+            label: "Status",
+            width: 90,
+            minWidth: 78,
+            render: (row) => <StatusBadge>{(row.isActive as boolean) ? "Active" : "Inactive"}</StatusBadge>,
+          },
         ],
       },
       {

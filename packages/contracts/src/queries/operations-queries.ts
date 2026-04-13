@@ -4,7 +4,7 @@ import type { ListSortDirection } from "./list-controls-queries";
 export type PackingSlipRow = {
   id: string;
   number: string;
-  projectId: string;
+  projectId: string | null;
   project: string;
   department: string;
   responsible: string;
@@ -13,6 +13,7 @@ export type PackingSlipRow = {
   itemCount: number;
   returnedCount: number;
   status: string;
+  lifecycleState: "operational" | "staging";
 };
 
 export type PackingSlipSortField =
@@ -36,6 +37,7 @@ export type PackingSlipListQuery = {
 export type PackingSlipDetailSummary = {
   id: string;
   number: string;
+  projectId: string | null;
   project: string;
   department: string;
   responsible: string;
@@ -48,6 +50,7 @@ export type PackingSlipDetailSummary = {
   returnedCount: number;
   pendingCount: number;
   primaryCodeValue: string;
+  lifecycleState: "operational" | "staging";
 };
 
 export type PackingSlipItemRow = {
@@ -133,9 +136,14 @@ export type ProjectCardRow = {
   name: string;
   clientId: string | null;
   client: string;
+  productionCompanyId: string | null;
+  productionCompany: string;
   status: string;
   startDate: string | null;
   endDate: string | null;
+  hasPreproduction: boolean;
+  preproductionStartDate: string | null;
+  preproductionEndDate: string | null;
   colorKey: string | null;
   departments: string;
   exposure: string;
@@ -209,6 +217,16 @@ export type CatalogClientRow = {
   isActive: boolean;
 };
 
+export type CatalogProductionCompanyRow = {
+  id: string;
+  name: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  notes: string;
+  isActive: boolean;
+};
+
 export type CatalogManufacturerRow = {
   id: string;
   name: string;
@@ -253,10 +271,43 @@ export type CatalogSnapshot = {
   users: CatalogUserRow[];
   crewMembers: CatalogCrewRow[];
   clients: CatalogClientRow[];
+  productionCompanies: CatalogProductionCompanyRow[];
   manufacturers: CatalogManufacturerRow[];
   categories: CatalogCategoryRow[];
   kits: CatalogKitRow[];
   assetOptions: CatalogAssetOptionRow[];
+};
+
+export type StagingPackingSlipRow = {
+  id: string;
+  number: string;
+  itemCount: number;
+  responsible: string;
+  department: string;
+  notes: string;
+  updatedAt: string;
+};
+
+export type ProjectCreationConflictItem = {
+  resourceId: string;
+  resourceLabel: string;
+  conflictingProjectId: string;
+  conflictingProject: string;
+  conflictingUnitId: string | null;
+  conflictingUnit: string;
+  overlapStart: string;
+  overlapEnd: string;
+};
+
+export type ProjectCreationConflictGroup = {
+  type: "crew" | "asset";
+  label: string;
+  items: ProjectCreationConflictItem[];
+};
+
+export type ProjectCreationConflictsSnapshot = {
+  hasConflicts: boolean;
+  groups: ProjectCreationConflictGroup[];
 };
 
 export type ProjectDetailAssetRow = {

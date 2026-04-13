@@ -14,6 +14,8 @@ import {
   createDraftRunFromChatSchema,
   createFinancialEntrySchema,
   createPackingSlipSchema,
+  createProjectBlueprintReadArgsSchema,
+  createProjectBlueprintSchema,
   createProjectSchema,
   createProjectUnitSchema,
   createRmaCaseSchema,
@@ -81,6 +83,7 @@ import type {
   CreateCatalogEntityInput,
   CreateFinancialEntryCommand,
   CreatePackingSlipCommand,
+  CreateProjectBlueprintInput,
   CreateRmaCaseCommand,
   CreateProjectInput,
   CreateProjectUnitInput,
@@ -130,6 +133,7 @@ type RegisterFoundationIpcOptions = {
   };
   projectMutations: {
     createProject: (input: CreateProjectInput) => void;
+    createProjectBlueprint: (input: CreateProjectBlueprintInput) => void;
     updateProject: (input: UpdateProjectInput) => void;
     deleteProject: (input: DeleteProjectInput) => void;
     createProjectUnit: (input: CreateProjectUnitInput) => void;
@@ -185,6 +189,15 @@ type RegisterFoundationIpcOptions = {
   ) => Promise<{
     fileName: string;
     mimeType: "application/pdf";
+      buffer: Buffer;
+      targetFilePath: string;
+    }>;
+  exportProjectBlueprintPdf: (
+    input: CreateProjectBlueprintInput,
+    targetFilePath: string,
+  ) => Promise<{
+    fileName: string;
+    mimeType: "application/pdf";
     buffer: Buffer;
     targetFilePath: string;
   }>;
@@ -222,11 +235,12 @@ export const registerFoundationIpc = ({
   catalogMutations,
   assetMutations,
   fileUploads,
-    incidentMutations,
-    financeMutations,
-    packingMutations,
+  incidentMutations,
+  financeMutations,
+  packingMutations,
   exportFinanceReportPdf,
   exportPackingSlipPdf,
+  exportProjectBlueprintPdf,
   rmaMutations,
   agentMutations,
   runtimeDiagnostics,
@@ -542,6 +556,55 @@ export const registerFoundationIpc = ({
     projectMutations.createProject(input);
     return foundationReads.getProjects();
   });
+  safeHandleReadWithSchema(
+    ipcChannels.projects.getStagingPackingSlips,
+    emptyReadArgsSchema,
+    () => foundationReads.getStagingPackingSlips(),
+    "The app could not load staging packing slips.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.projects.getCreationConflicts,
+    createProjectBlueprintReadArgsSchema,
+    (_event, input: CreateProjectBlueprintInput) => foundationReads.getProjectCreationConflicts(input),
+    "The app could not preview project setup conflicts.",
+  );
+  safeHandle(ipcChannels.projects.createBlueprint, createProjectBlueprintSchema, (_event, input) => {
+    projectMutations.createProjectBlueprint(input);
+    return foundationReads.getProjects();
+  });
+  safeHandleReadWithSchema(
+    ipcChannels.projects.exportBlueprintPdf,
+    createProjectBlueprintReadArgsSchema,
+    async (_event, input: CreateProjectBlueprintInput) => {
+      const baseName = input.generalInfo.code?.trim() || input.generalInfo.name?.trim() || "project-setup-summary";
+      const safeBaseName = baseName.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "project-setup-summary";
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: "Export project setup summary",
+        defaultPath: path.join(app.getPath("documents"), `${safeBaseName}.pdf`),
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+
+      if (canceled || !filePath) {
+        return {
+          saved: false,
+          fileName: null,
+          savedPath: null,
+          summary: "Project setup summary export cancelled.",
+        };
+      }
+
+      const pdf = await exportProjectBlueprintPdf(input, filePath);
+      fs.writeFileSync(filePath, pdf.buffer);
+
+      return {
+        saved: true,
+        fileName: path.basename(filePath),
+        savedPath: filePath,
+        summary: `Exported ${pdf.fileName} to ${path.basename(filePath)}.`,
+      };
+    },
+    "The app could not export that project setup summary.",
+  );
   safeHandle(ipcChannels.projects.update, updateProjectSchema, (_event, input) => {
     projectMutations.updateProject(input);
     return foundationReads.getProjects();

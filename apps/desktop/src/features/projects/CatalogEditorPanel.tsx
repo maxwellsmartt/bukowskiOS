@@ -35,6 +35,7 @@ const getPanelTitle = (entityType: CatalogEntityType, mode: "create" | "edit") =
     department: "department",
     crew: "crew member",
     client: "client",
+    production_company: "production company",
     manufacturer: "manufacturer",
     category: "category",
     kit: "kit",
@@ -53,6 +54,8 @@ const getPanelSubtitle = (entityType: CatalogEntityType) => {
       return "Crew is a reusable operational catalog, separate from auth users and permissions.";
     case "client":
       return "Clients now live as central records so projects stop depending on loose text fields.";
+    case "production_company":
+      return "Production companies stay reusable and historical snapshots keep project records audit-friendly.";
     case "manufacturer":
       return "Manufacturers keep support contacts reusable so RMA cases stay consistent and audit-ready.";
     case "category":
@@ -118,6 +121,7 @@ export const CatalogEditorPanel = ({
         } as CreateCatalogEntityInput | UpdateCatalogEntityInput);
         return;
       case "client":
+      case "production_company":
         await onSubmit({
           entityType,
           ...baseId,
@@ -214,7 +218,7 @@ export const CatalogEditorPanel = ({
           </>
         ) : null}
 
-        {entityType === "client" || entityType === "manufacturer" ? (
+        {entityType === "client" || entityType === "production_company" || entityType === "manufacturer" ? (
           <>
             <label className="action-field">
               <span className="action-field-label">Contact</span>

@@ -64,6 +64,44 @@ type FinanceReportPdfPayload = {
   }>;
 };
 
+type ProjectSetupSummaryPdfPayload = {
+  projectCode: string;
+  projectName: string;
+  status: string;
+  windowLabel: string;
+  preproductionLabel: string | null;
+  clientName: string;
+  productionCompanyName: string;
+  description: string;
+  packingSourceLabel: string;
+  totals: {
+    assetCount: number;
+    crewCount: number;
+    additionalUnitCount: number;
+  };
+  mainUnit: {
+    assetNames: string[];
+    crewNames: string[];
+  };
+  additionalUnits: Array<{
+    name: string;
+    dateLabel: string;
+    assetCount: number;
+    crewCount: number;
+    assetNames: string[];
+    crewNames: string[];
+  }>;
+  conflictGroups: Array<{
+    title: string;
+    items: Array<{
+      resourceLabel: string;
+      conflictingProject: string;
+      conflictingUnit: string | null;
+      overlapLabel: string;
+    }>;
+  }>;
+};
+
 const collectPdfBuffer = (document: PDFKit.PDFDocument) =>
   new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -538,6 +576,243 @@ export const createDocumentGenerationService = () => ({
 
     return {
       fileName: "bukowski-finance-report.pdf",
+      mimeType: "application/pdf" as const,
+      buffer: await bufferPromise,
+    };
+  },
+
+  async createProjectSetupPdf(payload: ProjectSetupSummaryPdfPayload) {
+    const document = new PDFDocument({
+      margin: 40,
+      size: "A4",
+    });
+    const bufferPromise = collectPdfBuffer(document);
+    const pageWidth = document.page.width - document.page.margins.left - document.page.margins.right;
+    const cardLeft = document.page.margins.left;
+    const surfaceBorder = "#d7dbe2";
+    const surfaceMuted = "#6c7585";
+    const surfaceText = "#1a2029";
+    const surfaceBackground = "#f7f8fa";
+    const accentBackground = "#141619";
+    const accentSoft = "#efe8dc";
+    const columnGap = 14;
+    let cursorY = document.page.margins.top;
+
+    const ensurePageSpace = (spaceNeeded: number) => {
+      if (cursorY + spaceNeeded <= document.page.height - document.page.margins.bottom) {
+        return;
+      }
+
+      document.addPage();
+      cursorY = document.page.margins.top;
+    };
+
+    const drawSectionHeading = (title: string, subtitle?: string) => {
+      ensurePageSpace(42);
+      document.fillColor(surfaceText).fontSize(13).text(title, cardLeft, cursorY, { width: pageWidth });
+      cursorY += 18;
+
+      if (subtitle) {
+        document.fillColor(surfaceMuted).fontSize(10).text(subtitle, cardLeft, cursorY, { width: pageWidth });
+        cursorY += 18;
+      }
+    };
+
+    const drawMetricCards = (rows: Array<{ label: string; value: string }>) => {
+      const cardWidth = Math.floor((pageWidth - columnGap * 2) / 3);
+      ensurePageSpace(84);
+
+      rows.forEach((row, index) => {
+        const x = cardLeft + index * (cardWidth + columnGap);
+        document.roundedRect(x, cursorY, cardWidth, 62, 14).fillAndStroke(surfaceBackground, surfaceBorder);
+        document.fillColor(surfaceMuted).fontSize(9).text(row.label.toUpperCase(), x + 14, cursorY + 12, {
+          width: cardWidth - 28,
+          characterSpacing: 0.9,
+        });
+        document.fillColor(surfaceText).fontSize(18).text(row.value, x + 14, cursorY + 28, {
+          width: cardWidth - 28,
+        });
+      });
+
+      cursorY += 76;
+    };
+
+    const drawCompactList = (items: string[], emptyLabel: string) => {
+      ensurePageSpace(42);
+
+      if (!items.length) {
+        document.roundedRect(cardLeft, cursorY, pageWidth, 42, 10).fillAndStroke(surfaceBackground, surfaceBorder);
+        document.fillColor(surfaceMuted).fontSize(10).text(emptyLabel, cardLeft + 14, cursorY + 14, {
+          width: pageWidth - 28,
+        });
+        cursorY += 54;
+        return;
+      }
+
+      items.forEach((item, index) => {
+        ensurePageSpace(24);
+
+        if (index % 2 === 0) {
+          document.roundedRect(cardLeft, cursorY - 2, pageWidth, 22, 8).fill(surfaceBackground);
+        }
+
+        document.fillColor(surfaceText).fontSize(10).text(item, cardLeft + 12, cursorY + 5, {
+          width: pageWidth - 24,
+        });
+        cursorY += 24;
+      });
+
+      cursorY += 6;
+    };
+
+    document.roundedRect(cardLeft, cursorY, pageWidth, 128, 18).fillAndStroke(accentBackground, "#22262c");
+    document.fillColor("#7d8595").fontSize(10).text("PROJECT SETUP", cardLeft + 24, cursorY + 16, {
+      width: 220,
+      characterSpacing: 1.2,
+    });
+    document.fillColor("#f4f5f7").fontSize(24).text(`${payload.projectCode} · ${payload.projectName}`, cardLeft + 24, cursorY + 34, {
+      width: pageWidth - 200,
+    });
+    document.fillColor("#c2c7d0").fontSize(11).text(payload.windowLabel, cardLeft + 24, cursorY + 70, {
+      width: 260,
+    });
+    document.fillColor("#8f98a8").fontSize(10).text(`Status · ${payload.status}`, cardLeft + 24, cursorY + 92, {
+      width: 160,
+    });
+
+    document.roundedRect(cardLeft + pageWidth - 160, cursorY + 20, 136, 82, 14).fill(accentSoft);
+    document.fillColor("#5d4a2d").fontSize(9).text("PACKING SOURCE", cardLeft + pageWidth - 144, cursorY + 32, {
+      width: 108,
+      characterSpacing: 0.9,
+    });
+    document.fillColor("#1f2126").fontSize(12).text(payload.packingSourceLabel, cardLeft + pageWidth - 144, cursorY + 48, {
+      width: 108,
+      height: 40,
+    });
+
+    cursorY += 146;
+
+    drawSectionHeading("General info");
+    document.roundedRect(cardLeft, cursorY, pageWidth, 94, 14).fillAndStroke(surfaceBackground, surfaceBorder);
+    document.fillColor(surfaceMuted).fontSize(9).text("CLIENT", cardLeft + 16, cursorY + 14, {
+      width: 160,
+      characterSpacing: 0.9,
+    });
+    document.fillColor(surfaceText).fontSize(11).text(payload.clientName, cardLeft + 16, cursorY + 28, {
+      width: 220,
+    });
+    document.fillColor(surfaceMuted).fontSize(9).text("PRODUCTION COMPANY", cardLeft + 260, cursorY + 14, {
+      width: 180,
+      characterSpacing: 0.9,
+    });
+    document.fillColor(surfaceText).fontSize(11).text(payload.productionCompanyName, cardLeft + 260, cursorY + 28, {
+      width: 220,
+    });
+    document.fillColor(surfaceMuted).fontSize(9).text("PRE-PRODUCTION", cardLeft + 16, cursorY + 58, {
+      width: 180,
+      characterSpacing: 0.9,
+    });
+    document.fillColor(surfaceText).fontSize(10).text(payload.preproductionLabel ?? "Not scheduled for this setup.", cardLeft + 16, cursorY + 72, {
+      width: pageWidth - 32,
+    });
+    cursorY += 108;
+
+    if (payload.description.trim()) {
+      drawSectionHeading("Setup note");
+      document.roundedRect(cardLeft, cursorY, pageWidth, 58, 14).fillAndStroke(surfaceBackground, surfaceBorder);
+      document.fillColor(surfaceText).fontSize(10).text(payload.description, cardLeft + 16, cursorY + 16, {
+        width: pageWidth - 32,
+        height: 28,
+      });
+      cursorY += 74;
+    }
+
+    drawSectionHeading("Resource summary");
+    drawMetricCards([
+      { label: "Main unit assets", value: String(payload.totals.assetCount) },
+      { label: "Crew linked", value: String(payload.totals.crewCount) },
+      { label: "Additional units", value: String(payload.totals.additionalUnitCount) },
+    ]);
+
+    drawSectionHeading("Main unit");
+    document.fillColor(surfaceMuted).fontSize(10).text("Assets", cardLeft, cursorY, { width: pageWidth / 2 });
+    cursorY += 16;
+    drawCompactList(payload.mainUnit.assetNames, "No assets linked yet.");
+    document.fillColor(surfaceMuted).fontSize(10).text("Crew", cardLeft, cursorY, { width: pageWidth / 2 });
+    cursorY += 16;
+    drawCompactList(payload.mainUnit.crewNames, "No crew linked yet.");
+
+    drawSectionHeading("Additional units", "Compact review of extra units included in this setup.");
+    if (!payload.additionalUnits.length) {
+      drawCompactList([], "No additional units configured.");
+    } else {
+      payload.additionalUnits.forEach((unit) => {
+        ensurePageSpace(96);
+        document.roundedRect(cardLeft, cursorY, pageWidth, 82, 14).fillAndStroke(surfaceBackground, surfaceBorder);
+        document.fillColor(surfaceText).fontSize(12).text(unit.name, cardLeft + 16, cursorY + 14, { width: 220 });
+        document.fillColor(surfaceMuted).fontSize(10).text(unit.dateLabel, cardLeft + 16, cursorY + 32, { width: 220 });
+        document.fillColor(surfaceMuted).fontSize(10).text(`${unit.assetCount} assets · ${unit.crewCount} crew`, cardLeft + 16, cursorY + 50, {
+          width: 220,
+        });
+        const assetPreview = unit.assetNames.slice(0, 3).join(", ") || "No assets";
+        const crewPreview = unit.crewNames.slice(0, 3).join(", ") || "No crew";
+        document.fillColor(surfaceText).fontSize(9).text(`Assets: ${assetPreview}`, cardLeft + 270, cursorY + 18, {
+          width: pageWidth - 286,
+        });
+        document.fillColor(surfaceText).fontSize(9).text(`Crew: ${crewPreview}`, cardLeft + 270, cursorY + 40, {
+          width: pageWidth - 286,
+        });
+        cursorY += 94;
+      });
+    }
+
+    drawSectionHeading("Conflict review");
+    if (!payload.conflictGroups.some((group) => group.items.length > 0)) {
+      drawCompactList([], "No blocking conflicts detected in this draft.");
+    } else {
+      payload.conflictGroups.forEach((group) => {
+        if (!group.items.length) {
+          return;
+        }
+
+        ensurePageSpace(34);
+        document.fillColor(surfaceText).fontSize(11).text(group.title, cardLeft, cursorY, {
+          width: pageWidth,
+        });
+        cursorY += 18;
+
+        group.items.forEach((item, index) => {
+          ensurePageSpace(40);
+          if (index % 2 === 0) {
+            document.roundedRect(cardLeft, cursorY - 2, pageWidth, 36, 10).fill(surfaceBackground);
+          }
+
+          const unitSuffix = item.conflictingUnit ? ` / ${item.conflictingUnit}` : "";
+          document.fillColor(surfaceText).fontSize(10).text(`${item.resourceLabel} · ${item.conflictingProject}${unitSuffix}`, cardLeft + 12, cursorY + 4, {
+            width: pageWidth - 24,
+          });
+          document.fillColor(surfaceMuted).fontSize(9).text(item.overlapLabel, cardLeft + 12, cursorY + 20, {
+            width: pageWidth - 24,
+          });
+          cursorY += 38;
+        });
+
+        cursorY += 8;
+      });
+    }
+
+    document
+      .fontSize(9)
+      .fillColor("#8f98a8")
+      .text("Generated by BukowskiOS project setup wizard", cardLeft, document.page.height - 52, {
+        width: pageWidth,
+        align: "left",
+      });
+
+    document.end();
+
+    return {
+      fileName: `${payload.projectCode.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "project-setup-summary"}.pdf`,
       mimeType: "application/pdf" as const,
       buffer: await bufferPromise,
     };

@@ -351,10 +351,15 @@ export const createProjectSchema = z
     name: nonEmptyString,
     clientId: optionalTrimmedString,
     clientName: optionalTrimmedString,
+    productionCompanyId: optionalTrimmedString,
+    productionCompanyName: optionalTrimmedString,
     status: optionalTrimmedString,
     description: optionalTrimmedString,
     startDate: optionalTrimmedString,
     endDate: optionalTrimmedString,
+    hasPreproduction: z.boolean().optional(),
+    preproductionStartDate: optionalTrimmedString,
+    preproductionEndDate: optionalTrimmedString,
     colorKey: optionalTrimmedString,
   })
   .strict();
@@ -417,6 +422,60 @@ export const unassignCrewFromProjectUnitSchema = z
   })
   .strict();
 
+const projectBlueprintCrewAssignmentSchema = z
+  .object({
+    crewMemberId: nonEmptyString,
+    roleLabel: optionalTrimmedString,
+    startDate: optionalTrimmedString,
+    endDate: optionalTrimmedString,
+    notes: optionalTrimmedString,
+  })
+  .strict();
+
+const projectBlueprintUnitSchema = z
+  .object({
+    id: optionalTrimmedString,
+    code: optionalTrimmedString,
+    name: nonEmptyString,
+    suggestedPreset: optionalTrimmedString,
+    sortOrder: z.number().int().optional(),
+    colorKey: optionalTrimmedString,
+    startDate: optionalTrimmedString,
+    endDate: optionalTrimmedString,
+    notes: optionalTrimmedString,
+    assetIds: z.array(nonEmptyString),
+    crewAssignments: z.array(projectBlueprintCrewAssignmentSchema),
+  })
+  .strict();
+
+const projectBlueprintPackingSelectionSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("none") }).strict(),
+  z
+    .object({
+      mode: z.literal("existing"),
+      packingSlipId: nonEmptyString,
+    })
+    .strict(),
+  z
+    .object({
+      mode: z.literal("draft"),
+      label: optionalTrimmedString,
+      departmentId: optionalTrimmedString,
+      responsibleUserId: optionalTrimmedString,
+      notes: optionalTrimmedString,
+    })
+    .strict(),
+]);
+
+export const createProjectBlueprintSchema = z
+  .object({
+    generalInfo: createProjectSchema,
+    mainUnit: projectBlueprintUnitSchema,
+    additionalUnits: z.array(projectBlueprintUnitSchema),
+    packingSelection: projectBlueprintPackingSelectionSchema,
+  })
+  .strict();
+
 const createCatalogLocationSchema = z
   .object({
     entityType: z.literal("location"),
@@ -450,6 +509,17 @@ const createCatalogCrewSchema = z
 const createCatalogClientSchema = z
   .object({
     entityType: z.literal("client"),
+    name: nonEmptyString,
+    contactName: optionalTrimmedString,
+    email: optionalTrimmedString,
+    phone: optionalTrimmedString,
+    notes: optionalTrimmedString,
+  })
+  .strict();
+
+const createCatalogProductionCompanySchema = z
+  .object({
+    entityType: z.literal("production_company"),
     name: nonEmptyString,
     contactName: optionalTrimmedString,
     email: optionalTrimmedString,
@@ -494,6 +564,7 @@ export const createCatalogEntitySchema = z.discriminatedUnion("entityType", [
   createCatalogDepartmentSchema,
   createCatalogCrewSchema,
   createCatalogClientSchema,
+  createCatalogProductionCompanySchema,
   createCatalogManufacturerSchema,
   createCatalogCategorySchema,
   createCatalogKitSchema,
@@ -504,6 +575,7 @@ export const updateCatalogEntitySchema = z.discriminatedUnion("entityType", [
   createCatalogDepartmentSchema.extend({ id: nonEmptyString }),
   createCatalogCrewSchema.extend({ id: nonEmptyString }),
   createCatalogClientSchema.extend({ id: nonEmptyString }),
+  createCatalogProductionCompanySchema.extend({ id: nonEmptyString }),
   createCatalogManufacturerSchema.extend({ id: nonEmptyString }),
   createCatalogCategorySchema.extend({ id: nonEmptyString }),
   createCatalogKitSchema.extend({ id: nonEmptyString }),
@@ -511,7 +583,7 @@ export const updateCatalogEntitySchema = z.discriminatedUnion("entityType", [
 
 export const deleteCatalogEntitySchema = z
   .object({
-    entityType: z.enum(["location", "department", "crew", "client", "manufacturer", "category", "kit"]),
+    entityType: z.enum(["location", "department", "crew", "client", "production_company", "manufacturer", "category", "kit"]),
     id: nonEmptyString,
   })
   .strict();

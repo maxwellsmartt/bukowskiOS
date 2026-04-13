@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, session } from "electron";
 import path from "node:path";
 import { format } from "date-fns";
+import type { CreateProjectBlueprintInput } from "@contracts";
 
 import { buildContentSecurityPolicy } from "./security/securityConfig";
 import { registerAppIpc } from "./ipc/registerAppIpc";
@@ -218,6 +219,81 @@ app.whenReady().then(() => {
           location: item.location,
           responsible: item.responsible,
           status: item.status,
+        })),
+      });
+
+      return {
+        ...pdf,
+        targetFilePath,
+      };
+    },
+    exportProjectBlueprintPdf: async (input: CreateProjectBlueprintInput, targetFilePath: string) => {
+      const catalog = localDatabase.foundationReads.getCatalogSnapshot();
+      const assets = localDatabase.foundationReads.getAssets({
+        search: "",
+        sortBy: "name",
+        sortDirection: "asc",
+      });
+      const assetNameById = new Map(assets.map((row) => [row.id, `${row.code} · ${row.name}`] as const));
+      const crewNameById = new Map(catalog.crewMembers.map((row) => [row.id, row.fullName] as const));
+      const clientName =
+        catalog.clients.find((row) => row.id === input.generalInfo.clientId)?.name ??
+        input.generalInfo.clientName?.trim() ??
+        "No client linked";
+      const productionCompanyName =
+        catalog.productionCompanies.find((row) => row.id === input.generalInfo.productionCompanyId)?.name ??
+        input.generalInfo.productionCompanyName?.trim() ??
+        "No production company linked";
+      const conflicts = localDatabase.foundationReads.getProjectCreationConflicts(input);
+      const additionalUnits = input.additionalUnits.map((unit) => ({
+        name: unit.name.trim() || unit.suggestedPreset?.trim() || "Additional Unit",
+        dateLabel:
+          unit.startDate || unit.endDate ? `${unit.startDate ?? "Open"} - ${unit.endDate ?? "Open"}` : "No dates selected",
+        assetCount: unit.assetIds.length,
+        crewCount: unit.crewAssignments.length,
+        assetNames: unit.assetIds.map((assetId) => assetNameById.get(assetId) ?? assetId),
+        crewNames: unit.crewAssignments.map((assignment) => crewNameById.get(assignment.crewMemberId) ?? assignment.crewMemberId),
+      }));
+      const packingSourceLabel =
+        input.packingSelection.mode === "existing"
+          ? `Staging slip ${input.packingSelection.packingSlipId}`
+          : input.packingSelection.mode === "draft"
+            ? "Draft staging slip"
+            : "No packing source";
+      const pdf = await documentGeneration.createProjectSetupPdf({
+        projectCode: input.generalInfo.code.trim().toUpperCase(),
+        projectName: input.generalInfo.name.trim(),
+        status: input.generalInfo.status?.trim() || "Prep",
+        windowLabel:
+          input.generalInfo.startDate || input.generalInfo.endDate
+            ? `${input.generalInfo.startDate ?? "Open"} - ${input.generalInfo.endDate ?? "Open"}`
+            : "No project window selected",
+        preproductionLabel:
+          input.generalInfo.hasPreproduction && (input.generalInfo.preproductionStartDate || input.generalInfo.preproductionEndDate)
+            ? `${input.generalInfo.preproductionStartDate ?? "Open"} - ${input.generalInfo.preproductionEndDate ?? "Open"}`
+            : null,
+        clientName,
+        productionCompanyName,
+        description: input.generalInfo.description?.trim() ?? "",
+        packingSourceLabel,
+        totals: {
+          assetCount: input.mainUnit.assetIds.length,
+          crewCount: input.mainUnit.crewAssignments.length,
+          additionalUnitCount: input.additionalUnits.length,
+        },
+        mainUnit: {
+          assetNames: input.mainUnit.assetIds.map((assetId) => assetNameById.get(assetId) ?? assetId),
+          crewNames: input.mainUnit.crewAssignments.map((assignment) => crewNameById.get(assignment.crewMemberId) ?? assignment.crewMemberId),
+        },
+        additionalUnits,
+        conflictGroups: conflicts.groups.map((group) => ({
+          title: group.label,
+          items: group.items.map((item) => ({
+            resourceLabel: item.resourceLabel,
+            conflictingProject: item.conflictingProject,
+            conflictingUnit: item.conflictingUnit,
+            overlapLabel: `${item.overlapStart} - ${item.overlapEnd}`,
+          })),
         })),
       });
 
