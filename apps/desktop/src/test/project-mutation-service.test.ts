@@ -164,6 +164,60 @@ describe("project mutation service", () => {
     cleanup();
   });
 
+  it("deletes structural blueprint projects when they have no operational records yet", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-blueprint-delete-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database);
+
+    mutations.createProjectBlueprint({
+      generalInfo: {
+        name: "Delete Me Blueprint",
+        status: "Prep",
+        startDate: "2026-05-01",
+        endDate: "2026-05-10",
+        colorKey: "amber",
+        departmentIds: ["dept-camera"],
+      },
+      mainUnit: {
+        name: "Main Unit",
+        windows: [{ startDate: "2026-05-01", endDate: "2026-05-10" }],
+        departmentIds: ["dept-camera"],
+        unitDepartments: [
+          {
+            departmentId: "dept-camera",
+            assetIds: [],
+            crewAssignments: [],
+            packingSeed: { mode: "none" },
+          },
+        ],
+      },
+      additionalUnits: [
+        {
+          name: "Second Unit",
+          windows: [{ startDate: "2026-05-03", endDate: "2026-05-05" }],
+          departmentIds: ["dept-camera"],
+          unitDepartments: [
+            {
+              departmentId: "dept-camera",
+              assetIds: [],
+              crewAssignments: [],
+              packingSeed: { mode: "none" },
+            },
+          ],
+        },
+      ],
+    });
+
+    const createdProject = reads.getProjects().find((project) => project.name === "Delete Me Blueprint");
+    expect(createdProject).toBeTruthy();
+
+    mutations.deleteProject({ projectId: createdProject!.id });
+
+    expect(reads.getProjects().some((project) => project.id === createdProject!.id)).toBe(false);
+
+    cleanup();
+  });
+
   it("auto-generates a project code when the blueprint omits it", () => {
     const { cleanup, database } = createTestDatabase("bukowski-project-blueprint-code-test");
     const reads = createFoundationReadService(database);

@@ -616,6 +616,38 @@ const getProjectRelationCount = (db: DatabaseSync, projectId: string) => {
   );
 };
 
+const getProjectOperationalRelationCount = (db: DatabaseSync, projectId: string) => {
+  const relationCounts = db
+    .prepare(
+      `
+        SELECT
+          (SELECT COUNT(*) FROM asset_current_state WHERE current_project_id = ?) AS current_asset_count,
+          (SELECT COUNT(*) FROM asset_assignments WHERE project_id = ?) AS assignment_count,
+          (SELECT COUNT(*) FROM incidents WHERE project_id = ?) AS incident_count,
+          (SELECT COUNT(*) FROM packing_slips WHERE project_id = ?) AS packing_count,
+          (SELECT COUNT(*) FROM financial_entries WHERE project_id = ?) AS finance_count,
+          (SELECT COUNT(*) FROM collaborator_fees WHERE project_id = ?) AS collaborator_fee_count
+      `,
+    )
+    .get(projectId, projectId, projectId, projectId, projectId, projectId) as {
+    current_asset_count: number;
+    assignment_count: number;
+    incident_count: number;
+    packing_count: number;
+    finance_count: number;
+    collaborator_fee_count: number;
+  };
+
+  return (
+    relationCounts.current_asset_count +
+    relationCounts.assignment_count +
+    relationCounts.incident_count +
+    relationCounts.packing_count +
+    relationCounts.finance_count +
+    relationCounts.collaborator_fee_count
+  );
+};
+
 const getProjectUnitRelationCount = (db: DatabaseSync, unitId: string) => {
   const relationCounts = db
     .prepare(
@@ -1771,16 +1803,39 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
   },
 
   deleteProject(input: DeleteProjectInput) {
-    const relationCount = getProjectRelationCount(db, input.projectId);
+    ensureProjectExists(db, input.projectId);
+    const relationCount = getProjectOperationalRelationCount(db, input.projectId);
 
     if (relationCount > 0) {
       throw new Error("This project already has linked operational records and cannot be deleted yet.");
     }
 
-    const result = db.prepare("DELETE FROM projects WHERE id = ?").run(input.projectId);
+    db.exec("BEGIN");
 
-    if (!result.changes) {
-      throw new Error("Project not found.");
+    try {
+      const unitIds = (
+        db.prepare("SELECT id FROM project_units WHERE project_id = ?").all(input.projectId) as Array<{ id: string }>
+      ).map((row) => row.id);
+
+      if (unitIds.length) {
+        const placeholders = unitIds.map(() => "?").join(", ");
+        db.prepare(`DELETE FROM project_unit_crew_assignments WHERE project_unit_id IN (${placeholders})`).run(...unitIds);
+        db.prepare(`DELETE FROM project_unit_departments WHERE project_unit_id IN (${placeholders})`).run(...unitIds);
+        db.prepare(`DELETE FROM project_unit_windows WHERE project_unit_id IN (${placeholders})`).run(...unitIds);
+      }
+
+      db.prepare("DELETE FROM project_departments WHERE project_id = ?").run(input.projectId);
+      db.prepare("DELETE FROM project_units WHERE project_id = ?").run(input.projectId);
+      const result = db.prepare("DELETE FROM projects WHERE id = ?").run(input.projectId);
+
+      if (!result.changes) {
+        throw new Error("Project not found.");
+      }
+
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
     }
   },
 
