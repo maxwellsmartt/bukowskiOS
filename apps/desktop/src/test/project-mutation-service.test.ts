@@ -58,4 +58,43 @@ describe("project mutation service", () => {
 
     cleanup();
   });
+
+  it("flags crew overlaps as warnings instead of blocking the assignment", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-conflict-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database);
+
+    mutations.createProjectUnit({
+      projectId: "project-studio",
+      code: "OVR",
+      name: "Overlap Unit",
+      startDate: "2026-04-10",
+      endDate: "2026-04-12",
+    });
+
+    const studioDetail = reads.getProjectDetail("project-studio");
+    const overlapUnit = studioDetail.units.find((unit) => unit.code === "OVR");
+    expect(overlapUnit).toBeTruthy();
+
+    mutations.assignCrewToProjectUnit({
+      projectId: "project-studio",
+      unitId: overlapUnit!.id,
+      crewMemberId: "crew-user-paola",
+      roleLabel: "Camera overlap",
+      startDate: "2026-04-10",
+      endDate: "2026-04-12",
+    });
+
+    const refreshedStudioDetail = reads.getProjectDetail("project-studio");
+    const refreshedAuroraDetail = reads.getProjectDetail("project-aurora");
+    const conflictedStudioUnit = refreshedStudioDetail.units.find((unit) => unit.id === overlapUnit!.id);
+    const conflictedAuroraUnit = refreshedAuroraDetail.units.find((unit) => unit.id === "unit-aurora-main");
+
+    expect(conflictedStudioUnit?.conflictCount).toBeGreaterThan(0);
+    expect(conflictedStudioUnit?.crewConflictCount).toBeGreaterThan(0);
+    expect(conflictedStudioUnit?.conflictSummary).toContain("crew overlap");
+    expect(conflictedAuroraUnit?.conflictCount).toBeGreaterThan(0);
+
+    cleanup();
+  });
 });

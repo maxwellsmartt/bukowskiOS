@@ -193,7 +193,37 @@
   - `bajo`: el tooltip de incidents reutiliza la infraestructura existente; si luego quieres drill-down directo, conviene un follow-up específico
 
 ### Slice O5 — Conflict detection v1
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - detectar conflictos reales de scheduling sin bloquear operaciones válidas y reflejarlos donde el usuario ya trabaja
+- Área:
+  - backend / frontend / agents
+- Qué cambió:
+  - detección de `crew overlaps` en `main`, reutilizada por:
+    - `Project detail`
+    - timeline
+    - tool `get_schedule_conflicts`
+  - `ProjectUnitRow` y el timeline ahora exponen:
+    - `conflictCount`
+    - `crewConflictCount`
+    - `assetConflictCount`
+    - `conflictSummary`
+  - `assignCrewToProjectUnit(...)` ya no bloquea por overlap; devuelve el snapshot actualizado y la UI muestra warning visible en la unidad
+  - `assignMoveAssets(...)` ahora devuelve warnings cuando un asset sigue ligado a otro proyecto con ventana solapada
+  - la UI de `Assets` y `Units` ya muestra feedback warning separado del éxito/error
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - tests nuevos para:
+    - overlap de crew sin bloqueo duro
+    - warnings de assets al reasignar entre ventanas solapadas
+  - el timeline ahora muestra chips y barras con señal de conflicto
+- Riesgos remanentes:
+  - `medio`: en esta v1 la visualización de conflicto en timeline está dominada por `crew overlaps`; los conflictos de assets quedan más fuertes en la mutation que en la vista temporal
+  - `medio`: sigue siendo un sistema de warning, no de enforcement duro; eso es deliberado para no romper operación
+  - `bajo`: si luego quieres conflicto fino por asset y por unidad, conviene enriquecer más el modelo temporal de `asset_assignments`
 
 ## Fase 2 — Finance visible y útil
 

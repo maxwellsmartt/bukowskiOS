@@ -88,6 +88,8 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
   const [unitDraft, setUnitDraft] = useState<UnitDraft>(emptyUnitDraft);
   const [crewDrafts, setCrewDrafts] = useState<Record<string, CrewAssignmentDraft>>({});
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const editingUnit = useMemo(
@@ -112,6 +114,8 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       sortOrder: String(units.length + 1),
     });
     setError(null);
+    setFeedback(null);
+    setWarning(null);
   };
 
   const beginEdit = (unit: ProjectDetailSnapshot["units"][number]) => {
@@ -119,6 +123,8 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
     setEditingUnitId(unit.id);
     setUnitDraft(toDraft(unit));
     setError(null);
+    setFeedback(null);
+    setWarning(null);
   };
 
   const resetEditor = () => {
@@ -126,6 +132,8 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
     setEditingUnitId(null);
     setUnitDraft(emptyUnitDraft);
     setError(null);
+    setFeedback(null);
+    setWarning(null);
   };
 
   const handleSave = async () => {
@@ -159,7 +167,9 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       }
 
       await Promise.resolve(onChanged());
+      const nextFeedback = editorMode === "create" ? "Unit created." : "Unit updated.";
       resetEditor();
+      setFeedback(nextFeedback);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to save project unit.");
     } finally {
@@ -198,6 +208,8 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       }
 
       setError(null);
+      setFeedback(action === "delete" ? "Unit deleted." : "Unit updated.");
+      setWarning(null);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to update unit.");
     } finally {
@@ -210,7 +222,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
 
     try {
       setIsSubmitting(true);
-      await assignCrewToProjectUnit({
+      const nextSnapshot = await assignCrewToProjectUnit({
         projectId,
         unitId,
         crewMemberId: draft.crewMemberId,
@@ -222,6 +234,8 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       await Promise.resolve(onChanged());
       setCrewDrafts((current) => ({ ...current, [unitId]: emptyCrewDraft }));
       setError(null);
+      setFeedback("Crew linked to unit.");
+      setWarning(nextSnapshot.units.find((unit) => unit.id === unitId)?.conflictSummary ?? null);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to assign crew member to unit.");
     } finally {
@@ -239,6 +253,8 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       });
       await Promise.resolve(onChanged());
       setError(null);
+      setFeedback("Crew assignment removed.");
+      setWarning(null);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Unable to remove crew assignment.");
     } finally {
@@ -257,6 +273,8 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
         </button>
       }
     >
+      {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
+      {warning ? <div className="action-feedback action-feedback-warning">{warning}</div> : null}
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
       <div ref={unitListRef} className="project-unit-list">
@@ -330,7 +348,10 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                   {unit.statusSource === "manual_override" ? "Manual override" : "Derived status"}
                 </StatusBadge>
                 <StatusBadge>{unit.crewAssignments.length} crew linked</StatusBadge>
+                {unit.conflictCount ? <StatusBadge tone="warning">{unit.conflictCount} conflicts</StatusBadge> : null}
               </div>
+
+              {unit.conflictSummary ? <div className="action-feedback action-feedback-warning">{unit.conflictSummary}</div> : null}
 
               {unit.crewAssignments.length ? (
                 <div className="queue-list">

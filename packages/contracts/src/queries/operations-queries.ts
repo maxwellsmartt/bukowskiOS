@@ -328,6 +328,10 @@ export type ProjectUnitRow = {
   startDate: string | null;
   endDate: string | null;
   notes: string;
+  conflictCount: number;
+  crewConflictCount: number;
+  assetConflictCount: number;
+  conflictSummary: string | null;
   crewAssignments: ProjectUnitCrewAssignmentRow[];
 };
 

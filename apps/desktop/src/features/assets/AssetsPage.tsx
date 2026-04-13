@@ -88,6 +88,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [actionError, setActionError] = useState<string | null>(null);
   const [packingError, setPackingError] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [actionWarning, setActionWarning] = useState<string | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const [isSubmittingPacking, setIsSubmittingPacking] = useState(false);
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
@@ -125,6 +126,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       await Promise.all([reload(), refreshProjects()]);
       setActionError(null);
       setActionFeedback(result.summary);
+      setActionWarning(result.warningSummary ?? null);
       setActionPanelOpen(false);
       setSelectedRowIds([]);
     } catch (nextError) {
@@ -155,6 +157,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       writePreference(uiPreferenceKeys.activePackingSlipId, result.packingSlipId);
       setPackingError(null);
       setActionFeedback(result.summary);
+      setActionWarning(null);
       setPackingPanelOpen(false);
       setSelectedRowIds([]);
       navigate("/packing-slips");
@@ -182,6 +185,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
         await Promise.all([reload(), refreshProjects(), reloadEditorDetail()]);
         setActionFeedback(result.summary);
+        setActionWarning(null);
       } else {
         const result = await createAsset({
           commandId: crypto.randomUUID(),
@@ -195,6 +199,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         await Promise.all([reload(), refreshProjects()]);
         setSelectedAssetId(result.assetId);
         setActionFeedback(result.summary);
+        setActionWarning(null);
       }
 
       setEditorError(null);
@@ -226,6 +231,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setSelectedAssetId(null);
       setEditorError(null);
       setActionFeedback(result.summary);
+      setActionWarning(null);
     } catch (nextError) {
       setEditorError(nextError instanceof Error ? nextError.message : "Unable to archive asset.");
     } finally {
@@ -304,6 +310,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
       {actionFeedback ? <div className="action-feedback action-feedback-success">{actionFeedback}</div> : null}
+      {actionWarning ? <div className="action-feedback action-feedback-warning">{actionWarning}</div> : null}
 
       {!error && !isLoading && assets.length === 0 ? (
         <GuidedEmptyState

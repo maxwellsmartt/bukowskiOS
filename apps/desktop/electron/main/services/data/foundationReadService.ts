@@ -1973,114 +1973,11 @@ export const createFoundationReadService = (db: DatabaseSync) => {
   },
 
   getProjectConflicts(input?: { projectId?: string | null; rangeStart?: string | null; rangeEnd?: string | null }) {
-    const rangeStart = toIsoDate(input?.rangeStart);
-    const rangeEnd = toIsoDate(input?.rangeEnd ?? addDays(rangeStart, 30));
-    const rows = db
-      .prepare(
-        `
-          SELECT
-            project_units.id,
-            project_units.project_id,
-            project_units.name,
-            project_units.start_date,
-            project_units.end_date,
-            projects.name AS project_name
-          FROM project_units
-          JOIN projects ON projects.id = project_units.project_id
-          WHERE project_units.start_date IS NOT NULL
-            AND project_units.end_date IS NOT NULL
-            AND project_units.end_date >= ?
-            AND project_units.start_date <= ?
-            AND (? IS NULL OR project_units.project_id = ?)
-          ORDER BY project_units.start_date, project_units.name
-        `,
-      )
-      .all(rangeStart, rangeEnd, input?.projectId ?? null, input?.projectId ?? null) as Array<{
-      id: string;
-      project_id: string;
-      name: string;
-      start_date: string;
-      end_date: string;
-      project_name: string;
-    }>;
-
-    const conflicts: Array<{
-      leftProjectId: string;
-      leftProject: string;
-      leftUnitId: string;
-      leftUnit: string;
-      rightProjectId: string;
-      rightProject: string;
-      rightUnitId: string;
-      rightUnit: string;
-      overlapStart: string;
-      overlapEnd: string;
-    }> = [];
-
-    for (let index = 0; index < rows.length; index += 1) {
-      for (let nextIndex = index + 1; nextIndex < rows.length; nextIndex += 1) {
-        const left = rows[index];
-        const right = rows[nextIndex];
-
-        if (left.project_id === right.project_id && left.id === right.id) {
-          continue;
-        }
-
-        const overlaps = left.start_date <= right.end_date && right.start_date <= left.end_date;
-
-        if (!overlaps) {
-          continue;
-        }
-
-        conflicts.push({
-          leftProjectId: left.project_id,
-          leftProject: left.project_name,
-          leftUnitId: left.id,
-          leftUnit: left.name,
-          rightProjectId: right.project_id,
-          rightProject: right.project_name,
-          rightUnitId: right.id,
-          rightUnit: right.name,
-          overlapStart: left.start_date > right.start_date ? left.start_date : right.start_date,
-          overlapEnd: left.end_date < right.end_date ? left.end_date : right.end_date,
-        });
-      }
-    }
-
-    return conflicts;
+    return projectReads.getProjectConflicts(input);
   },
 
   getProjectCrewAllocations(projectId: string) {
-    const detail = this.getProjectDetail(projectId);
-
-    if (!detail.project) {
-      return {
-        project: null,
-        units: [],
-      };
-    }
-
-    return {
-      project: {
-        id: detail.project.id,
-        name: detail.project.name,
-      },
-      units: detail.units.map((unit) => ({
-        id: unit.id,
-        name: unit.name,
-        status: unit.status,
-        startDate: unit.startDate,
-        endDate: unit.endDate,
-        crewAssignments: unit.crewAssignments.map((assignment) => ({
-          id: assignment.id,
-          crewMemberId: assignment.crewMemberId,
-          fullName: assignment.fullName,
-          roleLabel: assignment.roleLabel,
-          startDate: assignment.startDate,
-          endDate: assignment.endDate,
-        })),
-      })),
-    };
+    return projectReads.getProjectCrewAllocations(projectId);
   },
 
   getIncidentDetail(incidentId: string): IncidentDetailSnapshot {

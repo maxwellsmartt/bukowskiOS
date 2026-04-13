@@ -153,6 +153,29 @@ describe("asset mutation service", () => {
     cleanup();
   });
 
+  it("returns conflict warnings when assigning assets across overlapping project windows", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-conflict-test");
+    const mutations = createAssetMutationService(database);
+
+    const result = mutations.assignMoveAssets({
+      commandId: "cmd-test-asset-conflict-warning",
+      workspaceId: "workspace-metadata",
+      assetIds: ["asset-teradek-bolt"],
+      mode: "assign",
+      projectId: "project-studio",
+      assignedToUserId: "user-paola",
+      targetLocationId: "loc-video-village",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(result.conflictCount).toBeGreaterThan(0);
+    expect(result.warningSummary).toContain("still linked");
+    expect(result.summary).toContain("1 asset");
+
+    cleanup();
+  });
+
   it("creates, updates and archives editable assets with scan-ready codes", () => {
     const { cleanup, database } = createTestDatabase("bukowski-asset-mutation-test");
     const reads = createFoundationReadService(database);

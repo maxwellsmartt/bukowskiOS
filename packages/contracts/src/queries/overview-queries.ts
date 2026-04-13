@@ -50,6 +50,9 @@ export type ScheduleTimelineUnitLane = {
   activeIncidentCount: number;
   assignedAssetCount: number;
   crewAssignmentCount: number;
+  conflictCount: number;
+  crewConflictCount: number;
+  assetConflictCount: number;
   incidentMarkers: Array<{
     id: string;
     title: string;
@@ -71,6 +74,9 @@ export type ScheduleTimelineProjectLane = {
   activeIncidentCount: number;
   assignedAssetCount: number;
   crewAssignmentCount: number;
+  conflictCount: number;
+  crewConflictCount: number;
+  assetConflictCount: number;
   incidentMarkers: Array<{
     id: string;
     title: string;

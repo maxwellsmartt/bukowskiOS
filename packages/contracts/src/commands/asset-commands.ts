@@ -107,6 +107,9 @@ export type AssignMoveAssetsResult = {
   processedAssetIds: string[];
   repeated: boolean;
   summary: string;
+  conflictCount: number;
+  warningSummary?: string;
+  warnings?: string[];
 };
 
 export type AssetEditorInput = {

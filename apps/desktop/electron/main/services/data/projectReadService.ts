@@ -45,6 +45,111 @@ type ProjectReadDeps = {
   addDays: (date: string, days: number) => string;
 };
 
+type CrewAssignmentConflictRow = {
+  assignmentId: string;
+  crewMemberId: string;
+  crewMemberName: string;
+  projectId: string;
+  projectName: string;
+  unitId: string;
+  unitName: string;
+  startDate: string | null;
+  endDate: string | null;
+  unitStartDate: string | null;
+  unitEndDate: string | null;
+};
+
+type UnitConflictSnapshot = {
+  conflictCount: number;
+  crewConflictCount: number;
+  assetConflictCount: number;
+  conflictSummary: string | null;
+};
+
+const uniqueStrings = (values: Array<string | null | undefined>) =>
+  [...new Set(values.filter((value): value is string => Boolean(value?.trim())))];
+
+const resolveWindowBounds = (
+  startDate: string | null,
+  endDate: string | null,
+  fallbackStartDate: string | null,
+  fallbackEndDate: string | null,
+) => ({
+  end: endDate ?? fallbackEndDate,
+  start: startDate ?? fallbackStartDate,
+});
+
+const datesOverlap = (
+  leftStartDate: string | null,
+  leftEndDate: string | null,
+  rightStartDate: string | null,
+  rightEndDate: string | null,
+) => {
+  if (!leftStartDate || !leftEndDate || !rightStartDate || !rightEndDate) {
+    return false;
+  }
+
+  return leftStartDate <= rightEndDate && rightStartDate <= leftEndDate;
+};
+
+const summarizeUnitConflicts = (crewConflictCount: number, assetConflictCount: number) => {
+  const parts: string[] = [];
+
+  if (crewConflictCount > 0) {
+    parts.push(`${crewConflictCount} crew overlap${crewConflictCount === 1 ? "" : "s"}`);
+  }
+
+  if (assetConflictCount > 0) {
+    parts.push(`${assetConflictCount} asset overlap${assetConflictCount === 1 ? "" : "s"}`);
+  }
+
+  return {
+    assetConflictCount,
+    conflictCount: crewConflictCount + assetConflictCount,
+    conflictSummary: parts.length ? `Attention required: ${parts.join(" · ")}.` : null,
+    crewConflictCount,
+  } satisfies UnitConflictSnapshot;
+};
+
+const buildCrewConflictMap = (rows: CrewAssignmentConflictRow[]) => {
+  const conflicts = new Map<string, Set<string>>();
+
+  for (let index = 0; index < rows.length; index += 1) {
+    for (let nextIndex = index + 1; nextIndex < rows.length; nextIndex += 1) {
+      const left = rows[index];
+      const right = rows[nextIndex];
+
+      if (left.crewMemberId !== right.crewMemberId) {
+        continue;
+      }
+
+      if (left.assignmentId === right.assignmentId) {
+        continue;
+      }
+
+      const leftWindow = resolveWindowBounds(left.startDate, left.endDate, left.unitStartDate, left.unitEndDate);
+      const rightWindow = resolveWindowBounds(right.startDate, right.endDate, right.unitStartDate, right.unitEndDate);
+
+      if (!datesOverlap(leftWindow.start, leftWindow.end, rightWindow.start, rightWindow.end)) {
+        continue;
+      }
+
+      const summary = `${left.crewMemberName} overlaps with ${right.projectName} / ${right.unitName}.`;
+      const reverseSummary = `${right.crewMemberName} overlaps with ${left.projectName} / ${left.unitName}.`;
+
+      const leftConflicts = conflicts.get(left.unitId) ?? new Set<string>();
+      leftConflicts.add(summary);
+      conflicts.set(left.unitId, leftConflicts);
+
+      const rightConflicts = conflicts.get(right.unitId) ?? new Set<string>();
+      rightConflicts.add(reverseSummary);
+      conflicts.set(right.unitId, rightConflicts);
+    }
+  }
+
+  return conflicts;
+};
+
 export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps) => ({
   getScheduleTimeline(
     range: ScheduleTimelineRange,
@@ -115,13 +220,16 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         activeIncidentCount: number;
         assignedAssetCount: number;
         crewAssignmentCount: number;
+        conflictCount: number;
+        crewConflictCount: number;
+        assetConflictCount: number;
         incidentMarkers: ScheduleTimelineSnapshot["projects"][number]["incidentMarkers"];
         units: ScheduleTimelineSnapshot["projects"][number]["units"];
       }
     >();
 
     rows.forEach((row) => {
-      const projectEntry =
+      const projectEntry: ScheduleTimelineSnapshot["projects"][number] =
         projectMap.get(row.project_id) ??
         {
           id: row.project_id,
@@ -136,6 +244,9 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           activeIncidentCount: 0,
           assignedAssetCount: 0,
           crewAssignmentCount: 0,
+          conflictCount: 0,
+          crewConflictCount: 0,
+          assetConflictCount: 0,
           incidentMarkers: [],
           units: [],
         };
@@ -169,6 +280,9 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           activeIncidentCount: 0,
           assignedAssetCount: 0,
           crewAssignmentCount: 0,
+          conflictCount: 0,
+          crewConflictCount: 0,
+          assetConflictCount: 0,
           incidentMarkers: [],
         });
       }
@@ -234,6 +348,30 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       const pagedProjectIds = pagedProjects.map((project) => project.id);
       const pagedUnitIds = pagedProjects.flatMap((project) => project.units.map((unit) => unit.id));
       const projectIdPlaceholders = pagedProjectIds.map(() => "?").join(", ");
+      const allCrewAssignmentRows = db
+        .prepare(
+          `
+              SELECT
+              project_unit_crew_assignments.id AS assignmentId,
+              project_unit_crew_assignments.crew_member_id AS crewMemberId,
+              COALESCE(crew_members.full_name, 'Crew') AS crewMemberName,
+              project_units.project_id AS projectId,
+              projects.name AS projectName,
+              project_units.id AS unitId,
+              project_units.name AS unitName,
+              project_unit_crew_assignments.start_date AS startDate,
+              project_unit_crew_assignments.end_date AS endDate,
+              project_units.start_date AS unitStartDate,
+              project_units.end_date AS unitEndDate
+            FROM project_unit_crew_assignments
+            JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
+            JOIN projects ON projects.id = project_units.project_id
+            LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
+            ORDER BY project_units.project_id, project_units.sort_order, crew_members.full_name
+          `,
+        )
+        .all() as CrewAssignmentConflictRow[];
+      const crewConflictMap = buildCrewConflictMap(allCrewAssignmentRows);
 
       const projectAssetCounts = db
         .prepare(
@@ -342,9 +480,13 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
 
         project.units.forEach((unit) => {
           const unitIncidents = incidentsByUnit.get(unit.id) ?? [];
+          const unitConflict = summarizeUnitConflicts(crewConflictMap.get(unit.id)?.size ?? 0, 0);
           unit.assignedAssetCount = unitAssetCountMap.get(unit.id) ?? 0;
           unit.crewAssignmentCount = unitCrewCountMap.get(unit.id) ?? 0;
           unit.activeIncidentCount = unitIncidents.length;
+          unit.conflictCount = unitConflict.conflictCount;
+          unit.crewConflictCount = unitConflict.crewConflictCount;
+          unit.assetConflictCount = unitConflict.assetConflictCount;
           unit.incidentMarkers = unitIncidents.slice(0, 2).map((incident) => ({
             id: incident.id,
             title: incident.title,
@@ -352,6 +494,10 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             reportedAt: incident.reported_at.slice(0, 10),
           }));
         });
+
+        project.crewConflictCount = project.units.reduce((sum, unit) => sum + unit.crewConflictCount, 0);
+        project.assetConflictCount = project.units.reduce((sum, unit) => sum + unit.assetConflictCount, 0);
+        project.conflictCount = project.units.reduce((sum, unit) => sum + unit.conflictCount, 0);
       });
     }
 
@@ -751,6 +897,31 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       assignment_end_date: string | null;
       assignment_notes: string;
     }>;
+    const projectUnitIds = uniqueStrings(unitRows.map((row) => row.id));
+    const allCrewAssignmentRows = db
+      .prepare(
+        `
+          SELECT
+            project_unit_crew_assignments.id AS assignmentId,
+            project_unit_crew_assignments.crew_member_id AS crewMemberId,
+            COALESCE(crew_members.full_name, 'Crew') AS crewMemberName,
+            project_units.project_id AS projectId,
+            projects.name AS projectName,
+            project_units.id AS unitId,
+            project_units.name AS unitName,
+            project_unit_crew_assignments.start_date AS startDate,
+            project_unit_crew_assignments.end_date AS endDate,
+            project_units.start_date AS unitStartDate,
+            project_units.end_date AS unitEndDate
+          FROM project_unit_crew_assignments
+          JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
+          JOIN projects ON projects.id = project_units.project_id
+          LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
+          ORDER BY projects.name, project_units.sort_order, crew_members.full_name
+        `,
+      )
+      .all() as CrewAssignmentConflictRow[];
+    const crewConflictMap = buildCrewConflictMap(allCrewAssignmentRows);
 
     const detailMetrics: OverviewMetric[] = [
       { label: "Assigned assets", value: String(project.asset_count), tone: "info" },
@@ -807,6 +978,10 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           startDate: row.start_date,
           endDate: row.end_date,
           notes: row.notes,
+          conflictCount: 0,
+          crewConflictCount: 0,
+          assetConflictCount: 0,
+          conflictSummary: null,
           crewAssignments: [],
         };
 
@@ -829,6 +1004,17 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
     });
 
     const units = Array.from(unitsMap.values());
+    units.forEach((unit) => {
+      if (!projectUnitIds.includes(unit.id)) {
+        return;
+      }
+
+      const conflictSummary = summarizeUnitConflicts(crewConflictMap.get(unit.id)?.size ?? 0, 0);
+      unit.conflictCount = conflictSummary.conflictCount;
+      unit.crewConflictCount = conflictSummary.crewConflictCount;
+      unit.assetConflictCount = conflictSummary.assetConflictCount;
+      unit.conflictSummary = conflictSummary.conflictSummary;
+    });
     const timelineSummary = {
       activeUnits: units.filter((unit) => unit.status === "active").length,
       plannedUnits: units.filter((unit) => unit.status === "planned").length,
@@ -914,6 +1100,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
     }>;
 
     const conflicts: Array<{
+      type: "unit_window_overlap" | "crew_overlap";
       leftProjectId: string;
       leftProject: string;
       leftUnitId: string;
@@ -924,6 +1111,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       rightUnit: string;
       overlapStart: string;
       overlapEnd: string;
+      crewMemberId?: string;
+      crewMemberName?: string;
     }> = [];
 
     for (let index = 0; index < rows.length; index += 1) {
@@ -942,6 +1131,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         }
 
         conflicts.push({
+          type: "unit_window_overlap",
           leftProjectId: left.project_id,
           leftProject: left.project_name,
           leftUnitId: left.id,
@@ -952,6 +1142,83 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           rightUnit: right.name,
           overlapStart: left.start_date > right.start_date ? left.start_date : right.start_date,
           overlapEnd: left.end_date < right.end_date ? left.end_date : right.end_date,
+        });
+      }
+    }
+
+    const crewRows = db
+      .prepare(
+        `
+          SELECT
+            project_unit_crew_assignments.id AS assignmentId,
+            project_unit_crew_assignments.crew_member_id AS crewMemberId,
+            COALESCE(crew_members.full_name, 'Crew') AS crewMemberName,
+            project_units.project_id AS projectId,
+            projects.name AS projectName,
+            project_units.id AS unitId,
+            project_units.name AS unitName,
+            project_unit_crew_assignments.start_date AS startDate,
+            project_unit_crew_assignments.end_date AS endDate,
+            project_units.start_date AS unitStartDate,
+            project_units.end_date AS unitEndDate
+          FROM project_unit_crew_assignments
+          JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
+          JOIN projects ON projects.id = project_units.project_id
+          LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
+          WHERE (? IS NULL OR project_units.project_id = ?)
+             OR crew_member_id IN (
+               SELECT DISTINCT project_unit_crew_assignments.crew_member_id
+               FROM project_unit_crew_assignments
+               JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
+               WHERE (? IS NULL OR project_units.project_id = ?)
+             )
+          ORDER BY projects.name, project_units.name
+        `,
+      )
+      .all(
+        input?.projectId ?? null,
+        input?.projectId ?? null,
+        input?.projectId ?? null,
+        input?.projectId ?? null,
+      ) as CrewAssignmentConflictRow[];
+
+    for (let index = 0; index < crewRows.length; index += 1) {
+      for (let nextIndex = index + 1; nextIndex < crewRows.length; nextIndex += 1) {
+        const left = crewRows[index];
+        const right = crewRows[nextIndex];
+
+        if (left.crewMemberId !== right.crewMemberId || left.assignmentId === right.assignmentId) {
+          continue;
+        }
+
+        const leftWindow = resolveWindowBounds(left.startDate, left.endDate, left.unitStartDate, left.unitEndDate);
+        const rightWindow = resolveWindowBounds(right.startDate, right.endDate, right.unitStartDate, right.unitEndDate);
+        const overlapStart =
+          leftWindow.start && rightWindow.start && leftWindow.start > rightWindow.start ? leftWindow.start : rightWindow.start;
+        const overlapEnd = leftWindow.end && rightWindow.end && leftWindow.end < rightWindow.end ? leftWindow.end : rightWindow.end;
+
+        if (!datesOverlap(leftWindow.start, leftWindow.end, rightWindow.start, rightWindow.end)) {
+          continue;
+        }
+
+        if (!overlapStart || !overlapEnd || overlapEnd < rangeStart || overlapStart > rangeEnd) {
+          continue;
+        }
+
+        conflicts.push({
+          type: "crew_overlap",
+          leftProjectId: left.projectId,
+          leftProject: left.projectName,
+          leftUnitId: left.unitId,
+          leftUnit: left.unitName,
+          rightProjectId: right.projectId,
+          rightProject: right.projectName,
+          rightUnitId: right.unitId,
+          rightUnit: right.unitName,
+          overlapStart,
+          overlapEnd,
+          crewMemberId: left.crewMemberId,
+          crewMemberName: left.crewMemberName,
         });
       }
     }

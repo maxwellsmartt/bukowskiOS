@@ -197,6 +197,31 @@ const summarizeResult = (eventType: "assigned" | "moved", processedCount: number
     : `${processedCount} ${assetLabel} moved successfully.`;
 };
 
+const resolveDateOverlap = (
+  leftStartDate: string | null | undefined,
+  leftEndDate: string | null | undefined,
+  rightStartDate: string | null | undefined,
+  rightEndDate: string | null | undefined,
+) => {
+  if (!leftStartDate || !leftEndDate || !rightStartDate || !rightEndDate) {
+    return false;
+  }
+
+  return leftStartDate <= rightEndDate && rightStartDate <= leftEndDate;
+};
+
+const buildConflictWarningSummary = (warnings: string[]) => {
+  if (!warnings.length) {
+    return undefined;
+  }
+
+  if (warnings.length === 1) {
+    return warnings[0];
+  }
+
+  return `${warnings[0]} +${warnings.length - 1} more conflict warning${warnings.length === 2 ? "" : "s"}.`;
+};
+
 const ensureInternalCodeAvailable = (db: DatabaseSync, workspaceId: string, internalCode: string, currentAssetId?: string) => {
   const existing = db
     .prepare(
@@ -297,6 +322,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         processedAssetIds: assetIds,
         repeated: true,
         summary: "This command was already applied.",
+        conflictCount: 0,
       };
     }
 
@@ -443,6 +469,58 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
 
     const now = new Date().toISOString();
     const eventType = input.mode === "assign" ? "assigned" : "moved";
+    const currentProjectIds = uniqueValues(processedRows.map((row) => row.current_project_id));
+    const currentProjectWindows = currentProjectIds.length
+      ? (db
+          .prepare(
+            `
+              SELECT id, name, start_date, end_date
+              FROM projects
+              WHERE id IN (${createPlaceholders(currentProjectIds)})
+            `,
+          )
+          .all(...currentProjectIds) as Array<{
+          id: string;
+          name: string;
+          start_date: string | null;
+          end_date: string | null;
+        }>)
+      : [];
+    const currentProjectWindowMap = new Map(currentProjectWindows.map((row) => [row.id, row] as const));
+    const targetProjectWindow = input.projectId
+      ? ((db
+          .prepare("SELECT id, name, start_date, end_date FROM projects WHERE id = ? LIMIT 1")
+          .get(input.projectId) as { id: string; name: string; start_date: string | null; end_date: string | null } | undefined) ??
+        null)
+      : null;
+    const targetUnitWindow = input.projectUnitId ? projectUnitMap.get(input.projectUnitId) ?? null : null;
+    const targetWindowStart = targetUnitWindow?.start_date ?? targetProjectWindow?.start_date ?? null;
+    const targetWindowEnd = targetUnitWindow?.end_date ?? targetProjectWindow?.end_date ?? null;
+    const warnings =
+      input.mode === "assign" && input.projectId
+        ? processedRows.reduce<string[]>((messages, row) => {
+            if (!row.current_project_id || row.current_project_id === input.projectId) {
+              return messages;
+            }
+
+            const currentProject = currentProjectWindowMap.get(row.current_project_id);
+            const overlaps = resolveDateOverlap(
+              currentProject?.start_date,
+              currentProject?.end_date,
+              targetWindowStart,
+              targetWindowEnd,
+            );
+
+            if (!overlaps && targetWindowStart && targetWindowEnd) {
+              return messages;
+            }
+
+            messages.push(
+              `${row.asset_name} is still linked to ${currentProject?.name ?? "another project"} while this new assignment overlaps its current schedule.`,
+            );
+            return messages;
+          }, [])
+        : [];
 
     db.exec("BEGIN");
 
@@ -720,6 +798,9 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         processedAssetIds,
         repeated: false,
         summary: summarizeResult(eventType, processedAssetIds.length),
+        conflictCount: warnings.length,
+        warningSummary: buildConflictWarningSummary(warnings),
+        warnings,
       };
     } catch (error) {
       db.exec("ROLLBACK");

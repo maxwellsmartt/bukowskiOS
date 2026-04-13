@@ -560,16 +560,19 @@ const TimelineSignalRow = ({
   incidents,
   assets,
   crew,
+  conflicts,
 }: {
   incidents: number;
   assets: number;
   crew: number;
+  conflicts: number;
 }) => (
   <div className="timeline-signal-row">
+    {conflicts ? <span className="timeline-signal-chip is-warning">{conflicts} conflicts</span> : null}
     {incidents ? <span className="timeline-signal-chip is-critical">{incidents} incidents</span> : null}
     {assets ? <span className="timeline-signal-chip">{assets} assets</span> : null}
     {crew ? <span className="timeline-signal-chip is-info">{crew} crew</span> : null}
-    {!incidents && !assets && !crew ? <span className="timeline-signal-chip is-muted">No live load</span> : null}
+    {!conflicts && !incidents && !assets && !crew ? <span className="timeline-signal-chip is-muted">No live load</span> : null}
   </div>
 );
 
@@ -654,6 +657,7 @@ const TimelineLane = ({
                     </span>
                     <TimelineSignalRow
                       assets={project.assignedAssetCount}
+                      conflicts={project.conflictCount}
                       crew={project.crewAssignmentCount}
                       incidents={project.activeIncidentCount}
                     />
@@ -662,7 +666,7 @@ const TimelineLane = ({
 
         <div className="timeline-track">
           <div
-            className="timeline-track-grid"
+                className="timeline-track-grid"
             onPointerCancel={interactionHandlers.onPointerCancel}
             onPointerDown={interactionHandlers.onPointerDown}
             onPointerMove={interactionHandlers.onPointerMove}
@@ -675,7 +679,7 @@ const TimelineLane = ({
             />
             {projectBar ? (
               <div
-                className="timeline-bar"
+                className={`timeline-bar${project.conflictCount ? " timeline-bar-conflict" : ""}`}
                 onPointerEnter={(event) => onBarHover(event, project)}
                 onPointerLeave={onBarLeave}
                 onPointerMove={(event) => onBarHover(event, project)}
@@ -741,6 +745,7 @@ const TimelineLane = ({
                     <span className="timeline-lane-subtitle">{formatRangeLabel(unit.startDate, unit.endDate)}</span>
                     <TimelineSignalRow
                       assets={unit.assignedAssetCount}
+                      conflicts={unit.conflictCount}
                       crew={unit.crewAssignmentCount}
                       incidents={unit.activeIncidentCount}
                     />
@@ -762,7 +767,7 @@ const TimelineLane = ({
                     />
                     {unitBar ? (
                       <div
-                        className="timeline-bar timeline-bar-unit"
+                        className={`timeline-bar timeline-bar-unit${unit.conflictCount ? " timeline-bar-conflict" : ""}`}
                         onPointerEnter={(event) => onBarHover(event, unit, project.name)}
                         onPointerLeave={onBarLeave}
                         onPointerMove={(event) => onBarHover(event, unit, project.name)}

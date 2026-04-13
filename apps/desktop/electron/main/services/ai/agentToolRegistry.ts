@@ -29,6 +29,11 @@ const asInteger = (value: unknown, fallback: number) => {
 };
 
 const truncate = (value: string, max = 120) => (value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value);
+const addDays = (date: string, offset: number) => {
+  const nextDate = new Date(`${date}T00:00:00.000Z`);
+  nextDate.setUTCDate(nextDate.getUTCDate() + offset);
+  return nextDate.toISOString().slice(0, 10);
+};
 const resolveDraftLanguage = (value: unknown) => {
   const nextValue = asString(value).toLowerCase();
   return nextValue.startsWith("es") || nextValue.includes("spanish") ? "es" : "en";
@@ -897,7 +902,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_schedule_conflicts",
-      description: "Return overlapping project units in the next 30 days.",
+      description: "Return overlapping unit windows and crew scheduling conflicts in the next 30 days.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -907,48 +912,14 @@ export const createAgentToolRegistry = (
       },
       execute: (args) => {
         const days = asInteger(args.days, 30);
-        const timeline = foundationReads.getScheduleTimeline(days <= 30 ? "30d" : "90d", "day");
-        const units = timeline.projects.flatMap((project) =>
-          project.units.map((unit) => ({
-            projectId: project.id,
-            projectName: project.name,
-            unitId: unit.id,
-            unitName: unit.name,
-            startDate: unit.startDate,
-            endDate: unit.endDate,
-          })),
-        );
-        const conflicts: Array<Record<string, string>> = [];
-
-        for (let index = 0; index < units.length; index += 1) {
-          for (let nextIndex = index + 1; nextIndex < units.length; nextIndex += 1) {
-            const left = units[index];
-            const right = units[nextIndex];
-
-            if (!left.startDate || !left.endDate || !right.startDate || !right.endDate) {
-              continue;
-            }
-
-            if (left.projectId === right.projectId && left.unitId === right.unitId) {
-              continue;
-            }
-
-            const overlaps = left.startDate <= right.endDate && right.startDate <= left.endDate;
-
-            if (overlaps) {
-              conflicts.push({
-                leftProject: left.projectName,
-                leftUnit: left.unitName,
-                rightProject: right.projectName,
-                rightUnit: right.unitName,
-                overlapWindow: `${left.startDate} → ${left.endDate} / ${right.startDate} → ${right.endDate}`,
-              });
-            }
-          }
-        }
+        const rangeStart = new Date().toISOString().slice(0, 10);
+        const conflicts = foundationReads.getProjectConflicts({
+          rangeStart,
+          rangeEnd: addDays(rangeStart, days),
+        });
 
         return {
-          summary: conflicts.length ? `Detected ${conflicts.length} overlapping unit windows.` : "No overlapping project units detected.",
+          summary: conflicts.length ? `Detected ${conflicts.length} scheduling conflicts.` : "No scheduling conflicts detected.",
           payload: {
             count: conflicts.length,
             items: conflicts.slice(0, 8),
