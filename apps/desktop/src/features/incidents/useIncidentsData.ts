@@ -21,6 +21,7 @@ const defaultIncidentListQuery: IncidentListQuery = {
 
 const emptyIncidentDetail: IncidentDetailSnapshot = {
   incident: null,
+  files: [],
 };
 
 export const useIncidentsData = (query: IncidentListQuery = defaultIncidentListQuery) =>
@@ -71,4 +72,20 @@ export const resolveIncident = async (input: ResolveIncidentCommand): Promise<In
   }
 
   return window.bukowskiIncidents.resolve(input);
+};
+
+export const uploadIncidentFiles = async (incidentId: string) => {
+  if (!window.bukowskiIncidents) {
+    throw new Error("Incidents bridge unavailable");
+  }
+
+  return window.bukowskiIncidents.uploadFiles(incidentId);
+};
+
+export const openIncidentFile = async (fileId: string) => {
+  if (!window.bukowskiIncidents) {
+    throw new Error("Incidents bridge unavailable");
+  }
+
+  return window.bukowskiIncidents.openFile(fileId);
 };

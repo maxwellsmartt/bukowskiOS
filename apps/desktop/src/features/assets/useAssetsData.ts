@@ -58,6 +58,7 @@ const emptyAssetDetail: AssetDetailSnapshot = {
   linkedIncidents: [],
   editor: null,
   scannableCodes: [],
+  files: [],
 };
 
 const defaultAssetListQuery: AssetListQuery = {
@@ -149,4 +150,20 @@ export const archiveAsset = async (input: ArchiveAssetCommand): Promise<AssetEdi
   }
 
   return window.bukowskiAssets.archive(input);
+};
+
+export const uploadAssetFiles = async (assetId: string) => {
+  if (!window.bukowskiAssets) {
+    throw new Error("Assets bridge unavailable");
+  }
+
+  return window.bukowskiAssets.uploadFiles(assetId);
+};
+
+export const openAssetFile = async (fileId: string) => {
+  if (!window.bukowskiAssets) {
+    throw new Error("Assets bridge unavailable");
+  }
+
+  return window.bukowskiAssets.openFile(fileId);
 };

@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
@@ -2154,8 +2155,37 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       | undefined;
 
     if (!row) {
-      return { incident: null };
+      return { incident: null, files: [] };
     }
+
+    const files = db
+      .prepare(
+        `
+          SELECT
+            id,
+            file_type,
+            original_name,
+            mime_type,
+            byte_size,
+            status,
+            created_at,
+            storage_path
+          FROM incident_files
+          WHERE incident_id = ?
+            AND deleted_at IS NULL
+          ORDER BY created_at DESC
+        `,
+      )
+      .all(incidentId) as Array<{
+      id: string;
+      file_type: string | null;
+      original_name: string | null;
+      mime_type: string | null;
+      byte_size: number | null;
+      status: string | null;
+      created_at: string;
+      storage_path: string | null;
+    }>;
 
     return {
       incident: {
@@ -2182,6 +2212,21 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         financialStatus: row.financial_status,
         notes: row.notes,
       },
+      files: files.map((file) => {
+        const isMissing = file.status !== "deleted" && file.storage_path ? !fs.existsSync(file.storage_path) : file.status === "missing";
+        const mimeType = file.mime_type?.trim() || "application/octet-stream";
+
+        return {
+          id: file.id,
+          fileType: file.file_type?.trim() || "file",
+          originalName: file.original_name?.trim() || "Evidence file",
+          mimeType,
+          byteSize: file.byte_size ?? 0,
+          status: (isMissing ? "missing" : file.status?.trim() || "available") as "available" | "missing" | "deleted",
+          createdAt: file.created_at,
+          isPreviewable: mimeType.startsWith("image/") || mimeType === "application/pdf",
+        };
+      }),
     };
   },
 

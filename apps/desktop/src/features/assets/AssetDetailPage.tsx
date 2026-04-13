@@ -12,9 +12,42 @@ import { useShellContext } from "@shared/hooks/useShellContext";
 import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
-import { archiveAsset, updateAsset, useAssetDetail } from "./useAssetsData";
+import { archiveAsset, openAssetFile, updateAsset, uploadAssetFiles, useAssetDetail } from "./useAssetsData";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
+const fileDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "2-digit",
+  year: "numeric",
+});
+
+const formatByteSize = (byteSize: number) => {
+  if (!byteSize) {
+    return "0 B";
+  }
+
+  if (byteSize < 1024) {
+    return `${byteSize} B`;
+  }
+
+  if (byteSize < 1024 * 1024) {
+    return `${(byteSize / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const resolveFileTone = (status: "available" | "missing" | "deleted") => {
+  if (status === "available") {
+    return "success" as const;
+  }
+
+  if (status === "missing") {
+    return "warning" as const;
+  }
+
+  return "critical" as const;
+};
 
 export const AssetDetailPage = () => {
   const { assetId } = useParams();
@@ -28,6 +61,10 @@ export const AssetDetailPage = () => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [editorFeedback, setEditorFeedback] = useState<string | null>(null);
+  const [filesError, setFilesError] = useState<string | null>(null);
+  const [filesFeedback, setFilesFeedback] = useState<string | null>(null);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [openingFileId, setOpeningFileId] = useState<string | null>(null);
   const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
   const [isArchivingAsset, setIsArchivingAsset] = useState(false);
 
@@ -104,6 +141,8 @@ export const AssetDetailPage = () => {
       {catalogError ? <div className="empty-state">Incident catalog unavailable: {catalogError}</div> : null}
       {reportFeedback ? <div className="action-feedback action-feedback-success">{reportFeedback}</div> : null}
       {editorFeedback ? <div className="action-feedback action-feedback-success">{editorFeedback}</div> : null}
+      {filesFeedback ? <div className="action-feedback action-feedback-success">{filesFeedback}</div> : null}
+      {filesError ? <div className="action-feedback action-feedback-error">{filesError}</div> : null}
 
       {editorOpen && data.editor ? (
         <AssetEditorPanel
@@ -324,6 +363,84 @@ export const AssetDetailPage = () => {
               </div>
             ) : (
               <div className="empty-state">No linked incidents for this asset yet.</div>
+            )}
+          </SurfaceCard>
+
+          <SurfaceCard
+            title="Files"
+            subtitle="Photos, PDFs and support files attached directly to this asset."
+            aside={
+              <button
+                className="surface-card-action-text"
+                disabled={isUploadingFiles}
+                onClick={() => {
+                  setFilesError(null);
+                  setFilesFeedback(null);
+                  void (async () => {
+                    try {
+                      setIsUploadingFiles(true);
+                      const result = await uploadAssetFiles(data.asset!.id);
+                      if (result.uploadedCount > 0) {
+                        await reload();
+                      }
+                      setFilesFeedback(result.summary);
+                    } catch (nextError) {
+                      setFilesError(nextError instanceof Error ? nextError.message : "Unable to attach files to this asset.");
+                    } finally {
+                      setIsUploadingFiles(false);
+                    }
+                  })();
+                }}
+                type="button"
+              >
+                {isUploadingFiles ? "Uploading..." : "Attach files"}
+              </button>
+            }
+          >
+            {data.files.length ? (
+              <div className="entity-file-list">
+                {data.files.map((file) => (
+                  <div key={file.id} className="entity-file-row">
+                    <div className="entity-file-main">
+                      <div className="entity-file-head">
+                        <span className="entity-file-name">{file.originalName}</span>
+                        <StatusBadge tone={resolveFileTone(file.status)}>{file.status}</StatusBadge>
+                        {file.isPreviewable ? <StatusBadge tone="info">previewable</StatusBadge> : null}
+                      </div>
+                      <div className="entity-file-meta">
+                        <span>{file.fileType}</span>
+                        <span>{formatByteSize(file.byteSize)}</span>
+                        <span>{fileDateFormatter.format(new Date(file.createdAt))}</span>
+                      </div>
+                    </div>
+                    <div className="entity-file-actions">
+                      <button
+                        className="ghost-control"
+                        disabled={file.status !== "available" || openingFileId === file.id}
+                        onClick={() => {
+                          setFilesError(null);
+                          void (async () => {
+                            try {
+                              setOpeningFileId(file.id);
+                              await openAssetFile(file.id);
+                            } catch (nextError) {
+                              setFilesError(nextError instanceof Error ? nextError.message : "Unable to open that asset file.");
+                              await reload();
+                            } finally {
+                              setOpeningFileId(null);
+                            }
+                          })();
+                        }}
+                        type="button"
+                      >
+                        {openingFileId === file.id ? "Opening..." : "Open"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">No files attached yet. Add photos, PDFs or support evidence here.</div>
             )}
           </SurfaceCard>
         </div>

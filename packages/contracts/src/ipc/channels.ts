@@ -54,6 +54,8 @@ export const ipcChannels = {
     getSummary: "bukowskiAssets:getSummary",
     getOverview: "bukowskiAssets:getOverview",
     getDetail: "bukowskiAssets:getDetail",
+    uploadFiles: "bukowskiAssets:uploadFiles",
+    openFile: "bukowskiAssets:openFile",
     assignMove: "bukowskiAssets:assignMove",
     create: "bukowskiAssets:create",
     update: "bukowskiAssets:update",
@@ -69,6 +71,8 @@ export const ipcChannels = {
   incidents: {
     getList: "bukowskiIncidents:getList",
     getDetail: "bukowskiIncidents:getDetail",
+    uploadFiles: "bukowskiIncidents:uploadFiles",
+    openFile: "bukowskiIncidents:openFile",
     report: "bukowskiIncidents:report",
     update: "bukowskiIncidents:update",
     resolve: "bukowskiIncidents:resolve",

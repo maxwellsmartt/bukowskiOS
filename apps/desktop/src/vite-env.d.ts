@@ -29,6 +29,7 @@ import type {
   CreateAssistantThreadCommand,
   AssetDetailSnapshot,
   AssetEditorMutationResult,
+  FileUploadMutationResult,
   AssetListRow,
   AssetSummarySnapshot,
   CatalogListQuery,
@@ -161,6 +162,8 @@ declare global {
       getSummary: () => Promise<AssetSummarySnapshot>;
       getOverview: () => Promise<AssetsOverviewSnapshot>;
       getDetail: (assetId: string) => Promise<AssetDetailSnapshot>;
+      uploadFiles: (assetId: string) => Promise<FileUploadMutationResult>;
+      openFile: (fileId: string) => Promise<void>;
       assignMove: (input: AssignMoveAssetsInput) => Promise<AssignMoveAssetsResult>;
       create: (input: CreateAssetCommand) => Promise<AssetEditorMutationResult>;
       update: (input: UpdateAssetCommand) => Promise<AssetEditorMutationResult>;
@@ -176,6 +179,8 @@ declare global {
     bukowskiIncidents?: {
       getList: (query?: IncidentListQuery) => Promise<IncidentListRow[]>;
       getDetail: (incidentId: string) => Promise<IncidentDetailSnapshot>;
+      uploadFiles: (incidentId: string) => Promise<FileUploadMutationResult>;
+      openFile: (fileId: string) => Promise<void>;
       report: (input: ReportIncidentCommand) => Promise<ReportIncidentResult>;
       update: (input: UpdateIncidentCommand) => Promise<IncidentMutationResult>;
       resolve: (input: ResolveIncidentCommand) => Promise<IncidentMutationResult>;

@@ -80,6 +80,11 @@ export type IncidentMutationResult = {
   summary: string;
 };
 
+export type FileUploadMutationResult = {
+  uploadedCount: number;
+  summary: string;
+};
+
 export type AssignMoveAssetsInput = {
   commandId: string;
   workspaceId: string;

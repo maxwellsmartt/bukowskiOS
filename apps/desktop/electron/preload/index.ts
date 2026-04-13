@@ -29,6 +29,7 @@ import type {
   CreateAssistantThreadCommand,
   AssetDetailSnapshot,
   AssetEditorMutationResult,
+  FileUploadMutationResult,
   AssetListRow,
   AssetSummarySnapshot,
   CatalogListQuery,
@@ -197,6 +198,9 @@ const bukowskiAssets = {
   getOverview: () => ipcRenderer.invoke(ipcChannels.assets.getOverview) as Promise<AssetsOverviewSnapshot>,
   getDetail: (assetId: string) =>
     ipcRenderer.invoke(ipcChannels.assets.getDetail, assetId) as Promise<AssetDetailSnapshot>,
+  uploadFiles: (assetId: string) =>
+    ipcRenderer.invoke(ipcChannels.assets.uploadFiles, assetId) as Promise<FileUploadMutationResult>,
+  openFile: (fileId: string) => ipcRenderer.invoke(ipcChannels.assets.openFile, fileId) as Promise<void>,
   assignMove: (input: AssignMoveAssetsInput) =>
     ipcRenderer.invoke(ipcChannels.assets.assignMove, input) as Promise<AssignMoveAssetsResult>,
   create: (input: CreateAssetCommand) =>
@@ -223,6 +227,9 @@ const bukowskiIncidents = {
   getList: (query?: IncidentListQuery) => ipcRenderer.invoke(ipcChannels.incidents.getList, query) as Promise<IncidentListRow[]>,
   getDetail: (incidentId: string) =>
     ipcRenderer.invoke(ipcChannels.incidents.getDetail, incidentId) as Promise<IncidentDetailSnapshot>,
+  uploadFiles: (incidentId: string) =>
+    ipcRenderer.invoke(ipcChannels.incidents.uploadFiles, incidentId) as Promise<FileUploadMutationResult>,
+  openFile: (fileId: string) => ipcRenderer.invoke(ipcChannels.incidents.openFile, fileId) as Promise<void>,
   report: (input: ReportIncidentCommand) =>
     ipcRenderer.invoke(ipcChannels.incidents.report, input) as Promise<ReportIncidentResult>,
   update: (input: UpdateIncidentCommand) =>

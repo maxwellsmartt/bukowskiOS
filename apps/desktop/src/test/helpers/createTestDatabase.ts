@@ -17,6 +17,7 @@ import {
   applySchedulingFoundationMigration,
   bootstrapSchedulingFoundation,
 } from "../../../electron/main/services/data/schedulingFoundationBootstrap";
+import { applyOperationalFilesMigration } from "../../../electron/main/services/data/fileUploadService";
 import { applyTrackedSqlMigrations, applyTrackedStep } from "../../../electron/main/services/data/localDatabaseSupport";
 
 type TestDatabase = {
@@ -34,6 +35,7 @@ export const createTestDatabase = (prefix: string): TestDatabase => {
   applyTrackedStep(database, "runtime_admin_foundation_v1", () => applyAdminFoundationMigration(database));
   applyTrackedStep(database, "runtime_scheduling_foundation_v1", () => applySchedulingFoundationMigration(database));
   applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database));
+  applyTrackedStep(database, "runtime_operational_files_v1", () => applyOperationalFilesMigration(database));
   seedFoundationData(database);
   bootstrapAIGatewayFoundation(database);
   ensureProjectShellDefaults(database);

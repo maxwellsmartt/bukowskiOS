@@ -130,6 +130,17 @@ export type AssetLegacySnapshot = {
   hasAccessories: string;
 };
 
+export type AssetFileRow = {
+  id: string;
+  fileType: string;
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  status: "available" | "missing" | "deleted";
+  createdAt: string;
+  isPreviewable: boolean;
+};
+
 export type AssetDetailSnapshot = {
   asset: AssetDetailRow | null;
   legacy: AssetLegacySnapshot | null;
@@ -137,4 +148,5 @@ export type AssetDetailSnapshot = {
   linkedIncidents: AssetLinkedIncidentRow[];
   editor: AssetEditorSnapshot | null;
   scannableCodes: AssetScannableCodeRow[];
+  files: AssetFileRow[];
 };

@@ -438,6 +438,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           setIncidentDetailError(null);
           setIncidentDetailFeedback(null);
         }}
+        onRefresh={reloadIncidentDetail}
         onResolve={async (value) => {
           if (!activeIncidentId) {
             return;

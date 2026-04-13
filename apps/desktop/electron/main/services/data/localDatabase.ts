@@ -22,6 +22,7 @@ import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./admin
 import { createCatalogMutationService } from "./catalogMutationService";
 import { createDataRetentionService, summarizeDataRetention } from "./dataRetentionService";
 import { createFinanceMutationService } from "./financeMutationService";
+import { applyOperationalFilesMigration, createFileUploadService, type FileUploadService } from "./fileUploadService";
 import { createIncidentMutationService } from "./incidentMutationService";
 import { createPackingMutationService } from "./packingMutationService";
 import { cleanupPerformanceFoundationData, seedPerformanceFoundationData } from "./performanceFoundationSeed";
@@ -68,6 +69,7 @@ type LocalDatabaseRuntime = {
   agentMutations: AgentMutationService;
   runtimeDiagnostics: RuntimeDiagnosticsService;
   supportDiagnostics: SupportDiagnosticsService;
+  fileUploads: FileUploadService;
   getDiagnosticsSnapshot: () => AppDiagnosticsSnapshot;
   getSupportSnapshot: () => AppSupportSnapshot;
   createBackupNow: () => AppDiagnosticsSnapshot;
@@ -147,6 +149,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   applyTrackedStep(database, "runtime_admin_foundation_v1", () => applyAdminFoundationMigration(database));
   applyTrackedStep(database, "runtime_scheduling_foundation_v1", () => applySchedulingFoundationMigration(database));
   applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database));
+  applyTrackedStep(database, "runtime_operational_files_v1", () => applyOperationalFilesMigration(database));
   seedFoundationData(database);
   bootstrapAIGatewayFoundation(database);
   ensureProjectShellDefaults(database);
@@ -306,6 +309,9 @@ const createRuntime = (): LocalDatabaseRuntime => {
     getAppInfo,
     runtimeDiagnostics,
   });
+  const fileUploads = createFileUploadService(database, {
+    userDataPath: app.getPath("userData"),
+  });
   const dataRetention = createDataRetentionService(database);
   assistantChatService.reconcileInterruptedThreads();
   try {
@@ -372,6 +378,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     rmaMutations: createRmaMutationService(database),
     runtimeDiagnostics,
     supportDiagnostics,
+    fileUploads,
     getDiagnosticsSnapshot,
     getSupportSnapshot: () => supportDiagnostics.getSupportSnapshot(),
     createBackupNow,

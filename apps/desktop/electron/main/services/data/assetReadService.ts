@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
@@ -283,6 +284,7 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           linkedIncidents: [],
           editor: null,
           scannableCodes: [],
+          files: [],
         };
       }
 
@@ -341,6 +343,35 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
         symbology: string;
         code_value: string;
         is_primary: number;
+      }>;
+
+      const files = db
+        .prepare(
+          `
+            SELECT
+              id,
+              file_type,
+              original_name,
+              mime_type,
+              byte_size,
+              status,
+              created_at,
+              storage_path
+            FROM asset_files
+            WHERE asset_id = ?
+              AND deleted_at IS NULL
+            ORDER BY created_at DESC
+          `,
+        )
+        .all(assetId) as Array<{
+        id: string;
+        file_type: string | null;
+        original_name: string | null;
+        mime_type: string | null;
+        byte_size: number | null;
+        status: string | null;
+        created_at: string;
+        storage_path: string | null;
       }>;
 
       const primaryCodeValue = scannableCodes.find((row) => row.is_primary)?.code_value ?? asset.qr_code_value;
@@ -408,6 +439,21 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           codeValue: row.code_value,
           isPrimary: Boolean(row.is_primary),
         })),
+        files: files.map((row) => {
+          const isMissing = row.status !== "deleted" && row.storage_path ? !fs.existsSync(row.storage_path) : row.status === "missing";
+          const mimeType = row.mime_type?.trim() || "application/octet-stream";
+
+          return {
+            id: row.id,
+            fileType: row.file_type?.trim() || "file",
+            originalName: row.original_name?.trim() || "Attached file",
+            mimeType,
+            byteSize: row.byte_size ?? 0,
+            status: (isMissing ? "missing" : row.status?.trim() || "available") as "available" | "missing" | "deleted",
+            createdAt: row.created_at,
+            isPreviewable: mimeType.startsWith("image/") || mimeType === "application/pdf",
+          };
+        }),
       };
     },
 

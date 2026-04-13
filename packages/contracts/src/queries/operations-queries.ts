@@ -115,6 +115,16 @@ export type IncidentDetailSnapshot = {
     financialStatus: string;
     notes: string | null;
   } | null;
+  files: {
+    id: string;
+    fileType: string;
+    originalName: string;
+    mimeType: string;
+    byteSize: number;
+    status: "available" | "missing" | "deleted";
+    createdAt: string;
+    isPreviewable: boolean;
+  }[];
 };
 
 export type ProjectCardRow = {

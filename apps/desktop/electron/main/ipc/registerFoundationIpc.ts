@@ -147,6 +147,12 @@ type RegisterFoundationIpcOptions = {
     updateAsset: (input: UpdateAssetCommand) => unknown;
     archiveAsset: (input: ArchiveAssetCommand) => unknown;
   };
+  fileUploads: {
+    importAssetFiles: (assetId: string, sourceFilePaths: string[]) => unknown;
+    importIncidentFiles: (incidentId: string, sourceFilePaths: string[]) => unknown;
+    openAssetFile: (fileId: string) => Promise<void>;
+    openIncidentFile: (fileId: string) => Promise<void>;
+  };
   incidentMutations: {
     reportIncident: (input: ReportIncidentCommand) => unknown;
     updateIncident: (input: UpdateIncidentCommand) => unknown;
@@ -202,6 +208,7 @@ export const registerFoundationIpc = ({
   projectMutations,
   catalogMutations,
   assetMutations,
+  fileUploads,
     incidentMutations,
     financeMutations,
     packingMutations,
@@ -355,6 +362,47 @@ export const registerFoundationIpc = ({
   safeHandle(ipcChannels.assets.update, updateAssetSchema, (_event, input) => assetMutations.updateAsset(input));
   safeHandle(ipcChannels.assets.archive, archiveAssetSchema, (_event, input) => assetMutations.archiveAsset(input));
   safeHandleReadWithSchema(
+    ipcChannels.assets.uploadFiles,
+    idReadArgsSchema,
+    async (_event, assetId: string) => {
+      const detail = foundationReads.getAssetDetail(assetId);
+
+      if (!detail.asset) {
+        throw new Error("Asset was not found.");
+      }
+
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: `Attach files to ${detail.asset.name}`,
+        buttonLabel: "Attach files",
+        properties: ["openFile", "multiSelections"],
+        filters: [
+          { name: "Supported files", extensions: ["png", "jpg", "jpeg", "webp", "gif", "heic", "pdf"] },
+          { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "heic"] },
+          { name: "PDF", extensions: ["pdf"] },
+        ],
+      });
+
+      if (canceled || !filePaths.length) {
+        return {
+          uploadedCount: 0,
+          summary: "No asset files were selected.",
+        };
+      }
+
+      return fileUploads.importAssetFiles(assetId, filePaths);
+    },
+    "The app could not attach files to that asset.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.assets.openFile,
+    idReadArgsSchema,
+    async (_event, fileId: string) => {
+      await fileUploads.openAssetFile(fileId);
+      return null;
+    },
+    "The app could not open that asset file.",
+  );
+  safeHandleReadWithSchema(
     ipcChannels.packing.getList,
     packingSlipListReadArgsSchema,
     (_event, query: PackingSlipListQuery | undefined) => foundationReads.getPackingSlips(query),
@@ -422,6 +470,47 @@ export const registerFoundationIpc = ({
   safeHandle(ipcChannels.incidents.report, reportIncidentSchema, (_event, input) => incidentMutations.reportIncident(input));
   safeHandle(ipcChannels.incidents.update, updateIncidentSchema, (_event, input) => incidentMutations.updateIncident(input));
   safeHandle(ipcChannels.incidents.resolve, resolveIncidentSchema, (_event, input) => incidentMutations.resolveIncident(input));
+  safeHandleReadWithSchema(
+    ipcChannels.incidents.uploadFiles,
+    idReadArgsSchema,
+    async (_event, incidentId: string) => {
+      const detail = foundationReads.getIncidentDetail(incidentId);
+
+      if (!detail.incident) {
+        throw new Error("Incident was not found.");
+      }
+
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: `Attach evidence to ${detail.incident.title}`,
+        buttonLabel: "Attach evidence",
+        properties: ["openFile", "multiSelections"],
+        filters: [
+          { name: "Supported files", extensions: ["png", "jpg", "jpeg", "webp", "gif", "heic", "pdf"] },
+          { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "heic"] },
+          { name: "PDF", extensions: ["pdf"] },
+        ],
+      });
+
+      if (canceled || !filePaths.length) {
+        return {
+          uploadedCount: 0,
+          summary: "No incident evidence files were selected.",
+        };
+      }
+
+      return fileUploads.importIncidentFiles(incidentId, filePaths);
+    },
+    "The app could not attach files to that incident.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.incidents.openFile,
+    idReadArgsSchema,
+    async (_event, fileId: string) => {
+      await fileUploads.openIncidentFile(fileId);
+      return null;
+    },
+    "The app could not open that incident file.",
+  );
   safeHandleReadWithSchema(
     ipcChannels.projects.getList,
     projectListReadArgsSchema,

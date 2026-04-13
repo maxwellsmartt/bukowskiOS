@@ -5,6 +5,7 @@ import type { CatalogSnapshot, IncidentDetailSnapshot } from "@contracts";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { openIncidentFile, uploadIncidentFiles } from "./useIncidentsData";
 
 type IncidentDetailPanelProps = {
   detail: IncidentDetailSnapshot;
@@ -13,6 +14,7 @@ type IncidentDetailPanelProps = {
   isSubmitting: boolean;
   users: CatalogSnapshot["users"];
   onClose: () => void;
+  onRefresh: () => void | Promise<void>;
   onResolve: (value: { resolutionNotes?: string; costEstimate?: number; financialStatus?: string; resolvedByUserId?: string }) => Promise<void>;
   onUpdate: (value: {
     title: string;
@@ -46,6 +48,40 @@ const resolveStatusTone = (status: string) => {
   return "warning" as const;
 };
 
+const fileDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "2-digit",
+  year: "numeric",
+});
+
+const formatByteSize = (byteSize: number) => {
+  if (!byteSize) {
+    return "0 B";
+  }
+
+  if (byteSize < 1024) {
+    return `${byteSize} B`;
+  }
+
+  if (byteSize < 1024 * 1024) {
+    return `${(byteSize / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const resolveFileTone = (status: "available" | "missing" | "deleted") => {
+  if (status === "available") {
+    return "success" as const;
+  }
+
+  if (status === "missing") {
+    return "warning" as const;
+  }
+
+  return "critical" as const;
+};
+
 export const IncidentDetailPanel = ({
   detail,
   error,
@@ -53,6 +89,7 @@ export const IncidentDetailPanel = ({
   isSubmitting,
   users,
   onClose,
+  onRefresh,
   onResolve,
   onUpdate,
 }: IncidentDetailPanelProps) => {
@@ -66,6 +103,10 @@ export const IncidentDetailPanel = ({
   const [financialStatus, setFinancialStatus] = useState("");
   const [notes, setNotes] = useState("");
   const [resolutionNotes, setResolutionNotes] = useState("");
+  const [filesFeedback, setFilesFeedback] = useState<string | null>(null);
+  const [filesError, setFilesError] = useState<string | null>(null);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [openingFileId, setOpeningFileId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!incident) {
@@ -126,6 +167,85 @@ export const IncidentDetailPanel = ({
             <span className="summary-value">{incident.resolvedAt ?? "Still open"}</span>
           </div>
         </div>
+
+        <SurfaceCard
+          title="Evidence files"
+          subtitle="Attach photos, PDFs or reports linked to this incident."
+          aside={
+            <button
+              className="surface-card-action-text"
+              disabled={isUploadingFiles}
+              onClick={() => {
+                setFilesError(null);
+                setFilesFeedback(null);
+                void (async () => {
+                  try {
+                    setIsUploadingFiles(true);
+                    const result = await uploadIncidentFiles(incident.id);
+                    setFilesFeedback(result.summary);
+                    await onRefresh();
+                  } catch (nextError) {
+                    setFilesError(nextError instanceof Error ? nextError.message : "Unable to attach files to this incident.");
+                  } finally {
+                    setIsUploadingFiles(false);
+                  }
+                })();
+              }}
+              type="button"
+            >
+              {isUploadingFiles ? "Uploading..." : "Attach evidence"}
+            </button>
+          }
+        >
+          {detail.files.length ? (
+            <div className="entity-file-list">
+              {detail.files.map((file) => (
+                <div key={file.id} className="entity-file-row">
+                  <div className="entity-file-main">
+                    <div className="entity-file-head">
+                      <span className="entity-file-name">{file.originalName}</span>
+                      <StatusBadge tone={resolveFileTone(file.status)}>{file.status}</StatusBadge>
+                      {file.isPreviewable ? <StatusBadge tone="info">previewable</StatusBadge> : null}
+                    </div>
+                    <div className="entity-file-meta">
+                      <span>{file.fileType}</span>
+                      <span>{formatByteSize(file.byteSize)}</span>
+                      <span>{fileDateFormatter.format(new Date(file.createdAt))}</span>
+                    </div>
+                  </div>
+                  <div className="entity-file-actions">
+                    <button
+                      className="ghost-control"
+                      disabled={file.status !== "available" || openingFileId === file.id}
+                      onClick={() => {
+                        setFilesError(null);
+                        void (async () => {
+                          try {
+                            setOpeningFileId(file.id);
+                            await openIncidentFile(file.id);
+                          } catch (nextError) {
+                            setFilesError(nextError instanceof Error ? nextError.message : "Unable to open that incident file.");
+                            await onRefresh();
+                          } finally {
+                            setOpeningFileId(null);
+                          }
+                        })();
+                      }}
+                      type="button"
+                    >
+                      {openingFileId === file.id ? "Opening..." : "Open"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">No evidence files attached yet.</div>
+          )}
+        </SurfaceCard>
+
+        {filesFeedback ? <div className="action-feedback action-feedback-success">{filesFeedback}</div> : null}
+        {filesError ? <div className="action-feedback action-feedback-error">{filesError}</div> : null}
 
         <div className="action-form-grid">
           <label className="action-field action-field-wide">

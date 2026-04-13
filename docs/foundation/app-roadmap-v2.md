@@ -141,7 +141,30 @@
   - revisión final de jerarquía, densidad y relevancia de información en el PDF de packing
 
 ### Slice O3 — Uploads para Assets e Incidents
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - permitir adjuntar evidencia operativa real a `Assets` e `Incidents` sin salir del app
+- Área:
+  - backend / frontend
+- Qué cambió:
+  - nueva migración runtime `runtime_operational_files_v1` para enriquecer `asset_files` e `incident_files` con metadata local
+  - nuevo `fileUploadService` para importar archivos al `userData` del app y abrirlos de forma segura
+  - bridge nuevo para:
+    - adjuntar archivos a assets
+    - adjuntar evidencia a incidents
+    - abrir archivos guardados
+  - `Asset detail` e `Incident detail` ahora muestran los archivos adjuntos con estado, peso y fecha
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - pruebas nuevas del servicio de archivos y de lectura de estado `missing`
+  - nuevos botones `Attach files` / `Attach evidence` visibles en detail views
+- Riesgos remanentes:
+  - `medio`: este corte abre y lista archivos, pero todavía no incluye preview inline rico de imágenes/PDFs
+  - `medio`: todavía no hay gestión de borrado/replace de archivos adjuntos
+  - `bajo`: el cleanup en retention queda listo para un follow-up cuando se active borrado suave de archivos operativos
 
 ### Slice O4 — Timeline enriquecida v1
 - Estado: `planned`
