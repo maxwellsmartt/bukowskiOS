@@ -205,6 +205,16 @@ export type CatalogCrewRow = {
   notes: string;
   isActive: boolean;
   linkedUserId: string | null;
+  activeAssignments: Array<{
+    projectId: string;
+    project: string;
+    unitId: string | null;
+    unit: string;
+    departmentId: string | null;
+    department: string | null;
+    startDate: string | null;
+    endDate: string | null;
+  }>;
 };
 
 export type CatalogClientRow = {
@@ -251,6 +261,12 @@ export type CatalogAssetOptionRow = {
   code: string;
   category: string;
   status: string;
+  currentProjectId: string | null;
+  currentProject: string | null;
+  currentUnitId: string | null;
+  currentUnit: string | null;
+  currentDepartmentId: string | null;
+  currentDepartment: string | null;
 };
 
 export type CatalogKitRow = {
@@ -295,6 +311,8 @@ export type ProjectCreationConflictItem = {
   conflictingProject: string;
   conflictingUnitId: string | null;
   conflictingUnit: string;
+  conflictingDepartmentId: string | null;
+  conflictingDepartment: string | null;
   overlapStart: string;
   overlapEnd: string;
 };
@@ -368,6 +386,14 @@ export type ProjectUnitCrewAssignmentRow = {
   notes: string;
 };
 
+export type ProjectUnitWindowRow = {
+  id: string;
+  startDate: string | null;
+  endDate: string | null;
+  sortOrder: number;
+  label: string | null;
+};
+
 export type ProjectUnitRow = {
   id: string;
   code: string;
@@ -378,6 +404,8 @@ export type ProjectUnitRow = {
   colorKey: string | null;
   startDate: string | null;
   endDate: string | null;
+  windows: ProjectUnitWindowRow[];
+  departments: string[];
   notes: string;
   conflictCount: number;
   crewConflictCount: number;

@@ -245,23 +245,52 @@ app.whenReady().then(() => {
         input.generalInfo.productionCompanyName?.trim() ??
         "No production company linked";
       const conflicts = localDatabase.foundationReads.getProjectCreationConflicts(input);
+      const departmentNameById = new Map(catalog.departments.map((row) => [row.id, row.name] as const));
+      const summarizeUnitDepartments = (unit: CreateProjectBlueprintInput["mainUnit"] | CreateProjectBlueprintInput["additionalUnits"][number]) =>
+        (unit.departmentIds ?? []).map((departmentId) => departmentNameById.get(departmentId) ?? departmentId);
+      const summarizeBucketAssets = (
+        unit: CreateProjectBlueprintInput["mainUnit"] | CreateProjectBlueprintInput["additionalUnits"][number],
+      ) => [...new Set((unit.unitDepartments ?? []).flatMap((bucket) => bucket.assetIds))];
+      const summarizeBucketCrew = (
+        unit: CreateProjectBlueprintInput["mainUnit"] | CreateProjectBlueprintInput["additionalUnits"][number],
+      ) =>
+        (unit.unitDepartments ?? []).flatMap((bucket) =>
+          bucket.crewAssignments.filter((assignment) => assignment.crewMemberId?.trim()),
+        );
+      const packingSourceLabels = [
+        ...(input.mainUnit.unitDepartments ?? []).map((bucket) =>
+          bucket.packingSeed?.mode && bucket.packingSeed.mode !== "none"
+            ? `${departmentNameById.get(bucket.departmentId) ?? bucket.departmentId} · ${
+                bucket.packingSeed.mode === "existing" ? `Staging slip ${bucket.packingSeed.packingSlipId}` : "Draft packing seed"
+              }`
+            : null,
+        ),
+        ...input.additionalUnits.flatMap((unit) =>
+          (unit.unitDepartments ?? []).map((bucket) =>
+            bucket.packingSeed?.mode && bucket.packingSeed.mode !== "none"
+              ? `${unit.name.trim() || "Additional Unit"} / ${departmentNameById.get(bucket.departmentId) ?? bucket.departmentId} · ${
+                  bucket.packingSeed.mode === "existing" ? `Staging slip ${bucket.packingSeed.packingSlipId}` : "Draft packing seed"
+                }`
+              : null,
+          ),
+        ),
+      ].filter((value): value is string => Boolean(value));
       const additionalUnits = input.additionalUnits.map((unit) => ({
         name: unit.name.trim() || unit.suggestedPreset?.trim() || "Additional Unit",
         dateLabel:
-          unit.startDate || unit.endDate ? `${unit.startDate ?? "Open"} - ${unit.endDate ?? "Open"}` : "No dates selected",
-        assetCount: unit.assetIds.length,
-        crewCount: unit.crewAssignments.length,
-        assetNames: unit.assetIds.map((assetId) => assetNameById.get(assetId) ?? assetId),
-        crewNames: unit.crewAssignments.map((assignment) => crewNameById.get(assignment.crewMemberId) ?? assignment.crewMemberId),
+          unit.windows.length
+            ? unit.windows
+                .map((window) => `${window.startDate ?? "Open"} - ${window.endDate ?? "Open"}`)
+                .slice(0, 3)
+                .join(", ")
+            : "No dates selected",
+        assetCount: summarizeBucketAssets(unit).length,
+        crewCount: summarizeBucketCrew(unit).length,
+        assetNames: summarizeBucketAssets(unit).map((assetId) => assetNameById.get(assetId) ?? assetId),
+        crewNames: summarizeBucketCrew(unit).map((assignment) => crewNameById.get(assignment.crewMemberId) ?? assignment.crewMemberId),
       }));
-      const packingSourceLabel =
-        input.packingSelection.mode === "existing"
-          ? `Staging slip ${input.packingSelection.packingSlipId}`
-          : input.packingSelection.mode === "draft"
-            ? "Draft staging slip"
-            : "No packing source";
       const pdf = await documentGeneration.createProjectSetupPdf({
-        projectCode: input.generalInfo.code.trim().toUpperCase(),
+        projectCode: input.generalInfo.code?.trim().toUpperCase() || "Auto-generated",
         projectName: input.generalInfo.name.trim(),
         status: input.generalInfo.status?.trim() || "Prep",
         windowLabel:
@@ -275,15 +304,15 @@ app.whenReady().then(() => {
         clientName,
         productionCompanyName,
         description: input.generalInfo.description?.trim() ?? "",
-        packingSourceLabel,
+        packingSourceLabel: packingSourceLabels.length ? packingSourceLabels.join(" · ") : "No packing configured yet",
         totals: {
-          assetCount: input.mainUnit.assetIds.length,
-          crewCount: input.mainUnit.crewAssignments.length,
+          assetCount: summarizeBucketAssets(input.mainUnit).length,
+          crewCount: summarizeBucketCrew(input.mainUnit).length,
           additionalUnitCount: input.additionalUnits.length,
         },
         mainUnit: {
-          assetNames: input.mainUnit.assetIds.map((assetId) => assetNameById.get(assetId) ?? assetId),
-          crewNames: input.mainUnit.crewAssignments.map((assignment) => crewNameById.get(assignment.crewMemberId) ?? assignment.crewMemberId),
+          assetNames: summarizeBucketAssets(input.mainUnit).map((assetId) => assetNameById.get(assetId) ?? assetId),
+          crewNames: summarizeBucketCrew(input.mainUnit).map((assignment) => crewNameById.get(assignment.crewMemberId) ?? assignment.crewMemberId),
         },
         additionalUnits,
         conflictGroups: conflicts.groups.map((group) => ({
@@ -291,7 +320,10 @@ app.whenReady().then(() => {
           items: group.items.map((item) => ({
             resourceLabel: item.resourceLabel,
             conflictingProject: item.conflictingProject,
-            conflictingUnit: item.conflictingUnit,
+            conflictingUnit:
+              item.conflictingUnit && item.conflictingDepartment
+                ? `${item.conflictingUnit} / ${item.conflictingDepartment}`
+                : item.conflictingUnit ?? item.conflictingDepartment,
             overlapLabel: `${item.overlapStart} - ${item.overlapEnd}`,
           })),
         })),

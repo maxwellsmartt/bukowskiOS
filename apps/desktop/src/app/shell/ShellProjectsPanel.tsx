@@ -97,7 +97,7 @@ export const ShellProjectsPanel = () => {
       <div className="shell-projects-header">
         <span className="shell-nav-label">Projects</span>
         <button
-          className="shell-project-action"
+          className="shell-project-create-button"
           onClick={() => {
             setEditingProjectId(null);
             setWizardOpen(true);
@@ -107,6 +107,7 @@ export const ShellProjectsPanel = () => {
           type="button"
         >
           <Plus size={12} />
+          <span>New project</span>
         </button>
       </div>
 
@@ -177,13 +178,20 @@ export const ShellProjectsPanel = () => {
             </div>
 
             <div className="shell-project-item-actions" onClick={(event) => event.stopPropagation()}>
-              <button className="shell-project-action" onClick={() => beginEdit(project.id)} title="Edit project" type="button">
+              <button
+                aria-label={`Edit ${project.name}`}
+                className="shell-project-action"
+                data-tooltip="Edit project"
+                onClick={() => beginEdit(project.id)}
+                type="button"
+              >
                 <Pencil size={12} />
               </button>
               <button
-                className="shell-project-action"
+                aria-label={`Delete ${project.name}`}
+                className="shell-project-action is-danger"
+                data-tooltip="Delete project"
                 onClick={() => setPendingDeleteProject({ id: project.id, name: project.name })}
-                title="Delete project"
                 type="button"
               >
                 <Trash2 size={12} />

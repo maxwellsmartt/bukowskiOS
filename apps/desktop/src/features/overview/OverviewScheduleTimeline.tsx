@@ -19,6 +19,7 @@ import type {
   ScheduleTimelineProjectLane,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
+  ScheduleTimelineSegment,
   ScheduleTimelineSnapshot,
   ScheduleTimelineUnitLane,
 } from "@contracts";
@@ -158,6 +159,7 @@ type TimelineGridProps = {
 
 type TimelineBarGeometry = {
   left: number;
+  segment: ScheduleTimelineSegment;
   palette: (typeof colorMap)[keyof typeof colorMap];
   width: number;
 };
@@ -355,10 +357,11 @@ const resolveBarGeometry = (
   rangeStart: string,
   rangeEnd: string,
   paletteOverride?: (typeof colorMap)[keyof typeof colorMap],
+  segment?: ScheduleTimelineSegment,
 ): TimelineBarGeometry | null => {
   const totalDays = Math.max(diffDaysInclusive(rangeStart, rangeEnd), 1);
-  const startDate = row.startDate ?? rangeStart;
-  const endDate = row.endDate ?? rangeEnd;
+  const startDate = segment?.startDate ?? row.startDate ?? rangeStart;
+  const endDate = segment?.endDate ?? row.endDate ?? rangeEnd;
 
   if (endDate < rangeStart || startDate > rangeEnd) {
     return null;
@@ -371,9 +374,59 @@ const resolveBarGeometry = (
 
   return {
     left: (leftDays / totalDays) * 100,
+    segment:
+      segment ??
+      ({
+        id: `${startDate}-${endDate}`,
+        startDate,
+        endDate,
+        kind: "project_main",
+        label: null,
+      } satisfies ScheduleTimelineSegment),
     palette: paletteOverride ?? resolveTimelinePalette(row.colorKey),
     width: Math.max((visibleDays / totalDays) * 100, 0.9),
   };
+};
+
+const resolveSegmentGeometries = (
+  row: TimelineBarRow & { segments?: ScheduleTimelineSegment[] },
+  rangeStart: string,
+  rangeEnd: string,
+  paletteOverride?: (typeof colorMap)[keyof typeof colorMap],
+) => {
+  const segments = row.segments?.length
+    ? row.segments
+    : [
+        {
+          id: `${row.startDate ?? "open"}-${row.endDate ?? "open"}`,
+          startDate: row.startDate,
+          endDate: row.endDate,
+          kind: "project_main" as const,
+          label: null,
+        },
+      ];
+
+  return segments
+    .map((segment) => resolveBarGeometry(row, rangeStart, rangeEnd, paletteOverride, segment))
+    .filter((geometry): geometry is TimelineBarGeometry => Boolean(geometry));
+};
+
+const formatSegmentsLabel = (segments: ScheduleTimelineSegment[]) => {
+  const visible = segments.filter((segment) => segment.startDate || segment.endDate);
+  if (!visible.length) {
+    return "Dates pending";
+  }
+
+  const labels = visible.map((segment) => {
+    const prefix = segment.kind === "preproduction" ? "Pre · " : "";
+    return `${prefix}${formatRangeLabel(segment.startDate, segment.endDate)}`;
+  });
+
+  if (labels.length === 1) {
+    return labels[0] ?? "Dates pending";
+  }
+
+  return `${labels.length} windows · ${labels.slice(0, 3).join(", ")}${labels.length > 3 ? "…" : ""}`;
 };
 
 const resolveBand = (startDate: string, endDate: string, rangeStart: string, rangeEnd: string, label: string): TimelineBand => {
@@ -631,7 +684,7 @@ const TimelineLane = ({
   scale: ScheduleTimelineScale;
 }) => {
   const projectPalette = resolveTimelinePalette(project.colorKey);
-  const projectBar = resolveBarGeometry(project, rangeStart, rangeEnd, projectPalette);
+  const projectBars = resolveSegmentGeometries(project, rangeStart, rangeEnd, projectPalette);
 
   return (
     <div className="timeline-lane-block">
@@ -652,7 +705,7 @@ const TimelineLane = ({
                       <StatusBadge tone={resolveStatusTone(project.status)}>{project.status}</StatusBadge>
                     </div>
                     <span className="timeline-lane-subtitle">
-                      {formatRangeLabel(project.startDate, project.endDate)}
+                      {formatSegmentsLabel(project.segments)}
                       {project.units.length ? ` · ${project.units.length} units` : ""}
                     </span>
                     <TimelineSignalRow
@@ -677,22 +730,47 @@ const TimelineLane = ({
               bands={bands}
               scale={scale}
             />
-            {projectBar ? (
+            {projectBars.map((projectBar) => (
               <div
-                className={`timeline-bar${project.conflictCount ? " timeline-bar-conflict" : ""}`}
-                onPointerEnter={(event) => onBarHover(event, project)}
+                key={projectBar.segment.id}
+                className={`timeline-bar${project.conflictCount ? " timeline-bar-conflict" : ""}${projectBar.segment.kind === "preproduction" ? " timeline-bar-preproduction" : ""}`}
+                onPointerEnter={(event) =>
+                  onBarHover(
+                    event,
+                    {
+                      ...project,
+                      startDate: projectBar.segment.startDate,
+                      endDate: projectBar.segment.endDate,
+                      status: projectBar.segment.kind === "preproduction" ? "Pre-production" : project.status,
+                    },
+                    projectBar.segment.label ?? undefined,
+                  )
+                }
                 onPointerLeave={onBarLeave}
-                onPointerMove={(event) => onBarHover(event, project)}
+                onPointerMove={(event) =>
+                  onBarHover(
+                    event,
+                    {
+                      ...project,
+                      startDate: projectBar.segment.startDate,
+                      endDate: projectBar.segment.endDate,
+                      status: projectBar.segment.kind === "preproduction" ? "Pre-production" : project.status,
+                    },
+                    projectBar.segment.label ?? undefined,
+                  )
+                }
                 style={
                   {
-                    "--timeline-bar-fill": projectBar.palette.projectFill,
+                    "--timeline-bar-fill": projectBar.segment.kind === "preproduction" ? withAlpha(projectBar.palette.projectFill, 0.55) : projectBar.palette.projectFill,
                     "--timeline-bar-focus-ring": projectBar.palette.focusRing,
                     left: `${projectBar.left}%`,
                     width: `${projectBar.width}%`,
                   } as CSSProperties
                 }
-              />
-            ) : null}
+              >
+                {projectBar.segment.label ? <span className="timeline-bar-label">{projectBar.segment.label}</span> : null}
+              </div>
+            ))}
             <TimelineIncidentMarkers
               markers={project.incidentMarkers}
               onHover={(event, title, severity, reportedAt) =>
@@ -720,7 +798,7 @@ const TimelineLane = ({
         <div className="timeline-unit-list">
           {project.units.map((unit, unitIndex) => {
             const unitPalette = deriveUnitPalette(projectPalette, unitIndex);
-            const unitBar = resolveBarGeometry(unit, rangeStart, rangeEnd, unitPalette);
+            const unitBars = resolveSegmentGeometries(unit, rangeStart, rangeEnd, unitPalette);
 
             return (
               <div key={unit.id} className="timeline-lane-row timeline-lane-row-unit">
@@ -742,7 +820,7 @@ const TimelineLane = ({
                       <strong className="timeline-lane-title">{unit.name}</strong>
                       <StatusBadge tone={resolveStatusTone(unit.status)}>{unit.status}</StatusBadge>
                     </div>
-                    <span className="timeline-lane-subtitle">{formatRangeLabel(unit.startDate, unit.endDate)}</span>
+                    <span className="timeline-lane-subtitle">{formatSegmentsLabel(unit.segments)}</span>
                     <TimelineSignalRow
                       assets={unit.assignedAssetCount}
                       conflicts={unit.conflictCount}
@@ -765,12 +843,33 @@ const TimelineLane = ({
                       bands={bands}
                       scale={scale}
                     />
-                    {unitBar ? (
+                    {unitBars.map((unitBar) => (
                       <div
+                        key={unitBar.segment.id}
                         className={`timeline-bar timeline-bar-unit${unit.conflictCount ? " timeline-bar-conflict" : ""}`}
-                        onPointerEnter={(event) => onBarHover(event, unit, project.name)}
+                        onPointerEnter={(event) =>
+                          onBarHover(
+                            event,
+                            {
+                              ...unit,
+                              startDate: unitBar.segment.startDate,
+                              endDate: unitBar.segment.endDate,
+                            },
+                            project.name,
+                          )
+                        }
                         onPointerLeave={onBarLeave}
-                        onPointerMove={(event) => onBarHover(event, unit, project.name)}
+                        onPointerMove={(event) =>
+                          onBarHover(
+                            event,
+                            {
+                              ...unit,
+                              startDate: unitBar.segment.startDate,
+                              endDate: unitBar.segment.endDate,
+                            },
+                            project.name,
+                          )
+                        }
                         style={
                           {
                             "--timeline-bar-fill": unitBar.palette.unitFill,
@@ -780,7 +879,7 @@ const TimelineLane = ({
                           } as CSSProperties
                         }
                       />
-                    ) : null}
+                    ))}
                     <TimelineIncidentMarkers
                       markers={unit.incidentMarkers}
                       onHover={(event, title, severity, reportedAt) =>

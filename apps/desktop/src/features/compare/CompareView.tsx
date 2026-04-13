@@ -1,4 +1,4 @@
-import { ArrowLeft, Scale, Trash2, X } from "lucide-react";
+import { ArrowLeft, Scale, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -214,11 +214,12 @@ export const CompareView = () => {
             aside={
               <button
                 aria-label={`Remove ${card.item.label} from compare`}
-                className="surface-card-action"
+                className="surface-card-action is-danger"
+                data-tooltip={`Remove ${card.item.label}`}
                 onClick={() => removeItem(card.item.entityType, card.item.id)}
                 type="button"
               >
-                <X size={14} />
+                <Trash2 size={14} />
               </button>
             }
           >

@@ -100,14 +100,14 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
         <button
           aria-label={syncState.label}
           className={`icon-ghost-control sync-control ${syncState.className}`}
+          data-tooltip={syncState.label}
           onClick={() => navigate("/settings/sync")}
-          title={syncState.label}
           type="button"
         >
           <RefreshCcw size={14} />
           {syncState.badge ? <span className="sync-control-badge">{syncState.badge}</span> : null}
         </button>
-        <button aria-label="Alerts" className="icon-ghost-control" type="button">
+        <button aria-label="Alerts" className="icon-ghost-control" data-tooltip="Alerts" type="button">
           <Bell size={14} />
         </button>
       </div>

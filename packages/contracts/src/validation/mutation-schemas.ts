@@ -368,6 +368,26 @@ export const updateProjectSchema = createProjectSchema.extend({
   projectId: nonEmptyString,
 });
 
+export const projectBlueprintGeneralInfoSchema = z
+  .object({
+    code: optionalTrimmedString,
+    name: nonEmptyString,
+    clientId: optionalTrimmedString,
+    clientName: optionalTrimmedString,
+    productionCompanyId: optionalTrimmedString,
+    productionCompanyName: optionalTrimmedString,
+    status: nonEmptyString,
+    description: optionalTrimmedString,
+    startDate: nonEmptyString,
+    endDate: nonEmptyString,
+    hasPreproduction: z.boolean().optional(),
+    preproductionStartDate: optionalTrimmedString,
+    preproductionEndDate: optionalTrimmedString,
+    colorKey: nonEmptyString,
+    departmentIds: z.array(nonEmptyString),
+  })
+  .strict();
+
 export const deleteProjectSchema = z
   .object({
     projectId: nonEmptyString,
@@ -432,23 +452,7 @@ const projectBlueprintCrewAssignmentSchema = z
   })
   .strict();
 
-const projectBlueprintUnitSchema = z
-  .object({
-    id: optionalTrimmedString,
-    code: optionalTrimmedString,
-    name: nonEmptyString,
-    suggestedPreset: optionalTrimmedString,
-    sortOrder: z.number().int().optional(),
-    colorKey: optionalTrimmedString,
-    startDate: optionalTrimmedString,
-    endDate: optionalTrimmedString,
-    notes: optionalTrimmedString,
-    assetIds: z.array(nonEmptyString),
-    crewAssignments: z.array(projectBlueprintCrewAssignmentSchema),
-  })
-  .strict();
-
-const projectBlueprintPackingSelectionSchema = z.discriminatedUnion("mode", [
+const projectBlueprintPackingSeedSchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("none") }).strict(),
   z
     .object({
@@ -460,19 +464,51 @@ const projectBlueprintPackingSelectionSchema = z.discriminatedUnion("mode", [
     .object({
       mode: z.literal("draft"),
       label: optionalTrimmedString,
-      departmentId: optionalTrimmedString,
       responsibleUserId: optionalTrimmedString,
       notes: optionalTrimmedString,
     })
     .strict(),
 ]);
 
+const projectBlueprintUnitWindowSchema = z
+  .object({
+    id: optionalTrimmedString,
+    startDate: optionalTrimmedString,
+    endDate: optionalTrimmedString,
+    sortOrder: z.number().int().optional(),
+    label: optionalTrimmedString,
+  })
+  .strict();
+
+const projectBlueprintUnitDepartmentSchema = z
+  .object({
+    departmentId: nonEmptyString,
+    assetIds: z.array(nonEmptyString),
+    crewAssignments: z.array(projectBlueprintCrewAssignmentSchema),
+    packingSeed: projectBlueprintPackingSeedSchema.optional(),
+  })
+  .strict();
+
+const projectBlueprintUnitSchema = z
+  .object({
+    id: optionalTrimmedString,
+    code: optionalTrimmedString,
+    name: nonEmptyString,
+    suggestedPreset: optionalTrimmedString,
+    sortOrder: z.number().int().optional(),
+    colorKey: optionalTrimmedString,
+    windows: z.array(projectBlueprintUnitWindowSchema),
+    departmentIds: z.array(nonEmptyString),
+    unitDepartments: z.array(projectBlueprintUnitDepartmentSchema),
+    notes: optionalTrimmedString,
+  })
+  .strict();
+
 export const createProjectBlueprintSchema = z
   .object({
-    generalInfo: createProjectSchema,
+    generalInfo: projectBlueprintGeneralInfoSchema,
     mainUnit: projectBlueprintUnitSchema,
     additionalUnits: z.array(projectBlueprintUnitSchema),
-    packingSelection: projectBlueprintPackingSelectionSchema,
   })
   .strict();
 

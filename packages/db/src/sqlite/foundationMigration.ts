@@ -8,6 +8,8 @@ import aiProviderFoundationSql from "../migrations/0007_ai_provider_foundation.s
 import assistantChatMemoryFoundationSql from "../migrations/0008_assistant_chat_memory_foundation.sql?raw";
 import migrationTrackingSql from "../migrations/0009_migration_tracking.sql?raw";
 import projectCreationWizardSql from "../migrations/0010_project_creation_wizard.sql?raw";
+import projectUnitWindowsSql from "../migrations/0011_project_unit_windows.sql?raw";
+import projectDepartmentsMatrixSql from "../migrations/0012_project_departments_matrix.sql?raw";
 
 const foundationMigrations = [
   { version: "0001_foundation", sql: foundationCoreSql },
@@ -20,6 +22,8 @@ const foundationMigrations = [
   { version: "0008_assistant_chat_memory_foundation", sql: assistantChatMemoryFoundationSql },
   { version: "0009_migration_tracking", sql: migrationTrackingSql },
   { version: "0010_project_creation_wizard", sql: projectCreationWizardSql },
+  { version: "0011_project_unit_windows", sql: projectUnitWindowsSql },
+  { version: "0012_project_departments_matrix", sql: projectDepartmentsMatrixSql },
 ] as const;
 
 const foundationMigrationSql = foundationMigrations.map((migration) => migration.sql).join("\n\n");

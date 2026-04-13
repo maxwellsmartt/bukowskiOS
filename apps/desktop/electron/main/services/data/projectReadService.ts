@@ -69,17 +69,33 @@ type UnitConflictSnapshot = {
   conflictSummary: string | null;
 };
 
-type ProjectBlueprintResolvedUnit = {
-  name: string;
-  windowStart: string | null;
-  windowEnd: string | null;
+type ProjectBlueprintResolvedBucket = {
+  unitName: string;
+  departmentId: string;
+  departmentName: string;
+  windows: Array<{
+    startDate: string | null;
+    endDate: string | null;
+  }>;
   assetIds: string[];
   crewAssignments: Array<{
     crewMemberId: string;
     crewMemberName: string;
-    windowStart: string | null;
-    windowEnd: string | null;
+    windows: Array<{
+      startDate: string | null;
+      endDate: string | null;
+    }>;
   }>;
+};
+
+type ProjectBlueprintResolvedUnit = {
+  name: string;
+  windows: Array<{
+    startDate: string | null;
+    endDate: string | null;
+  }>;
+  departments: string[];
+  buckets: ProjectBlueprintResolvedBucket[];
 };
 
 const uniqueStrings = (values: Array<string | null | undefined>) =>
@@ -138,6 +154,33 @@ const resolveBlueprintWindowBounds = (
   start: startDate ?? fallbackStartDate ?? null,
   end: endDate ?? fallbackEndDate ?? null,
 });
+
+const windowsOverlap = (
+  leftWindows: Array<{ startDate: string | null; endDate: string | null }>,
+  rightWindows: Array<{ startDate: string | null; endDate: string | null }>,
+) =>
+  leftWindows.some((leftWindow) =>
+    rightWindows.some((rightWindow) => datesOverlap(leftWindow.startDate, leftWindow.endDate, rightWindow.startDate, rightWindow.endDate)),
+  );
+
+const overlapWindow = (
+  leftWindows: Array<{ startDate: string | null; endDate: string | null }>,
+  rightWindows: Array<{ startDate: string | null; endDate: string | null }>,
+) =>
+  leftWindows.flatMap((leftWindow) =>
+    rightWindows
+      .filter((rightWindow) => datesOverlap(leftWindow.startDate, leftWindow.endDate, rightWindow.startDate, rightWindow.endDate))
+      .map((rightWindow) => ({
+        startDate:
+          leftWindow.startDate && rightWindow.startDate && leftWindow.startDate > rightWindow.startDate
+            ? leftWindow.startDate
+            : rightWindow.startDate ?? leftWindow.startDate ?? "",
+        endDate:
+          leftWindow.endDate && rightWindow.endDate && leftWindow.endDate < rightWindow.endDate
+            ? leftWindow.endDate
+            : rightWindow.endDate ?? leftWindow.endDate ?? "",
+      })),
+  )[0] ?? { startDate: "", endDate: "" };
 
 const buildCrewConflictMap = (rows: CrewAssignmentConflictRow[]) => {
   const conflicts = new Map<string, Set<string>>();
@@ -198,6 +241,9 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             projects.color_key AS project_color_key,
             projects.start_date AS project_start_date,
             projects.end_date AS project_end_date,
+            projects.has_preproduction AS project_has_preproduction,
+            projects.preproduction_start_date AS project_preproduction_start_date,
+            projects.preproduction_end_date AS project_preproduction_end_date,
             project_units.id AS unit_id,
             project_units.code AS unit_code,
             project_units.name AS unit_name,
@@ -223,6 +269,9 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       project_color_key: string | null;
       project_start_date: string | null;
       project_end_date: string | null;
+      project_has_preproduction: number;
+      project_preproduction_start_date: string | null;
+      project_preproduction_end_date: string | null;
       unit_id: string | null;
       unit_code: string | null;
       unit_name: string | null;
@@ -233,6 +282,35 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       unit_start_date: string | null;
       unit_end_date: string | null;
     }>;
+
+    const unitWindows = db
+      .prepare(
+        `
+          SELECT
+            id,
+            project_unit_id,
+            start_date,
+            end_date,
+            sort_order,
+            label
+          FROM project_unit_windows
+          ORDER BY project_unit_id, sort_order, start_date, end_date
+        `,
+      )
+      .all() as Array<{
+      id: string;
+      project_unit_id: string;
+      start_date: string | null;
+      end_date: string | null;
+      sort_order: number;
+      label: string | null;
+    }>;
+    const unitWindowsByUnitId = new Map<string, typeof unitWindows>();
+    unitWindows.forEach((row) => {
+      const list = unitWindowsByUnitId.get(row.project_unit_id) ?? [];
+      list.push(row);
+      unitWindowsByUnitId.set(row.project_unit_id, list);
+    });
 
     const projectMap = new Map<
       string,
@@ -245,6 +323,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         colorKey: string | null;
         startDate: string | null;
         endDate: string | null;
+        segments: ScheduleTimelineSnapshot["projects"][number]["segments"];
         activeUnitCount: number;
         activeIncidentCount: number;
         assignedAssetCount: number;
@@ -269,6 +348,26 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           colorKey: row.project_color_key,
           startDate: row.project_start_date,
           endDate: row.project_end_date,
+          segments: [
+            {
+              id: `${row.project_id}-main`,
+              startDate: row.project_start_date,
+              endDate: row.project_end_date,
+              kind: "project_main",
+              label: null,
+            },
+            ...(row.project_has_preproduction && row.project_preproduction_start_date && row.project_preproduction_end_date
+              ? [
+                  {
+                    id: `${row.project_id}-pre`,
+                    startDate: row.project_preproduction_start_date,
+                    endDate: row.project_preproduction_end_date,
+                    kind: "preproduction" as const,
+                    label: "Pre",
+                  },
+                ]
+              : []),
+          ],
           activeUnitCount: 0,
           activeIncidentCount: 0,
           assignedAssetCount: 0,
@@ -296,6 +395,16 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           projectEntry.activeUnitCount += 1;
         }
 
+        const unitSegments =
+          (unitWindowsByUnitId.get(row.unit_id) ?? []).map((window) => ({
+            id: window.id,
+            startDate: window.start_date,
+            endDate: window.end_date,
+            kind: "unit_window" as const,
+            label: window.label,
+          })) ||
+          [];
+
         projectEntry.units.push({
           id: row.unit_id,
           code: row.unit_code ?? "UNIT",
@@ -305,6 +414,18 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           colorKey: row.unit_color_key,
           startDate: row.unit_start_date,
           endDate: row.unit_end_date,
+          segments:
+            unitSegments.length > 0
+              ? unitSegments
+              : [
+                  {
+                    id: `${row.unit_id}-legacy-window`,
+                    startDate: row.unit_start_date,
+                    endDate: row.unit_end_date,
+                    kind: "unit_window" as const,
+                    label: null,
+                  },
+                ],
           sortOrder: row.unit_sort_order ?? 0,
           activeIncidentCount: 0,
           assignedAssetCount: 0,
@@ -571,12 +692,21 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
               SELECT group_concat(name, ', ')
               FROM (
                 SELECT DISTINCT departments.name AS name
+                FROM project_departments
+                JOIN departments ON departments.id = project_departments.department_id
+                WHERE project_departments.project_id = projects.id
+                ORDER BY departments.name
+              )
+            ), COALESCE((
+              SELECT group_concat(name, ', ')
+              FROM (
+                SELECT DISTINCT departments.name AS name
                 FROM asset_assignments
                 JOIN departments ON departments.id = asset_assignments.department_id
                 WHERE asset_assignments.project_id = projects.id
                 ORDER BY departments.name
               )
-            ), '—') AS departments,
+            ), '—')) AS departments,
             COALESCE((
               SELECT SUM(cost_estimate)
               FROM incidents
@@ -692,12 +822,21 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
               SELECT group_concat(name, ', ')
               FROM (
                 SELECT DISTINCT departments.name AS name
+                FROM project_departments
+                JOIN departments ON departments.id = project_departments.department_id
+                WHERE project_departments.project_id = projects.id
+                ORDER BY departments.name
+              )
+            ), COALESCE((
+              SELECT group_concat(name, ', ')
+              FROM (
+                SELECT DISTINCT departments.name AS name
                 FROM asset_assignments
                 JOIN departments ON departments.id = asset_assignments.department_id
                 WHERE asset_assignments.project_id = projects.id
                 ORDER BY departments.name
               )
-            ), '—') AS departments,
+            ), '—')) AS departments,
             COALESCE((
               SELECT SUM(cost_estimate)
               FROM incidents
@@ -919,6 +1058,25 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             project_units.start_date,
             project_units.end_date,
             COALESCE(project_units.notes, '') AS notes,
+            COALESCE((
+              SELECT group_concat(name, ', ')
+              FROM (
+                SELECT DISTINCT departments.name AS name
+                FROM project_unit_departments
+                JOIN departments ON departments.id = project_unit_departments.department_id
+                WHERE project_unit_departments.project_unit_id = project_units.id
+                ORDER BY departments.name
+              )
+            ), COALESCE((
+              SELECT group_concat(name, ', ')
+              FROM (
+                SELECT DISTINCT departments.name AS name
+                FROM asset_assignments
+                JOIN departments ON departments.id = asset_assignments.department_id
+                WHERE asset_assignments.project_unit_id = project_units.id
+                ORDER BY departments.name
+              )
+            ), '—')) AS departments,
             project_unit_crew_assignments.id AS assignment_id,
             project_unit_crew_assignments.crew_member_id,
             COALESCE(crew_members.full_name, '—') AS crew_full_name,
@@ -946,6 +1104,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       start_date: string | null;
       end_date: string | null;
       notes: string;
+      departments: string;
       assignment_id: string | null;
       crew_member_id: string | null;
       crew_full_name: string;
@@ -955,6 +1114,40 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       assignment_end_date: string | null;
       assignment_notes: string;
     }>;
+    const unitWindowRows = db
+      .prepare(
+        `
+          SELECT
+            id,
+            project_unit_id,
+            start_date,
+            end_date,
+            sort_order,
+            label
+          FROM project_unit_windows
+          WHERE project_unit_id IN (
+            SELECT id
+            FROM project_units
+            WHERE project_id = ?
+              AND COALESCE(is_primary, 0) = 0
+          )
+          ORDER BY project_unit_id, sort_order, start_date, end_date
+        `,
+      )
+      .all(projectId) as Array<{
+      id: string;
+      project_unit_id: string;
+      start_date: string | null;
+      end_date: string | null;
+      sort_order: number;
+      label: string | null;
+    }>;
+    const unitWindowsByUnitId = new Map<string, typeof unitWindowRows>();
+    unitWindowRows.forEach((row) => {
+      const list = unitWindowsByUnitId.get(row.project_unit_id) ?? [];
+      list.push(row);
+      unitWindowsByUnitId.set(row.project_unit_id, list);
+    });
     const projectUnitIds = uniqueStrings(unitRows.map((row) => row.id));
     const allCrewAssignmentRows = db
       .prepare(
@@ -1035,6 +1228,14 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           colorKey: row.color_key,
           startDate: row.start_date,
           endDate: row.end_date,
+          windows: (unitWindowsByUnitId.get(row.id) ?? []).map((window) => ({
+            id: window.id,
+            startDate: window.start_date,
+            endDate: window.end_date,
+            sortOrder: window.sort_order,
+            label: window.label,
+          })),
+          departments: row.departments === "—" ? [] : row.departments.split(", ").filter(Boolean),
           notes: row.notes,
           conflictCount: 0,
           crewConflictCount: 0,
@@ -1062,6 +1263,19 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
     });
 
     const units = Array.from(unitsMap.values());
+    units.forEach((unit) => {
+      if (!unit.windows.length) {
+        unit.windows = [
+          {
+            id: `${unit.id}-legacy-window`,
+            startDate: unit.startDate,
+            endDate: unit.endDate,
+            sortOrder: 0,
+            label: null,
+          },
+        ];
+      }
+    });
     units.forEach((unit) => {
       if (!projectUnitIds.includes(unit.id)) {
         return;
@@ -1336,60 +1550,141 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       .prepare("SELECT id, full_name FROM crew_members WHERE workspace_id = ?")
       .all("workspace-default") as Array<{ id: string; full_name: string }>;
     const crewNameMap = new Map(crewMembers.map((row) => [row.id, row.full_name] as const));
+    const departmentRows = db
+      .prepare("SELECT id, name FROM departments WHERE workspace_id = ?")
+      .all("workspace-default") as Array<{ id: string; name: string }>;
+    const departmentNameMap = new Map(departmentRows.map((row) => [row.id, row.name] as const));
+    const assetLabelRows = db
+      .prepare("SELECT id, name FROM assets WHERE workspace_id = ?")
+      .all("workspace-default") as Array<{ id: string; name: string }>;
+    const assetLabelMap = new Map(assetLabelRows.map((row) => [row.id, row.name] as const));
+
+    const resolveUnitWindows = (
+      unit: CreateProjectBlueprintInput["mainUnit"] | CreateProjectBlueprintInput["additionalUnits"][number],
+      fallbackName: string,
+    ) => {
+      const resolvedWindows = (unit.windows ?? []).map((window) =>
+        resolveBlueprintWindowBounds(window.startDate, window.endDate, input.generalInfo.startDate, input.generalInfo.endDate),
+      );
+      return resolvedWindows.length
+        ? resolvedWindows.map((window) => ({ startDate: window.start, endDate: window.end }))
+        : [{ startDate: mainWindowStart, endDate: mainWindowEnd }];
+    };
+
+    const resolveCrewWindows = (
+      assignment: CreateProjectBlueprintInput["mainUnit"]["unitDepartments"][number]["crewAssignments"][number],
+      fallbackWindows: Array<{ startDate: string | null; endDate: string | null }>,
+    ) =>
+      assignment.startDate || assignment.endDate
+        ? [
+            resolveBlueprintWindowBounds(
+              assignment.startDate,
+              assignment.endDate,
+              fallbackWindows[0]?.startDate ?? input.generalInfo.startDate,
+              fallbackWindows[0]?.endDate ?? input.generalInfo.endDate,
+            ),
+          ].map((window) => ({ startDate: window.start, endDate: window.end }))
+        : fallbackWindows;
+
     const resolvedUnits: ProjectBlueprintResolvedUnit[] = [
       {
         name: "Main Unit",
-        windowStart: mainWindowStart,
-        windowEnd: mainWindowEnd,
-        assetIds: [...new Set(input.mainUnit.assetIds)],
-        crewAssignments: input.mainUnit.crewAssignments.map((assignment) => {
-          const window = resolveBlueprintWindowBounds(
-            assignment.startDate,
-            assignment.endDate,
-            mainWindowStart ?? undefined,
-            mainWindowEnd ?? undefined,
-          );
-
-          return {
-            crewMemberId: assignment.crewMemberId,
-            crewMemberName: crewNameMap.get(assignment.crewMemberId) ?? "Crew member",
-            windowStart: window.start,
-            windowEnd: window.end,
-          };
-        }),
-      },
-      ...input.additionalUnits.map((unit) => {
-        const unitWindow = resolveBlueprintWindowBounds(unit.startDate, unit.endDate, input.generalInfo.startDate, input.generalInfo.endDate);
-
-        return {
-          name: unit.name,
-          windowStart: unitWindow.start,
-          windowEnd: unitWindow.end,
-          assetIds: [...new Set(unit.assetIds)],
-          crewAssignments: unit.crewAssignments.map((assignment) => {
-            const window = resolveBlueprintWindowBounds(
-              assignment.startDate,
-              assignment.endDate,
-              unitWindow.start ?? undefined,
-              unitWindow.end ?? undefined,
-            );
-
-            return {
+        windows: [{ startDate: mainWindowStart, endDate: mainWindowEnd }],
+        departments: input.mainUnit.departmentIds ?? [],
+        buckets: (input.mainUnit.unitDepartments ?? []).map((bucket) => ({
+          unitName: "Main Unit",
+          departmentId: bucket.departmentId,
+          departmentName: departmentNameMap.get(bucket.departmentId) ?? "Department",
+          windows: [{ startDate: mainWindowStart, endDate: mainWindowEnd }],
+          assetIds: [...new Set(bucket.assetIds ?? [])],
+          crewAssignments: (bucket.crewAssignments ?? [])
+            .filter((assignment) => assignment.crewMemberId?.trim())
+            .map((assignment) => ({
               crewMemberId: assignment.crewMemberId,
               crewMemberName: crewNameMap.get(assignment.crewMemberId) ?? "Crew member",
-              windowStart: window.start,
-              windowEnd: window.end,
-            };
-          }),
+              windows: resolveCrewWindows(assignment, [{ startDate: mainWindowStart, endDate: mainWindowEnd }]),
+            })),
+        })),
+      },
+      ...input.additionalUnits.map((unit, index) => {
+        const unitName = unit.name || `Additional Unit ${index + 1}`;
+        const unitWindows = resolveUnitWindows(unit, unitName);
+
+        return {
+          name: unitName,
+          windows: unitWindows,
+          departments: unit.departmentIds ?? [],
+          buckets: (unit.unitDepartments ?? []).map((bucket) => ({
+            unitName,
+            departmentId: bucket.departmentId,
+            departmentName: departmentNameMap.get(bucket.departmentId) ?? "Department",
+            windows: unitWindows,
+            assetIds: [...new Set(bucket.assetIds ?? [])],
+            crewAssignments: (bucket.crewAssignments ?? [])
+              .filter((assignment) => assignment.crewMemberId?.trim())
+              .map((assignment) => ({
+                crewMemberId: assignment.crewMemberId,
+                crewMemberName: crewNameMap.get(assignment.crewMemberId) ?? "Crew member",
+                windows: resolveCrewWindows(assignment, unitWindows),
+              })),
+          })),
         };
       }),
     ];
 
+    const resolvedBuckets = resolvedUnits.flatMap((unit) => unit.buckets);
+
     const assetConflicts: ProjectCreationConflictsSnapshot["groups"][number]["items"] = [];
     const crewConflicts: ProjectCreationConflictsSnapshot["groups"][number]["items"] = [];
-    const uniqueAssetIds = [...new Set(resolvedUnits.flatMap((unit) => unit.assetIds))];
+    const uniqueAssetIds = [...new Set(resolvedBuckets.flatMap((bucket) => bucket.assetIds))];
 
     if (uniqueAssetIds.length) {
+      resolvedBuckets.forEach((bucket, bucketIndex) => {
+        resolvedBuckets.forEach((otherBucket, otherBucketIndex) => {
+          if (otherBucketIndex <= bucketIndex) {
+            return;
+          }
+
+          bucket.assetIds.forEach((assetId) => {
+            if (!otherBucket.assetIds.includes(assetId)) {
+              return;
+            }
+
+            if (!windowsOverlap(bucket.windows, otherBucket.windows)) {
+              return;
+            }
+
+            const currentOverlapWindow = overlapWindow(bucket.windows, otherBucket.windows);
+
+            assetConflicts.push({
+              resourceId: assetId,
+              resourceLabel: assetLabelMap.get(assetId) ?? "Asset",
+              conflictingProjectId: "draft",
+              conflictingProject: "This setup",
+              conflictingUnitId: null,
+              conflictingUnit: otherBucket.unitName,
+              conflictingDepartmentId: otherBucket.departmentId,
+              conflictingDepartment: otherBucket.departmentName,
+              overlapStart: currentOverlapWindow.startDate,
+              overlapEnd: currentOverlapWindow.endDate,
+            });
+
+            assetConflicts.push({
+              resourceId: assetId,
+              resourceLabel: assetLabelMap.get(assetId) ?? "Asset",
+              conflictingProjectId: "draft",
+              conflictingProject: "This setup",
+              conflictingUnitId: null,
+              conflictingUnit: bucket.unitName,
+              conflictingDepartmentId: bucket.departmentId,
+              conflictingDepartment: bucket.departmentName,
+              overlapStart: currentOverlapWindow.startDate,
+              overlapEnd: currentOverlapWindow.endDate,
+            });
+          });
+        });
+      });
+
       const placeholders = uniqueAssetIds.map(() => "?").join(", ");
       const rows = db
         .prepare(
@@ -1403,12 +1698,15 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
               project_units.id AS unit_id,
               COALESCE(project_units.name, 'Main Unit') AS unit_name,
               COALESCE(project_units.status, 'active') AS unit_status,
+              departments.id AS department_id,
+              departments.name AS department_name,
               COALESCE(project_units.start_date, projects.start_date) AS unit_start_date,
               COALESCE(project_units.end_date, projects.end_date) AS unit_end_date
             FROM asset_current_state
             JOIN assets ON assets.id = asset_current_state.asset_id
             LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
             LEFT JOIN project_units ON project_units.id = asset_current_state.project_unit_id
+            LEFT JOIN departments ON departments.id = asset_current_state.current_department_id
             WHERE asset_current_state.asset_id IN (${placeholders})
               AND asset_current_state.current_project_id IS NOT NULL
           `,
@@ -1422,6 +1720,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         unit_id: string | null;
         unit_name: string;
         unit_status: string;
+        department_id: string | null;
+        department_name: string | null;
         unit_start_date: string | null;
         unit_end_date: string | null;
       }>;
@@ -1435,15 +1735,16 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           return;
         }
 
-        resolvedUnits.forEach((unit) => {
-          if (!unit.assetIds.includes(row.asset_id)) {
+        resolvedBuckets.forEach((bucket) => {
+          if (!bucket.assetIds.includes(row.asset_id)) {
             return;
           }
 
-          if (!datesOverlap(unit.windowStart, unit.windowEnd, row.unit_start_date, row.unit_end_date)) {
+          if (!windowsOverlap(bucket.windows, [{ startDate: row.unit_start_date, endDate: row.unit_end_date }])) {
             return;
           }
 
+          const currentOverlapWindow = overlapWindow(bucket.windows, [{ startDate: row.unit_start_date, endDate: row.unit_end_date }]);
           assetConflicts.push({
             resourceId: row.asset_id,
             resourceLabel: row.asset_name,
@@ -1451,16 +1752,66 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             conflictingProject: row.project_name!,
             conflictingUnitId: row.unit_id,
             conflictingUnit: row.unit_name,
-            overlapStart: unit.windowStart && row.unit_start_date && unit.windowStart > row.unit_start_date ? unit.windowStart : row.unit_start_date ?? unit.windowStart ?? "",
-            overlapEnd: unit.windowEnd && row.unit_end_date && unit.windowEnd < row.unit_end_date ? unit.windowEnd : row.unit_end_date ?? unit.windowEnd ?? "",
+            conflictingDepartmentId: row.department_id,
+            conflictingDepartment: row.department_name,
+            overlapStart: currentOverlapWindow.startDate,
+            overlapEnd: currentOverlapWindow.endDate,
           });
         });
       });
     }
 
-    const uniqueCrewIds = [...new Set(resolvedUnits.flatMap((unit) => unit.crewAssignments.map((assignment) => assignment.crewMemberId)))];
+    const uniqueCrewIds = [...new Set(resolvedBuckets.flatMap((bucket) => bucket.crewAssignments.map((assignment) => assignment.crewMemberId)))];
 
     if (uniqueCrewIds.length) {
+      resolvedBuckets.forEach((bucket, bucketIndex) => {
+        resolvedBuckets.forEach((otherBucket, otherBucketIndex) => {
+          if (otherBucketIndex <= bucketIndex) {
+            return;
+          }
+
+          bucket.crewAssignments.forEach((assignment) => {
+            otherBucket.crewAssignments.forEach((otherAssignment) => {
+              if (assignment.crewMemberId !== otherAssignment.crewMemberId) {
+                return;
+              }
+
+              if (!windowsOverlap(assignment.windows, otherAssignment.windows)) {
+                return;
+              }
+
+              const currentOverlapWindow = overlapWindow(assignment.windows, otherAssignment.windows);
+
+              crewConflicts.push({
+                resourceId: assignment.crewMemberId,
+                resourceLabel: assignment.crewMemberName,
+                conflictingProjectId: "draft",
+                conflictingProject: "This setup",
+                conflictingUnitId: null,
+                conflictingUnit: otherBucket.unitName,
+                conflictingDepartmentId: otherBucket.departmentId,
+                conflictingDepartment: otherBucket.departmentName,
+                overlapStart: currentOverlapWindow.startDate,
+                overlapEnd: currentOverlapWindow.endDate,
+              });
+
+              crewConflicts.push({
+                resourceId: otherAssignment.crewMemberId,
+                resourceLabel: otherAssignment.crewMemberName,
+                conflictingProjectId: "draft",
+                conflictingProject: "This setup",
+                conflictingUnitId: null,
+                conflictingUnit: bucket.unitName,
+                conflictingDepartmentId: bucket.departmentId,
+                conflictingDepartment: bucket.departmentName,
+                overlapStart: currentOverlapWindow.startDate,
+                overlapEnd: currentOverlapWindow.endDate,
+              });
+            });
+          });
+        });
+      });
+
       const placeholders = uniqueCrewIds.map(() => "?").join(", ");
       const rows = db
         .prepare(
@@ -1474,12 +1825,15 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
               project_units.id AS unit_id,
               project_units.name AS unit_name,
               project_units.status AS unit_status,
+              departments.id AS department_id,
+              departments.name AS department_name,
               COALESCE(project_unit_crew_assignments.start_date, project_units.start_date, projects.start_date) AS assignment_start_date,
               COALESCE(project_unit_crew_assignments.end_date, project_units.end_date, projects.end_date) AS assignment_end_date
             FROM project_unit_crew_assignments
             JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
             JOIN projects ON projects.id = project_units.project_id
             LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
+            LEFT JOIN departments ON departments.id = project_unit_crew_assignments.department_id
             WHERE project_unit_crew_assignments.crew_member_id IN (${placeholders})
           `,
         )
@@ -1492,6 +1846,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         unit_id: string;
         unit_name: string;
         unit_status: string;
+        department_id: string | null;
+        department_name: string | null;
         assignment_start_date: string | null;
         assignment_end_date: string | null;
       }>;
@@ -1505,13 +1861,13 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           return;
         }
 
-        resolvedUnits.forEach((unit) => {
-          unit.crewAssignments.forEach((assignment) => {
+        resolvedBuckets.forEach((bucket) => {
+          bucket.crewAssignments.forEach((assignment) => {
             if (assignment.crewMemberId !== row.crew_member_id) {
               return;
             }
 
-            if (!datesOverlap(assignment.windowStart, assignment.windowEnd, row.assignment_start_date, row.assignment_end_date)) {
+            if (!windowsOverlap(assignment.windows, [{ startDate: row.assignment_start_date, endDate: row.assignment_end_date }])) {
               return;
             }
 
@@ -1522,14 +1878,10 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
               conflictingProject: row.project_name,
               conflictingUnitId: row.unit_id,
               conflictingUnit: row.unit_name,
-              overlapStart:
-                assignment.windowStart && row.assignment_start_date && assignment.windowStart > row.assignment_start_date
-                  ? assignment.windowStart
-                  : row.assignment_start_date ?? assignment.windowStart ?? "",
-              overlapEnd:
-                assignment.windowEnd && row.assignment_end_date && assignment.windowEnd < row.assignment_end_date
-                  ? assignment.windowEnd
-                  : row.assignment_end_date ?? assignment.windowEnd ?? "",
+              conflictingDepartmentId: row.department_id,
+              conflictingDepartment: row.department_name,
+              overlapStart: overlapWindow(assignment.windows, [{ startDate: row.assignment_start_date, endDate: row.assignment_end_date }]).startDate,
+              overlapEnd: overlapWindow(assignment.windows, [{ startDate: row.assignment_start_date, endDate: row.assignment_end_date }]).endDate,
             });
           });
         });

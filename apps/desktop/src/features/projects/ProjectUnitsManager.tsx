@@ -318,13 +318,16 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                   </button>
                   <button
                     className="shell-project-action"
+                    data-tooltip={unit.status === "cancelled" ? "Reactivate unit" : "Cancel unit"}
                     onClick={() => void runUnitAction(unit, unit.status === "cancelled" ? "reactivate" : "cancel")}
                     type="button"
                   >
                     <RotateCcw size={12} />
                   </button>
                   <button
-                    className="shell-project-action"
+                    aria-label={`Delete ${unit.name}`}
+                    className="shell-project-action is-danger"
+                    data-tooltip="Delete unit"
                     onClick={() => {
                       const confirmed = window.confirm(
                         `Delete unit "${unit.name}"? This only works if it has no linked operational records.`,

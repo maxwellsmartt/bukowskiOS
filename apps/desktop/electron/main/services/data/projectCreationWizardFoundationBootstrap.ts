@@ -184,3 +184,126 @@ export const applyProjectCreationWizardFoundationMigration = (db: DatabaseSync) 
     `,
   ).run("production-company-metadata-internal", workspaceId, "Metadata Internal", now, now);
 };
+
+export const applyProjectUnitWindowsFoundationMigration = (db: DatabaseSync) => {
+  if (!tableExists(db, "project_unit_windows")) {
+    db.exec(`
+      CREATE TABLE project_unit_windows (
+        id TEXT PRIMARY KEY,
+        project_unit_id TEXT NOT NULL REFERENCES project_units(id) ON DELETE CASCADE,
+        start_date TEXT,
+        end_date TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        label TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_project_unit_windows_unit_sort
+        ON project_unit_windows(project_unit_id, sort_order, start_date, end_date);
+    `);
+  }
+
+  db.exec(`
+    INSERT INTO project_unit_windows (
+      id,
+      project_unit_id,
+      start_date,
+      end_date,
+      sort_order,
+      label,
+      created_at,
+      updated_at
+    )
+    SELECT
+      'unit-window-' || project_units.id || '-primary',
+      project_units.id,
+      project_units.start_date,
+      project_units.end_date,
+      0,
+      NULL,
+      project_units.created_at,
+      project_units.updated_at
+    FROM project_units
+    WHERE project_units.start_date IS NOT NULL
+      AND project_units.end_date IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM project_unit_windows
+        WHERE project_unit_windows.project_unit_id = project_units.id
+      );
+  `);
+};
+
+export const applyProjectDepartmentsMatrixFoundationMigration = (db: DatabaseSync) => {
+  if (!tableExists(db, "project_departments")) {
+    db.exec(`
+      CREATE TABLE project_departments (
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        department_id TEXT NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (project_id, department_id)
+      );
+
+      CREATE INDEX idx_project_departments_department
+        ON project_departments(department_id, project_id);
+    `);
+  }
+
+  if (!tableExists(db, "project_unit_departments")) {
+    db.exec(`
+      CREATE TABLE project_unit_departments (
+        project_unit_id TEXT NOT NULL REFERENCES project_units(id) ON DELETE CASCADE,
+        department_id TEXT NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (project_unit_id, department_id)
+      );
+
+      CREATE INDEX idx_project_unit_departments_department
+        ON project_unit_departments(department_id, project_unit_id);
+    `);
+  }
+
+  if (!hasColumn(db, "project_unit_crew_assignments", "department_id")) {
+    db.exec("ALTER TABLE project_unit_crew_assignments ADD COLUMN department_id TEXT REFERENCES departments(id) ON DELETE SET NULL;");
+  }
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_project_unit_crew_assignments_department
+      ON project_unit_crew_assignments(department_id, project_unit_id);
+  `);
+
+  const now = new Date().toISOString();
+
+  db.exec(`
+    INSERT OR IGNORE INTO project_departments (project_id, department_id, created_at)
+    SELECT DISTINCT project_id, department_id, '${now}'
+    FROM asset_assignments
+    WHERE project_id IS NOT NULL
+      AND department_id IS NOT NULL;
+
+    INSERT OR IGNORE INTO project_departments (project_id, department_id, created_at)
+    SELECT DISTINCT project_id, department_id, '${now}'
+    FROM packing_slips
+    WHERE project_id IS NOT NULL
+      AND department_id IS NOT NULL;
+
+    INSERT OR IGNORE INTO project_departments (project_id, department_id, created_at)
+    SELECT DISTINCT project_id, department_id, '${now}'
+    FROM incidents
+    WHERE project_id IS NOT NULL
+      AND department_id IS NOT NULL;
+
+    INSERT OR IGNORE INTO project_unit_departments (project_unit_id, department_id, created_at)
+    SELECT DISTINCT project_unit_id, department_id, '${now}'
+    FROM asset_assignments
+    WHERE project_unit_id IS NOT NULL
+      AND department_id IS NOT NULL;
+
+    INSERT OR IGNORE INTO project_unit_departments (project_unit_id, department_id, created_at)
+    SELECT DISTINCT project_unit_id, department_id, '${now}'
+    FROM packing_slips
+    WHERE project_unit_id IS NOT NULL
+      AND department_id IS NOT NULL;
+  `);
+};

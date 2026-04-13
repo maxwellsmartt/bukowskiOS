@@ -5,6 +5,7 @@ import type { CatalogSnapshot } from "@contracts";
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
+const activeProjectStatuses = new Set(["Prep", "Active", "On hold"]);
 
 const mapAssetStatus = (operationalStatus: string, custodyStatus: string) => {
   if (operationalStatus === "maintenance") {
@@ -100,6 +101,79 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       linked_user_id: string | null;
       is_active: number;
     }>;
+
+    const crewAssignments = db
+      .prepare(
+        `
+          SELECT
+            project_unit_crew_assignments.crew_member_id,
+            projects.id AS project_id,
+            projects.name AS project_name,
+            projects.status AS project_status,
+            project_units.id AS unit_id,
+            COALESCE(project_units.name, 'Main Unit') AS unit_name,
+            project_units.status AS unit_status,
+            departments.id AS department_id,
+            departments.name AS department_name,
+            COALESCE(project_unit_crew_assignments.start_date, project_units.start_date, projects.start_date) AS assignment_start_date,
+            COALESCE(project_unit_crew_assignments.end_date, project_units.end_date, projects.end_date) AS assignment_end_date
+          FROM project_unit_crew_assignments
+          JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
+          JOIN projects ON projects.id = project_units.project_id
+          LEFT JOIN departments ON departments.id = project_unit_crew_assignments.department_id
+          WHERE project_units.workspace_id = ?
+        `,
+      )
+      .all(workspaceId) as Array<{
+      crew_member_id: string;
+      project_id: string;
+      project_name: string;
+      project_status: string;
+      unit_id: string | null;
+      unit_name: string;
+      unit_status: string;
+      department_id: string | null;
+      department_name: string | null;
+      assignment_start_date: string | null;
+      assignment_end_date: string | null;
+    }>;
+
+    const crewAssignmentsByMember = new Map<
+      string,
+      Array<{
+        projectId: string;
+        project: string;
+        unitId: string | null;
+        unit: string;
+        departmentId: string | null;
+        department: string | null;
+        startDate: string | null;
+        endDate: string | null;
+      }>
+    >();
+
+    crewAssignments.forEach((row) => {
+      if (!activeProjectStatuses.has(row.project_status)) {
+        return;
+      }
+
+      if (row.unit_status === "cancelled" || row.unit_status === "wrapped") {
+        return;
+      }
+
+      const assignments = crewAssignmentsByMember.get(row.crew_member_id) ?? [];
+      assignments.push({
+        projectId: row.project_id,
+        project: row.project_name,
+        unitId: row.unit_id,
+        unit: row.unit_name,
+        departmentId: row.department_id,
+        department: row.department_name,
+        startDate: row.assignment_start_date,
+        endDate: row.assignment_end_date,
+      });
+      crewAssignmentsByMember.set(row.crew_member_id, assignments);
+    });
 
     const clients = db
       .prepare(
@@ -259,10 +333,19 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
             COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
             asset_categories.name AS category,
             asset_current_state.operational_status,
-            asset_current_state.custody_status
+            asset_current_state.custody_status,
+            asset_current_state.current_project_id,
+            projects.name AS current_project_name,
+            asset_current_state.current_department_id,
+            departments.name AS current_department_name,
+            asset_current_state.project_unit_id,
+            project_units.name AS current_unit_name
           FROM assets
           JOIN asset_categories ON asset_categories.id = assets.category_id
           JOIN asset_current_state ON asset_current_state.asset_id = assets.id
+          LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
+          LEFT JOIN departments ON departments.id = asset_current_state.current_department_id
+          LEFT JOIN project_units ON project_units.id = asset_current_state.project_unit_id
           LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
           LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
           WHERE assets.workspace_id = ?
@@ -277,6 +360,12 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       category: string;
       operational_status: string;
       custody_status: string;
+      current_project_id: string | null;
+      current_project_name: string | null;
+      current_department_id: string | null;
+      current_department_name: string | null;
+      project_unit_id: string | null;
+      current_unit_name: string | null;
     }>;
 
     return {
@@ -308,6 +397,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         notes: row.notes,
         isActive: Boolean(row.is_active),
         linkedUserId: row.linked_user_id,
+        activeAssignments: crewAssignmentsByMember.get(row.id) ?? [],
       })),
       clients: clients.map((row) => ({
         id: row.id,
@@ -360,6 +450,12 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         code: row.code,
         category: row.category,
         status: mapAssetStatus(row.operational_status, row.custody_status),
+        currentProjectId: row.current_project_id,
+        currentProject: row.current_project_name,
+        currentDepartmentId: row.current_department_id,
+        currentDepartment: row.current_department_name,
+        currentUnitId: row.project_unit_id,
+        currentUnit: row.current_unit_name,
       })),
     };
   },

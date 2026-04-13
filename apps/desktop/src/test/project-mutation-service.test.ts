@@ -4,6 +4,13 @@ import { createProjectMutationService } from "../../electron/main/services/data/
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("project mutation service", () => {
+  const buildBucket = (departmentId: string, overrides?: Partial<{ assetIds: string[]; crewAssignments: Array<{ crewMemberId: string; roleLabel?: string }> }>) => ({
+    departmentId,
+    assetIds: overrides?.assetIds ?? [],
+    crewAssignments: overrides?.crewAssignments ?? [],
+    packingSeed: { mode: "none" as const },
+  });
+
   it("creates, updates and deletes standalone sidebar projects", () => {
     const { cleanup, database } = createTestDatabase("bukowski-project-test");
     const reads = createFoundationReadService(database);
@@ -119,25 +126,23 @@ describe("project mutation service", () => {
         preproductionEndDate: "2026-04-30",
         colorKey: "teal",
         description: "Blueprint creation test",
+        departmentIds: ["dept-video"],
       },
       mainUnit: {
         name: "Main Unit",
-        assetIds: ["asset-aputure-600d"],
-        crewAssignments: [{ crewMemberId: "crew-user-paola", roleLabel: "Lead" }],
+        windows: [{ startDate: "2026-05-01", endDate: "2026-05-10", sortOrder: 0 }],
+        departmentIds: ["dept-video"],
+        unitDepartments: [buildBucket("dept-video", { assetIds: ["asset-aputure-600d"], crewAssignments: [{ crewMemberId: "crew-user-paola", roleLabel: "Lead" }] })],
       },
       additionalUnits: [
         {
           name: "Second Unit",
           code: "BLUE-2U",
-          startDate: "2026-05-03",
-          endDate: "2026-05-06",
-          assetIds: ["asset-sachtler-flowtech"],
-          crewAssignments: [{ crewMemberId: "crew-user-miguel", roleLabel: "AC" }],
+          windows: [{ startDate: "2026-05-03", endDate: "2026-05-06", sortOrder: 0 }],
+          departmentIds: ["dept-video"],
+          unitDepartments: [buildBucket("dept-video", { assetIds: ["asset-sachtler-flowtech"], crewAssignments: [{ crewMemberId: "crew-user-miguel", roleLabel: "AC" }] })],
         },
       ],
-      packingSelection: {
-        mode: "none",
-      },
     });
 
     const project = reads.getProjects().find((row) => row.code === "BLUE");
@@ -155,6 +160,156 @@ describe("project mutation service", () => {
     const timelineProject = timeline.projects.find((row) => row.id === project!.id);
     expect(timelineProject?.units).toHaveLength(1);
     expect(timelineProject?.units[0]?.name).toBe("Second Unit");
+
+    cleanup();
+  });
+
+  it("auto-generates a project code when the blueprint omits it", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-blueprint-code-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database);
+
+    mutations.createProjectBlueprint({
+      generalInfo: {
+        name: "Silent River",
+        status: "Prep",
+        startDate: "2026-05-12",
+        endDate: "2026-05-20",
+        colorKey: "moss",
+        departmentIds: [],
+      },
+      mainUnit: {
+        name: "Main Unit",
+        windows: [{ startDate: "2026-05-12", endDate: "2026-05-20", sortOrder: 0 }],
+        departmentIds: [],
+        unitDepartments: [],
+      },
+      additionalUnits: [],
+    });
+
+    const project = reads.getProjects().find((row) => row.name === "Silent River");
+    expect(project?.code).toBeTruthy();
+    expect(project?.code).toBe("SR");
+
+    cleanup();
+  });
+
+  it("blocks overlapping crew assignments inside the same setup", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-blueprint-internal-crew-conflict-test");
+    const mutations = createProjectMutationService(database);
+
+    expect(() =>
+      mutations.createProjectBlueprint({
+        generalInfo: {
+          name: "Crew Conflict Setup",
+          status: "Prep",
+          startDate: "2026-05-12",
+          endDate: "2026-05-20",
+          colorKey: "moss",
+          departmentIds: ["dept-video"],
+        },
+        mainUnit: {
+          name: "Main Unit",
+          windows: [{ startDate: "2026-05-12", endDate: "2026-05-20", sortOrder: 0 }],
+          departmentIds: ["dept-video"],
+          unitDepartments: [buildBucket("dept-video", { crewAssignments: [{ crewMemberId: "crew-user-paola", roleLabel: "Lead" }] })],
+        },
+        additionalUnits: [
+          {
+            name: "Second Unit",
+            code: "CCS-2U",
+            windows: [{ startDate: "2026-05-14", endDate: "2026-05-16", sortOrder: 0 }],
+            departmentIds: ["dept-video"],
+            unitDepartments: [buildBucket("dept-video", { crewAssignments: [{ crewMemberId: "crew-user-paola", roleLabel: "Second Unit Lead" }] })],
+          },
+        ],
+      }),
+    ).toThrow("overlaps within this setup");
+
+    cleanup();
+  });
+
+  it("blocks overlapping asset assignments inside the same setup", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-blueprint-internal-asset-conflict-test");
+    const mutations = createProjectMutationService(database);
+
+    expect(() =>
+      mutations.createProjectBlueprint({
+        generalInfo: {
+          name: "Asset Conflict Setup",
+          status: "Prep",
+          startDate: "2026-05-12",
+          endDate: "2026-05-20",
+          colorKey: "moss",
+          departmentIds: ["dept-video"],
+        },
+        mainUnit: {
+          name: "Main Unit",
+          windows: [{ startDate: "2026-05-12", endDate: "2026-05-20", sortOrder: 0 }],
+          departmentIds: ["dept-video"],
+          unitDepartments: [buildBucket("dept-video", { assetIds: ["asset-aputure-600d"] })],
+        },
+        additionalUnits: [
+          {
+            name: "Second Unit",
+            code: "ACS-2U",
+            windows: [{ startDate: "2026-05-14", endDate: "2026-05-16", sortOrder: 0 }],
+            departmentIds: ["dept-video"],
+            unitDepartments: [buildBucket("dept-video", { assetIds: ["asset-aputure-600d"] })],
+          },
+        ],
+      }),
+    ).toThrow("overlaps within this setup");
+
+    cleanup();
+  });
+
+  it("persists multiple windows for an additional unit and exposes them in the timeline", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-blueprint-multi-window-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database);
+
+    mutations.createProjectBlueprint({
+      generalInfo: {
+        name: "Segmented Unit Setup",
+        status: "Prep",
+        startDate: "2026-05-12",
+        endDate: "2026-05-30",
+        hasPreproduction: true,
+        preproductionStartDate: "2026-05-08",
+        preproductionEndDate: "2026-05-11",
+        colorKey: "ice",
+        departmentIds: [],
+      },
+      mainUnit: {
+        name: "Main Unit",
+        windows: [{ startDate: "2026-05-12", endDate: "2026-05-30", sortOrder: 0 }],
+        departmentIds: [],
+        unitDepartments: [],
+      },
+      additionalUnits: [
+        {
+          name: "Second Unit",
+          code: "SEG-2U",
+          windows: [
+            { startDate: "2026-05-13", endDate: "2026-05-14", sortOrder: 0 },
+            { startDate: "2026-05-18", endDate: "2026-05-20", sortOrder: 1 },
+            { startDate: "2026-05-24", endDate: "2026-05-25", sortOrder: 2 },
+          ],
+          departmentIds: [],
+          unitDepartments: [],
+        },
+      ],
+    });
+
+    const project = reads.getProjects().find((row) => row.name === "Segmented Unit Setup");
+    const detail = reads.getProjectDetail(project!.id);
+    expect(detail.units[0]?.windows).toHaveLength(3);
+
+    const timeline = reads.getScheduleTimeline("90d", "week");
+    const timelineProject = timeline.projects.find((row) => row.id === project!.id);
+    expect(timelineProject?.segments.some((segment) => segment.kind === "preproduction")).toBe(true);
+    expect(timelineProject?.units[0]?.segments).toHaveLength(3);
 
     cleanup();
   });

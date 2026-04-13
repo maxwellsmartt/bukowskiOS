@@ -609,6 +609,7 @@ export const GlobalAssistantChat = () => {
                 <button
                   aria-label="Create new chat thread"
                   className="assistant-chat-sidebar-tool"
+                  data-tooltip="New chat"
                   onClick={() => void createSession()}
                   type="button"
                 >
@@ -617,6 +618,7 @@ export const GlobalAssistantChat = () => {
                 <button
                   aria-label="Collapse threads sidebar"
                   className="assistant-chat-sidebar-tool"
+                  data-tooltip="Collapse threads"
                   onClick={() => setIsSidebarCollapsed(true)}
                   type="button"
                 >
@@ -648,6 +650,7 @@ export const GlobalAssistantChat = () => {
                         <button
                           aria-label={isExpanded ? "Hide thread details" : "Show thread details"}
                           className={`assistant-chat-session-action${isExpanded ? " is-open" : ""}`}
+                          data-tooltip={isExpanded ? "Hide thread details" : "Show thread details"}
                           onClick={() => setExpandedSessionId((current) => (current === session.id ? null : session.id))}
                           type="button"
                         >
@@ -659,6 +662,7 @@ export const GlobalAssistantChat = () => {
                           className={`assistant-chat-session-action assistant-chat-session-menu-trigger${
                             threadMenuState?.sessionId === session.id ? " is-open" : ""
                           }`}
+                          data-tooltip="Thread actions"
                           onClick={(event) => openThreadMenu(session.id, event.currentTarget)}
                           type="button"
                         >
@@ -704,6 +708,7 @@ export const GlobalAssistantChat = () => {
                   <button
                     aria-label="Expand threads sidebar"
                     className="surface-card-action"
+                    data-tooltip="Expand threads"
                     onClick={() => setIsSidebarCollapsed(false)}
                     type="button"
                   >
@@ -712,7 +717,13 @@ export const GlobalAssistantChat = () => {
                 ) : null}
                 <div className="assistant-chat-context-pill">{resolvedActiveSession.contextLabel}</div>
               </div>
-              <button aria-label="Close assistant chat" className="surface-card-action" onClick={close} type="button">
+              <button
+                aria-label="Close assistant chat"
+                className="surface-card-action"
+                data-tooltip="Close assistant chat"
+                onClick={close}
+                type="button"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -876,6 +887,7 @@ export const GlobalAssistantChat = () => {
                 <button
                   aria-label={isSending ? "Routing message" : "Send message"}
                   className="assistant-chat-send-button"
+                  data-tooltip={isSending ? "Routing message" : "Send message"}
                   disabled={isSending || (!message.trim() && !attachments.length)}
                   onClick={handleSend}
                   type="button"
@@ -901,13 +913,14 @@ export const GlobalAssistantChat = () => {
                       <button
                         aria-label={`Remove ${attachment.name}`}
                         className="assistant-chat-attachment-remove"
+                        data-tooltip={`Remove ${attachment.name}`}
                         onClick={() => {
                           setAttachments((current) => current.filter((item) => item.id !== attachment.id));
                           setAttachmentError(null);
                         }}
                         type="button"
                       >
-                        <X size={10} />
+                        <Trash2 size={10} />
                       </button>
                     </span>
                   ))}

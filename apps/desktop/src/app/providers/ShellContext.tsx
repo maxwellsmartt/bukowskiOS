@@ -201,10 +201,12 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     setProjects(nextProjects);
     setProjectsError(null);
 
+    const requestedCode = input.generalInfo.code?.trim().toUpperCase();
+    const requestedName = input.generalInfo.name.trim();
     const createdProject =
       nextProjects.find(
         (project) =>
-          project.code === input.generalInfo.code.trim().toUpperCase() && project.name === input.generalInfo.name.trim(),
+          project.name === requestedName && (!requestedCode || project.code === requestedCode),
       ) ?? null;
 
     setRememberedProjectId(createdProject?.id ?? nextProjects[0]?.id ?? null);

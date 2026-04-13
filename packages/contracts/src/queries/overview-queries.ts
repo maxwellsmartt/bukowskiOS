@@ -37,6 +37,14 @@ export type ScheduleTimelineMarker = {
   endDate: string;
 };
 
+export type ScheduleTimelineSegment = {
+  id: string;
+  startDate: string | null;
+  endDate: string | null;
+  kind: "project_main" | "preproduction" | "unit_window";
+  label?: string | null;
+};
+
 export type ScheduleTimelineUnitLane = {
   id: string;
   code: string;
@@ -46,6 +54,7 @@ export type ScheduleTimelineUnitLane = {
   colorKey: string | null;
   startDate: string | null;
   endDate: string | null;
+  segments: ScheduleTimelineSegment[];
   sortOrder: number;
   activeIncidentCount: number;
   assignedAssetCount: number;
@@ -70,6 +79,7 @@ export type ScheduleTimelineProjectLane = {
   colorKey: string | null;
   startDate: string | null;
   endDate: string | null;
+  segments: ScheduleTimelineSegment[];
   activeUnitCount: number;
   activeIncidentCount: number;
   assignedAssetCount: number;

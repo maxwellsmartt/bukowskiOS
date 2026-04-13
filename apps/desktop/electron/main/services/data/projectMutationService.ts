@@ -67,6 +67,13 @@ const slugify = (value: string) =>
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
 
+const normalizeCodeToken = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "")
+    .toUpperCase();
+
 const ensureValue = (value: string, label: string) => {
   const nextValue = value.trim();
 
@@ -86,6 +93,177 @@ const normalizeOptionalText = (value?: string | null) => {
   const nextValue = value?.trim();
   return nextValue ? nextValue : null;
 };
+
+type NormalizedUnitWindow = {
+  id: string;
+  startDate: string | null;
+  endDate: string | null;
+  sortOrder: number;
+  label: string | null;
+};
+
+type NormalizedUnitDepartment = {
+  departmentId: string;
+  assetIds: string[];
+  crewAssignments: Array<{
+    crewMemberId: string;
+    roleLabel: string | null;
+    startDate: string | null;
+    endDate: string | null;
+    notes: string | null;
+  }>;
+  packingSeed:
+    | {
+        mode: "none";
+      }
+    | {
+        mode: "existing";
+        packingSlipId: string;
+      }
+    | {
+        mode: "draft";
+        label: string | null;
+        responsibleUserId: string | null;
+        notes: string | null;
+      };
+};
+
+const deriveUnitBoundsFromWindows = (windows: NormalizedUnitWindow[]) => {
+  const datedWindows = windows.filter((window) => window.startDate && window.endDate);
+
+  if (!datedWindows.length) {
+    return {
+      startDate: null,
+      endDate: null,
+    };
+  }
+
+  return {
+    startDate: datedWindows.reduce((current, window) => (current && current < window.startDate! ? current : window.startDate), datedWindows[0]!.startDate),
+    endDate: datedWindows.reduce((current, window) => (current && current > window.endDate! ? current : window.endDate), datedWindows[0]!.endDate),
+  };
+};
+
+const normalizeUnitWindows = (
+  windows: Array<{ id?: string; startDate?: string; endDate?: string; sortOrder?: number; label?: string }> | undefined,
+  label: string,
+) => {
+  const normalized = (windows ?? []).map((window, index) => {
+    const startDate = normalizeDateOnly(window.startDate);
+    const endDate = normalizeDateOnly(window.endDate);
+    assertDateWindow(startDate, endDate, `${label} window`);
+
+    return {
+      id: window.id?.trim() || `unit-window-${Date.now().toString(36)}-${index}`,
+      startDate,
+      endDate,
+      sortOrder: window.sortOrder ?? index,
+      label: normalizeOptionalText(window.label),
+    } satisfies NormalizedUnitWindow;
+  });
+
+  return normalized.sort((left, right) => {
+    if (left.sortOrder !== right.sortOrder) {
+      return left.sortOrder - right.sortOrder;
+    }
+
+    return (left.startDate ?? "").localeCompare(right.startDate ?? "");
+  });
+};
+
+const normalizeDepartmentIds = (departmentIds: string[] | undefined) => uniqueValues(departmentIds ?? []);
+
+const ensureDepartmentIdsExist = (db: DatabaseSync, departmentIds: string[], label: string) => {
+  departmentIds.forEach((departmentId) => ensureDepartmentExists(db, departmentId, label));
+};
+
+const normalizeUnitDepartments = (
+  db: DatabaseSync,
+  unit: CreateProjectBlueprintInput["mainUnit"],
+  projectDepartmentIds: string[],
+  label: string,
+) => {
+  const normalizedDepartments = (unit.unitDepartments ?? []).map((bucket) => {
+    const departmentId = ensureValue(bucket.departmentId, `${label} department`);
+
+    if (!projectDepartmentIds.includes(departmentId)) {
+      throw new Error(`${label} uses a department outside the project pool.`);
+    }
+
+    ensureDepartmentExists(db, departmentId, `${label} department`);
+    ensureAssetIdsExist(db, uniqueValues(bucket.assetIds));
+
+    const normalizedCrewAssignments = (bucket.crewAssignments ?? []).map((assignment) => {
+      ensureCrewMemberExists(db, assignment.crewMemberId);
+      const startDate = normalizeDateOnly(assignment.startDate);
+      const endDate = normalizeDateOnly(assignment.endDate);
+      assertDateWindow(startDate, endDate, `${label} crew assignment`);
+      return {
+        crewMemberId: assignment.crewMemberId,
+        roleLabel: normalizeOptionalText(assignment.roleLabel),
+        startDate,
+        endDate,
+        notes: normalizeOptionalText(assignment.notes),
+      };
+    });
+
+    const packingSeed =
+      bucket.packingSeed?.mode === "existing"
+        ? {
+            mode: "existing" as const,
+            packingSlipId: ensureValue(bucket.packingSeed.packingSlipId, `${label} packing slip`),
+          }
+        : bucket.packingSeed?.mode === "draft"
+          ? {
+              mode: "draft" as const,
+              label: normalizeOptionalText(bucket.packingSeed.label),
+              responsibleUserId: normalizeOptionalText(bucket.packingSeed.responsibleUserId),
+              notes: normalizeOptionalText(bucket.packingSeed.notes),
+            }
+          : {
+              mode: "none" as const,
+            };
+
+    if (packingSeed.mode === "draft" && packingSeed.responsibleUserId) {
+      ensureUserExists(db, packingSeed.responsibleUserId, `${label} responsible user`);
+    }
+
+    return {
+      departmentId,
+      assetIds: uniqueValues(bucket.assetIds),
+      crewAssignments: normalizedCrewAssignments,
+      packingSeed,
+    } satisfies NormalizedUnitDepartment;
+  });
+
+  const declaredDepartmentIds = normalizeDepartmentIds(unit.departmentIds);
+  ensureDepartmentIdsExist(db, declaredDepartmentIds, `${label} department`);
+
+  normalizedDepartments.forEach((bucket) => {
+    if (!declaredDepartmentIds.includes(bucket.departmentId)) {
+      throw new Error(`${label} has resources assigned to a department that is not enabled for that unit.`);
+    }
+  });
+
+  return normalizedDepartments;
+};
+
+const assertUnitWindowsWithinProjectWindow = (
+  projectStartDate: string | null,
+  projectEndDate: string | null,
+  windows: NormalizedUnitWindow[],
+  label: string,
+) => {
+  windows.forEach((window) => {
+    assertUnitWithinProjectWindow(projectStartDate, projectEndDate, window.startDate, window.endDate);
+    assertDateWindow(window.startDate, window.endDate, `${label} window`);
+  });
+};
+
+const windowsOverlap = (leftWindows: Array<{ startDate: string | null; endDate: string | null }>, rightWindows: Array<{ startDate: string | null; endDate: string | null }>) =>
+  leftWindows.some((leftWindow) =>
+    rightWindows.some((rightWindow) => resolveDateOverlap(leftWindow.startDate, leftWindow.endDate, rightWindow.startDate, rightWindow.endDate)),
+  );
 
 const resolveClientReference = (db: DatabaseSync, input: { clientId?: string; clientName?: string }) => {
   const directClientId = input.clientId?.trim();
@@ -334,6 +512,54 @@ const assertCodeAvailability = (db: DatabaseSync, code: string, currentProjectId
   if (existingProject) {
     throw new Error(`Project code ${code} is already in use.`);
   }
+};
+
+const buildGeneratedProjectCodeBase = (projectName: string) => {
+  const tokens = projectName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-zA-Z0-9]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  if (tokens.length >= 2) {
+    const initials = tokens
+      .slice(0, 4)
+      .map((token) => token[0] ?? "")
+      .join("");
+    return normalizeCodeToken(initials) || "PRJ";
+  }
+
+  if (tokens.length === 1) {
+    return normalizeCodeToken(tokens[0]!.slice(0, 6)) || "PRJ";
+  }
+
+  return "PRJ";
+};
+
+const resolveBlueprintProjectCode = (db: DatabaseSync, inputCode: string | undefined, projectName: string) => {
+  const explicitCode = inputCode?.trim();
+
+  if (explicitCode) {
+    const normalizedCode = ensureValue(explicitCode, "Project code").toUpperCase();
+    assertCodeAvailability(db, normalizedCode);
+    return normalizedCode;
+  }
+
+  const baseCode = buildGeneratedProjectCodeBase(projectName);
+
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    const candidateCode = attempt === 0 ? baseCode : `${baseCode}-${attempt + 1}`;
+
+    try {
+      assertCodeAvailability(db, candidateCode);
+      return candidateCode;
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error("Unable to generate a unique project code automatically.");
 };
 
 const assertProjectUnitCodeAvailability = (db: DatabaseSync, projectId: string, code: string, currentUnitId?: string) => {
@@ -686,8 +912,8 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
 
   createProjectBlueprint(input: CreateProjectBlueprintInput) {
     const now = new Date().toISOString();
-    const code = ensureValue(input.generalInfo.code, "Project code").toUpperCase();
     const name = ensureValue(input.generalInfo.name, "Project name");
+    const code = resolveBlueprintProjectCode(db, input.generalInfo.code, name);
     const client = resolveClientReference(db, input.generalInfo);
     const productionCompany = resolveProductionCompanyReference(db, input.generalInfo);
     const startDate = normalizeDateOnly(input.generalInfo.startDate);
@@ -696,21 +922,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
     const preproductionStartDate = normalizeDateOnly(input.generalInfo.preproductionStartDate);
     const preproductionEndDate = normalizeDateOnly(input.generalInfo.preproductionEndDate);
     const colorKey = normalizeColorKey(input.generalInfo.colorKey);
-    const mainUnitStartDate = startDate;
-    const mainUnitEndDate = endDate;
-    const mainUnitAssetIds = uniqueValues(input.mainUnit.assetIds);
-    const draftSlipAssetIds =
-      input.packingSelection.mode === "existing"
-        ? (() => {
-            const rows = db
-              .prepare("SELECT asset_id FROM packing_slip_items WHERE packing_slip_id = ? ORDER BY asset_id")
-              .all(input.packingSelection.packingSlipId) as Array<{ asset_id: string }>;
-            return rows.map((row) => row.asset_id);
-          })()
-        : [];
-    const combinedMainUnitAssetIds = uniqueValues(
-      (input.packingSelection.mode === "existing" ? draftSlipAssetIds : []).concat(mainUnitAssetIds),
-    );
+    const projectDepartmentIds = normalizeDepartmentIds(input.generalInfo.departmentIds);
     const projectId = `project-${slugify(code)}-${Date.now().toString(36)}`;
     const mainUnitId = `unit-${slugify(projectId)}-main`;
     const defaultActorUserId = "user-ops";
@@ -718,64 +930,200 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
 
     assertDateWindow(startDate, endDate, "Project");
     assertPreproductionWindow(hasPreproduction, preproductionStartDate, preproductionEndDate, startDate);
-    assertCodeAvailability(db, code);
-    ensureAssetIdsExist(db, combinedMainUnitAssetIds);
+    ensureDepartmentIdsExist(db, projectDepartmentIds, "Project department");
+
+    const departmentRows = projectDepartmentIds.length
+      ? (db
+          .prepare(`SELECT id, name FROM departments WHERE id IN (${projectDepartmentIds.map(() => "?").join(", ")})`)
+          .all(...projectDepartmentIds) as Array<{ id: string; name: string }>)
+      : [];
+    const departmentNameById = new Map(departmentRows.map((row) => [row.id, row.name] as const));
+
+    const mainUnitWindows: NormalizedUnitWindow[] = [
+      {
+        id: `unit-window-${slugify(code)}-main`,
+        startDate,
+        endDate,
+        sortOrder: 0,
+        label: null,
+      },
+    ];
+
+    const normalizedMainUnit = {
+      id: mainUnitId,
+      code: "MAIN",
+      name: "Main Unit",
+      sortOrder: 0,
+      colorKey,
+      startDate,
+      endDate,
+      windows: mainUnitWindows,
+      notes: normalizeOptionalText(input.mainUnit.notes),
+      departmentIds: normalizeDepartmentIds(input.mainUnit.departmentIds),
+      unitDepartments: normalizeUnitDepartments(db, input.mainUnit, projectDepartmentIds, "Main Unit"),
+    };
+
+    normalizedMainUnit.departmentIds.forEach((departmentId) => {
+      if (!projectDepartmentIds.includes(departmentId)) {
+        throw new Error("Main Unit uses a department outside the project pool.");
+      }
+    });
 
     const normalizedAdditionalUnits = input.additionalUnits.map((unit, index) => {
-      const unitStartDate = normalizeDateOnly(unit.startDate);
-      const unitEndDate = normalizeDateOnly(unit.endDate);
+      const unitWindows = normalizeUnitWindows(unit.windows, unit.name || `Additional unit ${index + 1}`);
       const resolvedCode = ensureValue(unit.code?.trim() || `${code}-${index + 2}U`, "Unit code").toUpperCase();
-
-      assertDateWindow(unitStartDate, unitEndDate, "Project unit");
-      assertUnitWithinProjectWindow(startDate, endDate, unitStartDate, unitEndDate);
-
-      ensureAssetIdsExist(db, uniqueValues(unit.assetIds));
+      assertUnitWindowsWithinProjectWindow(startDate, endDate, unitWindows, "Project unit");
+      const unitBounds = deriveUnitBoundsFromWindows(unitWindows);
       assertProjectUnitCodeAvailability(db, projectId, resolvedCode);
+
+      const departmentIds = normalizeDepartmentIds(unit.departmentIds);
+      ensureDepartmentIdsExist(db, departmentIds, "Unit department");
+      departmentIds.forEach((departmentId) => {
+        if (!projectDepartmentIds.includes(departmentId)) {
+          throw new Error(`${unit.name || `Additional unit ${index + 1}`} uses a department outside the project pool.`);
+        }
+      });
 
       return {
         ...unit,
-        assetIds: uniqueValues(unit.assetIds),
         code: resolvedCode,
         id: unit.id?.trim() || `unit-${slugify(projectId)}-${slugify(resolvedCode)}-${Date.now().toString(36)}-${index}`,
         sortOrder: unit.sortOrder ?? index + 1,
-        startDate: unitStartDate,
-        endDate: unitEndDate,
+        startDate: unitBounds.startDate,
+        endDate: unitBounds.endDate,
+        windows: unitWindows,
+        notes: normalizeOptionalText(unit.notes),
+        departmentIds,
+        unitDepartments: normalizeUnitDepartments(db, unit, projectDepartmentIds, unit.name || `Additional unit ${index + 1}`),
       };
     });
 
     const crewAssignmentDrafts = [
-      ...input.mainUnit.crewAssignments.map((assignment) => ({
-        ...assignment,
-        unitId: mainUnitId,
-        unitName: "Main Unit",
-        unitStartDate: mainUnitStartDate,
-        unitEndDate: mainUnitEndDate,
-      })),
-      ...normalizedAdditionalUnits.flatMap((unit) =>
-        unit.crewAssignments.map((assignment) => ({
+      ...normalizedMainUnit.unitDepartments.flatMap((bucket) =>
+        bucket.crewAssignments.map((assignment) => ({
           ...assignment,
-          unitId: unit.id!,
-          unitName: unit.name,
-          unitStartDate: unit.startDate ?? null,
-          unitEndDate: unit.endDate ?? null,
+          departmentId: bucket.departmentId,
+          departmentName: departmentNameById.get(bucket.departmentId) ?? "Department",
+          unitId: normalizedMainUnit.id,
+          unitName: normalizedMainUnit.name,
+          unitWindows: normalizedMainUnit.windows,
+          unitStartDate: startDate,
+          unitEndDate: endDate,
         })),
+      ),
+      ...normalizedAdditionalUnits.flatMap((unit) =>
+        unit.unitDepartments.flatMap((bucket) =>
+          bucket.crewAssignments.map((assignment) => ({
+            ...assignment,
+            departmentId: bucket.departmentId,
+            departmentName: departmentNameById.get(bucket.departmentId) ?? "Department",
+            unitId: unit.id!,
+            unitName: unit.name,
+            unitWindows: unit.windows,
+            unitStartDate: unit.startDate ?? null,
+            unitEndDate: unit.endDate ?? null,
+          })),
+        ),
       ),
     ];
 
     crewAssignmentDrafts.forEach((assignment) => {
-      ensureCrewMemberExists(db, assignment.crewMemberId);
       const assignmentStartDate = normalizeDateOnly(assignment.startDate);
       const assignmentEndDate = normalizeDateOnly(assignment.endDate);
       assertDateWindow(assignmentStartDate, assignmentEndDate, "Crew assignment");
-      assertUnitWithinProjectWindow(
-        assignment.unitStartDate,
-        assignment.unitEndDate,
-        assignmentStartDate,
-        assignmentEndDate,
-      );
+      assertUnitWithinProjectWindow(assignment.unitStartDate, assignment.unitEndDate, assignmentStartDate, assignmentEndDate);
     });
 
-    const conflictingProjectsByAsset = combinedMainUnitAssetIds.concat(...normalizedAdditionalUnits.flatMap((unit) => unit.assetIds));
+    for (let index = 0; index < crewAssignmentDrafts.length; index += 1) {
+      for (let nextIndex = index + 1; nextIndex < crewAssignmentDrafts.length; nextIndex += 1) {
+        const left = crewAssignmentDrafts[index];
+        const right = crewAssignmentDrafts[nextIndex];
+
+        if (left.crewMemberId !== right.crewMemberId) {
+          continue;
+        }
+
+        const leftWindows =
+          left.startDate || left.endDate
+            ? [{ startDate: normalizeDateOnly(left.startDate), endDate: normalizeDateOnly(left.endDate) }]
+            : left.unitWindows;
+        const rightWindows =
+          right.startDate || right.endDate
+            ? [{ startDate: normalizeDateOnly(right.startDate), endDate: normalizeDateOnly(right.endDate) }]
+            : right.unitWindows;
+
+        if (!windowsOverlap(leftWindows, rightWindows)) {
+          continue;
+        }
+
+        const crewMember = db
+          .prepare("SELECT COALESCE(full_name, 'Crew member') AS full_name FROM crew_members WHERE id = ? LIMIT 1")
+          .get(left.crewMemberId) as { full_name: string } | undefined;
+
+        throw new Error(
+          `${crewMember?.full_name ?? "Crew member"} overlaps within this setup between ${left.unitName} / ${left.departmentName} and ${right.unitName} / ${right.departmentName}. Reassign that crew member first.`,
+        );
+      }
+    }
+
+    const assignmentBuckets = [
+      {
+        unitId: normalizedMainUnit.id,
+        unitName: normalizedMainUnit.name,
+        windows: normalizedMainUnit.windows,
+        unitEndDate: endDate,
+        departments: normalizedMainUnit.unitDepartments,
+      },
+      ...normalizedAdditionalUnits.map((unit) => ({
+        unitId: unit.id!,
+        unitName: unit.name,
+        windows: unit.windows,
+        unitEndDate: unit.endDate ?? endDate,
+        departments: unit.unitDepartments,
+      })),
+    ];
+
+    const allAssetAssignments = assignmentBuckets.flatMap((unit) =>
+      unit.departments.map((bucket) => ({
+        unitId: unit.unitId,
+        unitName: unit.unitName,
+        windows: unit.windows,
+        unitEndDate: unit.unitEndDate,
+        departmentId: bucket.departmentId,
+        departmentName: departmentNameById.get(bucket.departmentId) ?? "Department",
+        assetIds: bucket.assetIds,
+        packingSeed: bucket.packingSeed,
+      })),
+    );
+
+    allAssetAssignments.forEach((bucket) => ensureAssetIdsExist(db, bucket.assetIds));
+
+    for (let index = 0; index < allAssetAssignments.length; index += 1) {
+      for (let nextIndex = index + 1; nextIndex < allAssetAssignments.length; nextIndex += 1) {
+        const left = allAssetAssignments[index];
+        const right = allAssetAssignments[nextIndex];
+
+        if (!windowsOverlap(left.windows, right.windows)) {
+          continue;
+        }
+
+        const duplicateAssetId = left.assetIds.find((assetId) => right.assetIds.includes(assetId));
+        if (!duplicateAssetId) {
+          continue;
+        }
+
+        const asset = db
+          .prepare("SELECT name FROM assets WHERE id = ? LIMIT 1")
+          .get(duplicateAssetId) as { name: string } | undefined;
+
+        throw new Error(
+          `${asset?.name ?? "Asset"} overlaps within this setup between ${left.unitName} / ${left.departmentName} and ${right.unitName} / ${right.departmentName}. Reassign that asset first.`,
+        );
+      }
+    }
+
+    const conflictingProjectsByAsset = uniqueValues(allAssetAssignments.flatMap((bucket) => bucket.assetIds));
+
     if (conflictingProjectsByAsset.length) {
       const placeholders = conflictingProjectsByAsset.map(() => "?").join(", ");
       const assetRows = db
@@ -786,13 +1134,17 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
               assets.name AS asset_name,
               projects.name AS project_name,
               projects.status AS project_status,
+              project_units.name AS unit_name,
               project_units.status AS unit_status,
-              COALESCE(project_units.start_date, projects.start_date) AS start_date,
-              COALESCE(project_units.end_date, projects.end_date) AS end_date
+              departments.name AS department_name,
+              COALESCE(project_unit_windows.start_date, project_units.start_date, projects.start_date) AS start_date,
+              COALESCE(project_unit_windows.end_date, project_units.end_date, projects.end_date) AS end_date
             FROM asset_current_state
             JOIN assets ON assets.id = asset_current_state.asset_id
             LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
             LEFT JOIN project_units ON project_units.id = asset_current_state.project_unit_id
+            LEFT JOIN departments ON departments.id = asset_current_state.current_department_id
+            LEFT JOIN project_unit_windows ON project_unit_windows.project_unit_id = project_units.id
             WHERE asset_current_state.asset_id IN (${placeholders})
               AND asset_current_state.current_project_id IS NOT NULL
           `,
@@ -802,31 +1154,29 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
         asset_name: string;
         project_name: string | null;
         project_status: string | null;
+        unit_name: string | null;
         unit_status: string | null;
+        department_name: string | null;
         start_date: string | null;
         end_date: string | null;
       }>;
-
-      const allUnitWindows = [
-        { name: "Main Unit", assetIds: combinedMainUnitAssetIds, startDate: mainUnitStartDate, endDate: mainUnitEndDate },
-        ...normalizedAdditionalUnits.map((unit) => ({
-          name: unit.name,
-          assetIds: unit.assetIds,
-          startDate: unit.startDate ?? null,
-          endDate: unit.endDate ?? null,
-        })),
-      ];
 
       const conflictingAsset = assetRows.find((row) => {
         if (!row.project_status || !row.project_name || row.project_status === "Wrapped" || row.unit_status === "cancelled" || row.unit_status === "wrapped") {
           return false;
         }
 
-        return allUnitWindows.some((unit) => unit.assetIds.includes(row.asset_id) && resolveDateOverlap(unit.startDate, unit.endDate, row.start_date, row.end_date));
+        return allAssetAssignments.some(
+          (bucket) =>
+            bucket.assetIds.includes(row.asset_id) &&
+            windowsOverlap(bucket.windows, [{ startDate: row.start_date, endDate: row.end_date }]),
+        );
       });
 
       if (conflictingAsset) {
-        throw new Error(`${conflictingAsset.asset_name} overlaps with ${conflictingAsset.project_name}. Resolve that asset conflict first.`);
+        throw new Error(
+          `${conflictingAsset.asset_name} overlaps with ${conflictingAsset.project_name} / ${conflictingAsset.unit_name ?? "Main Unit"}${conflictingAsset.department_name ? ` / ${conflictingAsset.department_name}` : ""}. Resolve that asset conflict first.`,
+        );
       }
     }
 
@@ -842,12 +1192,14 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
               projects.status AS project_status,
               project_units.name AS unit_name,
               project_units.status AS unit_status,
+              departments.name AS department_name,
               COALESCE(project_unit_crew_assignments.start_date, project_units.start_date, projects.start_date) AS start_date,
               COALESCE(project_unit_crew_assignments.end_date, project_units.end_date, projects.end_date) AS end_date
             FROM project_unit_crew_assignments
             JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
             JOIN projects ON projects.id = project_units.project_id
             LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
+            LEFT JOIN departments ON departments.id = project_unit_crew_assignments.department_id
             WHERE project_unit_crew_assignments.crew_member_id IN (${placeholders})
           `,
         )
@@ -858,6 +1210,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
         project_status: string;
         unit_name: string;
         unit_status: string;
+        department_name: string | null;
         start_date: string | null;
         end_date: string | null;
       }>;
@@ -868,24 +1221,21 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
         }
 
         return crewAssignmentDrafts.some((assignment) => {
-          const assignmentStartDate = normalizeDateOnly(assignment.startDate);
-          const assignmentEndDate = normalizeDateOnly(assignment.endDate);
-          const fallbackStartDate = assignment.unitStartDate;
-          const fallbackEndDate = assignment.unitEndDate;
+          const assignmentWindows =
+            assignment.startDate || assignment.endDate
+              ? [{ startDate: normalizeDateOnly(assignment.startDate), endDate: normalizeDateOnly(assignment.endDate) }]
+              : assignment.unitWindows;
           return (
             assignment.crewMemberId === row.crew_member_id &&
-            resolveDateOverlap(
-              assignmentStartDate ?? fallbackStartDate,
-              assignmentEndDate ?? fallbackEndDate,
-              row.start_date,
-              row.end_date,
-            )
+            windowsOverlap(assignmentWindows, [{ startDate: row.start_date, endDate: row.end_date }])
           );
         });
       });
 
       if (conflictingCrew) {
-        throw new Error(`${conflictingCrew.crew_name} overlaps with ${conflictingCrew.project_name} / ${conflictingCrew.unit_name}. Resolve that crew conflict first.`);
+        throw new Error(
+          `${conflictingCrew.crew_name} overlaps with ${conflictingCrew.project_name} / ${conflictingCrew.unit_name}${conflictingCrew.department_name ? ` / ${conflictingCrew.department_name}` : ""}. Resolve that crew conflict first.`,
+        );
       }
     }
 
@@ -937,6 +1287,14 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
         now,
       );
 
+      const insertProjectDepartment = db.prepare(
+        `
+          INSERT OR IGNORE INTO project_departments (project_id, department_id, created_at)
+          VALUES (?, ?, ?)
+        `,
+      );
+      projectDepartmentIds.forEach((departmentId) => insertProjectDepartment.run(projectId, departmentId, now));
+
       const insertUnit = db.prepare(
         `
           INSERT INTO project_units (
@@ -959,25 +1317,50 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       );
+      const insertUnitWindow = db.prepare(
+        `
+          INSERT INTO project_unit_windows (
+            id,
+            project_unit_id,
+            start_date,
+            end_date,
+            sort_order,
+            label,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      );
+      const insertUnitDepartment = db.prepare(
+        `
+          INSERT OR IGNORE INTO project_unit_departments (project_unit_id, department_id, created_at)
+          VALUES (?, ?, ?)
+        `,
+      );
 
-      const mainDerived = resolveDerivedStatusRow(mainUnitStartDate, mainUnitEndDate, null, null);
+      const mainDerived = resolveDerivedStatusRow(startDate, endDate, null, null);
       insertUnit.run(
-        mainUnitId,
+        normalizedMainUnit.id,
         workspaceId,
         projectId,
-        "MAIN",
-        "Main Unit",
+        normalizedMainUnit.code,
+        normalizedMainUnit.name,
         0,
         mainDerived.status,
         mainDerived.statusSource,
         colorKey,
-        mainUnitStartDate,
-        mainUnitEndDate,
-        normalizeOptionalText(input.mainUnit.notes),
+        startDate,
+        endDate,
+        normalizedMainUnit.notes,
         1,
         now,
         now,
       );
+      normalizedMainUnit.windows.forEach((window, index) => {
+        insertUnitWindow.run(window.id || `unit-window-${normalizedMainUnit.id}-${index}`, normalizedMainUnit.id, window.startDate, window.endDate, window.sortOrder, window.label, now, now);
+      });
+      normalizedMainUnit.departmentIds.forEach((departmentId) => insertUnitDepartment.run(normalizedMainUnit.id, departmentId, now));
 
       normalizedAdditionalUnits.forEach((unit) => {
         const derived = resolveDerivedStatusRow(unit.startDate ?? null, unit.endDate ?? null, null, null);
@@ -993,11 +1376,15 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
           normalizeColorKey(unit.colorKey),
           unit.startDate ?? null,
           unit.endDate ?? null,
-          normalizeOptionalText(unit.notes),
+          unit.notes,
           0,
           now,
           now,
         );
+        unit.windows.forEach((window, index) => {
+          insertUnitWindow.run(window.id || `unit-window-${unit.id}-${index}`, unit.id, window.startDate, window.endDate, window.sortOrder, window.label, now, now);
+        });
+        unit.departmentIds.forEach((departmentId) => insertUnitDepartment.run(unit.id!, departmentId, now));
       });
 
       const insertCrewAssignment = db.prepare(
@@ -1006,6 +1393,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
             id,
             workspace_id,
             project_unit_id,
+            department_id,
             crew_member_id,
             role_label,
             start_date,
@@ -1014,7 +1402,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
             created_at,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       );
 
@@ -1023,42 +1411,46 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
           `unit-crew-${Date.now().toString(36)}-${index}`,
           workspaceId,
           assignment.unitId,
+          assignment.departmentId,
           assignment.crewMemberId,
-          normalizeOptionalText(assignment.roleLabel),
+          assignment.roleLabel,
           normalizeDateOnly(assignment.startDate) ?? assignment.unitStartDate,
           normalizeDateOnly(assignment.endDate) ?? assignment.unitEndDate,
-          normalizeOptionalText(assignment.notes),
+          assignment.notes,
           now,
           now,
         );
       });
 
-      const assetRows = db
-        .prepare(
-          `
-            SELECT
-              asset_current_state.asset_id,
-              asset_current_state.current_location_id,
-              asset_current_state.current_department_id,
-              asset_current_state.current_responsible_user_id,
-              asset_current_state.active_assignment_id,
-              asset_current_state.condition_status,
-              asset_current_state.operational_status,
-              asset_current_state.custody_status
-            FROM asset_current_state
-            WHERE asset_current_state.asset_id IN (${uniqueValues(combinedMainUnitAssetIds.concat(...normalizedAdditionalUnits.flatMap((unit) => unit.assetIds))).map(() => "?").join(", ")})
-          `,
-        )
-        .all(...uniqueValues(combinedMainUnitAssetIds.concat(...normalizedAdditionalUnits.flatMap((unit) => unit.assetIds)))) as Array<{
-        asset_id: string;
-        current_location_id: string | null;
-        current_department_id: string | null;
-        current_responsible_user_id: string | null;
-        active_assignment_id: string | null;
-        condition_status: string;
-        operational_status: string;
-        custody_status: string;
-      }>;
+      const allAssetIds = uniqueValues(allAssetAssignments.flatMap((bucket) => bucket.assetIds));
+      const assetRows = allAssetIds.length
+        ? (db
+            .prepare(
+              `
+                SELECT
+                  asset_current_state.asset_id,
+                  asset_current_state.current_location_id,
+                  asset_current_state.current_department_id,
+                  asset_current_state.current_responsible_user_id,
+                  asset_current_state.active_assignment_id,
+                  asset_current_state.condition_status,
+                  asset_current_state.operational_status,
+                  asset_current_state.custody_status
+                FROM asset_current_state
+                WHERE asset_current_state.asset_id IN (${allAssetIds.map(() => "?").join(", ")})
+              `,
+            )
+            .all(...allAssetIds) as Array<{
+            asset_id: string;
+            current_location_id: string | null;
+            current_department_id: string | null;
+            current_responsible_user_id: string | null;
+            active_assignment_id: string | null;
+            condition_status: string;
+            operational_status: string;
+            custody_status: string;
+          }>)
+        : [];
       const assetRowMap = new Map(assetRows.map((row) => [row.asset_id, row] as const));
       const closeAssignment = db.prepare("UPDATE asset_assignments SET assignment_status = 'reassigned', updated_at = ? WHERE id = ?");
       const insertAssignment = db.prepare(
@@ -1115,6 +1507,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
           UPDATE asset_current_state
           SET
             current_project_id = ?,
+            current_department_id = ?,
             project_unit_id = ?,
             active_assignment_id = ?,
             last_event_id = ?,
@@ -1125,13 +1518,8 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
         `,
       );
 
-      const unitsForAssets = [
-        { id: mainUnitId, assetIds: combinedMainUnitAssetIds, endDate: mainUnitEndDate },
-        ...normalizedAdditionalUnits.map((unit) => ({ id: unit.id!, assetIds: unit.assetIds, endDate: unit.endDate ?? endDate })),
-      ];
-
-      unitsForAssets.forEach((unit, unitIndex) => {
-        unit.assetIds.forEach((assetId, assetIndex) => {
+      allAssetAssignments.forEach((bucket, unitIndex) => {
+        bucket.assetIds.forEach((assetId, assetIndex) => {
           const assetRow = assetRowMap.get(assetId);
 
           if (!assetRow) {
@@ -1154,14 +1542,14 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
             workspaceId,
             assetId,
             projectId,
-            assetRow.current_department_id,
-            unit.id,
+            bucket.departmentId,
+            bucket.unitId,
             assetRow.current_responsible_user_id,
             defaultActorUserId,
             assetRow.current_location_id,
             assetRow.current_location_id,
             "assigned",
-            unit.endDate,
+            bucket.unitEndDate,
             "Assigned during project setup wizard.",
             now,
             now,
@@ -1173,7 +1561,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
             assetId,
             assignmentId,
             projectId,
-            assetRow.current_department_id,
+            bucket.departmentId,
             defaultActorUserId,
             "assigned",
             assetRow.current_location_id,
@@ -1188,7 +1576,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
             now,
           );
 
-          updateAssetState.run(projectId, unit.id, assignmentId, eventId, now, assetId);
+          updateAssetState.run(projectId, bucket.departmentId, bucket.unitId, assignmentId, eventId, now, assetId);
         });
       });
 
@@ -1215,43 +1603,53 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
         });
       };
 
-      if (input.packingSelection.mode === "existing") {
-        const existingSlip = db
-          .prepare(
-            `
-              SELECT id
-              FROM packing_slips
-              WHERE id = ?
-                AND COALESCE(lifecycle_state, 'operational') = 'staging'
-              LIMIT 1
-            `,
-          )
-          .get(input.packingSelection.packingSlipId) as { id: string } | undefined;
-
-        if (!existingSlip) {
-          throw new Error("Selected staging packing slip was not found.");
+      allAssetAssignments.forEach((bucket) => {
+        const packingSeed = bucket.packingSeed ?? { mode: "none" as const };
+        if (packingSeed.mode === "none") {
+          return;
         }
 
-        db.prepare(
-          `
-            UPDATE packing_slips
-            SET
-              project_id = ?,
-              project_unit_id = ?,
-              lifecycle_state = 'operational',
-              status = 'Issued',
-              issue_date = ?,
-              updated_at = ?
-            WHERE id = ?
-          `,
-        ).run(projectId, mainUnitId, todayDateOnly(), now, existingSlip.id);
+        if (packingSeed.mode === "existing") {
+          const existingSlip = db
+            .prepare(
+              `
+                SELECT id, department_id
+                FROM packing_slips
+                WHERE id = ?
+                  AND COALESCE(lifecycle_state, 'operational') = 'staging'
+                LIMIT 1
+              `,
+            )
+            .get(packingSeed.packingSlipId) as { id: string; department_id: string | null } | undefined;
 
-        syncPackingSlipItems(existingSlip.id, combinedMainUnitAssetIds);
-      } else if (input.packingSelection.mode === "draft" && combinedMainUnitAssetIds.length > 0) {
-        ensureDepartmentExists(db, input.packingSelection.departmentId, "Selected department");
-        ensureUserExists(db, input.packingSelection.responsibleUserId, "Selected responsible user");
+          if (!existingSlip) {
+            throw new Error("Selected staging packing slip was not found.");
+          }
+
+          if (existingSlip.department_id && existingSlip.department_id !== bucket.departmentId) {
+            throw new Error(`Selected staging packing slip does not belong to ${bucket.departmentName}.`);
+          }
+
+          db.prepare(
+            `
+              UPDATE packing_slips
+              SET
+                project_id = ?,
+                project_unit_id = ?,
+                department_id = ?,
+                lifecycle_state = 'operational',
+                status = ?,
+                issue_date = ?,
+                updated_at = ?
+              WHERE id = ?
+            `,
+          ).run(projectId, bucket.unitId, bucket.departmentId, bucket.assetIds.length ? "Issued" : "Draft", todayDateOnly(), now, existingSlip.id);
+
+          syncPackingSlipItems(existingSlip.id, bucket.assetIds);
+          return;
+        }
+
         const nextPackingIdentifiers = buildPackingIdentifiers(getNextPackingSequence(db));
-
         db.prepare(
           `
             INSERT INTO packing_slips (
@@ -1271,25 +1669,26 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
               created_at,
               updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'operational', 'Issued', ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'operational', ?, ?, ?, ?, ?, ?)
           `,
         ).run(
           nextPackingIdentifiers.packingSlipId,
           workspaceId,
           projectId,
-          mainUnitId,
-          input.packingSelection.departmentId?.trim() || null,
+          bucket.unitId,
+          bucket.departmentId,
           defaultActorUserId,
-          input.packingSelection.responsibleUserId?.trim() || null,
+          packingSeed.responsibleUserId ?? null,
+          bucket.assetIds.length ? "Issued" : "Draft",
           todayDateOnly(),
-          endDate,
-          normalizeOptionalText(input.packingSelection.notes) ?? "Created during project setup wizard.",
+          bucket.unitEndDate,
+          packingSeed.notes ?? "Created during project setup wizard.",
           now,
           now,
         );
 
-        syncPackingSlipItems(nextPackingIdentifiers.packingSlipId, combinedMainUnitAssetIds);
-      }
+        syncPackingSlipItems(nextPackingIdentifiers.packingSlipId, bucket.assetIds);
+      });
 
       db.exec("COMMIT");
     } catch (error) {
@@ -1406,6 +1805,8 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
 
     const derived = resolveDerivedStatusRow(startDate, endDate, null, null);
 
+    const unitId = `unit-${slugify(input.projectId)}-${slugify(code)}-${Date.now().toString(36)}`;
+
     db.prepare(
       `
         INSERT INTO project_units (
@@ -1427,7 +1828,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     ).run(
-      `unit-${slugify(input.projectId)}-${slugify(code)}-${Date.now().toString(36)}`,
+      unitId,
       workspaceId,
       input.projectId,
       code,
@@ -1442,6 +1843,24 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
       now,
       now,
     );
+
+    if (startDate && endDate) {
+      db.prepare(
+        `
+          INSERT INTO project_unit_windows (
+            id,
+            project_unit_id,
+            start_date,
+            end_date,
+            sort_order,
+            label,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, 0, NULL, ?, ?)
+        `,
+      ).run(`unit-window-${unitId}-primary`, unitId, startDate, endDate, now, now);
+    }
   },
 
   updateProjectUnit(input: UpdateProjectUnitInput) {
@@ -1512,6 +1931,26 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
       input.unitId,
       input.projectId,
     );
+
+    db.prepare("DELETE FROM project_unit_windows WHERE project_unit_id = ?").run(input.unitId);
+
+    if (startDate && endDate) {
+      db.prepare(
+        `
+          INSERT INTO project_unit_windows (
+            id,
+            project_unit_id,
+            start_date,
+            end_date,
+            sort_order,
+            label,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, 0, NULL, ?, ?)
+        `,
+      ).run(`unit-window-${input.unitId}-primary`, input.unitId, startDate, endDate, now, now);
+    }
   },
 
   deleteProjectUnit(input: DeleteProjectUnitInput) {

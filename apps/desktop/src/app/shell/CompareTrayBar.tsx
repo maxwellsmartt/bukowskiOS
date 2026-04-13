@@ -29,7 +29,7 @@ export const CompareTrayBar = () => {
           <button
             className="ghost-control"
             disabled={!compatibleType || compatibleItems.length < 2}
-            title={reasonDisabled ?? "Comparison view is not available yet."}
+            data-tooltip={reasonDisabled ?? "Comparison view is not available yet."}
             onClick={() => {
               if (!compatibleType || compatibleItems.length < 2) {
                 return;
@@ -46,7 +46,13 @@ export const CompareTrayBar = () => {
                 : "Compare unavailable"}
             </span>
           </button>
-          <button aria-label="Clear compare tray" className="icon-ghost-control" onClick={clear} title="Clear tray" type="button">
+          <button
+            aria-label="Clear compare tray"
+            className="icon-ghost-control is-danger"
+            data-tooltip="Clear tray"
+            onClick={clear}
+            type="button"
+          >
             <Trash2 size={14} />
           </button>
         </div>
@@ -67,8 +73,8 @@ export const CompareTrayBar = () => {
                 <button
                   key={`${item.entityType}:${item.id}`}
                   className="compare-tray-chip"
+                  data-tooltip={`Remove ${item.label}`}
                   onClick={() => removeItem(item.entityType, item.id)}
-                  title={`Remove ${item.label}`}
                   type="button"
                 >
                   <span>{item.label}</span>

@@ -90,21 +90,7 @@ export type ProjectBlueprintCrewDraftInput = {
   notes?: string;
 };
 
-export type ProjectBlueprintUnitDraftInput = {
-  id?: string;
-  code?: string;
-  name: string;
-  suggestedPreset?: string;
-  sortOrder?: number;
-  colorKey?: string;
-  startDate?: string;
-  endDate?: string;
-  notes?: string;
-  assetIds: string[];
-  crewAssignments: ProjectBlueprintCrewDraftInput[];
-};
-
-export type ProjectBlueprintPackingSelection =
+export type ProjectBlueprintPackingSeed =
   | {
       mode: "none";
     }
@@ -115,14 +101,58 @@ export type ProjectBlueprintPackingSelection =
   | {
       mode: "draft";
       label?: string;
-      departmentId?: string;
       responsibleUserId?: string;
       notes?: string;
     };
 
+export type ProjectBlueprintUnitWindowInput = {
+  id?: string;
+  startDate?: string;
+  endDate?: string;
+  sortOrder?: number;
+  label?: string;
+};
+
+export type ProjectBlueprintUnitDepartmentDraftInput = {
+  departmentId: string;
+  assetIds: string[];
+  crewAssignments: ProjectBlueprintCrewDraftInput[];
+  packingSeed?: ProjectBlueprintPackingSeed;
+};
+
+export type ProjectBlueprintUnitDraftInput = {
+  id?: string;
+  code?: string;
+  name: string;
+  suggestedPreset?: string;
+  sortOrder?: number;
+  colorKey?: string;
+  windows: ProjectBlueprintUnitWindowInput[];
+  departmentIds: string[];
+  unitDepartments: ProjectBlueprintUnitDepartmentDraftInput[];
+  notes?: string;
+};
+
+export type ProjectBlueprintGeneralInfoInput = {
+  code?: string;
+  name: string;
+  clientId?: string;
+  clientName?: string;
+  productionCompanyId?: string;
+  productionCompanyName?: string;
+  status: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  hasPreproduction?: boolean;
+  preproductionStartDate?: string;
+  preproductionEndDate?: string;
+  colorKey: string;
+  departmentIds: string[];
+};
+
 export type CreateProjectBlueprintInput = {
-  generalInfo: CreateProjectInput;
+  generalInfo: ProjectBlueprintGeneralInfoInput;
   mainUnit: ProjectBlueprintUnitDraftInput;
   additionalUnits: ProjectBlueprintUnitDraftInput[];
-  packingSelection: ProjectBlueprintPackingSelection;
 };

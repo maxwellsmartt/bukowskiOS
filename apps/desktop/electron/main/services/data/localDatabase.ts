@@ -32,7 +32,11 @@ import { createPackingMutationService } from "./packingMutationService";
 import { cleanupPerformanceFoundationData, seedPerformanceFoundationData } from "./performanceFoundationSeed";
 import { seedFoundationData } from "./foundationSeed";
 import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
-import { applyProjectCreationWizardFoundationMigration } from "./projectCreationWizardFoundationBootstrap";
+import {
+  applyProjectCreationWizardFoundationMigration,
+  applyProjectDepartmentsMatrixFoundationMigration,
+  applyProjectUnitWindowsFoundationMigration,
+} from "./projectCreationWizardFoundationBootstrap";
 import { createProjectMutationService, ensureProjectShellDefaults } from "./projectMutationService";
 import { createRmaMutationService } from "./rmaMutationService";
 import { createRuntimeDiagnosticsService, type RuntimeDiagnosticsService } from "./runtimeDiagnosticsService";
@@ -155,6 +159,10 @@ const createRuntime = (): LocalDatabaseRuntime => {
   applyTrackedStep(database, "runtime_scheduling_foundation_v1", () => applySchedulingFoundationMigration(database));
   applyTrackedStep(database, "runtime_project_creation_wizard_v1", () =>
     applyProjectCreationWizardFoundationMigration(database),
+  );
+  applyTrackedStep(database, "runtime_project_unit_windows_v1", () => applyProjectUnitWindowsFoundationMigration(database));
+  applyTrackedStep(database, "runtime_project_departments_matrix_v1", () =>
+    applyProjectDepartmentsMatrixFoundationMigration(database),
   );
   applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database));
   applyTrackedStep(database, "runtime_operational_files_v2", () => applyOperationalFilesMigration(database));
