@@ -329,6 +329,20 @@ const resolveStatusTone = (status: string) => {
   return "neutral" as const;
 };
 
+const resolveIncidentTone = (severity: string) => {
+  const normalized = severity.toLowerCase();
+
+  if (normalized === "high") {
+    return "critical" as const;
+  }
+
+  if (normalized === "medium") {
+    return "warning" as const;
+  }
+
+  return "info" as const;
+};
+
 const resolveTimelinePalette = (colorKey: string | null) => colorMap[colorKey ?? "slate"] ?? colorMap.slate;
 
 const resolveDateLeft = (date: string, rangeStart: string, rangeEnd: string) => {
@@ -542,6 +556,50 @@ const TimelineGrid = ({
   </div>
 );
 
+const TimelineSignalRow = ({
+  incidents,
+  assets,
+  crew,
+}: {
+  incidents: number;
+  assets: number;
+  crew: number;
+}) => (
+  <div className="timeline-signal-row">
+    {incidents ? <span className="timeline-signal-chip is-critical">{incidents} incidents</span> : null}
+    {assets ? <span className="timeline-signal-chip">{assets} assets</span> : null}
+    {crew ? <span className="timeline-signal-chip is-info">{crew} crew</span> : null}
+    {!incidents && !assets && !crew ? <span className="timeline-signal-chip is-muted">No live load</span> : null}
+  </div>
+);
+
+const TimelineIncidentMarkers = ({
+  markers,
+  onHover,
+  onLeave,
+  rangeEnd,
+  rangeStart,
+}: {
+  markers: Array<{ id: string; title: string; severity: string; reportedAt: string }>;
+  onHover: (event: ReactPointerEvent<HTMLDivElement>, title: string, severity: string, reportedAt: string) => void;
+  onLeave: () => void;
+  rangeEnd: string;
+  rangeStart: string;
+}) => (
+  <>
+    {markers.map((marker) => (
+      <div
+        key={marker.id}
+        className={`timeline-incident-marker timeline-incident-marker-${marker.severity.toLowerCase()}`}
+        onPointerEnter={(event) => onHover(event, marker.title, marker.severity, marker.reportedAt)}
+        onPointerLeave={onLeave}
+        onPointerMove={(event) => onHover(event, marker.title, marker.severity, marker.reportedAt)}
+        style={{ left: `${resolveDateLeft(marker.reportedAt, rangeStart, rangeEnd)}%` }}
+      />
+    ))}
+  </>
+);
+
 const TimelineLane = ({
   bands,
   interactionHandlers,
@@ -586,16 +644,21 @@ const TimelineLane = ({
           </button>
 
           <div className="timeline-lane-copy">
-            <div className="timeline-lane-title-row">
-              <strong className="timeline-lane-title">{project.name}</strong>
-              <StatusBadge tone={resolveStatusTone(project.status)}>{project.status}</StatusBadge>
-            </div>
-            <span className="timeline-lane-subtitle">
-              {formatRangeLabel(project.startDate, project.endDate)}
-              {project.units.length ? ` · ${project.units.length} units` : ""}
-            </span>
-          </div>
-        </div>
+                    <div className="timeline-lane-title-row">
+                      <strong className="timeline-lane-title">{project.name}</strong>
+                      <StatusBadge tone={resolveStatusTone(project.status)}>{project.status}</StatusBadge>
+                    </div>
+                    <span className="timeline-lane-subtitle">
+                      {formatRangeLabel(project.startDate, project.endDate)}
+                      {project.units.length ? ` · ${project.units.length} units` : ""}
+                    </span>
+                    <TimelineSignalRow
+                      assets={project.assignedAssetCount}
+                      crew={project.crewAssignmentCount}
+                      incidents={project.activeIncidentCount}
+                    />
+                  </div>
+                </div>
 
         <div className="timeline-track">
           <div
@@ -626,6 +689,25 @@ const TimelineLane = ({
                 }
               />
             ) : null}
+            <TimelineIncidentMarkers
+              markers={project.incidentMarkers}
+              onHover={(event, title, severity, reportedAt) =>
+                onBarHover(
+                  event,
+                  {
+                    ...project,
+                    name: title,
+                    status: severity,
+                    startDate: reportedAt,
+                    endDate: reportedAt,
+                  },
+                  "Incident",
+                )
+              }
+              onLeave={onBarLeave}
+              rangeEnd={rangeEnd}
+              rangeStart={rangeStart}
+            />
           </div>
         </div>
       </div>
@@ -657,6 +739,11 @@ const TimelineLane = ({
                       <StatusBadge tone={resolveStatusTone(unit.status)}>{unit.status}</StatusBadge>
                     </div>
                     <span className="timeline-lane-subtitle">{formatRangeLabel(unit.startDate, unit.endDate)}</span>
+                    <TimelineSignalRow
+                      assets={unit.assignedAssetCount}
+                      crew={unit.crewAssignmentCount}
+                      incidents={unit.activeIncidentCount}
+                    />
                   </div>
                 </div>
 
@@ -689,6 +776,25 @@ const TimelineLane = ({
                         }
                       />
                     ) : null}
+                    <TimelineIncidentMarkers
+                      markers={unit.incidentMarkers}
+                      onHover={(event, title, severity, reportedAt) =>
+                        onBarHover(
+                          event,
+                          {
+                            ...unit,
+                            name: title,
+                            status: severity,
+                            startDate: reportedAt,
+                            endDate: reportedAt,
+                          },
+                          `${project.name} · incident`,
+                        )
+                      }
+                      onLeave={onBarLeave}
+                      rangeEnd={rangeEnd}
+                      rangeStart={rangeStart}
+                    />
                   </div>
                 </div>
               </div>

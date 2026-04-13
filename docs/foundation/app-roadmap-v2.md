@@ -167,7 +167,30 @@
   - `bajo`: el cleanup en retention queda listo para un follow-up cuando se active borrado suave de archivos operativos
 
 ### Slice O4 — Timeline enriquecida v1
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - añadir señales operativas visibles al timeline sin romper legibilidad ni performance
+- Área:
+  - backend / frontend
+- Qué cambió:
+  - el snapshot del timeline ahora incluye:
+    - `activeIncidentCount`
+    - `assignedAssetCount`
+    - `crewAssignmentCount`
+    - `incidentMarkers`
+  - esas señales se muestran en la lane de proyecto y unidad con chips compactos
+  - los incidents activos ahora aparecen como markers visuales dentro del rango temporal
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - el timeline ya da contexto de carga operativa sin tener que abrir cada proyecto
+  - prueba de lectura actualizada para el shape enriquecido del snapshot
+- Riesgos remanentes:
+  - `medio`: esto es una v1 visible, no conflict detection completa
+  - `medio`: si aparecen demasiados incidents en un mismo proyecto, los markers podrían necesitar stacking o filtrado más fino
+  - `bajo`: el tooltip de incidents reutiliza la infraestructura existente; si luego quieres drill-down directo, conviene un follow-up específico
 
 ### Slice O5 — Conflict detection v1
 - Estado: `planned`

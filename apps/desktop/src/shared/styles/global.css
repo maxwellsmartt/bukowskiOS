@@ -2550,6 +2550,40 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   font-size: 11px;
 }
 
+.timeline-signal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.timeline-signal-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.038);
+  color: var(--text-secondary);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+.timeline-signal-chip.is-info {
+  background: rgba(129, 212, 250, 0.12);
+  color: rgba(129, 212, 250, 0.98);
+}
+
+.timeline-signal-chip.is-critical {
+  background: rgba(255, 138, 128, 0.12);
+  color: rgba(255, 138, 128, 0.98);
+}
+
+.timeline-signal-chip.is-muted {
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.4);
+}
+
 .timeline-track {
   display: flex;
   align-items: center;
@@ -2629,6 +2663,30 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .timeline-bar-unit {
   height: 5px;
+}
+
+.timeline-incident-marker {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(12, 15, 20, 0.82);
+  border-radius: 2px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.timeline-incident-marker-high {
+  background: rgba(255, 138, 128, 0.98);
+}
+
+.timeline-incident-marker-medium {
+  background: rgba(255, 213, 79, 0.98);
+}
+
+.timeline-incident-marker-low {
+  background: rgba(129, 212, 250, 0.95);
 }
 
 .timeline-shared-playhead,

@@ -112,6 +112,10 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         startDate: string | null;
         endDate: string | null;
         activeUnitCount: number;
+        activeIncidentCount: number;
+        assignedAssetCount: number;
+        crewAssignmentCount: number;
+        incidentMarkers: ScheduleTimelineSnapshot["projects"][number]["incidentMarkers"];
         units: ScheduleTimelineSnapshot["projects"][number]["units"];
       }
     >();
@@ -129,6 +133,10 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           startDate: row.project_start_date,
           endDate: row.project_end_date,
           activeUnitCount: 0,
+          activeIncidentCount: 0,
+          assignedAssetCount: 0,
+          crewAssignmentCount: 0,
+          incidentMarkers: [],
           units: [],
         };
 
@@ -158,6 +166,10 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           startDate: row.unit_start_date,
           endDate: row.unit_end_date,
           sortOrder: row.unit_sort_order ?? 0,
+          activeIncidentCount: 0,
+          assignedAssetCount: 0,
+          crewAssignmentCount: 0,
+          incidentMarkers: [],
         });
       }
     });
@@ -217,6 +229,131 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
     const offset = Math.max(0, pagination?.offset ?? 0);
     const limit = Math.max(1, pagination?.limit ?? 24);
     const pagedProjects = scheduledProjects.slice(offset, offset + limit);
+
+    if (pagedProjects.length) {
+      const pagedProjectIds = pagedProjects.map((project) => project.id);
+      const pagedUnitIds = pagedProjects.flatMap((project) => project.units.map((unit) => unit.id));
+      const projectIdPlaceholders = pagedProjectIds.map(() => "?").join(", ");
+
+      const projectAssetCounts = db
+        .prepare(
+          `
+            SELECT current_project_id AS project_id, COUNT(*) AS asset_count
+            FROM asset_current_state
+            WHERE current_project_id IN (${projectIdPlaceholders})
+            GROUP BY current_project_id
+          `,
+        )
+        .all(...pagedProjectIds) as Array<{ project_id: string; asset_count: number }>;
+
+      const projectCrewCounts = db
+        .prepare(
+          `
+            SELECT project_units.project_id, COUNT(DISTINCT project_unit_crew_assignments.crew_member_id) AS crew_count
+            FROM project_unit_crew_assignments
+            JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
+            WHERE project_units.project_id IN (${projectIdPlaceholders})
+            GROUP BY project_units.project_id
+          `,
+        )
+        .all(...pagedProjectIds) as Array<{ project_id: string; crew_count: number }>;
+
+      const activeIncidentRows = db
+        .prepare(
+          `
+            SELECT
+              id,
+              project_id,
+              project_unit_id,
+              title,
+              severity,
+              reported_at
+            FROM incidents
+            WHERE project_id IN (${projectIdPlaceholders})
+              AND status != 'Resolved'
+            ORDER BY reported_at DESC
+          `,
+        )
+        .all(...pagedProjectIds) as Array<{
+        id: string;
+        project_id: string;
+        project_unit_id: string | null;
+        title: string;
+        severity: string;
+        reported_at: string;
+      }>;
+
+      const unitAssetCounts = pagedUnitIds.length
+        ? (db
+            .prepare(
+              `
+                SELECT project_unit_id, COUNT(*) AS asset_count
+                FROM asset_current_state
+                WHERE project_unit_id IN (${pagedUnitIds.map(() => "?").join(", ")})
+                GROUP BY project_unit_id
+              `,
+            )
+            .all(...pagedUnitIds) as Array<{ project_unit_id: string; asset_count: number }>)
+        : [];
+
+      const unitCrewCounts = pagedUnitIds.length
+        ? (db
+            .prepare(
+              `
+                SELECT project_unit_id, COUNT(DISTINCT crew_member_id) AS crew_count
+                FROM project_unit_crew_assignments
+                WHERE project_unit_id IN (${pagedUnitIds.map(() => "?").join(", ")})
+                GROUP BY project_unit_id
+              `,
+            )
+            .all(...pagedUnitIds) as Array<{ project_unit_id: string; crew_count: number }>)
+        : [];
+
+      const projectAssetCountMap = new Map(projectAssetCounts.map((row) => [row.project_id, row.asset_count]));
+      const projectCrewCountMap = new Map(projectCrewCounts.map((row) => [row.project_id, row.crew_count]));
+      const unitAssetCountMap = new Map(unitAssetCounts.map((row) => [row.project_unit_id, row.asset_count]));
+      const unitCrewCountMap = new Map(unitCrewCounts.map((row) => [row.project_unit_id, row.crew_count]));
+      const incidentsByProject = new Map<string, typeof activeIncidentRows>();
+      const incidentsByUnit = new Map<string, typeof activeIncidentRows>();
+
+      activeIncidentRows.forEach((row) => {
+        const projectList = incidentsByProject.get(row.project_id) ?? [];
+        projectList.push(row);
+        incidentsByProject.set(row.project_id, projectList);
+
+        if (row.project_unit_id) {
+          const unitList = incidentsByUnit.get(row.project_unit_id) ?? [];
+          unitList.push(row);
+          incidentsByUnit.set(row.project_unit_id, unitList);
+        }
+      });
+
+      pagedProjects.forEach((project) => {
+        const projectIncidents = incidentsByProject.get(project.id) ?? [];
+        project.assignedAssetCount = projectAssetCountMap.get(project.id) ?? 0;
+        project.crewAssignmentCount = projectCrewCountMap.get(project.id) ?? 0;
+        project.activeIncidentCount = projectIncidents.length;
+        project.incidentMarkers = projectIncidents.slice(0, 3).map((incident) => ({
+          id: incident.id,
+          title: incident.title,
+          severity: incident.severity,
+          reportedAt: incident.reported_at.slice(0, 10),
+        }));
+
+        project.units.forEach((unit) => {
+          const unitIncidents = incidentsByUnit.get(unit.id) ?? [];
+          unit.assignedAssetCount = unitAssetCountMap.get(unit.id) ?? 0;
+          unit.crewAssignmentCount = unitCrewCountMap.get(unit.id) ?? 0;
+          unit.activeIncidentCount = unitIncidents.length;
+          unit.incidentMarkers = unitIncidents.slice(0, 2).map((incident) => ({
+            id: incident.id,
+            title: incident.title,
+            severity: incident.severity,
+            reportedAt: incident.reported_at.slice(0, 10),
+          }));
+        });
+      });
+    }
 
     return {
       range,

@@ -47,6 +47,15 @@ export type ScheduleTimelineUnitLane = {
   startDate: string | null;
   endDate: string | null;
   sortOrder: number;
+  activeIncidentCount: number;
+  assignedAssetCount: number;
+  crewAssignmentCount: number;
+  incidentMarkers: Array<{
+    id: string;
+    title: string;
+    severity: string;
+    reportedAt: string;
+  }>;
 };
 
 export type ScheduleTimelineProjectLane = {
@@ -59,6 +68,15 @@ export type ScheduleTimelineProjectLane = {
   startDate: string | null;
   endDate: string | null;
   activeUnitCount: number;
+  activeIncidentCount: number;
+  assignedAssetCount: number;
+  crewAssignmentCount: number;
+  incidentMarkers: Array<{
+    id: string;
+    title: string;
+    severity: string;
+    reportedAt: string;
+  }>;
   units: ScheduleTimelineUnitLane[];
 };
 

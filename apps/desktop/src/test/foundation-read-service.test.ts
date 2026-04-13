@@ -66,6 +66,10 @@ describe("foundation read service", () => {
     expect(weeklyTimeline.totalProjects).toBe(weeklyTimeline.projects.length);
     expect(weeklyTimeline.visibleProjects).toBe(weeklyTimeline.projects.length);
     expect(weeklyTimeline.hasMoreProjects).toBe(false);
+    expect(weeklyTimeline.projects[0]?.assignedAssetCount).toBeTypeOf("number");
+    expect(weeklyTimeline.projects[0]?.crewAssignmentCount).toBeTypeOf("number");
+    expect(weeklyTimeline.projects[0]?.activeIncidentCount).toBeTypeOf("number");
+    expect(Array.isArray(weeklyTimeline.projects[0]?.incidentMarkers ?? [])).toBe(true);
     expect(pagedTimeline.limit).toBe(1);
     expect(pagedTimeline.offset).toBe(1);
     expect(pagedTimeline.visibleProjects).toBe(1);
