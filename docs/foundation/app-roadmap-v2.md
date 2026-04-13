@@ -291,7 +291,35 @@
   - `bajo`: el feedback del export vive en la misma página; si luego el flujo de reportes crece, convendrá una superficie dedicada de reporting
 
 ### Slice F3 — Documentos financieros adjuntos
-- Estado: `planned`
+- Estado: `done`
+- Objetivo:
+  - adjuntar y consultar documentos financieros desde el editor del entry sin sacar al usuario del flujo operativo
+- Área:
+  - backend / frontend
+- Qué cambió:
+  - `fileUploadService` ahora crea y usa `financial_documents` dentro del carril de archivos operativos
+  - nueva migración runtime `runtime_operational_files_v2` para asegurar la tabla y columnas necesarias
+  - `finance` ahora expone:
+    - `getDocuments(entryId)`
+    - `uploadDocuments(entryId)`
+    - `openDocument(fileId)`
+  - `financeReadService` devuelve metadata de documentos y preview inline conservadora para imágenes/PDF pequeños
+  - `FinanceEntryEditorPanel` ahora muestra:
+    - attach documents
+    - lista de adjuntos
+    - preview inline cuando aplica
+    - apertura externa del archivo
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test -- --run src/test/file-upload-service.test.ts`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - prueba nueva del carril de uploads financieros validando storage, lectura y `previewDataUrl`
+  - el editor de entries ya puede operar documentos financieros sin abrir otra vista aparte
+- Riesgos remanentes:
+  - `medio`: todavía no existe delete/archive de documentos financieros ni cleanup específico por usuario
+  - `medio`: el preview inline usa data URLs y por eso está limitado a archivos previewables y tamaños moderados
+  - `bajo`: si este módulo crece mucho, convendrá una vista dedicada de documentos financieros en vez de dejar todo dentro del editor
 
 ### Slice F4 — Agent tools financieros ampliados
 - Estado: `planned`

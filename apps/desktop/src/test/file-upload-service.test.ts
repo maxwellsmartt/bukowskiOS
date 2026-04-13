@@ -67,4 +67,32 @@ describe("file upload service", () => {
     cleanup();
     fs.rmSync(tempRoot, { force: true, recursive: true });
   });
+
+  it("imports finance documents and exposes inline preview metadata for the entry", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-file-upload-finance");
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-finance-files-"));
+    const sourceFilePath = path.join(tempRoot, "fixture-finance.pdf");
+    fs.writeFileSync(sourceFilePath, "finance-file");
+
+    const service = createFileUploadService(database, {
+      userDataPath: tempRoot,
+      shellApi: {
+        openPath: vi.fn().mockResolvedValue(""),
+      },
+    });
+
+    const result = service.importFinanceDocuments("entry-incident-reserve", [sourceFilePath]);
+    const reads = createFoundationReadService(database);
+    const documents = reads.getFinanceEntryDocuments("entry-incident-reserve");
+
+    expect(result.uploadedCount).toBe(1);
+    expect(documents).toHaveLength(1);
+    expect(documents[0]?.originalName).toBe("fixture-finance.pdf");
+    expect(documents[0]?.status).toBe("available");
+    expect(documents[0]?.mimeType).toBe("application/pdf");
+    expect(documents[0]?.previewDataUrl).toContain("data:application/pdf;base64,");
+
+    cleanup();
+    fs.rmSync(tempRoot, { force: true, recursive: true });
+  });
 });

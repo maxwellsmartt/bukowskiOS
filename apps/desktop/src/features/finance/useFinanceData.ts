@@ -1,7 +1,9 @@
 import type {
   AppExportResult,
   CreateFinancialEntryCommand,
+  FileUploadMutationResult,
   FinanceCostLinkRow,
+  FinancialDocumentRow,
   FinanceEntryListQuery,
   FinanceEntryMutationResult,
   FinanceEntryRow,
@@ -32,6 +34,7 @@ const emptyOverview: FinanceOverviewSnapshot = {
 
 const emptyCostLinks: FinanceCostLinkRow[] = [];
 const emptyEntries: FinanceEntryRow[] = [];
+const emptyDocuments: FinancialDocumentRow[] = [];
 
 const defaultFinanceEntryListQuery: FinanceEntryListQuery = {
   search: "",
@@ -78,6 +81,19 @@ export const useFinanceEntries = (query: FinanceEntryListQuery = defaultFinanceE
     [query.search, query.sortBy, query.sortDirection],
   );
 
+export const useFinanceEntryDocuments = (entryId: string | null) =>
+  useAsyncValue(
+    async () => {
+      if (!window.bukowskiFinance || !entryId) {
+        return emptyDocuments;
+      }
+
+      return window.bukowskiFinance.getDocuments(entryId);
+    },
+    emptyDocuments,
+    [entryId],
+  );
+
 export const createFinanceEntry = async (input: CreateFinancialEntryCommand): Promise<FinanceEntryMutationResult> => {
   if (!window.bukowskiFinance) {
     throw new Error("Finance bridge unavailable");
@@ -100,4 +116,20 @@ export const exportFinanceReportPdf = async (query?: FinanceOverviewQuery): Prom
   }
 
   return window.bukowskiFinance.exportReportPdf(query);
+};
+
+export const uploadFinanceDocuments = async (entryId: string): Promise<FileUploadMutationResult> => {
+  if (!window.bukowskiFinance) {
+    throw new Error("Finance bridge unavailable");
+  }
+
+  return window.bukowskiFinance.uploadDocuments(entryId);
+};
+
+export const openFinanceDocument = async (fileId: string): Promise<void> => {
+  if (!window.bukowskiFinance) {
+    throw new Error("Finance bridge unavailable");
+  }
+
+  return window.bukowskiFinance.openDocument(fileId);
 };

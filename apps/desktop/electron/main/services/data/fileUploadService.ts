@@ -82,6 +82,20 @@ export const applyOperationalFilesMigration = (db: DatabaseSync) => {
   ensureColumn(db, "incident_files", "mime_type", "TEXT DEFAULT 'application/octet-stream'");
   ensureColumn(db, "incident_files", "status", "TEXT DEFAULT 'available'");
   ensureColumn(db, "incident_files", "deleted_at", "TEXT");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS financial_documents (
+      id TEXT PRIMARY KEY,
+      financial_entry_id TEXT NOT NULL REFERENCES financial_entries(id),
+      file_type TEXT NOT NULL,
+      storage_path TEXT,
+      original_name TEXT,
+      byte_size INTEGER DEFAULT 0,
+      mime_type TEXT DEFAULT 'application/octet-stream',
+      status TEXT DEFAULT 'available',
+      uploaded_at TEXT NOT NULL,
+      deleted_at TEXT
+    );
+  `);
 };
 
 export const createFileUploadService = (db: DatabaseSync, options: FileUploadServiceOptions) => {
@@ -89,7 +103,7 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
   const shellApi = options.shellApi ?? shell;
 
   const importFiles = (
-    domain: "asset" | "incident",
+    domain: "asset" | "incident" | "finance",
     entityId: string,
     sourceFilePaths: string[],
   ): FileUploadMutationResult => {
@@ -109,10 +123,15 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
       if (!assetRow) {
         throw new Error("Asset was not found.");
       }
-    } else {
+    } else if (domain === "incident") {
       const incidentRow = db.prepare("SELECT id FROM incidents WHERE id = ? LIMIT 1").get(entityId) as { id: string } | undefined;
       if (!incidentRow) {
         throw new Error("Incident was not found.");
+      }
+    } else {
+      const financeRow = db.prepare("SELECT id FROM financial_entries WHERE id = ? LIMIT 1").get(entityId) as { id: string } | undefined;
+      if (!financeRow) {
+        throw new Error("Finance entry was not found.");
       }
     }
 
@@ -136,7 +155,8 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
               deleted_at
             ) VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?, ?, 'available', NULL)
           `)
-        : db.prepare(`
+        : domain === "incident"
+          ? db.prepare(`
             INSERT INTO incident_files (
               id,
               incident_id,
@@ -151,6 +171,20 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
               status,
               deleted_at
             ) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, 'available', NULL)
+          `)
+          : db.prepare(`
+            INSERT INTO financial_documents (
+              id,
+              financial_entry_id,
+              file_type,
+              storage_path,
+              original_name,
+              byte_size,
+              mime_type,
+              status,
+              uploaded_at,
+              deleted_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?, NULL)
           `);
 
     let uploadedCount = 0;
@@ -180,7 +214,7 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
             byteSize,
             mimeType,
           );
-        } else {
+        } else if (domain === "incident") {
           insertStatement.run(
             fileId,
             entityId,
@@ -191,6 +225,17 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
             originalName,
             byteSize,
             mimeType,
+          );
+        } else {
+          insertStatement.run(
+            fileId,
+            entityId,
+            inferFileType(mimeType),
+            storagePath,
+            originalName,
+            byteSize,
+            mimeType,
+            now,
           );
         }
 
@@ -240,6 +285,10 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
       return importFiles("incident", incidentId, sourceFilePaths);
     },
 
+    importFinanceDocuments(entryId: string, sourceFilePaths: string[]) {
+      return importFiles("finance", entryId, sourceFilePaths);
+    },
+
     async openAssetFile(fileId: string) {
       const row = db
         .prepare(
@@ -268,6 +317,21 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
         .get(fileId) as AssetFileRow | undefined;
 
       await openStoredRow(row, "incident_files", fileId);
+    },
+
+    async openFinanceDocument(fileId: string) {
+      const row = db
+        .prepare(
+          `
+            SELECT id, storage_path, status
+            FROM financial_documents
+            WHERE id = ?
+            LIMIT 1
+          `,
+        )
+        .get(fileId) as AssetFileRow | undefined;
+
+      await openStoredRow(row, "financial_documents", fileId);
     },
   };
 };

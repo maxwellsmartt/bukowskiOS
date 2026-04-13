@@ -47,6 +47,18 @@ export type FinanceEntryRow = {
   notes?: string | null;
 };
 
+export type FinancialDocumentRow = {
+  id: string;
+  fileType: string;
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  status: "available" | "missing" | "deleted";
+  createdAt: string;
+  isPreviewable: boolean;
+  previewDataUrl?: string | null;
+};
+
 export type FinanceEntrySortField = "date" | "type" | "category" | "reference" | "project" | "amount" | "status";
 
 export type FinanceEntryListQuery = {

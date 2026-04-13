@@ -1,7 +1,7 @@
 import { Save, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { AssetListRow, FinanceEntryRow, IncidentListRow, ProjectCardRow } from "@contracts";
+import type { AssetListRow, FinanceEntryRow, FinancialDocumentRow, IncidentListRow, ProjectCardRow } from "@contracts";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -22,14 +22,18 @@ export type FinanceEntryEditorDraft = {
 
 type FinanceEntryEditorPanelProps = {
   assets: AssetListRow[];
+  documents: FinancialDocumentRow[];
   incidents: IncidentListRow[];
   projects: ProjectCardRow[];
   error: string | null;
   feedback: string | null;
   initialValue?: FinanceEntryRow | null;
   isSubmitting: boolean;
+  isUploadingDocuments: boolean;
   mode: "create" | "edit";
+  onAttachDocuments: () => Promise<void>;
   onClose: () => void;
+  onOpenDocument: (fileId: string) => Promise<void>;
   onSubmit: (value: FinanceEntryEditorDraft) => Promise<void>;
 };
 
@@ -42,17 +46,36 @@ const normalizeOptional = (value: string) => {
 };
 
 const resolveDefaultDate = () => new Date().toISOString().slice(0, 10);
+const formatBytes = (value: number) => {
+  if (!value) {
+    return "0 B";
+  }
+
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  if (value >= 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+
+  return `${value} B`;
+};
 
 export const FinanceEntryEditorPanel = ({
   assets,
+  documents,
   incidents,
   projects,
   error,
   feedback,
   initialValue,
   isSubmitting,
+  isUploadingDocuments,
   mode,
+  onAttachDocuments,
   onClose,
+  onOpenDocument,
   onSubmit,
 }: FinanceEntryEditorPanelProps) => {
   const [entryType, setEntryType] = useState("reserve");
@@ -99,6 +122,26 @@ export const FinanceEntryEditorPanel = ({
   const selectedProjectLabel = useMemo(
     () => projects.find((project) => project.id === projectId)?.name ?? null,
     [projectId, projects],
+  );
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!documents.length) {
+      setSelectedDocumentId(null);
+      return;
+    }
+
+    if (selectedDocumentId && documents.some((document) => document.id === selectedDocumentId)) {
+      return;
+    }
+
+    const previewable = documents.find((document) => document.previewDataUrl);
+    setSelectedDocumentId(previewable?.id ?? documents[0]?.id ?? null);
+  }, [documents, selectedDocumentId]);
+
+  const selectedDocument = useMemo(
+    () => documents.find((document) => document.id === selectedDocumentId) ?? null,
+    [documents, selectedDocumentId],
   );
 
   return (
@@ -231,6 +274,101 @@ export const FinanceEntryEditorPanel = ({
           />
         </label>
       </div>
+
+      {mode === "edit" ? (
+        <SurfaceCard title="Documents" subtitle="Attach invoices, receipts and supporting PDFs directly to this entry.">
+          <div className="action-panel-actions action-panel-actions-inline">
+            <button className="ghost-control" disabled={isUploadingDocuments} onClick={() => void onAttachDocuments()} type="button">
+              <span>{isUploadingDocuments ? "Attaching..." : "Attach documents"}</span>
+            </button>
+            {documents.length ? <StatusBadge tone="info">{`${documents.length} attached`}</StatusBadge> : null}
+          </div>
+
+          {documents.length ? (
+            <div className="finance-documents-grid">
+              <div className="finance-documents-list">
+                {documents.map((document) => (
+                  <button
+                    key={document.id}
+                    className={`finance-document-row${selectedDocumentId === document.id ? " is-active" : ""}`}
+                    onClick={() => setSelectedDocumentId(document.id)}
+                    type="button"
+                  >
+                    <div className="finance-document-row-copy">
+                      <span className="finance-document-row-title">{document.originalName}</span>
+                      <span className="finance-document-row-meta">
+                        {document.fileType} · {formatBytes(document.byteSize)} · {document.status}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="finance-document-preview-card">
+                {selectedDocument ? (
+                  <>
+                    <div className="finance-document-preview-header">
+                      <div className="finance-document-row-copy">
+                        <span className="finance-document-row-title">{selectedDocument.originalName}</span>
+                        <span className="finance-document-row-meta">
+                          {selectedDocument.mimeType} · {new Date(selectedDocument.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <button
+                        className="ghost-control"
+                        disabled={selectedDocument.status !== "available"}
+                        onClick={() => void onOpenDocument(selectedDocument.id)}
+                        type="button"
+                      >
+                        Open file
+                      </button>
+                    </div>
+
+                    {selectedDocument.previewDataUrl ? (
+                      selectedDocument.mimeType === "application/pdf" ? (
+                        <iframe className="finance-document-preview-frame" src={selectedDocument.previewDataUrl} title={selectedDocument.originalName} />
+                      ) : (
+                        <img
+                          alt={selectedDocument.originalName}
+                          className="finance-document-preview-image"
+                          src={selectedDocument.previewDataUrl}
+                        />
+                      )
+                    ) : (
+                      <div className="guided-empty-state guided-empty-state-subtle">
+                        <div className="guided-empty-state-copy">
+                          <span className="guided-empty-state-title">Preview unavailable</span>
+                          <p className="guided-empty-state-body">
+                            This file can still be opened externally, but it is too large or not previewable inline.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="guided-empty-state guided-empty-state-subtle">
+                    <div className="guided-empty-state-copy">
+                      <span className="guided-empty-state-title">No documents yet</span>
+                      <p className="guided-empty-state-body">
+                        Attach invoices, receipts or contracts to keep financial follow-through close to the entry.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="guided-empty-state guided-empty-state-subtle">
+              <div className="guided-empty-state-copy">
+                <span className="guided-empty-state-title">No documents attached</span>
+                <p className="guided-empty-state-body">
+                  Add PDFs or images after the entry exists so the team can inspect the supporting evidence in one place.
+                </p>
+              </div>
+            </div>
+          )}
+        </SurfaceCard>
+      ) : null}
 
       <div className="action-panel-actions">
         <button

@@ -16,7 +16,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 
 import { FinanceEntryEditorPanel, type FinanceEntryEditorDraft } from "./FinanceEntryEditorPanel";
-import { createFinanceEntry, updateFinanceEntry, useFinanceEntries } from "./useFinanceData";
+import { createFinanceEntry, openFinanceDocument, updateFinanceEntry, uploadFinanceDocuments, useFinanceEntries, useFinanceEntryDocuments } from "./useFinanceData";
 
 const financeEntrySortOptions: Array<ListSortOption<FinanceEntrySortField>> = [
   { value: "date", label: "Entry date", columnKey: "date" },
@@ -59,11 +59,13 @@ export const FinanceEntriesPage = () => {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingDocuments, setIsUploadingDocuments] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const focusedEntryId = searchParams.get("focus");
 
   const editingEntry = useMemo(() => data.find((entry) => entry.id === editingEntryId) ?? null, [data, editingEntryId]);
+  const { data: documents, reload: reloadDocuments } = useFinanceEntryDocuments(editingEntryId);
 
   useEffect(() => {
     if (!focusedEntryId || !data.some((entry) => entry.id === focusedEntryId)) {
@@ -174,16 +176,43 @@ export const FinanceEntriesPage = () => {
       {isEditorOpen ? (
         <FinanceEntryEditorPanel
           assets={assets}
+          documents={documents}
           error={submitError}
           feedback={feedback}
           incidents={incidents}
           initialValue={editingEntry}
           isSubmitting={isSubmitting}
+          isUploadingDocuments={isUploadingDocuments}
           mode={editingEntry ? "edit" : "create"}
+          onAttachDocuments={async () => {
+            if (!editingEntryId) {
+              return;
+            }
+
+            try {
+              setIsUploadingDocuments(true);
+              const result = await uploadFinanceDocuments(editingEntryId);
+              setFeedback(result.summary);
+              setSubmitError(null);
+              await reloadDocuments();
+            } catch (nextError) {
+              setSubmitError(nextError instanceof Error ? nextError.message : "The app could not attach finance documents.");
+            } finally {
+              setIsUploadingDocuments(false);
+            }
+          }}
           onClose={() => {
             setIsEditorOpen(false);
             setEditingEntryId(null);
             setSubmitError(null);
+          }}
+          onOpenDocument={async (fileId) => {
+            try {
+              await openFinanceDocument(fileId);
+              setSubmitError(null);
+            } catch (nextError) {
+              setSubmitError(nextError instanceof Error ? nextError.message : "The app could not open that finance document.");
+            }
           }}
           onSubmit={handleSubmit}
           projects={projects}

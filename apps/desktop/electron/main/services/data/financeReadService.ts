@@ -1,6 +1,8 @@
+import fs from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
+  FinancialDocumentRow,
   FinanceCostLinkRow,
   FinanceEntryListQuery,
   FinanceEntryRow,
@@ -78,6 +80,8 @@ const buildMonthlyWindows = (months: number) =>
       startDate: toIsoDate(startOfMonth(anchor)),
     };
   });
+
+const maxInlinePreviewBytes = 5 * 1024 * 1024;
 
 export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps) => ({
   getFinanceOverview(query?: FinanceOverviewQuery): FinanceOverviewSnapshot {
@@ -373,5 +377,68 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
         query.sortDirection ?? deps.defaultFinanceEntryListQuery.sortDirection,
       ),
     ).map(({ dateValue: _dateValue, ...row }) => row);
+  },
+
+  getFinanceEntryDocuments(entryId: string): FinancialDocumentRow[] {
+    const rows = db
+      .prepare(
+        `
+          SELECT
+            id,
+            file_type,
+            original_name,
+            mime_type,
+            byte_size,
+            status,
+            uploaded_at,
+            storage_path
+          FROM financial_documents
+          WHERE financial_entry_id = ?
+            AND deleted_at IS NULL
+          ORDER BY uploaded_at DESC
+        `,
+      )
+      .all(entryId) as Array<{
+      id: string;
+      file_type: string | null;
+      original_name: string | null;
+      mime_type: string | null;
+      byte_size: number | null;
+      status: string | null;
+      uploaded_at: string;
+      storage_path: string | null;
+    }>;
+
+    return rows.map((row) => {
+      const isMissing = row.status !== "deleted" && row.storage_path ? !fs.existsSync(row.storage_path) : row.status === "missing";
+      const mimeType = row.mime_type?.trim() || "application/octet-stream";
+      const status = (isMissing ? "missing" : row.status?.trim() || "available") as "available" | "missing" | "deleted";
+      const canInlinePreview =
+        status === "available" &&
+        row.storage_path &&
+        fs.existsSync(row.storage_path) &&
+        (mimeType.startsWith("image/") || mimeType === "application/pdf") &&
+        (row.byte_size ?? 0) <= maxInlinePreviewBytes;
+
+      let previewDataUrl: string | null = null;
+
+      if (canInlinePreview) {
+        const storagePath = row.storage_path!;
+        const encoded = fs.readFileSync(storagePath).toString("base64");
+        previewDataUrl = `data:${mimeType};base64,${encoded}`;
+      }
+
+      return {
+        id: row.id,
+        fileType: row.file_type?.trim() || "file",
+        originalName: row.original_name?.trim() || "Attached finance document",
+        mimeType,
+        byteSize: row.byte_size ?? 0,
+        status,
+        createdAt: row.uploaded_at,
+        isPreviewable: mimeType.startsWith("image/") || mimeType === "application/pdf",
+        previewDataUrl,
+      };
+    });
   },
 });

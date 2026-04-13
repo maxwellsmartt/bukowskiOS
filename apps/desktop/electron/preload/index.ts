@@ -52,6 +52,7 @@ import type {
   FinanceEntryMutationResult,
   FinanceCostLinkRow,
   FinanceEntryRow,
+  FinancialDocumentRow,
   FinanceOverviewSnapshot,
   GlobalSearchGroup,
   GlobalSearchQuery,
@@ -265,6 +266,11 @@ const bukowskiFinance = {
     ipcRenderer.invoke(ipcChannels.finance.exportReportPdf, query) as Promise<AppExportResult>,
   getCostLinks: () => ipcRenderer.invoke(ipcChannels.finance.getCostLinks) as Promise<FinanceCostLinkRow[]>,
   getEntries: (query?: FinanceEntryListQuery) => ipcRenderer.invoke(ipcChannels.finance.getEntries, query) as Promise<FinanceEntryRow[]>,
+  getDocuments: (entryId: string) =>
+    ipcRenderer.invoke(ipcChannels.finance.getDocuments, entryId) as Promise<FinancialDocumentRow[]>,
+  uploadDocuments: (entryId: string) =>
+    ipcRenderer.invoke(ipcChannels.finance.uploadDocuments, entryId) as Promise<FileUploadMutationResult>,
+  openDocument: (fileId: string) => ipcRenderer.invoke(ipcChannels.finance.openDocument, fileId) as Promise<void>,
   create: (input: CreateFinancialEntryCommand) =>
     ipcRenderer.invoke(ipcChannels.finance.create, input) as Promise<FinanceEntryMutationResult>,
   update: (input: UpdateFinancialEntryCommand) =>

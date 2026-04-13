@@ -52,6 +52,7 @@ import type {
   FinanceEntryListQuery,
   FinanceEntryMutationResult,
   FinanceEntryRow,
+  FinancialDocumentRow,
   FinanceOverviewQuery,
   FinanceOverviewSnapshot,
   GlobalSearchGroup,
@@ -204,6 +205,9 @@ declare global {
       exportReportPdf: (query?: FinanceOverviewQuery) => Promise<AppExportResult>;
       getCostLinks: () => Promise<FinanceCostLinkRow[]>;
       getEntries: (query?: FinanceEntryListQuery) => Promise<FinanceEntryRow[]>;
+      getDocuments: (entryId: string) => Promise<FinancialDocumentRow[]>;
+      uploadDocuments: (entryId: string) => Promise<FileUploadMutationResult>;
+      openDocument: (fileId: string) => Promise<void>;
       create: (input: CreateFinancialEntryCommand) => Promise<FinanceEntryMutationResult>;
       update: (input: UpdateFinancialEntryCommand) => Promise<FinanceEntryMutationResult>;
     };

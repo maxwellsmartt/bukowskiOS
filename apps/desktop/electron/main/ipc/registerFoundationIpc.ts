@@ -152,8 +152,10 @@ type RegisterFoundationIpcOptions = {
   fileUploads: {
     importAssetFiles: (assetId: string, sourceFilePaths: string[]) => unknown;
     importIncidentFiles: (incidentId: string, sourceFilePaths: string[]) => unknown;
+    importFinanceDocuments: (entryId: string, sourceFilePaths: string[]) => unknown;
     openAssetFile: (fileId: string) => Promise<void>;
     openIncidentFile: (fileId: string) => Promise<void>;
+    openFinanceDocument: (fileId: string) => Promise<void>;
   };
   incidentMutations: {
     reportIncident: (input: ReportIncidentCommand) => unknown;
@@ -600,6 +602,57 @@ export const registerFoundationIpc = ({
     financeOverviewReadArgsSchema,
     (_event, query: FinanceOverviewQuery | undefined) => foundationReads.getFinanceOverview(query),
     "The app could not load finance overview.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.finance.getDocuments,
+    idReadArgsSchema,
+    (_event, entryId: string) => foundationReads.getFinanceEntryDocuments(entryId),
+    "The app could not load finance documents.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.finance.uploadDocuments,
+    idReadArgsSchema,
+    async (_event, entryId: string) => {
+      const entry = foundationReads.getFinanceEntries({
+        search: "",
+        sortBy: "date",
+        sortDirection: "desc",
+      }).find((row) => row.id === entryId);
+
+      if (!entry) {
+        throw new Error("Finance entry was not found.");
+      }
+
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: `Attach documents to ${entry.reference}`,
+        buttonLabel: "Attach documents",
+        properties: ["openFile", "multiSelections"],
+        filters: [
+          { name: "Supported files", extensions: ["png", "jpg", "jpeg", "webp", "gif", "heic", "pdf"] },
+          { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "heic"] },
+          { name: "PDF", extensions: ["pdf"] },
+        ],
+      });
+
+      if (canceled || !filePaths.length) {
+        return {
+          uploadedCount: 0,
+          summary: "No finance documents were selected.",
+        };
+      }
+
+      return fileUploads.importFinanceDocuments(entryId, filePaths);
+    },
+    "The app could not attach documents to that finance entry.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.finance.openDocument,
+    idReadArgsSchema,
+    async (_event, fileId: string) => {
+      await fileUploads.openFinanceDocument(fileId);
+      return null;
+    },
+    "The app could not open that finance document.",
   );
   safeHandleReadWithSchema(
     ipcChannels.finance.exportReportPdf,
