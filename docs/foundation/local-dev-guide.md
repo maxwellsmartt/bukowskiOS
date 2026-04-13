@@ -1,6 +1,6 @@
 # Local Dev Guide
 
-Guia corta para arrancar, validar y probar el foundation shell actual de bukowskiOS.
+Guia corta para arrancar, validar, empaquetar y retomar trabajo local de bukowskiOS, incluyendo una Mac nueva o una computadora de oficina que todavia no tenga toolchain ni dependencias instaladas.
 
 ## Estado actual del proyecto
 
@@ -26,19 +26,68 @@ Todavia no tiene:
 
 ## Prerequisitos
 
+- macOS con soporte para abrir Electron
 - Node.js 22+
-- macOS o entorno con soporte para abrir Electron
 - acceso a terminal dentro del repo
 
 Si no tienes `pnpm` instalado globalmente, usa `corepack pnpm` en todos los comandos.
 
-## Bootstrap local
+## Setup en una Mac nueva o limpia
 
-Desde la raiz del repo:
+Este repo usa Electron + `better-sqlite3`, asi que una maquina nueva necesita toolchain nativo ademas de Node.
+
+### 1. Instalar Xcode Command Line Tools
+
+```bash
+xcode-select --install
+```
+
+Riesgo si falta: `critico`
+
+Impacto real:
+- `pnpm install` puede fallar compilando modulos nativos
+- `electron-rebuild` puede romperse al reconstruir `better-sqlite3`
+
+### 2. Instalar Homebrew si la Mac no lo tiene
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+### 3. Instalar Node 22
+
+```bash
+brew install node@22
+brew link --overwrite node@22
+```
+
+### 4. Activar Corepack
+
+```bash
+corepack enable
+corepack prepare pnpm@10.8.1 --activate
+```
+
+### 5. Verificar toolchain minimo
+
+```bash
+node -v
+corepack pnpm -v
+```
+
+Esperado:
+- Node `22.x`
+- pnpm `10.8.1`
+
+## Bootstrap local del repo
+
+Con el repo ya clonado, desde la raiz:
 
 ```bash
 corepack pnpm install
 ```
+
+Esto instala dependencias del workspace y deja lista la base para correr dev, tests y packaging.
 
 ## Comandos base
 
@@ -64,6 +113,58 @@ pnpm verify
 - `test`: corre tests focalizados del foundation
 - `build`: genera build del renderer y de Electron main/preload
 - `verify`: corre typecheck + tests + build
+
+## Comandos de empaquetado
+
+Para una Mac de trabajo o de oficina, estos son los comandos utiles para generar artefactos instalables y validar que quedaron bien:
+
+### Build interno para pruebas locales
+
+```bash
+corepack pnpm --filter @bukowski/desktop package:mac
+```
+
+Esto:
+- corre `build`
+- reconstruye `better-sqlite3` contra Electron
+- genera app empaquetada para macOS sin publicacion
+
+### Verificar firma y bundle generado
+
+```bash
+corepack pnpm --filter @bukowski/desktop verify:mac-build
+```
+
+### Build release firmado
+
+Usar solo si la maquina ya tiene credenciales Apple configuradas:
+
+```bash
+corepack pnpm --filter @bukowski/desktop package:mac:release
+```
+
+### Publicacion a GitHub Releases
+
+Usar solo si la maquina ya tiene credenciales Apple y token de GitHub:
+
+```bash
+corepack pnpm --filter @bukowski/desktop release:github
+```
+
+### Artefactos esperados
+
+Despues de `package:mac`, los artefactos quedan en:
+
+```text
+apps/desktop/dist-packaged/
+```
+
+Ejemplos tipicos:
+- `apps/desktop/dist-packaged/mac-arm64/bukowskiOS.app`
+- `apps/desktop/dist-packaged/bukowskiOS-0.1.0-arm64.dmg`
+- `apps/desktop/dist-packaged/bukowskiOS-0.1.0-arm64.zip`
+
+Si necesitas mas detalle del flujo de signing/notarization, revisar [`docs/foundation/macos-release-flow.md`](/Users/ernestomaxwell/Dev/bukowskiOS/docs/foundation/macos-release-flow.md).
 
 ## Smoke run recomendado
 
@@ -128,7 +229,7 @@ La carpeta `supabase/` hoy existe para fijar ownership y preparar el siguiente s
 - La app crea una base local en:
 
 ```text
-/Users/ernestooffice2/Library/Application Support/@bukowski/desktop/bukowski-foundation.sqlite
+$HOME/Library/Application Support/@bukowski/desktop/bukowski-foundation.sqlite
 ```
 
 - En el primer arranque, la app:
@@ -140,29 +241,30 @@ La carpeta `supabase/` hoy existe para fijar ownership y preparar el siguiente s
 - El archivo fuente del import legacy hoy vive en:
 
 ```text
-/Users/ernestooffice2/Dev/bukowskiOS/packages/db/src/seeds/legacy-rentman-20211015.csv
+<repo>/packages/db/src/seeds/legacy-rentman-20211015.csv
 ```
 
-- Si quieres resetear el seed local, cierra la app, borra ese archivo `.sqlite` y vuelve a correr `corepack pnpm dev`.
+- Si quieres resetear el seed local, cierra la app, borra la base local `.sqlite` y vuelve a correr `corepack pnpm dev`.
 
-## Warning esperado en terminal
+## Warning posible en terminal
 
-Durante `dev` puedes ver este warning:
+Normalmente el runtime local usa `better-sqlite3` primero.
 
-```text
-ExperimentalWarning: SQLite is an experimental feature
-```
-
-Hoy esto no esta rompiendo el runtime ni el build.
+Si ese modulo nativo falla en una maquina nueva, la app puede intentar fallback a `node:sqlite`. En ese escenario podrias ver un warning relacionado con SQLite experimental.
 
 Impacto: `medio`
 
-Porque:
-- para foundation y testing local nos simplifica mucho el stack
-- pero sigue siendo una API experimental del runtime
+Impacto real:
+- la app puede seguir levantando
+- pero ese warning suele indicar que el entorno local no quedo del todo sano
+- si despues quieres empaquetar, conviene corregir primero el build nativo
 
-Salida estructural si esto molesta luego:
-- migrar a un driver estable como `better-sqlite3` cuando entremos a hardening del runtime local
+Fix rapido:
+- correr `corepack pnpm --filter @bukowski/desktop rebuild:electron`
+- si sigue fallando, reinstalar dependencias con `corepack pnpm install`
+
+Fix estructural:
+- mantener `better-sqlite3` sano en cada maquina de desarrollo y usar el fallback solo como red de seguridad, no como flujo principal
 
 ## Siguiente paso manual recomendado
 
@@ -176,24 +278,36 @@ Si quieres dejar Supabase pre-listo antes del siguiente slice, lo minimo seria:
 
 Si todo sale bien, debes poder:
 
-- instalar dependencias
+- instalar toolchain base en una Mac limpia
+- instalar dependencias del repo
 - correr `dev`
 - ver la app abrir
 - ver datos reales desde SQLite en el shell
 - correr `verify` sin errores
+- generar un `.dmg` local con `package:mac`
 
 ## Ledger de comandos iniciales
 
 ```bash
+xcode-select --install
+brew install node@22
+corepack enable
+corepack prepare pnpm@10.8.1 --activate
 corepack pnpm install
 corepack pnpm verify
 corepack pnpm dev
+corepack pnpm --filter @bukowski/desktop package:mac
+corepack pnpm --filter @bukowski/desktop verify:mac-build
 ```
 
 ## Notas de troubleshooting
 
 - Si `pnpm` no existe: usa `corepack pnpm ...`
-- Si Electron no abre: corre de nuevo `corepack pnpm install`
+- Si `node` no existe: instala `node@22` y corre de nuevo `corepack enable`
+- Si `pnpm install` falla compilando modulos nativos: corre `xcode-select --install` y luego `corepack pnpm install`
+- Si Electron no abre despues de instalar en una maquina nueva: corre `corepack pnpm --filter @bukowski/desktop rebuild:electron`
+- Si el packaging falla despues de cambiar de maquina o version de Node: corre `corepack pnpm --filter @bukowski/desktop rebuild:electron` y luego repite `package:mac`
+- Si ves warnings de SQLite experimental en una Mac nueva: asume primero que fallo `better-sqlite3` y revisa el paso de `rebuild:electron`
 - Si el puerto 5173 esta ocupado, Vite puede moverse a otro puerto automaticamente
 - Si algo falla en build, revisar primero `apps/desktop/vite.config.ts`
 - Si abre pero se ve raro en pantallas pequenas, revisar `apps/desktop/src/shared/styles/global.css`
