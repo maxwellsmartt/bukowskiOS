@@ -26,10 +26,28 @@ export type CreateCatalogDepartmentInput = {
 export type CreateCatalogCrewInput = {
   entityType: "crew";
   fullName: string;
+  primaryDepartmentId?: string;
+  documentId?: string;
   roleLabel?: string;
   email?: string;
   phone?: string;
   notes?: string;
+  bankAccounts?: CatalogCrewBankAccountInput[];
+};
+
+export type UploadCrewCatalogDocumentsInput = {
+  crewMemberId: string;
+  sourceFilePaths?: string[];
+};
+
+export type CatalogCrewBankAccountInput = {
+  bankName?: string;
+  accountHolder?: string;
+  accountNumber: string;
+  accountType?: string;
+  routingNumber?: string;
+  notes?: string;
+  maskInPreview?: boolean;
 };
 
 export type CreateCatalogClientInput = {
@@ -130,4 +148,49 @@ export type UpdateCatalogEntityInput =
 export type DeleteCatalogEntityInput = {
   entityType: CatalogEntityType;
   id: string;
+};
+
+export type DeleteCatalogEntitiesInput = {
+  entityType: CatalogEntityType;
+  ids: string[];
+};
+
+export type CatalogCsvExportMode = "template" | "data";
+
+export type ExportCatalogCsvInput = {
+  entityType: CatalogEntityType;
+  mode: CatalogCsvExportMode;
+  ids?: string[];
+};
+
+export type CatalogCsvImportStrategy = "merge" | "replace";
+
+export type PreviewCatalogCsvImportInput = {
+  entityType: CatalogEntityType;
+  csvText: string;
+  strategy: CatalogCsvImportStrategy;
+};
+
+export type CatalogCsvImportError = {
+  rowNumber: number;
+  message: string;
+  key: string | null;
+};
+
+export type CatalogCsvImportPreview = {
+  entityType: CatalogEntityType;
+  strategy: CatalogCsvImportStrategy;
+  totalRows: number;
+  created: number;
+  updated: number;
+  deactivated: number;
+  skipped: number;
+  invalid: number;
+  errors: CatalogCsvImportError[];
+};
+
+export type ImportCatalogCsvInput = PreviewCatalogCsvImportInput;
+
+export type CatalogCsvImportResult = CatalogCsvImportPreview & {
+  summary: string;
 };

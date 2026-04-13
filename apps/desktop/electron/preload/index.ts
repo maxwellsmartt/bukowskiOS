@@ -30,9 +30,15 @@ import type {
   AssetDetailSnapshot,
   AssetEditorMutationResult,
   FileUploadMutationResult,
+  FileDeleteMutationResult,
   AssetListRow,
   AssetSummarySnapshot,
   CatalogListQuery,
+  CatalogCsvImportPreview,
+  CatalogCsvImportResult,
+  DeleteCatalogEntitiesInput,
+  ExportCatalogCsvInput,
+  ImportCatalogCsvInput,
   CatalogSnapshot,
   CreateAssetCommand,
   CreateCatalogEntityInput,
@@ -46,6 +52,7 @@ import type {
   CreateProjectInput,
   CreateProjectUnitInput,
   DeleteCatalogEntityInput,
+  PreviewCatalogCsvImportInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
   FinanceEntryListQuery,
@@ -293,6 +300,16 @@ const bukowskiCatalog = {
   create: (input: CreateCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.create, input) as Promise<CatalogSnapshot>,
   update: (input: UpdateCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.update, input) as Promise<CatalogSnapshot>,
   remove: (input: DeleteCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.delete, input) as Promise<CatalogSnapshot>,
+  removeMany: (input: DeleteCatalogEntitiesInput) => ipcRenderer.invoke(ipcChannels.catalog.deleteMany, input) as Promise<CatalogSnapshot>,
+  exportCsv: (input: ExportCatalogCsvInput) => ipcRenderer.invoke(ipcChannels.catalog.exportCsv, input) as Promise<AppExportResult>,
+  previewImportCsv: (input: PreviewCatalogCsvImportInput) =>
+    ipcRenderer.invoke(ipcChannels.catalog.previewImportCsv, input) as Promise<CatalogCsvImportPreview>,
+  importCsv: (input: ImportCatalogCsvInput) =>
+    ipcRenderer.invoke(ipcChannels.catalog.importCsv, input) as Promise<{ result: CatalogCsvImportResult; snapshot: CatalogSnapshot }>,
+  uploadCrewDocuments: (crewMemberId: string, sourceFilePaths?: string[]) =>
+    ipcRenderer.invoke(ipcChannels.catalog.uploadCrewDocuments, { crewMemberId, sourceFilePaths }) as Promise<FileUploadMutationResult>,
+  openCrewDocument: (fileId: string) => ipcRenderer.invoke(ipcChannels.catalog.openCrewDocument, fileId) as Promise<void>,
+  deleteCrewDocument: (fileId: string) => ipcRenderer.invoke(ipcChannels.catalog.deleteCrewDocument, fileId) as Promise<FileDeleteMutationResult>,
 };
 
 const bukowskiRma = {

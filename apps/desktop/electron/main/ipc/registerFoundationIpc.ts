@@ -11,6 +11,7 @@ import {
   createAssetSchema,
   createAssistantThreadSchema,
   createCatalogEntitySchema,
+  deleteCatalogEntitiesSchema,
   createDraftRunFromChatSchema,
   createFinancialEntrySchema,
   createPackingSlipSchema,
@@ -22,6 +23,7 @@ import {
   idReadArgsSchema,
   deleteAssistantThreadSchema,
   deleteCatalogEntitySchema,
+  exportCatalogCsvSchema,
   deleteProjectSchema,
   deleteProjectUnitSchema,
   emptyReadArgsSchema,
@@ -37,6 +39,8 @@ import {
   reportIncidentSchema,
   resolveIncidentSchema,
   returnPackingSlipItemsSchema,
+  importCatalogCsvSchema,
+  previewCatalogCsvImportSchema,
   reviewAgentRunSchema,
   saveAiProviderConfigSchema,
   sendAssistantChatTurnSchema,
@@ -55,6 +59,7 @@ import {
   updateProjectUnitSchema,
   updateRmaCaseSchema,
   scheduleTimelineReadArgsSchema,
+  uploadCrewCatalogDocumentsReadArgsSchema,
 } from "@contracts";
 import type {
   AssistantChatSnapshot,
@@ -79,6 +84,8 @@ import type {
   AssignMoveAssetsInput,
   AssignCrewToProjectUnitInput,
   CatalogListQuery,
+  CatalogCsvImportResult,
+  CatalogCsvImportPreview,
   CreateAssetCommand,
   CreateCatalogEntityInput,
   CreateFinancialEntryCommand,
@@ -88,6 +95,8 @@ import type {
   CreateProjectInput,
   CreateProjectUnitInput,
   DeleteCatalogEntityInput,
+  DeleteCatalogEntitiesInput,
+  ExportCatalogCsvInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
   FinanceEntryListQuery,
@@ -105,6 +114,8 @@ import type {
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
   UnassignCrewFromProjectUnitInput,
+  PreviewCatalogCsvImportInput,
+  ImportCatalogCsvInput,
   UpdateAssetCommand,
   UpdateCatalogEntityInput,
   UpdateFinancialEntryCommand,
@@ -146,6 +157,10 @@ type RegisterFoundationIpcOptions = {
     createEntity: (input: CreateCatalogEntityInput) => void;
     updateEntity: (input: UpdateCatalogEntityInput) => void;
     deleteEntity: (input: DeleteCatalogEntityInput) => void;
+    deleteEntities: (input: DeleteCatalogEntitiesInput) => void;
+    buildCsvExport: (input: ExportCatalogCsvInput) => { fileName: string; csvText: string };
+    previewCsvImport: (input: PreviewCatalogCsvImportInput) => CatalogCsvImportPreview;
+    importCsv: (input: ImportCatalogCsvInput) => CatalogCsvImportResult;
   };
   assetMutations: {
     assignMoveAssets: (input: AssignMoveAssetsInput) => unknown;
@@ -157,9 +172,12 @@ type RegisterFoundationIpcOptions = {
     importAssetFiles: (assetId: string, sourceFilePaths: string[]) => unknown;
     importIncidentFiles: (incidentId: string, sourceFilePaths: string[]) => unknown;
     importFinanceDocuments: (entryId: string, sourceFilePaths: string[]) => unknown;
+    importCrewDocuments: (crewMemberId: string, sourceFilePaths: string[]) => unknown;
     openAssetFile: (fileId: string) => Promise<void>;
     openIncidentFile: (fileId: string) => Promise<void>;
     openFinanceDocument: (fileId: string) => Promise<void>;
+    openCrewDocument: (fileId: string) => Promise<void>;
+    deleteCrewDocument: (fileId: string) => { deletedCount: number; summary: string };
   };
   incidentMutations: {
     reportIncident: (input: ReportIncidentCommand) => unknown;
@@ -651,6 +669,114 @@ export const registerFoundationIpc = ({
     catalogMutations.deleteEntity(input);
     return foundationReads.getCatalogSnapshot();
   });
+  safeHandle(ipcChannels.catalog.deleteMany, deleteCatalogEntitiesSchema, (_event, input) => {
+    catalogMutations.deleteEntities(input);
+    return foundationReads.getCatalogSnapshot();
+  });
+  safeHandle(
+    ipcChannels.catalog.exportCsv,
+    exportCatalogCsvSchema,
+    async (_event, input: ExportCatalogCsvInput) => {
+      const exportPayload = catalogMutations.buildCsvExport(input);
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: `Export ${input.entityType} CSV`,
+        defaultPath: path.join(app.getPath("documents"), exportPayload.fileName),
+        filters: [{ name: "CSV", extensions: ["csv"] }],
+      });
+
+      if (canceled || !filePath) {
+        return {
+          saved: false,
+          fileName: null,
+          savedPath: null,
+          summary: "CSV export cancelled.",
+        };
+      }
+
+      fs.writeFileSync(filePath, exportPayload.csvText, "utf8");
+
+      return {
+        saved: true,
+        fileName: path.basename(filePath),
+        savedPath: filePath,
+        summary: `Exported ${exportPayload.fileName} to ${path.basename(filePath)}.`,
+      };
+    },
+  );
+  safeHandle(ipcChannels.catalog.previewImportCsv, previewCatalogCsvImportSchema, (_event, input) =>
+    catalogMutations.previewCsvImport(input),
+  );
+  safeHandle(ipcChannels.catalog.importCsv, importCatalogCsvSchema, (_event, input) => {
+    const result = catalogMutations.importCsv(input);
+    return {
+      result,
+      snapshot: foundationReads.getCatalogSnapshot(),
+    };
+  });
+  safeHandleReadWithSchema(
+    ipcChannels.catalog.uploadCrewDocuments,
+    uploadCrewCatalogDocumentsReadArgsSchema,
+    async (_event, input: { crewMemberId: string; sourceFilePaths?: string[] }) => {
+      const crewMemberId = input.crewMemberId;
+      const crewMember = foundationReads
+        .getCatalogSnapshot({
+          entityType: "crew",
+          search: "",
+          sortBy: "fullName",
+          sortDirection: "asc",
+        })
+        .crewMembers.find((row) => row.id === crewMemberId);
+
+      if (!crewMember) {
+        throw new Error("Crew member was not found.");
+      }
+
+      const resolvedPaths =
+        input.sourceFilePaths && input.sourceFilePaths.length
+          ? input.sourceFilePaths
+          : (() => null)();
+
+      if (resolvedPaths) {
+        return fileUploads.importCrewDocuments(crewMemberId, resolvedPaths);
+      }
+
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: `Attach crew documents to ${crewMember.fullName}`,
+        buttonLabel: "Attach documents",
+        properties: ["openFile", "multiSelections"],
+        filters: [
+          { name: "Supported files", extensions: ["png", "jpg", "jpeg", "webp", "gif", "heic", "pdf"] },
+          { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "heic"] },
+          { name: "PDF", extensions: ["pdf"] },
+        ],
+      });
+
+      if (canceled || !filePaths.length) {
+        return {
+          uploadedCount: 0,
+          summary: "No crew documents were selected.",
+        };
+      }
+
+      return fileUploads.importCrewDocuments(crewMemberId, filePaths);
+    },
+    "The app could not attach documents to that crew member.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.catalog.openCrewDocument,
+    idReadArgsSchema,
+    async (_event, fileId: string) => {
+      await fileUploads.openCrewDocument(fileId);
+      return null;
+    },
+    "The app could not open that crew document.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.catalog.deleteCrewDocument,
+    idReadArgsSchema,
+    async (_event, fileId: string) => fileUploads.deleteCrewDocument(fileId),
+    "The app could not remove that crew document.",
+  );
   safeHandleRead(ipcChannels.rma.getSnapshot, () => foundationReads.getRmaSnapshot(), "The app could not load the RMA snapshot.");
   safeHandleReadWithSchema(
     ipcChannels.rma.getDetail,

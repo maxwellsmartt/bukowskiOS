@@ -196,15 +196,44 @@ export type CatalogUserRow = {
   fullName: string;
 };
 
+export type CatalogCrewDocumentRow = {
+  id: string;
+  fileType: string;
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  status: "available" | "missing" | "deleted";
+  createdAt: string;
+  isPreviewable: boolean;
+  previewDataUrl?: string | null;
+};
+
+export type CatalogCrewBankAccountRow = {
+  id: string;
+  bankName: string;
+  accountHolder: string;
+  accountNumber: string;
+  accountType: string;
+  routingNumber: string;
+  notes: string;
+  maskInPreview: boolean;
+  maskedAccountNumber: string;
+};
+
 export type CatalogCrewRow = {
   id: string;
   fullName: string;
+  primaryDepartmentId: string | null;
+  primaryDepartment: string | null;
+  documentId: string;
   roleLabel: string;
   email: string;
   phone: string;
   notes: string;
   isActive: boolean;
   linkedUserId: string | null;
+  documents: CatalogCrewDocumentRow[];
+  bankAccounts: CatalogCrewBankAccountRow[];
   activeAssignments: Array<{
     projectId: string;
     project: string;

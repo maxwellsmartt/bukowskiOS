@@ -20,17 +20,20 @@ export const isSubnavItemActive = (pathname: string, path: string) => {
 
 export const SubnavTabs = ({ items }: SubnavTabsProps) => {
   const location = useLocation();
+  const activePath = items.find((item) => isSubnavItemActive(location.pathname, item.path))?.path ?? null;
 
   return (
     <div className="subnav-tabs">
       {items.map((item) => {
-        const isActive = isSubnavItemActive(location.pathname, item.path);
+        const isActive = activePath === item.path;
 
         return (
           <NavLink
             key={item.path}
             to={item.path}
-            className={() => `subnav-tab${isActive ? " active" : ""}`}
+            className={() =>
+              `subnav-tab${isActive ? " active" : ""}${item.tone === "accent" ? " subnav-tab-accent" : ""}${item.path === "/catalog" ? " subnav-tab-catalog" : ""}`
+            }
             end
             draggable={false}
           >

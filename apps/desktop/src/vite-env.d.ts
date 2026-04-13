@@ -29,9 +29,15 @@ import type {
   CreateAssistantThreadCommand,
   AssetDetailSnapshot,
   AssetEditorMutationResult,
+  FileDeleteMutationResult,
   FileUploadMutationResult,
   AssetListRow,
   AssetSummarySnapshot,
+  CatalogCsvImportPreview,
+  CatalogCsvImportResult,
+  DeleteCatalogEntitiesInput,
+  ExportCatalogCsvInput,
+  ImportCatalogCsvInput,
   CatalogListQuery,
   CatalogSnapshot,
   CreateAssetCommand,
@@ -46,6 +52,7 @@ import type {
   CreateRmaCaseCommand,
   DeleteAssistantThreadCommand,
   DeleteCatalogEntityInput,
+  PreviewCatalogCsvImportInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
   DraftRunFromChatResult,
@@ -223,6 +230,13 @@ declare global {
       create: (input: CreateCatalogEntityInput) => Promise<CatalogSnapshot>;
       update: (input: UpdateCatalogEntityInput) => Promise<CatalogSnapshot>;
       remove: (input: DeleteCatalogEntityInput) => Promise<CatalogSnapshot>;
+      removeMany: (input: DeleteCatalogEntitiesInput) => Promise<CatalogSnapshot>;
+      exportCsv: (input: ExportCatalogCsvInput) => Promise<AppExportResult>;
+      previewImportCsv: (input: PreviewCatalogCsvImportInput) => Promise<CatalogCsvImportPreview>;
+      importCsv: (input: ImportCatalogCsvInput) => Promise<{ result: CatalogCsvImportResult; snapshot: CatalogSnapshot }>;
+      uploadCrewDocuments: (crewMemberId: string, sourceFilePaths?: string[]) => Promise<FileUploadMutationResult>;
+      openCrewDocument: (fileId: string) => Promise<void>;
+      deleteCrewDocument: (fileId: string) => Promise<FileDeleteMutationResult>;
     };
     bukowskiRma?: {
       getSnapshot: () => Promise<RmaSnapshot>;

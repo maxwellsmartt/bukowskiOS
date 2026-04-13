@@ -535,10 +535,27 @@ const createCatalogCrewSchema = z
   .object({
     entityType: z.literal("crew"),
     fullName: nonEmptyString,
+    primaryDepartmentId: optionalTrimmedString,
+    documentId: optionalTrimmedString,
     roleLabel: optionalTrimmedString,
     email: optionalTrimmedString,
     phone: optionalTrimmedString,
     notes: optionalTrimmedString,
+    bankAccounts: z
+      .array(
+        z
+          .object({
+            bankName: optionalTrimmedString,
+            accountHolder: optionalTrimmedString,
+            accountNumber: nonEmptyString,
+            accountType: optionalTrimmedString,
+            routingNumber: optionalTrimmedString,
+            notes: optionalTrimmedString,
+            maskInPreview: z.boolean().optional(),
+          })
+          .strict(),
+      )
+      .optional(),
   })
   .strict();
 
@@ -623,6 +640,40 @@ export const deleteCatalogEntitySchema = z
     id: nonEmptyString,
   })
   .strict();
+
+export const deleteCatalogEntitiesSchema = z
+  .object({
+    entityType: z.enum(["location", "department", "crew", "client", "production_company", "manufacturer", "category", "kit"]),
+    ids: z.array(nonEmptyString).min(1),
+  })
+  .strict();
+
+export const exportCatalogCsvSchema = z
+  .object({
+    entityType: z.enum(["location", "department", "crew", "client", "production_company", "manufacturer", "category", "kit"]),
+    mode: z.enum(["template", "data"]),
+    ids: z.array(nonEmptyString).optional(),
+  })
+  .strict();
+
+export const previewCatalogCsvImportSchema = z
+  .object({
+    entityType: z.enum(["location", "department", "crew", "client", "production_company", "manufacturer", "category", "kit"]),
+    csvText: nonEmptyString,
+    strategy: z.enum(["merge", "replace"]),
+  })
+  .strict();
+
+export const importCatalogCsvSchema = previewCatalogCsvImportSchema;
+
+export const uploadCrewCatalogDocumentsReadArgsSchema = z.tuple([
+  z
+    .object({
+      crewMemberId: nonEmptyString,
+      sourceFilePaths: z.array(nonEmptyString).optional(),
+    })
+    .strict(),
+]);
 
 const rmaCaseAssetSchema = z
   .object({

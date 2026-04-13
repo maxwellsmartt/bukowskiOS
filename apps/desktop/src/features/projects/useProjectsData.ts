@@ -1,10 +1,16 @@
 import type {
   AssignCrewToProjectUnitInput,
+  CatalogCsvImportPreview,
+  CatalogCsvImportResult,
   CatalogListQuery,
   CreateProjectBlueprintInput,
   CreateCatalogEntityInput,
   CreateProjectUnitInput,
+  DeleteCatalogEntitiesInput,
   DeleteCatalogEntityInput,
+  ExportCatalogCsvInput,
+  ImportCatalogCsvInput,
+  PreviewCatalogCsvImportInput,
   DeleteProjectUnitInput,
   ProjectCreationConflictsSnapshot,
   ProjectListQuery,
@@ -137,6 +143,64 @@ export const deleteCatalogEntity = async (input: DeleteCatalogEntityInput): Prom
   }
 
   return window.bukowskiCatalog.remove(input);
+};
+
+export const deleteCatalogEntities = async (input: DeleteCatalogEntitiesInput): Promise<CatalogSnapshot> => {
+  if (!window.bukowskiCatalog) {
+    throw new Error("Catalog bridge unavailable");
+  }
+
+  return window.bukowskiCatalog.removeMany(input);
+};
+
+export const exportCatalogCsv = async (input: ExportCatalogCsvInput) => {
+  if (!window.bukowskiCatalog) {
+    throw new Error("Catalog bridge unavailable");
+  }
+
+  return window.bukowskiCatalog.exportCsv(input);
+};
+
+export const previewCatalogCsvImport = async (input: PreviewCatalogCsvImportInput): Promise<CatalogCsvImportPreview> => {
+  if (!window.bukowskiCatalog) {
+    throw new Error("Catalog bridge unavailable");
+  }
+
+  return window.bukowskiCatalog.previewImportCsv(input);
+};
+
+export const importCatalogCsv = async (
+  input: ImportCatalogCsvInput,
+): Promise<{ result: CatalogCsvImportResult; snapshot: CatalogSnapshot }> => {
+  if (!window.bukowskiCatalog) {
+    throw new Error("Catalog bridge unavailable");
+  }
+
+  return window.bukowskiCatalog.importCsv(input);
+};
+
+export const uploadCrewCatalogDocuments = async (crewMemberId: string, sourceFilePaths?: string[]) => {
+  if (!window.bukowskiCatalog) {
+    throw new Error("Catalog bridge unavailable");
+  }
+
+  return window.bukowskiCatalog.uploadCrewDocuments(crewMemberId, sourceFilePaths);
+};
+
+export const openCrewCatalogDocument = async (fileId: string) => {
+  if (!window.bukowskiCatalog) {
+    throw new Error("Catalog bridge unavailable");
+  }
+
+  return window.bukowskiCatalog.openCrewDocument(fileId);
+};
+
+export const deleteCrewCatalogDocument = async (fileId: string) => {
+  if (!window.bukowskiCatalog) {
+    throw new Error("Catalog bridge unavailable");
+  }
+
+  return window.bukowskiCatalog.deleteCrewDocument(fileId);
 };
 
 export const createProjectUnit = async (input: CreateProjectUnitInput): Promise<ProjectDetailSnapshot> => {

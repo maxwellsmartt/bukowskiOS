@@ -24,6 +24,7 @@ import { createFoundationReadService, type FoundationReadService } from "./found
 import { createAssetMutationService } from "./assetMutationService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
+import { applyCrewCatalogFoundationMigration } from "./crewCatalogFoundationBootstrap";
 import { createDataRetentionService, summarizeDataRetention } from "./dataRetentionService";
 import { createFinanceMutationService } from "./financeMutationService";
 import { applyOperationalFilesMigration, createFileUploadService, type FileUploadService } from "./fileUploadService";
@@ -164,6 +165,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   applyTrackedStep(database, "runtime_project_departments_matrix_v1", () =>
     applyProjectDepartmentsMatrixFoundationMigration(database),
   );
+  applyTrackedStep(database, "runtime_crew_catalog_foundation_v2", () => applyCrewCatalogFoundationMigration(database));
   applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database));
   applyTrackedStep(database, "runtime_operational_files_v2", () => applyOperationalFilesMigration(database));
   seedFoundationData(database);

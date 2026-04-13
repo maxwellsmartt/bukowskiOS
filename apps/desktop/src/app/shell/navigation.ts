@@ -20,6 +20,7 @@ export type NavItem = {
   label: string;
   path: string;
   icon?: LucideIcon;
+  tone?: "default" | "accent";
 };
 
 export const primaryNav: NavItem[] = [
@@ -34,7 +35,7 @@ export const assetsSubnav: NavItem[] = [
   { label: "Packing Slips", path: "/packing-slips", icon: ScrollText },
   { label: "Projects", path: "/projects", icon: Building2 },
   { label: "Incidents", path: "/incidents", icon: ClipboardList },
-  { label: "Catalog", path: "/catalog", icon: FolderCog },
+  { label: "Manage Catalog", path: "/catalog", icon: FolderCog, tone: "accent" },
 ];
 
 export const financeSubnav: NavItem[] = [

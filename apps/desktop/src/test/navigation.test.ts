@@ -42,7 +42,7 @@ describe("foundation navigation shell", () => {
       "Packing Slips",
       "Projects",
       "Incidents",
-      "Catalog",
+      "Manage Catalog",
     ]);
   });
 

@@ -1,8 +1,17 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import type { CreateCatalogEntityInput, DeleteCatalogEntityInput, UpdateCatalogEntityInput } from "@contracts";
+import type {
+  CreateCatalogEntityInput,
+  DeleteCatalogEntitiesInput,
+  DeleteCatalogEntityInput,
+  ExportCatalogCsvInput,
+  ImportCatalogCsvInput,
+  PreviewCatalogCsvImportInput,
+  UpdateCatalogEntityInput,
+} from "@contracts";
 
 import { createCodeGenerationService } from "./codeGenerationService";
+import { createCatalogCsvService } from "./catalogCsvService";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
@@ -32,6 +41,69 @@ const optionalValue = (value: string | undefined) => {
 };
 
 const uniqueValues = (values: string[] | undefined) => [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))];
+
+const replaceCrewBankAccounts = (
+  db: DatabaseSync,
+  crewMemberId: string,
+  bankAccounts:
+    | Array<{
+        bankName?: string;
+        accountHolder?: string;
+        accountNumber: string;
+        accountType?: string;
+        routingNumber?: string;
+        notes?: string;
+        maskInPreview?: boolean;
+      }>
+    | undefined,
+  now: string,
+) => {
+  db.prepare("DELETE FROM crew_bank_accounts WHERE crew_member_id = ?").run(crewMemberId);
+
+  (bankAccounts ?? [])
+    .map((entry) => ({
+      accountHolder: optionalValue(entry.accountHolder),
+      accountNumber: ensureValue(entry.accountNumber, "Bank account number"),
+      accountType: optionalValue(entry.accountType),
+      bankName: optionalValue(entry.bankName),
+      maskInPreview: entry.maskInPreview === false ? 0 : 1,
+      notes: optionalValue(entry.notes),
+      routingNumber: optionalValue(entry.routingNumber),
+    }))
+    .forEach((entry, index) => {
+      db.prepare(
+        `
+          INSERT INTO crew_bank_accounts (
+            id,
+            crew_member_id,
+            bank_name,
+            account_holder,
+            account_number,
+            account_type,
+            routing_number,
+            notes,
+            mask_in_preview,
+            sort_order,
+            created_at,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      ).run(
+        `crew-bank-account-${crewMemberId}-${index}-${Date.now().toString(36)}`,
+        crewMemberId,
+        entry.bankName,
+        entry.accountHolder,
+        entry.accountNumber,
+        entry.accountType,
+        entry.routingNumber,
+        entry.notes,
+        entry.maskInPreview,
+        index,
+        now,
+        now,
+      );
+    });
+};
 
 const assertUniqueCode = (
   db: DatabaseSync,
@@ -224,8 +296,8 @@ const replaceKitAssets = (db: DatabaseSync, kitId: string, assetIds: string[], n
 
 export const createCatalogMutationService = (db: DatabaseSync) => {
   const codeService = createCodeGenerationService(db);
-
-  return {
+  const csvService = createCatalogCsvService(db, codeService);
+  const service = {
     createEntity(input: CreateCatalogEntityInput) {
       const now = new Date().toISOString();
 
@@ -275,17 +347,21 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
           }
 
           case "crew": {
+            const crewName = ensureValue(input.fullName, "Crew name");
+            const crewId = `crew-${slugify(crewName)}-${Date.now().toString(36)}`;
             db.prepare(
               `
                 INSERT INTO crew_members (
-                  id, workspace_id, full_name, role_label, email, phone, notes, is_active, created_at, updated_at
+                  id, workspace_id, full_name, primary_department_id, document_id, role_label, email, phone, notes, is_active, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
               `,
             ).run(
-              `crew-${slugify(ensureValue(input.fullName, "Crew name"))}-${Date.now().toString(36)}`,
+              crewId,
               workspaceId,
-              ensureValue(input.fullName, "Crew name"),
+              crewName,
+              optionalValue(input.primaryDepartmentId),
+              optionalValue(input.documentId),
               optionalValue(input.roleLabel),
               optionalValue(input.email),
               optionalValue(input.phone),
@@ -293,6 +369,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               now,
               now,
             );
+            replaceCrewBankAccounts(db, crewId, input.bankAccounts, now);
             break;
           }
 
@@ -482,11 +559,13 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const result = db.prepare(
               `
                 UPDATE crew_members
-                SET full_name = ?, role_label = ?, email = ?, phone = ?, notes = ?, updated_at = ?
+                SET full_name = ?, primary_department_id = ?, document_id = ?, role_label = ?, email = ?, phone = ?, notes = ?, updated_at = ?
                 WHERE id = ?
               `,
             ).run(
               ensureValue(input.fullName, "Crew name"),
+              optionalValue(input.primaryDepartmentId),
+              optionalValue(input.documentId),
               optionalValue(input.roleLabel),
               optionalValue(input.email),
               optionalValue(input.phone),
@@ -497,6 +576,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             if (!result.changes) {
               throw new Error("Crew member not found.");
             }
+            replaceCrewBankAccounts(db, input.id, input.bankAccounts, now);
             break;
           }
 
@@ -716,7 +796,41 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
         throw error;
       }
     },
+
+    deleteEntities(input: DeleteCatalogEntitiesInput) {
+      const uniqueIds = uniqueValues(input.ids);
+
+      if (!uniqueIds.length) {
+        throw new Error("Select at least one catalog record.");
+      }
+
+      uniqueIds.forEach((id) => {
+        const relationCount = getDeleteGuardCount(db, { entityType: input.entityType, id });
+
+        if (relationCount > 0) {
+          throw new Error("One or more selected records already have linked operational data and cannot be deleted.");
+        }
+      });
+
+      uniqueIds.forEach((id) => {
+        service.deleteEntity({ entityType: input.entityType, id });
+      });
+    },
+
+    buildCsvExport(input: ExportCatalogCsvInput) {
+      return csvService.buildExport(input);
+    },
+
+    previewCsvImport(input: PreviewCatalogCsvImportInput) {
+      return csvService.previewImport(input);
+    },
+
+    importCsv(input: ImportCatalogCsvInput) {
+      return csvService.importCsv(input);
+    },
   };
+
+  return service;
 };
 
 export type CatalogMutationService = ReturnType<typeof createCatalogMutationService>;

@@ -99,6 +99,13 @@ export const ipcChannels = {
     create: "bukowskiCatalog:create",
     update: "bukowskiCatalog:update",
     delete: "bukowskiCatalog:delete",
+    deleteMany: "bukowskiCatalog:deleteMany",
+    exportCsv: "bukowskiCatalog:exportCsv",
+    previewImportCsv: "bukowskiCatalog:previewImportCsv",
+    importCsv: "bukowskiCatalog:importCsv",
+    uploadCrewDocuments: "bukowskiCatalog:uploadCrewDocuments",
+    openCrewDocument: "bukowskiCatalog:openCrewDocument",
+    deleteCrewDocument: "bukowskiCatalog:deleteCrewDocument",
   },
   rma: {
     getSnapshot: "bukowskiRma:getSnapshot",

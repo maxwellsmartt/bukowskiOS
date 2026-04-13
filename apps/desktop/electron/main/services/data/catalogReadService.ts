@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 
 import type { CatalogSnapshot } from "@contracts";
@@ -6,6 +7,7 @@ import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
 const activeProjectStatuses = new Set(["Prep", "Active", "On hold"]);
+const maxInlinePreviewBytes = 5 * 1024 * 1024;
 
 const mapAssetStatus = (operationalStatus: string, custodyStatus: string) => {
   if (operationalStatus === "maintenance") {
@@ -78,28 +80,94 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       .prepare(
         `
           SELECT
-            id,
-            full_name,
+            crew_members.id,
+            crew_members.full_name,
+            crew_members.primary_department_id,
+            departments.name AS primary_department_name,
+            COALESCE(crew_members.document_id, '') AS document_id,
             COALESCE(role_label, '') AS role_label,
             COALESCE(email, '') AS email,
             COALESCE(phone, '') AS phone,
             COALESCE(notes, '') AS notes,
-            linked_user_id,
-            is_active
+            crew_members.linked_user_id,
+            crew_members.is_active
           FROM crew_members
-          WHERE workspace_id = ?
-          ORDER BY is_active DESC, full_name
+          LEFT JOIN departments ON departments.id = crew_members.primary_department_id
+          WHERE crew_members.workspace_id = ?
+          ORDER BY crew_members.is_active DESC, crew_members.full_name
         `,
       )
       .all(workspaceId) as Array<{
       id: string;
       full_name: string;
+      primary_department_id: string | null;
+      primary_department_name: string | null;
+      document_id: string;
       role_label: string;
       email: string;
       phone: string;
       notes: string;
       linked_user_id: string | null;
       is_active: number;
+    }>;
+
+    const crewDocuments = db
+      .prepare(
+        `
+          SELECT
+            id,
+            crew_member_id,
+            file_type,
+            COALESCE(storage_path, '') AS storage_path,
+            COALESCE(original_name, '') AS original_name,
+            COALESCE(byte_size, 0) AS byte_size,
+            COALESCE(mime_type, 'application/octet-stream') AS mime_type,
+            COALESCE(status, 'available') AS status,
+            uploaded_at
+          FROM crew_documents
+          WHERE deleted_at IS NULL
+          ORDER BY uploaded_at DESC, original_name
+        `,
+      )
+      .all() as Array<{
+      id: string;
+      crew_member_id: string;
+      file_type: string;
+      storage_path: string;
+      original_name: string;
+      byte_size: number;
+      mime_type: string;
+      status: "available" | "missing" | "deleted";
+      uploaded_at: string;
+    }>;
+
+    const crewBankAccounts = db
+      .prepare(
+        `
+          SELECT
+            id,
+            crew_member_id,
+            COALESCE(bank_name, '') AS bank_name,
+            COALESCE(account_holder, '') AS account_holder,
+            account_number,
+            COALESCE(account_type, '') AS account_type,
+            COALESCE(routing_number, '') AS routing_number,
+            COALESCE(notes, '') AS notes,
+            COALESCE(mask_in_preview, 1) AS mask_in_preview
+          FROM crew_bank_accounts
+          ORDER BY crew_member_id, sort_order, created_at
+        `,
+      )
+      .all() as Array<{
+      id: string;
+      crew_member_id: string;
+      bank_name: string;
+      account_holder: string;
+      account_number: string;
+      account_type: string;
+      routing_number: string;
+      notes: string;
+      mask_in_preview: number;
     }>;
 
     const crewAssignments = db
@@ -152,6 +220,9 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       }>
     >();
 
+    const crewDocumentsByMember = new Map<string, CatalogSnapshot["crewMembers"][number]["documents"]>();
+    const crewBankAccountsByMember = new Map<string, CatalogSnapshot["crewMembers"][number]["bankAccounts"]>();
+
     crewAssignments.forEach((row) => {
       if (!activeProjectStatuses.has(row.project_status)) {
         return;
@@ -173,6 +244,48 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         endDate: row.assignment_end_date,
       });
       crewAssignmentsByMember.set(row.crew_member_id, assignments);
+    });
+
+    crewDocuments.forEach((row) => {
+      let previewDataUrl: string | null = null;
+
+      if (row.storage_path && row.status === "available" && row.byte_size <= maxInlinePreviewBytes && fs.existsSync(row.storage_path)) {
+        const encoded = fs.readFileSync(row.storage_path).toString("base64");
+        previewDataUrl = `data:${row.mime_type};base64,${encoded}`;
+      }
+
+      const documents = crewDocumentsByMember.get(row.crew_member_id) ?? [];
+      documents.push({
+        id: row.id,
+        fileType: row.file_type,
+        originalName: row.original_name,
+        mimeType: row.mime_type,
+        byteSize: row.byte_size,
+        status: row.status,
+        createdAt: row.uploaded_at,
+        isPreviewable: row.mime_type.startsWith("image/") || row.mime_type === "application/pdf",
+        previewDataUrl,
+      });
+      crewDocumentsByMember.set(row.crew_member_id, documents);
+    });
+
+    crewBankAccounts.forEach((row) => {
+      const accounts = crewBankAccountsByMember.get(row.crew_member_id) ?? [];
+      const normalizedNumber = row.account_number.trim();
+      const maskedDigits = normalizedNumber.slice(-4);
+      accounts.push({
+        id: row.id,
+        bankName: row.bank_name,
+        accountHolder: row.account_holder,
+        accountNumber: normalizedNumber,
+        accountType: row.account_type,
+        routingNumber: row.routing_number,
+        notes: row.notes,
+        maskInPreview: Boolean(row.mask_in_preview),
+        maskedAccountNumber:
+          normalizedNumber.length <= 4 ? normalizedNumber : `${"•".repeat(Math.max(0, normalizedNumber.length - 4))}${maskedDigits}`,
+      });
+      crewBankAccountsByMember.set(row.crew_member_id, accounts);
     });
 
     const clients = db
@@ -391,12 +504,17 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       crewMembers: crewMembers.map((row) => ({
         id: row.id,
         fullName: row.full_name,
+        primaryDepartmentId: row.primary_department_id,
+        primaryDepartment: row.primary_department_name,
+        documentId: row.document_id,
         roleLabel: row.role_label,
         email: row.email,
         phone: row.phone,
         notes: row.notes,
         isActive: Boolean(row.is_active),
         linkedUserId: row.linked_user_id,
+        documents: crewDocumentsByMember.get(row.id) ?? [],
+        bankAccounts: crewBankAccountsByMember.get(row.id) ?? [],
         activeAssignments: crewAssignmentsByMember.get(row.id) ?? [],
       })),
       clients: clients.map((row) => ({

@@ -71,22 +71,22 @@
 }
 
 [data-tooltip],
-.surface-card-action[aria-label],
+.surface-card-action[aria-label]:not([aria-label^="Close "]),
 .icon-ghost-control[aria-label],
 .shell-project-action[aria-label],
 .assistant-chat-sidebar-tool[aria-label],
 .assistant-chat-session-action[aria-label],
 .assistant-chat-send-button[aria-label],
 .assistant-chat-attachment-remove[aria-label],
-.project-setup-close-button[aria-label],
+.project-setup-close-button[aria-label]:not([aria-label^="Close "]),
 .icon-danger-control[aria-label] {
   position: relative;
 }
 
 [data-tooltip]::before,
 [data-tooltip]::after,
-.surface-card-action[aria-label]::before,
-.surface-card-action[aria-label]::after,
+.surface-card-action[aria-label]:not([aria-label^="Close "])::before,
+.surface-card-action[aria-label]:not([aria-label^="Close "])::after,
 .icon-ghost-control[aria-label]::before,
 .icon-ghost-control[aria-label]::after,
 .shell-project-action[aria-label]::before,
@@ -99,8 +99,8 @@
 .assistant-chat-send-button[aria-label]::after,
 .assistant-chat-attachment-remove[aria-label]::before,
 .assistant-chat-attachment-remove[aria-label]::after,
-.project-setup-close-button[aria-label]::before,
-.project-setup-close-button[aria-label]::after,
+.project-setup-close-button[aria-label]:not([aria-label^="Close "])::before,
+.project-setup-close-button[aria-label]:not([aria-label^="Close "])::after,
 .icon-danger-control[aria-label]::before,
 .icon-danger-control[aria-label]::after {
   position: absolute;
@@ -141,14 +141,14 @@
   z-index: 96;
 }
 
-.surface-card-action[aria-label]:not([data-tooltip])::after,
+.surface-card-action[aria-label]:not([data-tooltip]):not([aria-label^="Close "])::after,
 .icon-ghost-control[aria-label]:not([data-tooltip])::after,
 .shell-project-action[aria-label]:not([data-tooltip])::after,
 .assistant-chat-sidebar-tool[aria-label]:not([data-tooltip])::after,
 .assistant-chat-session-action[aria-label]:not([data-tooltip])::after,
 .assistant-chat-send-button[aria-label]:not([data-tooltip])::after,
 .assistant-chat-attachment-remove[aria-label]:not([data-tooltip])::after,
-.project-setup-close-button[aria-label]:not([data-tooltip])::after,
+.project-setup-close-button[aria-label]:not([data-tooltip]):not([aria-label^="Close "])::after,
 .icon-danger-control[aria-label]:not([data-tooltip])::after {
   content: attr(aria-label);
 }
@@ -169,10 +169,10 @@
 [data-tooltip]:hover::after,
 [data-tooltip]:focus-visible::before,
 [data-tooltip]:focus-visible::after,
-.surface-card-action[aria-label]:hover::before,
-.surface-card-action[aria-label]:hover::after,
-.surface-card-action[aria-label]:focus-visible::before,
-.surface-card-action[aria-label]:focus-visible::after,
+.surface-card-action[aria-label]:not([aria-label^="Close "]):hover::before,
+.surface-card-action[aria-label]:not([aria-label^="Close "]):hover::after,
+.surface-card-action[aria-label]:not([aria-label^="Close "]):focus-visible::before,
+.surface-card-action[aria-label]:not([aria-label^="Close "]):focus-visible::after,
 .icon-ghost-control[aria-label]:hover::before,
 .icon-ghost-control[aria-label]:hover::after,
 .icon-ghost-control[aria-label]:focus-visible::before,
@@ -197,10 +197,10 @@
 .assistant-chat-attachment-remove[aria-label]:hover::after,
 .assistant-chat-attachment-remove[aria-label]:focus-visible::before,
 .assistant-chat-attachment-remove[aria-label]:focus-visible::after,
-.project-setup-close-button[aria-label]:hover::before,
-.project-setup-close-button[aria-label]:hover::after,
-.project-setup-close-button[aria-label]:focus-visible::before,
-.project-setup-close-button[aria-label]:focus-visible::after,
+.project-setup-close-button[aria-label]:not([aria-label^="Close "]):hover::before,
+.project-setup-close-button[aria-label]:not([aria-label^="Close "]):hover::after,
+.project-setup-close-button[aria-label]:not([aria-label^="Close "]):focus-visible::before,
+.project-setup-close-button[aria-label]:not([aria-label^="Close "]):focus-visible::after,
 .icon-danger-control[aria-label]:hover::before,
 .icon-danger-control[aria-label]:hover::after,
 .icon-danger-control[aria-label]:focus-visible::before,
@@ -210,8 +210,8 @@
 
 [data-tooltip]:hover::before,
 [data-tooltip]:focus-visible::before,
-.surface-card-action[aria-label]:hover::before,
-.surface-card-action[aria-label]:focus-visible::before,
+.surface-card-action[aria-label]:not([aria-label^="Close "]):hover::before,
+.surface-card-action[aria-label]:not([aria-label^="Close "]):focus-visible::before,
 .icon-ghost-control[aria-label]:hover::before,
 .icon-ghost-control[aria-label]:focus-visible::before,
 .shell-project-action[aria-label]:hover::before,
@@ -224,8 +224,8 @@
 .assistant-chat-send-button[aria-label]:focus-visible::before,
 .assistant-chat-attachment-remove[aria-label]:hover::before,
 .assistant-chat-attachment-remove[aria-label]:focus-visible::before,
-.project-setup-close-button[aria-label]:hover::before,
-.project-setup-close-button[aria-label]:focus-visible::before,
+.project-setup-close-button[aria-label]:not([aria-label^="Close "]):hover::before,
+.project-setup-close-button[aria-label]:not([aria-label^="Close "]):focus-visible::before,
 .icon-danger-control[aria-label]:hover::before,
 .icon-danger-control[aria-label]:focus-visible::before {
   transform: translate(-50%, 0) rotate(45deg);
@@ -233,8 +233,8 @@
 
 [data-tooltip]:hover::after,
 [data-tooltip]:focus-visible::after,
-.surface-card-action[aria-label]:hover::after,
-.surface-card-action[aria-label]:focus-visible::after,
+.surface-card-action[aria-label]:not([aria-label^="Close "]):hover::after,
+.surface-card-action[aria-label]:not([aria-label^="Close "]):focus-visible::after,
 .icon-ghost-control[aria-label]:hover::after,
 .icon-ghost-control[aria-label]:focus-visible::after,
 .shell-project-action[aria-label]:hover::after,
@@ -247,8 +247,8 @@
 .assistant-chat-send-button[aria-label]:focus-visible::after,
 .assistant-chat-attachment-remove[aria-label]:hover::after,
 .assistant-chat-attachment-remove[aria-label]:focus-visible::after,
-.project-setup-close-button[aria-label]:hover::after,
-.project-setup-close-button[aria-label]:focus-visible::after,
+.project-setup-close-button[aria-label]:not([aria-label^="Close "]):hover::after,
+.project-setup-close-button[aria-label]:not([aria-label^="Close "]):focus-visible::after,
 .icon-danger-control[aria-label]:hover::after,
 .icon-danger-control[aria-label]:focus-visible::after {
   transform: translate(-50%, 0);
@@ -1579,6 +1579,11 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   -webkit-app-region: no-drag;
 }
 
+.subnav-tab-catalog {
+  margin-left: auto;
+  margin-right: 6px;
+}
+
 .subnav-tab {
   display: inline-flex;
   align-items: center;
@@ -1602,6 +1607,29 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   background: rgba(255, 255, 255, 0.055);
   color: var(--text-primary);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.subnav-tab-accent {
+  min-height: 31px;
+  padding: 6px 10px;
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  background: rgba(20, 83, 45, 0.18);
+  color: rgba(187, 247, 208, 0.98);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.subnav-tab-accent:hover {
+  border-color: rgba(74, 222, 128, 0.28);
+  background: rgba(21, 128, 61, 0.2);
+  color: rgba(220, 252, 231, 0.98);
+}
+
+.subnav-tab-accent.active {
+  border-color: rgba(74, 222, 128, 0.34);
+  background: rgba(22, 101, 52, 0.3);
+  color: rgba(240, 253, 244, 0.99);
+  box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.12);
 }
 
 .shell-content {
@@ -1762,6 +1790,65 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.catalog-toolbar-actions {
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.catalog-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 94px;
+  min-height: 29px;
+  padding: 0 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.catalog-toolbar-button:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+.catalog-toolbar-button:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+.catalog-toolbar-button svg {
+  flex: 0 0 auto;
+}
+
+.catalog-toolbar-button span {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.catalog-toolbar-button-primary {
+  background: rgba(92, 153, 255, 0.16);
+  border-color: rgba(92, 153, 255, 0.28);
+  color: var(--text-primary);
+}
+
+.catalog-toolbar-button-primary:hover {
+  background: rgba(92, 153, 255, 0.22);
+}
+
+.catalog-surface-card .surface-card-title {
+  color: #d8c6a1;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .list-toolbar {
@@ -2679,6 +2766,28 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  position: relative;
+}
+
+.data-table-columns-trigger-shell {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.data-table-columns-trigger {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 8px;
+}
+
+.data-table-columns-trigger.is-open {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+.data-table-columns-menu {
+  width: 220px;
 }
 
 .table-shell-wide-scroll {
@@ -2794,6 +2903,50 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   gap: 8px;
   height: 34px;
   padding: 0 10px;
+}
+
+.catalog-import-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.catalog-import-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.catalog-import-strategy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.catalog-import-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.catalog-import-error-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+}
+
+.catalog-import-error-row strong {
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.catalog-import-error-row span {
+  color: var(--text-secondary);
 }
 
 .data-table-header-label {
@@ -4297,6 +4450,217 @@ button.timeline-signal-chip:focus-visible {
 .catalog-asset-option.selected {
   border-color: rgba(92, 153, 255, 0.3);
   background: rgba(92, 153, 255, 0.08);
+}
+
+.catalog-crew-support-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.catalog-crew-support-card,
+.catalog-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.014);
+}
+
+.catalog-crew-support-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.catalog-inline-button {
+  white-space: nowrap;
+}
+
+.catalog-crew-bank-accounts,
+.catalog-preview-bank-accounts,
+.catalog-preview-documents {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.catalog-crew-documents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.catalog-crew-bank-account,
+.catalog-preview-bank-account {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.catalog-crew-bank-account-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.catalog-preview-bank-account strong,
+.catalog-preview-bank-account span {
+  display: block;
+}
+
+.catalog-preview-bank-account span {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.catalog-crew-document-row,
+.catalog-preview-document-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.018);
+  color: inherit;
+  text-align: left;
+}
+
+.catalog-crew-dropzone-shell {
+  position: relative;
+}
+
+.catalog-crew-dropzone-shell.is-disabled {
+  opacity: 0.72;
+}
+
+.catalog-crew-document-row:hover,
+.catalog-preview-document-row:hover {
+  border-color: rgba(92, 153, 255, 0.24);
+  background: rgba(92, 153, 255, 0.05);
+}
+
+.catalog-crew-dropzone {
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.catalog-crew-dropzone-shell.is-disabled .catalog-crew-dropzone {
+  border-color: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.catalog-crew-dropzone.is-drag-active {
+  border-color: rgba(92, 153, 255, 0.36);
+  background: rgba(92, 153, 255, 0.08);
+}
+
+.catalog-crew-document-card {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.018);
+  overflow: hidden;
+}
+
+.catalog-crew-document-open {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  color: inherit;
+  text-align: left;
+}
+
+.catalog-crew-document-open:hover {
+  background: rgba(92, 153, 255, 0.05);
+}
+
+.catalog-crew-document-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+}
+
+.catalog-crew-document-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 132px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(8, 10, 14, 0.82);
+}
+
+.catalog-crew-document-thumb {
+  width: 100%;
+  height: 132px;
+  object-fit: cover;
+}
+
+.catalog-crew-document-pdf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.catalog-crew-document-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.catalog-crew-document-copy strong,
+.catalog-crew-document-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catalog-crew-document-copy span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.catalog-preview-document-image,
+.catalog-preview-document-frame {
+  width: 100%;
+  min-height: 220px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  background: rgba(8, 10, 14, 0.9);
+}
+
+.catalog-preview-document-image {
+  object-fit: contain;
+  max-height: 320px;
+}
+
+.catalog-preview-document-frame {
+  height: 320px;
+}
+
+.action-field-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .agents-health-grid,

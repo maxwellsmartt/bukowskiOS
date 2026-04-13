@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
-import type { FileUploadMutationResult } from "@contracts";
+import type { FileDeleteMutationResult, FileUploadMutationResult } from "@contracts";
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
@@ -103,7 +103,7 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
   const shellApi = options.shellApi ?? shell;
 
   const importFiles = (
-    domain: "asset" | "incident" | "finance",
+    domain: "asset" | "incident" | "finance" | "crew",
     entityId: string,
     sourceFilePaths: string[],
   ): FileUploadMutationResult => {
@@ -128,10 +128,15 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
       if (!incidentRow) {
         throw new Error("Incident was not found.");
       }
-    } else {
+    } else if (domain === "finance") {
       const financeRow = db.prepare("SELECT id FROM financial_entries WHERE id = ? LIMIT 1").get(entityId) as { id: string } | undefined;
       if (!financeRow) {
         throw new Error("Finance entry was not found.");
+      }
+    } else {
+      const crewRow = db.prepare("SELECT id FROM crew_members WHERE id = ? LIMIT 1").get(entityId) as { id: string } | undefined;
+      if (!crewRow) {
+        throw new Error("Crew member was not found.");
       }
     }
 
@@ -172,10 +177,25 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
               deleted_at
             ) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, 'available', NULL)
           `)
-          : db.prepare(`
+          : domain === "finance"
+            ? db.prepare(`
             INSERT INTO financial_documents (
               id,
               financial_entry_id,
+              file_type,
+              storage_path,
+              original_name,
+              byte_size,
+              mime_type,
+              status,
+              uploaded_at,
+              deleted_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?, NULL)
+          `)
+            : db.prepare(`
+            INSERT INTO crew_documents (
+              id,
+              crew_member_id,
               file_type,
               storage_path,
               original_name,
@@ -225,6 +245,17 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
             originalName,
             byteSize,
             mimeType,
+          );
+        } else if (domain === "finance") {
+          insertStatement.run(
+            fileId,
+            entityId,
+            inferFileType(mimeType),
+            storagePath,
+            originalName,
+            byteSize,
+            mimeType,
+            now,
           );
         } else {
           insertStatement.run(
@@ -289,6 +320,10 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
       return importFiles("finance", entryId, sourceFilePaths);
     },
 
+    importCrewDocuments(crewMemberId: string, sourceFilePaths: string[]) {
+      return importFiles("crew", crewMemberId, sourceFilePaths);
+    },
+
     async openAssetFile(fileId: string) {
       const row = db
         .prepare(
@@ -332,6 +367,56 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
         .get(fileId) as AssetFileRow | undefined;
 
       await openStoredRow(row, "financial_documents", fileId);
+    },
+
+    async openCrewDocument(fileId: string) {
+      const row = db
+        .prepare(
+          `
+            SELECT id, storage_path, status
+            FROM crew_documents
+            WHERE id = ?
+            LIMIT 1
+          `,
+        )
+        .get(fileId) as AssetFileRow | undefined;
+
+      await openStoredRow(row, "crew_documents", fileId);
+    },
+
+    deleteCrewDocument(fileId: string): FileDeleteMutationResult {
+      const row = db
+        .prepare(
+          `
+            SELECT id, storage_path, status
+            FROM crew_documents
+            WHERE id = ?
+            LIMIT 1
+          `,
+        )
+        .get(fileId) as AssetFileRow | undefined;
+
+      if (!row) {
+        throw new Error("Crew document was not found.");
+      }
+
+      if (row.storage_path && fileSystem.existsSync(row.storage_path)) {
+        fileSystem.unlinkSync(row.storage_path);
+      }
+
+      db.prepare(
+        `
+          UPDATE crew_documents
+          SET status = 'deleted',
+              deleted_at = ?
+          WHERE id = ?
+        `,
+      ).run(options.now?.() ?? new Date().toISOString(), fileId);
+
+      return {
+        deletedCount: 1,
+        summary: "Crew document removed.",
+      };
     },
   };
 };

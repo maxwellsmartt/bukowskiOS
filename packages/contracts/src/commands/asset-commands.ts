@@ -85,6 +85,11 @@ export type FileUploadMutationResult = {
   summary: string;
 };
 
+export type FileDeleteMutationResult = {
+  deletedCount: number;
+  summary: string;
+};
+
 export type AssignMoveAssetsInput = {
   commandId: string;
   workspaceId: string;
