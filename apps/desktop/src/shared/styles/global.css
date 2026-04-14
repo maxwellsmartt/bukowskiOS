@@ -3447,6 +3447,10 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   white-space: nowrap;
 }
 
+.asset-kit-membership-inline {
+  color: rgba(245, 197, 107, 0.9);
+}
+
 .sync-outbox-list {
   display: flex;
   flex-direction: column;

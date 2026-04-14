@@ -113,6 +113,12 @@ export const AssetDetailPage = () => {
             <span className="summary-value">{data.asset.responsible}</span>
           </div>
           <div className="summary-row">
+            <span className="summary-label">Kit membership</span>
+            <span className="summary-value">
+              {data.asset.linkedKitCount ? data.asset.linkedKitCodes.join(" · ") : "Standalone"}
+            </span>
+          </div>
+          <div className="summary-row">
             <span className="summary-label">Condition</span>
             <span className="summary-value">{data.asset.condition}</span>
           </div>
@@ -153,6 +159,11 @@ export const AssetDetailPage = () => {
       {editorFeedback ? <div className="action-feedback action-feedback-success">{editorFeedback}</div> : null}
       {filesFeedback ? <div className="action-feedback action-feedback-success">{filesFeedback}</div> : null}
       {filesError ? <div className="action-feedback action-feedback-error">{filesError}</div> : null}
+      {data.asset.linkedKitCount ? (
+        <div className="action-feedback action-feedback-warning">
+          This asset is currently part of the active kit{data.asset.linkedKitCount === 1 ? "" : "s"} {data.asset.linkedKitCodes.join(", ")}. Remove it from the kit first before assigning or moving it individually.
+        </div>
+      ) : null}
 
       {editorOpen && data.editor ? (
         <AssetEditorPanel

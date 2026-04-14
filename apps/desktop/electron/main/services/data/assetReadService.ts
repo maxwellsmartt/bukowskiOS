@@ -41,6 +41,46 @@ type CountRow = {
   count: number;
 };
 
+type AssetKitMembershipRow = {
+  asset_id: string;
+  kit_id: string;
+  kit_code: string;
+  kit_name: string;
+};
+
+const loadActiveKitMemberships = (db: DatabaseSync, assetIds: string[]) => {
+  if (!assetIds.length) {
+    return new Map<string, AssetKitMembershipRow[]>();
+  }
+
+  const placeholders = assetIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+        SELECT
+          kit_assets.asset_id,
+          kits.id AS kit_id,
+          kits.code AS kit_code,
+          kits.name AS kit_name
+        FROM kit_assets
+        JOIN kits ON kits.id = kit_assets.kit_id
+        WHERE kits.is_active = 1
+          AND kit_assets.asset_id IN (${placeholders})
+        ORDER BY kits.name, kits.code
+      `,
+    )
+    .all(...assetIds) as AssetKitMembershipRow[];
+
+  const byAssetId = new Map<string, AssetKitMembershipRow[]>();
+  rows.forEach((row) => {
+    const current = byAssetId.get(row.asset_id) ?? [];
+    current.push(row);
+    byAssetId.set(row.asset_id, current);
+  });
+
+  return byAssetId;
+};
+
 export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) => {
   const service = {
     getAssetSummary(): AssetSummarySnapshot {
@@ -218,10 +258,23 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           ]),
         );
 
+      const kitMembershipsByAssetId = loadActiveKitMemberships(
+        db,
+        scopedRows.map((row) => row.id),
+      );
+
       return deps.sortRows(
         scopedRows,
         deps.resolveAssetComparator(query.sortBy ?? deps.defaultAssetListQuery.sortBy, query.sortDirection ?? deps.defaultAssetListQuery.sortDirection),
-      ).map(({ createdAt: _createdAt, updatedAt: _updatedAt, ...row }) => row);
+      ).map(({ createdAt: _createdAt, updatedAt: _updatedAt, ...row }) => {
+        const memberships = kitMembershipsByAssetId.get(row.id) ?? [];
+        return {
+          ...row,
+          linkedKitCount: memberships.length,
+          linkedKitCodes: memberships.map((membership) => membership.kit_code),
+          linkedKitNames: memberships.map((membership) => membership.kit_name),
+        };
+      });
     },
 
     getAssetDetail(assetId: string): AssetDetailSnapshot {
@@ -412,6 +465,7 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
       }>;
 
       const primaryCodeValue = scannableCodes.find((row) => row.is_primary)?.code_value ?? asset.qr_code_value;
+      const kitMemberships = loadActiveKitMemberships(db, [assetId]).get(assetId) ?? [];
 
       const timeline: AssetTimelineItem[] = timelineRows.map((row) => ({
         timestamp: deps.formatTimelineTimestamp(row.event_timestamp),
@@ -450,6 +504,9 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           replacementValue: deps.formatCurrency(asset.replacement_value),
           condition: asset.condition_status,
           custody: asset.custody_status,
+          linkedKitCount: kitMemberships.length,
+          linkedKitCodes: kitMemberships.map((membership) => membership.kit_code),
+          linkedKitNames: kitMemberships.map((membership) => membership.kit_name),
         },
         legacy: {
           source: asset.source_label,

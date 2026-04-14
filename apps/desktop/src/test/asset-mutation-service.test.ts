@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createAssetMutationService } from "../../electron/main/services/data/assetMutationService";
+import { createCatalogMutationService } from "../../electron/main/services/data/catalogMutationService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createPackingMutationService } from "../../electron/main/services/data/packingMutationService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
@@ -296,6 +297,67 @@ describe("asset mutation service", () => {
     expect(assignments).toHaveLength(1);
     expect(assignments[0]?.quantity).toBe(2);
     expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.quantity).toBe(0);
+
+    cleanup();
+  });
+
+  it("blocks assigning kit members individually unless the action comes from that kit", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-kit-guard-test");
+    const assetMutations = createAssetMutationService(database);
+    const catalogMutations = createCatalogMutationService(database);
+    const reads = createFoundationReadService(database);
+    const createdAsset = assetMutations.createAsset({
+      commandId: "cmd-test-asset-kit-member-create",
+      workspaceId: "workspace-metadata",
+      name: "Kit locked monitor",
+      internalCode: "KITLOCK-001",
+      categoryId: "cat-monitors",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    catalogMutations.createEntity({
+      entityType: "kit",
+      code: "FIELDKIT",
+      name: "Field Monitor Kit",
+      assetSelections: [{ assetId: createdAsset.assetId, quantity: 1 }],
+    });
+    const createdKit = reads.getCatalogSnapshot().kits.find((kit) => kit.code === "FIELDKIT");
+
+    expect(createdKit?.id).toBeTruthy();
+
+    expect(() =>
+      assetMutations.assignMoveAssets({
+        commandId: "cmd-test-asset-kit-block",
+        workspaceId: "workspace-metadata",
+        assetIds: [createdAsset.assetId],
+        assetSelections: [{ assetId: createdAsset.assetId, quantity: 1 }],
+        mode: "assign",
+        projectId: "project-aurora",
+        assignedToUserId: "user-paola",
+        targetLocationId: "loc-video-village",
+        actorType: "user",
+        sourceChannel: "desktop",
+      }),
+    ).toThrow("Remove it from the kit");
+
+    const allowedResult = assetMutations.assignMoveAssets({
+      commandId: "cmd-test-asset-kit-allow",
+      workspaceId: "workspace-metadata",
+      assetIds: [createdAsset.assetId],
+      assetSelections: [{ assetId: createdAsset.assetId, quantity: 1 }],
+      sourceKitId: createdKit!.id,
+      mode: "assign",
+      projectId: "project-aurora",
+      assignedToUserId: "user-paola",
+      targetLocationId: "loc-video-village",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(allowedResult.processedAssetIds).toEqual([createdAsset.assetId]);
 
     cleanup();
   });

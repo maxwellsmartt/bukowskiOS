@@ -110,6 +110,19 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       .map((assetId) => assetMap.get(assetId))
       .filter((asset): asset is (typeof assets)[number] => Boolean(asset));
   }, [assets, selectedRowIds]);
+  const selectedKitLockedAssets = useMemo(
+    () => selectedAssets.filter((asset) => asset.linkedKitCount > 0),
+    [selectedAssets],
+  );
+  const selectedKitLockSummary = useMemo(() => {
+    if (!selectedKitLockedAssets.length) {
+      return null;
+    }
+
+    return selectedKitLockedAssets
+      .map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`)
+      .join(", ");
+  }, [selectedKitLockedAssets]);
 
   const handleAssignMove = async (formValue: AssetAssignMoveFormValue) => {
     try {
@@ -259,6 +272,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           <div className="identity-cell">
             <span className="identity-title">{row.name}</span>
             <span className="identity-meta">{row.code}</span>
+            {row.linkedKitCount ? (
+              <span className="identity-meta asset-kit-membership-inline">
+                In kit {row.linkedKitCodes.join(", ")}
+              </span>
+            ) : null}
           </div>
         ),
       },
@@ -334,6 +352,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
       {actionFeedback ? <div className="action-feedback action-feedback-success">{actionFeedback}</div> : null}
       {actionWarning ? <div className="action-feedback action-feedback-warning">{actionWarning}</div> : null}
+      {selectedKitLockSummary ? (
+        <div className="action-feedback action-feedback-warning">
+          These assets are part of active kits and cannot be assigned or moved individually: {selectedKitLockSummary}. Remove them from the kit first if you need to operate them as standalone items.
+        </div>
+      ) : null}
 
       {!error && !isLoading && assets.length === 0 ? (
         <GuidedEmptyState
@@ -409,6 +432,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             </button>
             <button
               className="action-primary-button"
+              disabled={selectedKitLockedAssets.length > 0}
               onClick={() => {
                 setActionPanelOpen(true);
                 setPackingPanelOpen(false);
@@ -607,6 +631,12 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   <span className="summary-label">Condition / custody</span>
                   <span className="summary-value">
                     {activeAsset.condition} · {activeAsset.custody}
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Kit membership</span>
+                  <span className="summary-value">
+                    {activeAsset.linkedKitCount ? activeAsset.linkedKitCodes.join(" · ") : "Standalone"}
                   </span>
                 </div>
                 <div className="summary-row">

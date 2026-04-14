@@ -809,6 +809,7 @@ export const CatalogPage = () => {
           assetId: selection.assetId,
           quantity: selection.quantity,
         })),
+        sourceKitId: activeKitRow.id,
         mode: "assign",
         projectId: value.projectId,
         projectUnitId: value.projectUnitId,

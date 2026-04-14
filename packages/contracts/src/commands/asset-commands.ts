@@ -98,6 +98,7 @@ export type AssignMoveAssetsInput = {
     assetId: string;
     quantity: number;
   }>;
+  sourceKitId?: string;
   mode: "assign" | "move";
   projectId?: string;
   projectUnitId?: string;

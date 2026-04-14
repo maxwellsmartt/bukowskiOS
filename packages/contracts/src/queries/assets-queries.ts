@@ -27,6 +27,9 @@ export type AssetListRow = {
   hasAccessories: string;
   source: string;
   incidentsOpen: number;
+  linkedKitCount: number;
+  linkedKitCodes: string[];
+  linkedKitNames: string[];
 };
 
 export type AssetSortField =
@@ -99,6 +102,9 @@ export type AssetDetailRow = {
   replacementValue: string;
   condition: string;
   custody: string;
+  linkedKitCount: number;
+  linkedKitCodes: string[];
+  linkedKitNames: string[];
 };
 
 export type AssetEditorSnapshot = {

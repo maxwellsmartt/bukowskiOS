@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createAssetMutationService } from "../../electron/main/services/data/assetMutationService";
+import { createCatalogMutationService } from "../../electron/main/services/data/catalogMutationService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
@@ -114,6 +115,14 @@ describe("foundation read service", () => {
     const { cleanup, database } = createTestDatabase("bukowski-foundation-quantity-reads");
     const reads = createFoundationReadService(database);
     const assetMutations = createAssetMutationService(database);
+    const catalogMutations = createCatalogMutationService(database);
+
+    catalogMutations.createEntity({
+      entityType: "kit",
+      code: "READKIT",
+      name: "Read Model Kit",
+      assetSelections: [{ assetId: "asset-smallhd-cine7", quantity: 1 }],
+    });
 
     assetMutations.assignMoveAssets({
       commandId: "cmd-foundation-quantity-read-1",
@@ -130,6 +139,8 @@ describe("foundation read service", () => {
 
     const assetRow = reads.getAssets().find((row) => row.id === "asset-legacy-rentman-1");
     const assetDetail = reads.getAssetDetail("asset-legacy-rentman-1");
+    const kitMemberRow = reads.getAssets().find((row) => row.id === "asset-smallhd-cine7");
+    const kitMemberDetail = reads.getAssetDetail("asset-smallhd-cine7");
     const projectDetail = reads.getProjectDetail("project-aurora");
     const projectAsset = projectDetail.assets.find((row) => row.id === "asset-legacy-rentman-1");
     const availability = reads.getAssetAvailability({ assetId: "asset-legacy-rentman-1" })[0];
@@ -139,11 +150,17 @@ describe("foundation read service", () => {
     expect(assetRow?.quantity).toBe(1);
     expect(assetRow?.assignedQuantity).toBe(1);
     expect(assetRow?.checkedOutQuantity).toBe(0);
+    expect(assetRow?.linkedKitCount).toBe(0);
 
     expect(assetDetail.asset?.totalQuantity).toBe(2);
     expect(assetDetail.asset?.quantity).toBe(1);
     expect(assetDetail.asset?.assignedQuantity).toBe(1);
     expect(assetDetail.asset?.checkedOutQuantity).toBe(0);
+    expect(assetDetail.asset?.linkedKitCount).toBe(0);
+
+    expect(kitMemberRow?.linkedKitCount).toBe(1);
+    expect(kitMemberRow?.linkedKitCodes).toContain("READKIT");
+    expect(kitMemberDetail.asset?.linkedKitCodes).toContain("READKIT");
 
     expect(projectAsset?.totalQuantity).toBe(2);
     expect(projectAsset?.availableQuantity).toBe(1);
