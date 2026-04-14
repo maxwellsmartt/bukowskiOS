@@ -510,7 +510,7 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
         const reservations = db
           .prepare(
             `
-              SELECT COUNT(*) AS count
+              SELECT COALESCE(SUM(COALESCE(quantity, 1)), 0) AS count
               FROM asset_assignments
               WHERE asset_id = ?
                 AND returned_at IS NULL
@@ -533,7 +533,8 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           project: row.project,
           projectUnit: row.projectUnit,
           reservationsInWindow: reservations.count,
-          availableNow: row.status === "Available" && reservations.count === 0,
+          availableNow: row.quantity > 0,
+          availableQuantity: row.quantity,
           rangeStart,
           rangeEnd,
         };
@@ -632,6 +633,7 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
               assets.id AS asset_id,
               assets.name AS asset_name,
               COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS asset_code,
+              COALESCE(asset_assignments.quantity, 1) AS quantity,
               COALESCE(projects.name, '—') AS project_name,
               COALESCE(users.full_name, '—') AS assigned_to,
               asset_assignments.assignment_status,
@@ -654,6 +656,7 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
         asset_id: string;
         asset_name: string;
         asset_code: string;
+        quantity: number;
         project_name: string;
         assigned_to: string;
         assignment_status: string;
@@ -671,6 +674,7 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           assetId: row.asset_id,
           asset: row.asset_name,
           code: row.asset_code,
+          quantity: row.quantity,
           project: row.project_name,
           assignedTo: row.assigned_to,
           status: row.assignment_status,

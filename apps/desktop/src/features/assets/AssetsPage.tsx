@@ -17,6 +17,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
+import { formatAssetStockDetailRows, formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
@@ -262,7 +263,21 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         ),
       },
       { key: "category", label: "Category", width: 160, minWidth: 132, render: (row: (typeof assets)[number]) => row.category },
-      { key: "quantity", label: "Qty", align: "right" as const, width: 72, minWidth: 60, render: (row: (typeof assets)[number]) => row.quantity },
+      {
+        key: "quantity",
+        label: "Stock",
+        width: 188,
+        minWidth: 164,
+        render: (row: (typeof assets)[number]) => (
+          <span className="stock-inline-text">
+            {formatAssetStockInline({
+              availableQuantity: row.quantity,
+              assignedQuantity: row.assignedQuantity,
+              checkedOutQuantity: row.checkedOutQuantity,
+            })}
+          </span>
+        ),
+      },
       { key: "tracking", label: "Tracking", width: 110, minWidth: 96, render: (row: (typeof assets)[number]) => row.tracking },
       { key: "status", label: "Status", width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.status },
       { key: "condition", label: "Condition", width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.condition },
@@ -552,15 +567,24 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   <span className="summary-value">{activeAsset.code}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Quantity</span>
-                  <span className="summary-value">
-                    {activeAsset.quantity} · {activeAsset.tracking}
-                  </span>
+                  <span className="summary-label">Tracking</span>
+                  <span className="summary-value">{activeAsset.tracking}</span>
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">Location</span>
                   <span className="summary-value">{activeAsset.location}</span>
                 </div>
+                {formatAssetStockDetailRows({
+                  totalQuantity: activeAsset.totalQuantity,
+                  availableQuantity: activeAsset.quantity,
+                  assignedQuantity: activeAsset.assignedQuantity,
+                  checkedOutQuantity: activeAsset.checkedOutQuantity,
+                }).map((row) => (
+                  <div key={row.label} className="summary-row">
+                    <span className="summary-label">{row.label}</span>
+                    <span className="summary-value">{row.value}</span>
+                  </div>
+                ))}
                 <div className="summary-row">
                   <span className="summary-label">Project / responsible</span>
                   <span className="summary-value">

@@ -12,6 +12,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { formatProjectAssignmentInline } from "@shared/lib/assetQuantityPresentation";
 
 type ProjectDetailPanelProps = {
   data: ProjectDetailSnapshot;
@@ -293,6 +294,21 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               ),
             },
             { key: "status", label: "Status", width: 110, minWidth: 92, render: (row) => row.status },
+            {
+              key: "stock",
+              label: "Stock",
+              width: 176,
+              minWidth: 150,
+              render: (row) => (
+                <span className="stock-inline-text">
+                  {formatProjectAssignmentInline({
+                    totalQuantity: row.totalQuantity,
+                    assignedQuantity: row.assignedQuantity,
+                    checkedOutQuantity: row.checkedOutQuantity,
+                  })}
+                </span>
+              ),
+            },
             { key: "location", label: "Location", width: 180, minWidth: 140, render: (row) => row.location },
             { key: "unit", label: "Unit", width: 150, minWidth: 124, render: (row) => row.projectUnit },
             { key: "responsible", label: "Responsible", width: 160, minWidth: 132, render: (row) => row.responsible },

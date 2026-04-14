@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createAssetMutationService } from "../../electron/main/services/data/assetMutationService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
@@ -105,6 +106,56 @@ describe("foundation read service", () => {
 
     expect(reads.getProjects().some((project) => project.id === "project-aurora")).toBe(true);
     expect(reads.getScheduleTimeline("90d", "week").projects.some((project) => project.id === "project-aurora")).toBe(true);
+
+    cleanup();
+  });
+
+  it("exposes quantity buckets and reservation quantities across asset and project reads", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-foundation-quantity-reads");
+    const reads = createFoundationReadService(database);
+    const assetMutations = createAssetMutationService(database);
+
+    assetMutations.assignMoveAssets({
+      commandId: "cmd-foundation-quantity-read-1",
+      workspaceId: "workspace-metadata",
+      assetIds: ["asset-legacy-rentman-1"],
+      assetSelections: [{ assetId: "asset-legacy-rentman-1", quantity: 1 }],
+      mode: "assign",
+      projectId: "project-aurora",
+      assignedToUserId: "user-paola",
+      targetLocationId: "loc-video-village",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    const assetRow = reads.getAssets().find((row) => row.id === "asset-legacy-rentman-1");
+    const assetDetail = reads.getAssetDetail("asset-legacy-rentman-1");
+    const projectDetail = reads.getProjectDetail("project-aurora");
+    const projectAsset = projectDetail.assets.find((row) => row.id === "asset-legacy-rentman-1");
+    const availability = reads.getAssetAvailability({ assetId: "asset-legacy-rentman-1" })[0];
+    const reservations = reads.getAssetReservations({ assetId: "asset-legacy-rentman-1" });
+
+    expect(assetRow?.totalQuantity).toBe(2);
+    expect(assetRow?.quantity).toBe(1);
+    expect(assetRow?.assignedQuantity).toBe(1);
+    expect(assetRow?.checkedOutQuantity).toBe(0);
+
+    expect(assetDetail.asset?.totalQuantity).toBe(2);
+    expect(assetDetail.asset?.quantity).toBe(1);
+    expect(assetDetail.asset?.assignedQuantity).toBe(1);
+    expect(assetDetail.asset?.checkedOutQuantity).toBe(0);
+
+    expect(projectAsset?.totalQuantity).toBe(2);
+    expect(projectAsset?.availableQuantity).toBe(1);
+    expect(projectAsset?.assignedQuantity).toBe(1);
+    expect(projectAsset?.checkedOutQuantity).toBe(0);
+
+    expect(availability?.reservationsInWindow).toBe(1);
+    expect(availability?.availableQuantity).toBe(1);
+    expect(availability?.availableNow).toBe(true);
+
+    expect(reservations[0]?.quantity).toBe(1);
+    expect(reservations[0]?.project).toBe("Aurora Campaign");
 
     cleanup();
   });

@@ -3440,6 +3440,13 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   font-size: 13px;
 }
 
+.stock-inline-text {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
 .sync-outbox-list {
   display: flex;
   flex-direction: column;
@@ -5055,10 +5062,11 @@ button.timeline-signal-chip:focus-visible {
 .mission-node {
   position: relative;
   display: grid;
-  align-content: start;
+  grid-template-rows: auto minmax(36px, 36px) auto;
+  align-content: stretch;
   gap: 10px;
   width: 100%;
-  min-height: 118px;
+  min-height: 126px;
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
@@ -5193,6 +5201,7 @@ button.timeline-signal-chip:focus-visible {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  min-height: 36px;
 }
 
 .mission-node-footer {

@@ -1201,6 +1201,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
             asset_current_state.operational_status,
             asset_current_state.custody_status,
+            asset_current_state.total_quantity,
             asset_current_state.available_quantity,
             asset_current_state.assigned_quantity,
             asset_current_state.checked_out_quantity,
@@ -1227,6 +1228,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       code: string;
       operational_status: string;
       custody_status: string;
+      total_quantity: number;
       available_quantity: number;
       assigned_quantity: number;
       checked_out_quantity: number;
@@ -1480,6 +1482,10 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         row.assigned_quantity,
         row.checked_out_quantity,
       ),
+      totalQuantity: row.total_quantity,
+      availableQuantity: row.available_quantity,
+      assignedQuantity: row.assigned_quantity,
+      checkedOutQuantity: row.checked_out_quantity,
       location: row.location,
       responsible: row.responsible,
       condition: row.condition_status,

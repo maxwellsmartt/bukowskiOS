@@ -394,6 +394,10 @@ export type ProjectDetailAssetRow = {
   name: string;
   code: string;
   status: string;
+  totalQuantity: number;
+  availableQuantity: number;
+  assignedQuantity: number;
+  checkedOutQuantity: number;
   location: string;
   responsible: string;
   condition: string;

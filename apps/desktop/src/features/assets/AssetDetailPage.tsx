@@ -9,6 +9,7 @@ import { ScannableCodePanel } from "@shared/components/ScannableCodePanel";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { formatAssetStockDetailRows } from "@shared/lib/assetQuantityPresentation";
 import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
@@ -76,7 +77,7 @@ export const AssetDetailPage = () => {
     <div className="page-stack">
       <SurfaceCard
         title={data.asset.name}
-        subtitle="Current status, quantity, storage context and recent history for this asset."
+        subtitle="Current status, stock, storage context and recent history for this asset."
         aside={<StatusBadge tone={data.asset.status === "Maintenance" ? "warning" : "info"}>{data.asset.status}</StatusBadge>}
       >
         <div className="summary-grid">
@@ -85,15 +86,24 @@ export const AssetDetailPage = () => {
             <span className="summary-value">{data.asset.code}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Quantity</span>
-            <span className="summary-value">
-              {data.asset.quantity} · {data.asset.tracking}
-            </span>
+            <span className="summary-label">Tracking</span>
+            <span className="summary-value">{data.asset.tracking}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">Current location</span>
             <span className="summary-value">{data.asset.location}</span>
           </div>
+          {formatAssetStockDetailRows({
+            totalQuantity: data.asset.totalQuantity,
+            availableQuantity: data.asset.quantity,
+            assignedQuantity: data.asset.assignedQuantity,
+            checkedOutQuantity: data.asset.checkedOutQuantity,
+          }).map((row) => (
+            <div key={row.label} className="summary-row">
+              <span className="summary-label">{row.label}</span>
+              <span className="summary-value">{row.value}</span>
+            </div>
+          ))}
           <div className="summary-row">
             <span className="summary-label">Project</span>
             <span className="summary-value">{data.asset.project}</span>
