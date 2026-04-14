@@ -9,9 +9,27 @@ const workspaceId = DEFAULT_WORKSPACE_ID;
 const activeProjectStatuses = new Set(["Prep", "Active", "On hold"]);
 const maxInlinePreviewBytes = 5 * 1024 * 1024;
 
-const mapAssetStatus = (operationalStatus: string, custodyStatus: string) => {
+const mapAssetStatus = (
+  operationalStatus: string,
+  custodyStatus: string,
+  availableQuantity: number,
+  assignedQuantity: number,
+  checkedOutQuantity: number,
+) => {
   if (operationalStatus === "maintenance") {
     return "Maintenance";
+  }
+
+  if (checkedOutQuantity > 0 && assignedQuantity > 0) {
+    return "Split allocation";
+  }
+
+  if (custodyStatus === "partial_checked_out") {
+    return `Partial checkout (${checkedOutQuantity}/${availableQuantity + checkedOutQuantity})`;
+  }
+
+  if (custodyStatus === "partial_assigned") {
+    return `Partial assigned (${assignedQuantity}/${availableQuantity + assignedQuantity})`;
   }
 
   if (custodyStatus === "checked_out") {
@@ -399,7 +417,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
             COALESCE(kits.notes, '') AS notes,
             kits.is_active,
             COALESCE((
-              SELECT COUNT(*)
+              SELECT COALESCE(SUM(quantity), 0)
               FROM kit_assets
               WHERE kit_assets.kit_id = kits.id
             ), 0) AS asset_count,
@@ -437,6 +455,30 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       primary_code_value: string;
     }>;
 
+    const kitAssetSelections = db
+      .prepare(
+        `
+          SELECT kit_id, asset_id, quantity
+          FROM kit_assets
+          ORDER BY kit_id, asset_id
+        `,
+      )
+      .all() as Array<{
+      kit_id: string;
+      asset_id: string;
+      quantity: number;
+    }>;
+
+    const kitSelectionsById = new Map<string, Array<{ assetId: string; quantity: number }>>();
+    kitAssetSelections.forEach((row) => {
+      const current = kitSelectionsById.get(row.kit_id) ?? [];
+      current.push({
+        assetId: row.asset_id,
+        quantity: row.quantity,
+      });
+      kitSelectionsById.set(row.kit_id, current);
+    });
+
     const assetOptions = db
       .prepare(
         `
@@ -445,6 +487,9 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
             assets.name,
             COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
             asset_categories.name AS category,
+            asset_current_state.available_quantity AS quantity,
+            asset_current_state.assigned_quantity,
+            asset_current_state.checked_out_quantity,
             asset_current_state.operational_status,
             asset_current_state.custody_status,
             asset_current_state.current_project_id,
@@ -471,6 +516,9 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       name: string;
       code: string;
       category: string;
+      quantity: number;
+      assigned_quantity: number;
+      checked_out_quantity: number;
       operational_status: string;
       custody_status: string;
       current_project_id: string | null;
@@ -560,6 +608,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         isActive: Boolean(row.is_active),
         assetCount: row.asset_count,
         assetIds: row.asset_ids ? row.asset_ids.split(",").filter(Boolean) : [],
+        assetSelections: kitSelectionsById.get(row.id) ?? [],
         primaryCodeValue: row.primary_code_value,
       })),
       assetOptions: assetOptions.map((row) => ({
@@ -567,7 +616,14 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         name: row.name,
         code: row.code,
         category: row.category,
-        status: mapAssetStatus(row.operational_status, row.custody_status),
+        quantity: row.quantity,
+        status: mapAssetStatus(
+          row.operational_status,
+          row.custody_status,
+          row.quantity,
+          row.assigned_quantity,
+          row.checked_out_quantity,
+        ),
         currentProjectId: row.current_project_id,
         currentProject: row.current_project_name,
         currentDepartmentId: row.current_department_id,

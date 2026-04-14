@@ -1,12 +1,13 @@
 import { ArrowRightLeft, PackagePlus, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
+import type { AssetListRow, CatalogSnapshot, ProjectCardRow } from "@contracts";
 import { useProjectDetail } from "@features/projects/useProjectsData";
 import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 
 export type AssetAssignMoveFormValue = {
+  assetSelections?: Array<{ assetId: string; quantity: number }>;
   mode: "assign" | "move";
   projectId?: string;
   projectUnitId?: string;
@@ -26,6 +27,7 @@ type AssetAssignMovePanelProps = {
   onClose: () => void;
   onSubmit: (value: AssetAssignMoveFormValue) => Promise<void>;
   projects: ProjectCardRow[];
+  selectedAssets: AssetListRow[];
   selectedCount: number;
   users: CatalogSnapshot["users"];
 };
@@ -44,6 +46,7 @@ export const AssetAssignMovePanel = ({
   onClose,
   onSubmit,
   projects,
+  selectedAssets,
   selectedCount,
   users,
 }: AssetAssignMovePanelProps) => {
@@ -55,14 +58,65 @@ export const AssetAssignMovePanel = ({
   const [targetLocationId, setTargetLocationId] = useState("");
   const [expectedReturnAt, setExpectedReturnAt] = useState("");
   const [notes, setNotes] = useState("");
+  const [quantityByAssetId, setQuantityByAssetId] = useState<Record<string, number>>({});
   const { data: projectDetail } = useProjectDetail(mode === "assign" ? normalizeOptional(projectId) ?? null : null);
 
   useEffect(() => {
     setProjectUnitId("");
   }, [projectId, mode]);
 
+  useEffect(() => {
+    setQuantityByAssetId((current) => {
+      const nextState: Record<string, number> = {};
+
+      selectedAssets.forEach((asset) => {
+        const maxQuantity = Math.max(1, asset.quantity);
+        nextState[asset.id] = Math.min(maxQuantity, Math.max(1, current[asset.id] ?? maxQuantity));
+      });
+
+      return nextState;
+    });
+  }, [selectedAssets]);
+
+  const selectedAssetDetails = useMemo(
+    () =>
+      selectedAssets.map((asset) => {
+        const maxQuantity =
+          asset.quantity > 0
+            ? asset.quantity
+            : asset.assignedQuantity > 0 && asset.checkedOutQuantity === 0
+              ? asset.assignedQuantity
+              : Math.max(1, asset.quantity);
+        return {
+          ...asset,
+          sourceQuantity: maxQuantity,
+          requestedQuantity: Math.min(maxQuantity, Math.max(1, quantityByAssetId[asset.id] ?? maxQuantity)),
+        };
+      }),
+    [quantityByAssetId, selectedAssets],
+  );
+  const totalAssignQuantity = selectedAssetDetails.reduce((sum, asset) => sum + asset.requestedQuantity, 0);
+  const hasVariableQuantityAssets = selectedAssetDetails.some((asset) => asset.sourceQuantity > 1);
+
+  const handleQuantityChange = (assetId: string, availableQuantity: number, rawValue: string) => {
+    const parsedValue = Number.parseInt(rawValue, 10);
+    const nextValue = Number.isFinite(parsedValue) ? parsedValue : 1;
+
+    setQuantityByAssetId((current) => ({
+      ...current,
+      [assetId]: Math.min(Math.max(nextValue, 1), Math.max(1, availableQuantity)),
+    }));
+  };
+
   const handleSubmit = async () => {
     await onSubmit({
+      assetSelections:
+        mode === "assign"
+          ? selectedAssetDetails.map((asset) => ({
+              assetId: asset.id,
+              quantity: asset.requestedQuantity,
+            }))
+          : undefined,
       mode,
       projectId: mode === "assign" ? normalizeOptional(projectId) : undefined,
       projectUnitId: mode === "assign" ? normalizeOptional(projectUnitId) : undefined,
@@ -88,7 +142,52 @@ export const AssetAssignMovePanel = ({
     >
       <div className="chip-row">
         <span className="action-panel-selection">{selectedLabel}</span>
+        {mode === "assign" ? (
+          <span className="action-panel-selection">
+            {totalAssignQuantity} {totalAssignQuantity === 1 ? "item to assign" : "items to assign"}
+          </span>
+        ) : null}
       </div>
+
+      {mode === "assign" ? (
+        <>
+          <div className="packing-builder-selection-list">
+            {selectedAssetDetails.map((asset) => (
+              <div className="packing-builder-selection-row" key={asset.id}>
+                <div className="packing-builder-selection-copy">
+                  <span className="packing-builder-selection-title">{asset.name}</span>
+                  <span className="packing-builder-selection-meta">
+                    {asset.code} · Assignable {asset.sourceQuantity}
+                    {asset.assignedQuantity > 0 ? ` · Reserved ${asset.assignedQuantity}` : ""}
+                    {asset.serialNumber && asset.serialNumber !== "—" ? ` · ${asset.serialNumber}` : ""}
+                  </span>
+                </div>
+                {asset.sourceQuantity > 1 ? (
+                  <label className="packing-builder-selection-quantity">
+                    <span className="action-field-label">Qty</span>
+                    <input
+                      className="action-field-control"
+                      max={asset.sourceQuantity}
+                      min={1}
+                      onChange={(event) => handleQuantityChange(asset.id, asset.sourceQuantity, event.target.value)}
+                      type="number"
+                      value={asset.requestedQuantity}
+                    />
+                  </label>
+                ) : (
+                  <span className="packing-builder-selection-fixed">Qty 1</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {hasVariableQuantityAssets ? (
+            <div className="action-feedback action-feedback-warning">
+              Bulk rows can assign a partial quantity here. This MVP keeps one active assignment context per bulk row.
+            </div>
+          ) : null}
+        </>
+      ) : null}
 
       <div className="action-mode-toggle" role="tablist" aria-label="Asset action mode">
         <button

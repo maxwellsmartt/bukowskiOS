@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { foundationMigrations } from "@db";
 
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "../../../electron/main/services/data/adminFoundationBootstrap";
+import { applyAssetQuantityFoundationMigration } from "../../../electron/main/services/data/assetQuantityFoundationBootstrap";
 import {
   applyAIGatewayFoundationMigration,
   bootstrapAIGatewayFoundation,
@@ -44,6 +45,7 @@ export const createTestDatabase = (prefix: string): TestDatabase => {
   bootstrapAIGatewayFoundation(database);
   ensureProjectShellDefaults(database);
   bootstrapLegacyRentmanDemo(database);
+  applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database));
   bootstrapAdminFoundation(database);
   bootstrapSchedulingFoundation(database);
 

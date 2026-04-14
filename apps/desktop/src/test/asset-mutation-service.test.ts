@@ -121,11 +121,22 @@ describe("asset mutation service", () => {
     const { cleanup, database } = createTestDatabase("bukowski-asset-bulk-test");
     const reads = createFoundationReadService(database);
     const mutations = createAssetMutationService(database);
+    const createdAsset = mutations.createAsset({
+      commandId: "cmd-test-asset-bulk-create",
+      workspaceId: "workspace-metadata",
+      name: "Bulk test battery plate",
+      internalCode: "BULK-001",
+      categoryId: "cat-monitors",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
 
     const result = mutations.assignMoveAssets({
       commandId: "cmd-test-asset-bulk-assign",
       workspaceId: "workspace-metadata",
-      assetIds: ["asset-aputure-600d", "asset-teradek-bolt"],
+      assetIds: ["asset-aputure-600d", createdAsset.assetId],
       mode: "assign",
       projectId: "project-aurora",
       assignedToUserId: "user-paola",
@@ -139,7 +150,7 @@ describe("asset mutation service", () => {
     expect(result.summary).toContain("2 assets");
 
     const firstDetail = reads.getAssetDetail("asset-aputure-600d");
-    const secondDetail = reads.getAssetDetail("asset-teradek-bolt");
+    const secondDetail = reads.getAssetDetail(createdAsset.assetId);
     expect(firstDetail.asset?.responsible).toBe("Paola Rivas");
     expect(secondDetail.asset?.responsible).toBe("Paola Rivas");
     expect(firstDetail.asset?.location).toBe("Set / Video Village");
@@ -156,11 +167,34 @@ describe("asset mutation service", () => {
   it("returns conflict warnings when assigning assets across overlapping project windows", () => {
     const { cleanup, database } = createTestDatabase("bukowski-asset-conflict-test");
     const mutations = createAssetMutationService(database);
+    const createdAsset = mutations.createAsset({
+      commandId: "cmd-test-asset-conflict-create",
+      workspaceId: "workspace-metadata",
+      name: "Conflict test monitor",
+      internalCode: "CONFLICT-001",
+      categoryId: "cat-monitors",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    mutations.assignMoveAssets({
+      commandId: "cmd-test-asset-conflict-seed",
+      workspaceId: "workspace-metadata",
+      assetIds: [createdAsset.assetId],
+      mode: "assign",
+      projectId: "project-aurora",
+      assignedToUserId: "user-paola",
+      targetLocationId: "loc-video-village",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
 
     const result = mutations.assignMoveAssets({
       commandId: "cmd-test-asset-conflict-warning",
       workspaceId: "workspace-metadata",
-      assetIds: ["asset-teradek-bolt"],
+      assetIds: [createdAsset.assetId],
       mode: "assign",
       projectId: "project-studio",
       assignedToUserId: "user-paola",
@@ -172,6 +206,96 @@ describe("asset mutation service", () => {
     expect(result.conflictCount).toBeGreaterThan(0);
     expect(result.warningSummary).toContain("still linked");
     expect(result.summary).toContain("1 asset");
+
+    cleanup();
+  });
+
+  it("supports partial project assignment on bulk rows and tops up the same active context", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-partial-assign-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createAssetMutationService(database);
+
+    const firstResult = mutations.assignMoveAssets({
+      commandId: "cmd-test-asset-partial-assign-1",
+      workspaceId: "workspace-metadata",
+      assetIds: ["asset-legacy-rentman-1"],
+      assetSelections: [{ assetId: "asset-legacy-rentman-1", quantity: 1 }],
+      mode: "assign",
+      projectId: "project-aurora",
+      assignedToUserId: "user-paola",
+      targetLocationId: "loc-video-village",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(firstResult.processedAssetIds).toEqual(["asset-legacy-rentman-1"]);
+
+    let state = database
+      .prepare(
+        "SELECT available_quantity, assigned_quantity, checked_out_quantity, custody_status, active_assignment_id FROM asset_current_state WHERE asset_id = ?",
+      )
+      .get("asset-legacy-rentman-1") as
+      | {
+          available_quantity: number;
+          assigned_quantity: number;
+          checked_out_quantity: number;
+          custody_status: string;
+          active_assignment_id: string | null;
+        }
+      | undefined;
+
+    expect(state?.available_quantity).toBe(1);
+    expect(state?.assigned_quantity).toBe(1);
+    expect(state?.checked_out_quantity).toBe(0);
+    expect(state?.custody_status).toBe("partial_assigned");
+
+    const firstAssignment = database
+      .prepare("SELECT quantity, assignment_status FROM asset_assignments WHERE id = ?")
+      .get(state!.active_assignment_id!) as { quantity: number; assignment_status: string } | undefined;
+
+    expect(firstAssignment?.quantity).toBe(1);
+    expect(firstAssignment?.assignment_status).toBe("assigned");
+    expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.quantity).toBe(1);
+
+    mutations.assignMoveAssets({
+      commandId: "cmd-test-asset-partial-assign-2",
+      workspaceId: "workspace-metadata",
+      assetIds: ["asset-legacy-rentman-1"],
+      assetSelections: [{ assetId: "asset-legacy-rentman-1", quantity: 1 }],
+      mode: "assign",
+      projectId: "project-aurora",
+      assignedToUserId: "user-paola",
+      targetLocationId: "loc-video-village",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    state = database
+      .prepare(
+        "SELECT available_quantity, assigned_quantity, checked_out_quantity, custody_status, active_assignment_id FROM asset_current_state WHERE asset_id = ?",
+      )
+      .get("asset-legacy-rentman-1") as
+      | {
+          available_quantity: number;
+          assigned_quantity: number;
+          checked_out_quantity: number;
+          custody_status: string;
+          active_assignment_id: string | null;
+        }
+      | undefined;
+
+    expect(state?.available_quantity).toBe(0);
+    expect(state?.assigned_quantity).toBe(2);
+    expect(state?.checked_out_quantity).toBe(0);
+    expect(state?.custody_status).toBe("assigned");
+
+    const assignments = database
+      .prepare("SELECT id, quantity FROM asset_assignments WHERE asset_id = ? AND returned_at IS NULL")
+      .all("asset-legacy-rentman-1") as Array<{ id: string; quantity: number }>;
+
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.quantity).toBe(2);
+    expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.quantity).toBe(0);
 
     cleanup();
   });

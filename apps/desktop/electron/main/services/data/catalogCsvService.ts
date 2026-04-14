@@ -39,7 +39,7 @@ const expectedHeadersByEntity: Record<CatalogEntityType, string[]> = {
   production_company: ["name", "contactName", "email", "phone", "notes", "isActive"],
   manufacturer: ["name", "contactName", "supportEmail", "phone", "notes", "isActive"],
   category: ["code", "name", "description", "isActive"],
-  kit: ["code", "name", "description", "notes", "assetCodes", "isActive"],
+  kit: ["code", "name", "description", "notes", "assetQuantities", "isActive"],
 };
 
 type ExistingCatalogRow = {
@@ -121,7 +121,14 @@ type ImportAnalysisRow =
       key: string;
       existingId: string | null;
       entityType: "kit";
-      payload: { code: string; name: string; description: string | null; notes: string | null; assetIds: string[]; isActive: boolean };
+      payload: {
+        code: string;
+        name: string;
+        description: string | null;
+        notes: string | null;
+        assetSelections: Array<{ assetId: string; quantity: number }>;
+        isActive: boolean;
+      };
     };
 
 type ImportAnalysis = {
@@ -629,19 +636,32 @@ const analyzeImport = (db: DatabaseSync, input: PreviewCatalogCsvImportInput): I
             throw new Error(`Duplicate kit code ${code} inside the CSV.`);
           }
           seenKeys.add(key);
-          const assetCodes = trimValue(record.assetCodes)
-            ? trimValue(record.assetCodes)
+          const assetSelections = trimValue(record.assetQuantities)
+            ? trimValue(record.assetQuantities)
                 .split(";")
-                .map((assetCode) => trimValue(assetCode))
+                .map((entry) => trimValue(entry))
                 .filter(Boolean)
+                .map((entry) => {
+                  const [rawCode, rawQuantity] = entry.split(":");
+                  const assetCode = trimValue(rawCode);
+                  const quantity = Number.parseInt(trimValue(rawQuantity || "1"), 10);
+
+                  if (!assetCode) {
+                    throw new Error("Each asset quantity entry requires an asset code.");
+                  }
+
+                  if (!Number.isInteger(quantity) || quantity < 1) {
+                    throw new Error(`Asset ${assetCode} must use a positive integer quantity.`);
+                  }
+
+                  const assetId = assetIdByCode?.get(normalizeKey(assetCode));
+                  if (!assetId) {
+                    throw new Error(`Asset code ${assetCode} was not found for this workspace.`);
+                  }
+
+                  return { assetId, quantity };
+                })
             : [];
-          const assetIds = assetCodes.map((assetCode) => {
-            const assetId = assetIdByCode?.get(normalizeKey(assetCode));
-            if (!assetId) {
-              throw new Error(`Asset code ${assetCode} was not found for this workspace.`);
-            }
-            return assetId;
-          });
           operations.push({
             rowNumber,
             key,
@@ -652,7 +672,7 @@ const analyzeImport = (db: DatabaseSync, input: PreviewCatalogCsvImportInput): I
               name: trimValue(record.name),
               description: normalizeOptional(record.description),
               notes: normalizeOptional(record.notes),
-              assetIds: Array.from(new Set(assetIds)),
+              assetSelections,
               isActive: parseBooleanValue(record.isActive),
             },
           });
@@ -1063,9 +1083,9 @@ const runImportRow = (
       }
 
       db.prepare("DELETE FROM kit_assets WHERE kit_id = ?").run(kitId);
-      const insertKitAsset = db.prepare("INSERT INTO kit_assets (kit_id, asset_id, added_at) VALUES (?, ?, ?)");
-      row.payload.assetIds.forEach((assetId) => {
-        insertKitAsset.run(kitId, assetId, now);
+      const insertKitAsset = db.prepare("INSERT INTO kit_assets (kit_id, asset_id, quantity, added_at) VALUES (?, ?, ?, ?)");
+      row.payload.assetSelections.forEach((selection) => {
+        insertKitAsset.run(kitId, selection.assetId, selection.quantity, now);
       });
       codeService.ensurePrimaryCode({
         workspaceId,
@@ -1303,29 +1323,29 @@ export const createCatalogCsvService = (db: DatabaseSync, codeService: CodeGener
                 COALESCE(kits.notes, '') AS notes,
                 COALESCE(kits.is_active, 1) AS is_active,
                 COALESCE((
-                  SELECT group_concat(asset_code, ';')
+                  SELECT group_concat(asset_entry, ';')
                   FROM (
-                    SELECT COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS asset_code
+                    SELECT printf('%s:%d', COALESCE(legacy_rentman_items.legacy_code, assets.internal_code), COALESCE(kit_assets.quantity, 1)) AS asset_entry
                     FROM kit_assets
                     JOIN assets ON assets.id = kit_assets.asset_id
                     LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
                     LEFT JOIN legacy_rentman_items ON legacy_rentman_items.id = legacy_rentman_asset_links.legacy_item_id
                     WHERE kit_assets.kit_id = kits.id
-                    ORDER BY asset_code
+                    ORDER BY asset_entry
                   )
-                ), '') AS asset_codes
+                ), '') AS asset_quantities
               FROM kits
               WHERE kits.workspace_id = ?
                 ${idFilter.sql ? idFilter.sql.replace(/^ AND /u, "AND ") : ""}
               ORDER BY kits.name
             `,
           )
-          .all(workspaceId, ...idFilter.params) as Array<{ code: string; name: string; description: string; notes: string; asset_codes: string; is_active: number }>).map((row) => ({
+          .all(workspaceId, ...idFilter.params) as Array<{ code: string; name: string; description: string; notes: string; asset_quantities: string; is_active: number }>).map((row) => ({
           code: row.code,
           name: row.name,
           description: row.description,
           notes: row.notes,
-          assetCodes: row.asset_codes,
+          assetQuantities: row.asset_quantities,
           isActive: row.is_active ? "true" : "false",
         }));
         break;

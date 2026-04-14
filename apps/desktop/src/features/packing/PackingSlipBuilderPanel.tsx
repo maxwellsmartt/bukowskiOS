@@ -1,12 +1,13 @@
 import { PackageCheck, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
+import type { AssetListRow, CatalogSnapshot, PackingSlipAssetSelection, ProjectCardRow } from "@contracts";
 import { useProjectDetail } from "@features/projects/useProjectsData";
 import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 
 export type PackingSlipBuilderDraft = {
+  assetSelections: PackingSlipAssetSelection[];
   projectId: string;
   projectUnitId?: string;
   departmentId?: string;
@@ -23,6 +24,7 @@ type PackingSlipBuilderPanelProps = {
   onClose: () => void;
   onSubmit: (value: PackingSlipBuilderDraft) => Promise<void>;
   projects: ProjectCardRow[];
+  selectedAssets: AssetListRow[];
   selectedCount: number;
   users: CatalogSnapshot["users"];
 };
@@ -40,6 +42,7 @@ export const PackingSlipBuilderPanel = ({
   onClose,
   onSubmit,
   projects,
+  selectedAssets,
   selectedCount,
   users,
 }: PackingSlipBuilderPanelProps) => {
@@ -49,7 +52,21 @@ export const PackingSlipBuilderPanel = ({
   const [responsibleUserId, setResponsibleUserId] = useState("");
   const [returnDueAt, setReturnDueAt] = useState("");
   const [notes, setNotes] = useState("");
+  const [quantityByAssetId, setQuantityByAssetId] = useState<Record<string, number>>({});
   const { data: projectDetail } = useProjectDetail(normalizeOptional(projectId) ?? null);
+
+  useEffect(() => {
+    setQuantityByAssetId((current) => {
+      const nextState: Record<string, number> = {};
+
+      selectedAssets.forEach((asset) => {
+        const maxQuantity = Math.max(1, asset.quantity);
+        nextState[asset.id] = Math.min(maxQuantity, Math.max(1, current[asset.id] ?? maxQuantity));
+      });
+
+      return nextState;
+    });
+  }, [selectedAssets]);
 
   useEffect(() => {
     setProjectUnitId((current) =>
@@ -58,6 +75,29 @@ export const PackingSlipBuilderPanel = ({
   }, [projectDetail.units, projectId]);
 
   const selectedLabel = selectedCount === 1 ? "1 asset selected" : `${selectedCount} assets selected`;
+  const selectedAssetDetails = useMemo(
+    () =>
+      selectedAssets.map((asset) => {
+        const maxQuantity = Math.max(1, asset.quantity);
+        return {
+          ...asset,
+          requestedQuantity: Math.min(maxQuantity, Math.max(1, quantityByAssetId[asset.id] ?? maxQuantity)),
+        };
+      }),
+    [quantityByAssetId, selectedAssets],
+  );
+  const totalIssueQuantity = selectedAssetDetails.reduce((sum, asset) => sum + asset.requestedQuantity, 0);
+  const hasVariableQuantityAssets = selectedAssetDetails.some((asset) => asset.quantity > 1);
+
+  const handleQuantityChange = (assetId: string, availableQuantity: number, rawValue: string) => {
+    const parsedValue = Number.parseInt(rawValue, 10);
+    const nextValue = Number.isFinite(parsedValue) ? parsedValue : 1;
+
+    setQuantityByAssetId((current) => ({
+      ...current,
+      [assetId]: Math.min(Math.max(nextValue, 1), Math.max(1, availableQuantity)),
+    }));
+  };
 
   return (
     <SurfaceCard
@@ -71,7 +111,45 @@ export const PackingSlipBuilderPanel = ({
     >
       <div className="chip-row">
         <span className="action-panel-selection">{selectedLabel}</span>
+        <span className="action-panel-selection">
+          {totalIssueQuantity} {totalIssueQuantity === 1 ? "item to issue" : "items to issue"}
+        </span>
       </div>
+
+      <div className="packing-builder-selection-list">
+        {selectedAssetDetails.map((asset) => (
+          <div className="packing-builder-selection-row" key={asset.id}>
+            <div className="packing-builder-selection-copy">
+              <span className="packing-builder-selection-title">{asset.name}</span>
+              <span className="packing-builder-selection-meta">
+                {asset.code} · Available {asset.quantity}
+                {asset.serialNumber && asset.serialNumber !== "—" ? ` · ${asset.serialNumber}` : ""}
+              </span>
+            </div>
+            {asset.quantity > 1 ? (
+              <label className="packing-builder-selection-quantity">
+                <span className="action-field-label">Qty</span>
+                <input
+                  className="action-field-control"
+                  max={asset.quantity}
+                  min={1}
+                  onChange={(event) => handleQuantityChange(asset.id, asset.quantity, event.target.value)}
+                  type="number"
+                  value={asset.requestedQuantity}
+                />
+              </label>
+            ) : (
+              <span className="packing-builder-selection-fixed">Qty 1</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {hasVariableQuantityAssets ? (
+        <div className="action-feedback action-feedback-warning">
+          Bulk rows can issue a partial quantity here. Serialized or unitary assets still issue one item at a time.
+        </div>
+      ) : null}
 
       <div className="action-form-grid">
         <label className="action-field">
@@ -155,6 +233,10 @@ export const PackingSlipBuilderPanel = ({
           disabled={isSubmitting}
           onClick={() =>
             void onSubmit({
+              assetSelections: selectedAssetDetails.map((asset) => ({
+                assetId: asset.id,
+                quantity: asset.requestedQuantity,
+              })),
               projectId: projectId.trim(),
               projectUnitId: normalizeOptional(projectUnitId),
               departmentId: normalizeOptional(departmentId),

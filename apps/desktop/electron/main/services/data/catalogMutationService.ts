@@ -42,6 +42,42 @@ const optionalValue = (value: string | undefined) => {
 
 const uniqueValues = (values: string[] | undefined) => [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))];
 
+const normalizeKitAssetSelections = (
+  assetSelections:
+    | Array<{
+        assetId: string;
+        quantity: number;
+      }>
+    | undefined,
+  fallbackAssetIds?: string[],
+) => {
+  const byAssetId = new Map<string, number>();
+
+  (assetSelections ?? []).forEach((selection) => {
+    const assetId = selection.assetId?.trim();
+    const quantity = Math.trunc(selection.quantity);
+
+    if (!assetId) {
+      return;
+    }
+
+    byAssetId.set(assetId, quantity);
+  });
+
+  if (!byAssetId.size) {
+    uniqueValues(fallbackAssetIds).forEach((assetId) => {
+      byAssetId.set(assetId, 1);
+    });
+  }
+
+  return [...byAssetId.entries()]
+    .map(([assetId, quantity]) => ({
+      assetId,
+      quantity,
+    }))
+    .filter((selection) => Number.isInteger(selection.quantity) && selection.quantity > 0);
+};
+
 const replaceCrewBankAccounts = (
   db: DatabaseSync,
   crewMemberId: string,
@@ -279,18 +315,23 @@ const getDeleteGuardCount = (db: DatabaseSync, input: DeleteCatalogEntityInput) 
   }
 };
 
-const replaceKitAssets = (db: DatabaseSync, kitId: string, assetIds: string[], now: string) => {
+const replaceKitAssets = (
+  db: DatabaseSync,
+  kitId: string,
+  assetSelections: Array<{ assetId: string; quantity: number }>,
+  now: string,
+) => {
   db.prepare("DELETE FROM kit_assets WHERE kit_id = ?").run(kitId);
 
   const insertKitAsset = db.prepare(
     `
-      INSERT INTO kit_assets (kit_id, asset_id, added_at)
-      VALUES (?, ?, ?)
+      INSERT INTO kit_assets (kit_id, asset_id, quantity, added_at)
+      VALUES (?, ?, ?, ?)
     `,
   );
 
-  assetIds.forEach((assetId) => {
-    insertKitAsset.run(kitId, assetId, now);
+  assetSelections.forEach((selection) => {
+    insertKitAsset.run(kitId, selection.assetId, selection.quantity, now);
   });
 };
 
@@ -470,7 +511,8 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
 
           case "kit": {
             const code = ensureValue(input.code, "Kit code").toUpperCase();
-            const assetIds = uniqueValues(input.assetIds);
+            const assetSelections = normalizeKitAssetSelections(input.assetSelections, input.assetIds);
+            const assetIds = assetSelections.map((selection) => selection.assetId);
             assertUniqueCode(db, "kits", code);
             assertAssetIdsExist(db, assetIds);
 
@@ -492,7 +534,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               now,
             );
 
-            replaceKitAssets(db, kitId, assetIds, now);
+            replaceKitAssets(db, kitId, assetSelections, now);
             codeService.ensurePrimaryCode({
               workspaceId,
               entityType: "kit",
@@ -680,7 +722,8 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
 
           case "kit": {
             const code = ensureValue(input.code, "Kit code").toUpperCase();
-            const assetIds = uniqueValues(input.assetIds);
+            const assetSelections = normalizeKitAssetSelections(input.assetSelections, input.assetIds);
+            const assetIds = assetSelections.map((selection) => selection.assetId);
             assertUniqueCode(db, "kits", code, input.id);
             assertAssetIdsExist(db, assetIds);
             const result = db.prepare(
@@ -701,7 +744,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               throw new Error("Kit not found.");
             }
 
-            replaceKitAssets(db, input.id, assetIds, now);
+            replaceKitAssets(db, input.id, assetSelections, now);
             codeService.ensurePrimaryCode({
               workspaceId,
               entityType: "kit",

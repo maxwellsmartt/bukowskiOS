@@ -512,9 +512,27 @@ const formatTimelineTimestamp = (value: string) => {
   return `${dateFormatter.format(eventDate)} · ${eventTimeFormatter.format(eventDate)}`;
 };
 
-const mapAssetStatus = (operationalStatus: string, custodyStatus: string) => {
+const mapAssetStatus = (
+  operationalStatus: string,
+  custodyStatus: string,
+  availableQuantity: number,
+  assignedQuantity: number,
+  checkedOutQuantity: number,
+) => {
   if (operationalStatus === "maintenance") {
     return "Maintenance";
+  }
+
+  if (checkedOutQuantity > 0 && assignedQuantity > 0) {
+    return "Split allocation";
+  }
+
+  if (custodyStatus === "partial_checked_out") {
+    return `Partial checkout (${checkedOutQuantity}/${availableQuantity + checkedOutQuantity})`;
+  }
+
+  if (custodyStatus === "partial_assigned") {
+    return `Partial assigned (${assignedQuantity}/${availableQuantity + assignedQuantity})`;
   }
 
   if (custodyStatus === "checked_out") {
@@ -1428,8 +1446,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             projects.name AS project,
             COALESCE(departments.name, '—') AS department,
             COALESCE(users.full_name, '—') AS responsible,
-            COUNT(packing_slip_items.id) AS item_count,
-            SUM(CASE WHEN packing_slip_items.returned_at IS NOT NULL THEN 1 ELSE 0 END) AS returned_count
+            COALESCE(SUM(packing_slip_items.quantity), 0) AS item_count,
+            SUM(CASE WHEN packing_slip_items.returned_at IS NOT NULL THEN packing_slip_items.quantity ELSE 0 END) AS returned_count
           FROM packing_slips
           LEFT JOIN projects ON projects.id = packing_slips.project_id
           LEFT JOIN departments ON departments.id = packing_slips.department_id
@@ -1512,8 +1530,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
                 AND is_primary = 1
               LIMIT 1
             ), packing_slips.id) AS primary_code_value,
-            COUNT(packing_slip_items.id) AS item_count,
-            SUM(CASE WHEN packing_slip_items.returned_at IS NOT NULL THEN 1 ELSE 0 END) AS returned_count
+            COALESCE(SUM(packing_slip_items.quantity), 0) AS item_count,
+            SUM(CASE WHEN packing_slip_items.returned_at IS NOT NULL THEN packing_slip_items.quantity ELSE 0 END) AS returned_count
           FROM packing_slips
           LEFT JOIN projects ON projects.id = packing_slips.project_id
           LEFT JOIN departments ON departments.id = packing_slips.department_id

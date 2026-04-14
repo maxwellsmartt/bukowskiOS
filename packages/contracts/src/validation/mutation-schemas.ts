@@ -238,6 +238,16 @@ export const assignMoveAssetsSchema = z
     commandId: nonEmptyString,
     workspaceId: nonEmptyString,
     assetIds: z.array(nonEmptyString).min(1),
+    assetSelections: z
+      .array(
+        z
+          .object({
+            assetId: nonEmptyString,
+            quantity: z.number().int().positive(),
+          })
+          .strict(),
+      )
+      .optional(),
     mode: z.enum(["assign", "move"]),
     projectId: optionalTrimmedString,
     projectUnitId: optionalTrimmedString,
@@ -322,6 +332,16 @@ export const createPackingSlipSchema = z
     commandId: nonEmptyString,
     workspaceId: nonEmptyString,
     assetIds: z.array(nonEmptyString).min(1),
+    assetSelections: z
+      .array(
+        z
+          .object({
+            assetId: nonEmptyString,
+            quantity: z.number().int().positive(),
+          })
+          .strict(),
+      )
+      .optional(),
     projectId: nonEmptyString,
     projectUnitId: optionalTrimmedString,
     departmentId: optionalTrimmedString,
@@ -623,6 +643,16 @@ const createCatalogKitSchema = z
     description: optionalTrimmedString,
     notes: optionalTrimmedString,
     assetIds: z.array(nonEmptyString).optional(),
+    assetSelections: z
+      .array(
+        z
+          .object({
+            assetId: nonEmptyString,
+            quantity: z.number().int().positive(),
+          })
+          .strict(),
+      )
+      .optional(),
   })
   .strict();
 

@@ -94,6 +94,10 @@ export type AssignMoveAssetsInput = {
   commandId: string;
   workspaceId: string;
   assetIds: string[];
+  assetSelections?: Array<{
+    assetId: string;
+    quantity: number;
+  }>;
   mode: "assign" | "move";
   projectId?: string;
   projectUnitId?: string;

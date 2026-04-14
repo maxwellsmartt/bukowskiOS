@@ -8,6 +8,11 @@ export type CatalogEntityType =
   | "category"
   | "kit";
 
+export type CatalogKitAssetSelectionInput = {
+  assetId: string;
+  quantity: number;
+};
+
 export type CreateCatalogLocationInput = {
   entityType: "location";
   code: string;
@@ -91,6 +96,7 @@ export type CreateCatalogKitInput = {
   description?: string;
   notes?: string;
   assetIds?: string[];
+  assetSelections?: CatalogKitAssetSelectionInput[];
 };
 
 export type CreateCatalogEntityInput =

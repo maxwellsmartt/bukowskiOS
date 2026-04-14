@@ -20,7 +20,13 @@ type AssetReadDeps = {
   defaultAssetListQuery: AssetListQuery;
   formatCurrency: (amount: number | null | undefined) => string;
   mapTrackingLabel: (value: string) => string;
-  mapAssetStatus: (operationalStatus: string, custodyStatus: string) => string;
+  mapAssetStatus: (
+    operationalStatus: string,
+    custodyStatus: string,
+    availableQuantity: number,
+    assignedQuantity: number,
+    checkedOutQuantity: number,
+  ) => string;
   matchesSearch: (query: string | undefined, values: Array<string | null | undefined>) => boolean;
   resolveAssetComparator: (sortBy: AssetSortField, direction: ListSortDirection) => (left: any, right: any) => number;
   sortRows: SortRows;
@@ -44,7 +50,7 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           `
             SELECT COUNT(*) AS count
             FROM asset_current_state
-            WHERE custody_status IN ('checked_out', 'assigned')
+            WHERE custody_status IN ('checked_out', 'assigned', 'partial_checked_out', 'partial_assigned', 'partially_allocated')
           `,
         )
         .get() as CountRow;
@@ -76,7 +82,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
               assets.name,
               COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
               asset_categories.name AS category,
-              COALESCE(legacy_rentman_items.current_quantity, 1) AS quantity,
+              asset_current_state.available_quantity AS quantity,
+              asset_current_state.total_quantity,
+              asset_current_state.assigned_quantity,
+              asset_current_state.checked_out_quantity,
               COALESCE(legacy_rentman_asset_links.import_strategy, 'single') AS tracking,
               asset_current_state.operational_status,
               asset_current_state.custody_status,
@@ -124,6 +133,9 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
         code: string;
         category: string;
         quantity: number;
+        total_quantity: number;
+        assigned_quantity: number;
+        checked_out_quantity: number;
         tracking: string;
         operational_status: string;
         custody_status: string;
@@ -152,8 +164,17 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           code: row.code,
           category: row.category,
           quantity: row.quantity,
+          totalQuantity: row.total_quantity,
+          assignedQuantity: row.assigned_quantity,
+          checkedOutQuantity: row.checked_out_quantity,
           tracking: deps.mapTrackingLabel(row.tracking),
-          status: deps.mapAssetStatus(row.operational_status, row.custody_status),
+          status: deps.mapAssetStatus(
+            row.operational_status,
+            row.custody_status,
+            row.quantity,
+            row.assigned_quantity,
+            row.checked_out_quantity,
+          ),
           condition: row.condition_status,
           custody: row.custody_status,
           location: row.location,
@@ -216,7 +237,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
               asset_current_state.condition_status,
               asset_current_state.custody_status,
               asset_current_state.operational_status,
-              COALESCE(legacy_rentman_items.current_quantity, 1) AS quantity,
+              asset_current_state.available_quantity AS quantity,
+              asset_current_state.total_quantity,
+              asset_current_state.assigned_quantity,
+              asset_current_state.checked_out_quantity,
               COALESCE(legacy_rentman_asset_links.import_strategy, 'single') AS tracking,
               COALESCE(locations.name, '—') AS location,
               COALESCE(projects.name, '—') AS project,
@@ -264,6 +288,9 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
             custody_status: string;
             operational_status: string;
             quantity: number;
+            total_quantity: number;
+            assigned_quantity: number;
+            checked_out_quantity: number;
             tracking: string;
             location: string;
             project: string;
@@ -395,8 +422,17 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           id: asset.id,
           name: asset.name,
           code: asset.code,
-          status: deps.mapAssetStatus(asset.operational_status, asset.custody_status),
+          status: deps.mapAssetStatus(
+            asset.operational_status,
+            asset.custody_status,
+            asset.quantity,
+            asset.assigned_quantity,
+            asset.checked_out_quantity,
+          ),
           quantity: asset.quantity,
+          totalQuantity: asset.total_quantity,
+          assignedQuantity: asset.assigned_quantity,
+          checkedOutQuantity: asset.checked_out_quantity,
           tracking: deps.mapTrackingLabel(asset.tracking),
           location: asset.location,
           project: asset.project,

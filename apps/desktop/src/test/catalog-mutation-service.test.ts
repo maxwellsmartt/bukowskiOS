@@ -100,7 +100,7 @@ describe("catalog mutation service", () => {
       mode: "template",
     });
 
-    expect(kitTemplate.csvText.trim()).toBe("code,name,description,notes,assetCodes,isActive");
+    expect(kitTemplate.csvText.trim()).toBe("code,name,description,notes,assetQuantities,isActive");
 
     mutations.createEntity({
       entityType: "department",
@@ -263,6 +263,45 @@ describe("catalog mutation service", () => {
     expect(importedCrew?.documentId).toBe("402-1234567-8");
     expect(importedCrew?.bankAccounts).toHaveLength(1);
     expect(importedCrew?.bankAccounts[0]?.bankName).toBe("Banco Tres");
+
+    cleanup();
+  });
+
+  it("persists kit item quantities and exports them for csv round-trip", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-catalog-kit-quantity-test");
+    const mutations = createCatalogMutationService(database);
+    const reads = createFoundationReadService(database);
+
+    mutations.createEntity({
+      entityType: "kit",
+      code: "DITBULK",
+      name: "DIT Bulk Kit",
+      notes: "Quantity-aware kit",
+      assetSelections: [
+        { assetId: "asset-legacy-rentman-1", quantity: 2 },
+        { assetId: "asset-teradek-bolt", quantity: 1 },
+      ],
+    });
+
+    const snapshot = reads.getCatalogSnapshot();
+    const createdKit = snapshot.kits.find((kit) => kit.code === "DITBULK");
+
+    expect(createdKit?.assetCount).toBe(3);
+    expect(createdKit?.assetSelections).toEqual(
+      expect.arrayContaining([
+        { assetId: "asset-legacy-rentman-1", quantity: 2 },
+        { assetId: "asset-teradek-bolt", quantity: 1 },
+      ]),
+    );
+
+    const csvExport = mutations.buildCsvExport({
+      entityType: "kit",
+      mode: "data",
+      ids: [createdKit!.id],
+    });
+
+    expect(csvExport.csvText).toContain("assetQuantities");
+    expect(csvExport.csvText).toContain("485:2");
 
     cleanup();
   });

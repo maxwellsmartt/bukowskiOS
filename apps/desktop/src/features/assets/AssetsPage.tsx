@@ -103,6 +103,12 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     () => assets.find((asset) => asset.id === selectedAssetId) ?? null,
     [assets, selectedAssetId],
   );
+  const selectedAssets = useMemo(() => {
+    const assetMap = new Map(assets.map((asset) => [asset.id, asset] as const));
+    return selectedRowIds
+      .map((assetId) => assetMap.get(assetId))
+      .filter((asset): asset is (typeof assets)[number] => Boolean(asset));
+  }, [assets, selectedRowIds]);
 
   const handleAssignMove = async (formValue: AssetAssignMoveFormValue) => {
     try {
@@ -111,6 +117,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         commandId: crypto.randomUUID(),
         workspaceId,
         assetIds: selectedRowIds,
+        assetSelections: formValue.assetSelections,
         mode: formValue.mode,
         projectId: formValue.projectId,
         projectUnitId: formValue.projectUnitId,
@@ -143,6 +150,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         commandId: crypto.randomUUID(),
         workspaceId,
         assetIds: selectedRowIds,
+        assetSelections: formValue.assetSelections,
         projectId: formValue.projectId,
         projectUnitId: formValue.projectUnitId,
         departmentId: formValue.departmentId,
@@ -410,11 +418,12 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             setActionPanelOpen(false);
             setActionError(null);
           }}
-          onSubmit={handleAssignMove}
-          projects={projects}
-          selectedCount={selectedRowIds.length}
-          users={catalog.users}
-        />
+              onSubmit={handleAssignMove}
+              projects={projects}
+              selectedAssets={selectedAssets}
+              selectedCount={selectedRowIds.length}
+              users={catalog.users}
+            />
       ) : null}
 
       {packingPanelOpen && selectedRowIds.length ? (
@@ -429,6 +438,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           }}
           onSubmit={handleCreatePackingSlip}
           projects={projects}
+          selectedAssets={selectedAssets}
           selectedCount={selectedRowIds.length}
           users={catalog.users}
         />

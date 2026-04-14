@@ -21,6 +21,7 @@ import {
   reconcileLiveProviderEnablement,
 } from "./aiGatewayFoundationBootstrap";
 import { createFoundationReadService, type FoundationReadService } from "./foundationReadService";
+import { applyAssetQuantityFoundationMigration } from "./assetQuantityFoundationBootstrap";
 import { createAssetMutationService } from "./assetMutationService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
@@ -174,6 +175,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   bootstrapAIGatewayFoundation(database);
   ensureProjectShellDefaults(database);
   bootstrapLegacyRentmanDemo(database);
+  applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database));
   bootstrapAdminFoundation(database);
   bootstrapSchedulingFoundation(database);
   if (process.env.BUKOWSKI_PROFILE_DATASET === "1") {

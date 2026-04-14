@@ -166,7 +166,7 @@ const buildCatalogPreviewRows = (entityType: CatalogEntityType, row: Record<stri
     case "kit":
       return [
         { label: "Code", value: String(row.code ?? "—") },
-        { label: "Assets", value: String(row.assetCount ?? "0") },
+        { label: "Items", value: String(row.assetCount ?? "0") },
         { label: "Primary QR", value: String(row.primaryCodeValue ?? "Pending") },
         { label: "Description", value: String(row.description ?? "—") },
       ];
@@ -225,7 +225,7 @@ const catalogSortOptionsByEntityType: Record<CatalogEntityType, Array<ListSortOp
   kit: [
     { value: "name", label: "Kit", columnKey: "name" },
     { value: "code", label: "Code", columnKey: "code" },
-    { value: "assetCount", label: "Asset count", columnKey: "assetCount" },
+    { value: "assetCount", label: "Item count", columnKey: "assetCount" },
     { value: "description", label: "Description", columnKey: "description" },
     { value: "status", label: "Status" },
   ],
@@ -514,7 +514,7 @@ export const CatalogPage = () => {
         columns: [
           { key: "code", label: "Code", width: 90, minWidth: 76, render: (row) => row.code as string },
           { key: "name", label: "Kit", width: 180, minWidth: 144, render: (row) => row.name as string },
-          { key: "assetCount", label: "Assets", align: "right", width: 80, minWidth: 66, render: (row) => row.assetCount as number },
+          { key: "assetCount", label: "Items", align: "right", width: 80, minWidth: 66, render: (row) => row.assetCount as number },
           { key: "primaryCodeValue", label: "QR ready", width: 170, minWidth: 132, render: (row) => row.primaryCodeValue as string },
           { key: "description", label: "Description", width: 220, minWidth: 170, render: (row) => row.description as string },
         ],

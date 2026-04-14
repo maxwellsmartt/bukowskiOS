@@ -1479,7 +1479,11 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
                   asset_current_state.active_assignment_id,
                   asset_current_state.condition_status,
                   asset_current_state.operational_status,
-                  asset_current_state.custody_status
+                  asset_current_state.custody_status,
+                  asset_current_state.total_quantity,
+                  asset_current_state.available_quantity,
+                  asset_current_state.assigned_quantity,
+                  asset_current_state.checked_out_quantity
                 FROM asset_current_state
                 WHERE asset_current_state.asset_id IN (${allAssetIds.map(() => "?").join(", ")})
               `,
@@ -1493,6 +1497,10 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
             condition_status: string;
             operational_status: string;
             custody_status: string;
+            total_quantity: number;
+            available_quantity: number;
+            assigned_quantity: number;
+            checked_out_quantity: number;
           }>)
         : [];
       const assetRowMap = new Map(assetRows.map((row) => [row.asset_id, row] as const));
@@ -1510,6 +1518,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
             assigned_by_user_id,
             source_location_id,
             target_location_id,
+            quantity,
             assignment_status,
             checked_out_at,
             expected_return_at,
@@ -1518,7 +1527,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
             created_at,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?)
         `,
       );
       const insertEvent = db.prepare(
@@ -1555,6 +1564,9 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
             project_unit_id = ?,
             active_assignment_id = ?,
             last_event_id = ?,
+            available_quantity = 0,
+            assigned_quantity = total_quantity,
+            checked_out_quantity = 0,
             custody_status = 'assigned',
             updated_at = ?,
             version = version + 1
@@ -1572,6 +1584,10 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
 
           if (assetRow.custody_status === "checked_out") {
             throw new Error(`Asset ${assetId} is currently checked out and cannot be used in this project setup.`);
+          }
+
+          if (assetRow.available_quantity > 0 && (assetRow.assigned_quantity > 0 || assetRow.checked_out_quantity > 0)) {
+            throw new Error(`Asset ${assetId} already has partial quantity allocated and cannot be assigned as a full project row.`);
           }
 
           if (assetRow.active_assignment_id) {
@@ -1592,6 +1608,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
             defaultActorUserId,
             assetRow.current_location_id,
             assetRow.current_location_id,
+            assetRow.total_quantity,
             "assigned",
             bucket.unitEndDate,
             "Assigned during project setup wizard.",

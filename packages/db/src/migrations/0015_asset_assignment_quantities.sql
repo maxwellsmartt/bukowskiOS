@@ -1,0 +1,2 @@
+ALTER TABLE asset_assignments
+ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1;

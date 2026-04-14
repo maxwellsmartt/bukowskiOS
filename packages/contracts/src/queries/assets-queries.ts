@@ -7,6 +7,9 @@ export type AssetListRow = {
   code: string;
   category: string;
   quantity: number;
+  totalQuantity: number;
+  assignedQuantity: number;
+  checkedOutQuantity: number;
   tracking: string;
   status: string;
   condition: string;
@@ -86,6 +89,9 @@ export type AssetDetailRow = {
   code: string;
   status: string;
   quantity: number;
+  totalQuantity: number;
+  assignedQuantity: number;
+  checkedOutQuantity: number;
   tracking: string;
   location: string;
   project: string;

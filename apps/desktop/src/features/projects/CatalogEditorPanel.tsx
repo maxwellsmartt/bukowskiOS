@@ -33,6 +33,11 @@ type CrewBankAccountDraft = {
   maskInPreview: boolean;
 };
 
+type KitAssetSelectionDraft = {
+  assetId: string;
+  quantity: number;
+};
+
 const locationTypeOptions = ["warehouse", "set", "maintenance", "office", "external"] as const;
 
 const readString = (value: Record<string, unknown> | null | undefined, key: string) =>
@@ -40,6 +45,19 @@ const readString = (value: Record<string, unknown> | null | undefined, key: stri
 
 const readStringArray = (value: Record<string, unknown> | null | undefined, key: string) =>
   Array.isArray(value?.[key]) ? (value[key] as string[]) : [];
+
+const readKitAssetSelections = (value: Record<string, unknown> | null | undefined): KitAssetSelectionDraft[] =>
+  Array.isArray(value?.assetSelections)
+    ? (value.assetSelections as Array<Record<string, unknown>>)
+        .map((entry) => ({
+          assetId: typeof entry.assetId === "string" ? entry.assetId : "",
+          quantity: typeof entry.quantity === "number" ? entry.quantity : 1,
+        }))
+        .filter((entry) => entry.assetId.trim())
+    : readStringArray(value, "assetIds").map((assetId) => ({
+        assetId,
+        quantity: 1,
+      }));
 
 const readBankAccounts = (value: Record<string, unknown> | null | undefined): CrewBankAccountDraft[] =>
   Array.isArray(value?.bankAccounts)
@@ -168,7 +186,7 @@ export const CatalogEditorPanel = ({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
-  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+  const [kitAssetSelections, setKitAssetSelections] = useState<KitAssetSelectionDraft[]>([]);
   const [bankAccounts, setBankAccounts] = useState<CrewBankAccountDraft[]>([]);
   const [isCrewDropActive, setIsCrewDropActive] = useState(false);
   const canManageCrewDocuments = mode === "edit" && typeof initialValue?.id === "string";
@@ -187,7 +205,7 @@ export const CatalogEditorPanel = ({
     setEmail(entityType === "manufacturer" ? readString(initialValue, "supportEmail") : readString(initialValue, "email"));
     setPhone(readString(initialValue, "phone"));
     setNotes(readString(initialValue, "notes"));
-    setSelectedAssetIds(readStringArray(initialValue, "assetIds"));
+    setKitAssetSelections(readKitAssetSelections(initialValue));
     setBankAccounts(readBankAccounts(initialValue));
   }, [entityType, initialValue]);
 
@@ -278,10 +296,16 @@ export const CatalogEditorPanel = ({
           name: name.trim(),
           description: normalizeOptional(description),
           notes: normalizeOptional(notes),
-          assetIds: selectedAssetIds,
+          assetIds: kitAssetSelections.map((selection) => selection.assetId),
+          assetSelections: kitAssetSelections,
         } as CreateCatalogEntityInput | UpdateCatalogEntityInput);
     }
   };
+
+  const selectedKitItemCount = useMemo(
+    () => kitAssetSelections.reduce((sum, selection) => sum + selection.quantity, 0),
+    [kitAssetSelections],
+  );
 
   return (
     <SurfaceCard
@@ -641,13 +665,15 @@ export const CatalogEditorPanel = ({
           <div className="surface-card-header catalog-kit-assets-header">
             <div>
               <h3 className="surface-card-title">Kit members</h3>
-              <p className="surface-card-subtitle">Choose the assets that should live together as part of this package.</p>
+              <p className="surface-card-subtitle">Choose the assets that should live together as part of this package and set quantity when a row supports bulk stock.</p>
             </div>
-            <span className="section-header-context-pill">{selectedAssetIds.length} linked</span>
+            <span className="section-header-context-pill">{selectedKitItemCount} items linked</span>
           </div>
           <div className="catalog-asset-picker">
             {assetOptions.map((asset) => {
-              const checked = selectedAssetIds.includes(asset.id);
+              const currentSelection = kitAssetSelections.find((selection) => selection.assetId === asset.id);
+              const checked = Boolean(currentSelection);
+              const availableQuantity = Math.max(1, asset.quantity);
 
               return (
                 <label key={asset.id} className={`catalog-asset-option${checked ? " selected" : ""}`}>
@@ -655,8 +681,10 @@ export const CatalogEditorPanel = ({
                     checked={checked}
                     className="table-checkbox"
                     onChange={(event) =>
-                      setSelectedAssetIds((current) =>
-                        event.target.checked ? Array.from(new Set([...current, asset.id])) : current.filter((value) => value !== asset.id),
+                      setKitAssetSelections((current) =>
+                        event.target.checked
+                          ? [...current, { assetId: asset.id, quantity: 1 }]
+                          : current.filter((value) => value.assetId !== asset.id),
                       )
                     }
                     type="checkbox"
@@ -664,9 +692,36 @@ export const CatalogEditorPanel = ({
                   <div className="identity-cell">
                     <span className="identity-title">{asset.name}</span>
                     <span className="identity-meta">
-                      {asset.code} · {asset.category} · {asset.status}
+                      {asset.code} · {asset.category} · {asset.status} · Available {asset.quantity}
                     </span>
                   </div>
+                  {checked ? (
+                    <div className="catalog-kit-quantity-field">
+                      <span className="action-field-label">Qty</span>
+                      <input
+                        className="action-field-control"
+                        max={availableQuantity}
+                        min={1}
+                        onChange={(event) =>
+                          setKitAssetSelections((current) =>
+                            current.map((selection) =>
+                              selection.assetId === asset.id
+                                ? {
+                                    ...selection,
+                                    quantity: Math.min(
+                                      Math.max(Number.parseInt(event.target.value || "1", 10) || 1, 1),
+                                      availableQuantity,
+                                    ),
+                                  }
+                                : selection,
+                            ),
+                          )
+                        }
+                        type="number"
+                        value={Math.min(Math.max(currentSelection?.quantity ?? 1, 1), availableQuantity)}
+                      />
+                    </div>
+                  ) : null}
                 </label>
               );
             })}

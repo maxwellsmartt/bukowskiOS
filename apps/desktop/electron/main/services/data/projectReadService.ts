@@ -43,7 +43,13 @@ type ProjectReadDeps = {
     status: string | null,
     statusSource: string | null,
   ) => { status: ProjectUnitRow["status"]; statusSource: ProjectUnitRow["statusSource"] };
-  mapAssetStatus: (operationalStatus: string, custodyStatus: string) => string;
+  mapAssetStatus: (
+    operationalStatus: string,
+    custodyStatus: string,
+    availableQuantity: number,
+    assignedQuantity: number,
+    checkedOutQuantity: number,
+  ) => string;
   resolveScheduleWindowLabel: (startDate: string | null, endDate: string | null) => string;
   sortRows: SortRows;
   toIsoDate: (value?: string | null) => string;
@@ -1195,6 +1201,9 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
             asset_current_state.operational_status,
             asset_current_state.custody_status,
+            asset_current_state.available_quantity,
+            asset_current_state.assigned_quantity,
+            asset_current_state.checked_out_quantity,
             asset_current_state.condition_status,
             COALESCE(locations.name, '—') AS location,
             COALESCE(users.full_name, '—') AS responsible,
@@ -1218,6 +1227,9 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       code: string;
       operational_status: string;
       custody_status: string;
+      available_quantity: number;
+      assigned_quantity: number;
+      checked_out_quantity: number;
       condition_status: string;
       location: string;
       responsible: string;
@@ -1461,7 +1473,13 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       id: row.id,
       name: row.name,
       code: row.code,
-      status: deps.mapAssetStatus(row.operational_status, row.custody_status),
+      status: deps.mapAssetStatus(
+        row.operational_status,
+        row.custody_status,
+        row.available_quantity,
+        row.assigned_quantity,
+        row.checked_out_quantity,
+      ),
       location: row.location,
       responsible: row.responsible,
       condition: row.condition_status,
@@ -1791,7 +1809,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             COALESCE(departments.name, '—') AS department,
             COALESCE(packing_slips.notes, '') AS notes,
             packing_slips.updated_at,
-            COUNT(packing_slip_items.id) AS item_count
+            COALESCE(SUM(packing_slip_items.quantity), 0) AS item_count
           FROM packing_slips
           LEFT JOIN users ON users.id = packing_slips.responsible_user_id
           LEFT JOIN departments ON departments.id = packing_slips.department_id

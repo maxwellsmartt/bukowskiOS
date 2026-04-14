@@ -314,6 +314,7 @@ export type CatalogAssetOptionRow = {
   name: string;
   code: string;
   category: string;
+  quantity: number;
   status: string;
   currentProjectId: string | null;
   currentProject: string | null;
@@ -321,6 +322,11 @@ export type CatalogAssetOptionRow = {
   currentUnit: string | null;
   currentDepartmentId: string | null;
   currentDepartment: string | null;
+};
+
+export type CatalogKitAssetSelectionRow = {
+  assetId: string;
+  quantity: number;
 };
 
 export type CatalogKitRow = {
@@ -332,6 +338,7 @@ export type CatalogKitRow = {
   isActive: boolean;
   assetCount: number;
   assetIds: string[];
+  assetSelections: CatalogKitAssetSelectionRow[];
   primaryCodeValue: string;
 };
 

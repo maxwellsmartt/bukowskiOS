@@ -1,9 +1,15 @@
 import type { CommandActorType, CommandSourceChannel } from "./asset-commands";
 
+export type PackingSlipAssetSelection = {
+  assetId: string;
+  quantity: number;
+};
+
 export type CreatePackingSlipCommand = {
   commandId: string;
   workspaceId: string;
   assetIds: string[];
+  assetSelections?: PackingSlipAssetSelection[];
   projectId: string;
   projectUnitId?: string;
   departmentId?: string;

@@ -25,7 +25,10 @@ type PackingAssetRow = {
   operational_status: string;
   custody_status: string;
   version: number;
-  quantity: number;
+  total_quantity: number;
+  available_quantity: number;
+  assigned_quantity: number;
+  checked_out_quantity: number;
 };
 
 type PackingSlipRow = {
@@ -43,6 +46,8 @@ type PendingSlipItemRow = {
   asset_id: string;
   asset_name: string;
   asset_code: string;
+  quantity: number;
+  source_flow: string;
   current_location_id: string | null;
   default_location_id: string | null;
   current_project_id: string | null;
@@ -51,6 +56,10 @@ type PendingSlipItemRow = {
   current_responsible_user_id: string | null;
   active_assignment_id: string | null;
   condition_status: string;
+  operational_status: string;
+  available_quantity: number;
+  assigned_quantity: number;
+  checked_out_quantity: number;
   version: number;
   condition_out: string | null;
 };
@@ -198,7 +207,7 @@ const buildPackingIdentifiers = (sequence: number) => {
 };
 
 const buildIssueSummary = (slipNumber: string, itemCount: number) => {
-  const itemLabel = itemCount === 1 ? "asset" : "assets";
+  const itemLabel = itemCount === 1 ? "item" : "items";
   return `${slipNumber} issued with ${itemCount} ${itemLabel}.`;
 };
 
@@ -224,9 +233,54 @@ const resolveSlipStatus = (itemCount: number, returnedCount: number) => {
   return "Issued";
 };
 
+const deriveCustodyStatus = (
+  operationalStatus: string,
+  availableQuantity: number,
+  assignedQuantity: number,
+  checkedOutQuantity: number,
+) => {
+  if (operationalStatus === "maintenance") {
+    return "maintenance";
+  }
+
+  if (checkedOutQuantity > 0 && assignedQuantity > 0) {
+    return "partially_allocated";
+  }
+
+  if (checkedOutQuantity > 0 && availableQuantity > 0) {
+    return "partial_checked_out";
+  }
+
+  if (assignedQuantity > 0 && availableQuantity > 0) {
+    return "partial_assigned";
+  }
+
+  if (checkedOutQuantity > 0) {
+    return "checked_out";
+  }
+
+  if (assignedQuantity > 0) {
+    return "assigned";
+  }
+
+  return "available";
+};
+
 export const createPackingMutationService = (db: DatabaseSync) => ({
   createPackingSlip(input: CreatePackingSlipCommand): CreatePackingSlipResult {
-    const assetIds = uniqueValues(input.assetIds);
+    const normalizedSelections = (input.assetSelections ?? [])
+      .map((selection) => ({
+        assetId: selection.assetId?.trim(),
+        quantity: Math.trunc(selection.quantity),
+      }))
+      .filter((selection): selection is { assetId: string; quantity: number } => Boolean(selection.assetId));
+    const requestedQuantityByAssetId = new Map<string, number>();
+
+    normalizedSelections.forEach((selection) => {
+      requestedQuantityByAssetId.set(selection.assetId, selection.quantity);
+    });
+
+    const assetIds = normalizedSelections.length ? [...requestedQuantityByAssetId.keys()] : uniqueValues(input.assetIds);
     const insertReceipt = db.prepare(
       `
         INSERT OR REPLACE INTO command_receipts (
@@ -360,7 +414,10 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             asset_current_state.operational_status,
             asset_current_state.custody_status,
             asset_current_state.version,
-            COALESCE(legacy_rentman_items.current_quantity, 1) AS quantity
+            asset_current_state.total_quantity,
+            asset_current_state.available_quantity,
+            asset_current_state.assigned_quantity,
+            asset_current_state.checked_out_quantity
           FROM asset_current_state
           JOIN assets ON assets.id = asset_current_state.asset_id
           LEFT JOIN legacy_rentman_asset_links ON legacy_rentman_asset_links.asset_id = assets.id
@@ -373,6 +430,20 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
 
     if (assetRows.length !== assetIds.length) {
       fail("One or more selected assets no longer exist in the live registry.");
+    }
+
+    const invalidQuantityAsset = assetRows.find((row) => {
+      const sourceQuantity =
+        row.current_project_id === input.projectId && row.assigned_quantity > 0 ? row.assigned_quantity : row.available_quantity;
+      const requestedQuantity = requestedQuantityByAssetId.get(row.asset_id) ?? sourceQuantity;
+
+      return !Number.isInteger(requestedQuantity) || requestedQuantity < 1 || requestedQuantity > Math.max(0, sourceQuantity);
+    });
+
+    if (invalidQuantityAsset) {
+      fail(
+        `Requested quantity for ${invalidQuantityAsset.asset_name} exceeds what is currently available in inventory.`,
+      );
     }
 
     const maintenanceAsset = assetRows.find((row) => row.operational_status === "maintenance");
@@ -449,12 +520,13 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             packing_slip_id,
             asset_id,
             quantity,
+            source_flow,
             condition_out,
             condition_in,
             returned_at,
             notes
           )
-          VALUES (?, ?, ?, ?, ?, NULL, NULL, ?)
+          VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?)
         `,
       );
       const insertAssignmentStatement = db.prepare(
@@ -470,6 +542,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             assigned_by_user_id,
             source_location_id,
             target_location_id,
+            quantity,
             assignment_status,
             checked_out_at,
             expected_return_at,
@@ -478,7 +551,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             created_at,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'checked_out', ?, ?, NULL, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'checked_out', ?, ?, NULL, ?, ?, ?)
         `,
       );
       const updateAssignmentStatement = db.prepare(
@@ -490,6 +563,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             project_unit_id = ?,
             assigned_to_user_id = ?,
             target_location_id = ?,
+            quantity = ?,
             assignment_status = 'checked_out',
             checked_out_at = ?,
             expected_return_at = ?,
@@ -533,7 +607,10 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             project_unit_id = ?,
             current_responsible_user_id = ?,
             active_assignment_id = ?,
-            custody_status = 'checked_out',
+            available_quantity = ?,
+            assigned_quantity = ?,
+            checked_out_quantity = ?,
+            custody_status = ?,
             last_event_id = ?,
             version = ?,
             updated_at = ?
@@ -582,6 +659,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       );
 
       const processedAssetIds: string[] = [];
+      let totalIssuedQuantity = 0;
 
       assetRows.forEach((row, index) => {
         const assignmentId = row.active_assignment_id ?? `assign-${input.commandId}-${index}`;
@@ -592,10 +670,26 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           explicitProjectUnit?.id ?? (row.current_project_id === input.projectId ? row.project_unit_id : null);
         const itemId = `packing-item-${input.commandId}-${index}`;
         const eventId = `event-${input.commandId}-${index}`;
+        const sourceFlow = row.current_project_id === input.projectId && row.assigned_quantity > 0 ? "assigned" : "available";
+        const requestedQuantity =
+          requestedQuantityByAssetId.get(row.asset_id) ??
+          (sourceFlow === "assigned" ? row.assigned_quantity : row.available_quantity);
+        const nextAvailableQuantity =
+          sourceFlow === "assigned" ? row.available_quantity : Math.max(0, row.available_quantity - requestedQuantity);
+        const nextAssignedQuantity =
+          sourceFlow === "assigned" ? Math.max(0, row.assigned_quantity - requestedQuantity) : row.assigned_quantity;
+        const nextCheckedOutQuantity = row.checked_out_quantity + requestedQuantity;
+        const nextCustodyStatus = deriveCustodyStatus(
+          row.operational_status,
+          nextAvailableQuantity,
+          nextAssignedQuantity,
+          nextCheckedOutQuantity,
+        );
         const metadataJson = JSON.stringify({
           packingSlipId,
           slipNumber,
-          quantity: row.quantity,
+          quantity: requestedQuantity,
+          sourceFlow,
           previous: {
             projectId: row.current_project_id,
             projectUnitId: row.project_unit_id,
@@ -608,7 +702,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             projectUnitId,
             departmentId,
             responsibleUserId,
-            custodyStatus: "checked_out",
+            custodyStatus: nextCustodyStatus,
           },
           returnDueAt: nextReturnDueAt,
         });
@@ -618,7 +712,15 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             responsibleUserId ? ` · ${userMap.get(responsibleUserId)}` : ""
           }.`;
 
-        insertPackingItemStatement.run(itemId, packingSlipId, row.asset_id, row.quantity, row.condition_status, note);
+        insertPackingItemStatement.run(
+          itemId,
+          packingSlipId,
+          row.asset_id,
+          requestedQuantity,
+          sourceFlow,
+          row.condition_status,
+          note,
+        );
 
         if (row.active_assignment_id) {
           updateAssignmentStatement.run(
@@ -627,6 +729,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             projectUnitId,
             responsibleUserId,
             nextLocationId,
+            nextAssignedQuantity + nextCheckedOutQuantity,
             now,
             nextReturnDueAt,
             note,
@@ -645,6 +748,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             defaultActorUserId,
             row.current_location_id,
             nextLocationId,
+            requestedQuantity,
             now,
             nextReturnDueAt,
             note,
@@ -680,6 +784,10 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           projectUnitId,
           responsibleUserId,
           assignmentId,
+          nextAvailableQuantity,
+          nextAssignedQuantity,
+          nextCheckedOutQuantity,
+          nextCustodyStatus,
           eventId,
           row.version + 1,
           now,
@@ -688,6 +796,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
 
         insertAssetOutboxStatement.run(`outbox-${eventId}`, input.workspaceId, row.asset_id, eventId, metadataJson, now, now);
         processedAssetIds.push(row.asset_id);
+        totalIssuedQuantity += requestedQuantity;
       });
 
       insertPackingOutboxStatement.run(
@@ -703,6 +812,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           responsibleUserId: nextResponsibleUserId,
           status: "Issued",
           assetIds: processedAssetIds,
+          totalIssuedQuantity,
         }),
         now,
         now,
@@ -727,7 +837,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
         slipNumber,
         processedAssetIds,
         repeated: false,
-        summary: buildIssueSummary(slipNumber, processedAssetIds.length),
+        summary: buildIssueSummary(slipNumber, totalIssuedQuantity),
       };
     } catch (error) {
       db.exec("ROLLBACK");
@@ -833,6 +943,8 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             assets.id AS asset_id,
             assets.name AS asset_name,
             COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS asset_code,
+            packing_slip_items.quantity,
+            packing_slip_items.source_flow,
             asset_current_state.current_location_id,
             assets.default_location_id,
             asset_current_state.current_project_id,
@@ -841,6 +953,10 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             asset_current_state.current_responsible_user_id,
             asset_current_state.active_assignment_id,
             asset_current_state.condition_status,
+            asset_current_state.operational_status,
+            asset_current_state.available_quantity,
+            asset_current_state.assigned_quantity,
+            asset_current_state.checked_out_quantity,
             asset_current_state.version,
             packing_slip_items.condition_out
           FROM packing_slip_items
@@ -886,8 +1002,10 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
         `
           UPDATE asset_assignments
           SET
-            assignment_status = 'returned',
+            assignment_status = ?,
+            quantity = ?,
             returned_at = ?,
+            checked_out_at = ?,
             updated_at = ?
           WHERE id = ?
         `,
@@ -922,13 +1040,16 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           UPDATE asset_current_state
           SET
             current_location_id = ?,
-            current_project_id = NULL,
-            project_unit_id = NULL,
-            current_department_id = NULL,
-            current_responsible_user_id = NULL,
-            active_assignment_id = NULL,
+            current_project_id = ?,
+            project_unit_id = ?,
+            current_department_id = ?,
+            current_responsible_user_id = ?,
+            active_assignment_id = ?,
+            available_quantity = ?,
+            assigned_quantity = ?,
+            checked_out_quantity = ?,
             condition_status = ?,
-            custody_status = 'available',
+            custody_status = ?,
             last_event_id = ?,
             version = ?,
             updated_at = ?
@@ -964,11 +1085,29 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       );
 
       const processedAssetIds: string[] = [];
+      let returnedQuantity = 0;
 
       pendingRows.forEach((row, index) => {
         const nextLocationId = row.default_location_id ?? row.current_location_id;
         const nextCondition = conditionIn || row.condition_out || row.condition_status;
         const eventId = `event-${input.commandId}-${index}`;
+        const restoresToAssigned = row.source_flow === "assigned";
+        const nextAvailableQuantity = restoresToAssigned ? row.available_quantity : row.available_quantity + row.quantity;
+        const nextAssignedQuantity = restoresToAssigned ? row.assigned_quantity + row.quantity : row.assigned_quantity;
+        const nextCheckedOutQuantity = Math.max(0, row.checked_out_quantity - row.quantity);
+        const nextCustodyStatus = deriveCustodyStatus(
+          row.operational_status,
+          nextAvailableQuantity,
+          nextAssignedQuantity,
+          nextCheckedOutQuantity,
+        );
+        const nextProjectId = nextAssignedQuantity > 0 || nextCheckedOutQuantity > 0 ? resolvedSlip.project_id : null;
+        const nextProjectUnitId = nextAssignedQuantity > 0 || nextCheckedOutQuantity > 0 ? resolvedSlip.project_unit_id : null;
+        const nextDepartmentId = nextAssignedQuantity > 0 || nextCheckedOutQuantity > 0 ? resolvedSlip.department_id : null;
+        const nextResponsibleUserId =
+          nextAssignedQuantity > 0 || nextCheckedOutQuantity > 0 ? resolvedSlip.responsible_user_id : null;
+        const nextAssignmentId =
+          nextAssignedQuantity > 0 || nextCheckedOutQuantity > 0 ? row.active_assignment_id : null;
         const metadataJson = JSON.stringify({
           packingSlipId: input.packingSlipId,
           slipNumber,
@@ -983,7 +1122,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           next: {
             locationId: nextLocationId,
             conditionStatus: nextCondition,
-            custodyStatus: "available",
+            custodyStatus: nextCustodyStatus,
           },
         });
         const rowNote = note || `Returned ${row.asset_name} from ${slipNumber}.`;
@@ -991,7 +1130,21 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
         updatePackingItemStatement.run(nextCondition, now, rowNote, row.item_id);
 
         if (row.active_assignment_id) {
-          updateAssignmentStatement.run(now, now, row.active_assignment_id);
+          const nextAssignmentStatus =
+            nextCheckedOutQuantity > 0 ? "checked_out" : nextAssignedQuantity > 0 ? "assigned" : "returned";
+          const nextAssignmentQuantity =
+            nextAssignmentStatus === "returned" ? row.quantity : nextAssignedQuantity + nextCheckedOutQuantity;
+          const nextReturnedAt = nextAssignmentStatus === "returned" ? now : null;
+          const nextCheckedOutAt = nextAssignmentStatus === "checked_out" ? now : null;
+
+          updateAssignmentStatement.run(
+            nextAssignmentStatus,
+            nextAssignmentQuantity,
+            nextReturnedAt,
+            nextCheckedOutAt,
+            now,
+            row.active_assignment_id,
+          );
         }
 
         insertEventStatement.run(
@@ -1016,7 +1169,16 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
 
         updateCurrentStateStatement.run(
           nextLocationId,
+          nextProjectId,
+          nextProjectUnitId,
+          nextDepartmentId,
+          nextResponsibleUserId,
+          nextAssignmentId,
+          nextAvailableQuantity,
+          nextAssignedQuantity,
+          nextCheckedOutQuantity,
           nextCondition,
+          nextCustodyStatus,
           eventId,
           row.version + 1,
           now,
@@ -1025,14 +1187,15 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
 
         insertOutboxStatement.run(`outbox-${eventId}`, input.workspaceId, "asset_event", row.asset_id, eventId, metadataJson, now, now);
         processedAssetIds.push(row.asset_id);
+        returnedQuantity += row.quantity;
       });
 
       const slipCounts = db
         .prepare(
           `
             SELECT
-              COUNT(*) AS item_count,
-              SUM(CASE WHEN returned_at IS NOT NULL THEN 1 ELSE 0 END) AS returned_count
+              COALESCE(SUM(quantity), 0) AS item_count,
+              SUM(CASE WHEN returned_at IS NOT NULL THEN quantity ELSE 0 END) AS returned_count
             FROM packing_slip_items
             WHERE packing_slip_id = ?
           `,
@@ -1076,7 +1239,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
         processedAssetIds,
         repeated: false,
         slipStatus,
-        summary: buildReturnSummary(slipNumber, processedAssetIds.length, slipStatus),
+        summary: buildReturnSummary(slipNumber, returnedQuantity, slipStatus),
       };
     } catch (error) {
       db.exec("ROLLBACK");

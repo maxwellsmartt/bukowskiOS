@@ -25,6 +25,10 @@ type AssetStateRow = {
   active_assignment_id: string | null;
   operational_status: string;
   custody_status: string;
+  total_quantity: number;
+  available_quantity: number;
+  assigned_quantity: number;
+  checked_out_quantity: number;
   version: number;
 };
 
@@ -222,6 +226,32 @@ const buildConflictWarningSummary = (warnings: string[]) => {
   return `${warnings[0]} +${warnings.length - 1} more conflict warning${warnings.length === 2 ? "" : "s"}.`;
 };
 
+const resolveAssignableQuantity = (
+  row: AssetStateRow,
+  nextProjectId: string | null | undefined,
+  nextProjectUnitId: string | null | undefined,
+  nextDepartmentId: string | null | undefined,
+  nextResponsibleUserId: string | null | undefined,
+  nextLocationId: string | null | undefined,
+) => {
+  const sameContext =
+    row.current_project_id === (nextProjectId ?? null) &&
+    row.project_unit_id === (nextProjectUnitId ?? null) &&
+    row.current_department_id === (nextDepartmentId ?? null) &&
+    row.current_responsible_user_id === (nextResponsibleUserId ?? null) &&
+    row.current_location_id === (nextLocationId ?? null);
+
+  if (sameContext) {
+    return row.available_quantity;
+  }
+
+  if (row.available_quantity === 0 && row.assigned_quantity > 0 && row.checked_out_quantity === 0) {
+    return row.assigned_quantity;
+  }
+
+  return row.available_quantity;
+};
+
 const ensureInternalCodeAvailable = (db: DatabaseSync, workspaceId: string, internalCode: string, currentAssetId?: string) => {
   const existing = db
     .prepare(
@@ -262,7 +292,19 @@ const normalizeOptionalText = (value?: string) => {
 
 export const createAssetMutationService = (db: DatabaseSync) => ({
   assignMoveAssets(input: AssignMoveAssetsInput): AssignMoveAssetsResult {
-    const assetIds = uniqueValues(input.assetIds);
+    const normalizedSelections = (input.assetSelections ?? [])
+      .map((selection) => ({
+        assetId: selection.assetId?.trim(),
+        quantity: Math.trunc(selection.quantity),
+      }))
+      .filter((selection): selection is { assetId: string; quantity: number } => Boolean(selection.assetId));
+    const requestedQuantityByAssetId = new Map<string, number>();
+
+    normalizedSelections.forEach((selection) => {
+      requestedQuantityByAssetId.set(selection.assetId, selection.quantity);
+    });
+
+    const assetIds = normalizedSelections.length ? [...requestedQuantityByAssetId.keys()] : uniqueValues(input.assetIds);
     const insertReceipt = db.prepare(
       `
         INSERT OR REPLACE INTO command_receipts (
@@ -401,6 +443,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             asset_current_state.active_assignment_id,
             asset_current_state.operational_status,
             asset_current_state.custody_status,
+            asset_current_state.total_quantity,
+            asset_current_state.available_quantity,
+            asset_current_state.assigned_quantity,
+            asset_current_state.checked_out_quantity,
             asset_current_state.version
           FROM asset_current_state
           JOIN assets ON assets.id = asset_current_state.asset_id
@@ -412,6 +458,44 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
 
     if (assetStateRows.length !== assetIds.length) {
       fail("One or more selected assets no longer exist in the local registry.");
+    }
+
+    const invalidQuantityAsset =
+      input.mode === "assign"
+        ? assetStateRows.find((row) => {
+            if (row.checked_out_quantity > 0) {
+              return false;
+            }
+
+            const nextProjectId = input.projectId ?? row.current_project_id;
+            const nextProjectUnitId =
+              input.projectUnitId
+                ? input.projectUnitId
+                : input.projectId && input.projectId !== row.current_project_id
+                  ? null
+                  : row.project_unit_id;
+            const nextDepartmentId = input.departmentId ?? row.current_department_id;
+            const nextResponsibleUserId = input.assignedToUserId ?? row.current_responsible_user_id;
+            const nextLocationId = input.targetLocationId ?? row.current_location_id;
+            const sourceQuantity = resolveAssignableQuantity(
+              row,
+              nextProjectId,
+              nextProjectUnitId,
+              nextDepartmentId,
+              nextResponsibleUserId,
+              nextLocationId,
+            );
+            const requestedQuantity = requestedQuantityByAssetId.get(row.asset_id) ?? sourceQuantity;
+            return (
+              !Number.isInteger(requestedQuantity) ||
+              requestedQuantity < 1 ||
+              requestedQuantity > Math.max(0, sourceQuantity)
+            );
+          })
+        : null;
+
+    if (invalidQuantityAsset) {
+      fail(`Requested quantity for ${invalidQuantityAsset.asset_name} exceeds what is currently available for assignment.`);
     }
 
     const currentLocationIds = uniqueValues(assetStateRows.map((row) => row.current_location_id));
@@ -430,15 +514,27 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             const nextDepartmentId = input.departmentId ?? row.current_department_id;
             const nextResponsibleUserId = input.assignedToUserId ?? row.current_responsible_user_id;
             const nextLocationId = input.targetLocationId ?? row.current_location_id;
+            const sourceQuantity = resolveAssignableQuantity(
+              row,
+              nextProjectId,
+              nextProjectUnitId,
+              nextDepartmentId,
+              nextResponsibleUserId,
+              nextLocationId,
+            );
+            const requestedQuantity = requestedQuantityByAssetId.get(row.asset_id) ?? sourceQuantity;
+            const isSameContext =
+              row.current_project_id === nextProjectId &&
+              row.project_unit_id === nextProjectUnitId &&
+              row.current_department_id === nextDepartmentId &&
+              row.current_responsible_user_id === nextResponsibleUserId &&
+              row.current_location_id === nextLocationId;
 
             return (
               row.active_assignment_id === null ||
               row.custody_status !== "assigned" ||
-              row.current_project_id !== nextProjectId ||
-              row.project_unit_id !== nextProjectUnitId ||
-              row.current_department_id !== nextDepartmentId ||
-              row.current_responsible_user_id !== nextResponsibleUserId ||
-              row.current_location_id !== nextLocationId ||
+              !isSameContext ||
+              requestedQuantity !== sourceQuantity ||
               Boolean(input.expectedReturnAt)
             );
           });
@@ -454,10 +550,42 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         fail(`${maintenanceAsset.asset_name} is in maintenance and cannot be assigned right now.`);
       }
 
-      const checkedOutAsset = processedRows.find((row) => row.custody_status === "checked_out");
+      const checkedOutAsset = processedRows.find((row) => row.checked_out_quantity > 0);
 
       if (checkedOutAsset) {
         fail(`${checkedOutAsset.asset_name} is currently checked out. Return it before reassigning it.`);
+      }
+
+      const partiallyAllocatedAsset = processedRows.find((row) => {
+        if (!(row.available_quantity > 0 && row.assigned_quantity > 0)) {
+          return false;
+        }
+
+        const requestedQuantity = requestedQuantityByAssetId.get(row.asset_id) ?? row.available_quantity;
+        const nextProjectId = input.projectId ?? row.current_project_id;
+        const nextProjectUnitId =
+          input.projectUnitId
+            ? input.projectUnitId
+            : input.projectId && input.projectId !== row.current_project_id
+              ? null
+              : row.project_unit_id;
+        const nextDepartmentId = input.departmentId ?? row.current_department_id;
+        const nextResponsibleUserId = input.assignedToUserId ?? row.current_responsible_user_id;
+        const nextLocationId = input.targetLocationId ?? row.current_location_id;
+        const sameContext =
+          row.current_project_id === nextProjectId &&
+          row.project_unit_id === nextProjectUnitId &&
+          row.current_department_id === nextDepartmentId &&
+          row.current_responsible_user_id === nextResponsibleUserId &&
+          row.current_location_id === nextLocationId;
+
+        return !sameContext || requestedQuantity > row.available_quantity;
+      });
+
+      if (partiallyAllocatedAsset) {
+        fail(
+          `${partiallyAllocatedAsset.asset_name} already has partial quantity allocated in a different active context. Finish that flow before reassigning this bulk row.`,
+        );
       }
     } else {
       const checkedOutAsset = processedRows.find((row) => row.custody_status === "checked_out");
@@ -543,17 +671,36 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             project_unit_id,
             assigned_to_user_id,
             assigned_by_user_id,
-            source_location_id,
-            target_location_id,
-            assignment_status,
-            checked_out_at,
-            expected_return_at,
+          source_location_id,
+          target_location_id,
+          quantity,
+          assignment_status,
+          checked_out_at,
+          expected_return_at,
             returned_at,
             notes,
             created_at,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+        `,
+      );
+      const updateAssignmentStatement = db.prepare(
+        `
+          UPDATE asset_assignments
+          SET
+            project_id = ?,
+            department_id = ?,
+            project_unit_id = ?,
+            assigned_to_user_id = ?,
+            target_location_id = ?,
+            quantity = ?,
+            assignment_status = 'assigned',
+            checked_out_at = NULL,
+            expected_return_at = ?,
+            notes = ?,
+            updated_at = ?
+          WHERE id = ?
         `,
       );
       const updateAssignmentLocationStatement = db.prepare(
@@ -598,6 +745,9 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             project_unit_id = ?,
             current_responsible_user_id = ?,
             active_assignment_id = ?,
+            available_quantity = ?,
+            assigned_quantity = ?,
+            checked_out_quantity = ?,
             custody_status = ?,
             last_event_id = ?,
             version = ?,
@@ -661,31 +811,72 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
           nextProjectUnitId = null;
         }
 
+        const sourceQuantity =
+          input.mode === "assign"
+            ? resolveAssignableQuantity(
+                row,
+                nextProjectId,
+                nextProjectUnitId,
+                nextDepartmentId,
+                nextResponsibleUserId,
+                targetLocationId,
+              )
+            : row.available_quantity;
+        const requestedQuantity = requestedQuantityByAssetId.get(row.asset_id) ?? sourceQuantity;
+        const assignSourceFlow =
+          input.mode === "assign" && sourceQuantity === row.assigned_quantity && row.available_quantity === 0 ? "assigned" : "available";
+
         if (input.mode === "assign") {
-          if (row.active_assignment_id) {
+          const sameActiveContext =
+            row.active_assignment_id &&
+            row.checked_out_quantity === 0 &&
+            row.current_project_id === nextProjectId &&
+            row.project_unit_id === nextProjectUnitId &&
+            row.current_department_id === nextDepartmentId &&
+            row.current_responsible_user_id === nextResponsibleUserId &&
+            row.current_location_id === targetLocationId;
+
+          if (row.active_assignment_id && !sameActiveContext) {
             closeAssignmentStatement.run(now, row.active_assignment_id);
           }
 
-          nextAssignmentId = `assign-${input.commandId}-${index}`;
+          if (sameActiveContext && row.active_assignment_id) {
+            nextAssignmentId = row.active_assignment_id;
+            updateAssignmentStatement.run(
+              nextProjectId,
+              nextDepartmentId,
+              nextProjectUnitId,
+              nextResponsibleUserId,
+              targetLocationId,
+              row.assigned_quantity + requestedQuantity,
+              input.expectedReturnAt?.trim() || null,
+              input.notes?.trim() || null,
+              now,
+              row.active_assignment_id,
+            );
+          } else {
+            nextAssignmentId = `assign-${input.commandId}-${index}`;
 
-          insertAssignmentStatement.run(
-            nextAssignmentId,
-            input.workspaceId,
-            row.asset_id,
-            nextProjectId,
-            nextDepartmentId,
-            nextProjectUnitId,
-            nextResponsibleUserId,
-            defaultActorUserId,
-            row.current_location_id,
-            targetLocationId,
-            "assigned",
-            now,
-            input.expectedReturnAt?.trim() || null,
-            input.notes?.trim() || null,
-            now,
-            now,
-          );
+            insertAssignmentStatement.run(
+              nextAssignmentId,
+              input.workspaceId,
+              row.asset_id,
+              nextProjectId,
+              nextDepartmentId,
+              nextProjectUnitId,
+              nextResponsibleUserId,
+              defaultActorUserId,
+              row.current_location_id,
+              targetLocationId,
+              requestedQuantity,
+              "assigned",
+              now,
+              input.expectedReturnAt?.trim() || null,
+              input.notes?.trim() || null,
+              now,
+              now,
+            );
+          }
         } else if (row.active_assignment_id && targetLocationId !== row.current_location_id) {
           updateAssignmentLocationStatement.run(targetLocationId, now, row.active_assignment_id);
         }
@@ -729,7 +920,21 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             custodyStatus: input.mode === "assign" ? "assigned" : row.custody_status,
           },
           expectedReturnAt: input.expectedReturnAt ?? null,
+          quantity: input.mode === "assign" ? requestedQuantity : null,
         });
+        const nextAvailableQuantity =
+          input.mode === "assign"
+            ? assignSourceFlow === "assigned"
+              ? row.available_quantity
+              : Math.max(0, row.available_quantity - requestedQuantity)
+            : row.available_quantity;
+        const nextAssignedQuantity =
+          input.mode === "assign"
+            ? assignSourceFlow === "assigned"
+              ? requestedQuantity
+              : row.assigned_quantity + requestedQuantity
+            : row.assigned_quantity;
+        const nextCheckedOutQuantity = input.mode === "assign" ? 0 : row.checked_out_quantity;
 
         insertEventStatement.run(
           eventId,
@@ -759,7 +964,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
           nextProjectUnitId,
           nextResponsibleUserId,
           nextAssignmentId,
-          input.mode === "assign" ? "assigned" : row.custody_status,
+          nextAvailableQuantity,
+          nextAssignedQuantity,
+          nextCheckedOutQuantity,
+          input.mode === "assign" ? (nextAvailableQuantity > 0 ? "partial_assigned" : "assigned") : row.custody_status,
           eventId,
           row.version + 1,
           now,
@@ -970,11 +1178,15 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             condition_status,
             operational_status,
             custody_status,
+            total_quantity,
+            available_quantity,
+            assigned_quantity,
+            checked_out_quantity,
             last_event_id,
             version,
             updated_at
           )
-          VALUES (?, ?, ?, NULL, NULL, NULL, NULL, ?, 'available', 'available', ?, 1, ?)
+          VALUES (?, ?, ?, NULL, NULL, NULL, NULL, ?, 'available', 'available', 1, 1, 0, 0, ?, 1, ?)
         `,
       ).run(
         assetId,
