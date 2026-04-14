@@ -895,6 +895,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           SELECT name
           FROM projects
           WHERE workspace_id = ?
+            AND archived_at IS NULL
           ORDER BY CASE status
             WHEN 'Active' THEN 0
             WHEN 'Prep' THEN 1
@@ -952,6 +953,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             COALESCE(clients.name, projects.client_name, '—') AS client_name
           FROM projects
           LEFT JOIN clients ON clients.id = projects.client_id
+          WHERE projects.archived_at IS NULL
         `,
       )
       .all() as Array<{ id: string; code: string; name: string; client_name: string }>;
@@ -969,6 +971,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           FROM project_units
           JOIN projects ON projects.id = project_units.project_id
           WHERE COALESCE(project_units.is_primary, 0) = 0
+            AND projects.archived_at IS NULL
         `,
       )
       .all() as Array<{
@@ -988,6 +991,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             projects.name AS project_name
           FROM packing_slips
           JOIN projects ON projects.id = packing_slips.project_id
+          WHERE projects.archived_at IS NULL
         `,
       )
       .all() as Array<{ id: string; project_name: string }>;
@@ -1003,6 +1007,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           FROM incidents
           LEFT JOIN assets ON assets.id = incidents.asset_id
           LEFT JOIN projects ON projects.id = incidents.project_id
+          WHERE projects.archived_at IS NULL OR projects.id IS NULL
         `,
       )
       .all() as Array<{ id: string; title: string; asset_code: string; project_name: string }>;

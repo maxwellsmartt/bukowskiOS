@@ -53,7 +53,7 @@ const emptyTimeline: ScheduleTimelineSnapshot = {
   unscheduled: [],
 };
 
-export const useOverviewSnapshot = () =>
+export const useOverviewSnapshot = (refreshKey = 0) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiOverview) {
@@ -63,7 +63,7 @@ export const useOverviewSnapshot = () =>
       return window.bukowskiOverview.getSnapshot();
     },
     emptySnapshot,
-    [],
+    [refreshKey],
   );
 
 export const useOverviewTimeline = (
@@ -71,6 +71,7 @@ export const useOverviewTimeline = (
   scale: ScheduleTimelineScale = "week",
   anchorDate?: string,
   pagination?: ScheduleTimelinePagination,
+  refreshKey = 0,
 ) =>
   useAsyncValue(
     async () => {
@@ -81,5 +82,5 @@ export const useOverviewTimeline = (
       return window.bukowskiOverview.getTimeline(range, scale, anchorDate, pagination);
     },
     emptyTimeline,
-    [range, scale, anchorDate ?? "", pagination?.limit ?? 24, pagination?.offset ?? 0],
+    [range, scale, anchorDate ?? "", pagination?.limit ?? 24, pagination?.offset ?? 0, refreshKey],
   );

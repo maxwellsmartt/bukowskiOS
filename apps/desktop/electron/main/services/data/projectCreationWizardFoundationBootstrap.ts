@@ -185,6 +185,12 @@ export const applyProjectCreationWizardFoundationMigration = (db: DatabaseSync) 
   ).run("production-company-metadata-internal", workspaceId, "Metadata Internal", now, now);
 };
 
+export const applyProjectArchiveFoundationMigration = (db: DatabaseSync) => {
+  if (!hasColumn(db, "projects", "archived_at")) {
+    db.exec("ALTER TABLE projects ADD COLUMN archived_at TEXT;");
+  }
+};
+
 export const applyProjectUnitWindowsFoundationMigration = (db: DatabaseSync) => {
   if (!tableExists(db, "project_unit_windows")) {
     db.exec(`

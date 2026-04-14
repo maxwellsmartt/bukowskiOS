@@ -3,15 +3,18 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import type {
   AppInfo,
+  ArchiveProjectInput,
   CreateProjectBlueprintInput,
   CreateProjectInput,
   ProjectCardRow,
+  ProjectDeletePreview,
   ShellBootstrap,
+  UnarchiveProjectInput,
   UpdateProjectInput,
 } from "@contracts";
 import type { ProjectRouteSection, ScopeMode } from "@app/routing/route-meta";
 import { resolveActiveRoute, resolveRememberedGlobalPath } from "@app/routing/route-meta";
-import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
+import { readJsonPreference, readStringPreference, uiPreferenceKeys, writeJsonPreference, writePreference } from "@shared/lib/preferences";
 
 type ShellContextValue = {
   appInfo: AppInfo | null;
@@ -25,12 +28,18 @@ type ShellContextValue = {
   activeProject: ProjectCardRow | null;
   activeProjectRouteSection: ProjectRouteSection | null;
   projectsError: string | null;
+  showArchivedProjects: boolean;
+  setShowArchivedProjects: (show: boolean) => void;
+  projectDataVersion: number;
   setActiveProjectId: (projectId: string | null) => void;
   openProject: (projectId: string, section?: ProjectRouteSection) => void;
   refreshProjects: () => Promise<void>;
   createProject: (input: CreateProjectInput) => Promise<void>;
   createProjectBlueprint: (input: CreateProjectBlueprintInput) => Promise<ProjectCardRow | null>;
   updateProject: (input: UpdateProjectInput) => Promise<void>;
+  getProjectDeletePreview: (projectId: string) => Promise<ProjectDeletePreview>;
+  archiveProject: (input: ArchiveProjectInput) => Promise<void>;
+  unarchiveProject: (input: UnarchiveProjectInput) => Promise<void>;
   deleteProject: (projectId: string) => Promise<void>;
 };
 
@@ -66,6 +75,10 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   const [projects, setProjects] = useState<ProjectCardRow[]>([]);
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [projectsHydrated, setProjectsHydrated] = useState(false);
+  const [projectDataVersion, setProjectDataVersion] = useState(0);
+  const [showArchivedProjects, setShowArchivedProjects] = useState(() =>
+    readJsonPreference(uiPreferenceKeys.shellProjectsShowArchived, false),
+  );
   const [rememberedProjectId, setRememberedProjectId] = useState<string | null>(() =>
     readStringPreference(uiPreferenceKeys.activeProjectId),
   );
@@ -105,7 +118,12 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     }
 
     try {
-      const nextProjects = await window.bukowskiProjects.getList();
+      const nextProjects = await window.bukowskiProjects.getList({
+        search: "",
+        sortBy: "name",
+        sortDirection: "asc",
+        includeArchived: showArchivedProjects,
+      });
 
       setProjects(nextProjects);
       setProjectsError(null);
@@ -122,7 +140,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       setProjectsError(error instanceof Error ? error.message : "Project shell unavailable");
       setProjectsHydrated(true);
     }
-  }, []);
+  }, [showArchivedProjects]);
 
   useEffect(() => {
     void refreshProjects();
@@ -131,6 +149,10 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   useEffect(() => {
     writePreference(uiPreferenceKeys.activeProjectId, rememberedProjectId);
   }, [rememberedProjectId]);
+
+  useEffect(() => {
+    writeJsonPreference(uiPreferenceKeys.shellProjectsShowArchived, showArchivedProjects);
+  }, [showArchivedProjects]);
 
   const activeProjectId = activeRoute.scopeMode === "project" ? activeRoute.projectId : rememberedProjectId;
 
@@ -190,6 +212,8 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       nextProjects.find((project) => project.code === input.code.trim().toUpperCase() && project.name === input.name.trim()) ?? null;
 
     setRememberedProjectId(createdProject?.id ?? nextProjects[0]?.id ?? null);
+    await refreshProjects();
+    setProjectDataVersion((current) => current + 1);
   };
 
   const createProjectBlueprint = async (input: CreateProjectBlueprintInput) => {
@@ -210,6 +234,8 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       ) ?? null;
 
     setRememberedProjectId(createdProject?.id ?? nextProjects[0]?.id ?? null);
+    await refreshProjects();
+    setProjectDataVersion((current) => current + 1);
     return createdProject;
   };
 
@@ -222,6 +248,43 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     setProjects(nextProjects);
     setProjectsError(null);
     setRememberedProjectId(input.projectId);
+    await refreshProjects();
+    setProjectDataVersion((current) => current + 1);
+  };
+
+  const getProjectDeletePreview = async (projectId: string) => {
+    if (!window.bukowskiProjects) {
+      throw new Error("Projects bridge unavailable");
+    }
+
+    return window.bukowskiProjects.getDeletePreview(projectId);
+  };
+
+  const archiveProject = async (input: ArchiveProjectInput) => {
+    if (!window.bukowskiProjects) {
+      throw new Error("Projects bridge unavailable");
+    }
+
+    await window.bukowskiProjects.archive(input);
+    await refreshProjects();
+    setProjectsError(null);
+    setProjectDataVersion((current) => current + 1);
+
+    if (activeRoute.scopeMode === "project" && activeRoute.projectId === input.projectId) {
+      navigate(resolveRememberedGlobalPath(), { replace: true });
+    }
+  };
+
+  const unarchiveProject = async (input: UnarchiveProjectInput) => {
+    if (!window.bukowskiProjects) {
+      throw new Error("Projects bridge unavailable");
+    }
+
+    await window.bukowskiProjects.unarchive(input);
+    await refreshProjects();
+    setProjectsError(null);
+    setRememberedProjectId(input.projectId);
+    setProjectDataVersion((current) => current + 1);
   };
 
   const deleteProject = async (projectId: string) => {
@@ -229,12 +292,14 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       throw new Error("Projects bridge unavailable");
     }
 
-    const nextProjects = await window.bukowskiProjects.remove({ projectId });
+    const nextProjects = await window.bukowskiProjects.remove({ projectId, confirmedWithBackup: true });
     setProjects(nextProjects);
     setProjectsError(null);
     setRememberedProjectId((currentProjectId) =>
       currentProjectId === projectId ? nextProjects[0]?.id ?? null : currentProjectId,
     );
+    await refreshProjects();
+    setProjectDataVersion((current) => current + 1);
 
     if (activeRoute.scopeMode === "project" && activeRoute.projectId === projectId) {
       navigate(resolveRememberedGlobalPath(), { replace: true });
@@ -261,12 +326,18 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       activeProject,
       activeProjectRouteSection: activeRoute.scopeMode === "project" ? activeRoute.projectSection ?? null : null,
       projectsError,
+      showArchivedProjects,
+      setShowArchivedProjects,
+      projectDataVersion,
       setActiveProjectId,
       openProject,
       refreshProjects,
       createProject,
       createProjectBlueprint,
       updateProject,
+      getProjectDeletePreview,
+      archiveProject,
+      unarchiveProject,
       deleteProject,
     }),
     [
@@ -275,14 +346,22 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       activeRoute.projectSection,
       activeRoute.scopeMode,
       appInfo,
+      createProject,
+      archiveProject,
+      deleteProject,
+      getProjectDeletePreview,
       isScopeReady,
       openProject,
       projects,
       projectsError,
+      projectDataVersion,
       refreshProjects,
       createProjectBlueprint,
       scopeChipLabel,
       shellBootstrap,
+      showArchivedProjects,
+      unarchiveProject,
+      updateProject,
     ],
   );
 

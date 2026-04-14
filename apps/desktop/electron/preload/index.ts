@@ -15,6 +15,7 @@ import type {
   AgentRunRow,
   AssignAgentModelCommand,
   ArchiveAssetCommand,
+  ArchiveProjectInput,
   AssetListQuery,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
@@ -72,10 +73,11 @@ import type {
   PackingSlipDetailSnapshot,
   PackingSlipListQuery,
   PackingSlipRow,
-  ProjectListQuery,
   ProjectCardRow,
   ProjectCreationConflictsSnapshot,
+  ProjectDeletePreview,
   ProjectDetailSnapshot,
+  ProjectListQuery,
   ReportIncidentCommand,
   ReportIncidentResult,
   ResolveIncidentCommand,
@@ -113,6 +115,7 @@ import type {
   SendAssistantChatTurnCommand,
   UpdateAssistantThreadPreferencesCommand,
   StagingPackingSlipRow,
+  UnarchiveProjectInput,
 } from "@contracts";
 
 const shellActionListeners = new Set<(action: ShellAppAction) => void>();
@@ -253,6 +256,8 @@ const bukowskiIncidents = {
 const bukowskiProjects = {
   getList: (query?: ProjectListQuery) => ipcRenderer.invoke(ipcChannels.projects.getList, query) as Promise<ProjectCardRow[]>,
   getDetail: (projectId: string) => ipcRenderer.invoke(ipcChannels.projects.getDetail, projectId) as Promise<ProjectDetailSnapshot>,
+  getDeletePreview: (projectId: string) =>
+    ipcRenderer.invoke(ipcChannels.projects.getDeletePreview, projectId) as Promise<ProjectDeletePreview>,
   getCatalog: () => ipcRenderer.invoke(ipcChannels.projects.getCatalog) as Promise<CatalogSnapshot>,
   getStagingPackingSlips: () =>
     ipcRenderer.invoke(ipcChannels.projects.getStagingPackingSlips) as Promise<StagingPackingSlipRow[]>,
@@ -264,6 +269,9 @@ const bukowskiProjects = {
   exportBlueprintPdf: (input: CreateProjectBlueprintInput) =>
     ipcRenderer.invoke(ipcChannels.projects.exportBlueprintPdf, input) as Promise<AppExportResult>,
   update: (input: UpdateProjectInput) => ipcRenderer.invoke(ipcChannels.projects.update, input) as Promise<ProjectCardRow[]>,
+  archive: (input: ArchiveProjectInput) => ipcRenderer.invoke(ipcChannels.projects.archive, input) as Promise<ProjectCardRow[]>,
+  unarchive: (input: UnarchiveProjectInput) =>
+    ipcRenderer.invoke(ipcChannels.projects.unarchive, input) as Promise<ProjectCardRow[]>,
   remove: (input: DeleteProjectInput) => ipcRenderer.invoke(ipcChannels.projects.delete, input) as Promise<ProjectCardRow[]>,
   createUnit: (input: CreateProjectUnitInput) =>
     ipcRenderer.invoke(ipcChannels.projects.createUnit, input) as Promise<ProjectDetailSnapshot>,

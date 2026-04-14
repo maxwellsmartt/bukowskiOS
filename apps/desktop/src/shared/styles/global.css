@@ -1129,6 +1129,12 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   background: var(--bg-sidebar);
 }
 
+.shell-projects-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .shell-project-create-button {
   display: inline-flex;
   align-items: center;
@@ -1219,6 +1225,11 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   border-color: rgba(255, 255, 255, 0.09);
 }
 
+.shell-project-item.is-archived {
+  opacity: 0.82;
+  background: rgba(255, 255, 255, 0.012);
+}
+
 .shell-project-copy {
   display: flex;
   flex-direction: column;
@@ -1253,6 +1264,18 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   white-space: nowrap;
   color: var(--text-primary);
   font-size: 12px;
+}
+
+.shell-project-archived-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid rgba(212, 170, 83, 0.24);
+  border-radius: 999px;
+  background: rgba(212, 170, 83, 0.08);
+  color: rgba(255, 219, 132, 0.88);
+  font-size: 10px;
 }
 
 .shell-project-meta {
@@ -1365,6 +1388,139 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   color: var(--accent-critical);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.shell-project-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.018);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.shell-project-toggle.is-active {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.project-lifecycle-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(8, 9, 11, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.project-lifecycle-dialog {
+  width: min(520px, calc(100vw - 32px));
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01)),
+    #121518;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.project-lifecycle-dialog-header,
+.project-lifecycle-dialog-body,
+.project-lifecycle-dialog-actions {
+  padding: 16px 18px;
+}
+
+.project-lifecycle-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.project-lifecycle-dialog-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.project-lifecycle-dialog-header p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.project-lifecycle-dialog-body {
+  display: grid;
+  gap: 12px;
+}
+
+.project-lifecycle-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-lifecycle-summary-row.is-stacked {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.shell-project-summary-copy {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.project-lifecycle-summary-row.is-stacked .shell-project-summary-copy {
+  text-align: left;
+}
+
+.project-lifecycle-reason-list {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.project-lifecycle-reason-item {
+  padding: 10px 12px;
+  border: 1px solid rgba(212, 170, 83, 0.2);
+  border-radius: 12px;
+  background: rgba(212, 170, 83, 0.08);
+  color: rgba(255, 223, 164, 0.88);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.project-lifecycle-dialog-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 6px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.project-lifecycle-dialog-actions .ghost-control {
+  min-height: 30px;
+  padding: 0 10px;
+  gap: 5px;
+  font-size: 11px;
+}
+
+.status-stack-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .shell-main {
@@ -1502,6 +1658,22 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
+}
+
+.ghost-control.is-active {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.09);
+  color: var(--text-primary);
+}
+
+.ghost-control.is-danger {
+  color: rgba(231, 154, 154, 0.82);
+}
+
+.ghost-control.is-danger:hover:not(:disabled) {
+  background: rgba(227, 113, 113, 0.1);
+  border-color: transparent;
+  color: #ffd2d2;
 }
 
 .icon-ghost-control.is-danger {
@@ -6356,17 +6528,22 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .assistant-chat-compose-shell {
-  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  column-gap: 10px;
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.022);
-  padding: 10px 52px 10px 12px;
+  padding: 10px 12px;
 }
 
 .assistant-chat-input {
+  grid-column: 1;
   width: 100%;
   min-height: 72px;
   max-height: 180px;
+  margin: 0;
   border: none;
   background: transparent;
   color: var(--text-primary);
@@ -6383,18 +6560,19 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .assistant-chat-send-button {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
+  grid-column: 2;
+  align-self: end;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 34px;
   height: 34px;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-primary);
+  cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
 }
 

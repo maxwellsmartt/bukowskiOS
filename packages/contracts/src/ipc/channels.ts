@@ -80,6 +80,7 @@ export const ipcChannels = {
   projects: {
     getList: "bukowskiProjects:getList",
     getDetail: "bukowskiProjects:getDetail",
+    getDeletePreview: "bukowskiProjects:getDeletePreview",
     getCatalog: "bukowskiProjects:getCatalog",
     getStagingPackingSlips: "bukowskiProjects:getStagingPackingSlips",
     getCreationConflicts: "bukowskiProjects:getCreationConflicts",
@@ -87,6 +88,8 @@ export const ipcChannels = {
     createBlueprint: "bukowskiProjects:createBlueprint",
     exportBlueprintPdf: "bukowskiProjects:exportBlueprintPdf",
     update: "bukowskiProjects:update",
+    archive: "bukowskiProjects:archive",
+    unarchive: "bukowskiProjects:unarchive",
     delete: "bukowskiProjects:delete",
     createUnit: "bukowskiProjects:createUnit",
     updateUnit: "bukowskiProjects:updateUnit",

@@ -1,12 +1,14 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
+  ArchiveProjectInput,
   AssignCrewToProjectUnitInput,
   CreateProjectBlueprintInput,
   CreateProjectInput,
   CreateProjectUnitInput,
   DeleteProjectInput,
   DeleteProjectUnitInput,
+  UnarchiveProjectInput,
   UnassignCrewFromProjectUnitInput,
   UpdateProjectInput,
   UpdateProjectUnitInput,
@@ -616,8 +618,8 @@ const getProjectRelationCount = (db: DatabaseSync, projectId: string) => {
   );
 };
 
-const getProjectOperationalRelationCount = (db: DatabaseSync, projectId: string) => {
-  const relationCounts = db
+const getProjectOperationalRelationSummary = (db: DatabaseSync, projectId: string) =>
+  db
     .prepare(
       `
         SELECT
@@ -637,6 +639,9 @@ const getProjectOperationalRelationCount = (db: DatabaseSync, projectId: string)
     finance_count: number;
     collaborator_fee_count: number;
   };
+
+const getProjectOperationalRelationCount = (db: DatabaseSync, projectId: string) => {
+  const relationCounts = getProjectOperationalRelationSummary(db, projectId);
 
   return (
     relationCounts.current_asset_count +
@@ -684,7 +689,7 @@ const getProjectRow = (db: DatabaseSync, projectId: string) =>
   db
     .prepare(
       `
-        SELECT id, start_date, end_date, color_key, description, status
+        SELECT id, start_date, end_date, color_key, description, status, archived_at
              , production_company_id, production_company_name, has_preproduction, preproduction_start_date, preproduction_end_date
         FROM projects
         WHERE id = ?
@@ -699,6 +704,7 @@ const getProjectRow = (db: DatabaseSync, projectId: string) =>
         color_key: string | null;
         description: string | null;
         status: string;
+        archived_at: string | null;
         production_company_id: string | null;
         production_company_name: string | null;
         has_preproduction: number;
@@ -753,6 +759,10 @@ const ensureProjectExists = (db: DatabaseSync, projectId: string) => {
   }
 
   return project;
+};
+
+type ProjectMutationServiceOptions = {
+  createBackupBeforeDelete?: () => void;
 };
 
 const ensureProjectUnitExists = (db: DatabaseSync, projectId: string, unitId: string) => {
@@ -876,7 +886,7 @@ export const ensureProjectShellDefaults = (db: DatabaseSync) => {
   }
 };
 
-export const createProjectMutationService = (db: DatabaseSync) => ({
+export const createProjectMutationService = (db: DatabaseSync, options: ProjectMutationServiceOptions = {}) => ({
   createProject(input: CreateProjectInput) {
     const code = ensureValue(input.code, "Project code").toUpperCase();
     const name = ensureValue(input.name, "Project name");
@@ -1179,6 +1189,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
             LEFT JOIN project_unit_windows ON project_unit_windows.project_unit_id = project_units.id
             WHERE asset_current_state.asset_id IN (${placeholders})
               AND asset_current_state.current_project_id IS NOT NULL
+              AND projects.archived_at IS NULL
           `,
         )
         .all(...conflictingProjectsByAsset) as Array<{
@@ -1233,6 +1244,7 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
             LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
             LEFT JOIN departments ON departments.id = project_unit_crew_assignments.department_id
             WHERE project_unit_crew_assignments.crew_member_id IN (${placeholders})
+              AND projects.archived_at IS NULL
           `,
         )
         .all(...crewAssignmentDrafts.map((assignment) => assignment.crewMemberId)) as Array<{
@@ -1802,12 +1814,57 @@ export const createProjectMutationService = (db: DatabaseSync) => ({
     }
   },
 
+  archiveProject(input: ArchiveProjectInput) {
+    const project = ensureProjectExists(db, input.projectId);
+
+    if (project.archived_at) {
+      return;
+    }
+
+    db.prepare("UPDATE projects SET archived_at = ?, updated_at = ? WHERE id = ?").run(
+      new Date().toISOString(),
+      new Date().toISOString(),
+      input.projectId,
+    );
+  },
+
+  unarchiveProject(input: UnarchiveProjectInput) {
+    const project = ensureProjectExists(db, input.projectId);
+
+    if (!project.archived_at) {
+      return;
+    }
+
+    db.prepare("UPDATE projects SET archived_at = NULL, updated_at = ? WHERE id = ?").run(
+      new Date().toISOString(),
+      input.projectId,
+    );
+  },
+
   deleteProject(input: DeleteProjectInput) {
-    ensureProjectExists(db, input.projectId);
+    const project = ensureProjectExists(db, input.projectId);
     const relationCount = getProjectOperationalRelationCount(db, input.projectId);
 
+    if (!input.confirmedWithBackup) {
+      throw new Error("Hard delete requires explicit backup confirmation.");
+    }
+
+    if (project.status === "Active") {
+      throw new Error("Active projects cannot be hard-deleted. Archive the project instead.");
+    }
+
+    if (!project.archived_at) {
+      throw new Error("Archive the project before hard delete.");
+    }
+
     if (relationCount > 0) {
-      throw new Error("This project already has linked operational records and cannot be deleted yet.");
+      throw new Error("This project has linked operational history and can only be archived.");
+    }
+
+    try {
+      options.createBackupBeforeDelete?.();
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : "The local backup could not be created.");
     }
 
     db.exec("BEGIN");

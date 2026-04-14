@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+  archiveProjectSchema,
   archiveAssetSchema,
   assignAgentModelSchema,
   assignCrewToProjectUnitSchema,
@@ -48,6 +49,7 @@ import {
   setAgentApprovalModeSchema,
   setAgentStatusSchema,
   testAiProviderConnectionSchema,
+  unarchiveProjectSchema,
   unassignCrewFromProjectUnitSchema,
   updateAgentSchema,
   updateAssetSchema,
@@ -72,6 +74,7 @@ import type {
   DeleteAssistantThreadCommand,
   CreateAgentCommand,
   ArchiveAssetCommand,
+  ArchiveProjectInput,
   CreateDraftRunFromChatCommand,
   RecordRuntimeErrorCommand,
   ReviewAgentRunCommand,
@@ -113,6 +116,7 @@ import type {
   ScheduleTimelineRange,
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
+  UnarchiveProjectInput,
   UnassignCrewFromProjectUnitInput,
   PreviewCatalogCsvImportInput,
   ImportCatalogCsvInput,
@@ -146,6 +150,8 @@ type RegisterFoundationIpcOptions = {
     createProject: (input: CreateProjectInput) => void;
     createProjectBlueprint: (input: CreateProjectBlueprintInput) => void;
     updateProject: (input: UpdateProjectInput) => void;
+    archiveProject: (input: ArchiveProjectInput) => void;
+    unarchiveProject: (input: UnarchiveProjectInput) => void;
     deleteProject: (input: DeleteProjectInput) => void;
     createProjectUnit: (input: CreateProjectUnitInput) => void;
     updateProjectUnit: (input: UpdateProjectUnitInput) => void;
@@ -569,6 +575,12 @@ export const registerFoundationIpc = ({
     (_event, projectId: string) => foundationReads.getProjectDetail(projectId),
     "The app could not load that project.",
   );
+  safeHandleReadWithSchema(
+    ipcChannels.projects.getDeletePreview,
+    idReadArgsSchema,
+    (_event, projectId: string) => foundationReads.getProjectDeletePreview(projectId),
+    "The app could not load that project lifecycle preview.",
+  );
   safeHandleRead(ipcChannels.projects.getCatalog, () => foundationReads.getCatalogSnapshot(), "The app could not load the catalog.");
   safeHandle(ipcChannels.projects.create, createProjectSchema, (_event, input) => {
     projectMutations.createProject(input);
@@ -626,6 +638,14 @@ export const registerFoundationIpc = ({
   safeHandle(ipcChannels.projects.update, updateProjectSchema, (_event, input) => {
     projectMutations.updateProject(input);
     return foundationReads.getProjects();
+  });
+  safeHandle(ipcChannels.projects.archive, archiveProjectSchema, (_event, input) => {
+    projectMutations.archiveProject(input);
+    return foundationReads.getProjects({ search: "", sortBy: "name", sortDirection: "asc", includeArchived: true });
+  });
+  safeHandle(ipcChannels.projects.unarchive, unarchiveProjectSchema, (_event, input) => {
+    projectMutations.unarchiveProject(input);
+    return foundationReads.getProjects({ search: "", sortBy: "name", sortDirection: "asc", includeArchived: true });
   });
   safeHandle(ipcChannels.projects.delete, deleteProjectSchema, (_event, input) => {
     projectMutations.deleteProject(input);

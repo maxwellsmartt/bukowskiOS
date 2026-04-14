@@ -34,6 +34,7 @@ import { cleanupPerformanceFoundationData, seedPerformanceFoundationData } from 
 import { seedFoundationData } from "./foundationSeed";
 import { bootstrapLegacyRentmanDemo } from "./legacyRentmanDemo";
 import {
+  applyProjectArchiveFoundationMigration,
   applyProjectCreationWizardFoundationMigration,
   applyProjectDepartmentsMatrixFoundationMigration,
   applyProjectUnitWindowsFoundationMigration,
@@ -161,6 +162,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   applyTrackedStep(database, "runtime_project_creation_wizard_v1", () =>
     applyProjectCreationWizardFoundationMigration(database),
   );
+  applyTrackedStep(database, "runtime_project_archive_v1", () => applyProjectArchiveFoundationMigration(database));
   applyTrackedStep(database, "runtime_project_unit_windows_v1", () => applyProjectUnitWindowsFoundationMigration(database));
   applyTrackedStep(database, "runtime_project_departments_matrix_v1", () =>
     applyProjectDepartmentsMatrixFoundationMigration(database),
@@ -388,7 +390,11 @@ const createRuntime = (): LocalDatabaseRuntime => {
     foundationReads,
     agentReads,
     assistantChatService,
-    projectMutations: createProjectMutationService(database),
+    projectMutations: createProjectMutationService(database, {
+      createBackupBeforeDelete: () => {
+        createDatabaseBackup(database, backupPath);
+      },
+    }),
     catalogMutations: createCatalogMutationService(database),
     assetMutations: createAssetMutationService(database),
     incidentMutations: createIncidentMutationService(database),

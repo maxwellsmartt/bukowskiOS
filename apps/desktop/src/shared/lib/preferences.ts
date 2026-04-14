@@ -13,6 +13,7 @@ export const uiPreferenceKeys = {
   overviewTimelineScale: "overview-timeline-scale",
   recentEntityKeys: "recent-entity-keys",
   shellSidebarWidth: "shell-sidebar-width",
+  shellProjectsShowArchived: "shell-projects-show-archived",
 } as const;
 
 const buildPreferenceKey = (key: string) => `bukowski:${key}`;

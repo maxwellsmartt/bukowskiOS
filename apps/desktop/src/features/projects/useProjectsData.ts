@@ -1,4 +1,5 @@
 import type {
+  ArchiveProjectInput,
   AssignCrewToProjectUnitInput,
   CatalogCsvImportPreview,
   CatalogCsvImportResult,
@@ -12,9 +13,11 @@ import type {
   ImportCatalogCsvInput,
   PreviewCatalogCsvImportInput,
   DeleteProjectUnitInput,
+  ProjectDeletePreview,
   ProjectCreationConflictsSnapshot,
   ProjectListQuery,
   StagingPackingSlipRow,
+  UnarchiveProjectInput,
   UnassignCrewFromProjectUnitInput,
   UpdateCatalogEntityInput,
   UpdateProjectUnitInput,
@@ -88,7 +91,7 @@ export const useProjectsRegistry = (query: ProjectListQuery = defaultProjectList
       return window.bukowskiProjects.getList(query);
     },
     emptyProjects,
-    [query.search, query.sortBy, query.sortDirection],
+    [query.includeArchived, query.search, query.sortBy, query.sortDirection],
   );
 
 export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery) =>
@@ -261,6 +264,30 @@ export const getProjectCreationConflicts = async (
   }
 
   return window.bukowskiProjects.getCreationConflicts(input);
+};
+
+export const getProjectDeletePreview = async (projectId: string): Promise<ProjectDeletePreview> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.getDeletePreview(projectId);
+};
+
+export const archiveProject = async (input: ArchiveProjectInput): Promise<ProjectCardRow[]> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.archive(input);
+};
+
+export const unarchiveProject = async (input: UnarchiveProjectInput): Promise<ProjectCardRow[]> => {
+  if (!window.bukowskiProjects) {
+    throw new Error("Projects bridge unavailable");
+  }
+
+  return window.bukowskiProjects.unarchive(input);
 };
 
 export const exportProjectBlueprintPdf = async (input: CreateProjectBlueprintInput) => {

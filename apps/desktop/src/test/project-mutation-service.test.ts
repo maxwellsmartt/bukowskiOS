@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
@@ -11,10 +11,11 @@ describe("project mutation service", () => {
     packingSeed: { mode: "none" as const },
   });
 
-  it("creates, updates and deletes standalone sidebar projects", () => {
+  it("creates, updates, archives and deletes standalone sidebar projects", () => {
     const { cleanup, database } = createTestDatabase("bukowski-project-test");
     const reads = createFoundationReadService(database);
-    const mutations = createProjectMutationService(database);
+    const backupSpy = vi.fn();
+    const mutations = createProjectMutationService(database, { createBackupBeforeDelete: backupSpy });
     const catalog = reads.getCatalogSnapshot();
     const internalClient = catalog.clients.find((client) => client.name === "Internal");
 
@@ -40,7 +41,13 @@ describe("project mutation service", () => {
     expect(createdProject?.name).toBe("Renamed Project");
     expect(createdProject?.client).toBe("Partner");
 
-    mutations.deleteProject({ projectId: createdProject!.id });
+    mutations.archiveProject({ projectId: createdProject!.id });
+
+    expect(reads.getProjects().some((project) => project.code === "TEST")).toBe(false);
+    expect(reads.getProjects({ search: "", sortBy: "name", sortDirection: "asc", includeArchived: true }).some((project) => project.code === "TEST" && project.isArchived)).toBe(true);
+
+    mutations.deleteProject({ projectId: createdProject!.id, confirmedWithBackup: true });
+    expect(backupSpy).toHaveBeenCalledTimes(1);
 
     expect(reads.getProjects().some((project) => project.code === "TEST")).toBe(false);
 
@@ -167,7 +174,8 @@ describe("project mutation service", () => {
   it("deletes structural blueprint projects when they have no operational records yet", () => {
     const { cleanup, database } = createTestDatabase("bukowski-project-blueprint-delete-test");
     const reads = createFoundationReadService(database);
-    const mutations = createProjectMutationService(database);
+    const backupSpy = vi.fn();
+    const mutations = createProjectMutationService(database, { createBackupBeforeDelete: backupSpy });
 
     mutations.createProjectBlueprint({
       generalInfo: {
@@ -211,7 +219,9 @@ describe("project mutation service", () => {
     const createdProject = reads.getProjects().find((project) => project.name === "Delete Me Blueprint");
     expect(createdProject).toBeTruthy();
 
-    mutations.deleteProject({ projectId: createdProject!.id });
+    mutations.archiveProject({ projectId: createdProject!.id });
+    mutations.deleteProject({ projectId: createdProject!.id, confirmedWithBackup: true });
+    expect(backupSpy).toHaveBeenCalledTimes(1);
 
     expect(reads.getProjects().some((project) => project.id === createdProject!.id)).toBe(false);
 
@@ -364,6 +374,57 @@ describe("project mutation service", () => {
     const timelineProject = timeline.projects.find((row) => row.id === project!.id);
     expect(timelineProject?.segments.some((segment) => segment.kind === "preproduction")).toBe(true);
     expect(timelineProject?.units[0]?.segments).toHaveLength(3);
+
+    cleanup();
+  });
+
+  it("blocks hard delete while a project is active", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-active-delete-test");
+    const mutations = createProjectMutationService(database, { createBackupBeforeDelete: vi.fn() });
+
+    expect(() => mutations.deleteProject({ projectId: "project-aurora", confirmedWithBackup: true })).toThrow(
+      "Active projects cannot be hard-deleted. Archive the project instead.",
+    );
+
+    cleanup();
+  });
+
+  it("blocks hard delete until the project is archived", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-needs-archive-delete-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database, { createBackupBeforeDelete: vi.fn() });
+    const catalog = reads.getCatalogSnapshot();
+
+    mutations.createProject({
+      code: "SHELL",
+      name: "Shell Only",
+      clientId: catalog.clients[0]?.id,
+    });
+
+    const project = reads.getProjects().find((row) => row.code === "SHELL");
+    expect(() => mutations.deleteProject({ projectId: project!.id, confirmedWithBackup: true })).toThrow(
+      "Archive the project before hard delete.",
+    );
+
+    cleanup();
+  });
+
+  it("blocks hard delete when operational history exists", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-operational-delete-test");
+    const mutations = createProjectMutationService(database, { createBackupBeforeDelete: vi.fn() });
+
+    mutations.updateProject({
+      projectId: "project-aurora",
+      code: "AURORA",
+      name: "Aurora Campaign",
+      status: "Wrapped",
+      description: "Archive eligibility test",
+    });
+    mutations.archiveProject({ projectId: "project-aurora" });
+
+    expect(() => mutations.deleteProject({ projectId: "project-aurora", confirmedWithBackup: true })).toThrow(
+      "This project has linked operational history and can only be archived.",
+    );
 
     cleanup();
   });

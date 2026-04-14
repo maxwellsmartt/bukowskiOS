@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
+import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("foundation read service", () => {
@@ -80,6 +81,30 @@ describe("foundation read service", () => {
     expect(pagedTimeline.visibleProjects).toBe(1);
     expect(pagedTimeline.totalProjects).toBeGreaterThanOrEqual(pagedTimeline.visibleProjects);
     expect(pagedTimeline.hasMoreProjects).toBe(pagedTimeline.totalProjects > pagedTimeline.offset + pagedTimeline.visibleProjects);
+
+    cleanup();
+  });
+
+  it("hides archived projects from default lists and timeline until explicitly included", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-foundation-archived-projects");
+    const reads = createFoundationReadService(database);
+    const mutations = createProjectMutationService(database, { createBackupBeforeDelete: () => undefined });
+
+    expect(reads.getProjects().some((project) => project.id === "project-aurora")).toBe(true);
+    expect(reads.getScheduleTimeline("90d", "week").projects.some((project) => project.id === "project-aurora")).toBe(true);
+
+    mutations.archiveProject({ projectId: "project-aurora" });
+
+    expect(reads.getProjects().some((project) => project.id === "project-aurora")).toBe(false);
+    expect(
+      reads.getProjects({ search: "", sortBy: "name", sortDirection: "asc", includeArchived: true }).some((project) => project.id === "project-aurora" && project.isArchived),
+    ).toBe(true);
+    expect(reads.getScheduleTimeline("90d", "week").projects.some((project) => project.id === "project-aurora")).toBe(false);
+
+    mutations.unarchiveProject({ projectId: "project-aurora" });
+
+    expect(reads.getProjects().some((project) => project.id === "project-aurora")).toBe(true);
+    expect(reads.getScheduleTimeline("90d", "week").projects.some((project) => project.id === "project-aurora")).toBe(true);
 
     cleanup();
   });

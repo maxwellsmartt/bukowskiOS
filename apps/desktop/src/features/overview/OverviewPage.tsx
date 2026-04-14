@@ -4,6 +4,7 @@ import type { ScheduleTimelineRange, ScheduleTimelineScale } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useShellContext } from "@shared/hooks/useShellContext";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 import { OverviewScheduleTimeline } from "./OverviewScheduleTimeline";
@@ -30,7 +31,8 @@ const isTimelineScale = (value: string | null): value is ScheduleTimelineScale =
   value === "day" || value === "week" || value === "month";
 
 const OverviewContent = () => {
-  const { data, error } = useOverviewSnapshot();
+  const { projectDataVersion } = useShellContext();
+  const { data, error } = useOverviewSnapshot(projectDataVersion);
   const [timelineRange, setTimelineRange] = useState<ScheduleTimelineRange>(() => {
     const storedValue = readStringPreference(uiPreferenceKeys.overviewTimelineRange, "90d");
     return isTimelineRange(storedValue) ? storedValue : "90d";
@@ -48,6 +50,7 @@ const OverviewContent = () => {
     timelineScale,
     timelineAnchorDate,
     { limit: timelineProjectLimit, offset: 0 },
+    projectDataVersion,
   );
   const operationalCards = [
     data.cards.overdueReturns,

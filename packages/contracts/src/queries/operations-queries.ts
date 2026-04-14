@@ -139,6 +139,8 @@ export type ProjectCardRow = {
   productionCompanyId: string | null;
   productionCompany: string;
   status: string;
+  isArchived: boolean;
+  archivedAt: string | null;
   startDate: string | null;
   endDate: string | null;
   hasPreproduction: boolean;
@@ -172,6 +174,28 @@ export type ProjectListQuery = {
   search?: string;
   sortBy: ProjectSortField;
   sortDirection: ListSortDirection;
+  includeArchived?: boolean;
+};
+
+export type ProjectDeletePreview = {
+  projectId: string;
+  name: string;
+  status: string;
+  isArchived: boolean;
+  archivedAt: string | null;
+  canArchive: boolean;
+  canUnarchive: boolean;
+  canHardDelete: boolean;
+  backupWillRun: boolean;
+  hardDeleteBlockedReasons: string[];
+  operationalRelationSummary: {
+    currentAssetCount: number;
+    assignmentCount: number;
+    incidentCount: number;
+    packingCount: number;
+    financeCount: number;
+    collaboratorFeeCount: number;
+  };
 };
 
 export type CatalogLocationRow = {

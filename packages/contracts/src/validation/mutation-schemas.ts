@@ -391,6 +391,19 @@ export const projectBlueprintGeneralInfoSchema = z
 export const deleteProjectSchema = z
   .object({
     projectId: nonEmptyString,
+    confirmedWithBackup: z.literal(true),
+  })
+  .strict();
+
+export const archiveProjectSchema = z
+  .object({
+    projectId: nonEmptyString,
+  })
+  .strict();
+
+export const unarchiveProjectSchema = z
+  .object({
+    projectId: nonEmptyString,
   })
   .strict();
 

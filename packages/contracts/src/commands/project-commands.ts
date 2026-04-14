@@ -35,6 +35,15 @@ export type UpdateProjectInput = {
 
 export type DeleteProjectInput = {
   projectId: string;
+  confirmedWithBackup: true;
+};
+
+export type ArchiveProjectInput = {
+  projectId: string;
+};
+
+export type UnarchiveProjectInput = {
+  projectId: string;
 };
 
 export type CreateProjectUnitInput = {

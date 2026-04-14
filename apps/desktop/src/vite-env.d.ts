@@ -13,6 +13,7 @@ import type {
   AgentRosterRow,
   AgentRunRow,
   ArchiveAssetCommand,
+  ArchiveProjectInput,
   AssetListQuery,
   AssignAgentModelCommand,
   AssignCrewToProjectUnitInput,
@@ -76,6 +77,7 @@ import type {
   PackingSlipRow,
   ProjectCardRow,
   ProjectCreationConflictsSnapshot,
+  ProjectDeletePreview,
   ProjectDetailSnapshot,
   ProjectListQuery,
   ReportIncidentCommand,
@@ -111,6 +113,7 @@ import type {
   UpdateProjectUnitInput,
   UpdateRmaCaseCommand,
   StagingPackingSlipRow,
+  UnarchiveProjectInput,
 } from "@contracts";
 
 declare global {
@@ -200,6 +203,7 @@ declare global {
     bukowskiProjects?: {
       getList: (query?: ProjectListQuery) => Promise<ProjectCardRow[]>;
       getDetail: (projectId: string) => Promise<ProjectDetailSnapshot>;
+      getDeletePreview: (projectId: string) => Promise<ProjectDeletePreview>;
       getCatalog: () => Promise<CatalogSnapshot>;
       getStagingPackingSlips: () => Promise<StagingPackingSlipRow[]>;
       getCreationConflicts: (input: CreateProjectBlueprintInput) => Promise<ProjectCreationConflictsSnapshot>;
@@ -207,6 +211,8 @@ declare global {
       createBlueprint: (input: CreateProjectBlueprintInput) => Promise<ProjectCardRow[]>;
       exportBlueprintPdf: (input: CreateProjectBlueprintInput) => Promise<AppExportResult>;
       update: (input: UpdateProjectInput) => Promise<ProjectCardRow[]>;
+      archive: (input: ArchiveProjectInput) => Promise<ProjectCardRow[]>;
+      unarchive: (input: UnarchiveProjectInput) => Promise<ProjectCardRow[]>;
       remove: (input: DeleteProjectInput) => Promise<ProjectCardRow[]>;
       createUnit: (input: CreateProjectUnitInput) => Promise<ProjectDetailSnapshot>;
       updateUnit: (input: UpdateProjectUnitInput) => Promise<ProjectDetailSnapshot>;

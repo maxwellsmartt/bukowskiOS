@@ -29,6 +29,7 @@ const projectSortOptions: Array<ListSortOption<ProjectSortField>> = [
 ];
 
 export const ProjectsPage = () => {
+  const [showArchived, setShowArchived] = useState(false);
   const projectControls = useListControls<ProjectSortField, ProjectListQuery>({
     viewKey: "projects-registry-list",
     defaults: {
@@ -51,10 +52,11 @@ export const ProjectsPage = () => {
       search,
       sortBy,
       sortDirection,
+      includeArchived: showArchived,
     }),
   });
   const { data, error } = useProjectsRegistry(projectControls.query);
-  const { activeProjectId, openProject, setActiveProjectId } = useShellContext();
+  const { activeProjectId, openProject, setActiveProjectId, setShowArchivedProjects } = useShellContext();
   const { addItems, hasItem } = useCompareTray();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = useProjectDetail(activeProjectId);
@@ -68,6 +70,9 @@ export const ProjectsPage = () => {
       <div className="chip-row">
         <StatusBadge tone="success">{data.filter((project) => hasItem("project", project.id)).length} in compare</StatusBadge>
         {selectedRowIds.length ? <StatusBadge>{`${selectedRowIds.length} selected`}</StatusBadge> : null}
+        <button className={`ghost-control${showArchived ? " is-active" : ""}`} onClick={() => setShowArchived((current) => !current)} type="button">
+          {showArchived ? "Hide archived" : "Show archived"}
+        </button>
       </div>
 
       {selectedRowIds.length ? (
@@ -138,9 +143,14 @@ export const ProjectsPage = () => {
               {
                 key: "status",
                 label: "Status",
-                width: 96,
+                width: 132,
                 minWidth: 86,
-                render: (row) => <StatusBadge>{row.status}</StatusBadge>,
+                render: (row) => (
+                  <div className="status-stack-cell">
+                    <StatusBadge>{row.status}</StatusBadge>
+                    {row.isArchived ? <StatusBadge tone="warning">Archived</StatusBadge> : null}
+                  </div>
+                ),
               },
               {
                 key: "startDate",
@@ -187,7 +197,13 @@ export const ProjectsPage = () => {
             getRowId={(row) => row.id}
             maxHeight="min(72vh, 760px)"
             onRowClick={(row) => setActiveProjectId(row.id)}
-            onRowDoubleClick={(row) => openProject(row.id)}
+            onRowDoubleClick={(row) => {
+              if (row.isArchived) {
+                setShowArchivedProjects(true);
+              }
+
+              openProject(row.id);
+            }}
             onSortRequest={projectControls.handleColumnSortRequest}
             persistKey="projects-registry"
             rows={data}

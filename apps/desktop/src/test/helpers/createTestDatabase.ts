@@ -13,6 +13,7 @@ import {
 import { seedFoundationData } from "../../../electron/main/services/data/foundationSeed";
 import { bootstrapLegacyRentmanDemo } from "../../../electron/main/services/data/legacyRentmanDemo";
 import { applyCrewCatalogFoundationMigration } from "../../../electron/main/services/data/crewCatalogFoundationBootstrap";
+import { applyProjectArchiveFoundationMigration } from "../../../electron/main/services/data/projectCreationWizardFoundationBootstrap";
 import { ensureProjectShellDefaults } from "../../../electron/main/services/data/projectMutationService";
 import {
   applySchedulingFoundationMigration,
@@ -35,6 +36,7 @@ export const createTestDatabase = (prefix: string): TestDatabase => {
   applyTrackedSqlMigrations(database, foundationMigrations);
   applyTrackedStep(database, "runtime_admin_foundation_v1", () => applyAdminFoundationMigration(database));
   applyTrackedStep(database, "runtime_scheduling_foundation_v1", () => applySchedulingFoundationMigration(database));
+  applyTrackedStep(database, "runtime_project_archive_v1", () => applyProjectArchiveFoundationMigration(database));
   applyTrackedStep(database, "runtime_crew_catalog_foundation_v1", () => applyCrewCatalogFoundationMigration(database));
   applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database));
   applyTrackedStep(database, "runtime_operational_files_v2", () => applyOperationalFilesMigration(database));

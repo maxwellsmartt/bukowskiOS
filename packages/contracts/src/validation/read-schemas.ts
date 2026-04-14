@@ -135,6 +135,7 @@ export const projectListQuerySchema = z.object({
   search: boundedSearch.optional(),
   sortBy: projectSortFieldSchema,
   sortDirection: sortDirectionSchema,
+  includeArchived: z.boolean().optional(),
 });
 
 export const projectListReadArgsSchema = z.tuple([projectListQuerySchema.optional()]);

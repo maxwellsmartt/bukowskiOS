@@ -6,6 +6,7 @@ import type {
   OverviewMetric,
   ProjectCardRow,
   ProjectCreationConflictsSnapshot,
+  ProjectDeletePreview,
   ProjectDetailAssetRow,
   ProjectDetailIncidentRow,
   ProjectDetailSnapshot,
@@ -144,6 +145,57 @@ const summarizeUnitConflicts = (crewConflictCount: number, assetConflictCount: n
   } satisfies UnitConflictSnapshot;
 };
 
+const getProjectOperationalRelationSummary = (db: DatabaseSync, projectId: string) =>
+  db
+    .prepare(
+      `
+        SELECT
+          COALESCE((
+            SELECT COUNT(*)
+            FROM asset_current_state
+            WHERE asset_current_state.current_project_id = projects.id
+          ), 0) AS current_asset_count,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM asset_assignments
+            WHERE asset_assignments.project_id = projects.id
+          ), 0) AS assignment_count,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM incidents
+            WHERE incidents.project_id = projects.id
+          ), 0) AS incident_count,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM packing_slips
+            WHERE packing_slips.project_id = projects.id
+          ), 0) AS packing_count,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM financial_entries
+            WHERE financial_entries.project_id = projects.id
+          ), 0) AS finance_count,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM collaborator_fees
+            WHERE collaborator_fees.project_id = projects.id
+          ), 0) AS collaborator_fee_count
+        FROM projects
+        WHERE projects.id = ?
+        LIMIT 1
+      `,
+    )
+    .get(projectId) as
+    | {
+        current_asset_count: number;
+        assignment_count: number;
+        incident_count: number;
+        packing_count: number;
+        finance_count: number;
+        collaborator_fee_count: number;
+      }
+    | undefined;
+
 const activeProjectStatuses = new Set(["Prep", "Active", "On hold"]);
 
 const resolveBlueprintWindowBounds = (
@@ -265,6 +317,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           LEFT JOIN clients ON clients.id = projects.client_id
           LEFT JOIN project_units ON project_units.project_id = projects.id
             AND COALESCE(project_units.is_primary, 0) = 0
+          WHERE projects.archived_at IS NULL
           ORDER BY projects.name, project_units.sort_order, project_units.start_date, project_units.name
         `,
       )
@@ -528,6 +581,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
             JOIN projects ON projects.id = project_units.project_id
             LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
+            WHERE projects.archived_at IS NULL
             ORDER BY project_units.project_id, project_units.sort_order, crew_members.full_name
           `,
         )
@@ -817,6 +871,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             projects.production_company_id,
             COALESCE(production_companies.name, projects.production_company_name, '—') AS production_company_name,
             projects.status,
+            projects.archived_at,
             projects.start_date,
             projects.end_date,
             projects.has_preproduction,
@@ -871,9 +926,10 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           FROM projects
           LEFT JOIN clients ON clients.id = projects.client_id
           LEFT JOIN production_companies ON production_companies.id = projects.production_company_id
+          WHERE (? = 1 OR projects.archived_at IS NULL)
         `,
       )
-      .all() as Array<{
+      .all(query.includeArchived ? 1 : 0) as Array<{
       id: string;
       code: string;
       name: string;
@@ -882,6 +938,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       production_company_id: string | null;
       production_company_name: string;
       status: string;
+      archived_at: string | null;
       start_date: string | null;
       end_date: string | null;
       has_preproduction: number;
@@ -908,6 +965,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         productionCompanyId: row.production_company_id,
         productionCompany: row.production_company_name,
         status: row.status,
+        isArchived: Boolean(row.archived_at),
+        archivedAt: row.archived_at,
         startDate: row.start_date,
         endDate: row.end_date,
         hasPreproduction: Boolean(row.has_preproduction),
@@ -934,6 +993,85 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
     ).map(({ exposureValue: _exposureValue, createdAt: _createdAt, updatedAt: _updatedAt, ...row }) => row);
   },
 
+  getProjectDeletePreview(projectId: string): ProjectDeletePreview {
+    const project = db
+      .prepare(
+        `
+          SELECT
+            id,
+            name,
+            status,
+            archived_at
+          FROM projects
+          WHERE id = ?
+          LIMIT 1
+        `,
+      )
+      .get(projectId) as
+      | {
+          id: string;
+          name: string;
+          status: string;
+          archived_at: string | null;
+        }
+      | undefined;
+
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+
+    const relationSummary = getProjectOperationalRelationSummary(db, projectId) ?? {
+      current_asset_count: 0,
+      assignment_count: 0,
+      incident_count: 0,
+      packing_count: 0,
+      finance_count: 0,
+      collaborator_fee_count: 0,
+    };
+    const relationCount =
+      relationSummary.current_asset_count +
+      relationSummary.assignment_count +
+      relationSummary.incident_count +
+      relationSummary.packing_count +
+      relationSummary.finance_count +
+      relationSummary.collaborator_fee_count;
+    const isArchived = Boolean(project.archived_at);
+    const hardDeleteBlockedReasons: string[] = [];
+
+    if (project.status === "Active") {
+      hardDeleteBlockedReasons.push("Active projects must be archived instead of hard-deleted.");
+    }
+
+    if (!isArchived) {
+      hardDeleteBlockedReasons.push("Archive the project before hard delete.");
+    }
+
+    if (relationCount > 0) {
+      hardDeleteBlockedReasons.push("This project has linked operational history and can only be archived.");
+    }
+
+    return {
+      projectId: project.id,
+      name: project.name,
+      status: project.status,
+      isArchived,
+      archivedAt: project.archived_at,
+      canArchive: !isArchived,
+      canUnarchive: isArchived,
+      canHardDelete: hardDeleteBlockedReasons.length === 0,
+      backupWillRun: true,
+      hardDeleteBlockedReasons,
+      operationalRelationSummary: {
+        currentAssetCount: relationSummary.current_asset_count,
+        assignmentCount: relationSummary.assignment_count,
+        incidentCount: relationSummary.incident_count,
+        packingCount: relationSummary.packing_count,
+        financeCount: relationSummary.finance_count,
+        collaboratorFeeCount: relationSummary.collaborator_fee_count,
+      },
+    };
+  },
+
   getProjectDetail(projectId: string): ProjectDetailSnapshot {
     const project = db
       .prepare(
@@ -947,6 +1085,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             projects.production_company_id,
             COALESCE(production_companies.name, projects.production_company_name, '—') AS production_company_name,
             projects.status,
+            projects.archived_at,
             projects.start_date,
             projects.end_date,
             projects.has_preproduction,
@@ -1011,6 +1150,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           production_company_id: string | null;
           production_company_name: string;
           status: string;
+          archived_at: string | null;
           start_date: string | null;
           end_date: string | null;
           has_preproduction: number;
@@ -1442,6 +1582,8 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         productionCompanyId: project.production_company_id,
         productionCompany: project.production_company_name,
         status: project.status,
+        isArchived: Boolean(project.archived_at),
+        archivedAt: project.archived_at,
         startDate: project.start_date,
         endDate: project.end_date,
         hasPreproduction: Boolean(project.has_preproduction),

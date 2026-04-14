@@ -352,6 +352,48 @@
   - `medio`: el supervisor recibe contexto financiero útil, pero todavía no hay inyección especializada equivalente para todos los agentes no financieros
   - `bajo`: el warning de chunking del renderer sigue pendiente fuera de este slice
 
+### Slice PJD1 — Project archive-first lifecycle
+- Estado: `done`
+- Objetivo:
+  - reemplazar el delete directo por un flujo archive-first, con hard delete realmente protegido y sin dejar proyectos archivados contaminando timeline o superficie operativa
+- Área:
+  - backend / frontend
+- Qué cambió:
+  - `projects` ahora tiene archivado persistido con `archived_at`
+  - `ProjectCardRow` y `ProjectDetailSnapshot.project` ahora exponen `isArchived` y `archivedAt`
+  - `ProjectListQuery` soporta `includeArchived`
+  - nuevos comandos y preview:
+    - `archiveProject`
+    - `unarchiveProject`
+    - `getProjectDeletePreview`
+  - `hard delete` ahora solo corre si:
+    - el proyecto no está `Active`
+    - ya está archivado
+    - no tiene historial operativo relevante
+  - antes de cualquier `hard delete`, el backend ejecuta backup local automático
+  - los proyectos archivados salen por defecto de:
+    - sidebar
+    - `Projects page`
+    - timeline
+    - shell bootstrap operativo
+  - sidebar y `Projects page` ahora pueden mostrar archivados con control explícito de visibilidad
+  - el sidebar reemplazó el confirm genérico por un diálogo de lifecycle con:
+    - `Archive`
+    - `Unarchive`
+    - `Hard delete`
+    - razones claras cuando el borrado está bloqueado
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop test -- --run src/test/project-mutation-service.test.ts src/test/foundation-read-service.test.ts`
+  - `corepack pnpm --filter @bukowski/desktop build`
+- Evidencia:
+  - pruebas nuevas cubriendo archive/unarchive, bloqueo de active projects, bloqueo por historial operativo y desaparición/reaparición en timeline
+  - el backend ya no depende de la UI para proteger un `hard delete`
+- Riesgos remanentes:
+  - `medio`: el flujo archive/delete ya es seguro, pero todavía no genera receipts o auditoría dedicada por acción
+  - `medio`: los proyectos archivados ya salen del carril operativo principal, pero si luego se quiere consulta histórica más rica, hará falta una superficie de “archive browser” más explícita
+  - `bajo`: el diálogo del sidebar quedó funcional y claro, pero todavía acepta polish visual y copy fino
+
 ## Fase 3 — UX estructural
 
 ### Slice UX1 — Settings expandido
