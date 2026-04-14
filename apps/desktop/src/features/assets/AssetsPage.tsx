@@ -420,6 +420,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             </button>
             <button
               className="ghost-control"
+              disabled={selectedKitLockedAssets.length > 0}
               onClick={() => {
                 setPackingPanelOpen(true);
                 setActionPanelOpen(false);

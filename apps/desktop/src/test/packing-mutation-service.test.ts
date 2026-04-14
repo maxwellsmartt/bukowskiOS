@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createAssetMutationService } from "../../electron/main/services/data/assetMutationService";
+import { createCatalogMutationService } from "../../electron/main/services/data/catalogMutationService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createPackingMutationService } from "../../electron/main/services/data/packingMutationService";
 import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
@@ -284,6 +285,47 @@ describe("packing mutation service", () => {
     expect(assignment?.assignment_status).toBe("assigned");
     expect(assignment?.returned_at).toBeNull();
     expect(reads.getAssetDetail("asset-legacy-rentman-1").asset?.quantity).toBe(0);
+
+    cleanup();
+  });
+
+  it("blocks issuing kit members individually on packing slips", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-packing-kit-guard-test");
+    const assetMutations = createAssetMutationService(database);
+    const catalogMutations = createCatalogMutationService(database);
+    const packingMutations = createPackingMutationService(database);
+
+    const createdAsset = assetMutations.createAsset({
+      commandId: "cmd-test-packing-kit-member-create",
+      workspaceId: "workspace-metadata",
+      name: "Packing locked monitor",
+      internalCode: "PACKKIT-001",
+      categoryId: "cat-monitors",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Good",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    catalogMutations.createEntity({
+      entityType: "kit",
+      code: "PACKKIT",
+      name: "Packing Guard Kit",
+      assetSelections: [{ assetId: createdAsset.assetId, quantity: 1 }],
+    });
+
+    expect(() =>
+      packingMutations.createPackingSlip({
+        commandId: "cmd-test-packing-kit-block",
+        workspaceId: "workspace-metadata",
+        assetIds: [createdAsset.assetId],
+        assetSelections: [{ assetId: createdAsset.assetId, quantity: 1 }],
+        projectId: "project-aurora",
+        responsibleUserId: "user-paola",
+        actorType: "user",
+        sourceChannel: "desktop",
+      }),
+    ).toThrow("Remove it from the kit");
 
     cleanup();
   });

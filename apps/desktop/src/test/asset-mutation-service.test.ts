@@ -362,6 +362,61 @@ describe("asset mutation service", () => {
     cleanup();
   });
 
+  it("still blocks kit assignment when a kit member is in maintenance", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-kit-maintenance-guard-test");
+    const assetMutations = createAssetMutationService(database);
+    const catalogMutations = createCatalogMutationService(database);
+    const reads = createFoundationReadService(database);
+    const createdAsset = assetMutations.createAsset({
+      commandId: "cmd-test-asset-kit-maintenance-create",
+      workspaceId: "workspace-metadata",
+      name: "Maintenance blocked monitor",
+      internalCode: "KITMAIN-001",
+      categoryId: "cat-monitors",
+      defaultLocationId: "loc-warehouse-a",
+      conditionStatus: "Review",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    catalogMutations.createEntity({
+      entityType: "kit",
+      code: "MAINTKIT",
+      name: "Maintenance Sensitive Kit",
+      assetSelections: [{ assetId: createdAsset.assetId, quantity: 1 }],
+    });
+    const createdKit = reads.getCatalogSnapshot().kits.find((kit) => kit.code === "MAINTKIT");
+
+    database
+      .prepare(
+        `
+          UPDATE asset_current_state
+          SET operational_status = 'maintenance',
+              custody_status = 'maintenance'
+          WHERE asset_id = ?
+        `,
+      )
+      .run(createdAsset.assetId);
+
+    expect(() =>
+      assetMutations.assignMoveAssets({
+        commandId: "cmd-test-asset-kit-maintenance-assign",
+        workspaceId: "workspace-metadata",
+        assetIds: [createdAsset.assetId],
+        assetSelections: [{ assetId: createdAsset.assetId, quantity: 1 }],
+        sourceKitId: createdKit!.id,
+        mode: "assign",
+        projectId: "project-aurora",
+        assignedToUserId: "user-paola",
+        targetLocationId: "loc-video-village",
+        actorType: "user",
+        sourceChannel: "desktop",
+      }),
+    ).toThrow("in maintenance and cannot be assigned right now");
+
+    cleanup();
+  });
+
   it("creates, updates and archives editable assets with scan-ready codes", () => {
     const { cleanup, database } = createTestDatabase("bukowski-asset-mutation-test");
     const reads = createFoundationReadService(database);

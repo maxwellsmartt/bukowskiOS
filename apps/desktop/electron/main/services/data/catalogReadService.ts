@@ -498,7 +498,28 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
             asset_current_state.current_department_id,
             departments.name AS current_department_name,
             asset_current_state.project_unit_id,
-            project_units.name AS current_unit_name
+            project_units.name AS current_unit_name,
+            (
+              SELECT COUNT(*)
+              FROM kit_assets
+              JOIN kits ON kits.id = kit_assets.kit_id
+              WHERE kit_assets.asset_id = assets.id
+                AND kits.is_active = 1
+            ) AS linked_kit_count,
+            COALESCE((
+              SELECT group_concat(kits.code, ',')
+              FROM kit_assets
+              JOIN kits ON kits.id = kit_assets.kit_id
+              WHERE kit_assets.asset_id = assets.id
+                AND kits.is_active = 1
+            ), '') AS linked_kit_codes,
+            COALESCE((
+              SELECT group_concat(kits.name, ',')
+              FROM kit_assets
+              JOIN kits ON kits.id = kit_assets.kit_id
+              WHERE kit_assets.asset_id = assets.id
+                AND kits.is_active = 1
+            ), '') AS linked_kit_names
           FROM assets
           JOIN asset_categories ON asset_categories.id = assets.category_id
           JOIN asset_current_state ON asset_current_state.asset_id = assets.id
@@ -529,6 +550,9 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       current_department_name: string | null;
       project_unit_id: string | null;
       current_unit_name: string | null;
+      linked_kit_count: number;
+      linked_kit_codes: string;
+      linked_kit_names: string;
     }>;
 
     return {
@@ -622,6 +646,8 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         totalQuantity: row.total_quantity,
         assignedQuantity: row.assigned_quantity,
         checkedOutQuantity: row.checked_out_quantity,
+        operationalStatus: row.operational_status,
+        custodyStatus: row.custody_status,
         status: mapAssetStatus(
           row.operational_status,
           row.custody_status,
@@ -635,6 +661,9 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         currentDepartment: row.current_department_name,
         currentUnitId: row.project_unit_id,
         currentUnit: row.current_unit_name,
+        linkedKitCount: row.linked_kit_count,
+        linkedKitCodes: row.linked_kit_codes ? row.linked_kit_codes.split(",").filter(Boolean) : [],
+        linkedKitNames: row.linked_kit_names ? row.linked_kit_names.split(",").filter(Boolean) : [],
       })),
     };
   },

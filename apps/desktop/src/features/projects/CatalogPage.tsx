@@ -595,24 +595,57 @@ export const CatalogPage = () => {
         .filter((asset): asset is AssetAssignSelectionRow => Boolean(asset)),
     [activeKitSelections, assetOptionsById],
   );
-  const activeKitInsufficientMembers = useMemo(
+  const activeKitBlockedMembers = useMemo(
     () =>
       activeKitSelections
         .map((selection) => {
           const asset = assetOptionsById.get(selection.assetId);
-          if (!asset || asset.quantity < selection.quantity) {
+          if (!asset) {
             return {
-              code: asset?.code ?? selection.assetId,
+              code: selection.assetId,
               requested: selection.quantity,
-              available: asset?.quantity ?? 0,
+              available: 0,
+              reason: "missing" as const,
             };
           }
+
+          if (asset.operationalStatus === "maintenance") {
+            return {
+              code: asset.code,
+              requested: selection.quantity,
+              available: asset.quantity,
+              reason: "maintenance" as const,
+            };
+          }
+
+          if (asset.quantity < selection.quantity) {
+            return {
+              code: asset.code,
+              requested: selection.quantity,
+              available: asset.quantity,
+              reason: "stock" as const,
+            };
+          }
+
           return null;
         })
-        .filter((row): row is { code: string; requested: number; available: number } => Boolean(row)),
+        .filter(
+          (
+            row,
+          ): row is { code: string; requested: number; available: number; reason: "missing" | "maintenance" | "stock" } =>
+            Boolean(row),
+        ),
     [activeKitSelections, assetOptionsById],
   );
-  const canAssignActiveKit = Boolean(activeKitRow) && activeKitSelections.length > 0 && activeKitInsufficientMembers.length === 0;
+  const activeKitMaintenanceMembers = useMemo(
+    () => activeKitBlockedMembers.filter((row) => row.reason === "maintenance"),
+    [activeKitBlockedMembers],
+  );
+  const activeKitStockMembers = useMemo(
+    () => activeKitBlockedMembers.filter((row) => row.reason === "stock" || row.reason === "missing"),
+    [activeKitBlockedMembers],
+  );
+  const canAssignActiveKit = Boolean(activeKitRow) && activeKitSelections.length > 0 && activeKitBlockedMembers.length === 0;
   const totalCatalogRecords = useMemo(
     () =>
       data.locations.length +
@@ -1257,6 +1290,11 @@ export const CatalogPage = () => {
                                   ? `${asset.quantity} available · ${asset.assignedQuantity} reserved · ${asset.checkedOutQuantity} out`
                                   : "Availability unavailable"}
                               </span>
+                              {asset?.operationalStatus === "maintenance" ? (
+                                <span className="identity-meta">
+                                  In maintenance. This member blocks operational use of the full kit until it is back in service.
+                                </span>
+                              ) : null}
                             </div>
                             <span className="section-header-context-pill">Qty {selection.quantity}</span>
                           </div>
@@ -1268,9 +1306,21 @@ export const CatalogPage = () => {
                   )}
                 </div>
 
-                {activeKitInsufficientMembers.length ? (
+                {activeKitBlockedMembers.length ? (
                   <div className="action-feedback action-feedback-warning">
-                    This kit cannot be assigned yet. Missing stock for {activeKitInsufficientMembers.map((row) => `${row.code} (${row.available}/${row.requested})`).join(", ")}.
+                    {activeKitMaintenanceMembers.length ? (
+                      <span>
+                        This kit is blocked because these members are in maintenance:{" "}
+                        {activeKitMaintenanceMembers.map((row) => row.code).join(", ")}.
+                        {" "}Return them to ready state before using the full kit.
+                      </span>
+                    ) : null}
+                    {activeKitMaintenanceMembers.length && activeKitStockMembers.length ? <span> </span> : null}
+                    {activeKitStockMembers.length ? (
+                      <span>
+                        Missing stock for {activeKitStockMembers.map((row) => `${row.code} (${row.available}/${row.requested})`).join(", ")}.
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
 

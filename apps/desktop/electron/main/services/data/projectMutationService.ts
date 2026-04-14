@@ -179,6 +179,44 @@ const ensureDepartmentIdsExist = (db: DatabaseSync, departmentIds: string[], lab
   departmentIds.forEach((departmentId) => ensureDepartmentExists(db, departmentId, label));
 };
 
+const ensureAssetsAreNotLockedInActiveKits = (db: DatabaseSync, assetIds: string[], label: string) => {
+  if (!assetIds.length) {
+    return;
+  }
+
+  const memberships = db
+    .prepare(
+      `
+        SELECT
+          assets.name AS asset_name,
+          kits.code AS kit_code,
+          kits.name AS kit_name
+        FROM kit_assets
+        JOIN kits ON kits.id = kit_assets.kit_id
+        JOIN assets ON assets.id = kit_assets.asset_id
+        WHERE kits.is_active = 1
+          AND kit_assets.asset_id IN (${assetIds.map(() => "?").join(", ")})
+        ORDER BY kits.name, kits.code
+        LIMIT 1
+      `,
+    )
+    .get(...assetIds) as
+    | {
+        asset_name: string;
+        kit_code: string;
+        kit_name: string;
+      }
+    | undefined;
+
+  if (!memberships) {
+    return;
+  }
+
+  throw new Error(
+    `${memberships.asset_name} is already part of the active kit ${memberships.kit_code} · ${memberships.kit_name}. Remove it from the kit before using it in ${label}.`,
+  );
+};
+
 const normalizeUnitDepartments = (
   db: DatabaseSync,
   unit: CreateProjectBlueprintInput["mainUnit"],
@@ -193,7 +231,9 @@ const normalizeUnitDepartments = (
     }
 
     ensureDepartmentExists(db, departmentId, `${label} department`);
-    ensureAssetIdsExist(db, uniqueValues(bucket.assetIds));
+    const normalizedAssetIds = uniqueValues(bucket.assetIds);
+    ensureAssetIdsExist(db, normalizedAssetIds);
+    ensureAssetsAreNotLockedInActiveKits(db, normalizedAssetIds, label);
 
     const normalizedCrewAssignments = (bucket.crewAssignments ?? []).map((assignment) => {
       ensureCrewMemberExists(db, assignment.crewMemberId);
@@ -232,7 +272,7 @@ const normalizeUnitDepartments = (
 
     return {
       departmentId,
-      assetIds: uniqueValues(bucket.assetIds),
+      assetIds: normalizedAssetIds,
       crewAssignments: normalizedCrewAssignments,
       packingSeed,
     } satisfies NormalizedUnitDepartment;

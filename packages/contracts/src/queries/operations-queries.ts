@@ -318,6 +318,8 @@ export type CatalogAssetOptionRow = {
   totalQuantity: number;
   assignedQuantity: number;
   checkedOutQuantity: number;
+  operationalStatus: string;
+  custodyStatus: string;
   status: string;
   currentProjectId: string | null;
   currentProject: string | null;
@@ -325,6 +327,9 @@ export type CatalogAssetOptionRow = {
   currentUnit: string | null;
   currentDepartmentId: string | null;
   currentDepartment: string | null;
+  linkedKitCount: number;
+  linkedKitCodes: string[];
+  linkedKitNames: string[];
 };
 
 export type CatalogKitAssetSelectionRow = {

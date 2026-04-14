@@ -792,6 +792,11 @@ export const ProjectSetupWizard = ({
     ].filter(Boolean),
   );
 
+  const isAssetLockedInKit = (assetId: string) => {
+    const asset = catalog.assetOptions.find((row) => row.id === assetId);
+    return Boolean(asset?.linkedKitCount);
+  };
+
   const sameSetupAssetAssignmentsById = useMemo(() => {
     const nextMap = new Map<
       string,
@@ -995,6 +1000,10 @@ export const ProjectSetupWizard = ({
   }
 
   const handleAddAssetToActiveUnit = (assetId: string) => {
+    if (isAssetLockedInKit(assetId)) {
+      return;
+    }
+
     setAssignmentUnitAssets([...(activeAssignmentBucket?.assetIds ?? []), assetId]);
   };
 
@@ -1506,7 +1515,10 @@ export const ProjectSetupWizard = ({
                     <div className="project-setup-resource-list">
                       {assetAvailableRows.length ? (
                         assetAvailableRows.map((asset) => (
-                          <div key={asset.id} className={`project-setup-resource-row${isAssetOccupiedForNewProject(asset) ? " is-blocked" : ""}`}>
+                          <div
+                            key={asset.id}
+                            className={`project-setup-resource-row${isAssetOccupiedForNewProject(asset) || asset.linkedKitCount ? " is-blocked" : ""}`}
+                          >
                             <span className="project-setup-resource-copy">
                               <strong>{asset.code} · {asset.name}</strong>
                               <span>{asset.category} · {asset.status}</span>
@@ -1517,9 +1529,13 @@ export const ProjectSetupWizard = ({
                                   {asset.currentDepartment ? ` / ${asset.currentDepartment}` : ""}
                                 </span>
                               ) : null}
+                              {!isAssetOccupiedForNewProject(asset) && asset.linkedKitCount ? (
+                                <span>Part of active kit {asset.linkedKitCodes.join(", ")}</span>
+                              ) : null}
                             </span>
                             <span className="project-setup-resource-meta">
                               {isAssetOccupiedForNewProject(asset) ? <StatusBadge tone="critical">Unavailable</StatusBadge> : null}
+                              {!isAssetOccupiedForNewProject(asset) && asset.linkedKitCount ? <StatusBadge tone="warning">In kit</StatusBadge> : null}
                               {!isAssetOccupiedForNewProject(asset) && sameSetupAssetAssignmentsById.has(asset.id) ? (
                                 <StatusBadge tone="warning">Assigned to another unit</StatusBadge>
                               ) : !isAssetOccupiedForNewProject(asset) && assignedAssetIdsInOtherUnits.has(asset.id) ? (
@@ -1528,6 +1544,10 @@ export const ProjectSetupWizard = ({
                               {isAssetOccupiedForNewProject(asset) ? (
                                 <span className="project-setup-resource-occupancy">
                                   Resolve current assignment first
+                                </span>
+                              ) : asset.linkedKitCount ? (
+                                <span className="project-setup-resource-occupancy">
+                                  Remove from kit {asset.linkedKitCodes.join(", ")} first
                                 </span>
                               ) : sameSetupAssetAssignmentsById.has(asset.id) ? (
                                 <span className="project-setup-resource-occupancy">
@@ -1580,6 +1600,7 @@ export const ProjectSetupWizard = ({
                             <span className="project-setup-resource-copy">
                               <strong>{asset.code} · {asset.name}</strong>
                               <span>{asset.category} · {asset.status}</span>
+                              {asset.linkedKitCount ? <span>Part of active kit {asset.linkedKitCodes.join(", ")}</span> : null}
                             </span>
                             <button
                               aria-label={`Remove ${asset.name} from ${activeAssignmentUnitMeta.label}`}

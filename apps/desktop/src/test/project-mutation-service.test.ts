@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createCatalogMutationService } from "../../electron/main/services/data/catalogMutationService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
@@ -324,6 +325,41 @@ describe("project mutation service", () => {
         ],
       }),
     ).toThrow("overlaps within this setup");
+
+    cleanup();
+  });
+
+  it("blocks blueprint asset buckets when an asset belongs to an active kit", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-project-blueprint-kit-lock-test");
+    const catalogMutations = createCatalogMutationService(database);
+    const mutations = createProjectMutationService(database);
+
+    catalogMutations.createEntity({
+      entityType: "kit",
+      code: "WIZKIT",
+      name: "Wizard Locked Kit",
+      assetSelections: [{ assetId: "asset-aputure-600d", quantity: 1 }],
+    });
+
+    expect(() =>
+      mutations.createProjectBlueprint({
+        generalInfo: {
+          name: "Kit Locked Setup",
+          status: "Prep",
+          startDate: "2026-05-12",
+          endDate: "2026-05-20",
+          colorKey: "moss",
+          departmentIds: ["dept-video"],
+        },
+        mainUnit: {
+          name: "Main Unit",
+          windows: [{ startDate: "2026-05-12", endDate: "2026-05-20", sortOrder: 0 }],
+          departmentIds: ["dept-video"],
+          unitDepartments: [buildBucket("dept-video", { assetIds: ["asset-aputure-600d"] })],
+        },
+        additionalUnits: [],
+      }),
+    ).toThrow("Remove it from the kit");
 
     cleanup();
   });

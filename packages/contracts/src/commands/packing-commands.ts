@@ -10,6 +10,7 @@ export type CreatePackingSlipCommand = {
   workspaceId: string;
   assetIds: string[];
   assetSelections?: PackingSlipAssetSelection[];
+  sourceKitId?: string;
   projectId: string;
   projectUnitId?: string;
   departmentId?: string;

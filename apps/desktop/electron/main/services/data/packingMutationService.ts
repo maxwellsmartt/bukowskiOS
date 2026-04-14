@@ -90,6 +90,13 @@ type ProjectUnitRow = {
   end_date: string | null;
 };
 
+type KitMembershipRow = {
+  asset_id: string;
+  kit_id: string;
+  kit_code: string;
+  kit_name: string;
+};
+
 const uniqueValues = (values: Array<string | null | undefined>) =>
   [...new Set(values.filter((value): value is string => Boolean(value?.trim())))];
 
@@ -169,6 +176,38 @@ const loadProjectUnitEntities = (db: DatabaseSync, values: string[]) => {
     .all(...values) as ProjectUnitRow[];
 
   return new Map(rows.map((row) => [row.id, row]));
+};
+
+const loadKitMemberships = (db: DatabaseSync, assetIds: string[]) => {
+  if (!assetIds.length) {
+    return new Map<string, KitMembershipRow[]>();
+  }
+
+  const rows = db
+    .prepare(
+      `
+        SELECT
+          kit_assets.asset_id,
+          kits.id AS kit_id,
+          kits.code AS kit_code,
+          kits.name AS kit_name
+        FROM kit_assets
+        JOIN kits ON kits.id = kit_assets.kit_id
+        WHERE kits.is_active = 1
+          AND kit_assets.asset_id IN (${createPlaceholders(assetIds)})
+        ORDER BY kits.name, kits.code
+      `,
+    )
+    .all(...assetIds) as KitMembershipRow[];
+
+  const byAssetId = new Map<string, KitMembershipRow[]>();
+  rows.forEach((row) => {
+    const current = byAssetId.get(row.asset_id) ?? [];
+    current.push(row);
+    byAssetId.set(row.asset_id, current);
+  });
+
+  return byAssetId;
 };
 
 const ensureEntityExists = (value: string | undefined, label: string, map: Map<string, string>) => {
@@ -430,6 +469,29 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
 
     if (assetRows.length !== assetIds.length) {
       fail("One or more selected assets no longer exist in the live registry.");
+    }
+
+    const kitMembershipsByAssetId = loadKitMemberships(db, assetIds);
+    const kitProtectedAsset = assetRows.find((row) => {
+      const memberships = kitMembershipsByAssetId.get(row.asset_id) ?? [];
+
+      if (!memberships.length) {
+        return false;
+      }
+
+      if (!input.sourceKitId) {
+        return true;
+      }
+
+      return !memberships.some((membership) => membership.kit_id === input.sourceKitId);
+    });
+
+    if (kitProtectedAsset) {
+      const memberships = kitMembershipsByAssetId.get(kitProtectedAsset.asset_id) ?? [];
+      const membershipLabel = memberships.map((membership) => `${membership.kit_code} · ${membership.kit_name}`).join(", ");
+      fail(
+        `${kitProtectedAsset.asset_name} is already part of the active kit${memberships.length === 1 ? "" : "s"} ${membershipLabel}. Remove it from the kit before issuing it individually on a packing slip.`,
+      );
     }
 
     const invalidQuantityAsset = assetRows.find((row) => {

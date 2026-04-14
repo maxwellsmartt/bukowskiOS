@@ -88,6 +88,8 @@ export const PackingSlipBuilderPanel = ({
   );
   const totalIssueQuantity = selectedAssetDetails.reduce((sum, asset) => sum + asset.requestedQuantity, 0);
   const hasVariableQuantityAssets = selectedAssetDetails.some((asset) => asset.quantity > 1);
+  const kitLockedAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount > 0);
+  const kitLockSummary = kitLockedAssets.map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`).join(", ");
 
   const handleQuantityChange = (assetId: string, availableQuantity: number, rawValue: string) => {
     const parsedValue = Number.parseInt(rawValue, 10);
@@ -148,6 +150,12 @@ export const PackingSlipBuilderPanel = ({
       {hasVariableQuantityAssets ? (
         <div className="action-feedback action-feedback-warning">
           Bulk rows can issue a partial quantity here. Serialized or unitary assets still issue one item at a time.
+        </div>
+      ) : null}
+
+      {kitLockedAssets.length ? (
+        <div className="action-feedback action-feedback-warning">
+          These assets are part of active kits and cannot be issued individually on a packing slip: {kitLockSummary}. Remove them from the kit first if you need to dispatch them as standalone items.
         </div>
       ) : null}
 
@@ -230,7 +238,7 @@ export const PackingSlipBuilderPanel = ({
         </button>
         <button
           className="action-primary-button"
-          disabled={isSubmitting}
+          disabled={isSubmitting || kitLockedAssets.length > 0}
           onClick={() =>
             void onSubmit({
               assetSelections: selectedAssetDetails.map((asset) => ({

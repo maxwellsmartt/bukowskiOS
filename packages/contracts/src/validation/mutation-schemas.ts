@@ -343,6 +343,7 @@ export const createPackingSlipSchema = z
           .strict(),
       )
       .optional(),
+    sourceKitId: optionalTrimmedString,
     projectId: nonEmptyString,
     projectUnitId: optionalTrimmedString,
     departmentId: optionalTrimmedString,
