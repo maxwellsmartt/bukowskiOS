@@ -5256,6 +5256,37 @@ button.timeline-signal-chip:focus-visible {
   white-space: nowrap;
 }
 
+.provider-pill-logo,
+.provider-heading-logo {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.provider-heading-logo {
+  width: 16px;
+  height: 16px;
+}
+
+.provider-heading-logo-detail {
+  width: 18px;
+  height: 18px;
+}
+
+.provider-pill-logo.is-openai,
+.provider-heading-logo.is-openai {
+  filter: brightness(0) invert(1);
+}
+
+.provider-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .mission-operational-pill-idle {
   border-color: rgba(245, 184, 101, 0.24);
   background: rgba(245, 184, 101, 0.1);
@@ -5695,10 +5726,9 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .mission-node-model-pill {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 0 0 auto;
+  min-width: fit-content;
+  gap: 6px;
 }
 
 .agent-directory-meta {
@@ -5711,8 +5741,6 @@ button.timeline-signal-chip:focus-visible {
 .agent-directory-domain-pill,
 .agent-directory-model-pill {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .agent-directory-domain-pill {
@@ -5720,7 +5748,14 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .agent-directory-model-pill {
-  flex: 0 1 82px;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.agent-directory-model-pill span,
+.mission-node-model-pill span,
+.agent-detail-row .subtle-pill span {
+  min-width: fit-content;
 }
 
 @keyframes agent-live-dot-pulse-green {
@@ -5766,6 +5801,7 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .models-provider-row {
+  position: relative;
   display: grid;
   width: 100%;
   padding: 14px;
@@ -5776,6 +5812,12 @@ button.timeline-signal-chip:focus-visible {
   transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
 }
 
+.models-provider-row .agent-live-dot {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
 .models-provider-row:hover {
   border-color: rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.028);
@@ -5784,6 +5826,24 @@ button.timeline-signal-chip:focus-visible {
 .models-provider-row.is-selected {
   border-color: rgba(230, 151, 147, 0.24);
   box-shadow: inset 0 0 0 1px rgba(230, 151, 147, 0.12);
+}
+
+.models-provider-row.is-active-provider {
+  border-color: rgba(92, 190, 146, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(92, 190, 146, 0.12);
+}
+
+.models-provider-row.is-inactive-provider {
+  border-color: rgba(227, 113, 113, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(227, 113, 113, 0.08);
+}
+
+.models-provider-row.is-active-provider:hover {
+  border-color: rgba(92, 190, 146, 0.38);
+}
+
+.models-provider-row.is-inactive-provider:hover {
+  border-color: rgba(227, 113, 113, 0.28);
 }
 
 .models-provider-row-copy {

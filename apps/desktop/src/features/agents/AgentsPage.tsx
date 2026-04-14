@@ -4,6 +4,7 @@ import { CopyPlus, PauseCircle, PlayCircle, Plus, X } from "lucide-react";
 import type { AgentRosterRow } from "@contracts";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
 
 import { AgentDomainInsightPanel } from "./AgentDomainInsightPanel";
 import { AgentWizardPanel } from "./AgentWizardPanel";
@@ -87,77 +88,87 @@ export const AgentsPage = () => {
 
           <div className="agents-directory-grid">
             {data.map((agent) => (
-              <button
-                key={agent.id}
-                className={`agent-directory-card${selectedAgentId === agent.id ? " is-selected" : ""}`}
-                onClick={() => setSelectedAgentId(agent.id)}
-                type="button"
-              >
-                <span
-                  aria-label={getAgentIndicatorLabel(agent.status, agent.operationalState)}
-                  className={`agent-live-dot agent-live-dot-${getAgentIndicatorTone(agent.status, agent.operationalState)}`}
-                  data-tooltip={getAgentIndicatorLabel(agent.status, agent.operationalState)}
-                />
-                <div className="agent-directory-card-header">
-                  <div className="agent-directory-card-title">
-                    <span className="mission-node-emoji">{agent.emoji}</span>
-                    <strong>{agent.displayName}</strong>
-                  </div>
-                </div>
-                <p>{agent.role}</p>
-                <div className="agent-directory-meta">
-                  <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
-                    {operationalStateLabelMap[agent.operationalState]}
-                  </span>
-                  <span className="subtle-pill agent-directory-domain-pill" title={agent.domain}>
-                    {agent.domain}
-                  </span>
-                  <span className="subtle-pill agent-directory-model-pill" title={agent.modelLabel}>
-                    {agent.modelLabel}
-                  </span>
-                </div>
-                <div className="agent-directory-actions">
+              (() => {
+                const providerBrand = getAgentProviderBrand(agent.modelLabel);
+
+                return (
                   <button
-                    className="ghost-control"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setEditAgent(agent);
-                    }}
+                    key={agent.id}
+                    className={`agent-directory-card${selectedAgentId === agent.id ? " is-selected" : ""}`}
+                    onClick={() => setSelectedAgentId(agent.id)}
                     type="button"
                   >
-                    Configure
+                    <span
+                      aria-label={getAgentIndicatorLabel(agent.status, agent.operationalState)}
+                      className={`agent-live-dot agent-live-dot-${getAgentIndicatorTone(agent.status, agent.operationalState)}`}
+                      data-tooltip={getAgentIndicatorLabel(agent.status, agent.operationalState)}
+                    />
+                    <div className="agent-directory-card-header">
+                      <div className="agent-directory-card-title">
+                        <span className="mission-node-emoji">{agent.emoji}</span>
+                        <strong>{agent.displayName}</strong>
+                      </div>
+                    </div>
+                    <p>{agent.role}</p>
+                    <div className="agent-directory-meta">
+                      <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
+                        {operationalStateLabelMap[agent.operationalState]}
+                      </span>
+                      <span className="subtle-pill agent-directory-model-pill" title={agent.modelLabel}>
+                        {providerBrand.logoSrc ? (
+                          <img
+                            alt={providerBrand.logoAlt ?? providerBrand.label ?? "Provider"}
+                            className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
+                            src={providerBrand.logoSrc}
+                          />
+                        ) : null}
+                        <span>{agent.modelLabel}</span>
+                      </span>
+                    </div>
+                    <div className="agent-directory-actions">
+                      <button
+                        className="ghost-control"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setEditAgent(agent);
+                        }}
+                        type="button"
+                      >
+                        Configure
+                      </button>
+                      <button
+                        aria-label={agent.status === "active" ? `Pause ${agent.displayName}` : `Reactivate ${agent.displayName}`}
+                        className="ghost-control"
+                        data-tooltip={agent.status === "active" ? "Pause agent" : "Reactivate agent"}
+                        onClick={async (event) => {
+                          event.stopPropagation();
+                          await setAgentStatus({
+                            commandId: `cmd-agent-status-${Date.now().toString(36)}`,
+                            workspaceId,
+                            id: agent.id,
+                            status: agent.status === "active" ? "paused" : "active",
+                          });
+                        }}
+                        type="button"
+                      >
+                        {agent.status === "active" ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
+                      </button>
+                      <button
+                        aria-label={`Duplicate ${agent.displayName}`}
+                        className="ghost-control"
+                        data-tooltip="Duplicate agent"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDuplicateAgent(agent);
+                        }}
+                        type="button"
+                      >
+                        <CopyPlus size={14} />
+                      </button>
+                    </div>
                   </button>
-                  <button
-                    aria-label={agent.status === "active" ? `Pause ${agent.displayName}` : `Reactivate ${agent.displayName}`}
-                    className="ghost-control"
-                    data-tooltip={agent.status === "active" ? "Pause agent" : "Reactivate agent"}
-                    onClick={async (event) => {
-                      event.stopPropagation();
-                      await setAgentStatus({
-                        commandId: `cmd-agent-status-${Date.now().toString(36)}`,
-                        workspaceId,
-                        id: agent.id,
-                        status: agent.status === "active" ? "paused" : "active",
-                      });
-                    }}
-                    type="button"
-                  >
-                    {agent.status === "active" ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
-                  </button>
-                  <button
-                    aria-label={`Duplicate ${agent.displayName}`}
-                    className="ghost-control"
-                    data-tooltip="Duplicate agent"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setDuplicateAgent(agent);
-                    }}
-                    type="button"
-                  >
-                    <CopyPlus size={14} />
-                  </button>
-                </div>
-              </button>
+                );
+              })()
             ))}
           </div>
         </SurfaceCard>
@@ -186,7 +197,19 @@ export const AgentsPage = () => {
                   {operationalStateLabelMap[detail.agent.operationalState]}
                 </span>
                 <span className={`mission-node-status mission-node-status-${detail.agent.status}`}>{detail.agent.status}</span>
-                <span className="subtle-pill">{detail.agent.modelLabel}</span>
+                <span className="subtle-pill">
+                  {(() => {
+                    const providerBrand = getAgentProviderBrand(detail.agent.modelLabel);
+                    return providerBrand.logoSrc ? (
+                      <img
+                        alt={providerBrand.logoAlt ?? providerBrand.label ?? "Provider"}
+                        className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
+                        src={providerBrand.logoSrc}
+                      />
+                    ) : null;
+                  })()}
+                  <span>{detail.agent.modelLabel}</span>
+                </span>
                 <span className="subtle-pill">{detail.agent.approvalMode.replace(/_/g, " ")}</span>
               </div>
               <div className="agent-detail-meta">

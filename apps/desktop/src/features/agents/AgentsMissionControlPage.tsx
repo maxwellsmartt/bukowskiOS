@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
+import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
 
 import { AgentWizardPanel } from "./AgentWizardPanel";
 import { reviewAgentRun, setAgentApprovalMode, setAgentStatus, useAgentDetail, useMissionControlSnapshot } from "./useAgentsData";
@@ -207,83 +208,109 @@ export const AgentsMissionControlPage = () => {
         >
           <div className="mission-graph">
             {data.supervisor ? (
-              <button
-                className={`mission-node mission-node-root mission-node-operational-${data.supervisor.operationalState}${
-                  selectedAgentId === data.supervisor.id ? " is-selected" : ""
-                }`}
-                onClick={() => setSelectedAgentId(data.supervisor?.id ?? null)}
-                type="button"
-              >
-                <span
-                  aria-label={getAgentIndicatorLabel(data.supervisor.status, data.supervisor.operationalState)}
-                  className={`agent-live-dot agent-live-dot-${getAgentIndicatorTone(
-                    data.supervisor.status,
-                    data.supervisor.operationalState,
-                  )}`}
-                  data-tooltip={getAgentIndicatorLabel(data.supervisor.status, data.supervisor.operationalState)}
-                />
-                <div className="mission-node-topline">
-                  <span className="mission-node-emoji">{data.supervisor.emoji}</span>
-                  <span className="mission-node-name" title={data.supervisor.displayName}>
-                    {data.supervisor.displayName}
-                  </span>
-                </div>
-                <span className="mission-node-role mission-node-role-clamped">{data.supervisor.role}</span>
-                <div className="mission-node-footer">
-                  <span className={`mission-operational-pill mission-operational-pill-${data.supervisor.operationalState}`}>
-                    {operationalStateLabelMap[data.supervisor.operationalState]}
-                  </span>
-                  <span className="subtle-pill mission-node-model-pill" title={data.supervisor.modelLabel}>
-                    {data.supervisor.modelLabel}
-                  </span>
-                  <span className={`mission-node-status mission-node-status-${data.supervisor.status}`}>
-                    {statusLabelMap[data.supervisor.status]}
-                  </span>
-                </div>
-              </button>
+              (() => {
+                const providerBrand = getAgentProviderBrand(data.supervisor.modelLabel);
+
+                return (
+                  <button
+                    className={`mission-node mission-node-root mission-node-operational-${data.supervisor.operationalState}${
+                      selectedAgentId === data.supervisor.id ? " is-selected" : ""
+                    }`}
+                    onClick={() => setSelectedAgentId(data.supervisor?.id ?? null)}
+                    type="button"
+                  >
+                    <span
+                      aria-label={getAgentIndicatorLabel(data.supervisor.status, data.supervisor.operationalState)}
+                      className={`agent-live-dot agent-live-dot-${getAgentIndicatorTone(
+                        data.supervisor.status,
+                        data.supervisor.operationalState,
+                      )}`}
+                      data-tooltip={getAgentIndicatorLabel(data.supervisor.status, data.supervisor.operationalState)}
+                    />
+                    <div className="mission-node-topline">
+                      <span className="mission-node-emoji">{data.supervisor.emoji}</span>
+                      <span className="mission-node-name" title={data.supervisor.displayName}>
+                        {data.supervisor.displayName}
+                      </span>
+                    </div>
+                    <span className="mission-node-role mission-node-role-clamped">{data.supervisor.role}</span>
+                    <div className="mission-node-footer">
+                      <span className={`mission-operational-pill mission-operational-pill-${data.supervisor.operationalState}`}>
+                        {operationalStateLabelMap[data.supervisor.operationalState]}
+                      </span>
+                      <span className="subtle-pill mission-node-model-pill" title={data.supervisor.modelLabel}>
+                        {providerBrand.logoSrc ? (
+                          <img
+                            alt={providerBrand.logoAlt ?? providerBrand.label ?? "Provider"}
+                            className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
+                            src={providerBrand.logoSrc}
+                          />
+                        ) : null}
+                        <span>{data.supervisor.modelLabel}</span>
+                      </span>
+                      <span className={`mission-node-status mission-node-status-${data.supervisor.status}`}>
+                        {statusLabelMap[data.supervisor.status]}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })()
             ) : null}
 
             <div className="mission-graph-spine" />
 
             <div className="mission-graph-band">
               {data.subagents.map((agent) => (
-                <div key={agent.id} className="mission-graph-branch">
-                  <div className="mission-graph-branch-line" />
-                  <button
-                    className={`mission-node mission-node-operational-${agent.operationalState}${
-                      selectedAgentId === agent.id ? " is-selected" : ""
-                    }`}
-                    onClick={() => setSelectedAgentId(agent.id)}
-                    type="button"
-                  >
-                    <span
-                      aria-label={getAgentIndicatorLabel(agent.status, agent.operationalState)}
-                      className={`agent-live-dot agent-live-dot-${getAgentIndicatorTone(
-                        agent.status,
-                        agent.operationalState,
-                      )}`}
-                      data-tooltip={getAgentIndicatorLabel(agent.status, agent.operationalState)}
-                    />
-                    <div className="mission-node-topline">
-                      <span className="mission-node-emoji">{agent.emoji}</span>
-                      <span className="mission-node-name" title={agent.displayName}>
-                        {agent.displayName}
-                      </span>
+                (() => {
+                  const providerBrand = getAgentProviderBrand(agent.modelLabel);
+
+                  return (
+                    <div key={agent.id} className="mission-graph-branch">
+                      <div className="mission-graph-branch-line" />
+                      <button
+                        className={`mission-node mission-node-operational-${agent.operationalState}${
+                          selectedAgentId === agent.id ? " is-selected" : ""
+                        }`}
+                        onClick={() => setSelectedAgentId(agent.id)}
+                        type="button"
+                      >
+                        <span
+                          aria-label={getAgentIndicatorLabel(agent.status, agent.operationalState)}
+                          className={`agent-live-dot agent-live-dot-${getAgentIndicatorTone(
+                            agent.status,
+                            agent.operationalState,
+                          )}`}
+                          data-tooltip={getAgentIndicatorLabel(agent.status, agent.operationalState)}
+                        />
+                        <div className="mission-node-topline">
+                          <span className="mission-node-emoji">{agent.emoji}</span>
+                          <span className="mission-node-name" title={agent.displayName}>
+                            {agent.displayName}
+                          </span>
+                        </div>
+                        <span className="mission-node-role mission-node-role-clamped">{agent.role}</span>
+                        <div className="mission-node-footer">
+                          <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
+                            {operationalStateLabelMap[agent.operationalState]}
+                          </span>
+                          <span className="subtle-pill mission-node-model-pill" title={agent.modelLabel}>
+                            {providerBrand.logoSrc ? (
+                              <img
+                                alt={providerBrand.logoAlt ?? providerBrand.label ?? "Provider"}
+                                className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
+                                src={providerBrand.logoSrc}
+                              />
+                            ) : null}
+                            <span>{agent.modelLabel}</span>
+                          </span>
+                          <span className={`mission-node-status mission-node-status-${agent.status}`}>
+                            {statusLabelMap[agent.status]}
+                          </span>
+                        </div>
+                      </button>
                     </div>
-                    <span className="mission-node-role mission-node-role-clamped">{agent.role}</span>
-                    <div className="mission-node-footer">
-                      <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
-                        {operationalStateLabelMap[agent.operationalState]}
-                      </span>
-                      <span className="subtle-pill mission-node-model-pill" title={agent.modelLabel}>
-                        {agent.modelLabel}
-                      </span>
-                      <span className={`mission-node-status mission-node-status-${agent.status}`}>
-                        {statusLabelMap[agent.status]}
-                      </span>
-                    </div>
-                  </button>
-                </div>
+                  );
+                })()
               ))}
             </div>
           </div>
@@ -318,7 +345,19 @@ export const AgentsMissionControlPage = () => {
                 <span className={`mission-node-status mission-node-status-${selectedAgent.status}`}>
                   {statusLabelMap[selectedAgent.status]}
                 </span>
-                <span className="subtle-pill">{selectedAgent.modelLabel}</span>
+                <span className="subtle-pill">
+                  {(() => {
+                    const providerBrand = getAgentProviderBrand(selectedAgent.modelLabel);
+                    return providerBrand.logoSrc ? (
+                      <img
+                        alt={providerBrand.logoAlt ?? providerBrand.label ?? "Provider"}
+                        className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
+                        src={providerBrand.logoSrc}
+                      />
+                    ) : null;
+                  })()}
+                  <span>{selectedAgent.modelLabel}</span>
+                </span>
                 <span className="subtle-pill">{selectedAgent.approvalMode.replace(/_/g, " ")}</span>
               </div>
 

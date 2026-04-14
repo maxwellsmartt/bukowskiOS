@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 type SurfaceCardProps = {
-  title?: string;
-  subtitle?: string;
+  title?: ReactNode;
+  subtitle?: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
   className?: string;

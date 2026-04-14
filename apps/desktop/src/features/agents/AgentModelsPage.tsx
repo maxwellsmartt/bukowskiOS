@@ -4,6 +4,7 @@ import { CheckCircle2, KeyRound, RadioTower, RotateCcw, ServerCog } from "lucide
 import type { AgentModelAssignmentRow, AgentModelRow } from "@contracts";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
 
 import {
   assignAgentModel,
@@ -43,6 +44,17 @@ const providerModelOptions: Record<string, Array<{ key: string; label: string }>
   openclaw: [{ key: "openclaw:command", label: "OpenClaw Command" }],
   custom: [{ key: "custom:gateway-default", label: "Gateway Default" }],
 };
+
+const providerStatusIndicatorToneMap: Record<AgentModelRow["status"], "green" | "amber" | "red"> = {
+  healthy: "green",
+  configured: "amber",
+  testing: "amber",
+  not_configured: "amber",
+  invalid_key: "red",
+  unavailable: "red",
+};
+
+const providerDisplayOrder = ["openai", "anthropic", "openclaw", "custom"] as const;
 
 type ProviderDraft = {
   enabled: boolean;
@@ -92,6 +104,30 @@ export const AgentModelsPage = () => {
   const selectedProvider = useMemo(
     () => data.providers.find((provider) => provider.providerKey === selectedProviderKey) ?? null,
     [data.providers, selectedProviderKey],
+  );
+  const orderedProviders = useMemo(
+    () =>
+      [...data.providers].sort((left, right) => {
+        const leftOrder = providerDisplayOrder.indexOf(left.providerKey as (typeof providerDisplayOrder)[number]);
+        const rightOrder = providerDisplayOrder.indexOf(right.providerKey as (typeof providerDisplayOrder)[number]);
+
+        if (leftOrder !== -1 || rightOrder !== -1) {
+          if (leftOrder === -1) {
+            return 1;
+          }
+
+          if (rightOrder === -1) {
+            return -1;
+          }
+
+          if (leftOrder !== rightOrder) {
+            return leftOrder - rightOrder;
+          }
+        }
+
+        return left.label.localeCompare(right.label);
+      }),
+    [data.providers],
   );
 
   useEffect(() => {
@@ -296,40 +332,80 @@ export const AgentModelsPage = () => {
           {error ? <div className="empty-state">Models unavailable: {error}</div> : null}
 
           <div className="models-provider-list">
-            {data.providers.map((provider) => (
-              <button
-                key={provider.id}
-                className={`models-provider-row${selectedProviderKey === provider.providerKey ? " is-selected" : ""}`}
-                onClick={() => setSelectedProviderKey(provider.providerKey)}
-                type="button"
-              >
-                <div className="models-provider-row-copy">
-                  <div className="models-provider-row-topline">
-                    <strong>{provider.label}</strong>
-                    {provider.isActiveProvider ? <span className="subtle-pill">Active</span> : null}
-                    {!provider.supportsLiveRequests ? <span className="subtle-pill">Shell</span> : null}
-                  </div>
-                  <p>{providerStatusSummaryMap[provider.status]}</p>
-                  <div className="agent-detail-row">
-                    <span className={`run-status-pill run-status-pill-${provider.status}`}>
-                      {providerStatusLabelMap[provider.status]}
-                    </span>
-                    <span className="subtle-pill">{provider.assignedAgents.length} agents</span>
-                    {provider.hasStoredSecret ? (
-                      <span className="subtle-pill">
-                        <KeyRound size={12} />
-                        <span>Key stored</span>
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              </button>
+            {orderedProviders.map((provider) => (
+              (() => {
+                const providerBrand = getAgentProviderBrand(provider.providerKey);
+                const indicatorTone = providerStatusIndicatorToneMap[provider.status];
+
+                return (
+                  <button
+                    key={provider.id}
+                    className={`models-provider-row${selectedProviderKey === provider.providerKey ? " is-selected" : ""}${
+                      provider.isActiveProvider ? " is-active-provider" : " is-inactive-provider"
+                    }`}
+                    onClick={() => setSelectedProviderKey(provider.providerKey)}
+                    type="button"
+                  >
+                    <span
+                      aria-label={providerStatusLabelMap[provider.status]}
+                      className={`agent-live-dot agent-live-dot-${indicatorTone}`}
+                      data-tooltip={`${provider.label} · ${providerStatusLabelMap[provider.status]}`}
+                    />
+                    <div className="models-provider-row-copy">
+                      <div className="models-provider-row-topline">
+                        <strong className="provider-heading">
+                          {providerBrand.logoSrc ? (
+                            <img
+                              alt={providerBrand.logoAlt ?? provider.label}
+                              className={`provider-heading-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
+                              src={providerBrand.logoSrc}
+                            />
+                          ) : null}
+                          <span>{provider.label}</span>
+                        </strong>
+                        {!provider.supportsLiveRequests ? <span className="subtle-pill">Shell</span> : null}
+                      </div>
+                      <p>{providerStatusSummaryMap[provider.status]}</p>
+                      <div className="agent-detail-row">
+                        <span className={`run-status-pill run-status-pill-${provider.status}`}>
+                          {providerStatusLabelMap[provider.status]}
+                        </span>
+                        <span className="subtle-pill">{provider.assignedAgents.length} agents</span>
+                        {provider.hasStoredSecret ? (
+                          <span className="subtle-pill">
+                            <KeyRound size={12} />
+                            <span>Key stored</span>
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })()
             ))}
           </div>
         </SurfaceCard>
 
         <SurfaceCard
-          title={selectedProvider?.label ?? "Select a provider"}
+          title={
+            selectedProvider ? (
+              <span className="provider-heading">
+                {(() => {
+                  const providerBrand = getAgentProviderBrand(selectedProvider.providerKey);
+                  return providerBrand.logoSrc ? (
+                    <img
+                      alt={providerBrand.logoAlt ?? selectedProvider.label}
+                      className={`provider-heading-logo provider-heading-logo-detail${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
+                      src={providerBrand.logoSrc}
+                    />
+                  ) : null;
+                })()}
+                <span>{selectedProvider.label}</span>
+              </span>
+            ) : (
+              "Select a provider"
+            )
+          }
           subtitle={
             selectedProvider
               ? "Provider configuration lives in the main process. Secrets never return to the renderer."
@@ -338,7 +414,11 @@ export const AgentModelsPage = () => {
           aside={
             selectedProvider ? (
               <div className="agent-detail-row">
-                {selectedProvider.isActiveProvider ? <span className="subtle-pill">Currently active</span> : null}
+                <span
+                  aria-label={providerStatusLabelMap[selectedProvider.status]}
+                  className={`agent-live-dot agent-live-dot-${providerStatusIndicatorToneMap[selectedProvider.status]}`}
+                  data-tooltip={`${selectedProvider.label} · ${providerStatusLabelMap[selectedProvider.status]}`}
+                />
                 {!selectedProvider.supportsLiveRequests ? <span className="subtle-pill">Future shell</span> : null}
               </div>
             ) : null
