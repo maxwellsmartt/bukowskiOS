@@ -4935,6 +4935,10 @@ button.timeline-signal-chip:focus-visible {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.agents-directory-layout.is-directory-expanded {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .agents-models-layout {
   display: grid;
   grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.35fr);
@@ -4992,6 +4996,7 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .mission-node {
+  position: relative;
   display: grid;
   align-content: start;
   gap: 10px;
@@ -5038,6 +5043,44 @@ button.timeline-signal-chip:focus-visible {
 .agent-directory-card.is-selected {
   border-color: rgba(230, 151, 147, 0.28);
   box-shadow: inset 0 0 0 1px rgba(230, 151, 147, 0.12);
+}
+
+.agent-live-dot {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  pointer-events: auto;
+}
+
+.agent-live-dot-green {
+  background: #67d6a1;
+  box-shadow:
+    0 0 0 1px rgba(103, 214, 161, 0.16),
+    0 0 8px rgba(103, 214, 161, 0.34),
+    0 0 14px rgba(103, 214, 161, 0.12);
+  animation: agent-live-dot-pulse-green 1.8s ease-in-out infinite;
+}
+
+.agent-live-dot-amber {
+  background: #f2be72;
+  box-shadow:
+    0 0 0 1px rgba(242, 190, 114, 0.16),
+    0 0 8px rgba(242, 190, 114, 0.28),
+    0 0 14px rgba(242, 190, 114, 0.1);
+  animation: agent-live-dot-pulse-amber 1.8s ease-in-out infinite;
+}
+
+.agent-live-dot-red {
+  background: #ff8d8d;
+  box-shadow:
+    0 0 0 1px rgba(255, 141, 141, 0.16),
+    0 0 8px rgba(255, 141, 141, 0.28),
+    0 0 14px rgba(255, 141, 141, 0.1);
+  animation: agent-live-dot-pulse-red 1.8s ease-in-out infinite;
 }
 
 .mission-node-root {
@@ -5098,8 +5141,10 @@ button.timeline-signal-chip:focus-visible {
 .mission-node-footer {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-top: auto;
+  min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .mission-node-status,
@@ -5508,9 +5553,10 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .agent-directory-card {
+  position: relative;
   display: grid;
-  gap: 10px;
-  min-height: 220px;
+  gap: 8px;
+  min-height: 208px;
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
@@ -5524,7 +5570,102 @@ button.timeline-signal-chip:focus-visible {
 .agent-directory-card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
+  padding-right: 18px;
+}
+
+.agent-directory-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.agent-directory-card-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-node-footer .mission-operational-pill,
+.mission-node-footer .mission-node-status,
+.mission-node-footer .subtle-pill,
+.agent-directory-meta .mission-operational-pill,
+.agent-directory-meta .subtle-pill {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+.mission-node-footer .mission-operational-pill,
+.mission-node-footer .mission-node-status {
+  flex: 0 0 auto;
+}
+
+.mission-node-model-pill {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-directory-meta {
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.agent-directory-domain-pill,
+.agent-directory-model-pill {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-directory-domain-pill {
+  flex: 1 1 auto;
+}
+
+.agent-directory-model-pill {
+  flex: 0 1 82px;
+}
+
+@keyframes agent-live-dot-pulse-green {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes agent-live-dot-pulse-amber {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes agent-live-dot-pulse-red {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
 }
 
 .models-provider-list,
@@ -6718,6 +6859,7 @@ button.timeline-signal-chip:focus-visible {
   position: relative;
   z-index: 2;
   gap: 8px;
+  padding-left: 8px;
   flex-wrap: nowrap;
   white-space: nowrap;
   overflow: visible;

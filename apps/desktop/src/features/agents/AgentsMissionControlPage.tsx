@@ -24,6 +24,36 @@ const operationalStateLabelMap = {
   not_working: "Not working",
 } as const;
 
+const getAgentIndicatorTone = (
+  status: "active" | "paused",
+  operationalState: "idle" | "working" | "not_working",
+) => {
+  if (status !== "active") {
+    return "amber";
+  }
+
+  if (operationalState === "working") {
+    return "green";
+  }
+
+  if (operationalState === "not_working") {
+    return "red";
+  }
+
+  return "amber";
+};
+
+const getAgentIndicatorLabel = (
+  status: "active" | "paused",
+  operationalState: "idle" | "working" | "not_working",
+) => {
+  if (status !== "active") {
+    return "Paused";
+  }
+
+  return operationalStateLabelMap[operationalState];
+};
+
 export const AgentsMissionControlPage = () => {
   const { data, error, reload } = useMissionControlSnapshot();
   const [searchParams] = useSearchParams();
@@ -33,8 +63,8 @@ export const AgentsMissionControlPage = () => {
   const [processingRunId, setProcessingRunId] = useState<string | null>(null);
   const [approvalFeedback, setApprovalFeedback] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState({
-    queue: false,
-    activity: false,
+    queue: true,
+    activity: true,
     models: true,
     connectors: true,
   });
@@ -184,6 +214,14 @@ export const AgentsMissionControlPage = () => {
                 onClick={() => setSelectedAgentId(data.supervisor?.id ?? null)}
                 type="button"
               >
+                <span
+                  aria-label={getAgentIndicatorLabel(data.supervisor.status, data.supervisor.operationalState)}
+                  className={`agent-live-dot agent-live-dot-${getAgentIndicatorTone(
+                    data.supervisor.status,
+                    data.supervisor.operationalState,
+                  )}`}
+                  data-tooltip={getAgentIndicatorLabel(data.supervisor.status, data.supervisor.operationalState)}
+                />
                 <div className="mission-node-topline">
                   <span className="mission-node-emoji">{data.supervisor.emoji}</span>
                   <span className="mission-node-name" title={data.supervisor.displayName}>
@@ -194,6 +232,9 @@ export const AgentsMissionControlPage = () => {
                 <div className="mission-node-footer">
                   <span className={`mission-operational-pill mission-operational-pill-${data.supervisor.operationalState}`}>
                     {operationalStateLabelMap[data.supervisor.operationalState]}
+                  </span>
+                  <span className="subtle-pill mission-node-model-pill" title={data.supervisor.modelLabel}>
+                    {data.supervisor.modelLabel}
                   </span>
                   <span className={`mission-node-status mission-node-status-${data.supervisor.status}`}>
                     {statusLabelMap[data.supervisor.status]}
@@ -215,6 +256,14 @@ export const AgentsMissionControlPage = () => {
                     onClick={() => setSelectedAgentId(agent.id)}
                     type="button"
                   >
+                    <span
+                      aria-label={getAgentIndicatorLabel(agent.status, agent.operationalState)}
+                      className={`agent-live-dot agent-live-dot-${getAgentIndicatorTone(
+                        agent.status,
+                        agent.operationalState,
+                      )}`}
+                      data-tooltip={getAgentIndicatorLabel(agent.status, agent.operationalState)}
+                    />
                     <div className="mission-node-topline">
                       <span className="mission-node-emoji">{agent.emoji}</span>
                       <span className="mission-node-name" title={agent.displayName}>
@@ -225,6 +274,9 @@ export const AgentsMissionControlPage = () => {
                     <div className="mission-node-footer">
                       <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
                         {operationalStateLabelMap[agent.operationalState]}
+                      </span>
+                      <span className="subtle-pill mission-node-model-pill" title={agent.modelLabel}>
+                        {agent.modelLabel}
                       </span>
                       <span className={`mission-node-status mission-node-status-${agent.status}`}>
                         {statusLabelMap[agent.status]}
@@ -387,7 +439,13 @@ export const AgentsMissionControlPage = () => {
           title="Run queue"
           subtitle={collapsedSections.queue ? undefined : "Trabajo reciente y drafts pendientes."}
           aside={
-            <button className={`mission-section-toggle${collapsedSections.queue ? " is-collapsed" : ""}`} onClick={() => toggleSection("queue")} type="button">
+            <button
+              aria-label={collapsedSections.queue ? "Expand queue" : "Collapse queue"}
+              className={`mission-section-toggle${collapsedSections.queue ? " is-collapsed" : ""}`}
+              data-tooltip={collapsedSections.queue ? "Expand queue" : "Collapse queue"}
+              onClick={() => toggleSection("queue")}
+              type="button"
+            >
               <ChevronDown size={14} />
             </button>
           }
@@ -444,7 +502,13 @@ export const AgentsMissionControlPage = () => {
           title="Activity feed"
           subtitle={collapsedSections.activity ? undefined : "Actividad reciente del sistema."}
           aside={
-            <button className={`mission-section-toggle${collapsedSections.activity ? " is-collapsed" : ""}`} onClick={() => toggleSection("activity")} type="button">
+            <button
+              aria-label={collapsedSections.activity ? "Expand activity" : "Collapse activity"}
+              className={`mission-section-toggle${collapsedSections.activity ? " is-collapsed" : ""}`}
+              data-tooltip={collapsedSections.activity ? "Expand activity" : "Collapse activity"}
+              onClick={() => toggleSection("activity")}
+              type="button"
+            >
               <ChevronDown size={14} />
             </button>
           }
@@ -481,7 +545,13 @@ export const AgentsMissionControlPage = () => {
           title="Models"
           subtitle={collapsedSections.models ? undefined : "Asignaciones activas."}
           aside={
-            <button className={`mission-section-toggle${collapsedSections.models ? " is-collapsed" : ""}`} onClick={() => toggleSection("models")} type="button">
+            <button
+              aria-label={collapsedSections.models ? "Expand models" : "Collapse models"}
+              className={`mission-section-toggle${collapsedSections.models ? " is-collapsed" : ""}`}
+              data-tooltip={collapsedSections.models ? "Expand models" : "Collapse models"}
+              onClick={() => toggleSection("models")}
+              type="button"
+            >
               <ChevronDown size={14} />
             </button>
           }
@@ -506,7 +576,13 @@ export const AgentsMissionControlPage = () => {
           title="Connectors"
           subtitle={collapsedSections.connectors ? undefined : "Estado de disponibilidad."}
           aside={
-            <button className={`mission-section-toggle${collapsedSections.connectors ? " is-collapsed" : ""}`} onClick={() => toggleSection("connectors")} type="button">
+            <button
+              aria-label={collapsedSections.connectors ? "Expand connectors" : "Collapse connectors"}
+              className={`mission-section-toggle${collapsedSections.connectors ? " is-collapsed" : ""}`}
+              data-tooltip={collapsedSections.connectors ? "Expand connectors" : "Collapse connectors"}
+              onClick={() => toggleSection("connectors")}
+              type="button"
+            >
               <ChevronDown size={14} />
             </button>
           }

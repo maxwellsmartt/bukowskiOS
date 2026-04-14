@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CopyPlus, PauseCircle, PlayCircle, Plus } from "lucide-react";
+import { CopyPlus, PauseCircle, PlayCircle, Plus, X } from "lucide-react";
 
 import type { AgentRosterRow } from "@contracts";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -17,6 +17,30 @@ const operationalStateLabelMap = {
   working: "Working",
   not_working: "Not working",
 } as const;
+
+const getAgentIndicatorTone = (status: AgentRosterRow["status"], operationalState: AgentRosterRow["operationalState"]) => {
+  if (status !== "active") {
+    return "amber";
+  }
+
+  if (operationalState === "working") {
+    return "green";
+  }
+
+  if (operationalState === "not_working") {
+    return "red";
+  }
+
+  return "amber";
+};
+
+const getAgentIndicatorLabel = (status: AgentRosterRow["status"], operationalState: AgentRosterRow["operationalState"]) => {
+  if (status !== "active") {
+    return "Paused";
+  }
+
+  return operationalStateLabelMap[operationalState];
+};
 
 export const AgentsPage = () => {
   const { data, error } = useAgentsList();
@@ -48,7 +72,7 @@ export const AgentsPage = () => {
         body="Browse the roster, adjust supervision posture and shape each specialist through a visual builder."
       />
 
-      <div className="agents-directory-layout">
+      <div className={`agents-directory-layout${selectedAgentId ? "" : " is-directory-expanded"}`}>
         <SurfaceCard
           title="Agent directory"
           subtitle="The current roster, models and operating posture."
@@ -69,18 +93,28 @@ export const AgentsPage = () => {
                 onClick={() => setSelectedAgentId(agent.id)}
                 type="button"
               >
+                <span
+                  aria-label={getAgentIndicatorLabel(agent.status, agent.operationalState)}
+                  className={`agent-live-dot agent-live-dot-${getAgentIndicatorTone(agent.status, agent.operationalState)}`}
+                  data-tooltip={getAgentIndicatorLabel(agent.status, agent.operationalState)}
+                />
                 <div className="agent-directory-card-header">
-                  <span className="mission-node-emoji">{agent.emoji}</span>
-                  <span className={`mission-node-status mission-node-status-${agent.status}`}>{agent.status}</span>
+                  <div className="agent-directory-card-title">
+                    <span className="mission-node-emoji">{agent.emoji}</span>
+                    <strong>{agent.displayName}</strong>
+                  </div>
                 </div>
-                <strong>{agent.displayName}</strong>
                 <p>{agent.role}</p>
                 <div className="agent-directory-meta">
                   <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
                     {operationalStateLabelMap[agent.operationalState]}
                   </span>
-                  <span className="subtle-pill">{agent.domain}</span>
-                  <span className="subtle-pill">{agent.modelLabel}</span>
+                  <span className="subtle-pill agent-directory-domain-pill" title={agent.domain}>
+                    {agent.domain}
+                  </span>
+                  <span className="subtle-pill agent-directory-model-pill" title={agent.modelLabel}>
+                    {agent.modelLabel}
+                  </span>
                 </div>
                 <div className="agent-directory-actions">
                   <button
@@ -94,7 +128,9 @@ export const AgentsPage = () => {
                     Configure
                   </button>
                   <button
+                    aria-label={agent.status === "active" ? `Pause ${agent.displayName}` : `Reactivate ${agent.displayName}`}
                     className="ghost-control"
+                    data-tooltip={agent.status === "active" ? "Pause agent" : "Reactivate agent"}
                     onClick={async (event) => {
                       event.stopPropagation();
                       await setAgentStatus({
@@ -109,7 +145,9 @@ export const AgentsPage = () => {
                     {agent.status === "active" ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
                   </button>
                   <button
+                    aria-label={`Duplicate ${agent.displayName}`}
                     className="ghost-control"
+                    data-tooltip="Duplicate agent"
                     onClick={(event) => {
                       event.stopPropagation();
                       setDuplicateAgent(agent);
@@ -124,11 +162,24 @@ export const AgentsPage = () => {
           </div>
         </SurfaceCard>
 
-        <SurfaceCard
-          title={detail.agent?.displayName ?? "Select an agent"}
-          subtitle={detail.agent?.role ?? "The selected agent opens here with scope, posture and recent activity."}
-        >
-          {detail.agent ? (
+        {selectedAgentId ? (
+          <SurfaceCard
+            title={detail.agent?.displayName ?? "Loading agent"}
+            subtitle={detail.agent?.role ?? "The selected agent opens here with scope, posture and recent activity."}
+            aside={
+              <div className="surface-card-actions">
+                <button
+                  aria-label="Close agent detail"
+                  className="surface-card-action"
+                  onClick={() => setSelectedAgentId(null)}
+                  type="button"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            }
+          >
+            {detail.agent ? (
             <div className="agent-detail-stack">
               <div className="agent-detail-row">
                 <span className={`mission-operational-pill mission-operational-pill-${detail.agent.operationalState}`}>
@@ -176,10 +227,11 @@ export const AgentsPage = () => {
                 )}
               </div>
             </div>
-          ) : (
-            <div className="empty-state">Select any agent card to inspect its configured scope and recent runs.</div>
-          )}
-        </SurfaceCard>
+            ) : (
+              <div className="empty-state">Loading agent details...</div>
+            )}
+          </SurfaceCard>
+        ) : null}
       </div>
 
       <AgentWizardPanel onClose={() => setCreateOpen(false)} open={createOpen} />

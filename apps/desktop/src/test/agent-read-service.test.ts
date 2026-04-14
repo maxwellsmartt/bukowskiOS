@@ -35,8 +35,10 @@ describe("agent read service", () => {
     const agents = reads.getAgentsList();
 
     expect(missionControl.supervisor?.displayName).toBe("Supervisor Agent");
+    expect(missionControl.supervisor?.modelLabel).toBeTruthy();
     expect(missionControl.supervisor?.operationalState).toBe("not_working");
     expect(missionControl.subagents.length).toBeGreaterThanOrEqual(5);
+    expect(missionControl.subagents.every((agent) => Boolean(agent.modelLabel))).toBe(true);
     expect(missionControl.queue.length).toBeGreaterThan(0);
     expect(missionControl.activity.length).toBeGreaterThan(0);
     expect(agents.some((agent) => agent.displayName === "Assets Agent")).toBe(true);

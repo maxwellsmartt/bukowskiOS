@@ -92,6 +92,7 @@ export type AgentGraphNode = {
   role: string;
   mission: string;
   domain: string;
+  modelLabel: string;
   status: AgentStatus;
   operationalState: "idle" | "working" | "not_working";
   secondaryLabel: string;

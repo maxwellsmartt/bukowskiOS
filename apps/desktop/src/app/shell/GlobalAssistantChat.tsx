@@ -7,6 +7,7 @@ import type { AssistantApprovalPreference, AssistantGatewayAttachment } from "@c
 import { useAssistantChat } from "@app/providers/AssistantChatContext";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { reviewAgentRun } from "@features/agents/useAgentsData";
+import { readJsonPreference, uiPreferenceKeys, writeJsonPreference } from "@shared/lib/preferences";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
@@ -250,7 +251,9 @@ export const GlobalAssistantChat = () => {
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [activeSelector, setActiveSelector] = useState<ActiveSelector>(null);
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() =>
+    readJsonPreference<boolean>(uiPreferenceKeys.assistantChatSidebarCollapsed, false),
+  );
   const [threadMenuState, setThreadMenuState] = useState<ThreadMenuState>(null);
   const [expandedMessageDetails, setExpandedMessageDetails] = useState<Record<string, boolean>>({});
   const [optimisticTurn, setOptimisticTurn] = useState<OptimisticTurn | null>(null);
@@ -262,6 +265,8 @@ export const GlobalAssistantChat = () => {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const threadEndRef = useRef<HTMLDivElement | null>(null);
+  const previousIsOpenRef = useRef(isOpen);
+  const previousThreadSignatureRef = useRef("");
 
   const resolvedActiveSession = useMemo(
     () => buildOptimisticSession(activeSession, optimisticTurn, optimisticAssistantMessage),
@@ -369,6 +374,10 @@ export const GlobalAssistantChat = () => {
   }, [expandedSessionId, sessions]);
 
   useEffect(() => {
+    writeJsonPreference(uiPreferenceKeys.assistantChatSidebarCollapsed, isSidebarCollapsed);
+  }, [isSidebarCollapsed]);
+
+  useEffect(() => {
     if (!isOpen) {
       return;
     }
@@ -390,13 +399,25 @@ export const GlobalAssistantChat = () => {
 
   useEffect(() => {
     if (!isOpen) {
+      previousIsOpenRef.current = false;
+      return;
+    }
+
+    const threadSignature = `${resolvedActiveSession.id}:${resolvedActiveSession.messages.length}:${resolvedActiveSession.latestState?.label ?? ""}:${resolvedActiveSession.latestState?.tone ?? ""}`;
+    const justOpened = !previousIsOpenRef.current;
+    const threadChanged = previousThreadSignatureRef.current !== threadSignature;
+
+    previousIsOpenRef.current = true;
+    previousThreadSignatureRef.current = threadSignature;
+
+    if (!justOpened && !threadChanged) {
       return;
     }
 
     const nextFrame = window.requestAnimationFrame(() => {
       threadEndRef.current?.scrollIntoView({
         block: "end",
-        behavior: resolvedActiveSession.messages.length > 1 || Boolean(resolvedActiveSession.latestState) ? "smooth" : "auto",
+        behavior: justOpened ? "auto" : "smooth",
       });
     });
 

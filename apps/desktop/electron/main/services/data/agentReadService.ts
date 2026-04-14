@@ -247,6 +247,7 @@ const toGraphNode = (
   role: row.role_label?.trim() || row.display_name,
   mission: row.mission?.trim() || row.role_summary,
   domain: row.domain_key,
+  modelLabel: row.model_label,
   status: row.status,
   operationalState:
     row.status === "paused" ||

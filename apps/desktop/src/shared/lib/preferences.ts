@@ -6,6 +6,7 @@ export const uiPreferenceKeys = {
   lastProjectRoutePath: "last-project-route-path",
   lastProjectRouteSection: "last-project-route-section",
   lastRoutePath: "last-route-path",
+  assistantChatSidebarCollapsed: "assistant-chat-sidebar-collapsed",
   overviewTimelineAnchorDate: "overview-timeline-anchor-date",
   overviewTimelineExpandedProjects: "overview-timeline-expanded-projects",
   overviewTimelineGridDensity: "overview-timeline-grid-density",
