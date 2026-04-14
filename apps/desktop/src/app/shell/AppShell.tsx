@@ -8,6 +8,7 @@ import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared
 import { pushRecentEntityKey } from "@shared/lib/recentEntities";
 
 import { CompareTrayBar } from "./CompareTrayBar";
+import { FloatingTooltipLayer } from "./FloatingTooltipLayer";
 import { GlobalAssistantChat } from "./GlobalAssistantChat";
 import { GlobalSearchPalette } from "./GlobalSearchPalette";
 import { agentsSubnav, assetsSubnav, buildProjectSubnav, financeSubnav } from "./navigation";
@@ -216,6 +217,7 @@ export const AppShell = () => {
       </div>
       <GlobalSearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <GlobalAssistantChat />
+      <FloatingTooltipLayer />
     </div>
   );
 };

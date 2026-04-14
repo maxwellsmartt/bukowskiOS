@@ -264,6 +264,68 @@
   transform: translate(-50%, 0);
 }
 
+body.has-floating-tooltips [data-tooltip]::before,
+body.has-floating-tooltips [data-tooltip]::after,
+body.has-floating-tooltips .surface-card-action[aria-label]:not([aria-label^="Close "])::before,
+body.has-floating-tooltips .surface-card-action[aria-label]:not([aria-label^="Close "])::after,
+body.has-floating-tooltips .icon-ghost-control[aria-label]::before,
+body.has-floating-tooltips .icon-ghost-control[aria-label]::after,
+body.has-floating-tooltips .shell-project-action[aria-label]::before,
+body.has-floating-tooltips .shell-project-action[aria-label]::after,
+body.has-floating-tooltips .assistant-chat-sidebar-tool[aria-label]::before,
+body.has-floating-tooltips .assistant-chat-sidebar-tool[aria-label]::after,
+body.has-floating-tooltips .assistant-chat-session-action[aria-label]::before,
+body.has-floating-tooltips .assistant-chat-session-action[aria-label]::after,
+body.has-floating-tooltips .assistant-chat-send-button[aria-label]::before,
+body.has-floating-tooltips .assistant-chat-send-button[aria-label]::after,
+body.has-floating-tooltips .assistant-chat-attachment-remove[aria-label]::before,
+body.has-floating-tooltips .assistant-chat-attachment-remove[aria-label]::after,
+body.has-floating-tooltips .project-setup-close-button[aria-label]:not([aria-label^="Close "])::before,
+body.has-floating-tooltips .project-setup-close-button[aria-label]:not([aria-label^="Close "])::after,
+body.has-floating-tooltips .icon-danger-control[aria-label]::before,
+body.has-floating-tooltips .icon-danger-control[aria-label]::after {
+  display: none !important;
+}
+
+.floating-tooltip {
+  position: fixed;
+  z-index: 200;
+  max-width: min(240px, calc(100vw - 20px));
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(18, 21, 26, 0.98);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  color: #eef2f7;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
+  pointer-events: none;
+}
+
+.floating-tooltip::before {
+  content: "";
+  position: absolute;
+  left: var(--floating-tooltip-arrow-offset, 20px);
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(18, 21, 26, 0.98);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.floating-tooltip-top::before {
+  bottom: -5px;
+  transform: translateX(-50%) rotate(225deg);
+}
+
+.floating-tooltip-bottom::before {
+  top: -5px;
+}
+
 .project-setup-step-label {
   display: inline-block;
   margin-bottom: 6px;
