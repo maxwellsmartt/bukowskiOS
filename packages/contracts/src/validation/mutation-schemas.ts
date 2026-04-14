@@ -36,6 +36,7 @@ export const createAgentSchema = z
     emoji: optionalTrimmedString,
     modelKey: nonEmptyString,
     role: nonEmptyString,
+    mission: nonEmptyString,
     domain: nonEmptyString,
     allowedTools: z.array(nonEmptyString),
     allowedDomains: z.array(nonEmptyString),

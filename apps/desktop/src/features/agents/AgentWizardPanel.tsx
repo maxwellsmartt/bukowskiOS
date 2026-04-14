@@ -77,6 +77,7 @@ type AgentDraft = {
   emoji: string;
   modelKey: string;
   role: string;
+  mission: string;
   domain: string;
   allowedTools: string[];
   allowedDomains: string[];
@@ -86,18 +87,20 @@ type AgentDraft = {
 };
 
 const buildDraftFromMission = (mission: string): AgentDraft => {
-  const role = mission.trim();
-  const domain = inferDomain(role);
-  const firstSentence = role.split(".")[0]?.trim() || "New Agent";
+  const missionText = mission.trim();
+  const domain = inferDomain(missionText);
+  const firstSentence = missionText.split(".")[0]?.trim() || "New Agent";
   const displayName = firstSentence.length > 52 ? `${firstSentence.slice(0, 49)}...` : firstSentence;
   const agentId = slugify(displayName || "new-agent") || "new-agent";
+  const defaultRole = `${displayName || "New"} Agent`;
 
   return {
     agentId,
     displayName,
     emoji: "◌",
     modelKey: defaultModelByDomain[domain] ?? "openai:gpt-5.4-mini",
-    role: role || "Supports operational routing inside BukowskiOS.",
+    role: defaultRole,
+    mission: missionText || "Supports operational routing inside BukowskiOS.",
     domain,
     allowedTools: defaultToolsByDomain[domain] ?? ["workspace.search"],
     allowedDomains: defaultDomainsByDomain[domain] ?? [domain],
@@ -118,6 +121,7 @@ const buildDraftFromAgent = (agent: AgentRosterRow): AgentDraft => ({
       ? "openclaw:command"
       : "openai:gpt-5.4-mini",
   role: agent.role,
+  mission: agent.mission,
   domain: agent.domain,
   allowedTools: agent.toolsSummary ? agent.toolsSummary.split("·").map((value) => value.trim()).filter(Boolean) : [],
   allowedDomains: agent.domainsSummary ? agent.domainsSummary.split("·").map((value) => value.trim()).filter(Boolean) : [],
@@ -189,6 +193,7 @@ export const AgentWizardPanel = ({
           emoji: draft.emoji,
           modelKey: draft.modelKey,
           role: draft.role,
+          mission: draft.mission,
           domain: draft.domain,
           allowedTools: draft.allowedTools,
           allowedDomains: draft.allowedDomains,
@@ -205,6 +210,7 @@ export const AgentWizardPanel = ({
           emoji: draft.emoji,
           modelKey: draft.modelKey,
           role: draft.role,
+          mission: draft.mission,
           domain: draft.domain,
           allowedTools: draft.allowedTools,
           allowedDomains: draft.allowedDomains,
@@ -282,7 +288,7 @@ export const AgentWizardPanel = ({
               </label>
 
               <label className="field-block">
-                <span className="field-label">Display name</span>
+                <span className="field-label">Display Name</span>
                 <input
                   className="field-input"
                   onChange={(event) => setDraft((current) => (current ? { ...current, displayName: event.target.value } : current))}
@@ -355,12 +361,22 @@ export const AgentWizardPanel = ({
               </label>
 
               <label className="field-block field-block-span-2">
-                <span className="field-label">Mission</span>
+                <span className="field-label">Role</span>
                 <textarea
                   className="field-textarea"
                   onChange={(event) => setDraft((current) => (current ? { ...current, role: event.target.value } : current))}
-                  rows={4}
+                  rows={2}
                   value={draft?.role ?? ""}
+                />
+              </label>
+
+              <label className="field-block field-block-span-2">
+                <span className="field-label">Mission</span>
+                <textarea
+                  className="field-textarea"
+                  onChange={(event) => setDraft((current) => (current ? { ...current, mission: event.target.value } : current))}
+                  rows={4}
+                  value={draft?.mission ?? ""}
                 />
               </label>
 

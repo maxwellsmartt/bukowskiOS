@@ -83,6 +83,7 @@ const normalizeMeta = (response: {
   stateBody: string;
   routedAgentId: string | null;
   routedAgentName: string;
+  routedAgentRole: string | null;
   intentLabel: string;
   commandStateLabel: string;
   toolTraces: Array<{ summary: string }>;
@@ -105,6 +106,7 @@ const normalizeMeta = (response: {
   body: response.stateBody,
   routedAgentId: response.routedAgentId,
   routedAgentName: response.routedAgentName,
+  routedAgentRole: response.routedAgentRole,
   intentLabel: response.intentLabel,
   commandStateLabel: response.commandStateLabel,
   toolLabel: response.toolTraces.length ? response.toolTraces.map((trace) => trace.summary).join(" · ") : undefined,
@@ -536,6 +538,7 @@ export const createAssistantChatService = (
       assistantMessage: string;
       routedAgentId: string | null;
       routedAgentName: string;
+      routedAgentRole: string | null;
       orchestration: { intent: string | null; requiresApproval: boolean } | null;
       stateLabel: string;
       stateBody: string;
@@ -600,6 +603,7 @@ export const createAssistantChatService = (
       body: errorMessage,
       routedAgentId: null,
       routedAgentName: "Supervisor Agent",
+      routedAgentRole: "Supervisor Agent",
       intentLabel: "Routing unavailable",
       commandStateLabel: "No changes applied",
     };
@@ -828,7 +832,8 @@ export const createAssistantChatService = (
               agent_runs.thread_id,
               agent_runs.agent_id,
               agent_runs.title,
-              COALESCE(agents.display_name, 'Supervisor Agent') AS agent_display_name
+              COALESCE(agents.display_name, 'Supervisor Agent') AS agent_display_name,
+              COALESCE(NULLIF(trim(agents.role_label), ''), agents.display_name, 'Supervisor Agent') AS agent_role_label
             FROM agent_runs
             LEFT JOIN agents ON agents.id = agent_runs.agent_id
             WHERE agent_runs.workspace_id = ?
@@ -843,6 +848,7 @@ export const createAssistantChatService = (
             agent_id: string | null;
             title: string;
             agent_display_name: string;
+            agent_role_label: string;
           }
         | undefined;
 
@@ -859,6 +865,7 @@ export const createAssistantChatService = (
           body: "You denied this supervised draft. No changes were made.",
           routedAgentId: run.agent_id,
           routedAgentName: run.agent_display_name,
+          routedAgentRole: run.agent_role_label,
           intentLabel: "Approval decision recorded",
           commandStateLabel: "No changes applied",
           draftRunId: run.id,
@@ -908,6 +915,7 @@ export const createAssistantChatService = (
             : "Applying your approval and continuing this supervised follow-up.",
         routedAgentId: run.agent_id,
         routedAgentName: run.agent_display_name,
+        routedAgentRole: run.agent_role_label,
         intentLabel: "Approval decision recorded",
         commandStateLabel: "No changes applied",
         draftRunId: run.id,

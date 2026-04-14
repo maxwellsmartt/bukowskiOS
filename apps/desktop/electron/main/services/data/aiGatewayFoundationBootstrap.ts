@@ -107,6 +107,7 @@ const buildSystemAgentRecord = (agent: AgentConfigRecord) => ({
   id: agent.id,
   agentKey: agent.agent_key,
   displayName: agent.display_name,
+  roleLabel: agent.display_name,
   emoji: agent.emoji,
   iconKey: agent.icon_key,
   agentType: agent.agent_type,
@@ -136,6 +137,7 @@ const buildSystemAgentRecord = (agent: AgentConfigRecord) => ({
 
 export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
   ensureColumn(db, "agents", "provider_key", "TEXT");
+  ensureColumn(db, "agents", "role_label", "TEXT");
   ensureColumn(db, "agents", "agent_type", "TEXT DEFAULT 'specialist'");
   ensureColumn(db, "agents", "icon_key", "TEXT");
   ensureColumn(db, "agents", "mission", "TEXT");
@@ -177,6 +179,12 @@ export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
   agentsMissingProvider.forEach((agent) => {
     db.prepare("UPDATE agents SET provider_key = ? WHERE id = ?").run(inferProviderKeyFromModel(agent.model_key), agent.id);
   });
+
+  db.exec(`
+    UPDATE agents
+    SET role_label = COALESCE(NULLIF(trim(role_label), ''), display_name)
+    WHERE role_label IS NULL OR trim(role_label) = '';
+  `);
 };
 
 export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
@@ -234,6 +242,7 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
       workspace_id,
       agent_key,
       display_name,
+      role_label,
       emoji,
       role_summary,
       domain_key,
@@ -261,13 +270,14 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
       sort_order,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const updateSystemAgent = db.prepare(`
     UPDATE agents
     SET
       agent_key = ?,
+      role_label = ?,
       emoji = ?,
       domain_key = ?,
       agent_type = ?,
@@ -296,6 +306,7 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
         workspace.id,
         agent.agentKey,
         agent.displayName,
+        agent.roleLabel,
         agent.emoji,
         agent.roleSummary,
         agent.domainKey,
@@ -327,6 +338,7 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
 
       updateSystemAgent.run(
         agent.agentKey,
+        agent.roleLabel,
         agent.emoji,
         agent.domainKey,
         agent.agentType,

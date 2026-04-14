@@ -18,6 +18,12 @@ const statusLabelMap = {
   paused: "Paused",
 } as const;
 
+const operationalStateLabelMap = {
+  idle: "Idle",
+  working: "Working",
+  not_working: "Not working",
+} as const;
+
 export const AgentsMissionControlPage = () => {
   const { data, error, reload } = useMissionControlSnapshot();
   const [searchParams] = useSearchParams();
@@ -186,6 +192,9 @@ export const AgentsMissionControlPage = () => {
                 </div>
                 <span className="mission-node-role mission-node-role-clamped">{data.supervisor.role}</span>
                 <div className="mission-node-footer">
+                  <span className={`mission-operational-pill mission-operational-pill-${data.supervisor.operationalState}`}>
+                    {operationalStateLabelMap[data.supervisor.operationalState]}
+                  </span>
                   <span className={`mission-node-status mission-node-status-${data.supervisor.status}`}>
                     {statusLabelMap[data.supervisor.status]}
                   </span>
@@ -214,6 +223,9 @@ export const AgentsMissionControlPage = () => {
                     </div>
                     <span className="mission-node-role mission-node-role-clamped">{agent.role}</span>
                     <div className="mission-node-footer">
+                      <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
+                        {operationalStateLabelMap[agent.operationalState]}
+                      </span>
                       <span className={`mission-node-status mission-node-status-${agent.status}`}>
                         {statusLabelMap[agent.status]}
                       </span>
@@ -248,6 +260,9 @@ export const AgentsMissionControlPage = () => {
           >
             <div className="agent-detail-stack">
               <div className="agent-detail-row">
+                <span className={`mission-operational-pill mission-operational-pill-${selectedAgent.operationalState}`}>
+                  {operationalStateLabelMap[selectedAgent.operationalState]}
+                </span>
                 <span className={`mission-node-status mission-node-status-${selectedAgent.status}`}>
                   {statusLabelMap[selectedAgent.status]}
                 </span>
@@ -259,6 +274,10 @@ export const AgentsMissionControlPage = () => {
                 <div>
                   <span className="agent-detail-kicker">Role</span>
                   <strong>{selectedAgent.role}</strong>
+                </div>
+                <div>
+                  <span className="agent-detail-kicker">Mission</span>
+                  <strong>{selectedAgent.mission}</strong>
                 </div>
                 <div>
                   <span className="agent-detail-kicker">Domain</span>

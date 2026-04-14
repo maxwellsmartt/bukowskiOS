@@ -33,6 +33,7 @@ export type AssistantChatMessageMeta = {
   body: string;
   routedAgentId: string | null;
   routedAgentName: string;
+  routedAgentRole: string | null;
   intentLabel: string;
   commandStateLabel: string;
   toolLabel?: string;
@@ -89,9 +90,10 @@ export type AgentGraphNode = {
   displayName: string;
   emoji: string;
   role: string;
+  mission: string;
   domain: string;
   status: AgentStatus;
-  operationalState: "idle" | "working" | "attention";
+  operationalState: "idle" | "working" | "not_working";
   secondaryLabel: string;
   isSupervisor: boolean;
 };
@@ -102,9 +104,11 @@ export type AgentRosterRow = {
   displayName: string;
   emoji: string;
   role: string;
+  mission: string;
   domain: string;
   providerKey: string;
   status: AgentStatus;
+  operationalState: "idle" | "working" | "not_working";
   modelLabel: string;
   approvalMode: AgentApprovalMode;
   toolsSummary: string;

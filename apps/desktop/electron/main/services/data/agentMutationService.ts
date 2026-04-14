@@ -157,6 +157,7 @@ const buildApprovalMeta = (
   decision: ReviewAgentRunCommand["decision"],
   routedAgentId: string | null,
   routedAgentName: string,
+  routedAgentRole: string | null,
 ): AssistantChatMessageMeta => {
   if (decision === "deny") {
     return {
@@ -165,6 +166,7 @@ const buildApprovalMeta = (
       body: "This draft was denied. No command-layer action will proceed from it.",
       routedAgentId,
       routedAgentName,
+      routedAgentRole,
       intentLabel: "Approval decision recorded",
       commandStateLabel: "Denied · no changes applied",
       approvalDecision: "denied",
@@ -179,6 +181,7 @@ const buildApprovalMeta = (
       body: "This thread is approved for this specialist during the current session. No command-layer action was executed.",
       routedAgentId,
       routedAgentName,
+      routedAgentRole,
       intentLabel: "Approval decision recorded",
       commandStateLabel: "Session-approved · no changes made",
       approvalDecision: "approved_for_session",
@@ -192,6 +195,7 @@ const buildApprovalMeta = (
     body: "This draft is approved for supervised follow-up. No command-layer action was executed.",
     routedAgentId,
     routedAgentName,
+    routedAgentRole,
     intentLabel: "Approval decision recorded",
     commandStateLabel: "Approved · no changes made",
     approvalDecision: "approved",
@@ -300,7 +304,8 @@ export const createAgentMutationService = (
     const now = new Date().toISOString();
     const agentId = ensureValue(input.agentId, "Agent ID").toLowerCase();
     const displayName = ensureValue(input.displayName, "Display name");
-    const role = ensureValue(input.role, "Mission");
+    const role = ensureValue(input.role, "Role");
+    const mission = ensureValue(input.mission, "Mission");
     const domain = ensureValue(input.domain, "Domain");
     const modelKey = ensureValue(input.modelKey, "Model");
     const providerKey = resolveProviderKey(modelKey);
@@ -324,8 +329,10 @@ export const createAgentMutationService = (
           workspace_id,
           agent_key,
           display_name,
+          role_label,
           emoji,
           role_summary,
+          mission,
           domain_key,
           provider_key,
           model_key,
@@ -340,7 +347,7 @@ export const createAgentMutationService = (
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0,
           COALESCE((SELECT MAX(sort_order) + 1 FROM agents WHERE workspace_id = ?), 1),
           ?, ?
         )
@@ -350,8 +357,10 @@ export const createAgentMutationService = (
       workspaceId,
       agentId,
       displayName,
-      optionalValue(input.emoji),
       role,
+      optionalValue(input.emoji),
+      mission,
+      mission,
       domain,
       providerKey,
       modelKey,
@@ -386,7 +395,8 @@ export const createAgentMutationService = (
   updateAgent(input: UpdateAgentCommand): AgentMutationResult {
     const now = new Date().toISOString();
     const displayName = ensureValue(input.displayName, "Display name");
-    const role = ensureValue(input.role, "Mission");
+    const role = ensureValue(input.role, "Role");
+    const mission = ensureValue(input.mission, "Mission");
     const domain = ensureValue(input.domain, "Domain");
     const modelKey = ensureValue(input.modelKey, "Model");
     const providerKey = resolveProviderKey(modelKey);
@@ -414,8 +424,10 @@ export const createAgentMutationService = (
         UPDATE agents
         SET agent_key = ?,
             display_name = ?,
+            role_label = ?,
             emoji = ?,
             role_summary = ?,
+            mission = ?,
             domain_key = ?,
             provider_key = ?,
             model_key = ?,
@@ -432,8 +444,10 @@ export const createAgentMutationService = (
     ).run(
       nextAgentKey,
       displayName,
-      optionalValue(input.emoji),
       role,
+      optionalValue(input.emoji),
+      mission,
+      mission,
       domain,
       providerKey,
       modelKey,
@@ -869,7 +883,8 @@ export const createAgentMutationService = (
             agent_runs.title,
             agent_runs.status,
             agent_runs.approval_required,
-            COALESCE(agents.display_name, 'Supervisor Agent') AS agent_display_name
+            COALESCE(agents.display_name, 'Supervisor Agent') AS agent_display_name,
+            COALESCE(NULLIF(trim(agents.role_label), ''), agents.display_name, 'Supervisor Agent') AS agent_role_label
           FROM agent_runs
           LEFT JOIN agents ON agents.id = agent_runs.agent_id
           WHERE agent_runs.workspace_id = ?
@@ -886,6 +901,7 @@ export const createAgentMutationService = (
           status: string;
           approval_required: number;
           agent_display_name: string;
+          agent_role_label: string;
         }
       | undefined;
 
@@ -959,7 +975,7 @@ export const createAgentMutationService = (
           db,
           run.thread_id,
           run.id,
-          buildApprovalMeta(input.decision, run.agent_id, run.agent_display_name),
+          buildApprovalMeta(input.decision, run.agent_id, run.agent_display_name, run.agent_role_label),
         );
       }
 

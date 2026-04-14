@@ -32,13 +32,15 @@ describe("agent read service", () => {
 
     const reads = createAgentReadService(database);
     const missionControl = reads.getMissionControlSnapshot();
+    const agents = reads.getAgentsList();
 
     expect(missionControl.supervisor?.displayName).toBe("Supervisor Agent");
-    expect(missionControl.supervisor?.operationalState).toBe("working");
+    expect(missionControl.supervisor?.operationalState).toBe("not_working");
     expect(missionControl.subagents.length).toBeGreaterThanOrEqual(5);
     expect(missionControl.queue.length).toBeGreaterThan(0);
     expect(missionControl.activity.length).toBeGreaterThan(0);
-    expect(reads.getAgentsList().some((agent) => agent.displayName === "Assets Agent")).toBe(true);
+    expect(agents.some((agent) => agent.displayName === "Assets Agent")).toBe(true);
+    expect(agents.some((agent) => agent.role === "Assets Agent")).toBe(true);
     expect(reads.getRunsList().some((run) => run.status === "needs_approval")).toBe(true);
     expect(reads.getModelsSnapshot().providers.some((provider) => provider.providerKey === "openai")).toBe(true);
     expect(reads.getConnectorsSnapshot().some((connector) => connector.status === "configured")).toBe(true);

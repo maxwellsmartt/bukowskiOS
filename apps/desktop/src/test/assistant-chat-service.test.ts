@@ -63,6 +63,7 @@ describe("assistant chat service", () => {
           assistantMessage: "I reviewed the attached image.",
           routedAgentId: "agent-supervisor",
           routedAgentName: "Supervisor Agent",
+          routedAgentRole: "Supervisor Agent",
           intentLabel: "Image review request",
           commandStateLabel: "No changes applied",
           draftRunId: null,

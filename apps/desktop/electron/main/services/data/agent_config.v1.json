@@ -19,6 +19,7 @@
   ],
   "user_overridable_fields": [
     "display_name",
+    "role_label",
     "role_summary",
     "mission",
     "provider_key",

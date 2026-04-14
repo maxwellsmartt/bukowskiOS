@@ -15,6 +15,7 @@ export type AgentEditorInput = {
   emoji?: string;
   modelKey: string;
   role: string;
+  mission: string;
   domain: string;
   allowedTools: string[];
   allowedDomains: string[];
@@ -165,6 +166,7 @@ export type DraftRunFromChatResult = {
   status: AgentRunStatus;
   routedAgentId: string | null;
   routedAgentName: string;
+  routedAgentRole?: string | null;
   supervisorReply: string;
   requiresApproval: boolean;
 };
@@ -216,6 +218,7 @@ export type AssistantGatewayResponse = {
   assistantMessage: string;
   routedAgentId: string | null;
   routedAgentName: string;
+  routedAgentRole: string | null;
   intentLabel: string;
   commandStateLabel: string;
   draftRunId: string | null;

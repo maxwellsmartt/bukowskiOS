@@ -12,6 +12,11 @@ import { setAgentStatus, useAgentDetail, useAgentsList, useMissionControlSnapsho
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
+const operationalStateLabelMap = {
+  idle: "Idle",
+  working: "Working",
+  not_working: "Not working",
+} as const;
 
 export const AgentsPage = () => {
   const { data, error } = useAgentsList();
@@ -71,6 +76,9 @@ export const AgentsPage = () => {
                 <strong>{agent.displayName}</strong>
                 <p>{agent.role}</p>
                 <div className="agent-directory-meta">
+                  <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
+                    {operationalStateLabelMap[agent.operationalState]}
+                  </span>
                   <span className="subtle-pill">{agent.domain}</span>
                   <span className="subtle-pill">{agent.modelLabel}</span>
                 </div>
@@ -123,6 +131,9 @@ export const AgentsPage = () => {
           {detail.agent ? (
             <div className="agent-detail-stack">
               <div className="agent-detail-row">
+                <span className={`mission-operational-pill mission-operational-pill-${detail.agent.operationalState}`}>
+                  {operationalStateLabelMap[detail.agent.operationalState]}
+                </span>
                 <span className={`mission-node-status mission-node-status-${detail.agent.status}`}>{detail.agent.status}</span>
                 <span className="subtle-pill">{detail.agent.modelLabel}</span>
                 <span className="subtle-pill">{detail.agent.approvalMode.replace(/_/g, " ")}</span>
@@ -135,6 +146,10 @@ export const AgentsPage = () => {
                 <div>
                   <span className="agent-detail-kicker">Domains</span>
                   <strong>{detail.domains.join(" · ") || "No domains defined"}</strong>
+                </div>
+                <div>
+                  <span className="agent-detail-kicker">Mission</span>
+                  <strong>{detail.agent.mission}</strong>
                 </div>
               </div>
               <p className="agent-detail-notes">{detail.agent.notes || "No notes for this agent yet."}</p>

@@ -237,7 +237,7 @@ const loadAgentTarget = (db: DatabaseSync, agentKey: string) =>
   db
     .prepare(
       `
-        SELECT id, display_name, approval_mode
+        SELECT id, display_name, COALESCE(NULLIF(trim(role_label), ''), display_name) AS role_label, approval_mode
         FROM agents
         WHERE workspace_id = ?
           AND agent_key = ?
@@ -248,6 +248,7 @@ const loadAgentTarget = (db: DatabaseSync, agentKey: string) =>
     | {
         id: string;
         display_name: string;
+        role_label: string;
         approval_mode: string;
       }
     | undefined;
@@ -256,7 +257,7 @@ const loadAgentRuntimeConfigByKey = (db: DatabaseSync, agentKey: string) =>
   db
     .prepare(
       `
-        SELECT id, agent_key, display_name, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
+        SELECT id, agent_key, display_name, COALESCE(NULLIF(trim(role_label), ''), display_name) AS role_label, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
         FROM agents
         WHERE workspace_id = ?
           AND agent_key = ?
@@ -268,6 +269,7 @@ const loadAgentRuntimeConfigByKey = (db: DatabaseSync, agentKey: string) =>
         id: string;
         agent_key: string;
         display_name: string;
+        role_label: string;
         approval_mode: string;
         provider_key: string | null;
         model_key: string;
@@ -279,7 +281,7 @@ const loadAgentRuntimeConfigById = (db: DatabaseSync, agentId: string) =>
   db
     .prepare(
       `
-        SELECT id, agent_key, display_name, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
+        SELECT id, agent_key, display_name, COALESCE(NULLIF(trim(role_label), ''), display_name) AS role_label, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
         FROM agents
         WHERE workspace_id = ?
           AND id = ?
@@ -291,6 +293,7 @@ const loadAgentRuntimeConfigById = (db: DatabaseSync, agentId: string) =>
         id: string;
         agent_key: string;
         display_name: string;
+        role_label: string;
         approval_mode: string;
         provider_key: string | null;
         model_key: string;
@@ -466,6 +469,7 @@ const buildHumanErrorResponse = (
   assistantMessage: body,
   routedAgentId: null,
   routedAgentName: "Supervisor Agent",
+  routedAgentRole: "Supervisor Agent",
   intentLabel: "Routing unavailable",
   commandStateLabel: "No changes applied",
   draftRunId: null,
@@ -497,6 +501,22 @@ const deriveApprovalReason = (args: {
   }
 
   return null;
+};
+
+const markThreadRoutedAgentPending = (db: DatabaseSync, threadId: string, routedAgentId: string | null) => {
+  if (!routedAgentId) {
+    return;
+  }
+
+  db.prepare(
+    `
+      UPDATE assistant_chat_thread_state
+      SET last_routed_agent_id = ?,
+          updated_at = ?
+      WHERE thread_id = ?
+        AND last_state IN ('pending', 'streaming')
+    `,
+  ).run(routedAgentId, new Date().toISOString(), threadId);
 };
 
 export const createAssistantGatewayService = (
@@ -725,6 +745,7 @@ export const createAssistantGatewayService = (
             assistantMessage: "I could not finish that read-only lookup cleanly. No changes were made.",
             routedAgentId: null,
             routedAgentName: "Supervisor Agent",
+            routedAgentRole: "Supervisor Agent",
             intentLabel: "Intent classified",
             commandStateLabel: "No changes applied",
             draftRunId: null,
@@ -795,6 +816,7 @@ export const createAssistantGatewayService = (
         assistantMessage: "I could not finish that answer cleanly. No changes were made.",
         routedAgentId: null,
         routedAgentName: "Supervisor Agent",
+        routedAgentRole: "Supervisor Agent",
         intentLabel: "Intent classified",
         commandStateLabel: "No changes applied",
         draftRunId: null,
@@ -807,6 +829,9 @@ export const createAssistantGatewayService = (
 
     const target = loadAgentTarget(db, orchestration.target_agent);
     const targetRuntime = loadAgentRuntimeConfigByKey(db, orchestration.target_agent);
+
+    markThreadRoutedAgentPending(db, request.threadId, target?.id ?? null);
+
     const sessionApproval = loadThreadSessionApproval(db, request.threadId);
     const requestedApprovalMode = request.context.requestedApprovalMode ?? "supervised";
     const sessionApprovalApplies =
@@ -1087,6 +1112,7 @@ export const createAssistantGatewayService = (
       assistantMessage: specialistMessage,
       routedAgentId: typedOrchestration.targetAgentId,
       routedAgentName: typedOrchestration.targetAgentName,
+      routedAgentRole: target?.role_label ?? "Supervisor Agent",
       intentLabel: `Intent classified · ${typedOrchestration.intent}`,
       commandStateLabel: draftRunId
         ? requiresApproval

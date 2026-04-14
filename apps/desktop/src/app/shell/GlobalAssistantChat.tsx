@@ -419,6 +419,7 @@ export const GlobalAssistantChat = () => {
       body: "Routing intent and preparing a supervised response. No changes have been made.",
       routedAgentId: null,
       routedAgentName: "Supervisor Agent",
+      routedAgentRole: "Supervisor Agent",
       intentLabel,
       commandStateLabel: "No changes applied",
     } satisfies AssistantChatSessionState;
@@ -491,6 +492,7 @@ export const GlobalAssistantChat = () => {
                 : "Applying your approval and waiting for the delegated work to finish.",
             routedAgentId: resolvedActiveSession.lastRoutedAgentId,
             routedAgentName: activeSessionState?.routedAgentName ?? "Supervisor Agent",
+            routedAgentRole: activeSessionState?.routedAgentRole ?? "Supervisor Agent",
             intentLabel: "Approval decision recorded",
             commandStateLabel: "No changes applied",
             draftRunId: runId,
@@ -681,7 +683,12 @@ export const GlobalAssistantChat = () => {
                         </div>
                         <div className="assistant-chat-session-detail-row">
                           <span>Assigned</span>
-                          <strong>{hasState ? session.latestState?.routedAgentName ?? "Supervisor Agent" : "Not routed yet"}</strong>
+                          <div className="assistant-chat-assigned-agent">
+                            <strong>{hasState ? session.latestState?.routedAgentName ?? "Supervisor Agent" : "Not routed yet"}</strong>
+                            {hasState && session.latestState?.routedAgentRole ? (
+                              <span>{session.latestState.routedAgentRole}</span>
+                            ) : null}
+                          </div>
                         </div>
                         <div className="assistant-chat-session-detail-row">
                           <span>Intent</span>
@@ -751,9 +758,14 @@ export const GlobalAssistantChat = () => {
                 return (
                   <div key={entry.id} className="assistant-chat-message-block assistant-chat-message-block-assistant">
                     <div className="assistant-chat-message-meta">
-                      <span className={`assistant-chat-speaker-pill${messageState ? ` assistant-chat-speaker-pill-${messageState.tone}` : ""}`}>
-                        {messageState?.routedAgentName ?? "Supervisor Agent"}
-                      </span>
+                      <div className="assistant-chat-speaker-meta">
+                        <span className={`assistant-chat-speaker-pill${messageState ? ` assistant-chat-speaker-pill-${messageState.tone}` : ""}`}>
+                          {messageState?.routedAgentName ?? "Supervisor Agent"}
+                        </span>
+                        {messageState?.routedAgentRole ? (
+                          <span className="assistant-chat-speaker-role">{messageState.routedAgentRole}</span>
+                        ) : null}
+                      </div>
                       {messageState ? (
                         <button
                           aria-label={isExpanded ? "Hide response details" : "Show response details"}

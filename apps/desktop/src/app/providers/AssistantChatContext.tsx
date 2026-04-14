@@ -135,6 +135,7 @@ const deriveFallbackState = (thread: AssistantChatThreadRow): AssistantChatSessi
       body: "Routing intent and preparing a supervised response. No changes have been made.",
       routedAgentId: thread.lastRoutedAgentId,
       routedAgentName: "Supervisor Agent",
+      routedAgentRole: "Supervisor Agent",
       intentLabel: thread.lastIntent ?? "Pending classification",
       commandStateLabel: "No changes applied",
     };
@@ -146,6 +147,7 @@ const deriveFallbackState = (thread: AssistantChatThreadRow): AssistantChatSessi
     body: thread.lastErrorSummary ?? "This conversation could not be completed.",
     routedAgentId: thread.lastRoutedAgentId,
     routedAgentName: "Supervisor Agent",
+    routedAgentRole: "Supervisor Agent",
     intentLabel: thread.lastIntent ?? "Routing unavailable",
     commandStateLabel: "No changes applied",
   };

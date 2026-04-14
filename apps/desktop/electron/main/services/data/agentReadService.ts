@@ -83,8 +83,10 @@ type AgentRow = {
   id: string;
   agent_key: string;
   display_name: string;
+  role_label: string | null;
   emoji: string | null;
   role_summary: string;
+  mission: string | null;
   domain_key: string;
   provider_key: string | null;
   model_key: string;
@@ -110,8 +112,10 @@ const loadAgentRows = (db: DatabaseSync) =>
           id,
           agent_key,
           display_name,
+          role_label,
           emoji,
           role_summary,
+          mission,
           domain_key,
           provider_key,
           model_key,
@@ -131,19 +135,38 @@ const loadAgentRows = (db: DatabaseSync) =>
     .all(workspaceId)
     .filter((row) => isVisibleAgent(row as AgentRow)) as AgentRow[];
 
-const toRosterRow = (row: AgentRow): AgentRosterRow => {
+const toRosterRow = (
+  row: AgentRow,
+  statusContext?: {
+    busyAgentIds: Set<string>;
+    notWorkingAgentIds: Set<string>;
+    unhealthyProviderKeys: Set<string>;
+  },
+): AgentRosterRow => {
   const tools = parseJsonArray(row.allowed_tools_json);
   const domains = parseJsonArray(row.allowed_domains_json);
+  const role = row.role_label?.trim() || row.display_name;
+  const mission = row.mission?.trim() || row.role_summary;
 
   return {
     id: row.id,
     agentId: row.agent_key,
     displayName: row.display_name,
     emoji: row.emoji ?? "◌",
-    role: row.role_summary,
+    role,
+    mission,
     domain: row.domain_key,
     providerKey: row.provider_key ?? "openai",
     status: row.status,
+    operationalState:
+      row.status === "paused" ||
+      !row.model_key.trim() ||
+      statusContext?.unhealthyProviderKeys.has(row.provider_key ?? "openai") ||
+      statusContext?.notWorkingAgentIds.has(row.id)
+        ? "not_working"
+        : statusContext?.busyAgentIds.has(row.id)
+          ? "working"
+          : "idle",
     modelLabel: row.model_label,
     approvalMode: row.approval_mode,
     toolsSummary: tools.join(" · "),
@@ -161,7 +184,7 @@ const loadBusyAgentIds = (db: DatabaseSync) => {
         FROM agent_runs
         WHERE workspace_id = ?
           AND agent_id IS NOT NULL
-          AND status IN ('routing', 'running', 'approved')
+          AND status IN ('routing', 'running')
       `,
     )
     .all(workspaceId) as Array<{ agent_id: string }>;
@@ -183,11 +206,11 @@ const loadBusyAgentIds = (db: DatabaseSync) => {
   ]);
 };
 
-const loadAttentionAgentIds = (db: DatabaseSync) => {
+const loadNotWorkingAgentIds = (db: DatabaseSync) => {
   const providerRows = loadProviderRows(db);
   const unhealthyProviders = new Set(
     providerRows
-      .filter((row) => row.enabled === 1 && !["healthy", "configured"].includes(row.status))
+      .filter((row) => row.enabled !== 1 || !["healthy", "configured"].includes(row.status))
       .map((row) => row.provider_key),
   );
 
@@ -213,7 +236,7 @@ const toGraphNode = (
   row: AgentRow,
   statusContext: {
     busyAgentIds: Set<string>;
-    attentionAgentIds: Set<string>;
+    notWorkingAgentIds: Set<string>;
     unhealthyProviderKeys: Set<string>;
   },
 ): AgentGraphNode => ({
@@ -221,12 +244,16 @@ const toGraphNode = (
   agentId: row.agent_key,
   displayName: row.display_name,
   emoji: row.emoji ?? "◌",
-  role: row.role_summary,
+  role: row.role_label?.trim() || row.display_name,
+  mission: row.mission?.trim() || row.role_summary,
   domain: row.domain_key,
   status: row.status,
   operationalState:
-    row.status === "paused" || statusContext.unhealthyProviderKeys.has(row.provider_key ?? "openai") || statusContext.attentionAgentIds.has(row.id)
-      ? "attention"
+    row.status === "paused" ||
+    !row.model_key.trim() ||
+    statusContext.unhealthyProviderKeys.has(row.provider_key ?? "openai") ||
+    statusContext.notWorkingAgentIds.has(row.id)
+      ? "not_working"
       : statusContext.busyAgentIds.has(row.id)
         ? "working"
         : "idle",
@@ -468,7 +495,7 @@ export const createAgentReadService = (
     const supervisor = agentRows.find((row) => row.is_supervisor === 1) ?? null;
     const subagents = agentRows.filter((row) => row.is_supervisor !== 1);
     const busyAgentIds = loadBusyAgentIds(db);
-    const attentionContext = loadAttentionAgentIds(db);
+    const attentionContext = loadNotWorkingAgentIds(db);
     const modelSummary = buildProviderRows(db, secretStore);
     const connectorSummary = db
       .prepare(
@@ -506,16 +533,16 @@ export const createAgentReadService = (
       supervisor: supervisor
         ? toGraphNode(supervisor, {
             busyAgentIds,
-            attentionAgentIds: attentionContext.runAgentIds,
+            notWorkingAgentIds: attentionContext.runAgentIds,
             unhealthyProviderKeys: attentionContext.providerKeys,
           })
         : null,
       subagents: subagents.map((agent) =>
         toGraphNode(agent, {
-          busyAgentIds,
-          attentionAgentIds: attentionContext.runAgentIds,
-          unhealthyProviderKeys: attentionContext.providerKeys,
-        }),
+            busyAgentIds,
+            notWorkingAgentIds: attentionContext.runAgentIds,
+            unhealthyProviderKeys: attentionContext.providerKeys,
+          }),
       ),
       queue: loadRuns(db, 5).filter(isVisibleRunRow).map(toRunRow),
       activity: loadActivity(db, 6).filter(isVisibleActivityRow).map(toActivityRow),
@@ -539,7 +566,16 @@ export const createAgentReadService = (
   },
 
   getAgentsList(): AgentRosterRow[] {
-    return loadAgentRows(db).map(toRosterRow);
+    const busyAgentIds = loadBusyAgentIds(db);
+    const attentionContext = loadNotWorkingAgentIds(db);
+
+    return loadAgentRows(db).map((row) =>
+      toRosterRow(row, {
+        busyAgentIds,
+        notWorkingAgentIds: attentionContext.runAgentIds,
+        unhealthyProviderKeys: attentionContext.providerKeys,
+      }),
+    );
   },
 
   getAgentDetail(agentId: string): AgentDetailSnapshot {
@@ -554,8 +590,15 @@ export const createAgentReadService = (
       };
     }
 
+    const busyAgentIds = loadBusyAgentIds(db);
+    const attentionContext = loadNotWorkingAgentIds(db);
+
     return {
-      agent: toRosterRow(row),
+      agent: toRosterRow(row, {
+        busyAgentIds,
+        notWorkingAgentIds: attentionContext.runAgentIds,
+        unhealthyProviderKeys: attentionContext.providerKeys,
+      }),
       tools: parseJsonArray(row.allowed_tools_json),
       domains: parseJsonArray(row.allowed_domains_json),
       recentRuns: loadRuns(db, 4, row.id).map(toRunRow),
