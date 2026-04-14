@@ -1570,6 +1570,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             assets.id AS asset_id,
             assets.name AS asset_name,
             COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
+            COALESCE(assets.serial_number, '—') AS serial_number,
             packing_slip_items.quantity,
             COALESCE(packing_slip_items.condition_out, '—') AS condition_out,
             COALESCE(packing_slip_items.condition_in, '—') AS condition_in,
@@ -1592,6 +1593,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       asset_id: string;
       asset_name: string;
       code: string;
+      serial_number: string;
       quantity: number;
       condition_out: string;
       condition_in: string;
@@ -1606,6 +1608,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       assetId: row.asset_id,
       asset: row.asset_name,
       code: row.code,
+      serialNumber: row.serial_number,
       quantity: row.quantity,
       conditionOut: row.condition_out,
       conditionIn: row.condition_in,

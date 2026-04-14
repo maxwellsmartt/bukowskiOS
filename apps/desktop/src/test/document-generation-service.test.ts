@@ -25,6 +25,7 @@ test("document generation service creates a packing slip pdf buffer", async () =
       {
         code: "CAM-001",
         name: "Cinema Camera",
+        serialNumber: "SN-CAM-001",
         quantity: 1,
         conditionOut: "Good",
         conditionIn: "Good",
@@ -35,6 +36,7 @@ test("document generation service creates a packing slip pdf buffer", async () =
       {
         code: "LGT-101",
         name: "Key Light",
+        serialNumber: "SN-LGT-101",
         quantity: 2,
         conditionOut: "Good",
         conditionIn: "",

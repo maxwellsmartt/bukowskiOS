@@ -213,6 +213,7 @@ app.whenReady().then(() => {
         items: detail.items.map((item) => ({
           code: item.code,
           name: item.asset,
+          serialNumber: item.serialNumber,
           quantity: item.quantity,
           conditionOut: item.conditionOut,
           conditionIn: item.conditionIn,

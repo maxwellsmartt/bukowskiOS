@@ -58,6 +58,7 @@ export type PackingSlipItemRow = {
   assetId: string;
   asset: string;
   code: string;
+  serialNumber: string;
   quantity: number;
   conditionOut: string;
   conditionIn: string;

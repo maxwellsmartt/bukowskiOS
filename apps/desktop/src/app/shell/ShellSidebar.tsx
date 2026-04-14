@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 
 import { resolveActiveRoute, resolvePrimaryNavKey } from "@app/routing/route-meta";
+import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
 
 import { ShellProjectsPanel } from "./ShellProjectsPanel";
 import { primaryNav, utilityNav } from "./navigation";
@@ -13,7 +14,7 @@ export const ShellSidebar = () => {
   return (
     <aside className="shell-sidebar">
       <div className="shell-brand">
-        <img className="shell-brand-lockup" src="/brand/bukowskiOS_logo_white@2x.png" alt="bukowskiOS" />
+        <img className="shell-brand-lockup" src={brandLogoWhite} alt="bukowskiOS" />
       </div>
 
       <div className="shell-sidebar-scroll-zone">
