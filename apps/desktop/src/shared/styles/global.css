@@ -4750,6 +4750,27 @@ button.timeline-signal-chip:focus-visible {
   flex-shrink: 0;
 }
 
+.catalog-kit-asset-stock,
+.catalog-kit-asset-context {
+  color: var(--text-muted);
+}
+
+.catalog-kit-preview-list {
+  display: grid;
+  gap: 10px;
+}
+
+.catalog-kit-preview-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
 .catalog-crew-support-grid {
   display: grid;
   gap: 12px;

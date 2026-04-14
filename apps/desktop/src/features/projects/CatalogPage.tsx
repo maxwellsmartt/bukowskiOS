@@ -11,6 +11,9 @@ import type {
   CatalogSnapshot,
   CatalogSortField,
 } from "@contracts";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { AssetAssignMovePanel, type AssetAssignSelectionRow, type AssetAssignMoveFormValue } from "@features/assets/AssetAssignMovePanel";
+import { assignMoveAssets } from "@features/assets/useAssetsData";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
@@ -21,6 +24,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
+import { useShellContext } from "@shared/hooks/useShellContext";
 
 import { CatalogEditorPanel } from "./CatalogEditorPanel";
 import {
@@ -35,6 +39,7 @@ import {
   uploadCrewCatalogDocuments,
   updateCatalogEntity,
   useCatalogData,
+  useProjectsData,
 } from "./useProjectsData";
 
 type CatalogTabConfig = {
@@ -166,7 +171,8 @@ const buildCatalogPreviewRows = (entityType: CatalogEntityType, row: Record<stri
     case "kit":
       return [
         { label: "Code", value: String(row.code ?? "—") },
-        { label: "Items", value: String(row.assetCount ?? "0") },
+        { label: "Members", value: String(Array.isArray(row.assetSelections) ? row.assetSelections.length : 0) },
+        { label: "Units in package", value: String(row.assetCount ?? "0") },
         { label: "Primary QR", value: String(row.primaryCodeValue ?? "Pending") },
         { label: "Description", value: String(row.description ?? "—") },
       ];
@@ -359,6 +365,8 @@ const CatalogCsvImportDialog = ({
 };
 
 export const CatalogPage = () => {
+  const { refreshProjects } = useShellContext();
+  const { data: projects } = useProjectsData();
   const [activeTab, setActiveTab] = useState<CatalogEntityType>("crew");
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
@@ -404,6 +412,9 @@ export const CatalogPage = () => {
   const [importDialogState, setImportDialogState] = useState<ImportDialogState | null>(null);
   const [isSubmittingImport, setIsSubmittingImport] = useState(false);
   const [catalogActionMessage, setCatalogActionMessage] = useState<string | null>(null);
+  const [kitAssignOpen, setKitAssignOpen] = useState(false);
+  const [kitAssignError, setKitAssignError] = useState<string | null>(null);
+  const [isSubmittingKitAssign, setIsSubmittingKitAssign] = useState(false);
 
   const tabs = useMemo<CatalogTabConfig[]>(
     () => [
@@ -514,7 +525,14 @@ export const CatalogPage = () => {
         columns: [
           { key: "code", label: "Code", width: 90, minWidth: 76, render: (row) => row.code as string },
           { key: "name", label: "Kit", width: 180, minWidth: 144, render: (row) => row.name as string },
-          { key: "assetCount", label: "Items", align: "right", width: 80, minWidth: 66, render: (row) => row.assetCount as number },
+          {
+            key: "memberCount",
+            label: "Package",
+            width: 172,
+            minWidth: 148,
+            render: (row) =>
+              `${Array.isArray(row.assetSelections) ? row.assetSelections.length : 0} members · ${String(row.assetCount ?? 0)} units`,
+          },
           { key: "primaryCodeValue", label: "QR ready", width: 170, minWidth: 132, render: (row) => row.primaryCodeValue as string },
           { key: "description", label: "Description", width: 220, minWidth: 170, render: (row) => row.description as string },
         ],
@@ -545,10 +563,56 @@ export const CatalogPage = () => {
   const selectedRowIds = selectedIds[activeTab];
   const selectedCount = selectedRowIds.length;
   const previewRow = activeTabConfig.rows.find((row) => row.id === activePreviewIds[activeTab]) ?? null;
+  const assetOptionsById = useMemo(
+    () => new Map(data.assetOptions.map((asset) => [asset.id, asset] as const)),
+    [data.assetOptions],
+  );
   const selectedRow = selectedRowIds.length === 1 ? activeTabConfig.rows.find((row) => row.id === selectedRowIds[0]) ?? null : null;
   const editTargetRow = selectedCount === 1 ? selectedRow : selectedCount === 0 ? previewRow : null;
   const showPreview = Boolean(previewRow) && !editorMode;
   const showContextColumn = Boolean(editorMode) || showPreview;
+  const activeKitRow =
+    activeTab === "kit" && editTargetRow ? (editTargetRow as CatalogSnapshot["kits"][number]) : null;
+  const activeKitSelections = activeKitRow?.assetSelections ?? [];
+  const activeKitAssignmentAssets = useMemo<AssetAssignSelectionRow[]>(
+    () =>
+      activeKitSelections
+        .map((selection) => {
+          const asset = assetOptionsById.get(selection.assetId);
+          if (!asset) {
+            return null;
+          }
+
+          return {
+            id: asset.id,
+            name: asset.name,
+            code: asset.code,
+            quantity: asset.quantity,
+            assignedQuantity: asset.assignedQuantity,
+            checkedOutQuantity: asset.checkedOutQuantity,
+          } satisfies AssetAssignSelectionRow;
+        })
+        .filter((asset): asset is AssetAssignSelectionRow => Boolean(asset)),
+    [activeKitSelections, assetOptionsById],
+  );
+  const activeKitInsufficientMembers = useMemo(
+    () =>
+      activeKitSelections
+        .map((selection) => {
+          const asset = assetOptionsById.get(selection.assetId);
+          if (!asset || asset.quantity < selection.quantity) {
+            return {
+              code: asset?.code ?? selection.assetId,
+              requested: selection.quantity,
+              available: asset?.quantity ?? 0,
+            };
+          }
+          return null;
+        })
+        .filter((row): row is { code: string; requested: number; available: number } => Boolean(row)),
+    [activeKitSelections, assetOptionsById],
+  );
+  const canAssignActiveKit = Boolean(activeKitRow) && activeKitSelections.length > 0 && activeKitInsufficientMembers.length === 0;
   const totalCatalogRecords = useMemo(
     () =>
       data.locations.length +
@@ -727,6 +791,46 @@ export const CatalogPage = () => {
       );
     } finally {
       setIsSubmittingImport(false);
+    }
+  };
+
+  const handleAssignKit = async (value: AssetAssignMoveFormValue) => {
+    if (!activeKitRow || !activeKitSelections.length) {
+      return;
+    }
+
+    try {
+      setIsSubmittingKitAssign(true);
+      const result = await assignMoveAssets({
+        commandId: crypto.randomUUID(),
+        workspaceId: DEFAULT_WORKSPACE_ID,
+        assetIds: activeKitSelections.map((selection) => selection.assetId),
+        assetSelections: activeKitSelections.map((selection) => ({
+          assetId: selection.assetId,
+          quantity: selection.quantity,
+        })),
+        mode: "assign",
+        projectId: value.projectId,
+        projectUnitId: value.projectUnitId,
+        departmentId: value.departmentId,
+        assignedToUserId: value.assignedToUserId,
+        targetLocationId: value.targetLocationId,
+        expectedReturnAt: value.expectedReturnAt,
+        notes: value.notes
+          ? `Assigned from kit ${activeKitRow.code} · ${activeKitRow.name}. ${value.notes}`
+          : `Assigned from kit ${activeKitRow.code} · ${activeKitRow.name}.`,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+
+      await Promise.all([reload(), refreshProjects()]);
+      setKitAssignError(null);
+      setKitAssignOpen(false);
+      setCatalogActionMessage(result.summary);
+    } catch (nextError) {
+      setKitAssignError(nextError instanceof Error ? nextError.message : "Kit assignment failed.");
+    } finally {
+      setIsSubmittingKitAssign(false);
     }
   };
 
@@ -1126,7 +1230,88 @@ export const CatalogPage = () => {
                 ) : null}
               </>
             ) : null}
+
+            {activeTab === "kit" ? (
+              <>
+                <div className="catalog-preview-section">
+                  <div className="surface-card-header">
+                    <div>
+                      <h3 className="surface-card-title">Package contents</h3>
+                      <p className="surface-card-subtitle">This kit is only a package template. Stock is debited later, when the kit is assigned operationally.</p>
+                    </div>
+                  </div>
+
+                  {Array.isArray(previewRow.assetSelections) && previewRow.assetSelections.length ? (
+                    <div className="catalog-kit-preview-list">
+                      {(previewRow.assetSelections as CatalogSnapshot["kits"][number]["assetSelections"]).map((selection) => {
+                        const asset = assetOptionsById.get(selection.assetId);
+
+                        return (
+                          <div key={selection.assetId} className="catalog-kit-preview-item">
+                            <div className="identity-cell">
+                              <span className="identity-title">{asset?.name ?? selection.assetId}</span>
+                              <span className="identity-meta">{asset ? `${asset.code} · ${asset.category}` : "Catalog asset"}</span>
+                              <span className="identity-meta">
+                                {asset
+                                  ? `${asset.quantity} available · ${asset.assignedQuantity} reserved · ${asset.checkedOutQuantity} out`
+                                  : "Availability unavailable"}
+                              </span>
+                            </div>
+                            <span className="section-header-context-pill">Qty {selection.quantity}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="catalog-crew-support-empty">No kit members linked yet.</div>
+                  )}
+                </div>
+
+                {activeKitInsufficientMembers.length ? (
+                  <div className="action-feedback action-feedback-warning">
+                    This kit cannot be assigned yet. Missing stock for {activeKitInsufficientMembers.map((row) => `${row.code} (${row.available}/${row.requested})`).join(", ")}.
+                  </div>
+                ) : null}
+
+                <div className="action-panel-actions action-panel-actions-start">
+                  <button
+                    className="action-primary-button"
+                    disabled={!canAssignActiveKit}
+                    onClick={() => {
+                      setKitAssignOpen(true);
+                      setKitAssignError(null);
+                    }}
+                    type="button"
+                  >
+                    Assign kit
+                  </button>
+                </div>
+              </>
+            ) : null}
           </SurfaceCard>
+        ) : null}
+
+        {kitAssignOpen && activeKitRow ? (
+          <AssetAssignMovePanel
+            allowedModes={["assign"]}
+            defaultProjectId={null}
+            departments={data.departments}
+            error={kitAssignError}
+            isSubmitting={isSubmittingKitAssign}
+            lockedAssetSelections={activeKitSelections}
+            locations={data.locations}
+            onClose={() => {
+              setKitAssignOpen(false);
+              setKitAssignError(null);
+            }}
+            onSubmit={handleAssignKit}
+            projects={projects}
+            selectedAssets={activeKitAssignmentAssets}
+            selectedCount={activeKitAssignmentAssets.length}
+            subtitle="Assign this kit as one operational package. The system will debit the underlying asset quantities using the stable asset assignment flow."
+            title={`Assign kit · ${activeKitRow.code}`}
+            users={data.users}
+          />
         ) : null}
       </div>
 

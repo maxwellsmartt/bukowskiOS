@@ -93,7 +93,11 @@ export const PackingSlipDetailPanel = ({
           </span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Items</span>
+          <span className="summary-label">Units on slip</span>
+          <span className="summary-value">{data.slip.itemCount}</span>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Return progress</span>
           <span className="summary-value">
             {data.slip.returnedCount} returned · {data.slip.pendingCount} pending
           </span>
@@ -179,7 +183,7 @@ export const PackingSlipDetailPanel = ({
               </div>
             ),
           },
-          { key: "quantity", label: "Qty", align: "right", width: 72, minWidth: 60, render: (row) => row.quantity },
+          { key: "quantity", label: "Units", align: "right", width: 72, minWidth: 60, render: (row) => row.quantity },
           { key: "conditionOut", label: "Condition out", width: 116, minWidth: 100, render: (row) => row.conditionOut },
           { key: "conditionIn", label: "Condition in", width: 116, minWidth: 100, render: (row) => row.conditionIn },
           { key: "location", label: "Location", width: 170, minWidth: 136, render: (row) => row.location },

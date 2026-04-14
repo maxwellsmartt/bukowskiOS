@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CatalogEntityType, CatalogSnapshot, CreateCatalogEntityInput, UpdateCatalogEntityInput } from "@contracts";
 import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
 
 type CatalogEditorPanelProps = {
   assetOptions: CatalogSnapshot["assetOptions"];
@@ -306,6 +307,7 @@ export const CatalogEditorPanel = ({
     () => kitAssetSelections.reduce((sum, selection) => sum + selection.quantity, 0),
     [kitAssetSelections],
   );
+  const selectedKitMemberCount = kitAssetSelections.length;
 
   return (
     <SurfaceCard
@@ -667,7 +669,9 @@ export const CatalogEditorPanel = ({
               <h3 className="surface-card-title">Kit members</h3>
               <p className="surface-card-subtitle">Choose the assets that should live together as part of this package and set quantity when a row supports bulk stock.</p>
             </div>
-            <span className="section-header-context-pill">{selectedKitItemCount} items linked</span>
+            <span className="section-header-context-pill">
+              {selectedKitMemberCount} members · {selectedKitItemCount} units
+            </span>
           </div>
           <div className="catalog-asset-picker">
             {assetOptions.map((asset) => {
@@ -692,7 +696,17 @@ export const CatalogEditorPanel = ({
                   <div className="identity-cell">
                     <span className="identity-title">{asset.name}</span>
                     <span className="identity-meta">
-                      {asset.code} · {asset.category} · {asset.status} · Available {asset.quantity}
+                      {asset.code} · {asset.category} · {asset.status}
+                    </span>
+                    <span className="identity-meta catalog-kit-asset-stock">
+                      {formatAssetStockInline({
+                        availableQuantity: asset.quantity,
+                        assignedQuantity: asset.assignedQuantity,
+                        checkedOutQuantity: asset.checkedOutQuantity,
+                      })}
+                    </span>
+                    <span className="identity-meta catalog-kit-asset-context">
+                      {asset.currentProject ? `Live on ${asset.currentProject}${asset.currentUnit ? ` · ${asset.currentUnit}` : ""}` : "Free in stock"}
                     </span>
                   </div>
                   {checked ? (

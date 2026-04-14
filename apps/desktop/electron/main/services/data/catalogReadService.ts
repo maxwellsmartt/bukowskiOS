@@ -487,6 +487,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
             assets.name,
             COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
             asset_categories.name AS category,
+            asset_current_state.total_quantity,
             asset_current_state.available_quantity AS quantity,
             asset_current_state.assigned_quantity,
             asset_current_state.checked_out_quantity,
@@ -516,6 +517,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       name: string;
       code: string;
       category: string;
+      total_quantity: number;
       quantity: number;
       assigned_quantity: number;
       checked_out_quantity: number;
@@ -617,6 +619,9 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         code: row.code,
         category: row.category,
         quantity: row.quantity,
+        totalQuantity: row.total_quantity,
+        assignedQuantity: row.assigned_quantity,
+        checkedOutQuantity: row.checked_out_quantity,
         status: mapAssetStatus(
           row.operational_status,
           row.custody_status,

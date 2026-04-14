@@ -1,7 +1,7 @@
 import { ArrowRightLeft, PackagePlus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { AssetListRow, CatalogSnapshot, ProjectCardRow } from "@contracts";
+import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
 import { useProjectDetail } from "@features/projects/useProjectsData";
 import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -18,17 +18,31 @@ export type AssetAssignMoveFormValue = {
   notes?: string;
 };
 
+export type AssetAssignSelectionRow = {
+  id: string;
+  name: string;
+  code: string;
+  quantity: number;
+  assignedQuantity: number;
+  checkedOutQuantity: number;
+  serialNumber?: string;
+};
+
 type AssetAssignMovePanelProps = {
+  allowedModes?: Array<"assign" | "move">;
   defaultProjectId: string | null;
   departments: CatalogSnapshot["departments"];
   error: string | null;
   isSubmitting: boolean;
+  lockedAssetSelections?: Array<{ assetId: string; quantity: number }>;
   locations: CatalogSnapshot["locations"];
   onClose: () => void;
   onSubmit: (value: AssetAssignMoveFormValue) => Promise<void>;
   projects: ProjectCardRow[];
-  selectedAssets: AssetListRow[];
+  selectedAssets: AssetAssignSelectionRow[];
   selectedCount: number;
+  subtitle?: string;
+  title?: string;
   users: CatalogSnapshot["users"];
 };
 
@@ -38,19 +52,23 @@ const normalizeOptional = (value: string) => {
 };
 
 export const AssetAssignMovePanel = ({
+  allowedModes = ["assign", "move"],
   defaultProjectId,
   departments,
   error,
   isSubmitting,
+  lockedAssetSelections,
   locations,
   onClose,
   onSubmit,
   projects,
   selectedAssets,
   selectedCount,
+  subtitle,
+  title,
   users,
 }: AssetAssignMovePanelProps) => {
-  const [mode, setMode] = useState<"assign" | "move">("assign");
+  const [mode, setMode] = useState<"assign" | "move">(allowedModes[0] ?? "assign");
   const [projectId, setProjectId] = useState(defaultProjectId ?? "");
   const [projectUnitId, setProjectUnitId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
@@ -60,6 +78,12 @@ export const AssetAssignMovePanel = ({
   const [notes, setNotes] = useState("");
   const [quantityByAssetId, setQuantityByAssetId] = useState<Record<string, number>>({});
   const { data: projectDetail } = useProjectDetail(mode === "assign" ? normalizeOptional(projectId) ?? null : null);
+
+  useEffect(() => {
+    if (!allowedModes.includes(mode)) {
+      setMode(allowedModes[0] ?? "assign");
+    }
+  }, [allowedModes, mode]);
 
   useEffect(() => {
     setProjectUnitId("");
@@ -81,6 +105,7 @@ export const AssetAssignMovePanel = ({
   const selectedAssetDetails = useMemo(
     () =>
       selectedAssets.map((asset) => {
+        const lockedQuantity = lockedAssetSelections?.find((selection) => selection.assetId === asset.id)?.quantity;
         const maxQuantity =
           asset.quantity > 0
             ? asset.quantity
@@ -90,13 +115,16 @@ export const AssetAssignMovePanel = ({
         return {
           ...asset,
           sourceQuantity: maxQuantity,
-          requestedQuantity: Math.min(maxQuantity, Math.max(1, quantityByAssetId[asset.id] ?? maxQuantity)),
+          requestedQuantity:
+            typeof lockedQuantity === "number"
+              ? lockedQuantity
+              : Math.min(maxQuantity, Math.max(1, quantityByAssetId[asset.id] ?? maxQuantity)),
         };
       }),
-    [quantityByAssetId, selectedAssets],
+    [lockedAssetSelections, quantityByAssetId, selectedAssets],
   );
   const totalAssignQuantity = selectedAssetDetails.reduce((sum, asset) => sum + asset.requestedQuantity, 0);
-  const hasVariableQuantityAssets = selectedAssetDetails.some((asset) => asset.sourceQuantity > 1);
+  const hasVariableQuantityAssets = !lockedAssetSelections?.length && selectedAssetDetails.some((asset) => asset.sourceQuantity > 1);
 
   const handleQuantityChange = (assetId: string, availableQuantity: number, rawValue: string) => {
     const parsedValue = Number.parseInt(rawValue, 10);
@@ -137,8 +165,8 @@ export const AssetAssignMovePanel = ({
           <X size={14} />
         </button>
       }
-      title="Assign / move"
-      subtitle="Run one auditable operational command against the full selection. This writes timeline events and updates current state together."
+      title={title ?? "Assign / move"}
+      subtitle={subtitle ?? "Run one auditable operational command against the full selection. This writes timeline events and updates current state together."}
     >
       <div className="chip-row">
         <span className="action-panel-selection">{selectedLabel}</span>
@@ -162,7 +190,9 @@ export const AssetAssignMovePanel = ({
                     {asset.serialNumber && asset.serialNumber !== "—" ? ` · ${asset.serialNumber}` : ""}
                   </span>
                 </div>
-                {asset.sourceQuantity > 1 ? (
+                {lockedAssetSelections?.length ? (
+                  <span className="packing-builder-selection-fixed">Qty {asset.requestedQuantity}</span>
+                ) : asset.sourceQuantity > 1 ? (
                   <label className="packing-builder-selection-quantity">
                     <span className="action-field-label">Qty</span>
                     <input
@@ -189,24 +219,30 @@ export const AssetAssignMovePanel = ({
         </>
       ) : null}
 
-      <div className="action-mode-toggle" role="tablist" aria-label="Asset action mode">
-        <button
-          className={`action-mode-button${mode === "assign" ? " active" : ""}`}
-          onClick={() => setMode("assign")}
-          type="button"
-        >
-          <PackagePlus size={14} />
-          <span>Assign</span>
-        </button>
-        <button
-          className={`action-mode-button${mode === "move" ? " active" : ""}`}
-          onClick={() => setMode("move")}
-          type="button"
-        >
-          <ArrowRightLeft size={14} />
-          <span>Move</span>
-        </button>
-      </div>
+      {allowedModes.length > 1 ? (
+        <div className="action-mode-toggle" role="tablist" aria-label="Asset action mode">
+          {allowedModes.includes("assign") ? (
+            <button
+              className={`action-mode-button${mode === "assign" ? " active" : ""}`}
+              onClick={() => setMode("assign")}
+              type="button"
+            >
+              <PackagePlus size={14} />
+              <span>Assign</span>
+            </button>
+          ) : null}
+          {allowedModes.includes("move") ? (
+            <button
+              className={`action-mode-button${mode === "move" ? " active" : ""}`}
+              onClick={() => setMode("move")}
+              type="button"
+            >
+              <ArrowRightLeft size={14} />
+              <span>Move</span>
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="action-form-grid">
         {mode === "assign" ? (

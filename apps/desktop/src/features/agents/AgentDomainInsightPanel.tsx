@@ -90,8 +90,8 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
     title = "Assets context";
     subtitle = "Live inventory and movement posture relevant to this agent.";
     insights = [
-      `${assetsOverview.totalAssets} total assets currently registered`,
-      `${assetsOverview.assignedAssets} assets currently assigned`,
+      `${assetsOverview.totalAssets} total inventory units currently registered`,
+      `${assetsOverview.assignedAssets} units currently reserved or checked out`,
       `${assetsOverview.cards.openPackingSlips.value} open packing slips still in motion`,
       `${assetsOverview.cards.overdueReturns.value} overdue return cases needing review`,
     ];

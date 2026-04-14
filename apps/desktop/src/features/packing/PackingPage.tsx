@@ -28,7 +28,7 @@ const packingSortOptions: Array<ListSortOption<PackingSlipSortField>> = [
   { value: "department", label: "Department", columnKey: "department" },
   { value: "responsible", label: "Responsible", columnKey: "responsible" },
   { value: "status", label: "Status", columnKey: "status" },
-  { value: "itemCount", label: "Item count", columnKey: "itemCount" },
+  { value: "itemCount", label: "Unit count", columnKey: "itemCount" },
   { value: "returnedCount", label: "Returned count", columnKey: "returnedCount" },
 ];
 
@@ -147,14 +147,13 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               { key: "responsible", label: "Responsible", width: 150, minWidth: 126, render: (row) => row.responsible },
               { key: "issuedDate", label: "Issued", width: 90, minWidth: 80, render: (row) => row.issuedDate },
               { key: "dueDate", label: "Due", width: 90, minWidth: 80, render: (row) => row.dueDate },
-              { key: "itemCount", label: "Items", align: "right", width: 74, minWidth: 62, render: (row) => row.itemCount },
+              { key: "itemCount", label: "Units", align: "right", width: 74, minWidth: 62, render: (row) => row.itemCount },
               {
-                key: "returnedCount",
-                label: "Returned",
-                align: "right",
-                width: 84,
-                minWidth: 72,
-                render: (row) => row.returnedCount,
+                key: "progress",
+                label: "Progress",
+                width: 156,
+                minWidth: 132,
+                render: (row) => `${row.returnedCount} returned · ${Math.max(0, row.itemCount - row.returnedCount)} pending`,
               },
               {
                 key: "status",

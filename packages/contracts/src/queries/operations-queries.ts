@@ -315,6 +315,9 @@ export type CatalogAssetOptionRow = {
   code: string;
   category: string;
   quantity: number;
+  totalQuantity: number;
+  assignedQuantity: number;
+  checkedOutQuantity: number;
   status: string;
   currentProjectId: string | null;
   currentProject: string | null;

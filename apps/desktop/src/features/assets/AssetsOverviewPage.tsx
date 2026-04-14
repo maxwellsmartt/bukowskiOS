@@ -69,15 +69,15 @@ export const AssetsOverviewPage = () => {
 
   const overviewCards = [
     {
-      label: "Total assets",
+      label: "Total units",
       value: data.totalAssets,
-      subtitle: "Registered inventory across warehouse, set and active workflows.",
+      subtitle: "All inventory units currently represented across warehouse, set and active workflows.",
       tone: "info" as const,
     },
     {
-      label: "Assigned assets",
+      label: "Reserved / out units",
       value: data.assignedAssets,
-      subtitle: "Assets currently assigned to a project, unit or responsible owner.",
+      subtitle: "Units currently reserved on projects or checked out on active slips.",
       tone: "info" as const,
     },
     data.cards.overdueReturns,

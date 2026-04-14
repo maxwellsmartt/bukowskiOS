@@ -44,13 +44,23 @@ type CountRow = {
 export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) => {
   const service = {
     getAssetSummary(): AssetSummarySnapshot {
-      const totalAssets = db.prepare("SELECT COUNT(*) AS count FROM assets WHERE is_active = 1").get() as CountRow;
+      const totalAssets = db
+        .prepare(
+          `
+            SELECT COALESCE(SUM(total_quantity), 0) AS count
+            FROM asset_current_state
+            JOIN assets ON assets.id = asset_current_state.asset_id
+            WHERE assets.is_active = 1
+          `,
+        )
+        .get() as CountRow;
       const assignedAssets = db
         .prepare(
           `
-            SELECT COUNT(*) AS count
+            SELECT COALESCE(SUM(assigned_quantity + checked_out_quantity), 0) AS count
             FROM asset_current_state
-            WHERE custody_status IN ('checked_out', 'assigned', 'partial_checked_out', 'partial_assigned', 'partially_allocated')
+            JOIN assets ON assets.id = asset_current_state.asset_id
+            WHERE assets.is_active = 1
           `,
         )
         .get() as CountRow;
