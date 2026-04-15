@@ -54,6 +54,12 @@ const createSupabaseClientFromEnv = () => {
   }
 };
 
+const persistStoredTokens = (tokens: { accessToken: string | null; refreshToken: string | null }) => {
+  void window.bukowskiAuth?.setStoredTokens(tokens).catch((error) => {
+    console.warn("Unable to persist the Supabase session locally.", error);
+  });
+};
+
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [supabase] = useState(() => createSupabaseClientFromEnv());
   const [status, setStatus] = useState<SessionStatus>(() => (supabase ? "loading" : "authenticated"));
@@ -106,7 +112,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       setStatus(data.session?.user ? "authenticated" : "unauthenticated");
 
       if (data.session) {
-        void window.bukowskiAuth?.setStoredTokens({
+        persistStoredTokens({
           accessToken: data.session.access_token,
           refreshToken: data.session.refresh_token,
         });
@@ -118,7 +124,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       setStatus(nextSession?.user ? "authenticated" : "unauthenticated");
       setAuthError(null);
 
-      void window.bukowskiAuth?.setStoredTokens({
+      persistStoredTokens({
         accessToken: nextSession?.access_token ?? null,
         refreshToken: nextSession?.refresh_token ?? null,
       });

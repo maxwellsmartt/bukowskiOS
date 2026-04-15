@@ -1132,6 +1132,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
     db.exec("BEGIN");
 
     try {
+      const totalQuantity = Math.max(1, Math.trunc(input.totalQuantity ?? 1));
       const primaryCode = codeService.ensurePrimaryCode({
         workspaceId: input.workspaceId,
         entityType: "asset",
@@ -1188,6 +1189,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         categoryId: input.categoryId,
         defaultLocationId: input.defaultLocationId?.trim() || null,
         primaryCodeValue: primaryCode.codeValue,
+        totalQuantity,
       });
 
       db.prepare(
@@ -1251,13 +1253,15 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             version,
             updated_at
           )
-          VALUES (?, ?, ?, NULL, NULL, NULL, NULL, ?, 'available', 'available', 1, 1, 0, 0, ?, 1, ?)
+          VALUES (?, ?, ?, NULL, NULL, NULL, NULL, ?, 'available', 'available', ?, ?, 0, 0, ?, 1, ?)
         `,
       ).run(
         assetId,
         input.workspaceId,
         input.defaultLocationId?.trim() || null,
         input.conditionStatus.trim() || "Good",
+        totalQuantity,
+        totalQuantity,
         eventId,
         now,
       );

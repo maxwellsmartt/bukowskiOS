@@ -115,6 +115,7 @@ Decisiones bloqueadas:
 | 2026-04-15 | Working tree | Usuario aplica migración `20260415150000_sync_outbox_bridge.sql`; se valida REST `public.sync_outbox` con sesión guardada y respuesta 200. Se detecta que SQLite local solo tenía `workspace-metadata`, por lo que se agrega IPC `ensureLocalWorkspaces` y `WorkspaceProvider` cachea los workspaces Supabase en local. Verificación: `typecheck`, `build` y tests focalizados pasan; tras reiniciar dev, SQLite contiene `Metadata Cine2` con UUID remoto. | Evitar fallos de foreign key al crear assets con UUID remoto de workspace y mantener la cache local consistente antes de probar outbox real. |
 | 2026-04-15 | Working tree | Se corrige inconsistencia reportada en Assets: el fallback local ya no muestra temporalmente assets de `workspace-metadata` cuando hay sesión Supabase, y `getAssetSummary`/`getAssetsOverview` aceptan `workspaceId` para que métricas y tabla usen el mismo scope. Verificación: `typecheck`, `build` y test de assets pasan. | Evitar parpadeo de datos cruzados y métricas engañosas en workspaces remotos vacíos. |
 | 2026-04-15 | Working tree | Se completa el scope de las cards operativas de Assets (`overdueReturns`, `openPackingSlips`, `activeIncidents`, `maintenanceWatch`) por workspace y se agrega botón `Import CSV` junto a `New asset` con parser CSV local para first-run imports. Verificación: `typecheck`, `build` y tests focalizados pasan. | Evitar métricas globales en workspaces nuevos y dar una ruta práctica para cargar inventarios preexistentes. |
+| 2026-04-15 | Working tree | Se valida el CSV real `Exportación_Equipos_20211015 (1).csv`: headers en español/Rentman (`Nombre (en la base de datos)`, `Código`, `Cantidad actual`, `Códigos QR`, `Ubicado en almacén`) no eran reconocidos. Se amplía el parser, se preserva `Cantidad actual` como `totalQuantity` y se evita error no manejado de `setStoredTokens`. Verificación: `typecheck`, `build` y tests focalizados pasan. | Convertir el import de un demo técnico a un first-run import tolerante con exportaciones reales. |
 
 ## Decisiones tomadas
 
@@ -146,6 +147,7 @@ Decisiones bloqueadas:
 | medio | Workspace remoto existe en Supabase pero no en SQLite local, bloqueando writes workspace-scoped por foreign key. | Cachear memberships/workspaces remotos vía IPC al refrescar `WorkspaceProvider`. | Mitigado y validado en SQLite local. |
 | medio | Métricas y tabla de assets pueden mostrar scopes diferentes durante la migración multi-workspace. | Pasar `workspaceId` también a summary/overview y evitar fallback visual a `workspace-metadata` en sesión Supabase. | Mitigado en Assets. |
 | medio | CSV import inicial depende de catálogos existentes y aún no crea categorías/ubicaciones faltantes. | MVP importa contra categorías/ubicaciones conocidas; Slice 3 debe cubrir plantillas, preview avanzado y mapeo de catálogos por workspace. | Abierto como deuda UX/data. |
+| bajo | Exports reales pueden traer headers localizados, acentos, columnas duplicadas o ubicaciones de almacén que no existen como catálogo. | Normalizar headers con acentos/puntuación, soportar aliases Rentman en español y guardar ubicación/carpeta fuente en notas cuando no hay catálogo local. | Mitigado para CSV probado; mantener abierto para preview/import wizard. |
 
 ## Incompletos / deuda técnica
 
@@ -158,7 +160,7 @@ Decisiones bloqueadas:
 - El transport Supabase está opt-in y la migración remota ya fue aplicada; falta generar un asset real y confirmar una fila `sent` en Supabase.
 - Falta validar visualmente en app que el cambio de workspace aísla assets creados en cada workspace.
 - Deuda técnica: los catálogos base por workspace todavía no se clonan/filtran; para el MVP se desbloquea workspace FK, pero Slice 2/3 debe separar catálogos por workspace con más rigor.
-- Import CSV de assets ya existe como MVP sin preview; falta agregar template descargable, pantalla de preview/errores por fila y creación guiada de categorías/ubicaciones faltantes.
+- Import CSV de assets ya existe como MVP sin preview; falta agregar template descargable, pantalla de preview/errores por fila, resumen de warnings antes de importar y creación guiada de categorías/ubicaciones faltantes.
 
 ## Próximo paso recomendado
 

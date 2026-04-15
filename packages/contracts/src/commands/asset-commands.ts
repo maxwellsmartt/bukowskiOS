@@ -140,6 +140,7 @@ export type AssetEditorInput = {
   ownershipType?: string;
   qrCodeValue?: string;
   isActive?: boolean;
+  totalQuantity?: number;
 };
 
 export type CreateAssetCommand = AssetEditorInput & {

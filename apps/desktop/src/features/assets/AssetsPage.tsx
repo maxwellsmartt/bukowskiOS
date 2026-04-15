@@ -47,7 +47,19 @@ const assetSortOptions: Array<ListSortOption<AssetSortField>> = [
   { value: "createdAt", label: "Created" },
 ];
 
-const normalizeCsvHeader = (value: string) => value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+const normalizeCsvHeader = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+const normalizeCsvLookup = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 const allowedCsvConditions = new Set(["Good", "Review", "Damaged"]);
 
 const parseCsvText = (text: string) => {
@@ -115,6 +127,21 @@ const resolveCsvValue = (row: Record<string, string>, keys: string[]) => {
 
   return "";
 };
+
+const parseCsvQuantity = (value: string, rowNumber: number) => {
+  if (!value) {
+    return 1;
+  }
+
+  const parsed = Number.parseInt(value.replace(/[,\s]/g, ""), 10);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`CSV row ${rowNumber} has an invalid quantity.`);
+  }
+
+  return parsed;
+};
+
+const joinCsvNotes = (parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join("\n");
 
 export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageProps) => (
   <AssetsContent projectId={projectId} projectName={projectName} />
@@ -353,13 +380,14 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       const categoryByCodeOrName = new Map(
         catalog.categories.flatMap((category) => [
           [category.code.trim().toLowerCase(), category.id] as const,
-          [category.name.trim().toLowerCase(), category.id] as const,
+          [normalizeCsvLookup(category.code), category.id] as const,
+          [normalizeCsvLookup(category.name), category.id] as const,
         ]),
       );
       const locationByCodeOrName = new Map(
         catalog.locations.flatMap((location) => [
-          [location.code.trim().toLowerCase(), location.id] as const,
-          [location.name.trim().toLowerCase(), location.id] as const,
+          [normalizeCsvLookup(location.code), location.id] as const,
+          [normalizeCsvLookup(location.name), location.id] as const,
         ]),
       );
       const defaultCategoryId = catalog.categories[0]?.id;
@@ -370,34 +398,61 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       const drafts = dataRows.map((values, index) => {
         const row = Object.fromEntries(headers.map((header, headerIndex) => [header, values[headerIndex] ?? ""]));
-        const name = resolveCsvValue(row, ["name", "asset", "assetName"]);
-        const internalCode = resolveCsvValue(row, ["internalCode", "code", "assetCode", "sku"]);
+        const rowNumber = index + 2;
+        const name = resolveCsvValue(row, [
+          "name",
+          "asset",
+          "assetName",
+          "Nombre (en la base de datos)",
+          "Nombre (en la base de datos) 2",
+          "nombre",
+        ]);
+        const internalCode = resolveCsvValue(row, [
+          "internalCode",
+          "code",
+          "assetCode",
+          "sku",
+          "Código",
+          "ID (Número de serie)",
+          "Códigos QR",
+        ]);
         const categoryValue = resolveCsvValue(row, ["categoryId", "categoryCode", "category"]);
-        const locationValue = resolveCsvValue(row, ["defaultLocationId", "locationCode", "location", "defaultLocation"]);
-        const categoryId = categoryByCodeOrName.get(categoryValue.trim().toLowerCase()) ?? defaultCategoryId;
-        const defaultLocationId = locationValue ? locationByCodeOrName.get(locationValue.trim().toLowerCase()) : undefined;
+        const explicitLocationValue = resolveCsvValue(row, ["defaultLocationId", "locationCode", "location", "defaultLocation"]);
+        const warehouseSlot = resolveCsvValue(row, ["Ubicado en almacén", "warehouseSlot", "warehouse"]);
+        const categoryId = categoryByCodeOrName.get(normalizeCsvLookup(categoryValue)) ?? defaultCategoryId;
+        const defaultLocationId = explicitLocationValue
+          ? locationByCodeOrName.get(normalizeCsvLookup(explicitLocationValue))
+          : warehouseSlot
+            ? locationByCodeOrName.get(normalizeCsvLookup(warehouseSlot))
+            : undefined;
         const replacementValueText = resolveCsvValue(row, ["replacementValue", "replacement", "value"]);
         const replacementValue = replacementValueText ? Number(replacementValueText.replace(/[$,\s]/g, "")) : undefined;
         const conditionStatus = resolveCsvValue(row, ["condition", "conditionStatus"]) || "Good";
+        const totalQuantity = parseCsvQuantity(resolveCsvValue(row, ["quantity", "Cantidad actual", "currentQuantity"]), rowNumber);
+        const folderPath = resolveCsvValue(row, ["Estructura de la carpeta (Carpeta)", "folderPath"]);
+        const folderType = resolveCsvValue(row, ["Tipo de articulo (Carpeta)", "folderType"]);
+        const positionType = resolveCsvValue(row, ["Tipo (posición/case/set)", "positionType"]);
+        const externalNote = resolveCsvValue(row, ["Nota externa", "externalNote", "notes"]);
+        const serialNumber = resolveCsvValue(row, ["serialNumber", "serial", "Número de Serie (Número de serie)"]);
 
         if (!name || !internalCode) {
-          throw new Error(`CSV row ${index + 2} is missing name or code.`);
+          throw new Error(`CSV row ${rowNumber} is missing name or code.`);
         }
 
-        if (categoryValue && !categoryByCodeOrName.has(categoryValue.trim().toLowerCase())) {
-          throw new Error(`CSV row ${index + 2} references an unknown category: ${categoryValue}.`);
+        if (categoryValue && !categoryByCodeOrName.has(normalizeCsvLookup(categoryValue))) {
+          throw new Error(`CSV row ${rowNumber} references an unknown category: ${categoryValue}.`);
         }
 
-        if (locationValue && !defaultLocationId) {
-          throw new Error(`CSV row ${index + 2} references an unknown location: ${locationValue}.`);
+        if (explicitLocationValue && !defaultLocationId) {
+          throw new Error(`CSV row ${rowNumber} references an unknown location: ${explicitLocationValue}.`);
         }
 
         if (replacementValueText && Number.isNaN(replacementValue)) {
-          throw new Error(`CSV row ${index + 2} has an invalid replacement value.`);
+          throw new Error(`CSV row ${rowNumber} has an invalid replacement value.`);
         }
 
         if (!allowedCsvConditions.has(conditionStatus)) {
-          throw new Error(`CSV row ${index + 2} has an unsupported condition. Use Good, Review, or Damaged.`);
+          throw new Error(`CSV row ${rowNumber} has an unsupported condition. Use Good, Review, or Damaged.`);
         }
 
         return {
@@ -407,13 +462,20 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           defaultLocationId,
           brand: resolveCsvValue(row, ["brand"]),
           model: resolveCsvValue(row, ["model"]),
-          serialNumber: resolveCsvValue(row, ["serialNumber", "serial"]),
+          serialNumber,
           description: resolveCsvValue(row, ["description"]),
           conditionStatus,
-          notes: resolveCsvValue(row, ["notes"]),
+          notes: joinCsvNotes([
+            externalNote,
+            warehouseSlot && `Warehouse slot: ${warehouseSlot}`,
+            folderPath && `Source folder: ${folderPath}`,
+            folderType && `Source folder type: ${folderType}`,
+            positionType && `Source item type: ${positionType}`,
+          ]),
           replacementValue,
           ownershipType: resolveCsvValue(row, ["ownership", "ownershipType"]) || "owned",
-          qrCodeValue: resolveCsvValue(row, ["qr", "qrCode", "qrCodeValue", "barcode"]),
+          qrCodeValue: resolveCsvValue(row, ["qr", "qrCode", "qrCodeValue", "barcode", "Códigos QR"]),
+          totalQuantity,
         };
       });
 
