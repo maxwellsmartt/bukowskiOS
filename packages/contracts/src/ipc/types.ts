@@ -83,6 +83,14 @@ export type AppSyncOutboxRow = {
   payloadJson: string;
 };
 
+export type EnsureLocalWorkspaceInput = {
+  id: string;
+  name: string;
+  slug: string;
+  baseCurrency: string;
+  iconColor?: string | null;
+};
+
 export type AppActionResult = {
   summary: string;
   diagnostics: AppDiagnosticsSnapshot;

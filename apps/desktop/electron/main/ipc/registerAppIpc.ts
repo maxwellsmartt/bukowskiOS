@@ -2,6 +2,7 @@ import { app, dialog, ipcMain, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { z } from "zod";
 
 import {
   createAppUserSchema,
@@ -25,6 +26,7 @@ type RegisterAppIpcOptions = {
   revokeTelegramLink: (input: import("@contracts").RevokeTelegramLinkCommand) => import("@contracts").AppUserMutationResult;
   createBackupNow: () => import("@contracts").AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => import("@contracts").AppDiagnosticsSnapshot;
+  ensureLocalWorkspaces: (workspaces: import("@contracts").EnsureLocalWorkspaceInput[]) => import("@contracts").AppDiagnosticsSnapshot;
   runLocalSyncNow: () => Promise<import("@contracts").AppDiagnosticsSnapshot>;
   getSyncOutboxRows: () => import("@contracts").AppSyncOutboxRow[];
   retrySyncOutboxRow: (id: string) => Promise<import("@contracts").AppDiagnosticsSnapshot>;
@@ -32,6 +34,16 @@ type RegisterAppIpcOptions = {
   exportRecentLogs: (filePath: string) => import("@contracts").AppExportResult;
   exportSupportBundle: (directoryPath: string) => import("@contracts").AppExportResult;
 };
+
+const ensureLocalWorkspacesSchema = z.array(
+  z.object({
+    id: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    slug: z.string().trim().min(1),
+    baseCurrency: z.string().trim().min(1),
+    iconColor: z.string().trim().nullable().optional(),
+  }),
+);
 
 const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) => {
   const { canceled, filePath } = await dialog.showSaveDialog({
@@ -99,6 +111,7 @@ export const registerAppIpc = ({
   revokeTelegramLink,
   createBackupNow,
   runIntegrityCheckNow,
+  ensureLocalWorkspaces,
   runLocalSyncNow,
   getSyncOutboxRows,
   retrySyncOutboxRow,
@@ -150,6 +163,18 @@ export const registerAppIpc = ({
       return revokeTelegramLink(parsed);
     } catch (error) {
       throw sanitizeIpcError(error, "The app could not revoke Telegram access for that user.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.ensureLocalWorkspaces, (event, input) => {
+    try {
+      assertTrustedIpcSender(event);
+      const parsed = ensureLocalWorkspacesSchema.parse(input);
+      return {
+        summary: "Remote workspaces cached locally.",
+        diagnostics: ensureLocalWorkspaces(parsed),
+      };
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not cache remote workspaces locally.");
     }
   });
   ipcMain.handle(ipcChannels.app.createBackup, (event) => {

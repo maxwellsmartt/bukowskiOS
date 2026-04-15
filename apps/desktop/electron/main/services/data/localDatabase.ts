@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { AppDiagnosticsSnapshot, AppExportResult, AppInfo, AppSupportSnapshot, AppSyncOutboxRow } from "@contracts";
+import type { EnsureLocalWorkspaceInput } from "@contracts";
 import { foundationMigrations } from "@db";
 import { createSupabaseOutboxTransport } from "@sync";
 
@@ -93,6 +94,7 @@ type LocalDatabaseRuntime = {
   getSupportSnapshot: () => AppSupportSnapshot;
   createBackupNow: () => AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => AppDiagnosticsSnapshot;
+  ensureLocalWorkspaces: (workspaces: EnsureLocalWorkspaceInput[]) => AppDiagnosticsSnapshot;
   runLocalSyncNow: () => Promise<AppDiagnosticsSnapshot>;
   getSyncOutboxRows: () => AppSyncOutboxRow[];
   retrySyncOutboxRow: (id: string) => Promise<AppDiagnosticsSnapshot>;
@@ -283,6 +285,44 @@ const createRuntime = (): LocalDatabaseRuntime => {
     return getDiagnosticsSnapshot();
   };
 
+  const ensureLocalWorkspaces = (workspaces: EnsureLocalWorkspaceInput[]) => {
+    const timestamp = new Date().toISOString();
+    const statement = database.prepare(
+      `
+        INSERT INTO workspaces (id, name, slug, base_currency, icon_color, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          name = excluded.name,
+          slug = excluded.slug,
+          base_currency = excluded.base_currency,
+          icon_color = excluded.icon_color,
+          updated_at = excluded.updated_at
+      `,
+    );
+
+    try {
+      database.exec("BEGIN");
+      workspaces.forEach((workspace) => {
+        statement.run(
+          workspace.id,
+          workspace.name.trim() || "Workspace",
+          workspace.slug.trim() || workspace.id,
+          workspace.baseCurrency.trim().toUpperCase() || "USD",
+          workspace.iconColor?.trim() || null,
+          timestamp,
+          timestamp,
+        );
+      });
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
+    logger.info("Ensured remote workspaces in local SQLite cache.", { count: workspaces.length });
+
+    return getDiagnosticsSnapshot();
+  };
+
   const supabaseTokenStore = createSupabaseTokenStore();
   const syncOutboxWorker = createSyncOutboxWorkerService(database, {
     transport: isSupabaseSyncEnabled()
@@ -446,6 +486,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     getSupportSnapshot: () => supportDiagnostics.getSupportSnapshot(),
     createBackupNow,
     runIntegrityCheckNow,
+    ensureLocalWorkspaces,
     runLocalSyncNow,
     getSyncOutboxRows,
     retrySyncOutboxRow,

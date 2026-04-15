@@ -9,6 +9,7 @@ export const ipcChannels = {
     updateUser: "bukowskiApp:updateUser",
     setUserActive: "bukowskiApp:setUserActive",
     revokeTelegramLink: "bukowskiApp:revokeTelegramLink",
+    ensureLocalWorkspaces: "bukowskiApp:ensureLocalWorkspaces",
     runIntegrityCheck: "bukowskiApp:runIntegrityCheck",
     runLocalSync: "bukowskiApp:runLocalSync",
     getSyncOutboxRows: "bukowskiApp:getSyncOutboxRows",

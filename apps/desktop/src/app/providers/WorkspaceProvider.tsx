@@ -89,7 +89,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
     const { data, error } = await supabase
       .from("workspace_memberships")
-      .select("workspace_id,status,workspaces(name),roles(name)")
+      .select("workspace_id,status,workspaces(name,slug,base_currency,icon_color),roles(name)")
       .eq("user_id", user.id)
       .eq("status", "active");
 
@@ -103,7 +103,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       const typedRow = row as {
         workspace_id: string;
         status: "active" | "invited" | "inactive";
-        workspaces?: { name?: string | null } | null;
+        workspaces?: { name?: string | null; slug?: string | null; base_currency?: string | null; icon_color?: string | null } | null;
         roles?: { name?: string | null } | null;
       };
 
@@ -115,6 +115,28 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         permissions: [],
       };
     });
+
+    await window.bukowskiApp?.ensureLocalWorkspaces(
+      nextMemberships.map((membership, index) => {
+        const sourceRow = (data ?? [])[index] as
+          | {
+              workspaces?: {
+                slug?: string | null;
+                base_currency?: string | null;
+                icon_color?: string | null;
+              } | null;
+            }
+          | undefined;
+
+        return {
+          id: membership.workspaceId,
+          name: membership.workspaceName,
+          slug: sourceRow?.workspaces?.slug ?? membership.workspaceId,
+          baseCurrency: sourceRow?.workspaces?.base_currency ?? "USD",
+          iconColor: sourceRow?.workspaces?.icon_color ?? null,
+        };
+      }),
+    );
 
     setMemberships(nextMemberships);
     setActiveWorkspaceId((current) =>

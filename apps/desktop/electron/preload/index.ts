@@ -26,6 +26,7 @@ import type {
   AppInfo,
   AppSupportSnapshot,
   AppSyncOutboxRow,
+  EnsureLocalWorkspaceInput,
   AppUserMutationResult,
   AppUsersSnapshot,
   AssetsOverviewSnapshot,
@@ -153,6 +154,8 @@ const bukowskiApp = {
     ipcRenderer.invoke(ipcChannels.app.setUserActive, input) as Promise<AppUserMutationResult>,
   revokeTelegramLink: (input: RevokeTelegramLinkCommand) =>
     ipcRenderer.invoke(ipcChannels.app.revokeTelegramLink, input) as Promise<AppUserMutationResult>,
+  ensureLocalWorkspaces: (workspaces: EnsureLocalWorkspaceInput[]) =>
+    ipcRenderer.invoke(ipcChannels.app.ensureLocalWorkspaces, workspaces) as Promise<AppActionResult>,
   runIntegrityCheck: () => ipcRenderer.invoke(ipcChannels.app.runIntegrityCheck) as Promise<AppActionResult>,
   runLocalSync: () => ipcRenderer.invoke(ipcChannels.app.runLocalSync) as Promise<AppActionResult>,
   getSyncOutboxRows: () => ipcRenderer.invoke(ipcChannels.app.getSyncOutboxRows) as Promise<AppSyncOutboxRow[]>,

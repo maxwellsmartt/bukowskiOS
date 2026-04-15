@@ -22,7 +22,7 @@ Decisiones bloqueadas:
 | Slice | Estado | Inicio | Cierre | Owner | Evidencia de verificación |
 | --- | --- | --- | --- | --- | --- |
 | 0 — Foundation Supabase + Seguridad | In progress | 2026-04-15 |  | Codex | Dependencias instaladas; roadmap, paquete Supabase, Keychain IPC, deep links, migración y Edge Functions desplegadas. Migración validada con REST `workspaces` 200; functions responden `authentication_required`/`forbidden` sin sesión. Typecheck/build/tests pasan. |
-| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Login real Supabase y creación real de workspace remoto validados en app. Providers/rutas/guardas/switcher creados. Assets list/create/edit/archive consumen active workspace local. Outbox async con transport Supabase opt-in. Typecheck/tests pasan: 26 archivos, 99 tests. |
+| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Login real Supabase y creación real de workspace remoto validados en app. Providers/rutas/guardas/switcher creados. Assets list/create/edit/archive consumen active workspace local. Outbox async con transport Supabase opt-in. Workspaces remotos se cachean en SQLite local. Typecheck/build/tests pasan. |
 | 2 — Roles, Permissions e Invites | Todo |  |  | Codex | Pendiente. |
 | 3 — Workspaces CRUD + Sharing | Todo |  |  | Codex | Pendiente. |
 | 4 — Archiving Wrapped-Gate | Todo |  |  | Codex | Pendiente. |
@@ -57,7 +57,9 @@ Decisiones bloqueadas:
 - Done — Migrar lista/create/edit/archive de assets al workspace activo en SQLite local.
 - Done — Convertir sync outbox worker a transport async injectable con retry/backoff preservado.
 - Done — Agregar transport Supabase opt-in para auditar filas en `public.sync_outbox`.
-- Doing — Validar migración remota `sync_outbox` y activar `VITE_SUPABASE_SYNC_ENABLED=true` en dev.
+- Done — Validar migración remota `sync_outbox` y activar `VITE_SUPABASE_SYNC_ENABLED=true` en dev.
+- Done — Cachear memberships/workspaces Supabase en SQLite local para desbloquear writes workspace-scoped.
+- Doing — Validar push real de una fila `sync_outbox` generada por create/edit asset.
 - Todo — Conectar MFA TOTP real con Supabase MFA.
 
 ### Slice 2 — Roles, Permissions e Invites
@@ -110,6 +112,7 @@ Decisiones bloqueadas:
 | 2026-04-15 | Working tree | Usuario valida en app el flujo Supabase real: login exitoso y creación de workspace remoto después de desactivar gateway JWT verification. Verificación local: `typecheck` y `test` pasan; tests: 26 archivos, 96 casos. | Cerrar el riesgo principal del vertical MVP auth/workspace antes de avanzar a assets/outbox. |
 | 2026-04-15 | Working tree | Assets empieza a respetar workspace activo: el renderer envía `workspaceId`, `getAssets` filtra por `assets.workspace_id` y create/update/archive/assign/packing slip usan el workspace activo. Verificación: `corepack pnpm --filter @bukowski/desktop test -- asset-mutation-service.test.ts` pasa con 26 archivos/97 tests; `typecheck` pasa. | Reducir riesgo del reemplazo de `DEFAULT_WORKSPACE_ID` con un vertical local verificable antes del push remoto a Supabase. |
 | 2026-04-15 | Working tree | Se convierte `syncOutboxWorkerService` a async con transport injectable, se agrega `createSupabaseOutboxTransport`, migración `public.sync_outbox` con RLS por membership y bandera opt-in `VITE_SUPABASE_SYNC_ENABLED`. Verificación: `typecheck` pasa y `corepack pnpm --filter @bukowski/desktop test -- sync-outbox-worker-service.test.ts` pasa con 26 archivos/99 tests. | Preparar push remoto idempotente y auditable sin romper modo local ni activar red antes de aplicar migración remota. |
+| 2026-04-15 | Working tree | Usuario aplica migración `20260415150000_sync_outbox_bridge.sql`; se valida REST `public.sync_outbox` con sesión guardada y respuesta 200. Se detecta que SQLite local solo tenía `workspace-metadata`, por lo que se agrega IPC `ensureLocalWorkspaces` y `WorkspaceProvider` cachea los workspaces Supabase en local. Verificación: `typecheck`, `build` y tests focalizados pasan. | Evitar fallos de foreign key al crear assets con UUID remoto de workspace y mantener la cache local consistente antes de probar outbox real. |
 
 ## Decisiones tomadas
 
@@ -138,6 +141,7 @@ Decisiones bloqueadas:
 | bajo | Edge Functions pueden quedar desactualizadas frente al código local si se redeployan manualmente desde Dashboard. | Documentar evidencia en roadmap y migrar a Supabase CLI antes de más functions. | Abierto. |
 | medio | Gateway JWT verification de Supabase puede rechazar tokens `ES256` antes de ejecutar functions. | Desactivar `Verify JWT` en functions que validan bearer contra `/auth/v1/user`; registrar `supabase/config.toml`. | Mitigado en dev. |
 | medio | Activar Supabase sync antes de aplicar la migración `sync_outbox` marcaría filas como failed/retry. | Mantener `VITE_SUPABASE_SYNC_ENABLED=false` hasta correr la migración y validar una fila real. | Abierto. |
+| medio | Workspace remoto existe en Supabase pero no en SQLite local, bloqueando writes workspace-scoped por foreign key. | Cachear memberships/workspaces remotos vía IPC al refrescar `WorkspaceProvider`. | Mitigado en código; falta validar visualmente tras reload. |
 
 ## Incompletos / deuda técnica
 
@@ -147,9 +151,10 @@ Decisiones bloqueadas:
 - Aún no se ha iniciado reemplazo de `DEFAULT_WORKSPACE_ID`.
 - Aún no se ha implementado sync remoto real; el worker actual sigue haciendo acknowledge local.
 - MFA TOTP está como pantalla placeholder; falta wiring real Supabase MFA.
-- El transport Supabase existe pero queda opt-in; falta aplicar `20260415150000_sync_outbox_bridge.sql` en Supabase dev y validar un push real.
+- El transport Supabase está opt-in y la migración remota ya fue aplicada; falta generar un asset real y confirmar una fila `sent` en Supabase.
 - Falta validar visualmente en app que el cambio de workspace aísla assets creados en cada workspace.
+- Deuda técnica: los catálogos base por workspace todavía no se clonan/filtran; para el MVP se desbloquea workspace FK, pero Slice 2/3 debe separar catálogos por workspace con más rigor.
 
 ## Próximo paso recomendado
 
-Aplicar la migración remota `sync_outbox`, activar `VITE_SUPABASE_SYNC_ENABLED=true` en dev y validar una fila real desde la pantalla de Sync Outbox.
+Reload del app, confirmar que `Metadata Cine2` queda en SQLite local, crear/editar un asset y validar que el outbox sube una fila `sent` a `public.sync_outbox`.

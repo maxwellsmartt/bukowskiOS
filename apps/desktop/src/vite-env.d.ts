@@ -26,6 +26,7 @@ import type {
   AppInfo,
   AppSupportSnapshot,
   AppSyncOutboxRow,
+  EnsureLocalWorkspaceInput,
   AppUserMutationResult,
   AppUsersSnapshot,
   AssetsOverviewSnapshot,
@@ -138,6 +139,7 @@ declare global {
       updateUser: (input: UpdateAppUserCommand) => Promise<AppUserMutationResult>;
       setUserActive: (input: SetAppUserActiveCommand) => Promise<AppUserMutationResult>;
       revokeTelegramLink: (input: RevokeTelegramLinkCommand) => Promise<AppUserMutationResult>;
+      ensureLocalWorkspaces: (workspaces: EnsureLocalWorkspaceInput[]) => Promise<AppActionResult>;
       runIntegrityCheck: () => Promise<AppActionResult>;
       runLocalSync: () => Promise<AppActionResult>;
       getSyncOutboxRows: () => Promise<AppSyncOutboxRow[]>;

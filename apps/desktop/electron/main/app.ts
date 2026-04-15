@@ -196,6 +196,7 @@ app.whenReady().then(() => {
     revokeTelegramLink: (input) => localDatabase.userAdmin.revokeTelegramLink(input),
     createBackupNow: localDatabase.createBackupNow,
     runIntegrityCheckNow: localDatabase.runIntegrityCheckNow,
+    ensureLocalWorkspaces: localDatabase.ensureLocalWorkspaces,
     runLocalSyncNow: localDatabase.runLocalSyncNow,
     getSyncOutboxRows: localDatabase.getSyncOutboxRows,
     retrySyncOutboxRow: localDatabase.retrySyncOutboxRow,
