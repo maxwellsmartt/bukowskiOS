@@ -1291,6 +1291,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .shell-project-copy {
   display: flex;
   flex-direction: column;
+  flex: 1;
   gap: 3px;
   min-width: 0;
 }
@@ -1386,6 +1387,11 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   color: #ffd2d2;
   background: rgba(227, 113, 113, 0.1);
   border-color: transparent;
+}
+
+.shell-project-action:disabled {
+  cursor: wait;
+  opacity: 0.46;
 }
 
 .shell-project-action-confirm {

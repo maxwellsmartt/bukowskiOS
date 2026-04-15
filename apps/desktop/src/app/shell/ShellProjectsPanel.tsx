@@ -1,4 +1,4 @@
-import { Archive, createLucideIcon } from "lucide-react";
+import { Archive, Pencil, Trash2, createLucideIcon } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -8,6 +8,7 @@ import {
   type WizardTab,
 } from "@features/projects/ProjectSetupWizard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import type { ProjectCardRow, ProjectDeletePreview } from "@contracts";
 
 const LayersPlus = createLucideIcon("layers-plus", [
   [
@@ -28,9 +29,30 @@ const LayersPlus = createLucideIcon("layers-plus", [
   ["path", { d: "M21 6v4", key: "layers-plus-vertical" }],
 ]);
 
+const buildProjectDeleteMessage = (preview: ProjectDeletePreview) => {
+  const relationSummary = preview.operationalRelationSummary;
+  const linkedItems = [
+    relationSummary.currentAssetCount ? `${relationSummary.currentAssetCount} current assets` : null,
+    relationSummary.assignmentCount ? `${relationSummary.assignmentCount} assignments` : null,
+    relationSummary.incidentCount ? `${relationSummary.incidentCount} incidents` : null,
+    relationSummary.packingCount ? `${relationSummary.packingCount} packing slips` : null,
+    relationSummary.financeCount ? `${relationSummary.financeCount} finance records` : null,
+    relationSummary.collaboratorFeeCount ? `${relationSummary.collaboratorFeeCount} collaborator fees` : null,
+  ].filter(Boolean);
+
+  return [
+    `Delete "${preview.name}"?`,
+    preview.backupWillRun ? "A backup will be created before deletion." : "No backup is scheduled for this deletion.",
+    linkedItems.length ? `Linked data: ${linkedItems.join(", ")}.` : "No linked operational data was found.",
+    "This cannot be undone.",
+  ].join("\n\n");
+};
+
 export const ShellProjectsPanel = () => {
   const {
     activeProjectId,
+    deleteProject,
+    getProjectDeletePreview,
     openProject,
     projects,
     projectsError,
@@ -42,6 +64,44 @@ export const ShellProjectsPanel = () => {
   const [wizardTab, setWizardTab] = useState<WizardTab>("general");
   const [wizardDraft, setWizardDraft] = useState<ProjectSetupDraft>(createEmptyProjectSetupDraft());
   const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+
+  const handleEditProject = (projectId: string) => {
+    setActionError(null);
+    openProject(projectId, "info");
+  };
+
+  const handleDeleteProject = async (project: ProjectCardRow) => {
+    if (deletingProjectId) {
+      return;
+    }
+
+    setDeletingProjectId(project.id);
+    setActionError(null);
+
+    try {
+      const preview = await getProjectDeletePreview(project.id);
+
+      if (!preview.canHardDelete) {
+        setActionError(
+          preview.hardDeleteBlockedReasons.length
+            ? preview.hardDeleteBlockedReasons.join(" ")
+            : "This project cannot be deleted yet.",
+        );
+        return;
+      }
+
+      if (!window.confirm(buildProjectDeleteMessage(preview))) {
+        return;
+      }
+
+      await deleteProject(project.id);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not delete this project.");
+    } finally {
+      setDeletingProjectId(null);
+    }
+  };
 
   return (
     <section className="shell-projects">
@@ -97,6 +157,33 @@ export const ShellProjectsPanel = () => {
               <span className="shell-project-meta">
                 {project.assetCount} assets · {project.incidentCount} incidents
               </span>
+            </div>
+            <div className="shell-project-item-actions" aria-label={`${project.name} actions`}>
+              <button
+                aria-label={`Edit ${project.name}`}
+                className="shell-project-action"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleEditProject(project.id);
+                }}
+                title="Edit project"
+                type="button"
+              >
+                <Pencil size={13} />
+              </button>
+              <button
+                aria-label={`Delete ${project.name}`}
+                className="shell-project-action is-danger"
+                disabled={deletingProjectId === project.id}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleDeleteProject(project);
+                }}
+                title="Delete project"
+                type="button"
+              >
+                <Trash2 size={13} />
+              </button>
             </div>
           </div>
         ))}
