@@ -228,7 +228,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const activeMembership =
-    memberships.find((membership) => membership.workspaceId === activeWorkspaceId) ?? memberships[0] ?? null;
+    memberships.find((membership) => membership.workspaceId === activeWorkspaceId) ??
+    (isLocalFallback ? memberships[0] ?? null : null);
 
   const switchWorkspace = useCallback(
     (workspaceId: string) => {
@@ -249,7 +250,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const value = useMemo<WorkspaceContextValue>(
     () => ({
-      activeWorkspaceId: activeMembership?.workspaceId ?? activeWorkspaceId,
+      activeWorkspaceId: activeMembership?.workspaceId ?? (isLocalFallback ? activeWorkspaceId : "__pending-workspace__"),
       activeWorkspaceName: activeMembership?.workspaceName ?? "Select workspace",
       memberships,
       activeMembership,
@@ -268,6 +269,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       createWorkspace,
       hasPermission,
       isCreatingWorkspace,
+      isLocalFallback,
       memberships,
       refreshWorkspaces,
       status,

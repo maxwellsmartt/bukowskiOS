@@ -16,6 +16,7 @@ import type {
   ArchiveAssetCommand,
   ArchiveProjectInput,
   AssetListQuery,
+  AssetWorkspaceQuery,
   AssignAgentModelCommand,
   AssignCrewToProjectUnitInput,
   AssignMoveAssetsInput,
@@ -202,8 +203,8 @@ declare global {
     };
     bukowskiAssets?: {
       getList: (query?: AssetListQuery) => Promise<AssetListRow[]>;
-      getSummary: () => Promise<AssetSummarySnapshot>;
-      getOverview: () => Promise<AssetsOverviewSnapshot>;
+      getSummary: (query?: AssetWorkspaceQuery) => Promise<AssetSummarySnapshot>;
+      getOverview: (query?: AssetWorkspaceQuery) => Promise<AssetsOverviewSnapshot>;
       getDetail: (assetId: string) => Promise<AssetDetailSnapshot>;
       uploadFiles: (assetId: string) => Promise<FileUploadMutationResult>;
       openFile: (fileId: string) => Promise<void>;

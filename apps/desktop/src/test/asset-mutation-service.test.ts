@@ -549,6 +549,8 @@ describe("asset mutation service", () => {
         .getAssets({ workspaceId: "workspace-assets-alt", sortBy: "name", sortDirection: "asc" })
         .some((asset) => asset.id === createResult.assetId),
     ).toBe(true);
+    expect(reads.getAssetSummary({ workspaceId: "workspace-assets-alt" }).totalAssets).toBe("1");
+    expect(reads.getAssetSummary({ workspaceId: "workspace-metadata" }).totalAssets).not.toBe("1");
 
     cleanup();
   });

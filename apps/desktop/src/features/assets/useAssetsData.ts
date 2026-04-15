@@ -4,6 +4,7 @@ import type {
   AssetEditorMutationResult,
   AssetListQuery,
   AssetListRow,
+  AssetWorkspaceQuery,
   AssetsOverviewSnapshot,
   AssetSummarySnapshot,
   AssignMoveAssetsInput,
@@ -82,30 +83,30 @@ export const useAssetsList = (query: AssetListQuery = defaultAssetListQuery) =>
     [query.workspaceId, query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
   );
 
-export const useAssetSummary = () =>
+export const useAssetSummary = (query: AssetWorkspaceQuery = {}) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiAssets) {
         return emptyAssetSummary;
       }
 
-      return window.bukowskiAssets.getSummary();
+      return window.bukowskiAssets.getSummary(query);
     },
     emptyAssetSummary,
-    [],
+    [query.workspaceId],
   );
 
-export const useAssetsOverview = () =>
+export const useAssetsOverview = (query: AssetWorkspaceQuery = {}) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiAssets) {
         return emptyAssetsOverview;
       }
 
-      return window.bukowskiAssets.getOverview();
+      return window.bukowskiAssets.getOverview(query);
     },
     emptyAssetsOverview,
-    [],
+    [query.workspaceId],
   );
 
 export const useAssetDetail = (assetId: string | undefined) =>

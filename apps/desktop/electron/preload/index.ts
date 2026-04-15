@@ -18,6 +18,7 @@ import type {
   ArchiveAssetCommand,
   ArchiveProjectInput,
   AssetListQuery,
+  AssetWorkspaceQuery,
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppActionResult,
@@ -247,8 +248,8 @@ const bukowskiAgents = {
 
 const bukowskiAssets = {
   getList: (query?: AssetListQuery) => ipcRenderer.invoke(ipcChannels.assets.getList, query) as Promise<AssetListRow[]>,
-  getSummary: () => ipcRenderer.invoke(ipcChannels.assets.getSummary) as Promise<AssetSummarySnapshot>,
-  getOverview: () => ipcRenderer.invoke(ipcChannels.assets.getOverview) as Promise<AssetsOverviewSnapshot>,
+  getSummary: (query?: AssetWorkspaceQuery) => ipcRenderer.invoke(ipcChannels.assets.getSummary, query) as Promise<AssetSummarySnapshot>,
+  getOverview: (query?: AssetWorkspaceQuery) => ipcRenderer.invoke(ipcChannels.assets.getOverview, query) as Promise<AssetsOverviewSnapshot>,
   getDetail: (assetId: string) =>
     ipcRenderer.invoke(ipcChannels.assets.getDetail, assetId) as Promise<AssetDetailSnapshot>,
   uploadFiles: (assetId: string) =>

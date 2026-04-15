@@ -56,6 +56,10 @@ export type AssetListQuery = {
   sortDirection: ListSortDirection;
 };
 
+export type AssetWorkspaceQuery = {
+  workspaceId?: string;
+};
+
 export type AssetSummarySnapshot = {
   totalAssets: string;
   assignedAssets: string;

@@ -5,6 +5,7 @@ import type {
   AssetsOverviewSnapshot,
   AssetSummarySnapshot,
   AssetListQuery,
+  AssetWorkspaceQuery,
   AssetSortField,
   AssetDetailSnapshot,
   AssetLinkedIncidentRow,
@@ -83,7 +84,7 @@ const loadActiveKitMemberships = (db: DatabaseSync, assetIds: string[]) => {
 
 export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) => {
   const service = {
-    getAssetSummary(): AssetSummarySnapshot {
+    getAssetSummary(query: AssetWorkspaceQuery = {}): AssetSummarySnapshot {
       const totalAssets = db
         .prepare(
           `
@@ -91,9 +92,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
             FROM asset_current_state
             JOIN assets ON assets.id = asset_current_state.asset_id
             WHERE assets.is_active = 1
+              AND (? IS NULL OR assets.workspace_id = ?)
           `,
         )
-        .get() as CountRow;
+        .get(query.workspaceId ?? null, query.workspaceId ?? null) as CountRow;
       const assignedAssets = db
         .prepare(
           `
@@ -101,9 +103,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
             FROM asset_current_state
             JOIN assets ON assets.id = asset_current_state.asset_id
             WHERE assets.is_active = 1
+              AND (? IS NULL OR assets.workspace_id = ?)
           `,
         )
-        .get() as CountRow;
+        .get(query.workspaceId ?? null, query.workspaceId ?? null) as CountRow;
 
       return {
         totalAssets: String(totalAssets.count),
@@ -111,9 +114,9 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
       };
     },
 
-    getAssetsOverview(): AssetsOverviewSnapshot {
+    getAssetsOverview(query: AssetWorkspaceQuery = {}): AssetsOverviewSnapshot {
       const overviewSnapshot = deps.getOverviewSnapshot();
-      const assetSummary = service.getAssetSummary();
+      const assetSummary = service.getAssetSummary(query);
 
       return {
         totalAssets: assetSummary.totalAssets,

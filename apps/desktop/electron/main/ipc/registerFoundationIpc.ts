@@ -33,6 +33,7 @@ import {
   financeOverviewReadArgsSchema,
   globalSearchReadArgsSchema,
   assetListReadArgsSchema,
+  assetWorkspaceReadArgsSchema,
   incidentListReadArgsSchema,
   packingSlipListReadArgsSchema,
   projectListReadArgsSchema,
@@ -86,6 +87,7 @@ import type {
   ReviewAgentRunCommand,
   SendAssistantChatTurnCommand,
   AssetListQuery,
+  AssetWorkspaceQuery,
   SetActiveAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
   SetAgentApprovalModeCommand,
@@ -425,8 +427,18 @@ export const registerFoundationIpc = ({
     (_event, query: AssetListQuery | undefined) => foundationReads.getAssets(query),
     "The app could not load assets.",
   );
-  safeHandleRead(ipcChannels.assets.getSummary, () => foundationReads.getAssetSummary(), "The app could not load the asset summary.");
-  safeHandleRead(ipcChannels.assets.getOverview, () => foundationReads.getAssetsOverview(), "The app could not load the asset overview.");
+  safeHandleReadWithSchema(
+    ipcChannels.assets.getSummary,
+    assetWorkspaceReadArgsSchema,
+    (_event, query: AssetWorkspaceQuery | undefined) => foundationReads.getAssetSummary(query),
+    "The app could not load the asset summary.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.assets.getOverview,
+    assetWorkspaceReadArgsSchema,
+    (_event, query: AssetWorkspaceQuery | undefined) => foundationReads.getAssetsOverview(query),
+    "The app could not load the asset overview.",
+  );
   safeHandleReadWithSchema(
     ipcChannels.assets.getDetail,
     idReadArgsSchema,

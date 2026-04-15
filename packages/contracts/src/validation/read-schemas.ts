@@ -112,7 +112,12 @@ export const assetListQuerySchema = z.object({
   sortDirection: sortDirectionSchema,
 });
 
+export const assetWorkspaceQuerySchema = z.object({
+  workspaceId: nonEmptyId.optional(),
+});
+
 export const assetListReadArgsSchema = z.tuple([assetListQuerySchema.optional()]);
+export const assetWorkspaceReadArgsSchema = z.tuple([assetWorkspaceQuerySchema.optional()]);
 
 export const packingSlipListQuerySchema = z.object({
   scopeProjectId: nonEmptyId.nullable().optional(),

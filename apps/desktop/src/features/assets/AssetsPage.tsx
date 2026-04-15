@@ -652,7 +652,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 };
 
 const GlobalAssetsMetrics = () => {
-  const { data: assetsOverview, error } = useAssetsOverview();
+  const { activeWorkspaceId } = useWorkspace();
+  const { data: assetsOverview, error } = useAssetsOverview({ workspaceId: activeWorkspaceId });
   const overviewCards = [
     {
       label: "Total units",
