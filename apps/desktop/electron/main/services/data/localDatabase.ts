@@ -289,13 +289,12 @@ const createRuntime = (): LocalDatabaseRuntime => {
     const timestamp = new Date().toISOString();
     const statement = database.prepare(
       `
-        INSERT INTO workspaces (id, name, slug, base_currency, icon_color, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO workspaces (id, name, slug, base_currency, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           name = excluded.name,
           slug = excluded.slug,
           base_currency = excluded.base_currency,
-          icon_color = excluded.icon_color,
           updated_at = excluded.updated_at
       `,
     );
@@ -308,7 +307,6 @@ const createRuntime = (): LocalDatabaseRuntime => {
           workspace.name.trim() || "Workspace",
           workspace.slug.trim() || workspace.id,
           workspace.baseCurrency.trim().toUpperCase() || "USD",
-          workspace.iconColor?.trim() || null,
           timestamp,
           timestamp,
         );
