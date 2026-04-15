@@ -147,6 +147,64 @@ const getErrorMessage = (error: unknown) =>
 const isDuplicateRegistryCodeError = (error: unknown) =>
   /registry code .* already in use/i.test(getErrorMessage(error));
 
+type AssetCsvDraft = {
+  importRowNumber: number;
+  name: string;
+  internalCode: string;
+  categoryId: string;
+  defaultLocationId: string | undefined;
+  brand: string;
+  model: string;
+  serialNumber: string;
+  description: string;
+  conditionStatus: string;
+  notes: string;
+  replacementValue: number | undefined;
+  ownershipType: string;
+  qrCodeValue: string;
+  totalQuantity: number;
+};
+
+const aggregateAssetCsvDrafts = (drafts: AssetCsvDraft[]) => {
+  const draftsByCode = new Map<string, AssetCsvDraft & { importRowNumbers: number[]; serialNumbers: string[] }>();
+  let mergedDuplicateRows = 0;
+
+  for (const draft of drafts) {
+    const normalizedCode = draft.internalCode.trim().toUpperCase();
+    const existingDraft = draftsByCode.get(normalizedCode);
+
+    if (!existingDraft) {
+      draftsByCode.set(normalizedCode, {
+        ...draft,
+        importRowNumbers: [draft.importRowNumber],
+        serialNumbers: draft.serialNumber ? [draft.serialNumber] : [],
+      });
+      continue;
+    }
+
+    mergedDuplicateRows += 1;
+    existingDraft.importRowNumbers.push(draft.importRowNumber);
+    existingDraft.totalQuantity = Math.max(existingDraft.totalQuantity, draft.totalQuantity, existingDraft.importRowNumbers.length);
+
+    if (draft.serialNumber && !existingDraft.serialNumbers.includes(draft.serialNumber)) {
+      existingDraft.serialNumbers.push(draft.serialNumber);
+    }
+  }
+
+  return {
+    drafts: Array.from(draftsByCode.values()).map(({ importRowNumbers, serialNumbers, ...draft }) => ({
+      ...draft,
+      importRowNumber: importRowNumbers[0] ?? draft.importRowNumber,
+      notes: joinCsvNotes([
+        draft.notes,
+        serialNumbers.length > 1 && `Source serials: ${serialNumbers.join(", ")}`,
+        importRowNumbers.length > 1 && `Merged CSV rows: ${importRowNumbers.join(", ")}`,
+      ]),
+    })),
+    mergedDuplicateRows,
+  };
+};
+
 export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageProps) => (
   <AssetsContent projectId={projectId} projectName={projectName} />
 );
@@ -401,8 +459,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       }
 
       const existingCodes = new Set(assets.map((asset) => asset.code.trim().toUpperCase()).filter(Boolean));
-      const csvCodes = new Set<string>();
-      const drafts = dataRows.map((values, index) => {
+      const rawDrafts = dataRows.map((values, index): AssetCsvDraft => {
         const row = Object.fromEntries(headers.map((header, headerIndex) => [header, values[headerIndex] ?? ""]));
         const rowNumber = index + 2;
         const name = resolveCsvValue(row, [
@@ -485,6 +542,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           totalQuantity,
         };
       });
+      const { drafts, mergedDuplicateRows } = aggregateAssetCsvDrafts(rawDrafts);
 
       let importedCount = 0;
       let skippedDuplicateCount = 0;
@@ -493,7 +551,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         const { importRowNumber, ...assetDraft } = draft;
         const normalizedCode = assetDraft.internalCode.trim().toUpperCase();
 
-        if (existingCodes.has(normalizedCode) || csvCodes.has(normalizedCode)) {
+        if (existingCodes.has(normalizedCode)) {
           skippedDuplicateCount += 1;
           continue;
         }
@@ -508,7 +566,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             ...assetDraft,
           });
           importedCount += 1;
-          csvCodes.add(normalizedCode);
+          existingCodes.add(normalizedCode);
         } catch (error) {
           if (isDuplicateRegistryCodeError(error)) {
             skippedDuplicateCount += 1;
@@ -527,6 +585,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       await Promise.all([reload(), refreshProjects()]);
       setActionFeedback(
         `Imported ${importedCount} asset${importedCount === 1 ? "" : "s"} from ${file.name}.${
+          mergedDuplicateRows ? ` Merged ${mergedDuplicateRows} duplicate CSV row${mergedDuplicateRows === 1 ? "" : "s"}.` : ""
+        }${
           skippedDuplicateCount ? ` Skipped ${skippedDuplicateCount} existing code${skippedDuplicateCount === 1 ? "" : "s"}.` : ""
         }`,
       );
