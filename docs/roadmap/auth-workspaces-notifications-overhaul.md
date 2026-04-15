@@ -21,7 +21,7 @@ Decisiones bloqueadas:
 
 | Slice | Estado | Inicio | Cierre | Owner | Evidencia de verificación |
 | --- | --- | --- | --- | --- | --- |
-| 0 — Foundation Supabase + Seguridad | In progress | 2026-04-15 |  | Codex | Dependencias instaladas; roadmap, paquete Supabase, Keychain IPC, deep links, migración y Edge Function stubs creados. Migración validada en Supabase dev con REST `workspaces` 200. Typecheck/build/tests pasan. |
+| 0 — Foundation Supabase + Seguridad | In progress | 2026-04-15 |  | Codex | Dependencias instaladas; roadmap, paquete Supabase, Keychain IPC, deep links, migración y Edge Functions desplegadas. Migración validada con REST `workspaces` 200; functions responden `authentication_required`/`forbidden` sin sesión. Typecheck/build/tests pasan. |
 | 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Providers de sesión/workspace, rutas auth, guardas, switcher y create workspace remoto vía Edge Function wiring creados. Typecheck/build/tests pasan: 26 archivos, 96 tests. |
 | 2 — Roles, Permissions e Invites | Todo |  |  | Codex | Pendiente. |
 | 3 — Workspaces CRUD + Sharing | Todo |  |  | Codex | Pendiente. |
@@ -41,7 +41,7 @@ Decisiones bloqueadas:
 - Done — Crear Edge Functions stub para invites/bootstrap admin.
 - Done — Correr typecheck/build y registrar resultado.
 - Done — Validar migración contra un proyecto Supabase real.
-- Todo — Desplegar Edge Functions en entorno dev.
+- Done — Desplegar Edge Functions en entorno dev.
 
 ### Slice 1 — Auth + Workspace Vertical MVP
 
@@ -99,6 +99,7 @@ Decisiones bloqueadas:
 | 2026-04-15 | Working tree | Se conecta `WorkspaceCreateScreen` con `WorkspaceProvider.createWorkspace`, que invoca `admin-workspace-bootstrap`; se agrega rehidratación de sesión desde Keychain. | Pasar de placeholder a flujo remoto real conservando fallback local-dev seguro. |
 | 2026-04-15 | Working tree | Verificación del flujo workspace create/session hydration: `corepack pnpm --filter @bukowski/desktop typecheck`, `test` y `build` pasan; tests: 26 archivos, 96 casos. | Registrar evidencia antes de commitear el micro-slice. |
 | 2026-04-15 | Working tree | Se configura Supabase dev local con anon key en `apps/desktop/.env.local`, se protege `.env.local` en `.gitignore`, y se valida `public.workspaces` vía REST con respuesta 200. | Confirmar que la migración foundation ya existe en el proyecto Supabase dev sin exponer secretos admin. |
+| 2026-04-15 | Working tree | Se validan Edge Functions desplegadas: `admin-workspace-bootstrap` responde `401 authentication_required` sin sesión; `send-invite` responde `403 forbidden` sin usuario con permisos. | Confirmar deploy y secretos con errores seguros antes de probar creación real de workspace. |
 
 ## Decisiones tomadas
 
@@ -127,7 +128,7 @@ Decisiones bloqueadas:
 
 ## Incompletos / deuda técnica
 
-- El schema remoto foundation ya fue desplegado y validado contra Supabase dev; falta validar Edge Functions contra ese entorno.
+- El schema remoto foundation y las Edge Functions ya fueron desplegados y validados contra Supabase dev; falta probar flujo autenticado real desde la app.
 - Guards de sesión/workspace ya existen, pero falta endurecer comportamiento prod sin fallback.
 - Aún no hay validación workspace-scoped aplicada a handlers existentes.
 - Aún no se ha iniciado reemplazo de `DEFAULT_WORKSPACE_ID`.
@@ -137,4 +138,4 @@ Decisiones bloqueadas:
 
 ## Próximo paso recomendado
 
-Desplegar `admin-workspace-bootstrap` y `send-invite` en Supabase dev, configurar sus secretos y validar creación real de workspace desde la app.
+Crear un usuario dev por email/password o magic link y validar el flujo autenticado real: login -> create workspace -> workspace picker.
