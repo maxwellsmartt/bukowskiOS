@@ -62,6 +62,7 @@ const emptyAssetDetail: AssetDetailSnapshot = {
 };
 
 const defaultAssetListQuery: AssetListQuery = {
+  workspaceId: undefined,
   scopeProjectId: null,
   search: "",
   sortBy: "name",
@@ -78,7 +79,7 @@ export const useAssetsList = (query: AssetListQuery = defaultAssetListQuery) =>
       return window.bukowskiAssets.getList(query);
     },
     emptyAssetList,
-    [query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
+    [query.workspaceId, query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
   );
 
 export const useAssetSummary = () =>

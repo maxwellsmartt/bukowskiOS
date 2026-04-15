@@ -175,9 +175,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
             LEFT JOIN project_units ON project_units.id = asset_current_state.project_unit_id
             LEFT JOIN users ON users.id = asset_current_state.current_responsible_user_id
             WHERE assets.is_active = 1
+              AND (? IS NULL OR assets.workspace_id = ?)
           `,
         )
-        .all() as Array<{
+        .all(query.workspaceId ?? null, query.workspaceId ?? null) as Array<{
         id: string;
         name: string;
         code: string;

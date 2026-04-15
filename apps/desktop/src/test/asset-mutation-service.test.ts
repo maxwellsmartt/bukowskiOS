@@ -494,4 +494,62 @@ describe("asset mutation service", () => {
 
     cleanup();
   });
+
+  it("filters asset lists by workspace id", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-workspace-filter");
+    const reads = createFoundationReadService(database);
+    const mutations = createAssetMutationService(database);
+
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, name, slug, base_currency, created_at, updated_at)
+          VALUES (?, ?, ?, 'USD', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `,
+      )
+      .run("workspace-assets-alt", "Assets Alt", "assets-alt");
+
+    database
+      .prepare(
+        `
+          INSERT INTO locations (id, workspace_id, code, name, type, description, is_active, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+        `,
+      )
+      .run("loc-alt-warehouse", "workspace-assets-alt", "ALT-WH", "Alt Warehouse", "storage", "Workspace-specific warehouse");
+
+    database
+      .prepare(
+        `
+          INSERT INTO asset_categories (id, workspace_id, parent_category_id, code, name, description, created_at)
+          VALUES (?, ?, NULL, ?, ?, ?, CURRENT_TIMESTAMP)
+        `,
+      )
+      .run("cat-alt-monitors", "workspace-assets-alt", "ALT-MON", "Alt Monitors", "Workspace-specific monitor category");
+
+    const createResult = mutations.createAsset({
+      commandId: "cmd-test-asset-create-alt-workspace",
+      workspaceId: "workspace-assets-alt",
+      name: "Workspace isolated monitor",
+      internalCode: "ALT-001",
+      categoryId: "cat-alt-monitors",
+      defaultLocationId: "loc-alt-warehouse",
+      conditionStatus: "Good",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(
+      reads
+        .getAssets({ workspaceId: "workspace-metadata", sortBy: "name", sortDirection: "asc" })
+        .some((asset) => asset.id === createResult.assetId),
+    ).toBe(false);
+    expect(
+      reads
+        .getAssets({ workspaceId: "workspace-assets-alt", sortBy: "name", sortDirection: "asc" })
+        .some((asset) => asset.id === createResult.assetId),
+    ).toBe(true);
+
+    cleanup();
+  });
 });

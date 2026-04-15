@@ -22,7 +22,7 @@ Decisiones bloqueadas:
 | Slice | Estado | Inicio | Cierre | Owner | Evidencia de verificación |
 | --- | --- | --- | --- | --- | --- |
 | 0 — Foundation Supabase + Seguridad | In progress | 2026-04-15 |  | Codex | Dependencias instaladas; roadmap, paquete Supabase, Keychain IPC, deep links, migración y Edge Functions desplegadas. Migración validada con REST `workspaces` 200; functions responden `authentication_required`/`forbidden` sin sesión. Typecheck/build/tests pasan. |
-| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Login real Supabase y creación real de workspace remoto validados en app. Providers/rutas/guardas/switcher creados. Typecheck/tests pasan: 26 archivos, 96 tests. |
+| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Login real Supabase y creación real de workspace remoto validados en app. Providers/rutas/guardas/switcher creados. Assets list/create/edit/archive consumen active workspace local. Typecheck/tests pasan: 26 archivos, 97 tests. |
 | 2 — Roles, Permissions e Invites | Todo |  |  | Codex | Pendiente. |
 | 3 — Workspaces CRUD + Sharing | Todo |  |  | Codex | Pendiente. |
 | 4 — Archiving Wrapped-Gate | Todo |  |  | Codex | Pendiente. |
@@ -54,7 +54,8 @@ Decisiones bloqueadas:
 - Done — Conectar `WorkspaceCreateScreen` a la Edge Function `admin-workspace-bootstrap` cuando Supabase está configurado.
 - Done — Validar flujo real en app: login Supabase -> create workspace -> workspace creado.
 - Doing — Portar estética/login desde `checkbox_app` con más fidelidad visual.
-- Todo — Migrar flujo assets a workspace activo + outbox Supabase.
+- Done — Migrar lista/create/edit/archive de assets al workspace activo en SQLite local.
+- Doing — Migrar flujo assets a outbox Supabase con push/retry remoto.
 - Todo — Conectar MFA TOTP real con Supabase MFA.
 
 ### Slice 2 — Roles, Permissions e Invites
@@ -105,6 +106,7 @@ Decisiones bloqueadas:
 | 2026-04-15 | Working tree | Se reemplaza validación JWT local en Edge Functions por lookup contra `/auth/v1/user` y se vuelve idempotente el bootstrap de workspace/rol/membership. | Soportar JWT `ES256` de Supabase y recuperarse de intentos parciales de creación. |
 | 2026-04-15 | Working tree | Se detecta que el gateway de Supabase Edge Functions rechaza JWT `ES256` antes de ejecutar la función; se documenta `verify_jwt=false` para functions que validan bearer internamente. | Evitar doble validación JWT y mantener autorización explícita dentro de la función. |
 | 2026-04-15 | Working tree | Usuario valida en app el flujo Supabase real: login exitoso y creación de workspace remoto después de desactivar gateway JWT verification. Verificación local: `typecheck` y `test` pasan; tests: 26 archivos, 96 casos. | Cerrar el riesgo principal del vertical MVP auth/workspace antes de avanzar a assets/outbox. |
+| 2026-04-15 | Working tree | Assets empieza a respetar workspace activo: el renderer envía `workspaceId`, `getAssets` filtra por `assets.workspace_id` y create/update/archive/assign/packing slip usan el workspace activo. Verificación: `corepack pnpm --filter @bukowski/desktop test -- asset-mutation-service.test.ts` pasa con 26 archivos/97 tests; `typecheck` pasa. | Reducir riesgo del reemplazo de `DEFAULT_WORKSPACE_ID` con un vertical local verificable antes del push remoto a Supabase. |
 
 ## Decisiones tomadas
 
@@ -141,8 +143,9 @@ Decisiones bloqueadas:
 - Aún no se ha iniciado reemplazo de `DEFAULT_WORKSPACE_ID`.
 - Aún no se ha implementado sync remoto real; el worker actual sigue haciendo acknowledge local.
 - MFA TOTP está como pantalla placeholder; falta wiring real Supabase MFA.
-- Workspace Create ya llama Edge Function cuando Supabase está configurado; falta validar contra Supabase dev real.
+- Falta conectar el outbox de assets a Supabase remoto con retry/backoff real; por ahora el worker sigue confirmando localmente.
+- Falta validar visualmente en app que el cambio de workspace aísla assets creados en cada workspace.
 
 ## Próximo paso recomendado
 
-Avanzar al vertical MVP de assets por workspace activo con sync outbox/retry auditable, manteniendo el flujo auth/workspace como base estable.
+Conectar el outbox de assets a Supabase remoto con push/retry auditable y validar en app que el cambio de workspace aísla los assets creados.

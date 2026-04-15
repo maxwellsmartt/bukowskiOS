@@ -3,7 +3,7 @@ import { Plus, SquarePen, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import type { AssetListQuery, AssetSortField } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { PackingSlipBuilderPanel, type PackingSlipBuilderDraft } from "@features/packing/PackingSlipBuilderPanel";
 import { createPackingSlip } from "@features/packing/usePackingData";
@@ -47,13 +47,12 @@ const assetSortOptions: Array<ListSortOption<AssetSortField>> = [
   { value: "createdAt", label: "Created" },
 ];
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
-
 export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageProps) => (
   <AssetsContent projectId={projectId} projectName={projectName} />
 );
 
 const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
+  const { activeWorkspaceId } = useWorkspace();
   const { activeProject, projects, refreshProjects } = useShellContext();
   const { addItems, hasItem } = useCompareTray();
   const isProjectMode = Boolean(projectId);
@@ -73,6 +72,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       incidentsOpen: "desc",
     },
     buildQuery: ({ search, sortBy, sortDirection }) => ({
+      workspaceId: activeWorkspaceId,
       scopeProjectId: projectId,
       search,
       sortBy,
@@ -129,7 +129,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setIsSubmittingAction(true);
       const result = await assignMoveAssets({
         commandId: crypto.randomUUID(),
-        workspaceId,
+        workspaceId: activeWorkspaceId,
         assetIds: selectedRowIds,
         assetSelections: formValue.assetSelections,
         mode: formValue.mode,
@@ -162,7 +162,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setIsSubmittingPacking(true);
       const result = await createPackingSlip({
         commandId: crypto.randomUUID(),
-        workspaceId,
+        workspaceId: activeWorkspaceId,
         assetIds: selectedRowIds,
         assetSelections: formValue.assetSelections,
         projectId: formValue.projectId,
@@ -197,7 +197,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       if (editorMode === "edit" && editorAssetId) {
         const result = await updateAsset({
           commandId: crypto.randomUUID(),
-          workspaceId,
+          workspaceId: activeWorkspaceId,
           assetId: editorAssetId,
           actorType: "user",
           sourceChannel: "desktop",
@@ -211,7 +211,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       } else {
         const result = await createAsset({
           commandId: crypto.randomUUID(),
-          workspaceId,
+          workspaceId: activeWorkspaceId,
           actorType: "user",
           sourceChannel: "desktop",
           isActive: true,
@@ -242,7 +242,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setIsArchivingAsset(true);
       const result = await archiveAsset({
         commandId: crypto.randomUUID(),
-        workspaceId,
+        workspaceId: activeWorkspaceId,
         assetId: editorAssetId,
         actorType: "user",
         sourceChannel: "desktop",

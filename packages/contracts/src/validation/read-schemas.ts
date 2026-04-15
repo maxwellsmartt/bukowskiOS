@@ -105,6 +105,7 @@ export const scheduleTimelineReadArgsSchema = z.tuple([
 ]);
 
 export const assetListQuerySchema = z.object({
+  workspaceId: nonEmptyId.optional(),
   scopeProjectId: nonEmptyId.nullable().optional(),
   search: boundedSearch.optional(),
   sortBy: assetSortFieldSchema,

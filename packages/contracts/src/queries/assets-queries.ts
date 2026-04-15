@@ -49,6 +49,7 @@ export type AssetSortField =
   | "updatedAt";
 
 export type AssetListQuery = {
+  workspaceId?: string;
   scopeProjectId?: string | null;
   search?: string;
   sortBy: AssetSortField;
