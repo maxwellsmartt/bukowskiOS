@@ -21,12 +21,12 @@ export type ResolvedRouteMeta = AppRouteMeta & {
 };
 
 export const globalRouteMeta: AppRouteMeta[] = [
-  { path: "/assets/overview", label: "Assets Overview", scopeMode: "global", domain: "assets" },
   { path: "/assets", label: "Assets", scopeMode: "global", domain: "assets" },
   { path: "/assets/:assetId", label: "Asset Detail", scopeMode: "global", domain: "assets" },
   { path: "/packing-slips", label: "Packing Slips", scopeMode: "global", domain: "assets" },
   { path: "/incidents", label: "Incidents", scopeMode: "global", domain: "assets" },
   { path: "/projects", label: "Projects", scopeMode: "global", domain: "projects" },
+  { path: "/projects/schedule", label: "Schedule Overview", scopeMode: "global", domain: "projects" },
   { path: "/rma", label: "RMA", scopeMode: "global", domain: "assets" },
   { path: "/catalog", label: "Catalog", scopeMode: "global", domain: "utility" },
   { path: "/compare", label: "Compare", scopeMode: "global", domain: "utility" },
@@ -91,8 +91,8 @@ export const appRouteMeta: AppRouteMeta[] = [...globalRouteMeta, ...projectRoute
 export const projectRouteSections: ProjectRouteSection[] = ["overview", "assets", "packing", "incidents", "budget", "info"];
 
 const normalizeLegacyGlobalPath = (pathname: string | null) => {
-  if (!pathname || pathname === "/overview") {
-    return "/assets/overview";
+  if (!pathname || pathname === "/overview" || pathname === "/assets/overview") {
+    return "/assets";
   }
 
   return pathname;
@@ -120,14 +120,14 @@ const isGlobalRoutePath = (pathname: string) =>
 
 export const resolveRememberedGlobalPath = () => {
   const rememberedPath = normalizeLegacyGlobalPath(
-    readStringPreference(uiPreferenceKeys.lastGlobalRoutePath, "/assets/overview"),
+    readStringPreference(uiPreferenceKeys.lastGlobalRoutePath, "/assets"),
   );
 
   if (!rememberedPath) {
-    return "/assets/overview";
+    return "/assets";
   }
 
-  return isGlobalRoutePath(rememberedPath) ? rememberedPath : "/assets/overview";
+  return isGlobalRoutePath(rememberedPath) ? rememberedPath : "/assets";
 };
 
 export const resolveInitialPath = () => {
@@ -137,7 +137,7 @@ export const resolveInitialPath = () => {
     resolveRememberedGlobalPath();
 
   if (!rememberedPath) {
-    return "/assets/overview";
+    return "/assets";
   }
 
   return findMatchingRoute(rememberedPath) ? rememberedPath : resolveRememberedGlobalPath();

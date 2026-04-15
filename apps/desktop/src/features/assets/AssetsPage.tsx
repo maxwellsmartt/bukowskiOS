@@ -23,7 +23,7 @@ import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { AssetAssignMovePanel, type AssetAssignMoveFormValue } from "./AssetAssignMovePanel";
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
-import { archiveAsset, assignMoveAssets, createAsset, updateAsset, useAssetDetail, useAssetsList } from "./useAssetsData";
+import { archiveAsset, assignMoveAssets, createAsset, updateAsset, useAssetDetail, useAssetsList, useAssetsOverview } from "./useAssetsData";
 
 type AssetsPageProps = {
   projectId?: string | null;
@@ -316,7 +316,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   );
 
   return (
-    <div className="page-stack">
+    <div className="page-stack assets-page-stack">
       <SectionHeader
         title={isProjectMode ? "Project Assets" : "Assets"}
         contextLabel={isProjectMode ? sectionScopeLabel ?? undefined : undefined}
@@ -333,9 +333,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       ) : null}
 
       <div className="chip-row">
-        {selectedRowIds.length || isProjectMode ? (
-          <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : effectiveProjectName ?? "Project scope"}</StatusBadge>
-        ) : null}
+        {isProjectMode ? <StatusBadge>{effectiveProjectName ?? "Project scope"}</StatusBadge> : null}
       </div>
 
       {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
@@ -373,65 +371,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           secondaryActionLabel="Open Catalog"
           onSecondaryAction={() => navigate("/catalog")}
         />
-      ) : null}
-
-      {selectedRowIds.length ? (
-        <div className="selection-action-bar">
-          <div className="selection-action-copy">
-            <span className="selection-action-title">
-              {selectedRowIds.length === 1 ? "1 asset selected" : `${selectedRowIds.length} assets selected`}
-            </span>
-            <span className="selection-action-subtitle">
-              {isProjectMode ? "Move or reassign these assets." : "Assign, move or create a packing slip."}
-            </span>
-          </div>
-          <div className="selection-action-buttons">
-            <button
-              className="ghost-control"
-              onClick={() =>
-                addItems(
-                  assets
-                    .filter((asset) => selectedRowIds.includes(asset.id))
-                    .map((asset) => ({
-                      id: asset.id,
-                      entityType: "asset" as const,
-                      label: `${asset.code} · ${asset.name}`,
-                      subtitle: `${asset.location} · ${asset.project}`,
-                      meta: asset.projectUnit && asset.projectUnit !== "—" ? `Unit · ${asset.projectUnit}` : undefined,
-                    })),
-                )
-              }
-              type="button"
-            >
-              Add to compare
-            </button>
-            <button
-              className="ghost-control"
-              disabled={selectedKitLockedAssets.length > 0}
-              onClick={() => {
-                setPackingPanelOpen(true);
-                setActionPanelOpen(false);
-                setPackingError(null);
-                setActionFeedback(null);
-              }}
-              type="button"
-            >
-              Create packing slip
-            </button>
-            <button
-              className="action-primary-button"
-              disabled={selectedKitLockedAssets.length > 0}
-              onClick={() => {
-                setActionPanelOpen(true);
-                setPackingPanelOpen(false);
-                setActionFeedback(null);
-              }}
-              type="button"
-            >
-              Assign / move selected
-            </button>
-          </div>
-        </div>
       ) : null}
 
       {actionPanelOpen && selectedRowIds.length ? (
@@ -490,21 +429,77 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         />
       ) : null}
 
-      <div className={`list-layout${activeAsset ? " has-preview" : ""}`}>
+      {!isProjectMode ? <GlobalAssetsMetrics /> : null}
+
+      <div className={`list-layout asset-list-layout${activeAsset ? " has-preview" : ""}`}>
         <SurfaceCard
+          className="asset-registry-card"
           title={isProjectMode ? "Assets" : "Assets"}
           aside={
-            <button
-              className="ghost-control"
-              onClick={() => {
-                setEditorMode("create");
-                setEditorError(null);
-              }}
-              type="button"
-            >
-              <Plus size={14} />
-              <span>New asset</span>
-            </button>
+            <div className="asset-registry-header-actions">
+              {selectedRowIds.length ? (
+                <>
+                  <span className="asset-selection-count">
+                    {selectedRowIds.length === 1 ? "1 selected" : `${selectedRowIds.length} selected`}
+                  </span>
+                  <button
+                    className="ghost-control action-row-button"
+                    onClick={() =>
+                      addItems(
+                        assets
+                          .filter((asset) => selectedRowIds.includes(asset.id))
+                          .map((asset) => ({
+                            id: asset.id,
+                            entityType: "asset" as const,
+                            label: `${asset.code} · ${asset.name}`,
+                            subtitle: `${asset.location} · ${asset.project}`,
+                            meta: asset.projectUnit && asset.projectUnit !== "—" ? `Unit · ${asset.projectUnit}` : undefined,
+                          })),
+                      )
+                    }
+                    type="button"
+                  >
+                    Add to compare
+                  </button>
+                  <button
+                    className="ghost-control action-row-button"
+                    disabled={selectedKitLockedAssets.length > 0}
+                    onClick={() => {
+                      setPackingPanelOpen(true);
+                      setActionPanelOpen(false);
+                      setPackingError(null);
+                      setActionFeedback(null);
+                    }}
+                    type="button"
+                  >
+                    Create packing slip
+                  </button>
+                  <button
+                    className="action-primary-button action-row-button"
+                    disabled={selectedKitLockedAssets.length > 0}
+                    onClick={() => {
+                      setActionPanelOpen(true);
+                      setPackingPanelOpen(false);
+                      setActionFeedback(null);
+                    }}
+                    type="button"
+                  >
+                    Assign / move selected
+                  </button>
+                </>
+              ) : null}
+              <button
+                className="asset-create-button action-row-button"
+                onClick={() => {
+                  setEditorMode("create");
+                  setEditorError(null);
+                }}
+                type="button"
+              >
+                <Plus size={14} />
+                <span>New asset</span>
+              </button>
+            </div>
           }
         >
           <ListToolbar
@@ -530,12 +525,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 : "No assets yet. Create the first one after setting up the catalog."
             }
             getRowId={(row) => row.id}
-            maxHeight="min(68vh, 760px)"
+            maxHeight={isProjectMode ? "min(68vh, 760px)" : "min(56vh, 680px)"}
             onRowClick={(row) => setSelectedAssetId(row.id)}
             onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
             onSortRequest={assetControls.handleColumnSortRequest}
             persistKey="assets-registry"
-            persistentHorizontalScroll
             rows={assets}
             shellClassName="table-shell-wide-scroll"
             selectable
@@ -654,5 +648,38 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         ) : null}
       </div>
     </div>
+  );
+};
+
+const GlobalAssetsMetrics = () => {
+  const { data: assetsOverview, error } = useAssetsOverview();
+  const overviewCards = [
+    {
+      label: "Total units",
+      value: assetsOverview.totalAssets,
+      tone: "info" as const,
+    },
+    {
+      label: "Reserved / out units",
+      value: assetsOverview.assignedAssets,
+      tone: "info" as const,
+    },
+    assetsOverview.cards.overdueReturns,
+    assetsOverview.cards.openPackingSlips,
+    assetsOverview.cards.activeIncidents,
+    assetsOverview.cards.maintenanceWatch,
+  ];
+
+  return (
+    <>
+      {error ? <div className="action-feedback action-feedback-error">Asset metrics unavailable: {error}</div> : null}
+      <div className="overview-operational-grid overview-operational-grid-assets">
+        {overviewCards.map((card) => (
+          <SurfaceCard key={card.label} className="overview-operational-card" title={card.label}>
+            <span className={`overview-operational-value metric-tone-${card.tone}`}>{card.value}</span>
+          </SurfaceCard>
+        ))}
+      </div>
+    </>
   );
 };

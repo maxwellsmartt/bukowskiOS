@@ -5,6 +5,7 @@ import {
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -38,7 +39,6 @@ type DataTableProps<T = unknown> = {
   emptyMessage?: string;
   persistKey?: string;
   shellClassName?: string;
-  persistentHorizontalScroll?: boolean;
   sortState?: {
     columnKey: string;
     direction: ListSortDirection;
@@ -49,6 +49,7 @@ type DataTableProps<T = unknown> = {
 };
 
 const selectionColumnWidth = 44;
+const columnReorderThreshold = 6;
 
 const resolveMaxHeight = (value: DataTableProps["maxHeight"]) =>
   typeof value === "number" ? `${value}px` : value ?? "min(58vh, 620px)";
@@ -67,7 +68,6 @@ export const DataTable = <T = unknown,>({
   emptyMessage = "No rows available.",
   persistKey,
   shellClassName,
-  persistentHorizontalScroll = false,
   sortState = null,
   onSortRequest,
   autoScrollToActiveRow = false,
@@ -86,6 +86,9 @@ export const DataTable = <T = unknown,>({
   const [internalSelectedRowIds, setInternalSelectedRowIds] = useState<string[]>([]);
   const activeSelection = selectedRowIds ?? internalSelectedRowIds;
   const resizeStateRef = useRef<{ columnKey: string; startX: number; startWidth: number } | null>(null);
+  const columnReorderStateRef = useRef<{ columnKey: string; startX: number; startY: number; active: boolean } | null>(null);
+  const suppressNextSortClickRef = useRef(false);
+  const columnOrderUndoStackRef = useRef<string[][]>([]);
 
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
     const parsedWidths = persistKey ? readJsonPreference<Record<string, number>>(`table:${persistKey}`, {}) : {};
@@ -95,13 +98,12 @@ export const DataTable = <T = unknown,>({
       return accumulator;
     }, {});
   });
-  const [horizontalScrollMetrics, setHorizontalScrollMetrics] = useState({
-    hasOverflow: false,
-    maxScrollLeft: 0,
-    scrollLeft: 0,
-  });
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
   const [columnsMenuStyle, setColumnsMenuStyle] = useState<{ top: number; left: number; placement: "bottom" | "top" } | null>(null);
+  const [reorderState, setReorderState] = useState<{ draggedKey: string | null; overKey: string | null }>({
+    draggedKey: null,
+    overKey: null,
+  });
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>(() => {
     const defaultKeys = columns.map((column) => column.key);
     if (!persistKey) {
@@ -176,65 +178,38 @@ export const DataTable = <T = unknown,>({
   }, [activeRowId, autoScrollToActiveRow, rows]);
 
   useEffect(() => {
-    if (!persistentHorizontalScroll) {
+    if (!persistKey) {
       return;
     }
 
-    const shell = tableShellRef.current;
-    const table = tableRef.current;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isEditableTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        Boolean(target?.isContentEditable);
 
-    if (!shell || !table) {
-      return;
-    }
+      if (isEditableTarget || !(event.metaKey || event.ctrlKey) || event.shiftKey || event.key.toLowerCase() !== "z") {
+        return;
+      }
 
-    const updateMetrics = () => {
-      const maxScrollLeft = Math.max(0, table.scrollWidth - shell.clientWidth);
-      const hasOverflow = maxScrollLeft > 2;
-      setHorizontalScrollMetrics({
-        hasOverflow,
-        maxScrollLeft,
-        scrollLeft: Math.min(shell.scrollLeft, maxScrollLeft),
-      });
+      const previousOrder = columnOrderUndoStackRef.current.pop();
+
+      if (!previousOrder) {
+        return;
+      }
+
+      event.preventDefault();
+      setVisibleColumnKeys(previousOrder);
     };
 
-    updateMetrics();
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateMetrics();
-    });
-
-    resizeObserver.observe(shell);
-    resizeObserver.observe(table);
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      resizeObserver.disconnect();
+      window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [columns, columnWidths, persistentHorizontalScroll, rows]);
-
-  useEffect(() => {
-    if (!persistentHorizontalScroll) {
-      return;
-    }
-
-    const shell = tableShellRef.current;
-
-    if (!shell) {
-      return;
-    }
-
-    const handleShellScroll = () => {
-      setHorizontalScrollMetrics((current) => ({
-        ...current,
-        scrollLeft: shell.scrollLeft,
-      }));
-    };
-
-    shell.addEventListener("scroll", handleShellScroll, { passive: true });
-
-    return () => {
-      shell.removeEventListener("scroll", handleShellScroll);
-    };
-  }, [persistentHorizontalScroll]);
+  }, [persistKey]);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -281,8 +256,8 @@ export const DataTable = <T = unknown,>({
       }
 
       const rect = trigger.getBoundingClientRect();
-      const menuWidth = 220;
-      const estimatedMenuHeight = 280;
+      const menuWidth = 184;
+      const estimatedMenuHeight = 244;
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const fitsBelow = rect.bottom + 8 + estimatedMenuHeight <= viewportHeight - 12;
@@ -317,7 +292,8 @@ export const DataTable = <T = unknown,>({
   const someRowsSelected = activeSelection.length > 0 && !allRowsSelected;
   const visibleColumns = useMemo(() => {
     const resolvedKeys = visibleColumnKeys.filter((key) => columns.some((column) => column.key === key));
-    return columns.filter((column) => resolvedKeys.includes(column.key));
+    const columnByKey = new Map(columns.map((column) => [column.key, column] as const));
+    return resolvedKeys.map((key) => columnByKey.get(key)).filter((column): column is DataColumn<T> => Boolean(column));
   }, [columns, visibleColumnKeys]);
   const hideableColumns = columns.filter((column) => column.hideable !== false);
   const visibleHideableCount = visibleColumns.filter((column) => column.hideable !== false).length;
@@ -361,8 +337,106 @@ export const DataTable = <T = unknown,>({
         return current.filter((key) => key !== columnKey);
       }
 
-      return columns.filter((column) => current.includes(column.key) || column.key === columnKey).map((column) => column.key);
+      return [...current, columnKey];
     });
+  };
+
+  const moveVisibleColumn = (sourceKey: string, targetKey: string) => {
+    if (sourceKey === targetKey) {
+      return;
+    }
+
+    setVisibleColumnKeys((currentKeys) => {
+      const sourceIndex = currentKeys.indexOf(sourceKey);
+      const targetIndex = currentKeys.indexOf(targetKey);
+
+      if (sourceIndex === -1 || targetIndex === -1) {
+        return currentKeys;
+      }
+
+      const nextKeys = [...currentKeys];
+      const [movedKey] = nextKeys.splice(sourceIndex, 1);
+      nextKeys.splice(targetIndex, 0, movedKey);
+      columnOrderUndoStackRef.current = [...columnOrderUndoStackRef.current.slice(-9), currentKeys];
+      return nextKeys;
+    });
+  };
+
+  const handleColumnPointerDown = (event: ReactPointerEvent<HTMLElement>, columnKey: string) => {
+    if (!persistKey || event.button !== 0 || resizeStateRef.current) {
+      return;
+    }
+
+    columnReorderStateRef.current = {
+      columnKey,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+    };
+  };
+
+  const handleColumnPointerMove = (event: ReactPointerEvent<HTMLElement>, columnKey: string) => {
+    const dragState = columnReorderStateRef.current;
+
+    if (!dragState) {
+      return;
+    }
+
+    const distanceX = Math.abs(event.clientX - dragState.startX);
+    const distanceY = Math.abs(event.clientY - dragState.startY);
+
+    if (!dragState.active && Math.max(distanceX, distanceY) >= columnReorderThreshold) {
+      dragState.active = true;
+      document.body.classList.add("is-reordering-table-column");
+      setReorderState({ draggedKey: dragState.columnKey, overKey: columnKey });
+    }
+
+    if (dragState.active) {
+      event.preventDefault();
+      setReorderState((current) => (current.overKey === columnKey ? current : { ...current, overKey: columnKey }));
+    }
+  };
+
+  const handleColumnPointerUp = (event: ReactPointerEvent<HTMLElement>, columnKey: string) => {
+    const dragState = columnReorderStateRef.current;
+
+    if (!dragState) {
+      return;
+    }
+
+    if (dragState.active) {
+      event.preventDefault();
+      event.stopPropagation();
+      suppressNextSortClickRef.current = true;
+      moveVisibleColumn(dragState.columnKey, columnKey);
+    }
+
+    columnReorderStateRef.current = null;
+    document.body.classList.remove("is-reordering-table-column");
+    setReorderState({ draggedKey: null, overKey: null });
+  };
+
+  const cancelColumnReorder = () => {
+    columnReorderStateRef.current = null;
+    document.body.classList.remove("is-reordering-table-column");
+    setReorderState({ draggedKey: null, overKey: null });
+  };
+
+  const handleColumnPointerLeave = (event: ReactPointerEvent<HTMLElement>) => {
+    if (columnReorderStateRef.current?.active) {
+      event.preventDefault();
+    }
+  };
+
+  const handleSortClick = (event: ReactMouseEvent<HTMLButtonElement>, columnKey: string) => {
+    if (reorderState.draggedKey || suppressNextSortClickRef.current) {
+      event.preventDefault();
+      event.stopPropagation();
+      suppressNextSortClickRef.current = false;
+      return;
+    }
+
+    onSortRequest?.(columnKey);
   };
 
   return (
@@ -433,13 +507,21 @@ export const DataTable = <T = unknown,>({
                 className={[
                   column.align === "right" ? "align-right" : "",
                   sortState?.columnKey === column.key ? "data-table-sort-active" : "",
+                  persistKey ? "data-table-column-reorderable" : "",
+                  reorderState.draggedKey === column.key ? "data-table-column-dragging" : "",
+                  reorderState.overKey === column.key && reorderState.draggedKey !== column.key ? "data-table-column-drop-target" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
+                onPointerDown={(event) => handleColumnPointerDown(event, column.key)}
+                onPointerCancel={cancelColumnReorder}
+                onPointerLeave={handleColumnPointerLeave}
+                onPointerMove={(event) => handleColumnPointerMove(event, column.key)}
+                onPointerUp={(event) => handleColumnPointerUp(event, column.key)}
               >
                 <div className="data-table-header-cell">
                   {onSortRequest ? (
-                    <button className="data-table-sort-button" onClick={() => onSortRequest(column.key)} type="button">
+                    <button className="data-table-sort-button" onClick={(event) => handleSortClick(event, column.key)} type="button">
                       <span>{column.label}</span>
                       {sortState?.columnKey === column.key ? (
                         <span className="data-table-sort-indicator">{sortState.direction === "asc" ? "↑" : "↓"}</span>
@@ -518,30 +600,6 @@ export const DataTable = <T = unknown,>({
         </tbody>
         </table>
       </div>
-      {persistentHorizontalScroll && horizontalScrollMetrics.hasOverflow ? (
-        <label className="data-table-horizontal-range-shell">
-          <span className="sr-only">Horizontal table scroll</span>
-          <input
-            aria-label="Horizontal table scroll"
-            className="data-table-horizontal-range"
-            max={horizontalScrollMetrics.maxScrollLeft}
-            min={0}
-            onChange={(event) => {
-              const nextScrollLeft = Number(event.target.value);
-              setHorizontalScrollMetrics((current) => ({
-                ...current,
-                scrollLeft: nextScrollLeft,
-              }));
-
-              if (tableShellRef.current) {
-                tableShellRef.current.scrollLeft = nextScrollLeft;
-              }
-            }}
-            type="range"
-            value={horizontalScrollMetrics.scrollLeft}
-          />
-        </label>
-      ) : null}
       {columnsMenuOpen && columnsMenuStyle && showColumnVisibilityControl
         ? createPortal(
             <div

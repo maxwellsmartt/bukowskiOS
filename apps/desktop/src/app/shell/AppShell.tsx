@@ -11,7 +11,7 @@ import { CompareTrayBar } from "./CompareTrayBar";
 import { FloatingTooltipLayer } from "./FloatingTooltipLayer";
 import { GlobalAssistantChat } from "./GlobalAssistantChat";
 import { GlobalSearchPalette } from "./GlobalSearchPalette";
-import { agentsSubnav, assetsSubnav, buildProjectSubnav, financeSubnav } from "./navigation";
+import { agentsSubnav, assetsSubnav, buildProjectSubnav, financeSubnav, projectsSubnav } from "./navigation";
 import { ShellErrorBoundary } from "./ShellErrorBoundary";
 import { ShellSidebar } from "./ShellSidebar";
 import { SubnavTabs } from "./SubnavTabs";
@@ -49,6 +49,10 @@ export const AppShell = () => {
 
     if (activeRoute.domain === "assets") {
       return assetsSubnav;
+    }
+
+    if (activeRoute.domain === "projects") {
+      return projectsSubnav;
     }
 
     return [];

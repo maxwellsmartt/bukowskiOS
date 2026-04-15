@@ -3,12 +3,9 @@ import { useEffect, useState } from "react";
 import type { ScheduleTimelineRange, ScheduleTimelineScale } from "@contracts";
 import { OverviewScheduleTimeline } from "@features/overview/OverviewScheduleTimeline";
 import { useOverviewTimeline } from "@features/overview/useOverviewSnapshot";
-import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
-import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useShellContext } from "@shared/hooks/useShellContext";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
-
-import { useAssetsOverview } from "./useAssetsData";
 
 const timelinePageSize = 24;
 
@@ -26,8 +23,8 @@ const isTimelineRange = (value: string | null): value is ScheduleTimelineRange =
 const isTimelineScale = (value: string | null): value is ScheduleTimelineScale =>
   value === "day" || value === "week" || value === "month";
 
-export const AssetsOverviewPage = () => {
-  const { data, error } = useAssetsOverview();
+export const ProjectsSchedulePage = () => {
+  const { projectDataVersion } = useShellContext();
   const [timelineRange, setTimelineRange] = useState<ScheduleTimelineRange>(() => {
     const storedValue = readStringPreference(uiPreferenceKeys.overviewTimelineRange, "90d");
     return isTimelineRange(storedValue) ? storedValue : "90d";
@@ -45,6 +42,7 @@ export const AssetsOverviewPage = () => {
     timelineScale,
     timelineAnchorDate,
     { limit: timelineProjectLimit, offset: 0 },
+    projectDataVersion,
   );
 
   useEffect(() => {
@@ -67,38 +65,9 @@ export const AssetsOverviewPage = () => {
     setTimelineProjectLimit(timelinePageSize);
   }, [timelineRange, timelineScale]);
 
-  const overviewCards = [
-    {
-      label: "Total units",
-      value: data.totalAssets,
-      subtitle: "All inventory units currently represented across warehouse, set and active workflows.",
-      tone: "info" as const,
-    },
-    {
-      label: "Reserved / out units",
-      value: data.assignedAssets,
-      subtitle: "Units currently reserved on projects or checked out on active slips.",
-      tone: "info" as const,
-    },
-    data.cards.overdueReturns,
-    data.cards.openPackingSlips,
-    data.cards.activeIncidents,
-    data.cards.maintenanceWatch,
-  ];
-
   return (
     <div className="page-stack">
-      <SectionHeader title="Assets Overview" titleTone="accent" />
-
-      {error ? <div className="empty-state">Assets overview unavailable: {error}</div> : null}
-
-      <div className="overview-operational-grid overview-operational-grid-assets">
-        {overviewCards.map((card) => (
-          <SurfaceCard key={card.label} className="overview-operational-card" title={card.label}>
-            <span className={`overview-operational-value metric-tone-${card.tone}`}>{card.value}</span>
-          </SurfaceCard>
-        ))}
-      </div>
+      <SectionHeader title="Schedule Overview" />
 
       <OverviewScheduleTimeline
         anchorDate={timelineAnchorDate}
@@ -111,30 +80,6 @@ export const AssetsOverviewPage = () => {
         scale={timelineScale}
         snapshot={timelineSnapshot}
       />
-
-      <SurfaceCard title="Recent Movements">
-        <DataTable
-          columns={[
-            {
-              key: "asset",
-              label: "Asset",
-              render: (row) => (
-                <div className="identity-cell">
-                  <span className="identity-title">{row.asset}</span>
-                  <span className="identity-meta">{row.code}</span>
-                </div>
-              ),
-            },
-            { key: "from", label: "From", render: (row) => row.from },
-            { key: "to", label: "To", render: (row) => row.to },
-            { key: "actor", label: "Handled by", render: (row) => row.actor },
-            { key: "time", label: "Time", align: "right", render: (row) => row.timestamp },
-          ]}
-          maxHeight="min(44vh, 420px)"
-          persistKey="assets-overview-recent-movements"
-          rows={data.recentMovements}
-        />
-      </SurfaceCard>
     </div>
   );
 };

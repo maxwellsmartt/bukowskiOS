@@ -4,6 +4,7 @@ import {
   Boxes,
   BriefcaseBusiness,
   Building2,
+  CalendarDays,
   ClipboardList,
   FolderCog,
   FolderOpenDot,
@@ -27,13 +28,17 @@ export type NavItem = {
 
 export const primaryNav: NavItem[] = [
   { label: "Projects", path: "/projects", icon: FolderOpenDot },
-  { label: "Assets", path: "/assets/overview", icon: Boxes },
+  { label: "Assets", path: "/assets", icon: Boxes },
   { label: "Finance", path: "/finance", icon: BriefcaseBusiness },
   { label: "Automation", path: "/agents/mission-control", icon: Bot },
 ];
 
+export const projectsSubnav: NavItem[] = [
+  { label: "Schedule Overview", path: "/projects/schedule", icon: CalendarDays },
+  { label: "Projects", path: "/projects", icon: FolderOpenDot },
+];
+
 export const assetsSubnav: NavItem[] = [
-  { label: "Overview", path: "/assets/overview", icon: BarChart3 },
   { label: "Assets", path: "/assets", icon: PackageSearch },
   { label: "Packing Slips", path: "/packing-slips", icon: ScrollText },
   { label: "Incidents", path: "/incidents", icon: ClipboardList },

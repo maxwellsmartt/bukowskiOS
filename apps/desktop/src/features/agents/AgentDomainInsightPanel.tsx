@@ -98,7 +98,6 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
       detail: `${movement.from} -> ${movement.to} · ${movement.timestamp}`,
     }));
     shortcuts = [
-      { label: "Assets overview", path: "/assets/overview" },
       { label: "Assets", path: "/assets" },
       { label: "Packing slips", path: "/packing-slips" },
     ];
@@ -128,7 +127,7 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
     ];
     shortcuts = [
       { label: "Incidents", path: "/incidents" },
-      { label: "Assets overview", path: "/assets/overview" },
+      { label: "Assets", path: "/assets" },
     ];
   }
 
@@ -171,7 +170,7 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
     }));
     shortcuts = [
       { label: "Projects", path: "/projects" },
-      { label: "Assets overview", path: "/assets/overview" },
+      { label: "Schedule Overview", path: "/projects/schedule" },
     ];
   }
 

@@ -929,7 +929,9 @@ const TimelineLane = ({
           <div className="timeline-lane-copy">
                     <div className="timeline-lane-title-row">
                       <strong className="timeline-lane-title">{project.name}</strong>
-                      <StatusBadge tone={resolveStatusTone(project.status)}>{project.status}</StatusBadge>
+                      <span className="timeline-status-badge">
+                        <StatusBadge tone={resolveStatusTone(project.status)}>{project.status}</StatusBadge>
+                      </span>
                     </div>
                     <div className="timeline-lane-subtitle-group">
                       <TimelineWindowPills segments={project.segments} />
@@ -1671,7 +1673,9 @@ export const OverviewScheduleTimeline = ({
                 <div key={project.id} className="timeline-unscheduled-item">
                   <div className="timeline-lane-title-row">
                     <strong className="timeline-lane-title">{project.name}</strong>
-                    <StatusBadge tone={resolveStatusTone(project.status)}>{project.status}</StatusBadge>
+                    <span className="timeline-status-badge">
+                      <StatusBadge tone={resolveStatusTone(project.status)}>{project.status}</StatusBadge>
+                    </span>
                   </div>
                   <span className="timeline-lane-subtitle">{project.client}</span>
                 </div>

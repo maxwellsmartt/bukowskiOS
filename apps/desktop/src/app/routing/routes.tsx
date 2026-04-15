@@ -23,7 +23,6 @@ const AgentsMissionControlPage = lazyPage(
 );
 const AgentsPage = lazyPage(() => import("@features/agents/AgentsPage"), "AgentsPage");
 const AssetDetailPage = lazyPage(() => import("@features/assets/AssetDetailPage"), "AssetDetailPage");
-const AssetsOverviewPage = lazyPage(() => import("@features/assets/AssetsOverviewPage"), "AssetsOverviewPage");
 const AssetsPage = lazyPage(() => import("@features/assets/AssetsPage"), "AssetsPage");
 const CompareView = lazyPage(() => import("@features/compare/CompareView"), "CompareView");
 const FinanceCostLinksPage = lazyPage(() => import("@features/finance/FinanceCostLinksPage"), "FinanceCostLinksPage");
@@ -39,11 +38,10 @@ const ProjectInfoPage = lazyPage(() => import("@features/projects/ProjectInfoPag
 const ProjectOverviewPage = lazyPage(() => import("@features/projects/ProjectOverviewPage"), "ProjectOverviewPage");
 const ProjectPackingPage = lazyPage(() => import("@features/projects/ProjectPackingPage"), "ProjectPackingPage");
 const ProjectsPage = lazyPage(() => import("@features/projects/ProjectsPage"), "ProjectsPage");
+const ProjectsSchedulePage = lazyPage(() => import("@features/projects/ProjectsSchedulePage"), "ProjectsSchedulePage");
 const RmaPage = lazyPage(() => import("@features/rma/RmaPage"), "RmaPage");
 
 const routeElements = {
-  "/overview": <Navigate to="/assets/overview" replace />,
-  "/assets/overview": <AssetsOverviewPage />,
   "/assets": <AssetsPage />,
   "/assets/:assetId": <AssetDetailPage />,
   "/packing-slips": <PackingPage />,
@@ -62,6 +60,7 @@ const routeElements = {
   "/agents/connectors": <AgentConnectorsPage />,
   "/settings": <SettingsPage />,
   "/settings/sync": <SyncOutboxPage />,
+  "/projects/schedule": <ProjectsSchedulePage />,
   "/projects/:projectId/overview": <ProjectOverviewPage />,
   "/projects/:projectId/assets": <ProjectAssetsPage />,
   "/projects/:projectId/packing": <ProjectPackingPage />,
@@ -78,7 +77,8 @@ export const appRoutes = appRouteMeta.map((route) => ({
 export const AppRoutes = () => (
   <Routes>
     <Route path="/" element={<Navigate to={resolveInitialPath()} replace />} />
-    <Route path="/overview" element={<Navigate to="/assets/overview" replace />} />
+    <Route path="/overview" element={<Navigate to="/assets" replace />} />
+    <Route path="/assets/overview" element={<Navigate to="/assets" replace />} />
     {appRoutes.map((route) => (
       <Route key={route.path} path={route.path} element={route.element} />
     ))}

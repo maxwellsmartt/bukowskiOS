@@ -7,10 +7,6 @@ type SubnavTabsProps = {
 };
 
 export const isSubnavItemActive = (pathname: string, path: string) => {
-  if (path === "/assets/overview") {
-    return pathname === "/assets/overview";
-  }
-
   if (path === "/assets") {
     return pathname === "/assets" || Boolean(matchPath({ path: "/assets/:assetId", end: true }, pathname));
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { agentsSubnav, assetsSubnav, financeSubnav, primaryNav } from "@app/shell/navigation";
+import { agentsSubnav, assetsSubnav, financeSubnav, primaryNav, projectsSubnav } from "@app/shell/navigation";
 import { resolveActiveRoute } from "@app/routing/route-meta";
 import { appRoutes } from "@app/routing/routes";
 import { isSubnavItemActive } from "@app/shell/SubnavTabs";
@@ -30,7 +30,12 @@ describe("foundation navigation shell", () => {
   });
 
   it("preserves the full asset operations sub-navigation", () => {
-    expect(assetsSubnav.map((item) => item.label)).toEqual(["Overview", "Assets", "Packing Slips", "Incidents"]);
+    expect(assetsSubnav.map((item) => item.label)).toEqual(["Assets", "Packing Slips", "Incidents"]);
+  });
+
+  it("adds the global project schedule to projects navigation", () => {
+    expect(projectsSubnav.map((item) => item.label)).toEqual(["Schedule Overview", "Projects"]);
+    expect(resolveActiveRoute("/projects/schedule").domain).toBe("projects");
   });
 
   it("treats project workspaces as their own scope mode", () => {
@@ -42,15 +47,16 @@ describe("foundation navigation shell", () => {
   });
 
   it("keeps global assets unfiltered by project route memory", () => {
-    const resolved = resolveActiveRoute("/assets/overview");
+    const resolved = resolveActiveRoute("/assets");
 
     expect(resolved.scopeMode).toBe("global");
     expect(resolved.domain).toBe("assets");
     expect(resolved.projectId).toBeNull();
   });
 
-  it("registers assets overview and rma routes", () => {
-    expect(appRoutes.some((route) => route.path === "/assets/overview")).toBe(true);
+  it("registers global operations routes", () => {
+    expect(appRoutes.some((route) => route.path === "/assets")).toBe(true);
+    expect(appRoutes.some((route) => route.path === "/projects/schedule")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/rma")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/compare")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/agents/mission-control")).toBe(true);

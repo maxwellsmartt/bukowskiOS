@@ -98,8 +98,8 @@ export const ListToolbar = <TSort extends string,>({
       }
 
       const rect = trigger.getBoundingClientRect();
-      const menuWidth = 220;
-      const estimatedMenuHeight = 232;
+      const menuWidth = 184;
+      const estimatedMenuHeight = 208;
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const fitsBelow = rect.bottom + 8 + estimatedMenuHeight <= viewportHeight - 12;
