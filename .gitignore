@@ -13,4 +13,6 @@ apps/desktop/dist-packaged
 apps/desktop/test-results
 apps/desktop/playwright-report
 apps/desktop/electron.vite.config.*.timestamp-*
+apps/desktop/.env.local
+apps/desktop/.env.*.local
 supabase/.temp
