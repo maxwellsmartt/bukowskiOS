@@ -5,6 +5,7 @@ import path from "node:path";
 
 import type { AppDiagnosticsSnapshot, AppExportResult, AppInfo, AppSupportSnapshot, AppSyncOutboxRow } from "@contracts";
 import { foundationMigrations } from "@db";
+import { createSupabaseOutboxTransport } from "@sync";
 
 import { createAssistantGatewayService } from "../ai/assistantGatewayService";
 import { createAssistantMemoryService } from "../ai/assistantMemoryService";
@@ -48,6 +49,7 @@ import { applySchedulingFoundationMigration, bootstrapSchedulingFoundation } fro
 import { createSupportDiagnosticsService, type SupportDiagnosticsService } from "./supportDiagnosticsService";
 import { createSyncOutboxWorkerService, summarizeSyncOutboxWorker } from "./syncOutboxWorkerService";
 import { createUserAdminService, type UserAdminService } from "./userAdminService";
+import { createSupabaseTokenStore } from "../auth/tokenStore";
 import { createConnectorBridgeService } from "../connectors/connectorBridgeService";
 import { createTelegramConnectorService } from "../connectors/telegramConnectorService";
 import {
@@ -91,10 +93,10 @@ type LocalDatabaseRuntime = {
   getSupportSnapshot: () => AppSupportSnapshot;
   createBackupNow: () => AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => AppDiagnosticsSnapshot;
-  runLocalSyncNow: () => AppDiagnosticsSnapshot;
+  runLocalSyncNow: () => Promise<AppDiagnosticsSnapshot>;
   getSyncOutboxRows: () => AppSyncOutboxRow[];
-  retrySyncOutboxRow: (id: string) => AppDiagnosticsSnapshot;
-  retryAllFailedSyncOutboxRows: () => AppDiagnosticsSnapshot;
+  retrySyncOutboxRow: (id: string) => Promise<AppDiagnosticsSnapshot>;
+  retryAllFailedSyncOutboxRows: () => Promise<AppDiagnosticsSnapshot>;
   exportRecentLogs: (filePath: string) => AppExportResult;
   exportSupportBundle: (directoryPath: string) => AppExportResult;
 };
@@ -113,6 +115,11 @@ let lastSyncStatus: "healthy" | "failed" | "idle" = "idle";
 const logger = getDesktopLogger("local-database");
 
 const backupMaxAgeMs = 24 * 60 * 60 * 1000;
+
+const isSupabaseSyncEnabled = () => {
+  const value = process.env.VITE_SUPABASE_SYNC_ENABLED?.trim().toLowerCase();
+  return value === "1" || value === "true";
+};
 
 const withRecoveredDatabase = (databasePath: string, backupPath: string) => {
   const openDatabase = () => {
@@ -276,10 +283,19 @@ const createRuntime = (): LocalDatabaseRuntime => {
     return getDiagnosticsSnapshot();
   };
 
-  const syncOutboxWorker = createSyncOutboxWorkerService(database);
+  const supabaseTokenStore = createSupabaseTokenStore();
+  const syncOutboxWorker = createSyncOutboxWorkerService(database, {
+    transport: isSupabaseSyncEnabled()
+      ? createSupabaseOutboxTransport({
+          supabaseUrl: process.env.VITE_SUPABASE_URL ?? "",
+          anonKey: process.env.VITE_SUPABASE_ANON_KEY ?? "",
+          getAccessToken: async () => (await supabaseTokenStore.getTokens()).accessToken,
+        })
+      : undefined,
+  });
 
-  const runLocalSyncNow = () => {
-    const syncSummary = syncOutboxWorker.runDueEntries();
+  const runLocalSyncNow = async () => {
+    const syncSummary = await syncOutboxWorker.runDueEntries();
     lastSyncRunAt = new Date().toISOString();
     lastSyncSummary = summarizeSyncOutboxWorker(syncSummary);
     lastSyncStatus = syncSummary.failedRows > 0 ? "failed" : "healthy";
@@ -290,7 +306,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
 
   const getSyncOutboxRows = () => syncOutboxWorker.listRows();
 
-  const retrySyncOutboxRow = (id: string) => {
+  const retrySyncOutboxRow = async (id: string) => {
     const retried = syncOutboxWorker.retryRow(id);
 
     if (!retried) {
@@ -298,13 +314,13 @@ const createRuntime = (): LocalDatabaseRuntime => {
     }
 
     logger.info("Queued one sync outbox row for retry.", { id });
-    return runLocalSyncNow();
+    return await runLocalSyncNow();
   };
 
-  const retryAllFailedSyncOutboxRows = () => {
+  const retryAllFailedSyncOutboxRows = async () => {
     const retriedCount = syncOutboxWorker.retryAllFailedRows();
     logger.info("Queued failed sync outbox rows for retry.", { retriedCount });
-    return runLocalSyncNow();
+    return await runLocalSyncNow();
   };
 
   const secretStore = createAISecretStore();
@@ -363,7 +379,12 @@ const createRuntime = (): LocalDatabaseRuntime => {
     logger.warn("Startup retention pass failed.");
   }
   try {
-    runLocalSyncNow();
+    void runLocalSyncNow().catch(() => {
+      lastSyncRunAt = new Date().toISOString();
+      lastSyncStatus = "failed";
+      lastSyncSummary = "The local sync worker failed during startup.";
+      logger.warn("Startup local sync pass failed.");
+    });
   } catch {
     lastSyncRunAt = new Date().toISOString();
     lastSyncStatus = "failed";
@@ -390,14 +411,12 @@ const createRuntime = (): LocalDatabaseRuntime => {
   retentionTimer.unref();
   syncOutboxTimer?.unref();
   syncOutboxTimer = setInterval(() => {
-    try {
-      runLocalSyncNow();
-    } catch {
+    void runLocalSyncNow().catch(() => {
       lastSyncRunAt = new Date().toISOString();
       lastSyncStatus = "failed";
       lastSyncSummary = "The scheduled local sync pass failed.";
       logger.warn("Scheduled local sync pass failed.");
-    }
+    });
   }, 60 * 1000);
   syncOutboxTimer.unref();
 

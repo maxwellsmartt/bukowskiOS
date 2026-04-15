@@ -22,7 +22,7 @@ Decisiones bloqueadas:
 | Slice | Estado | Inicio | Cierre | Owner | Evidencia de verificación |
 | --- | --- | --- | --- | --- | --- |
 | 0 — Foundation Supabase + Seguridad | In progress | 2026-04-15 |  | Codex | Dependencias instaladas; roadmap, paquete Supabase, Keychain IPC, deep links, migración y Edge Functions desplegadas. Migración validada con REST `workspaces` 200; functions responden `authentication_required`/`forbidden` sin sesión. Typecheck/build/tests pasan. |
-| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Login real Supabase y creación real de workspace remoto validados en app. Providers/rutas/guardas/switcher creados. Assets list/create/edit/archive consumen active workspace local. Typecheck/tests pasan: 26 archivos, 97 tests. |
+| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Login real Supabase y creación real de workspace remoto validados en app. Providers/rutas/guardas/switcher creados. Assets list/create/edit/archive consumen active workspace local. Outbox async con transport Supabase opt-in. Typecheck/tests pasan: 26 archivos, 99 tests. |
 | 2 — Roles, Permissions e Invites | Todo |  |  | Codex | Pendiente. |
 | 3 — Workspaces CRUD + Sharing | Todo |  |  | Codex | Pendiente. |
 | 4 — Archiving Wrapped-Gate | Todo |  |  | Codex | Pendiente. |
@@ -55,7 +55,9 @@ Decisiones bloqueadas:
 - Done — Validar flujo real en app: login Supabase -> create workspace -> workspace creado.
 - Doing — Portar estética/login desde `checkbox_app` con más fidelidad visual.
 - Done — Migrar lista/create/edit/archive de assets al workspace activo en SQLite local.
-- Doing — Migrar flujo assets a outbox Supabase con push/retry remoto.
+- Done — Convertir sync outbox worker a transport async injectable con retry/backoff preservado.
+- Done — Agregar transport Supabase opt-in para auditar filas en `public.sync_outbox`.
+- Doing — Validar migración remota `sync_outbox` y activar `VITE_SUPABASE_SYNC_ENABLED=true` en dev.
 - Todo — Conectar MFA TOTP real con Supabase MFA.
 
 ### Slice 2 — Roles, Permissions e Invites
@@ -107,6 +109,7 @@ Decisiones bloqueadas:
 | 2026-04-15 | Working tree | Se detecta que el gateway de Supabase Edge Functions rechaza JWT `ES256` antes de ejecutar la función; se documenta `verify_jwt=false` para functions que validan bearer internamente. | Evitar doble validación JWT y mantener autorización explícita dentro de la función. |
 | 2026-04-15 | Working tree | Usuario valida en app el flujo Supabase real: login exitoso y creación de workspace remoto después de desactivar gateway JWT verification. Verificación local: `typecheck` y `test` pasan; tests: 26 archivos, 96 casos. | Cerrar el riesgo principal del vertical MVP auth/workspace antes de avanzar a assets/outbox. |
 | 2026-04-15 | Working tree | Assets empieza a respetar workspace activo: el renderer envía `workspaceId`, `getAssets` filtra por `assets.workspace_id` y create/update/archive/assign/packing slip usan el workspace activo. Verificación: `corepack pnpm --filter @bukowski/desktop test -- asset-mutation-service.test.ts` pasa con 26 archivos/97 tests; `typecheck` pasa. | Reducir riesgo del reemplazo de `DEFAULT_WORKSPACE_ID` con un vertical local verificable antes del push remoto a Supabase. |
+| 2026-04-15 | Working tree | Se convierte `syncOutboxWorkerService` a async con transport injectable, se agrega `createSupabaseOutboxTransport`, migración `public.sync_outbox` con RLS por membership y bandera opt-in `VITE_SUPABASE_SYNC_ENABLED`. Verificación: `typecheck` pasa y `corepack pnpm --filter @bukowski/desktop test -- sync-outbox-worker-service.test.ts` pasa con 26 archivos/99 tests. | Preparar push remoto idempotente y auditable sin romper modo local ni activar red antes de aplicar migración remota. |
 
 ## Decisiones tomadas
 
@@ -134,6 +137,7 @@ Decisiones bloqueadas:
 | medio | Fallback local-dev podría ocultar errores de Supabase si se usa en prod. | Mostrar estado local fallback y requerir env Supabase para builds release en hardening. | Abierto. |
 | bajo | Edge Functions pueden quedar desactualizadas frente al código local si se redeployan manualmente desde Dashboard. | Documentar evidencia en roadmap y migrar a Supabase CLI antes de más functions. | Abierto. |
 | medio | Gateway JWT verification de Supabase puede rechazar tokens `ES256` antes de ejecutar functions. | Desactivar `Verify JWT` en functions que validan bearer contra `/auth/v1/user`; registrar `supabase/config.toml`. | Mitigado en dev. |
+| medio | Activar Supabase sync antes de aplicar la migración `sync_outbox` marcaría filas como failed/retry. | Mantener `VITE_SUPABASE_SYNC_ENABLED=false` hasta correr la migración y validar una fila real. | Abierto. |
 
 ## Incompletos / deuda técnica
 
@@ -143,9 +147,9 @@ Decisiones bloqueadas:
 - Aún no se ha iniciado reemplazo de `DEFAULT_WORKSPACE_ID`.
 - Aún no se ha implementado sync remoto real; el worker actual sigue haciendo acknowledge local.
 - MFA TOTP está como pantalla placeholder; falta wiring real Supabase MFA.
-- Falta conectar el outbox de assets a Supabase remoto con retry/backoff real; por ahora el worker sigue confirmando localmente.
+- El transport Supabase existe pero queda opt-in; falta aplicar `20260415150000_sync_outbox_bridge.sql` en Supabase dev y validar un push real.
 - Falta validar visualmente en app que el cambio de workspace aísla assets creados en cada workspace.
 
 ## Próximo paso recomendado
 
-Conectar el outbox de assets a Supabase remoto con push/retry auditable y validar en app que el cambio de workspace aísla los assets creados.
+Aplicar la migración remota `sync_outbox`, activar `VITE_SUPABASE_SYNC_ENABLED=true` en dev y validar una fila real desde la pantalla de Sync Outbox.

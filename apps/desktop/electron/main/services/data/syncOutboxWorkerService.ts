@@ -5,7 +5,7 @@ import { getDesktopLogger } from "../logger";
 
 type SyncOutboxStatus = "pending" | "processing" | "failed" | "sent";
 
-type SyncOutboxRow = {
+export type SyncOutboxRow = {
   id: string;
   workspace_id: string;
   entity_type: string;
@@ -20,6 +20,8 @@ type SyncOutboxRow = {
   created_at: string;
   updated_at: string;
 };
+
+export type SyncOutboxTransport = (row: SyncOutboxRow) => Promise<void> | void;
 
 export type SyncOutboxWorkerSummary = {
   recoveredStaleRows: number;
@@ -36,6 +38,7 @@ type SyncOutboxWorkerOptions = {
   now?: () => string;
   batchSize?: number;
   staleProcessingMinutes?: number;
+  transport?: SyncOutboxTransport;
 };
 
 const logger = getDesktopLogger("sync-outbox-worker");
@@ -62,7 +65,7 @@ const resolveRetryDelayMinutes = (attemptCount: number) => {
 
 export const summarizeSyncOutboxWorker = (summary: SyncOutboxWorkerSummary) => {
   const parts = [
-    summary.sentRows ? `${summary.sentRows} rows acknowledged locally` : null,
+    summary.sentRows ? `${summary.sentRows} rows sent` : null,
     summary.failedRows ? `${summary.failedRows} rows scheduled for retry` : null,
     summary.recoveredStaleRows ? `${summary.recoveredStaleRows} stale processing rows recovered` : null,
     summary.skippedRows ? `${summary.skippedRows} rows skipped` : null,
@@ -86,7 +89,7 @@ const countByStatus = (db: DatabaseSync, status: SyncOutboxStatus) =>
       .get(status) as { count: number }
   ).count;
 
-const acknowledgeLocalTransport = (row: SyncOutboxRow) => {
+const acknowledgeLocalTransport: SyncOutboxTransport = (row) => {
   const payload = JSON.parse(row.payload_json) as unknown;
 
   if (payload === null || typeof payload !== "object") {
@@ -101,11 +104,7 @@ const acknowledgeLocalTransport = (row: SyncOutboxRow) => {
     throw new Error("Outbox row is missing operation_type.");
   }
 
-  return {
-    acceptedAt: new Date().toISOString(),
-    entityType: row.entity_type,
-    entityId: row.entity_id,
-  };
+  return undefined;
 };
 
 export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOutboxWorkerOptions = {}) => {
@@ -114,6 +113,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
   const now = () => options.now?.() ?? new Date().toISOString();
   const batchSize = Math.max(1, options.batchSize ?? 25);
   const staleProcessingMinutes = Math.max(1, options.staleProcessingMinutes ?? 5);
+  const transport = options.transport ?? acknowledgeLocalTransport;
 
   const recoverStaleProcessingRows = (timestamp: string) => {
     const staleCutoff = subtractMinutes(timestamp, staleProcessingMinutes);
@@ -233,7 +233,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
       return retriedCount;
     },
 
-    runDueEntries(): SyncOutboxWorkerSummary {
+    async runDueEntries(): Promise<SyncOutboxWorkerSummary> {
       if (isRunning) {
         const counts = getCounts();
         return {
@@ -271,7 +271,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
         let failedRows = 0;
         let skippedRows = 0;
 
-        dueRows.forEach((row) => {
+        for (const row of dueRows) {
           const claimed = db
             .prepare(
               `
@@ -288,7 +288,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
 
           if (!claimed.changes) {
             skippedRows += 1;
-            return;
+            continue;
           }
 
           const claimedRow = db
@@ -304,13 +304,13 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
 
           if (!claimedRow) {
             skippedRows += 1;
-            return;
+            continue;
           }
 
           processedRows += 1;
 
           try {
-            acknowledgeLocalTransport(claimedRow);
+            await transport(claimedRow);
             db
               .prepare(
                 `
@@ -325,7 +325,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
               )
               .run(now(), claimedRow.id);
             sentRows += 1;
-            logger.debug("Acknowledged sync row locally.", {
+            logger.debug("Sent sync row.", {
               id: claimedRow.id,
               entityType: claimedRow.entity_type,
               operationType: claimedRow.operation_type,
@@ -361,7 +361,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
               error: error instanceof Error ? error.message : String(error),
             });
           }
-        });
+        }
 
         const counts = getCounts();
 

@@ -80,6 +80,39 @@ export type BukowskiDatabase = {
         };
         Update: Partial<BukowskiDatabase["public"]["Tables"]["notifications"]["Insert"]>;
       };
+      sync_outbox: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          entity_type: string;
+          entity_id: string;
+          event_id: string | null;
+          operation_type: string;
+          payload_json: Json;
+          status: "pending" | "processing" | "failed" | "sent";
+          attempt_count: number;
+          last_error: string | null;
+          next_retry_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          workspace_id: string;
+          entity_type: string;
+          entity_id: string;
+          event_id?: string | null;
+          operation_type: string;
+          payload_json: Json;
+          status?: "pending" | "processing" | "failed" | "sent";
+          attempt_count?: number;
+          last_error?: string | null;
+          next_retry_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<BukowskiDatabase["public"]["Tables"]["sync_outbox"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: {
