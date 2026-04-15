@@ -75,7 +75,25 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     let isMounted = true;
 
-    void supabase.auth.getSession().then(({ data, error }) => {
+    const hydrateSession = async () => {
+      const storedTokens = await window.bukowskiAuth?.getStoredTokens();
+
+      if (storedTokens?.accessToken && storedTokens.refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: storedTokens.accessToken,
+          refresh_token: storedTokens.refreshToken,
+        });
+
+        if (error && isMounted) {
+          setAuthError(error.message);
+          await window.bukowskiAuth?.clearStoredTokens();
+        }
+      }
+
+      return supabase.auth.getSession();
+    };
+
+    void hydrateSession().then(({ data, error }) => {
       if (!isMounted) {
         return;
       }

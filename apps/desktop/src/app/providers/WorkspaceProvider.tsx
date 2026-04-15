@@ -20,12 +20,22 @@ type WorkspaceContextValue = {
   activeMembership: WorkspaceMembership | null;
   permissions: string[];
   isWorkspaceReady: boolean;
+  isCreatingWorkspace: boolean;
   workspaceError: string | null;
   switchWorkspace: (workspaceId: string) => void;
+  refreshWorkspaces: () => Promise<void>;
+  createWorkspace: (input: CreateWorkspaceInput) => Promise<string>;
   hasPermission: (permissionKey: string) => boolean;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
+
+export type CreateWorkspaceInput = {
+  name: string;
+  slug: string;
+  baseCurrency: string;
+  iconColor?: string | null;
+};
 
 const localMembership: WorkspaceMembership = {
   workspaceId: DEFAULT_WORKSPACE_ID,
@@ -39,6 +49,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const { status, user, supabase, isLocalFallback } = useSession();
   const [memberships, setMemberships] = useState<WorkspaceMembership[]>(() => [localMembership]);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(
     () => readStringPreference(uiPreferenceKeys.activeWorkspaceId, DEFAULT_WORKSPACE_ID) ?? DEFAULT_WORKSPACE_ID,
   );
@@ -47,7 +58,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     writePreference(uiPreferenceKeys.activeWorkspaceId, activeWorkspaceId);
   }, [activeWorkspaceId]);
 
-  useEffect(() => {
+  const refreshWorkspaces = useCallback(async () => {
     if (status === "loading") {
       return;
     }
@@ -59,58 +70,102 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    let isMounted = true;
+    setWorkspaceError(null);
 
-    const loadMemberships = async () => {
+    const { data, error } = await supabase
+      .from("workspace_memberships")
+      .select("workspace_id,status,workspaces(name),roles(name)")
+      .eq("user_id", user.id)
+      .eq("status", "active");
+
+    if (error) {
+      setWorkspaceError(error.message);
+      setMemberships([]);
+      return;
+    }
+
+    const nextMemberships = ((data ?? []) as unknown[]).map((row) => {
+      const typedRow = row as {
+        workspace_id: string;
+        status: "active" | "invited" | "inactive";
+        workspaces?: { name?: string | null } | null;
+        roles?: { name?: string | null } | null;
+      };
+
+      return {
+        workspaceId: typedRow.workspace_id,
+        workspaceName: typedRow.workspaces?.name ?? "Workspace",
+        roleName: typedRow.roles?.name ?? "Member",
+        status: typedRow.status,
+        permissions: [],
+      };
+    });
+
+    setMemberships(nextMemberships);
+    setActiveWorkspaceId((current) =>
+      nextMemberships.some((membership) => membership.workspaceId === current)
+        ? current
+        : nextMemberships[0]?.workspaceId ?? "",
+    );
+  }, [isLocalFallback, status, supabase, user]);
+
+  useEffect(() => {
+    void refreshWorkspaces();
+  }, [refreshWorkspaces]);
+
+  const createWorkspace = useCallback(
+    async (input: CreateWorkspaceInput) => {
+      if (isLocalFallback || !supabase) {
+        throw new Error("Supabase is not configured. Workspace creation is disabled in local-dev fallback mode.");
+      }
+
+      const name = input.name.trim();
+      const slug = input.slug.trim().toLowerCase();
+      const baseCurrency = input.baseCurrency.trim().toUpperCase();
+
+      if (!name || !slug || !baseCurrency) {
+        throw new Error("Workspace name, slug and currency are required.");
+      }
+
+      setIsCreatingWorkspace(true);
       setWorkspaceError(null);
 
-      const { data, error } = await supabase
-        .from("workspace_memberships")
-        .select("workspace_id,status,workspaces(name),roles(name)")
-        .eq("user_id", user.id)
-        .eq("status", "active");
+      try {
+        const { data, error } = await supabase.functions.invoke("admin-workspace-bootstrap", {
+          body: {
+            name,
+            slug,
+            baseCurrency,
+            iconColor: input.iconColor?.trim() || null,
+          },
+        });
 
-      if (!isMounted) {
-        return;
+        if (error) {
+          throw error;
+        }
+
+        const workspaceId =
+          data && typeof data === "object" && "workspaceId" in data && typeof data.workspaceId === "string"
+            ? data.workspaceId
+            : null;
+
+        if (!workspaceId) {
+          throw new Error("Workspace was created but the response did not include a workspace id.");
+        }
+
+        await refreshWorkspaces();
+        setActiveWorkspaceId(workspaceId);
+        return workspaceId;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Workspace creation failed.";
+        setWorkspaceError(message);
+        throw error;
+      } finally {
+        setIsCreatingWorkspace(false);
       }
-
-      if (error) {
-        setWorkspaceError(error.message);
-        setMemberships([]);
-        return;
-      }
-
-      const nextMemberships = ((data ?? []) as unknown[]).map((row) => {
-        const typedRow = row as {
-          workspace_id: string;
-          status: "active" | "invited" | "inactive";
-          workspaces?: { name?: string | null } | null;
-          roles?: { name?: string | null } | null;
-        };
-
-        return {
-          workspaceId: typedRow.workspace_id,
-          workspaceName: typedRow.workspaces?.name ?? "Workspace",
-          roleName: typedRow.roles?.name ?? "Member",
-          status: typedRow.status,
-          permissions: [],
-        };
-      });
-
-      setMemberships(nextMemberships);
-      setActiveWorkspaceId((current) =>
-        nextMemberships.some((membership) => membership.workspaceId === current)
-          ? current
-          : nextMemberships[0]?.workspaceId ?? "",
-      );
-    };
-
-    void loadMemberships();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isLocalFallback, status, supabase, user]);
+    },
+    [isLocalFallback, refreshWorkspaces, supabase],
+  );
 
   const activeMembership =
     memberships.find((membership) => membership.workspaceId === activeWorkspaceId) ?? memberships[0] ?? null;
@@ -140,11 +195,25 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       activeMembership,
       permissions: activeMembership?.permissions ?? [],
       isWorkspaceReady: status === "authenticated" && Boolean(activeMembership),
+      isCreatingWorkspace,
       workspaceError,
       switchWorkspace,
+      refreshWorkspaces,
+      createWorkspace,
       hasPermission,
     }),
-    [activeMembership, activeWorkspaceId, hasPermission, memberships, status, switchWorkspace, workspaceError],
+    [
+      activeMembership,
+      activeWorkspaceId,
+      createWorkspace,
+      hasPermission,
+      isCreatingWorkspace,
+      memberships,
+      refreshWorkspaces,
+      status,
+      switchWorkspace,
+      workspaceError,
+    ],
   );
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

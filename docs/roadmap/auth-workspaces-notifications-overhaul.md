@@ -22,7 +22,7 @@ Decisiones bloqueadas:
 | Slice | Estado | Inicio | Cierre | Owner | Evidencia de verificación |
 | --- | --- | --- | --- | --- | --- |
 | 0 — Foundation Supabase + Seguridad | In progress | 2026-04-15 |  | Codex | Dependencias instaladas; roadmap, paquete Supabase, Keychain IPC, deep links, migración y Edge Function stubs creados. Typecheck/build/tests pasan. |
-| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Providers de sesión/workspace, rutas auth, guardas y switcher local-dev creados. Typecheck/build/tests pasan. |
+| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Providers de sesión/workspace, rutas auth, guardas, switcher y create workspace remoto vía Edge Function wiring creados. Typecheck/build/tests pasan: 26 archivos, 96 tests. |
 | 2 — Roles, Permissions e Invites | Todo |  |  | Codex | Pendiente. |
 | 3 — Workspaces CRUD + Sharing | Todo |  |  | Codex | Pendiente. |
 | 4 — Archiving Wrapped-Gate | Todo |  |  | Codex | Pendiente. |
@@ -43,14 +43,17 @@ Decisiones bloqueadas:
 - Todo — Validar migración contra un proyecto Supabase real.
 - Todo — Desplegar Edge Functions en entorno dev.
 
+### Slice 1 — Auth + Workspace Vertical MVP
+
 - Done — Crear `SessionProvider` con Supabase PKCE y fallback local-dev seguro.
+- Done — Rehidratar sesión Supabase desde Keychain al arrancar.
 - Done — Crear `WorkspaceProvider` con active workspace persistido y fallback `workspace-metadata`.
 - Done — Crear pantallas login/recovery/MFA placeholder/workspace picker/create.
 - Done — Agregar guards sesión/workspace sin romper el modo local actual.
 - Done — Implementar workspace switch básico en top bar.
+- Done — Conectar `WorkspaceCreateScreen` a la Edge Function `admin-workspace-bootstrap` cuando Supabase está configurado.
 - Doing — Portar estética/login desde `checkbox_app` con más fidelidad visual.
 - Todo — Migrar flujo assets a workspace activo + outbox Supabase.
-- Todo — Conectar Workspace Create a Edge Function `admin-workspace-bootstrap`.
 - Todo — Conectar MFA TOTP real con Supabase MFA.
 
 ### Slice 2 — Roles, Permissions e Invites
@@ -93,6 +96,8 @@ Decisiones bloqueadas:
 | 2026-04-15 | Working tree | Verificación final: `corepack pnpm --filter @bukowski/desktop test` pasa con 26 archivos y 92 tests; typecheck y build vuelven a pasar. | Dejar evidencia completa del estado actual del Slice 0. |
 | 2026-04-15 | Working tree | Se inicia Slice 1 foundation: `SessionProvider`, `WorkspaceProvider`, rutas auth/workspaces, guards y `WorkspaceSwitcher` en top bar con fallback local-dev. | Preparar la app para auth/workspace real sin bloquear el flujo single-user actual. |
 | 2026-04-15 | Working tree | Verificación Slice 1 foundation: `corepack pnpm --filter @bukowski/desktop typecheck`, `build` y `test` pasan; tests: 26 archivos, 92 casos. | Confirmar que los providers/guards no rompen comportamiento existente. |
+| 2026-04-15 | Working tree | Se conecta `WorkspaceCreateScreen` con `WorkspaceProvider.createWorkspace`, que invoca `admin-workspace-bootstrap`; se agrega rehidratación de sesión desde Keychain. | Pasar de placeholder a flujo remoto real conservando fallback local-dev seguro. |
+| 2026-04-15 | Working tree | Verificación del flujo workspace create/session hydration: `corepack pnpm --filter @bukowski/desktop typecheck`, `test` y `build` pasan; tests: 26 archivos, 96 casos. | Registrar evidencia antes de commitear el micro-slice. |
 
 ## Decisiones tomadas
 
@@ -127,8 +132,8 @@ Decisiones bloqueadas:
 - Aún no se ha iniciado reemplazo de `DEFAULT_WORKSPACE_ID`.
 - Aún no se ha implementado sync remoto real; el worker actual sigue haciendo acknowledge local.
 - MFA TOTP está como pantalla placeholder; falta wiring real Supabase MFA.
-- Workspace Create está como pantalla placeholder; falta llamada a Edge Function.
+- Workspace Create ya llama Edge Function cuando Supabase está configurado; falta validar contra Supabase dev real.
 
 ## Próximo paso recomendado
 
-Cerrar Slice 0 desplegando/validando la migración y Edge Functions en un entorno Supabase dev. Después iniciar Slice 1 con login y workspace picker sin tocar todavía todo el dominio de assets.
+Validar `admin-workspace-bootstrap` contra Supabase dev real y luego avanzar al vertical MVP de assets por workspace activo con outbox/retry auditable.
