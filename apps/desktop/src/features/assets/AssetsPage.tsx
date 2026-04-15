@@ -142,6 +142,8 @@ const parseCsvQuantity = (value: string, rowNumber: number) => {
 };
 
 const joinCsvNotes = (parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join("\n");
+const isDuplicateRegistryCodeError = (error: unknown) =>
+  error instanceof Error && /registry code .* already in use/i.test(error.message);
 
 export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageProps) => (
   <AssetsContent projectId={projectId} projectName={projectName} />
@@ -456,6 +458,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         }
 
         return {
+          importRowNumber: rowNumber,
           name,
           internalCode: internalCode.toUpperCase(),
           categoryId,
@@ -479,19 +482,42 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         };
       });
 
+      let importedCount = 0;
+      let skippedDuplicateCount = 0;
+
       for (const draft of drafts) {
-        await createAsset({
-          commandId: crypto.randomUUID(),
-          workspaceId: activeWorkspaceId,
-          actorType: "user",
-          sourceChannel: "desktop",
-          isActive: true,
-          ...draft,
-        });
+        const { importRowNumber, ...assetDraft } = draft;
+
+        try {
+          await createAsset({
+            commandId: crypto.randomUUID(),
+            workspaceId: activeWorkspaceId,
+            actorType: "user",
+            sourceChannel: "desktop",
+            isActive: true,
+            ...assetDraft,
+          });
+          importedCount += 1;
+        } catch (error) {
+          if (isDuplicateRegistryCodeError(error)) {
+            skippedDuplicateCount += 1;
+            continue;
+          }
+
+          throw new Error(
+            `CSV row ${importRowNumber} could not be imported: ${
+              error instanceof Error ? error.message : "Unknown asset import error."
+            }`,
+          );
+        }
       }
 
       await Promise.all([reload(), refreshProjects()]);
-      setActionFeedback(`Imported ${drafts.length} asset${drafts.length === 1 ? "" : "s"} from ${file.name}.`);
+      setActionFeedback(
+        `Imported ${importedCount} asset${importedCount === 1 ? "" : "s"} from ${file.name}.${
+          skippedDuplicateCount ? ` Skipped ${skippedDuplicateCount} existing code${skippedDuplicateCount === 1 ? "" : "s"}.` : ""
+        }`,
+      );
     } catch (error) {
       setEditorError(error instanceof Error ? error.message : "Asset CSV import failed.");
     } finally {
