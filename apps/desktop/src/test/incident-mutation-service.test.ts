@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createIncidentMutationService } from "../../electron/main/services/data/incidentMutationService";
+import { createUserAdminService } from "../../electron/main/services/data/userAdminService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("incident mutation service", () => {
@@ -127,6 +128,36 @@ describe("incident mutation service", () => {
       .prepare("SELECT outcome_status FROM command_receipts WHERE command_id = ?")
       .get("cmd-test-incident-lifecycle-resolve") as { outcome_status: string } | undefined;
     expect(receipt?.outcome_status).toBe("success");
+
+    cleanup();
+  });
+
+  it("blocks incident reporting when the actor lacks incident permissions", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-incident-permission-test");
+    const mutations = createIncidentMutationService(database);
+    const userAdmin = createUserAdminService(database);
+
+    const financeUser = userAdmin.createUser({
+      workspaceId: "workspace-metadata",
+      fullName: "Finance Only",
+      roleId: "role-finance-viewer",
+      email: "finance.only@metadata.cine",
+    });
+
+    expect(() =>
+      mutations.reportIncident({
+        commandId: "cmd-test-incident-blocked",
+        workspaceId: "workspace-metadata",
+        actorUserId: financeUser.userId ?? "",
+        assetId: "asset-smallhd-cine7",
+        incidentType: "damage",
+        severity: "High",
+        title: "Blocked incident",
+        description: "This should not pass for a finance-only user.",
+        actorType: "user",
+        sourceChannel: "telegram",
+      }),
+    ).toThrow("does not have permission");
 
     cleanup();
   });

@@ -13,6 +13,7 @@ import projectDepartmentsMatrixSql from "../migrations/0012_project_departments_
 import kitAssetQuantitiesSql from "../migrations/0013_kit_asset_quantities.sql?raw";
 import assetQuantityStateSql from "../migrations/0014_asset_quantity_state.sql?raw";
 import assetAssignmentQuantitiesSql from "../migrations/0015_asset_assignment_quantities.sql?raw";
+import connectorRuntimeSql from "../migrations/0016_connector_runtime.sql?raw";
 
 const foundationMigrations = [
   { version: "0001_foundation", sql: foundationCoreSql },
@@ -30,6 +31,7 @@ const foundationMigrations = [
   { version: "0013_kit_asset_quantities", sql: kitAssetQuantitiesSql },
   { version: "0014_asset_quantity_state", sql: assetQuantityStateSql },
   { version: "0015_asset_assignment_quantities", sql: assetAssignmentQuantitiesSql },
+  { version: "0016_connector_runtime", sql: connectorRuntimeSql },
 ] as const;
 
 const foundationMigrationSql = foundationMigrations.map((migration) => migration.sql).join("\n\n");

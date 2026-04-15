@@ -9,6 +9,7 @@ export type RmaCaseAssetInput = {
 export type CreateRmaCaseCommand = {
   commandId: string;
   workspaceId: string;
+  actorUserId?: string;
   manufacturerId: string;
   supportEmail?: string;
   title: string;
@@ -22,6 +23,7 @@ export type CreateRmaCaseCommand = {
 export type UpdateRmaCaseCommand = {
   commandId: string;
   workspaceId: string;
+  actorUserId?: string;
   rmaCaseId: string;
   manufacturerId: string;
   supportEmail?: string;

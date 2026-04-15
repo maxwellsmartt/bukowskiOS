@@ -222,6 +222,35 @@ const assertUniqueManufacturerName = (db: DatabaseSync, name: string, currentId?
   }
 };
 
+const assertLinkableUserExists = (db: DatabaseSync, userId: string | undefined) => {
+  const nextUserId = optionalValue(userId);
+
+  if (!nextUserId) {
+    return null;
+  }
+
+  const membership = db
+    .prepare(
+      `
+        SELECT users.id
+        FROM workspace_memberships
+        JOIN users ON users.id = workspace_memberships.user_id
+        WHERE workspace_memberships.workspace_id = ?
+          AND workspace_memberships.user_id = ?
+          AND workspace_memberships.status = 'active'
+          AND users.is_active = 1
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, nextUserId) as { id: string } | undefined;
+
+  if (!membership) {
+    throw new Error("Linked user must be an active internal workspace user.");
+  }
+
+  return nextUserId;
+};
+
 const assertAssetIdsExist = (db: DatabaseSync, assetIds: string[]) => {
   if (!assetIds.length) {
     return;
@@ -390,18 +419,20 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
           case "crew": {
             const crewName = ensureValue(input.fullName, "Crew name");
             const crewId = `crew-${slugify(crewName)}-${Date.now().toString(36)}`;
+            const linkedUserId = assertLinkableUserExists(db, input.linkedUserId);
             db.prepare(
               `
                 INSERT INTO crew_members (
-                  id, workspace_id, full_name, primary_department_id, document_id, role_label, email, phone, notes, is_active, created_at, updated_at
+                  id, workspace_id, full_name, primary_department_id, linked_user_id, document_id, role_label, email, phone, notes, is_active, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
               `,
             ).run(
               crewId,
               workspaceId,
               crewName,
               optionalValue(input.primaryDepartmentId),
+              linkedUserId,
               optionalValue(input.documentId),
               optionalValue(input.roleLabel),
               optionalValue(input.email),
@@ -598,15 +629,17 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
           }
 
           case "crew": {
+            const linkedUserId = assertLinkableUserExists(db, input.linkedUserId);
             const result = db.prepare(
               `
                 UPDATE crew_members
-                SET full_name = ?, primary_department_id = ?, document_id = ?, role_label = ?, email = ?, phone = ?, notes = ?, updated_at = ?
+                SET full_name = ?, primary_department_id = ?, linked_user_id = ?, document_id = ?, role_label = ?, email = ?, phone = ?, notes = ?, updated_at = ?
                 WHERE id = ?
               `,
             ).run(
               ensureValue(input.fullName, "Crew name"),
               optionalValue(input.primaryDepartmentId),
+              linkedUserId,
               optionalValue(input.documentId),
               optionalValue(input.roleLabel),
               optionalValue(input.email),

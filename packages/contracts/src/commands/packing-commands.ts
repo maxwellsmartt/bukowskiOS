@@ -8,6 +8,7 @@ export type PackingSlipAssetSelection = {
 export type CreatePackingSlipCommand = {
   commandId: string;
   workspaceId: string;
+  actorUserId?: string;
   assetIds: string[];
   assetSelections?: PackingSlipAssetSelection[];
   sourceKitId?: string;
@@ -33,6 +34,7 @@ export type CreatePackingSlipResult = {
 export type ReturnPackingSlipItemsCommand = {
   commandId: string;
   workspaceId: string;
+  actorUserId?: string;
   packingSlipId: string;
   assetIds?: string[];
   conditionIn?: string;

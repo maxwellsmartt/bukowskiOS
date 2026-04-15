@@ -405,6 +405,11 @@ const createDraftRun = (
     approvalDecision: "pending" | "approved" | "approved_for_session" | null;
     approvalScope: "run" | "session" | null;
     detailsJson: string;
+    sourceConnectorKey?: string | null;
+    sourceChannelId?: string | null;
+    sourceExternalMessageId?: string | null;
+    sourceActorUserId?: string | null;
+    correlationId?: string | null;
   },
 ) => {
   const now = new Date().toISOString();
@@ -430,10 +435,15 @@ const createDraftRun = (
         approval_decided_at,
         source,
         details_json,
+        source_connector_key,
+        source_channel_id,
+        source_external_message_id,
+        source_actor_user_id,
+        correlation_id,
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, NULL, 'chat', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ai_gateway', ?, ?, ?)
+      VALUES (?, ?, ?, NULL, 'chat', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ai_gateway', ?, ?, ?, ?, ?, ?, ?)
     `,
   ).run(
     runId,
@@ -450,6 +460,11 @@ const createDraftRun = (
     args.approvalScope,
     args.approvalDecision ? now : null,
     args.detailsJson,
+    args.sourceConnectorKey ?? null,
+    args.sourceChannelId ?? null,
+    args.sourceExternalMessageId ?? null,
+    args.sourceActorUserId ?? null,
+    args.correlationId ?? null,
     now,
     now,
   );
@@ -984,6 +999,11 @@ export const createAssistantGatewayService = (
       approval_decision: approvalDecision,
       approval_reason: approvalReason,
       existing_run_id: executionOptions?.existingRunId ?? null,
+      source_connector_key: request.context.sourceConnectorKey ?? null,
+      source_channel_id: request.context.sourceChannelId ?? null,
+      source_external_message_id: request.context.sourceExternalMessageId ?? null,
+      source_actor_user_id: request.context.sourceActorUserId ?? null,
+      correlation_id: request.context.correlationId ?? null,
     });
 
     let draftRunId: string | null = null;
@@ -1044,6 +1064,11 @@ export const createAssistantGatewayService = (
         approvalDecision,
         approvalScope,
         detailsJson,
+        sourceConnectorKey: request.context.sourceConnectorKey ?? null,
+        sourceChannelId: request.context.sourceChannelId ?? null,
+        sourceExternalMessageId: request.context.sourceExternalMessageId ?? null,
+        sourceActorUserId: request.context.sourceActorUserId ?? null,
+        correlationId: request.context.correlationId ?? null,
       });
       draftRunId = createdRun.runId;
 

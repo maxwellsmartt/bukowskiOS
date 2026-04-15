@@ -6,6 +6,7 @@ import type {
   AssistantChatAttachmentRow,
   AssistantChatMessageMeta,
   AssistantChatMessageRow,
+  AssistantChatMessageSource,
   AssistantChatSnapshot,
   AssistantChatThreadRow,
   AssistantChatThreadState,
@@ -29,6 +30,7 @@ type AssistantChatMessage = {
   role: "assistant" | "user";
   body: string;
   state?: AssistantChatSessionState | null;
+  source: AssistantChatMessageSource | null;
   attachments: AssistantChatAttachmentRow[];
   createdAt: number;
   updatedAt: number;
@@ -111,6 +113,7 @@ const buildFallbackSession = (pathname: string): AssistantChatSession => ({
       role: "assistant",
       body: fallbackWelcomeBody,
       state: null,
+      source: null,
       attachments: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -187,6 +190,7 @@ const normalizeThread = (thread: AssistantChatThreadRow): AssistantChatSession =
       role: message.role,
       body: message.body,
       state: message.meta,
+      source: message.source,
       attachments: message.attachments,
       createdAt: parseTimestamp(message.createdAt),
       updatedAt: parseTimestamp(message.updatedAt),

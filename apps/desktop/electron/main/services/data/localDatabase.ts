@@ -25,6 +25,7 @@ import { applyAssetQuantityFoundationMigration } from "./assetQuantityFoundation
 import { createAssetMutationService } from "./assetMutationService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
+import { applyConnectorFoundationMigration, bootstrapConnectorFoundation } from "./connectorFoundationBootstrap";
 import { applyCrewCatalogFoundationMigration } from "./crewCatalogFoundationBootstrap";
 import { createDataRetentionService, summarizeDataRetention } from "./dataRetentionService";
 import { createFinanceMutationService } from "./financeMutationService";
@@ -46,6 +47,9 @@ import { createRuntimeDiagnosticsService, type RuntimeDiagnosticsService } from 
 import { applySchedulingFoundationMigration, bootstrapSchedulingFoundation } from "./schedulingFoundationBootstrap";
 import { createSupportDiagnosticsService, type SupportDiagnosticsService } from "./supportDiagnosticsService";
 import { createSyncOutboxWorkerService, summarizeSyncOutboxWorker } from "./syncOutboxWorkerService";
+import { createUserAdminService, type UserAdminService } from "./userAdminService";
+import { createConnectorBridgeService } from "../connectors/connectorBridgeService";
+import { createTelegramConnectorService } from "../connectors/telegramConnectorService";
 import {
   applyTrackedSqlMigrations,
   applyTrackedStep,
@@ -81,6 +85,7 @@ type LocalDatabaseRuntime = {
   agentMutations: AgentMutationService;
   runtimeDiagnostics: RuntimeDiagnosticsService;
   supportDiagnostics: SupportDiagnosticsService;
+  userAdmin: UserAdminService;
   fileUploads: FileUploadService;
   getDiagnosticsSnapshot: () => AppDiagnosticsSnapshot;
   getSupportSnapshot: () => AppSupportSnapshot;
@@ -170,9 +175,11 @@ const createRuntime = (): LocalDatabaseRuntime => {
   );
   applyTrackedStep(database, "runtime_crew_catalog_foundation_v2", () => applyCrewCatalogFoundationMigration(database));
   applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database));
+  applyTrackedStep(database, "runtime_connector_foundation_v2", () => applyConnectorFoundationMigration(database));
   applyTrackedStep(database, "runtime_operational_files_v2", () => applyOperationalFilesMigration(database));
   seedFoundationData(database);
   bootstrapAIGatewayFoundation(database);
+  bootstrapConnectorFoundation(database);
   ensureProjectShellDefaults(database);
   bootstrapLegacyRentmanDemo(database);
   applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database));
@@ -304,6 +311,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   reconcileLiveProviderEnablement(database, secretStore);
   const openaiProviderService = createOpenAIProviderService();
   const foundationReads = createFoundationReadService(database);
+  const userAdmin = createUserAdminService(database);
   const agentReads = createAgentReadService(database, secretStore);
   const sessionStore = createAssistantGatewaySessionStore(database);
   const toolRegistry = createAgentToolRegistry(foundationReads, {
@@ -325,6 +333,13 @@ const createRuntime = (): LocalDatabaseRuntime => {
     memoryService,
     attachmentsRootPath,
   });
+  const connectorBridgeService = createConnectorBridgeService(database, {
+    assistantChatService,
+  });
+  const telegramConnectorService = createTelegramConnectorService(database, {
+    secretStore,
+    bridgeService: connectorBridgeService,
+  });
   const runtimeDiagnostics = createRuntimeDiagnosticsService(database);
   const supportDiagnostics = createSupportDiagnosticsService({
     database,
@@ -337,6 +352,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   });
   const dataRetention = createDataRetentionService(database);
   assistantChatService.reconcileInterruptedThreads();
+  void telegramConnectorService.start();
   try {
     const retentionSummary = dataRetention.run();
     lastRetentionRunAt = new Date().toISOString();
@@ -405,6 +421,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     rmaMutations: createRmaMutationService(database),
     runtimeDiagnostics,
     supportDiagnostics,
+    userAdmin,
     fileUploads,
     getDiagnosticsSnapshot,
     getSupportSnapshot: () => supportDiagnostics.getSupportSnapshot(),
@@ -421,6 +438,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
       openaiProviderService,
       assistantGatewayService,
       assistantChatService,
+      connectorBridgeService,
+      telegramConnectorService,
     }),
   };
 };

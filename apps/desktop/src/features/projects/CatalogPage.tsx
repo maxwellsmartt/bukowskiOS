@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import type {
+  AppUsersSnapshot,
   CatalogCsvImportPreview,
   CatalogCsvImportStrategy,
   CatalogEntityType,
@@ -34,6 +35,7 @@ import {
   deleteCrewCatalogDocument,
   exportCatalogCsv,
   importCatalogCsv,
+  notifyCatalogChanged,
   openCrewCatalogDocument,
   previewCatalogCsvImport,
   uploadCrewCatalogDocuments,
@@ -41,6 +43,11 @@ import {
   useCatalogData,
   useProjectsData,
 } from "./useProjectsData";
+
+const emptyUsersSnapshot: AppUsersSnapshot = {
+  users: [],
+  roles: [],
+};
 
 type CatalogTabConfig = {
   key: CatalogEntityType;
@@ -415,6 +422,23 @@ export const CatalogPage = () => {
   const [kitAssignOpen, setKitAssignOpen] = useState(false);
   const [kitAssignError, setKitAssignError] = useState<string | null>(null);
   const [isSubmittingKitAssign, setIsSubmittingKitAssign] = useState(false);
+  const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
+  const [isCreatingCrewUser, setIsCreatingCrewUser] = useState(false);
+  const [createCrewUserRoleId, setCreateCrewUserRoleId] = useState("");
+
+  const loadUsersSnapshot = async () => {
+    if (!window.bukowskiApp) {
+      return;
+    }
+
+    const nextUsersSnapshot = await window.bukowskiApp.getUsersSnapshot();
+    setUsersSnapshot(nextUsersSnapshot);
+    setCreateCrewUserRoleId((current) => current || nextUsersSnapshot.roles[0]?.id || "");
+  };
+
+  useEffect(() => {
+    void loadUsersSnapshot();
+  }, []);
 
   const tabs = useMemo<CatalogTabConfig[]>(
     () => [
@@ -573,6 +597,19 @@ export const CatalogPage = () => {
   const showContextColumn = Boolean(editorMode) || showPreview;
   const activeKitRow =
     activeTab === "kit" && editTargetRow ? (editTargetRow as CatalogSnapshot["kits"][number]) : null;
+  const previewCrewRow =
+    activeTab === "crew" && previewRow ? (previewRow as CatalogSnapshot["crewMembers"][number]) : null;
+  const previewLinkedUser = useMemo(
+    () =>
+      previewCrewRow?.linkedUserId
+        ? usersSnapshot.users.find((user) => user.id === previewCrewRow.linkedUserId) ?? null
+        : null,
+    [previewCrewRow?.linkedUserId, usersSnapshot.users],
+  );
+  const previewCreateRole = useMemo(
+    () => usersSnapshot.roles.find((role) => role.id === createCrewUserRoleId) ?? null,
+    [createCrewUserRoleId, usersSnapshot.roles],
+  );
   const activeKitSelections = activeKitRow?.assetSelections ?? [];
   const activeKitAssignmentAssets = useMemo<AssetAssignSelectionRow[]>(
     () =>
@@ -781,6 +818,38 @@ export const CatalogPage = () => {
       await reload();
     } catch (nextError) {
       setEditorError(nextError instanceof Error ? nextError.message : "Crew document removal failed.");
+    }
+  };
+
+  const handleCreateInternalUserFromCrew = async () => {
+    if (!window.bukowskiApp || !previewCrewRow) {
+      return;
+    }
+
+    if (!createCrewUserRoleId) {
+      setEditorError("Pick a role before creating the internal user.");
+      return;
+    }
+
+    try {
+      setIsCreatingCrewUser(true);
+      const result = await window.bukowskiApp.createUser({
+        workspaceId: DEFAULT_WORKSPACE_ID,
+        fullName: previewCrewRow.fullName,
+        email: previewCrewRow.email ?? "",
+        phone: previewCrewRow.phone ?? "",
+        roleId: createCrewUserRoleId,
+        linkedCrewMemberId: previewCrewRow.id,
+      });
+
+      setCatalogActionMessage(result.summary);
+      setEditorError(null);
+      await Promise.all([reload(), loadUsersSnapshot()]);
+      notifyCatalogChanged();
+    } catch (nextError) {
+      setEditorError(nextError instanceof Error ? nextError.message : "Could not create the internal user from this crew record.");
+    } finally {
+      setIsCreatingCrewUser(false);
     }
   };
 
@@ -1105,6 +1174,7 @@ export const CatalogPage = () => {
             assetOptions={data.assetOptions}
             crewDocuments={activeTab === "crew" && editTargetRow ? ((editTargetRow.documents as CatalogSnapshot["crewMembers"][number]["documents"]) ?? []) : []}
             departmentOptions={data.departments}
+            userOptions={data.users}
             entityType={activeTab}
             error={editorError}
             initialValue={editorMode === "edit" ? editTargetRow : null}
@@ -1164,6 +1234,107 @@ export const CatalogPage = () => {
 
             {activeTab === "crew" ? (
               <>
+                <div className="catalog-preview-section">
+                  <div className="surface-card-header">
+                    <div>
+                      <h3 className="surface-card-title">Internal user</h3>
+                      <p className="surface-card-subtitle">
+                        Reuse this crew profile to create the internal identity that Telegram, roles and permissions rely on.
+                      </p>
+                    </div>
+                  </div>
+
+                  {previewLinkedUser ? (
+                    <div className="summary-grid">
+                      <div className="summary-row">
+                        <span className="summary-label">Linked user</span>
+                        <span className="summary-value">{previewLinkedUser.fullName}</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="summary-label">Role</span>
+                        <span className="summary-value">{previewLinkedUser.roleName ?? "No role assigned"}</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="summary-label">Telegram</span>
+                        <span className="summary-value">
+                          {previewLinkedUser.telegramLinkStatus === "linked"
+                            ? "Linked"
+                            : previewLinkedUser.telegramLinkStatus === "pending"
+                              ? "Pending link"
+                              : previewLinkedUser.telegramLinkStatus === "revoked"
+                                ? "Revoked"
+                                : "Not linked"}
+                        </span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="summary-label">Ready</span>
+                        <span className="summary-value">{previewLinkedUser.readyForTelegram ? "Ready for Telegram" : "Needs setup"}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="agent-form-grid">
+                        <label className="field-block">
+                          <span className="field-label">Role</span>
+                          <select
+                            className="field-input"
+                            onChange={(event) => setCreateCrewUserRoleId(event.target.value)}
+                            value={createCrewUserRoleId}
+                          >
+                            <option value="">Select a role</option>
+                            {usersSnapshot.roles.map((role) => (
+                              <option key={role.id} value={role.id}>
+                                {role.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <div className="field-block field-block-span-2">
+                          <span className="field-label">What will be reused</span>
+                          <div className="summary-grid">
+                            <div className="summary-row">
+                              <span className="summary-label">Name</span>
+                              <span className="summary-value">{previewCrewRow?.fullName ?? "—"}</span>
+                            </div>
+                            <div className="summary-row">
+                              <span className="summary-label">Email</span>
+                              <span className="summary-value">{previewCrewRow?.email || "No email yet"}</span>
+                            </div>
+                            <div className="summary-row">
+                              <span className="summary-label">Phone</span>
+                              <span className="summary-value">{previewCrewRow?.phone || "No phone yet"}</span>
+                            </div>
+                            <div className="summary-row">
+                              <span className="summary-label">Membership</span>
+                              <span className="summary-value">Active on create</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="models-provider-diagnostic">
+                        <span className="agent-detail-kicker">Role preview</span>
+                        <p>
+                          {previewCreateRole
+                            ? `${previewCreateRole.name}: ${previewCreateRole.permissionKeys.join(", ")}`
+                            : "Pick the primary role first. You can refine permissions later from Users & access."}
+                        </p>
+                      </div>
+
+                      <div className="action-panel-actions action-panel-actions-start">
+                        <button
+                          className="action-primary-button"
+                          disabled={!createCrewUserRoleId || isCreatingCrewUser}
+                          onClick={() => void handleCreateInternalUserFromCrew()}
+                          type="button"
+                        >
+                          {isCreatingCrewUser ? "Creating..." : "Create internal user"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
                 {Array.isArray(previewRow.bankAccounts) && previewRow.bankAccounts.length ? (
                   <div className="catalog-preview-section">
                     <div className="surface-card-header">

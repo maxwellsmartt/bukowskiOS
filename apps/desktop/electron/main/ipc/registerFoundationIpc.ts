@@ -12,6 +12,7 @@ import {
   createAssetSchema,
   createAssistantThreadSchema,
   createCatalogEntitySchema,
+  createConnectorLinkTokenSchema,
   deleteCatalogEntitiesSchema,
   createDraftRunFromChatSchema,
   createFinancialEntrySchema,
@@ -44,10 +45,12 @@ import {
   previewCatalogCsvImportSchema,
   reviewAgentRunSchema,
   saveAiProviderConfigSchema,
+  saveConnectorConfigSchema,
   sendAssistantChatTurnSchema,
   setActiveAssistantThreadSchema,
   setAgentApprovalModeSchema,
   setAgentStatusSchema,
+  testConnectorConnectionSchema,
   testAiProviderConnectionSchema,
   unarchiveProjectSchema,
   unassignCrewFromProjectUnitSchema,
@@ -69,13 +72,16 @@ import type {
   CreateAssistantThreadCommand,
   AssistantGatewayRequest,
   SaveAIProviderConfigCommand,
+  SaveConnectorConfigCommand,
   TestAIProviderConnectionCommand,
+  TestConnectorConnectionCommand,
   AssistantGatewayResponse,
   DeleteAssistantThreadCommand,
   CreateAgentCommand,
   ArchiveAssetCommand,
   ArchiveProjectInput,
   CreateDraftRunFromChatCommand,
+  CreateConnectorLinkTokenCommand,
   RecordRuntimeErrorCommand,
   ReviewAgentRunCommand,
   SendAssistantChatTurnCommand,
@@ -235,7 +241,10 @@ type RegisterFoundationIpcOptions = {
     setAgentStatus: (input: SetAgentStatusCommand) => unknown;
     setAgentApprovalMode: (input: SetAgentApprovalModeCommand) => unknown;
     saveAIProviderConfig: (input: SaveAIProviderConfigCommand) => unknown;
+    saveConnectorConfig: (input: SaveConnectorConfigCommand) => unknown;
     testAIProviderConnection: (input: TestAIProviderConnectionCommand) => unknown;
+    testConnectorConnection: (input: TestConnectorConnectionCommand) => unknown;
+    createConnectorLinkToken: (input: CreateConnectorLinkTokenCommand) => unknown;
     assignAgentModel: (input: AssignAgentModelCommand) => unknown;
     getAssistantChatSnapshot: () => AssistantChatSnapshot;
     createAssistantThread: (input: CreateAssistantThreadCommand) => AssistantChatSnapshot;
@@ -327,9 +336,24 @@ export const registerFoundationIpc = ({
     (_event, input) => agentMutations.saveAIProviderConfig(input),
   );
   safeHandle(
+    ipcChannels.agents.saveConnectorConfig,
+    saveConnectorConfigSchema,
+    (_event, input) => agentMutations.saveConnectorConfig(input),
+  );
+  safeHandle(
     ipcChannels.agents.testAIProviderConnection,
     testAiProviderConnectionSchema,
     (_event, input) => agentMutations.testAIProviderConnection(input),
+  );
+  safeHandle(
+    ipcChannels.agents.testConnectorConnection,
+    testConnectorConnectionSchema,
+    (_event, input) => agentMutations.testConnectorConnection(input),
+  );
+  safeHandle(
+    ipcChannels.agents.createConnectorLinkToken,
+    createConnectorLinkTokenSchema,
+    (_event, input) => agentMutations.createConnectorLinkToken(input),
   );
   safeHandle(
     ipcChannels.agents.assignAgentModel,

@@ -8,6 +8,7 @@ import type {
   AssistantChatAttachmentStatus,
   AssistantChatMessageMeta,
   AssistantChatMessageRow,
+  AssistantChatMessageSource,
   AssistantChatSnapshot,
   AssistantChatThreadRow,
   AssistantChatThreadState,
@@ -154,6 +155,18 @@ const parseMessageMeta = (value: string | null): AssistantChatMessageMeta | null
   }
 };
 
+const parseMessageSource = (value: string | null): AssistantChatMessageSource | null => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as AssistantChatMessageSource;
+  } catch {
+    return null;
+  }
+};
+
 type ThreadRow = {
   id: string;
   title: string;
@@ -178,6 +191,7 @@ type MessageDbRow = {
   body: string;
   message_state: AssistantChatMessageRow["state"];
   state_payload_json: string | null;
+  source_metadata_json: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -289,7 +303,7 @@ export const createAssistantChatService = (
 
     const messageRows = db.prepare(
       `
-        SELECT id, thread_id, role, body, message_state, state_payload_json, created_at, updated_at
+        SELECT id, thread_id, role, body, message_state, state_payload_json, source_metadata_json, created_at, updated_at
         FROM assistant_chat_messages
         WHERE deleted_at IS NULL
         ORDER BY created_at ASC
@@ -304,6 +318,7 @@ export const createAssistantChatService = (
         body: message.body,
         state: message.message_state,
         meta: parseMessageMeta(message.state_payload_json),
+        source: parseMessageSource(message.source_metadata_json),
         attachments: attachmentMap[message.id] ?? [],
         createdAt: message.created_at,
         updatedAt: message.updated_at,
@@ -754,12 +769,34 @@ export const createAssistantChatService = (
             body,
             message_state,
             state_payload_json,
+            source_connector_key,
+            source_channel_id,
+            source_external_message_id,
+            source_actor_user_id,
+            correlation_id,
+            source_metadata_json,
             created_at,
             updated_at,
             deleted_at
-          ) VALUES (?, ?, 'user', ?, 'sent', NULL, ?, ?, NULL)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
-      ).run(userMessageId, input.threadId, userBody, now, now);
+      ).run(
+        userMessageId,
+        input.threadId,
+        "user",
+        userBody,
+        "sent",
+        null,
+        input.source?.connectorKey ?? null,
+        input.context.sourceChannelId ?? null,
+        input.context.sourceExternalMessageId ?? input.source?.externalMessageId ?? null,
+        input.context.sourceActorUserId ?? input.source?.actorUserId ?? null,
+        input.context.correlationId ?? input.source?.correlationId ?? null,
+        input.source ? JSON.stringify(input.source) : null,
+        now,
+        now,
+        null,
+      );
 
       (input.attachments ?? []).forEach((attachment) => {
         persistAttachment(input.threadId, userMessageId, attachment);

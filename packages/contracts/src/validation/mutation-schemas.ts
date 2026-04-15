@@ -90,6 +90,72 @@ export const testAiProviderConnectionSchema = z
   })
   .strict();
 
+export const saveConnectorConfigSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    connectorKey: nonEmptyString,
+    enabled: z.boolean(),
+    botToken: optionalTrimmedString,
+    clearStoredSecret: z.boolean().optional(),
+  })
+  .strict();
+
+export const testConnectorConnectionSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    connectorKey: nonEmptyString,
+  })
+  .strict();
+
+export const createConnectorLinkTokenSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    connectorKey: nonEmptyString,
+    userId: nonEmptyString,
+    expiresInMinutes: z.number().int().positive().max(24 * 60).optional(),
+  })
+  .strict();
+
+export const createAppUserSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    fullName: nonEmptyString,
+    email: optionalTrimmedString,
+    phone: optionalTrimmedString,
+    roleId: nonEmptyString,
+    linkedCrewMemberId: optionalTrimmedString,
+  })
+  .strict();
+
+export const updateAppUserSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    userId: nonEmptyString,
+    fullName: nonEmptyString,
+    email: optionalTrimmedString,
+    phone: optionalTrimmedString,
+    roleId: nonEmptyString,
+    linkedCrewMemberId: optionalTrimmedString,
+  })
+  .strict();
+
+export const setAppUserActiveSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    userId: nonEmptyString,
+    isActive: z.boolean(),
+  })
+  .strict();
+
+export const revokeTelegramLinkSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    userId: nonEmptyString,
+  })
+  .strict();
+
 export const assignAgentModelSchema = z
   .object({
     commandId: nonEmptyString,
@@ -147,6 +213,26 @@ export const assistantGatewayToolContextSchema = z
     currentView: optionalNullableString,
     activeFilters: z.record(z.string(), z.string()).optional(),
     requestedApprovalMode: assistantApprovalPreferenceSchema.optional(),
+    sourceConnectorKey: optionalNullableString,
+    sourceChannelId: optionalNullableString,
+    sourceExternalMessageId: optionalNullableString,
+    sourceActorUserId: optionalNullableString,
+    correlationId: optionalNullableString,
+  })
+  .strict();
+
+export const assistantChatMessageSourceSchema = z
+  .object({
+    connectorKey: nonEmptyString,
+    connectorLabel: optionalTrimmedString,
+    channelLabel: optionalTrimmedString,
+    actorUserId: optionalNullableString,
+    actorName: nonEmptyString,
+    actorRole: optionalNullableString,
+    permissionSummary: nonEmptyString,
+    externalMessageId: optionalNullableString,
+    correlationId: optionalNullableString,
+    isLinkedIdentity: z.boolean(),
   })
   .strict();
 
@@ -158,6 +244,7 @@ export const sendAssistantChatTurnSchema = z
     message: nonEmptyString,
     attachments: z.array(assistantGatewayAttachmentSchema).optional(),
     context: assistantGatewayToolContextSchema,
+    source: assistantChatMessageSourceSchema.optional(),
   })
   .strict();
 
@@ -266,6 +353,7 @@ export const reportIncidentSchema = z
   .object({
     commandId: nonEmptyString,
     workspaceId: nonEmptyString,
+    actorUserId: optionalTrimmedString,
     assetId: optionalTrimmedString,
     assignmentId: optionalTrimmedString,
     projectId: optionalTrimmedString,
@@ -289,6 +377,7 @@ export const updateIncidentSchema = z
   .object({
     commandId: nonEmptyString,
     workspaceId: nonEmptyString,
+    actorUserId: optionalTrimmedString,
     incidentId: nonEmptyString,
     title: optionalTrimmedString,
     description: optionalTrimmedString,
@@ -307,6 +396,7 @@ export const resolveIncidentSchema = z
   .object({
     commandId: nonEmptyString,
     workspaceId: nonEmptyString,
+    actorUserId: optionalTrimmedString,
     incidentId: nonEmptyString,
     resolutionNotes: optionalTrimmedString,
     costEstimate: z.number().finite().nonnegative().optional(),
@@ -332,6 +422,7 @@ export const createPackingSlipSchema = z
   .object({
     commandId: nonEmptyString,
     workspaceId: nonEmptyString,
+    actorUserId: optionalTrimmedString,
     assetIds: z.array(nonEmptyString).min(1),
     assetSelections: z
       .array(
@@ -359,6 +450,7 @@ export const returnPackingSlipItemsSchema = z
   .object({
     commandId: nonEmptyString,
     workspaceId: nonEmptyString,
+    actorUserId: optionalTrimmedString,
     packingSlipId: nonEmptyString,
     assetIds: z.array(nonEmptyString).optional(),
     conditionIn: optionalTrimmedString,
@@ -572,6 +664,7 @@ const createCatalogCrewSchema = z
     entityType: z.literal("crew"),
     fullName: nonEmptyString,
     primaryDepartmentId: optionalTrimmedString,
+    linkedUserId: optionalTrimmedString,
     documentId: optionalTrimmedString,
     roleLabel: optionalTrimmedString,
     email: optionalTrimmedString,
@@ -733,6 +826,7 @@ export const createRmaCaseSchema = z
   .object({
     commandId: nonEmptyString,
     workspaceId: nonEmptyString,
+    actorUserId: optionalTrimmedString,
     manufacturerId: nonEmptyString,
     supportEmail: optionalTrimmedString,
     title: nonEmptyString,

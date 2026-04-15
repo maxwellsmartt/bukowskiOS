@@ -45,7 +45,10 @@ describe("agent read service", () => {
     expect(agents.some((agent) => agent.role === "Assets Agent")).toBe(true);
     expect(reads.getRunsList().some((run) => run.status === "needs_approval")).toBe(true);
     expect(reads.getModelsSnapshot().providers.some((provider) => provider.providerKey === "openai")).toBe(true);
-    expect(reads.getConnectorsSnapshot().some((connector) => connector.status === "configured")).toBe(true);
+    expect(reads.getConnectorsSnapshot().some((connector) => connector.connectorKey === "telegram")).toBe(true);
+    expect(
+      reads.getConnectorsSnapshot().some((connector) => connector.connectorKey === "email" && connector.status === "configured"),
+    ).toBe(false);
 
     cleanup();
   });

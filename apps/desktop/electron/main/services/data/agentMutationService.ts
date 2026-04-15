@@ -9,28 +9,33 @@ import type {
   AgentApprovalMode,
   AgentRunReviewResult,
   AgentMutationResult,
+  ConnectorMutationResult,
   AgentStatus,
   AssignAgentModelCommand,
+  CreateConnectorLinkTokenCommand,
   CreateAssistantThreadCommand,
   CreateAgentCommand,
   CreateDraftRunFromChatCommand,
   DeleteAssistantThreadCommand,
   DraftRunFromChatResult,
   ReviewAgentRunCommand,
+  SaveConnectorConfigCommand,
   SaveAIProviderConfigCommand,
   SendAssistantChatTurnCommand,
   SetActiveAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
   SetAgentApprovalModeCommand,
   SetAgentStatusCommand,
+  TestConnectorConnectionCommand,
   TestAIProviderConnectionCommand,
   UpdateAgentCommand,
 } from "@contracts";
 
 import type { AssistantChatService } from "./assistantChatService";
 import type { AssistantGatewayService } from "../ai/assistantGatewayService";
-import type { AISecretStore } from "../ai/aiSecretStore";
 import type { OpenAIProviderService } from "../ai/openaiProviderService";
+import type { ConnectorBridgeService } from "../connectors/connectorBridgeService";
+import type { TelegramConnectorService } from "../connectors/telegramConnectorService";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
@@ -294,10 +299,17 @@ const actionVerbRequiresApproval = (message: string) =>
 export const createAgentMutationService = (
   db: DatabaseSync,
   options: {
-    secretStore: AISecretStore;
+    secretStore: {
+      hasProviderSecret: (workspaceId: string, providerKey: string) => boolean;
+      getProviderSecret: (workspaceId: string, providerKey: string) => string | null;
+      setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => void;
+      clearProviderSecret: (workspaceId: string, providerKey: string) => void;
+    };
     openaiProviderService: OpenAIProviderService;
     assistantGatewayService: AssistantGatewayService;
     assistantChatService?: AssistantChatService;
+    connectorBridgeService?: ConnectorBridgeService;
+    telegramConnectorService?: TelegramConnectorService;
   },
 ) => ({
   createAgent(input: CreateAgentCommand): AgentMutationResult {
@@ -760,6 +772,74 @@ export const createAgentMutationService = (
         result.ok && config.enabled !== 1
           ? `${result.summary} ${config.display_name} is now enabled for chat.`
           : result.summary,
+    };
+  },
+
+  async saveConnectorConfig(input: SaveConnectorConfigCommand): Promise<ConnectorMutationResult> {
+    const connectorKey = ensureValue(input.connectorKey, "Connector key").toLowerCase();
+
+    if (connectorKey !== "telegram") {
+      throw new Error("Only Telegram is supported right now.");
+    }
+
+    if (!options.telegramConnectorService) {
+      throw new Error("Telegram connector service unavailable.");
+    }
+
+    const status = await options.telegramConnectorService.saveConfig({
+      enabled: input.enabled,
+      botToken: input.botToken,
+      clearStoredSecret: input.clearStoredSecret,
+    });
+
+    return {
+      connectorKey,
+      status,
+      summary:
+        status === "configured"
+          ? "Telegram connector enabled and polling direct messages."
+          : status === "disabled"
+            ? "Telegram connector disabled."
+            : "Telegram connector saved, but a valid bot token is still required.",
+    };
+  },
+
+  async testConnectorConnection(input: TestConnectorConnectionCommand): Promise<ConnectorMutationResult> {
+    const connectorKey = ensureValue(input.connectorKey, "Connector key").toLowerCase();
+
+    if (connectorKey !== "telegram") {
+      throw new Error("Only Telegram is supported right now.");
+    }
+
+    if (!options.telegramConnectorService) {
+      throw new Error("Telegram connector service unavailable.");
+    }
+
+    const result = await options.telegramConnectorService.testConnection();
+    return {
+      connectorKey,
+      status: "configured",
+      botUsername: result.botUsername,
+      summary: result.botUsername ? `Telegram is connected as @${result.botUsername}.` : "Telegram responded successfully.",
+    };
+  },
+
+  createConnectorLinkToken(input: CreateConnectorLinkTokenCommand): ConnectorMutationResult {
+    const connectorKey = ensureValue(input.connectorKey, "Connector key").toLowerCase();
+    if (!options.connectorBridgeService) {
+      throw new Error("Connector bridge service unavailable.");
+    }
+    const result = options.connectorBridgeService.createLinkToken({
+      connectorKey,
+      userId: input.userId,
+      expiresInMinutes: input.expiresInMinutes,
+    });
+
+    return {
+      connectorKey,
+      status: "configured",
+      linkToken: result.token,
+      summary: result.summary,
     };
   },
 

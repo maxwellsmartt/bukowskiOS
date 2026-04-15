@@ -1,6 +1,7 @@
 import type {
   AgentApprovalMode,
   AssistantApprovalPreference,
+  AssistantChatMessageSource,
   AgentRunApprovalDecision,
   AgentRunApprovalScope,
   AgentRunStatus,
@@ -62,6 +63,11 @@ export type AIGatewayToolContext = {
   currentView?: string | null;
   activeFilters?: Record<string, string>;
   requestedApprovalMode?: AssistantApprovalPreference;
+  sourceConnectorKey?: string | null;
+  sourceChannelId?: string | null;
+  sourceExternalMessageId?: string | null;
+  sourceActorUserId?: string | null;
+  correlationId?: string | null;
 };
 
 export type AssistantGatewayAttachment = {
@@ -72,6 +78,18 @@ export type AssistantGatewayAttachment = {
   dataUrl: string;
 };
 
+export type AssistantChatMessageSourceInput = Omit<
+  AssistantChatMessageSource,
+  "connectorLabel" | "channelLabel" | "actorUserId" | "actorRole" | "externalMessageId" | "correlationId"
+> & {
+  connectorLabel?: string;
+  channelLabel?: string;
+  actorUserId?: string | null;
+  actorRole?: string | null;
+  externalMessageId?: string | null;
+  correlationId?: string | null;
+};
+
 export type AssistantGatewayRequest = {
   commandId: string;
   workspaceId: string;
@@ -79,6 +97,7 @@ export type AssistantGatewayRequest = {
   message: string;
   attachments?: AssistantGatewayAttachment[];
   context: AIGatewayToolContext;
+  source?: AssistantChatMessageSourceInput;
 };
 
 export type CreateAssistantThreadCommand = {
@@ -175,6 +194,36 @@ export type AIProviderMutationResult = {
   providerKey: string;
   status: AIProviderStatus;
   summary: string;
+};
+
+export type SaveConnectorConfigCommand = {
+  commandId: string;
+  workspaceId: string;
+  connectorKey: string;
+  enabled: boolean;
+  botToken?: string;
+  clearStoredSecret?: boolean;
+};
+
+export type TestConnectorConnectionCommand = {
+  workspaceId: string;
+  connectorKey: string;
+};
+
+export type CreateConnectorLinkTokenCommand = {
+  commandId: string;
+  workspaceId: string;
+  connectorKey: string;
+  userId: string;
+  expiresInMinutes?: number;
+};
+
+export type ConnectorMutationResult = {
+  connectorKey: string;
+  status: "configured" | "not_configured" | "disabled";
+  summary: string;
+  botUsername?: string | null;
+  linkToken?: string | null;
 };
 
 export type AgentRunReviewResult = {

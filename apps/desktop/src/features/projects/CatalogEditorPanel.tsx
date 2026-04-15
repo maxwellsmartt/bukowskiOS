@@ -10,6 +10,7 @@ type CatalogEditorPanelProps = {
   assetOptions: CatalogSnapshot["assetOptions"];
   crewDocuments?: CatalogSnapshot["crewMembers"][number]["documents"];
   departmentOptions?: CatalogSnapshot["departments"];
+  userOptions?: CatalogSnapshot["users"];
   entityType: CatalogEntityType;
   error: string | null;
   initialValue?: Record<string, unknown> | null;
@@ -163,6 +164,7 @@ export const CatalogEditorPanel = ({
   assetOptions,
   crewDocuments = [],
   departmentOptions = [],
+  userOptions = [],
   entityType,
   error,
   initialValue,
@@ -182,6 +184,7 @@ export const CatalogEditorPanel = ({
   const [locationType, setLocationType] = useState("warehouse");
   const [roleLabel, setRoleLabel] = useState("");
   const [primaryDepartmentId, setPrimaryDepartmentId] = useState("");
+  const [linkedUserId, setLinkedUserId] = useState("");
   const [documentId, setDocumentId] = useState("");
   const [contactName, setContactName] = useState("");
   const [email, setEmail] = useState("");
@@ -193,6 +196,7 @@ export const CatalogEditorPanel = ({
   const canManageCrewDocuments = mode === "edit" && typeof initialValue?.id === "string";
 
   const departmentSelectOptions = useMemo(() => departmentOptions, [departmentOptions]);
+  const linkedUserOptions = useMemo(() => userOptions, [userOptions]);
 
   useEffect(() => {
     setCode(readString(initialValue, "code"));
@@ -200,6 +204,7 @@ export const CatalogEditorPanel = ({
     setDescription(readString(initialValue, "description"));
     setLocationType(readString(initialValue, "type") || "warehouse");
     setPrimaryDepartmentId(readString(initialValue, "primaryDepartmentId"));
+    setLinkedUserId(readString(initialValue, "linkedUserId"));
     setDocumentId(readString(initialValue, "documentId"));
     setRoleLabel(readString(initialValue, "roleLabel"));
     setContactName(readString(initialValue, "contactName"));
@@ -239,6 +244,7 @@ export const CatalogEditorPanel = ({
           ...baseId,
           fullName: name.trim(),
           primaryDepartmentId: normalizeOptional(primaryDepartmentId),
+          linkedUserId: normalizeOptional(linkedUserId),
           documentId: normalizeOptional(documentId),
           roleLabel: normalizeOptional(roleLabel),
           email: normalizeOptional(email),
@@ -359,6 +365,17 @@ export const CatalogEditorPanel = ({
               </SelectField>
             </label>
             <label className="action-field">
+              <span className="action-field-label">Linked user</span>
+              <SelectField onChange={(event) => setLinkedUserId(event.target.value)} value={linkedUserId}>
+                <option value="">No linked user</option>
+                {linkedUserOptions.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.fullName}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
+            <label className="action-field">
               <span className="action-field-label">Document ID</span>
               <input className="action-field-control" onChange={(event) => setDocumentId(event.target.value)} value={documentId} />
             </label>
@@ -409,8 +426,24 @@ export const CatalogEditorPanel = ({
         ) : null}
       </div>
 
-      {entityType === "crew" ? (
+        {entityType === "crew" ? (
         <div className="catalog-crew-support-grid">
+          <div className="catalog-crew-support-card">
+            <div className="surface-card-header catalog-kit-assets-header">
+              <div>
+                <h3 className="surface-card-title">Identity link</h3>
+                <p className="surface-card-subtitle">
+                  Link this crew member to an internal user when you want connectors like Telegram to resolve real roles and permissions.
+                </p>
+              </div>
+            </div>
+            <div className="catalog-crew-support-empty">
+              {linkedUserId
+                ? `Linked to internal user ${linkedUserOptions.find((user) => user.id === linkedUserId)?.fullName ?? linkedUserId}.`
+                : "No internal user linked yet."}
+            </div>
+          </div>
+
           <div className="catalog-crew-support-card">
             <div className="surface-card-header catalog-kit-assets-header">
               <div>

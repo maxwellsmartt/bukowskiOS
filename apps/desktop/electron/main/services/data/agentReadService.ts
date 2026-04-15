@@ -52,6 +52,8 @@ const parseRunDetails = (value: string | null | undefined) => {
   }
 };
 
+const formatOptionalTimestampLabel = (value: string | null) => (value ? formatTimestampLabel(value) : "Never tested");
+
 const formatTimestampLabel = (value: string) => {
   const timestamp = new Date(value).getTime();
   const now = Date.now();
@@ -77,6 +79,14 @@ const formatTimestampLabel = (value: string) => {
   }
 
   return absoluteFormatter.format(new Date(value));
+};
+
+const resolveConnectorStatus = (connectorKey: string, status: AgentConnectorRow["status"]): AgentConnectorRow["status"] => {
+  if (connectorKey !== "telegram") {
+    return status === "disabled" ? "disabled" : "not_configured";
+  }
+
+  return status;
 };
 
 type AgentRow = {
@@ -278,8 +288,6 @@ type ProviderConfigRow = {
   last_error_summary: string | null;
   notes: string;
 };
-
-const formatOptionalTimestampLabel = (value: string | null) => (value ? formatTimestampLabel(value) : "Never");
 
 const loadProviderRows = (db: DatabaseSync) =>
   db
@@ -489,7 +497,10 @@ const buildProviderRows = (
 
 export const createAgentReadService = (
   db: DatabaseSync,
-  secretStore?: { hasProviderSecret: (workspaceId: string, providerKey: string) => boolean },
+  secretStore?: {
+    hasProviderSecret: (workspaceId: string, providerKey: string) => boolean;
+    hasConnectorSecret?: (workspaceId: string, connectorKey: string) => boolean;
+  },
 ) => ({
   getMissionControlSnapshot(): MissionControlSnapshot {
     const agentRows = loadAgentRows(db);
@@ -518,17 +529,10 @@ export const createAgentReadService = (
 
     const activeCount = agentRows.filter((row) => row.status === "active").length;
     const pausedCount = agentRows.filter((row) => row.status === "paused").length;
-    const configuredConnectors = db
-      .prepare(
-        `
-          SELECT COUNT(*) AS count
-          FROM agent_connector_configs
-          WHERE workspace_id = ?
-            AND status = 'configured'
-        `,
-      )
-      .get(workspaceId) as { count: number };
     const assignedModels = agentRows.filter((row) => row.model_label.trim().length > 0).length;
+    const effectiveConfiguredConnectors = connectorSummary.filter(
+      (row) => resolveConnectorStatus(row.connector_key, row.status) === "configured",
+    ).length;
 
     return {
       supervisor: supervisor
@@ -551,7 +555,7 @@ export const createAgentReadService = (
         activeAgents: String(activeCount),
         pausedAgents: String(pausedCount),
         recentRuns: String(loadRuns(db, 12).length),
-        connectorsConfigured: String(configuredConnectors.count),
+        connectorsConfigured: String(effectiveConfiguredConnectors),
         modelsAssigned: String(assignedModels),
       },
       modelSummary,
@@ -559,9 +563,22 @@ export const createAgentReadService = (
         id: row.id,
         connectorKey: row.connector_key,
         label: row.display_name,
-        status: row.status,
+        status: resolveConnectorStatus(row.connector_key, row.status),
         capability: row.capability_summary,
         notes: row.notes,
+        operationalMode: row.connector_key === "telegram" ? "dm_first" : "future",
+        hasStoredSecret: secretStore?.hasConnectorSecret?.(workspaceId, row.connector_key) ?? false,
+        botUsername: null,
+        linkedAccounts: 0,
+        activeLinks: 0,
+        activeChannels: 0,
+        inboundMessages: 0,
+        pendingDeliveries: 0,
+        deliverySummary: row.connector_key === "telegram" ? "DM-first bridge staged." : "Connector shell staged for future activation.",
+        lastErrorSummary: "",
+        lastTestedAtLabel: "Never tested",
+        lastInboundAtLabel: "No inbound yet",
+        lastOutboundAtLabel: "No outbound yet",
       })),
     };
   },
@@ -646,7 +663,78 @@ export const createAgentReadService = (
     const rows = db
       .prepare(
         `
-          SELECT id, connector_key, display_name, status, capability_summary, COALESCE(notes, '') AS notes
+          SELECT
+            agent_connector_configs.id,
+            agent_connector_configs.connector_key,
+            agent_connector_configs.display_name,
+            agent_connector_configs.status,
+            agent_connector_configs.capability_summary,
+            COALESCE(agent_connector_configs.notes, '') AS notes,
+            COALESCE(agent_connector_configs.bot_username, '') AS bot_username,
+            COALESCE(agent_connector_configs.last_tested_at, '') AS last_tested_at,
+            COALESCE(agent_connector_configs.last_error_summary, '') AS last_error_summary,
+            COALESCE(
+              (
+                SELECT COUNT(*)
+                FROM connector_accounts
+                WHERE connector_accounts.workspace_id = agent_connector_configs.workspace_id
+                  AND connector_accounts.connector_key = agent_connector_configs.connector_key
+              ),
+              0
+            ) AS linked_accounts,
+            COALESCE(
+              (
+                SELECT COUNT(*)
+                FROM connector_accounts
+                WHERE connector_accounts.workspace_id = agent_connector_configs.workspace_id
+                  AND connector_accounts.connector_key = agent_connector_configs.connector_key
+                  AND connector_accounts.link_status = 'linked'
+              ),
+              0
+            ) AS active_links,
+            COALESCE(
+              (
+                SELECT COUNT(*)
+                FROM connector_channels
+                WHERE connector_channels.workspace_id = agent_connector_configs.workspace_id
+                  AND connector_channels.connector_key = agent_connector_configs.connector_key
+                  AND connector_channels.status = 'active'
+              ),
+              0
+            ) AS active_channels,
+            COALESCE(
+              (
+                SELECT COUNT(*)
+                FROM connector_message_receipts
+                WHERE connector_message_receipts.workspace_id = agent_connector_configs.workspace_id
+                  AND connector_message_receipts.connector_key = agent_connector_configs.connector_key
+                  AND connector_message_receipts.direction = 'inbound'
+              ),
+              0
+            ) AS inbound_messages,
+            COALESCE(
+              (
+                SELECT COUNT(*)
+                FROM connector_message_receipts
+                WHERE connector_message_receipts.workspace_id = agent_connector_configs.workspace_id
+                  AND connector_message_receipts.connector_key = agent_connector_configs.connector_key
+                  AND connector_message_receipts.direction = 'outbound'
+                  AND connector_message_receipts.status IN ('pending_delivery', 'delivery_failed')
+              ),
+              0
+            ) AS pending_deliveries,
+            (
+              SELECT MAX(last_inbound_at)
+              FROM connector_channels
+              WHERE connector_channels.workspace_id = agent_connector_configs.workspace_id
+                AND connector_channels.connector_key = agent_connector_configs.connector_key
+            ) AS last_inbound_at,
+            (
+              SELECT MAX(last_outbound_at)
+              FROM connector_channels
+              WHERE connector_channels.workspace_id = agent_connector_configs.workspace_id
+                AND connector_channels.connector_key = agent_connector_configs.connector_key
+            ) AS last_outbound_at
           FROM agent_connector_configs
           WHERE workspace_id = ?
           ORDER BY display_name COLLATE NOCASE ASC
@@ -659,15 +747,41 @@ export const createAgentReadService = (
       status: AgentConnectorRow["status"];
       capability_summary: string;
       notes: string;
+      bot_username: string;
+      last_tested_at: string;
+      last_error_summary: string;
+      linked_accounts: number;
+      active_links: number;
+      active_channels: number;
+      inbound_messages: number;
+      pending_deliveries: number;
+      last_inbound_at: string | null;
+      last_outbound_at: string | null;
     }>;
 
     return rows.map((row) => ({
+      status: resolveConnectorStatus(row.connector_key, row.status),
       id: row.id,
       connectorKey: row.connector_key,
       label: row.display_name,
-      status: row.status,
       capability: row.capability_summary,
       notes: row.notes,
+      operationalMode: row.connector_key === "telegram" ? "dm_first" : "future",
+      hasStoredSecret: secretStore?.hasConnectorSecret?.(workspaceId, row.connector_key) ?? false,
+      botUsername: row.bot_username || null,
+      linkedAccounts: row.linked_accounts,
+      activeLinks: row.active_links,
+      activeChannels: row.active_channels,
+      inboundMessages: row.inbound_messages,
+      pendingDeliveries: row.pending_deliveries,
+      deliverySummary:
+        row.connector_key === "telegram"
+          ? `${row.active_links} linked identities, ${row.pending_deliveries} deliveries pending.`
+          : "Connector shell staged for future activation.",
+      lastErrorSummary: row.last_error_summary,
+      lastTestedAtLabel: formatOptionalTimestampLabel(row.last_tested_at || null),
+      lastInboundAtLabel: row.last_inbound_at ? formatTimestampLabel(row.last_inbound_at) : "No inbound yet",
+      lastOutboundAtLabel: row.last_outbound_at ? formatTimestampLabel(row.last_outbound_at) : "No outbound yet",
     }));
   },
 });

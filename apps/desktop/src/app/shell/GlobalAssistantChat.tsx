@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
 import { ArrowUp, Bot, ChevronDown, Ellipsis, PanelLeftClose, PanelLeftOpen, Paperclip, Plus, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AssistantChatSession, AssistantChatSessionState } from "@app/providers/AssistantChatContext";
@@ -38,6 +47,7 @@ type OptimisticTurn = {
     id: string;
     role: "user";
     body: string;
+    source: null;
   };
   state: AssistantChatSessionState;
 };
@@ -99,6 +109,119 @@ const buildUserBubbleMessage = (body: string, attachments: AssistantGatewayAttac
 
   const summary = formatAttachmentSummary(attachments.length);
   return trimmedBody ? `${trimmedBody}\n\n${summary}` : summary;
+};
+
+const inlineMarkdownTokenPattern = /(\*\*\*[^*\n][\s\S]*?\*\*\*|\*\*[^*\n][\s\S]*?\*\*|__[^_\n][\s\S]*?__|`[^`\n][\s\S]*?`|\*[^*\n][\s\S]*?\*)/g;
+
+const renderInlineMarkdown = (text: string, keyPrefix: string): ReactNode[] => {
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  let matchIndex = 0;
+
+  for (const match of text.matchAll(inlineMarkdownTokenPattern)) {
+    const token = match[0];
+    const start = match.index ?? 0;
+
+    if (start > cursor) {
+      nodes.push(text.slice(cursor, start));
+    }
+
+    const key = `${keyPrefix}-${matchIndex.toString(36)}`;
+
+    if (token.startsWith("***") && token.endsWith("***")) {
+      const value = token.slice(3, -3).trim();
+      nodes.push(
+        <strong key={key}>
+          <em>{value}</em>
+        </strong>,
+      );
+    } else if ((token.startsWith("**") && token.endsWith("**")) || (token.startsWith("__") && token.endsWith("__"))) {
+      nodes.push(<strong key={key}>{token.slice(2, -2).trim()}</strong>);
+    } else if (token.startsWith("*") && token.endsWith("*")) {
+      nodes.push(<em key={key}>{token.slice(1, -1).trim()}</em>);
+    } else if (token.startsWith("`") && token.endsWith("`")) {
+      nodes.push(<code key={key}>{token.slice(1, -1)}</code>);
+    } else {
+      nodes.push(token);
+    }
+
+    cursor = start + token.length;
+    matchIndex += 1;
+  }
+
+  if (cursor < text.length) {
+    nodes.push(text.slice(cursor));
+  }
+
+  return nodes.length ? nodes : [text];
+};
+
+const renderParagraphBody = (value: string, keyPrefix: string) =>
+  value.split("\n").map((line, index, lines) => (
+    <Fragment key={`${keyPrefix}-line-${index.toString(36)}`}>
+      {renderInlineMarkdown(line, `${keyPrefix}-inline-${index.toString(36)}`)}
+      {index < lines.length - 1 ? <br /> : null}
+    </Fragment>
+  ));
+
+const renderMessageMarkdown = (body: string) => {
+  const normalized = body.replace(/\r\n/g, "\n").trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const blocks = normalized.split(/\n{2,}/).filter((block) => block.trim().length > 0);
+
+  return blocks.map((block, blockIndex) => {
+    const trimmedBlock = block.trim();
+    const headingMatch = trimmedBlock.match(/^(#{1,6})\s+(.+)$/s);
+
+    if (headingMatch) {
+      return (
+        <div
+          key={`markdown-heading-${blockIndex.toString(36)}`}
+          className={`assistant-chat-markdown-heading assistant-chat-markdown-heading-${headingMatch[1].length}`}
+        >
+          {renderInlineMarkdown(headingMatch[2].trim(), `heading-${blockIndex.toString(36)}`)}
+        </div>
+      );
+    }
+
+    const lines = trimmedBlock.split("\n");
+    const orderedList = lines.every((line) => /^\d+\.\s+/.test(line.trim()));
+    const unorderedList = lines.every((line) => /^[-*]\s+/.test(line.trim()));
+
+    if (orderedList) {
+      return (
+        <ol key={`markdown-ordered-${blockIndex.toString(36)}`} className="assistant-chat-markdown-list assistant-chat-markdown-list-ordered">
+          {lines.map((line, itemIndex) => (
+            <li key={`ordered-${blockIndex.toString(36)}-${itemIndex.toString(36)}`}>
+              {renderInlineMarkdown(line.trim().replace(/^\d+\.\s+/, ""), `ordered-${blockIndex.toString(36)}-${itemIndex.toString(36)}`)}
+            </li>
+          ))}
+        </ol>
+      );
+    }
+
+    if (unorderedList) {
+      return (
+        <ul key={`markdown-unordered-${blockIndex.toString(36)}`} className="assistant-chat-markdown-list assistant-chat-markdown-list-unordered">
+          {lines.map((line, itemIndex) => (
+            <li key={`unordered-${blockIndex.toString(36)}-${itemIndex.toString(36)}`}>
+              {renderInlineMarkdown(line.trim().replace(/^[-*]\s+/, ""), `unordered-${blockIndex.toString(36)}-${itemIndex.toString(36)}`)}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    return (
+      <p key={`markdown-paragraph-${blockIndex.toString(36)}`} className="assistant-chat-markdown-paragraph">
+        {renderParagraphBody(trimmedBlock, `paragraph-${blockIndex.toString(36)}`)}
+      </p>
+    );
+  });
 };
 
 const readFileAsDataUrl = (file: File) =>
@@ -208,6 +331,7 @@ const buildOptimisticSession = (
   if (optimisticAssistantMessage && optimisticAssistantMessage.threadId === session.id) {
     nextMessages.push({
       ...optimisticAssistantMessage.message,
+      source: null,
       attachments: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -455,6 +579,7 @@ export const GlobalAssistantChat = () => {
         id: `assistant-optimistic-user-${Date.now().toString(36)}`,
         role: "user",
         body: outgoingUserMessage,
+        source: null,
       },
       state: pendingState,
     });
@@ -759,9 +884,22 @@ export const GlobalAssistantChat = () => {
             <div className="assistant-chat-thread">
               {resolvedActiveSession.messages.map((entry) => {
                 if (entry.role === "user") {
+                  const sourceMeta = [entry.source?.actorRole, entry.source?.channelLabel].filter(Boolean).join(" · ");
                   return (
                     <div key={entry.id} className="assistant-chat-message-block assistant-chat-message-block-user">
-                      <div className="assistant-chat-bubble assistant-chat-bubble-user">{entry.body}</div>
+                      {entry.source ? (
+                        <div className="assistant-chat-message-meta assistant-chat-message-meta-user">
+                          <div className="assistant-chat-speaker-meta">
+                            <span className="assistant-chat-speaker-pill assistant-chat-speaker-pill-external">
+                              {entry.source.actorName}
+                            </span>
+                            {sourceMeta ? <span className="assistant-chat-speaker-role">{sourceMeta}</span> : null}
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="assistant-chat-bubble assistant-chat-bubble-user">
+                        <div className="assistant-chat-bubble-content">{renderMessageMarkdown(entry.body)}</div>
+                      </div>
                     </div>
                   );
                 }
@@ -804,7 +942,9 @@ export const GlobalAssistantChat = () => {
                       ) : null}
                     </div>
 
-                    <div className="assistant-chat-bubble assistant-chat-bubble-assistant">{entry.body}</div>
+                    <div className="assistant-chat-bubble assistant-chat-bubble-assistant">
+                      <div className="assistant-chat-bubble-content">{renderMessageMarkdown(entry.body)}</div>
+                    </div>
 
                     {needsApproval && messageState?.draftRunId ? (
                       <div className="assistant-chat-approval-card">

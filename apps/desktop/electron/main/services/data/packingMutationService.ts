@@ -7,8 +7,7 @@ import type {
   ReturnPackingSlipItemsResult,
 } from "@contracts";
 import { assertProjectUnitSupportsOperationalFlow } from "./projectScheduling";
-
-const defaultActorUserId = "user-ops";
+import { resolveAuthorizedActor } from "./mutationAuthorization";
 
 type PackingAssetRow = {
   asset_id: string;
@@ -307,6 +306,12 @@ const deriveCustodyStatus = (
 
 export const createPackingMutationService = (db: DatabaseSync) => ({
   createPackingSlip(input: CreatePackingSlipCommand): CreatePackingSlipResult {
+    const actor = resolveAuthorizedActor(db, {
+      workspaceId: input.workspaceId,
+      actorUserId: input.actorUserId,
+      requiredPermission: "packing-slips.create",
+      actionLabel: "create packing slips",
+    });
     const normalizedSelections = (input.assetSelections ?? [])
       .map((selection) => ({
         assetId: selection.assetId?.trim(),
@@ -339,7 +344,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       insertReceipt.run(
         input.commandId,
         input.workspaceId,
-        defaultActorUserId,
+        actor.actorUserId,
         input.actorType,
         input.sourceChannel,
         new Date().toISOString(),
@@ -387,7 +392,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
     const projectEntityMap = loadProjectEntities(db, uniqueValues([input.projectId]));
     const departmentMap = loadNamedEntities(db, "departments", uniqueValues([input.departmentId]));
     const projectUnitMap = loadProjectUnitEntities(db, uniqueValues([input.projectUnitId]));
-    const userMap = loadUserEntities(db, uniqueValues([input.responsibleUserId, defaultActorUserId]));
+    const userMap = loadUserEntities(db, uniqueValues([input.responsibleUserId, actor.actorUserId]));
 
     if (input.projectId && !projectMap.has(input.projectId)) {
       fail("Project not found.");
@@ -401,7 +406,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       fail("Responsible user not found.");
     }
 
-    if (!userMap.has(defaultActorUserId)) {
+    if (!userMap.has(actor.actorUserId)) {
       fail("Actor user not found.");
     }
 
@@ -566,7 +571,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
         input.projectId,
         explicitProjectUnit?.id ?? null,
         nextDepartmentId,
-        defaultActorUserId,
+        actor.actorUserId,
         nextResponsibleUserId,
         now,
         nextReturnDueAt,
@@ -807,7 +812,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
             departmentId,
             projectUnitId,
             responsibleUserId,
-            defaultActorUserId,
+            actor.actorUserId,
             row.current_location_id,
             nextLocationId,
             requestedQuantity,
@@ -826,7 +831,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           assignmentId,
           input.projectId,
           departmentId,
-          defaultActorUserId,
+          actor.actorUserId,
           nextLocationId,
           row.current_location_id,
           nextLocationId,
@@ -883,7 +888,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       insertReceipt.run(
         input.commandId,
         input.workspaceId,
-        defaultActorUserId,
+        actor.actorUserId,
         input.actorType,
         input.sourceChannel,
         now,
@@ -907,7 +912,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       insertReceipt.run(
         input.commandId,
         input.workspaceId,
-        defaultActorUserId,
+        actor.actorUserId,
         input.actorType,
         input.sourceChannel,
         now,
@@ -920,6 +925,12 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
   },
 
   returnPackingSlipItems(input: ReturnPackingSlipItemsCommand): ReturnPackingSlipItemsResult {
+    const actor = resolveAuthorizedActor(db, {
+      workspaceId: input.workspaceId,
+      actorUserId: input.actorUserId,
+      requiredPermission: "packing-slips.create",
+      actionLabel: "return packing slip items",
+    });
     const selectedAssetIds = uniqueValues(input.assetIds ?? []);
     const insertReceipt = db.prepare(
       `
@@ -940,7 +951,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       insertReceipt.run(
         input.commandId,
         input.workspaceId,
-        defaultActorUserId,
+        actor.actorUserId,
         input.actorType,
         input.sourceChannel,
         new Date().toISOString(),
@@ -989,8 +1000,8 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
 
     const resolvedSlip = slip ?? fail("Packing slip not found in the local registry.");
 
-    const actorUserMap = loadUserEntities(db, [defaultActorUserId]);
-    if (!actorUserMap.has(defaultActorUserId)) {
+    const actorUserMap = loadUserEntities(db, [actor.actorUserId]);
+    if (!actorUserMap.has(actor.actorUserId)) {
       fail("Actor user not found.");
     }
 
@@ -1216,7 +1227,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
           row.active_assignment_id,
           resolvedSlip.project_id,
           resolvedSlip.department_id,
-          defaultActorUserId,
+          actor.actorUserId,
           nextLocationId,
           row.current_location_id,
           nextLocationId,
@@ -1285,7 +1296,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       insertReceipt.run(
         input.commandId,
         input.workspaceId,
-        defaultActorUserId,
+        actor.actorUserId,
         input.actorType,
         input.sourceChannel,
         now,
@@ -1309,7 +1320,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       insertReceipt.run(
         input.commandId,
         input.workspaceId,
-        defaultActorUserId,
+        actor.actorUserId,
         input.actorType,
         input.sourceChannel,
         now,

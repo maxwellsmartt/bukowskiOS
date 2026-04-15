@@ -4,6 +4,7 @@ import { createCatalogMutationService } from "../../electron/main/services/data/
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createPackingMutationService } from "../../electron/main/services/data/packingMutationService";
 import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
+import { createUserAdminService } from "../../electron/main/services/data/userAdminService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("packing mutation service", () => {
@@ -120,6 +121,33 @@ describe("packing mutation service", () => {
 
     expect(failedReceipt?.outcome_status).toBe("failed");
     expect(failedReceipt?.error_message).toContain("cancelled");
+
+    cleanup();
+  });
+
+  it("blocks packing issue when the actor lacks packing permissions", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-packing-permission-test");
+    const packingMutations = createPackingMutationService(database);
+    const userAdmin = createUserAdminService(database);
+
+    const financeUser = userAdmin.createUser({
+      workspaceId: "workspace-metadata",
+      fullName: "Finance Only",
+      roleId: "role-finance-viewer",
+      email: "finance.packing@metadata.cine",
+    });
+
+    expect(() =>
+      packingMutations.createPackingSlip({
+        commandId: "cmd-test-packing-blocked",
+        workspaceId: "workspace-metadata",
+        actorUserId: financeUser.userId ?? "",
+        assetIds: ["asset-smallhd-cine7"],
+        projectId: "project-aurora",
+        actorType: "user",
+        sourceChannel: "telegram",
+      }),
+    ).toThrow("does not have permission");
 
     cleanup();
   });

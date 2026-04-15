@@ -25,6 +25,9 @@ import type {
 import type { CatalogSnapshot, ProjectCardRow, ProjectDetailSnapshot } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { useEffect, useState } from "react";
+
+const catalogRefreshEvent = "bukowski:catalog-changed";
 
 const emptyProjects: ProjectCardRow[] = [];
 
@@ -81,6 +84,27 @@ const defaultCatalogListQuery: CatalogListQuery = {
   sortDirection: "asc",
 };
 
+const useCatalogRefreshVersion = () => {
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      setVersion((current) => current + 1);
+    };
+
+    window.addEventListener(catalogRefreshEvent, handleRefresh);
+    return () => {
+      window.removeEventListener(catalogRefreshEvent, handleRefresh);
+    };
+  }, []);
+
+  return version;
+};
+
+export const notifyCatalogChanged = () => {
+  window.dispatchEvent(new Event(catalogRefreshEvent));
+};
+
 export const useProjectsRegistry = (query: ProjectListQuery = defaultProjectListQuery) =>
   useAsyncValue(
     async () => {
@@ -94,8 +118,10 @@ export const useProjectsRegistry = (query: ProjectListQuery = defaultProjectList
     [query.includeArchived, query.search, query.sortBy, query.sortDirection],
   );
 
-export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery) =>
-  useAsyncValue(
+export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery) => {
+  const refreshVersion = useCatalogRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiProjects) {
         if (window.bukowskiCatalog) {
@@ -108,8 +134,9 @@ export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery
       return window.bukowskiCatalog ? window.bukowskiCatalog.getSnapshot(query) : window.bukowskiProjects.getCatalog();
     },
     emptyCatalog,
-    [query.entityType, query.search, query.sortBy, query.sortDirection],
+    [query.entityType, query.search, query.sortBy, query.sortDirection, refreshVersion],
   );
+};
 
 export const useProjectDetail = (projectId: string | null) =>
   useAsyncValue(

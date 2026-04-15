@@ -10,24 +10,28 @@ import type {
   AgentModelRow,
   AgentModelsSnapshot,
   AgentMutationResult,
+  ConnectorMutationResult,
   AgentRunReviewResult,
   AgentRosterRow,
   AgentRunRow,
   AssignAgentModelCommand,
   CreateAgentCommand,
   CreateAssistantThreadCommand,
+  CreateConnectorLinkTokenCommand,
   CreateDraftRunFromChatCommand,
   DeleteAssistantThreadCommand,
   DraftRunFromChatResult,
   MissionControlSnapshot,
   ReviewAgentRunCommand,
   SaveAIProviderConfigCommand,
+  SaveConnectorConfigCommand,
   SendAssistantChatTurnCommand,
   SetActiveAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
   SetAgentApprovalModeCommand,
   SetAgentStatusCommand,
   TestAIProviderConnectionCommand,
+  TestConnectorConnectionCommand,
   UpdateAgentCommand,
 } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
@@ -259,6 +263,40 @@ export const testAIProviderConnection = async (
   }
 
   const result = await window.bukowskiAgents.testAIProviderConnection(input);
+  notifyAgentsChanged();
+  return result;
+};
+
+export const saveConnectorConfig = async (input: SaveConnectorConfigCommand): Promise<ConnectorMutationResult> => {
+  if (!window.bukowskiAgents) {
+    throw new Error("Agents bridge unavailable");
+  }
+
+  const result = await window.bukowskiAgents.saveConnectorConfig(input);
+  notifyAgentsChanged();
+  return result;
+};
+
+export const testConnectorConnection = async (
+  input: TestConnectorConnectionCommand,
+): Promise<ConnectorMutationResult> => {
+  if (!window.bukowskiAgents) {
+    throw new Error("Agents bridge unavailable");
+  }
+
+  const result = await window.bukowskiAgents.testConnectorConnection(input);
+  notifyAgentsChanged();
+  return result;
+};
+
+export const createConnectorLinkToken = async (
+  input: CreateConnectorLinkTokenCommand,
+): Promise<ConnectorMutationResult> => {
+  if (!window.bukowskiAgents) {
+    throw new Error("Agents bridge unavailable");
+  }
+
+  const result = await window.bukowskiAgents.createConnectorLinkToken(input);
   notifyAgentsChanged();
   return result;
 };

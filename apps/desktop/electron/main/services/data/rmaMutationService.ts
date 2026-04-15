@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { CreateRmaCaseCommand, RmaCaseAssetInput, RmaCaseMutationResult, UpdateRmaCaseCommand } from "@contracts";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { resolveAuthorizedActor } from "./mutationAuthorization";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
 
@@ -129,6 +130,12 @@ const replaceCaseAssets = (db: DatabaseSync, rmaCaseId: string, assetItems: Retu
 
 export const createRmaMutationService = (db: DatabaseSync) => ({
   createRmaCase(input: CreateRmaCaseCommand): RmaCaseMutationResult {
+    const actor = resolveAuthorizedActor(db, {
+      workspaceId: input.workspaceId,
+      actorUserId: input.actorUserId,
+      requiredPermission: "rma.create",
+      actionLabel: "create RMAs",
+    });
     const now = new Date().toISOString();
     const assetItems = uniqueAssetItems(input.assetItems);
     const manufacturer = loadManufacturer(db, ensureValue(input.manufacturerId, "Manufacturer"));
@@ -163,9 +170,9 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
             sent_at,
             closed_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'Draft', 'user-ops', ?, ?, NULL, NULL)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'Draft', ?, ?, ?, NULL, NULL)
         `,
-      ).run(rmaCaseId, workspaceId, manufacturer.id, title, supportEmail, problemSummary, optionalValue(input.notes), now, now);
+      ).run(rmaCaseId, workspaceId, manufacturer.id, title, supportEmail, problemSummary, optionalValue(input.notes), actor.actorUserId, now, now);
 
       replaceCaseAssets(db, rmaCaseId, assetItems, now);
 
@@ -181,6 +188,12 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
   },
 
   updateRmaCase(input: UpdateRmaCaseCommand): RmaCaseMutationResult {
+    resolveAuthorizedActor(db, {
+      workspaceId: input.workspaceId,
+      actorUserId: input.actorUserId,
+      requiredPermission: "rma.create",
+      actionLabel: "update RMAs",
+    });
     const now = new Date().toISOString();
     const assetItems = uniqueAssetItems(input.assetItems);
     const manufacturer = loadManufacturer(db, ensureValue(input.manufacturerId, "Manufacturer"));

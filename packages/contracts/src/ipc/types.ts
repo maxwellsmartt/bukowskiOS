@@ -6,6 +6,50 @@ export type AppInfo = {
   shellVersion: string;
 };
 
+export type AppUserRoleRow = {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  isSystemRole: boolean;
+  permissionKeys: string[];
+  assignedUserCount: number;
+};
+
+export type AppUserAdminRow = {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  isActive: boolean;
+  membershipStatus: "active" | "inactive" | "missing";
+  roleId: string | null;
+  roleKey: string | null;
+  roleName: string | null;
+  permissionKeys: string[];
+  linkedCrewId: string | null;
+  linkedCrewLabel: string | null;
+  telegramAccountId: string | null;
+  telegramLinkStatus: "linked" | "pending" | "revoked" | "none";
+  telegramDisplayName: string | null;
+  telegramUsername: string | null;
+  telegramExternalUserId: string | null;
+  telegramLinkedAt: string | null;
+  telegramLastSeenAt: string | null;
+  readyForTelegram: boolean;
+};
+
+export type AppUsersSnapshot = {
+  users: AppUserAdminRow[];
+  roles: AppUserRoleRow[];
+};
+
+export type AppUserMutationResult = {
+  summary: string;
+  snapshot: AppUsersSnapshot;
+  userId: string | null;
+};
+
 export type AppDiagnosticsSnapshot = {
   databaseSizeBytes: number;
   backupSizeBytes: number;

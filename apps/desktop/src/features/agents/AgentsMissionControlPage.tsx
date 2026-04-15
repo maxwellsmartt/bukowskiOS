@@ -204,7 +204,6 @@ export const AgentsMissionControlPage = () => {
         <SurfaceCard
           className="agents-graph-card"
           title="Mission graph"
-          subtitle="Supervisor arriba, especialistas abajo."
         >
           <div className="mission-graph">
             {data.supervisor ? (
@@ -235,9 +234,6 @@ export const AgentsMissionControlPage = () => {
                     </div>
                     <span className="mission-node-role mission-node-role-clamped">{data.supervisor.role}</span>
                     <div className="mission-node-footer">
-                      <span className={`mission-operational-pill mission-operational-pill-${data.supervisor.operationalState}`}>
-                        {operationalStateLabelMap[data.supervisor.operationalState]}
-                      </span>
                       <span className="subtle-pill mission-node-model-pill" title={data.supervisor.modelLabel}>
                         {providerBrand.logoSrc ? (
                           <img
@@ -248,9 +244,14 @@ export const AgentsMissionControlPage = () => {
                         ) : null}
                         <span>{data.supervisor.modelLabel}</span>
                       </span>
-                      <span className={`mission-node-status mission-node-status-${data.supervisor.status}`}>
-                        {statusLabelMap[data.supervisor.status]}
-                      </span>
+                      <div className="mission-node-footer-status-row">
+                        <span className={`mission-operational-pill mission-operational-pill-${data.supervisor.operationalState}`}>
+                          {operationalStateLabelMap[data.supervisor.operationalState]}
+                        </span>
+                        <span className={`mission-node-status mission-node-status-${data.supervisor.status}`}>
+                          {statusLabelMap[data.supervisor.status]}
+                        </span>
+                      </div>
                     </div>
                   </button>
                 );
@@ -290,9 +291,6 @@ export const AgentsMissionControlPage = () => {
                         </div>
                         <span className="mission-node-role mission-node-role-clamped">{agent.role}</span>
                         <div className="mission-node-footer">
-                          <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
-                            {operationalStateLabelMap[agent.operationalState]}
-                          </span>
                           <span className="subtle-pill mission-node-model-pill" title={agent.modelLabel}>
                             {providerBrand.logoSrc ? (
                               <img
@@ -303,9 +301,14 @@ export const AgentsMissionControlPage = () => {
                             ) : null}
                             <span>{agent.modelLabel}</span>
                           </span>
-                          <span className={`mission-node-status mission-node-status-${agent.status}`}>
-                            {statusLabelMap[agent.status]}
-                          </span>
+                          <div className="mission-node-footer-status-row">
+                            <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
+                              {operationalStateLabelMap[agent.operationalState]}
+                            </span>
+                            <span className={`mission-node-status mission-node-status-${agent.status}`}>
+                              {statusLabelMap[agent.status]}
+                            </span>
+                          </div>
                         </div>
                       </button>
                     </div>

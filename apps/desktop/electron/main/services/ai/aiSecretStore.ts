@@ -27,8 +27,23 @@ const saveManifest = (manifest: SecretManifest) => {
 };
 
 const createSecretKey = (workspaceId: string, providerKey: string) => `${workspaceId}:${providerKey}`;
+const createConnectorSecretKey = (workspaceId: string, connectorKey: string) => `${workspaceId}:connector:${connectorKey}`;
 
-export const createAISecretStore = () => ({
+export type AISecretStore = {
+  hasProviderSecret: (workspaceId: string, providerKey: string) => boolean;
+  getProviderSecret: (workspaceId: string, providerKey: string) => string | null;
+  setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => void;
+  clearProviderSecret: (workspaceId: string, providerKey: string) => void;
+};
+
+export type ConnectorSecretStore = AISecretStore & {
+  hasConnectorSecret: (workspaceId: string, connectorKey: string) => boolean;
+  getConnectorSecret: (workspaceId: string, connectorKey: string) => string | null;
+  setConnectorSecret: (workspaceId: string, connectorKey: string, secret: string) => void;
+  clearConnectorSecret: (workspaceId: string, connectorKey: string) => void;
+};
+
+export const createAISecretStore = (): ConnectorSecretStore => ({
   hasProviderSecret(workspaceId: string, providerKey: string) {
     if (!safeStorage.isEncryptionAvailable()) {
       return false;
@@ -74,6 +89,50 @@ export const createAISecretStore = () => ({
     delete manifest[createSecretKey(workspaceId, providerKey)];
     saveManifest(manifest);
   },
-});
 
-export type AISecretStore = ReturnType<typeof createAISecretStore>;
+  hasConnectorSecret(workspaceId: string, connectorKey: string) {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return false;
+    }
+
+    const manifest = loadManifest();
+    return Boolean(manifest[createConnectorSecretKey(workspaceId, connectorKey)]);
+  },
+
+  getConnectorSecret(workspaceId: string, connectorKey: string) {
+    const manifest = loadManifest();
+    const encodedSecret = manifest[createConnectorSecretKey(workspaceId, connectorKey)];
+
+    if (!encodedSecret) {
+      return null;
+    }
+
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error("Secure local encryption is unavailable on this device.");
+    }
+
+    return safeStorage.decryptString(Buffer.from(encodedSecret, "base64"));
+  },
+
+  setConnectorSecret(workspaceId: string, connectorKey: string, secret: string) {
+    const nextSecret = secret.trim();
+
+    if (!nextSecret) {
+      throw new Error("Connector secret is required.");
+    }
+
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error("Secure local encryption is unavailable on this device.");
+    }
+
+    const manifest = loadManifest();
+    manifest[createConnectorSecretKey(workspaceId, connectorKey)] = safeStorage.encryptString(nextSecret).toString("base64");
+    saveManifest(manifest);
+  },
+
+  clearConnectorSecret(workspaceId: string, connectorKey: string) {
+    const manifest = loadManifest();
+    delete manifest[createConnectorSecretKey(workspaceId, connectorKey)];
+    saveManifest(manifest);
+  },
+});

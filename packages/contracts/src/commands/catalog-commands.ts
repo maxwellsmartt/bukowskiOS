@@ -32,6 +32,7 @@ export type CreateCatalogCrewInput = {
   entityType: "crew";
   fullName: string;
   primaryDepartmentId?: string;
+  linkedUserId?: string;
   documentId?: string;
   roleLabel?: string;
   email?: string;
@@ -199,4 +200,34 @@ export type ImportCatalogCsvInput = PreviewCatalogCsvImportInput;
 
 export type CatalogCsvImportResult = CatalogCsvImportPreview & {
   summary: string;
+};
+
+export type CreateAppUserCommand = {
+  workspaceId: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  roleId: string;
+  linkedCrewMemberId?: string;
+};
+
+export type UpdateAppUserCommand = {
+  workspaceId: string;
+  userId: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  roleId: string;
+  linkedCrewMemberId?: string;
+};
+
+export type SetAppUserActiveCommand = {
+  workspaceId: string;
+  userId: string;
+  isActive: boolean;
+};
+
+export type RevokeTelegramLinkCommand = {
+  workspaceId: string;
+  userId: string;
 };

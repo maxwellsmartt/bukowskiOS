@@ -20,6 +20,7 @@ export type AssignAssetCommand = {
 export type ReportIncidentCommand = {
   commandId: string;
   workspaceId: string;
+  actorUserId?: string;
   assetId?: string;
   assignmentId?: string;
   projectId?: string;
@@ -48,6 +49,7 @@ export type ReportIncidentResult = {
 export type UpdateIncidentCommand = {
   commandId: string;
   workspaceId: string;
+  actorUserId?: string;
   incidentId: string;
   title?: string;
   description?: string;
@@ -64,6 +66,7 @@ export type UpdateIncidentCommand = {
 export type ResolveIncidentCommand = {
   commandId: string;
   workspaceId: string;
+  actorUserId?: string;
   incidentId: string;
   resolutionNotes?: string;
   costEstimate?: number;

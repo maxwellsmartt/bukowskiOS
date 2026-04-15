@@ -3,7 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
-import { emptyReadArgsSchema } from "@contracts";
+import {
+  createAppUserSchema,
+  emptyReadArgsSchema,
+  revokeTelegramLinkSchema,
+  setAppUserActiveSchema,
+  updateAppUserSchema,
+} from "@contracts";
 import { ipcChannels } from "@contracts/ipc/channels";
 import { assertAllowedExternalUrl, assertTrustedIpcSender, sanitizeIpcError } from "../security/securityConfig";
 import { safeHandleReadWithSchema } from "./ipcSafeHandler";
@@ -12,6 +18,11 @@ type RegisterAppIpcOptions = {
   database: DatabaseSync;
   getDiagnosticsSnapshot: () => import("@contracts").AppDiagnosticsSnapshot;
   getSupportSnapshot: () => import("@contracts").AppSupportSnapshot;
+  getUsersSnapshot: () => import("@contracts").AppUsersSnapshot;
+  createUser: (input: import("@contracts").CreateAppUserCommand) => import("@contracts").AppUserMutationResult;
+  updateUser: (input: import("@contracts").UpdateAppUserCommand) => import("@contracts").AppUserMutationResult;
+  setUserActive: (input: import("@contracts").SetAppUserActiveCommand) => import("@contracts").AppUserMutationResult;
+  revokeTelegramLink: (input: import("@contracts").RevokeTelegramLinkCommand) => import("@contracts").AppUserMutationResult;
   createBackupNow: () => import("@contracts").AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => import("@contracts").AppDiagnosticsSnapshot;
   runLocalSyncNow: () => import("@contracts").AppDiagnosticsSnapshot;
@@ -81,6 +92,11 @@ export const registerAppIpc = ({
   database,
   getDiagnosticsSnapshot,
   getSupportSnapshot,
+  getUsersSnapshot,
+  createUser,
+  updateUser,
+  setUserActive,
+  revokeTelegramLink,
   createBackupNow,
   runIntegrityCheckNow,
   runLocalSyncNow,
@@ -99,6 +115,43 @@ export const registerAppIpc = ({
   }));
   safeHandleReadWithSchema(ipcChannels.app.getDiagnostics, emptyReadArgsSchema, () => getDiagnosticsSnapshot());
   safeHandleReadWithSchema(ipcChannels.app.getSupportSnapshot, emptyReadArgsSchema, () => getSupportSnapshot());
+  safeHandleReadWithSchema(ipcChannels.app.getUsersSnapshot, emptyReadArgsSchema, () => getUsersSnapshot());
+  ipcMain.handle(ipcChannels.app.createUser, (event, input) => {
+    try {
+      assertTrustedIpcSender(event);
+      const parsed = createAppUserSchema.parse(input);
+      return createUser(parsed);
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not create that user.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.updateUser, (event, input) => {
+    try {
+      assertTrustedIpcSender(event);
+      const parsed = updateAppUserSchema.parse(input);
+      return updateUser(parsed);
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not update that user.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.setUserActive, (event, input) => {
+    try {
+      assertTrustedIpcSender(event);
+      const parsed = setAppUserActiveSchema.parse(input);
+      return setUserActive(parsed);
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not change that user state.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.revokeTelegramLink, (event, input) => {
+    try {
+      assertTrustedIpcSender(event);
+      const parsed = revokeTelegramLinkSchema.parse(input);
+      return revokeTelegramLink(parsed);
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not revoke Telegram access for that user.");
+    }
+  });
   ipcMain.handle(ipcChannels.app.createBackup, (event) => {
     try {
       assertTrustedIpcSender(event);

@@ -6,6 +6,71 @@ import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
 
+const operationalPermissions = [
+  ["perm-assets-read", "assets.read", "Read assets", "View asset registry and current state"],
+  ["perm-assets-manage", "assets.manage", "Manage assets", "Create movements and update assets"],
+  ["perm-incidents-read", "incidents.read", "Read incidents", "View incident queues and details"],
+  ["perm-incidents-create", "incidents.create", "Create incidents", "Report new incidents"],
+  ["perm-rma-read", "rma.read", "Read RMAs", "Review RMA queues and manufacturer cases"],
+  ["perm-rma-create", "rma.create", "Create RMAs", "Open or prepare new RMA cases"],
+  ["perm-packing-read", "packing-slips.read", "Read packing slips", "View packing slip detail and status"],
+  ["perm-packing-create", "packing-slips.create", "Create packing slips", "Issue new packing slips"],
+  ["perm-finance-read", "finance.read", "Read finance shell", "View finance exposure and entries"],
+] as const;
+
+const operationalRoles = [
+  ["role-admin", "admin", "Admin", "Full operational access", 1],
+  ["role-supervisor", "supervisor", "Supervisor", "Supervise operations and incidents", 0],
+  ["role-operations-supervisor", "operations_supervisor", "Operations Supervisor", "Coordinate incidents, RMAs and packing flows", 0],
+  ["role-vtr-operator", "vtr_operator", "VTR Operator", "Report set issues and work with VTR equipment context", 0],
+  ["role-logistics-operator", "logistics_operator", "Logistics Operator", "Handle packing flows and asset dispatch", 0],
+  ["role-maintenance-operator", "maintenance_operator", "Maintenance Operator", "Handle incidents, repairs and RMAs", 0],
+  ["role-finance-viewer", "finance_viewer", "Finance Viewer", "Review finance status without edit privileges", 0],
+] as const;
+
+const operationalRolePermissions = [
+  ["role-admin", "perm-assets-read"],
+  ["role-admin", "perm-assets-manage"],
+  ["role-admin", "perm-incidents-read"],
+  ["role-admin", "perm-incidents-create"],
+  ["role-admin", "perm-rma-read"],
+  ["role-admin", "perm-rma-create"],
+  ["role-admin", "perm-packing-read"],
+  ["role-admin", "perm-packing-create"],
+  ["role-admin", "perm-finance-read"],
+  ["role-supervisor", "perm-assets-read"],
+  ["role-supervisor", "perm-incidents-read"],
+  ["role-supervisor", "perm-incidents-create"],
+  ["role-supervisor", "perm-rma-read"],
+  ["role-supervisor", "perm-rma-create"],
+  ["role-supervisor", "perm-packing-read"],
+  ["role-supervisor", "perm-packing-create"],
+  ["role-supervisor", "perm-finance-read"],
+  ["role-operations-supervisor", "perm-assets-read"],
+  ["role-operations-supervisor", "perm-assets-manage"],
+  ["role-operations-supervisor", "perm-incidents-read"],
+  ["role-operations-supervisor", "perm-incidents-create"],
+  ["role-operations-supervisor", "perm-rma-read"],
+  ["role-operations-supervisor", "perm-rma-create"],
+  ["role-operations-supervisor", "perm-packing-read"],
+  ["role-operations-supervisor", "perm-packing-create"],
+  ["role-vtr-operator", "perm-assets-read"],
+  ["role-vtr-operator", "perm-incidents-read"],
+  ["role-vtr-operator", "perm-incidents-create"],
+  ["role-vtr-operator", "perm-rma-read"],
+  ["role-vtr-operator", "perm-rma-create"],
+  ["role-logistics-operator", "perm-assets-read"],
+  ["role-logistics-operator", "perm-assets-manage"],
+  ["role-logistics-operator", "perm-packing-read"],
+  ["role-logistics-operator", "perm-packing-create"],
+  ["role-maintenance-operator", "perm-assets-read"],
+  ["role-maintenance-operator", "perm-incidents-read"],
+  ["role-maintenance-operator", "perm-incidents-create"],
+  ["role-maintenance-operator", "perm-rma-read"],
+  ["role-maintenance-operator", "perm-rma-create"],
+  ["role-finance-viewer", "perm-finance-read"],
+] as const;
+
 const hasColumn = (db: DatabaseSync, tableName: string, columnName: string) => {
   const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
   return rows.some((row) => row.name === columnName);
@@ -38,6 +103,33 @@ export const bootstrapAdminFoundation = (db: DatabaseSync) => {
   db.exec("BEGIN");
 
   try {
+    operationalPermissions.forEach(([id, key, label, description]) => {
+      db.prepare(
+        `
+          INSERT OR IGNORE INTO permissions (id, key, label, description)
+          VALUES (?, ?, ?, ?)
+        `,
+      ).run(id, key, label, description);
+    });
+
+    operationalRoles.forEach(([id, key, name, description, isSystemRole]) => {
+      db.prepare(
+        `
+          INSERT OR IGNORE INTO roles (id, workspace_id, key, name, description, is_system_role, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+      ).run(id, workspaceId, key, name, description, isSystemRole, now);
+    });
+
+    operationalRolePermissions.forEach(([roleId, permissionId]) => {
+      db.prepare(
+        `
+          INSERT OR IGNORE INTO role_permissions (role_id, permission_id, created_at)
+          VALUES (?, ?, ?)
+        `,
+      ).run(roleId, permissionId, now);
+    });
+
     const projectsWithClients = db
       .prepare(
         `

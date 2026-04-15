@@ -10,6 +10,7 @@ import type {
   AgentModelRow,
   AgentModelsSnapshot,
   AgentMutationResult,
+  ConnectorMutationResult,
   AgentRosterRow,
   AgentRunRow,
   ArchiveAssetCommand,
@@ -25,9 +26,13 @@ import type {
   AppInfo,
   AppSupportSnapshot,
   AppSyncOutboxRow,
+  AppUserMutationResult,
+  AppUsersSnapshot,
   AssetsOverviewSnapshot,
   CreateAgentCommand,
+  CreateAppUserCommand,
   CreateAssistantThreadCommand,
+  CreateConnectorLinkTokenCommand,
   AssetDetailSnapshot,
   AssetEditorMutationResult,
   FileDeleteMutationResult,
@@ -80,6 +85,7 @@ import type {
   ProjectDeletePreview,
   ProjectDetailSnapshot,
   ProjectListQuery,
+  RevokeTelegramLinkCommand,
   ReportIncidentCommand,
   ReportIncidentResult,
   ResolveIncidentCommand,
@@ -91,6 +97,7 @@ import type {
   RmaCaseMutationResult,
   RmaSnapshot,
   SaveAIProviderConfigCommand,
+  SaveConnectorConfigCommand,
   ScheduleTimelinePagination,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
@@ -98,10 +105,12 @@ import type {
   SetAgentApprovalModeCommand,
   SetActiveAssistantThreadCommand,
   SetAgentStatusCommand,
+  SetAppUserActiveCommand,
   ShellAppAction,
   ShellBootstrap,
   SendAssistantChatTurnCommand,
   TestAIProviderConnectionCommand,
+  TestConnectorConnectionCommand,
   UnassignCrewFromProjectUnitInput,
   UpdateAgentCommand,
   UpdateAssetCommand,
@@ -109,6 +118,7 @@ import type {
   UpdateCatalogEntityInput,
   UpdateFinancialEntryCommand,
   UpdateIncidentCommand,
+  UpdateAppUserCommand,
   UpdateProjectInput,
   UpdateProjectUnitInput,
   UpdateRmaCaseCommand,
@@ -122,7 +132,12 @@ declare global {
       getAppInfo: () => Promise<AppInfo>;
       getDiagnostics: () => Promise<AppDiagnosticsSnapshot>;
       getSupportSnapshot: () => Promise<AppSupportSnapshot>;
+      getUsersSnapshot: () => Promise<AppUsersSnapshot>;
       createBackup: () => Promise<AppActionResult>;
+      createUser: (input: CreateAppUserCommand) => Promise<AppUserMutationResult>;
+      updateUser: (input: UpdateAppUserCommand) => Promise<AppUserMutationResult>;
+      setUserActive: (input: SetAppUserActiveCommand) => Promise<AppUserMutationResult>;
+      revokeTelegramLink: (input: RevokeTelegramLinkCommand) => Promise<AppUserMutationResult>;
       runIntegrityCheck: () => Promise<AppActionResult>;
       runLocalSync: () => Promise<AppActionResult>;
       getSyncOutboxRows: () => Promise<AppSyncOutboxRow[]>;
@@ -152,7 +167,10 @@ declare global {
       setStatus: (input: SetAgentStatusCommand) => Promise<AgentMutationResult>;
       setApprovalMode: (input: SetAgentApprovalModeCommand) => Promise<AgentMutationResult>;
       saveAIProviderConfig: (input: SaveAIProviderConfigCommand) => Promise<AIProviderMutationResult>;
+      saveConnectorConfig: (input: SaveConnectorConfigCommand) => Promise<ConnectorMutationResult>;
       testAIProviderConnection: (input: TestAIProviderConnectionCommand) => Promise<AIProviderMutationResult>;
+      testConnectorConnection: (input: TestConnectorConnectionCommand) => Promise<ConnectorMutationResult>;
+      createConnectorLinkToken: (input: CreateConnectorLinkTokenCommand) => Promise<ConnectorMutationResult>;
       assignAgentModel: (input: AssignAgentModelCommand) => Promise<AgentMutationResult>;
       createAssistantThread: (input: CreateAssistantThreadCommand) => Promise<AssistantChatSnapshot>;
       deleteAssistantThread: (input: DeleteAssistantThreadCommand) => Promise<AssistantChatSnapshot>;

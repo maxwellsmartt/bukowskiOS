@@ -51,12 +51,26 @@ export type AssistantChatAttachmentRow = {
   status: AssistantChatAttachmentStatus;
 };
 
+export type AssistantChatMessageSource = {
+  connectorKey: string;
+  connectorLabel: string;
+  channelLabel: string;
+  actorUserId: string | null;
+  actorName: string;
+  actorRole: string | null;
+  permissionSummary: string;
+  externalMessageId: string | null;
+  correlationId: string | null;
+  isLinkedIdentity: boolean;
+};
+
 export type AssistantChatMessageRow = {
   id: string;
   role: "assistant" | "user";
   body: string;
   state: AssistantChatMessageState;
   meta: AssistantChatMessageMeta | null;
+  source: AssistantChatMessageSource | null;
   attachments: AssistantChatAttachmentRow[];
   createdAt: string;
   updatedAt: string;
@@ -202,6 +216,19 @@ export type AgentConnectorRow = {
   status: "configured" | "not_configured" | "disabled";
   capability: string;
   notes: string;
+  operationalMode: "dm_first" | "future";
+  hasStoredSecret: boolean;
+  botUsername: string | null;
+  linkedAccounts: number;
+  activeLinks: number;
+  activeChannels: number;
+  inboundMessages: number;
+  pendingDeliveries: number;
+  deliverySummary: string;
+  lastErrorSummary: string;
+  lastTestedAtLabel: string;
+  lastInboundAtLabel: string;
+  lastOutboundAtLabel: string;
 };
 
 export type MissionControlHealthSnapshot = {

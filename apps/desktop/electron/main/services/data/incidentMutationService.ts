@@ -7,8 +7,7 @@ import type {
   ResolveIncidentCommand,
   UpdateIncidentCommand,
 } from "@contracts";
-
-const defaultActorUserId = "user-ops";
+import { resolveAuthorizedActor } from "./mutationAuthorization";
 
 type AssetIncidentContextRow = {
   asset_id: string;
@@ -207,6 +206,12 @@ const loadIncidentRecord = (db: DatabaseSync, workspaceId: string, incidentId: s
 
 export const createIncidentMutationService = (db: DatabaseSync) => ({
   reportIncident(input: ReportIncidentCommand): ReportIncidentResult {
+    const actor = resolveAuthorizedActor(db, {
+      workspaceId: input.workspaceId,
+      actorUserId: input.actorUserId,
+      requiredPermission: "incidents.create",
+      actionLabel: "report incidents",
+    });
     const title = ensureValue(input.title, "Incident title");
     const description = ensureValue(input.description, "Incident description");
     const incidentType = ensureValue(input.incidentType, "Incident type");
@@ -288,13 +293,13 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
     const projectMap = loadEntityMap(db, "projects", uniqueValues([nextProjectId]));
     const departmentMap = loadEntityMap(db, "departments", uniqueValues([nextDepartmentId]));
     const assetMap = loadEntityMap(db, "assets", uniqueValues([input.assetId]));
-    const userMap = loadUserMap(db, uniqueValues([nextResponsibleUserId, defaultActorUserId]));
+    const userMap = loadUserMap(db, uniqueValues([nextResponsibleUserId, actor.actorUserId]));
 
     ensureEntityExists(nextProjectId, "Project", projectMap);
     ensureEntityExists(nextDepartmentId, "Department", departmentMap);
     ensureEntityExists(input.assetId, "Asset", assetMap);
     ensureEntityExists(nextResponsibleUserId, "Responsible user", userMap);
-    ensureEntityExists(defaultActorUserId, "Actor user", userMap);
+    ensureEntityExists(actor.actorUserId, "Actor user", userMap);
 
     const workspaceCurrency = (db
       .prepare("SELECT base_currency FROM workspaces WHERE id = ? LIMIT 1")
@@ -348,7 +353,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
         nextProjectUnitId ?? null,
         nextDepartmentId ?? null,
         nextAssignmentId ?? null,
-        defaultActorUserId,
+        actor.actorUserId,
         incidentType,
         severity,
         title,
@@ -405,7 +410,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
           nextAssignmentId ?? null,
           nextProjectId ?? null,
           nextDepartmentId ?? null,
-          defaultActorUserId,
+          actor.actorUserId,
           nextLocationId ?? null,
           now,
           input.commandId,
@@ -485,7 +490,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
       receiptHelpers.insertReceipt.run(
         input.commandId,
         input.workspaceId,
-        defaultActorUserId,
+        actor.actorUserId,
         input.actorType,
         input.sourceChannel,
         now,
@@ -507,7 +512,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
       receiptHelpers.insertReceipt.run(
         input.commandId,
         input.workspaceId,
-        defaultActorUserId,
+        actor.actorUserId,
         input.actorType,
         input.sourceChannel,
         now,
@@ -520,6 +525,12 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
   },
 
   updateIncident(input: UpdateIncidentCommand): IncidentMutationResult {
+    const actor = resolveAuthorizedActor(db, {
+      workspaceId: input.workspaceId,
+      actorUserId: input.actorUserId,
+      requiredPermission: "incidents.create",
+      actionLabel: "update incidents",
+    });
     const receiptHelpers = createCommandReceiptHelpers(db);
     const existingReceipt = receiptHelpers.getExistingReceipt(input.commandId);
 
@@ -543,9 +554,9 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
 
     const nextResponsibleUserId =
       input.responsibleUserId === undefined ? incident.responsible_user_id : normalizeOptionalText(input.responsibleUserId);
-    const userMap = loadUserMap(db, uniqueValues([nextResponsibleUserId, defaultActorUserId]));
+    const userMap = loadUserMap(db, uniqueValues([nextResponsibleUserId, actor.actorUserId]));
     ensureEntityExists(nextResponsibleUserId ?? undefined, "Responsible user", userMap);
-    ensureEntityExists(defaultActorUserId, "Actor user", userMap);
+    ensureEntityExists(actor.actorUserId, "Actor user", userMap);
 
     const nextTitle = input.title?.trim() ? input.title.trim() : incident.title;
     const nextDescription = input.description?.trim() ? input.description.trim() : incident.description;
@@ -596,7 +607,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
       receiptHelpers.insertReceipt.run(
         input.commandId,
         input.workspaceId,
-        defaultActorUserId,
+        actor.actorUserId,
         input.actorType,
         input.sourceChannel,
         now,
@@ -610,7 +621,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
       receiptHelpers.insertReceipt.run(
         input.commandId,
         input.workspaceId,
-        defaultActorUserId,
+        actor.actorUserId,
         input.actorType,
         input.sourceChannel,
         now,
@@ -629,6 +640,12 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
   },
 
   resolveIncident(input: ResolveIncidentCommand): IncidentMutationResult {
+    const actor = resolveAuthorizedActor(db, {
+      workspaceId: input.workspaceId,
+      actorUserId: input.actorUserId,
+      requiredPermission: "incidents.create",
+      actionLabel: "resolve incidents",
+    });
     const incident = loadIncidentRecord(db, input.workspaceId, input.incidentId);
     if (!incident) {
       throw new Error("Incident not found.");
@@ -639,6 +656,7 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
     return this.updateIncident({
       commandId: input.commandId,
       workspaceId: input.workspaceId,
+      actorUserId: actor.actorUserId,
       incidentId: input.incidentId,
       status: "Resolved",
       responsibleUserId: input.resolvedByUserId ?? incident.responsible_user_id,
