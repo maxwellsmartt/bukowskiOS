@@ -9,7 +9,6 @@ import { ScannableCodePanel } from "@shared/components/ScannableCodePanel";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
-import { formatAssetStockDetailRows } from "@shared/lib/assetQuantityPresentation";
 import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
@@ -77,33 +76,29 @@ export const AssetDetailPage = () => {
     <div className="page-stack">
       <SurfaceCard
         title={data.asset.name}
-        subtitle="Current status, stock, storage context and recent history for this asset."
         aside={<StatusBadge tone={data.asset.status === "Maintenance" ? "warning" : "info"}>{data.asset.status}</StatusBadge>}
       >
         <div className="summary-grid">
           <div className="summary-row">
-            <span className="summary-label">Registry code</span>
+            <span className="summary-label">Asset code</span>
             <span className="summary-value">{data.asset.code}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label">Tracking</span>
-            <span className="summary-value">{data.asset.tracking}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">Current location</span>
             <span className="summary-value">{data.asset.location}</span>
           </div>
-          {formatAssetStockDetailRows({
-            totalQuantity: data.asset.totalQuantity,
-            availableQuantity: data.asset.quantity,
-            assignedQuantity: data.asset.assignedQuantity,
-            checkedOutQuantity: data.asset.checkedOutQuantity,
-          }).map((row) => (
-            <div key={row.label} className="summary-row">
-              <span className="summary-label">{row.label}</span>
-              <span className="summary-value">{row.value}</span>
-            </div>
-          ))}
+          <div className="summary-row">
+            <span className="summary-label">Available</span>
+            <span className="summary-value">{data.asset.quantity}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Reserved</span>
+            <span className="summary-value">{data.asset.assignedQuantity}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Checked out</span>
+            <span className="summary-value">{data.asset.checkedOutQuantity}</span>
+          </div>
           <div className="summary-row">
             <span className="summary-label">Project</span>
             <span className="summary-value">{data.asset.project}</span>
@@ -113,18 +108,8 @@ export const AssetDetailPage = () => {
             <span className="summary-value">{data.asset.responsible}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Kit membership</span>
-            <span className="summary-value">
-              {data.asset.linkedKitCount ? data.asset.linkedKitCodes.join(" · ") : "Standalone"}
-            </span>
-          </div>
-          <div className="summary-row">
             <span className="summary-label">Condition</span>
             <span className="summary-value">{data.asset.condition}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label">Replacement</span>
-            <span className="summary-value">{data.asset.replacementValue}</span>
           </div>
         </div>
 
@@ -149,7 +134,7 @@ export const AssetDetailPage = () => {
             }}
             type="button"
           >
-            Report incident for this asset
+            Report incident
           </button>
         </div>
       </SurfaceCard>
@@ -283,7 +268,7 @@ export const AssetDetailPage = () => {
       ) : null}
 
       <div className="split-layout">
-        <SurfaceCard title="Event timeline" subtitle="Trace of the operational events behind the current state.">
+        <SurfaceCard title="Timeline">
           <div className="timeline-list">
             {data.timeline.map((event) => (
               <div key={event.timestamp + event.title} className="timeline-item">
@@ -296,76 +281,93 @@ export const AssetDetailPage = () => {
         </SurfaceCard>
 
         <div className="page-stack">
-          <SurfaceCard title="Legacy source" subtitle="Original fields preserved from the Rentman export.">
-            {data.legacy ? (
-              <div className="summary-grid">
-                <div className="summary-row">
-                  <span className="summary-label">Source</span>
-                  <span className="summary-value">{data.legacy.source}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Legacy code</span>
-                  <span className="summary-value">{data.legacy.legacyCode}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">QR code</span>
-                  <span className="summary-value">{data.legacy.qrCode}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Warehouse slot</span>
-                  <span className="summary-value">{data.legacy.warehouseSlot}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Folder path</span>
-                  <span className="summary-value">{data.legacy.folderPath}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Accessories</span>
-                  <span className="summary-value">{data.legacy.hasAccessories}</span>
-                </div>
+          <SurfaceCard title="Details">
+            <div className="summary-grid">
+              <div className="summary-row">
+                <span className="summary-label">Tracking</span>
+                <span className="summary-value">{data.asset.tracking}</span>
               </div>
-            ) : (
-              <div className="empty-state">No legacy source linked to this asset.</div>
-            )}
-          </SurfaceCard>
+              <div className="summary-row">
+                <span className="summary-label">Replacement</span>
+                <span className="summary-value">{data.asset.replacementValue}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Kit membership</span>
+                <span className="summary-value">
+                  {data.asset.linkedKitCount ? data.asset.linkedKitCodes.join(" · ") : "Standalone"}
+                </span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Primary code</span>
+                <span className="summary-value">{data.editor?.primaryCodeValue ?? "Pending"}</span>
+              </div>
+            </div>
 
-          <SurfaceCard title="Codes" subtitle="Primary and secondary scan identities for this asset.">
-            {data.scannableCodes.length ? (
-              <div className="page-stack">
-                {data.editor?.primaryCodeValue ? (
-                  <ScannableCodePanel
-                    codeValue={data.editor.primaryCodeValue}
-                    subtitle="Live QR and Code128 preview for the primary asset code."
-                    title={data.asset.name}
-                    onPrint={({ qrDataUrl, barcodeDataUrl }) =>
-                      printScannableLabel({
-                        title: data.asset!.name,
-                        subtitle: data.asset!.code,
-                        codeValue: data.editor!.primaryCodeValue,
-                        qrDataUrl,
-                        barcodeDataUrl,
-                      })
-                    }
-                  />
-                ) : null}
-                <div className="queue-list">
-                {data.scannableCodes.map((code) => (
-                  <div key={code.id} className="queue-item">
-                    <div className="identity-cell">
-                      <span className="identity-title">{code.codeValue}</span>
-                      <span className="identity-meta">{code.symbology.toUpperCase()}</span>
+            {data.editor?.primaryCodeValue ? (
+              <ScannableCodePanel
+                codeValue={data.editor.primaryCodeValue}
+                subtitle="Primary code"
+                title={data.asset.name}
+                onPrint={({ qrDataUrl, barcodeDataUrl }) =>
+                  printScannableLabel({
+                    title: data.asset!.name,
+                    subtitle: data.asset!.code,
+                    codeValue: data.editor!.primaryCodeValue,
+                    qrDataUrl,
+                    barcodeDataUrl,
+                  })
+                }
+              />
+            ) : null}
+
+            <details className="detail-disclosure">
+              <summary className="detail-disclosure-summary">More details</summary>
+              <div className="detail-disclosure-content">
+                {data.legacy ? (
+                  <div className="summary-grid">
+                    <div className="summary-row">
+                      <span className="summary-label">Source</span>
+                      <span className="summary-value">{data.legacy.source}</span>
                     </div>
-                    <StatusBadge tone={code.isPrimary ? "success" : "info"}>{code.isPrimary ? "Primary" : "Secondary"}</StatusBadge>
+                    <div className="summary-row">
+                      <span className="summary-label">Legacy code</span>
+                      <span className="summary-value">{data.legacy.legacyCode}</span>
+                    </div>
+                    <div className="summary-row">
+                      <span className="summary-label">Warehouse slot</span>
+                      <span className="summary-value">{data.legacy.warehouseSlot}</span>
+                    </div>
+                    <div className="summary-row">
+                      <span className="summary-label">Folder path</span>
+                      <span className="summary-value">{data.legacy.folderPath}</span>
+                    </div>
+                    <div className="summary-row">
+                      <span className="summary-label">Accessories</span>
+                      <span className="summary-value">{data.legacy.hasAccessories}</span>
+                    </div>
                   </div>
-                ))}
-                </div>
+                ) : null}
+
+                {data.scannableCodes.filter((code) => !code.isPrimary).length ? (
+                  <div className="queue-list">
+                    {data.scannableCodes
+                      .filter((code) => !code.isPrimary)
+                      .map((code) => (
+                        <div key={code.id} className="queue-item">
+                          <div className="identity-cell">
+                            <span className="identity-title">{code.codeValue}</span>
+                            <span className="identity-meta">{code.symbology.toUpperCase()}</span>
+                          </div>
+                          <StatusBadge tone="neutral">Secondary</StatusBadge>
+                        </div>
+                      ))}
+                  </div>
+                ) : null}
               </div>
-            ) : (
-              <div className="empty-state">No scannable code has been generated yet.</div>
-            )}
+            </details>
           </SurfaceCard>
 
-          <SurfaceCard title="Linked incidents" subtitle="Open and recent issues related to this asset.">
+          <SurfaceCard title="Linked incidents">
             {data.linkedIncidents.length ? (
               <div className="queue-list">
                 {data.linkedIncidents.map((incident) => (
@@ -389,7 +391,6 @@ export const AssetDetailPage = () => {
 
           <SurfaceCard
             title="Files"
-            subtitle="Photos, PDFs and support files attached directly to this asset."
             aside={
               <button
                 className="surface-card-action-text"
@@ -426,7 +427,7 @@ export const AssetDetailPage = () => {
                       <div className="entity-file-head">
                         <span className="entity-file-name">{file.originalName}</span>
                         <StatusBadge tone={resolveFileTone(file.status)}>{file.status}</StatusBadge>
-                        {file.isPreviewable ? <StatusBadge tone="info">previewable</StatusBadge> : null}
+                        {file.isPreviewable ? <StatusBadge tone="info">Preview</StatusBadge> : null}
                       </div>
                       <div className="entity-file-meta">
                         <span>{file.fileType}</span>
@@ -461,7 +462,7 @@ export const AssetDetailPage = () => {
                 ))}
               </div>
             ) : (
-              <div className="empty-state">No files attached yet. Add photos, PDFs or support evidence here.</div>
+              <div className="empty-state">No files attached yet.</div>
             )}
           </SurfaceCard>
         </div>

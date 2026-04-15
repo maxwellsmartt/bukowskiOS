@@ -78,10 +78,6 @@ export const AssetEditorPanel = ({
   const [qrCodeValue, setQrCodeValue] = useState(initialValue?.qrCodeValue ?? initialValue?.primaryCodeValue ?? "");
 
   const title = mode === "create" ? "New asset" : "Edit asset";
-  const subtitle =
-    mode === "create"
-      ? "Add a new asset with identity, location and scan details."
-      : "Update identity, operational defaults and scan details.";
   const primaryCodeValue = useMemo(() => initialValue?.primaryCodeValue || qrCodeValue.trim() || "Will generate on save", [initialValue, qrCodeValue]);
 
   return (
@@ -92,7 +88,6 @@ export const AssetEditorPanel = ({
         </button>
       }
       title={title}
-      subtitle={subtitle}
     >
       <div className="summary-grid compact-summary-grid">
         <div className="summary-row">
@@ -101,7 +96,11 @@ export const AssetEditorPanel = ({
         </div>
         <div className="summary-row">
           <span className="summary-label">Status</span>
-          <span className="summary-value">{initialValue ? (initialValue.isActive ? "Active" : "Archived") : "New asset"}</span>
+          <span className="summary-value">
+            <StatusBadge tone={initialValue ? (initialValue.isActive ? "success" : "neutral") : "info"}>
+              {initialValue ? (initialValue.isActive ? "Active" : "Archived") : "New"}
+            </StatusBadge>
+          </span>
         </div>
       </div>
 
@@ -112,7 +111,7 @@ export const AssetEditorPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Registry code</span>
+          <span className="action-field-label">Asset code</span>
           <input
             className="action-field-control"
             onChange={(event) => setInternalCode(event.target.value.toUpperCase())}
@@ -145,21 +144,6 @@ export const AssetEditorPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Brand</span>
-          <input className="action-field-control" onChange={(event) => setBrand(event.target.value)} value={brand} />
-        </label>
-
-        <label className="action-field">
-          <span className="action-field-label">Model</span>
-          <input className="action-field-control" onChange={(event) => setModel(event.target.value)} value={model} />
-        </label>
-
-        <label className="action-field">
-          <span className="action-field-label">Serial</span>
-          <input className="action-field-control" onChange={(event) => setSerialNumber(event.target.value)} value={serialNumber} />
-        </label>
-
-        <label className="action-field">
           <span className="action-field-label">Condition</span>
           <SelectField onChange={(event) => setConditionStatus(event.target.value)} value={conditionStatus}>
             {conditionOptions.map((option) => (
@@ -170,60 +154,83 @@ export const AssetEditorPanel = ({
           </SelectField>
         </label>
 
-        <label className="action-field">
-          <span className="action-field-label">Ownership</span>
-          <SelectField onChange={(event) => setOwnershipType(event.target.value)} value={ownershipType}>
-            {ownershipOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </SelectField>
-        </label>
-
-        <label className="action-field">
-          <span className="action-field-label">Replacement value</span>
-          <input
-            className="action-field-control"
-            inputMode="decimal"
-            onChange={(event) => setReplacementValue(event.target.value)}
-            placeholder="Optional"
-            value={replacementValue}
-          />
-        </label>
-
-        <label className="action-field action-field-wide">
-          <span className="action-field-label">QR value</span>
-          <input
-            className="action-field-control"
-            onChange={(event) => setQrCodeValue(event.target.value)}
-            placeholder="Leave blank to auto-generate"
-            value={qrCodeValue}
-          />
-        </label>
-
-        <label className="action-field action-field-wide">
-          <span className="action-field-label">Description</span>
-          <textarea
-            className="action-field-control action-textarea"
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Short operational description"
-            rows={3}
-            value={description}
-          />
-        </label>
-
-        <label className="action-field action-field-wide">
-          <span className="action-field-label">Notes</span>
-          <textarea
-            className="action-field-control action-textarea"
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Internal notes, prep cues or traceability hints."
-            rows={3}
-            value={notes}
-          />
-        </label>
       </div>
+
+      <details className="detail-disclosure">
+        <summary className="detail-disclosure-summary">More details</summary>
+        <div className="detail-disclosure-content">
+          <div className="action-form-grid">
+            <label className="action-field">
+              <span className="action-field-label">Brand</span>
+              <input className="action-field-control" onChange={(event) => setBrand(event.target.value)} value={brand} />
+            </label>
+
+            <label className="action-field">
+              <span className="action-field-label">Model</span>
+              <input className="action-field-control" onChange={(event) => setModel(event.target.value)} value={model} />
+            </label>
+
+            <label className="action-field">
+              <span className="action-field-label">Serial</span>
+              <input className="action-field-control" onChange={(event) => setSerialNumber(event.target.value)} value={serialNumber} />
+            </label>
+
+            <label className="action-field">
+              <span className="action-field-label">Ownership</span>
+              <SelectField onChange={(event) => setOwnershipType(event.target.value)} value={ownershipType}>
+                {ownershipOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
+
+            <label className="action-field">
+              <span className="action-field-label">Replacement value</span>
+              <input
+                className="action-field-control"
+                inputMode="decimal"
+                onChange={(event) => setReplacementValue(event.target.value)}
+                placeholder="Optional"
+                value={replacementValue}
+              />
+            </label>
+
+            <label className="action-field action-field-wide">
+              <span className="action-field-label">QR value</span>
+              <input
+                className="action-field-control"
+                onChange={(event) => setQrCodeValue(event.target.value)}
+                placeholder="Leave blank to generate it automatically"
+                value={qrCodeValue}
+              />
+            </label>
+
+            <label className="action-field action-field-wide">
+              <span className="action-field-label">Description</span>
+              <textarea
+                className="action-field-control action-textarea"
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Short description"
+                rows={3}
+                value={description}
+              />
+            </label>
+
+            <label className="action-field action-field-wide">
+              <span className="action-field-label">Notes</span>
+              <textarea
+                className="action-field-control action-textarea"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Optional note"
+                rows={3}
+                value={notes}
+              />
+            </label>
+          </div>
+        </div>
+      </details>
 
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
@@ -267,7 +274,7 @@ export const AssetEditorPanel = ({
       </div>
 
       <ConfirmDialog
-        body="Archive this asset from the active registry? The record stays auditable, but it will stop showing as an active operational item."
+        body="Archive this asset? It will stay in history, but it will no longer appear in active work."
         confirmLabel="Archive asset"
         isOpen={confirmArchiveOpen}
         isSubmitting={isArchiving}

@@ -120,10 +120,10 @@ export const IncidentReportPanel = ({
         </button>
       }
       title={title}
-      subtitle="Create a real incident record linked to operational context. This writes the incident queue and the asset timeline when an asset is attached."
     >
-      <div className="chip-row">
-        <span className="action-panel-selection">{selectedAssetLabel}</span>
+      <div className="summary-row">
+        <span className="summary-label">Asset</span>
+        <span className="summary-value">{selectedAssetLabel}</span>
       </div>
 
       <div className="action-form-grid">
@@ -173,48 +173,12 @@ export const IncidentReportPanel = ({
           </SelectField>
         </label>
 
-        <label className="action-field">
-          <span className="action-field-label">Unit</span>
-          <SelectField disabled={!projectId} onChange={(event) => setProjectUnitId(event.target.value)} value={projectUnitId}>
-            <option value="">{projectId ? "No specific unit" : "Choose project first"}</option>
-            {projectDetail.units.map((unit) => (
-              <option key={unit.id} value={unit.id}>
-                {unit.code} · {unit.name}
-              </option>
-            ))}
-          </SelectField>
-        </label>
-
-        <label className="action-field">
-          <span className="action-field-label">Department</span>
-          <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
-            <option value="">No department</option>
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.code} · {department.name}
-              </option>
-            ))}
-          </SelectField>
-        </label>
-
-        <label className="action-field">
-          <span className="action-field-label">Responsible</span>
-          <SelectField onChange={(event) => setResponsibleUserId(event.target.value)} value={responsibleUserId}>
-            <option value="">Auto / unassigned</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.fullName}
-              </option>
-            ))}
-          </SelectField>
-        </label>
-
         <label className="action-field action-field-wide">
           <span className="action-field-label">Title</span>
           <input
             className="action-field-control"
             onChange={(event) => setIncidentTitle(event.target.value)}
-            placeholder="Short operational title"
+            placeholder="Short title"
             value={incidentTitle}
           />
         </label>
@@ -224,33 +188,76 @@ export const IncidentReportPanel = ({
           <textarea
             className="action-field-control action-textarea"
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="Describe what happened, when it was found and what is currently known."
+            placeholder="What happened?"
             rows={4}
             value={description}
           />
         </label>
-
-        <label className="action-field">
-          <span className="action-field-label">Cost estimate</span>
-          <input
-            className="action-field-control"
-            inputMode="decimal"
-            onChange={(event) => setCostEstimate(event.target.value)}
-            placeholder="Optional"
-            value={costEstimate}
-          />
-        </label>
-
-        <label className="action-field">
-          <span className="action-field-label">Notes</span>
-          <input
-            className="action-field-control"
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Optional internal note"
-            value={notes}
-          />
-        </label>
       </div>
+
+      <details className="detail-disclosure">
+        <summary className="detail-disclosure-summary">More details</summary>
+        <div className="detail-disclosure-content">
+          <div className="action-form-grid">
+            <label className="action-field">
+              <span className="action-field-label">Unit</span>
+              <SelectField disabled={!projectId} onChange={(event) => setProjectUnitId(event.target.value)} value={projectUnitId}>
+                <option value="">{projectId ? "No specific unit" : "Choose project first"}</option>
+                {projectDetail.units.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.code} · {unit.name}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
+
+            <label className="action-field">
+              <span className="action-field-label">Department</span>
+              <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
+                <option value="">No department</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.code} · {department.name}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
+
+            <label className="action-field">
+              <span className="action-field-label">Responsible</span>
+              <SelectField onChange={(event) => setResponsibleUserId(event.target.value)} value={responsibleUserId}>
+                <option value="">Auto / unassigned</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.fullName}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
+
+            <label className="action-field">
+              <span className="action-field-label">Cost estimate</span>
+              <input
+                className="action-field-control"
+                inputMode="decimal"
+                onChange={(event) => setCostEstimate(event.target.value)}
+                placeholder="Optional"
+                value={costEstimate}
+              />
+            </label>
+
+            <label className="action-field action-field-wide">
+              <span className="action-field-label">Notes</span>
+              <input
+                className="action-field-control"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Optional note"
+                value={notes}
+              />
+            </label>
+          </div>
+        </div>
+      </details>
 
       {error ? (
         <div className="action-feedback action-feedback-error">

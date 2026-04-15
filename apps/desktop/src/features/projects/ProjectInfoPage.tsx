@@ -63,15 +63,15 @@ export const ProjectInfoPage = () => {
   }, [data.project]);
 
   if (error) {
-    return <div className="empty-state">Project info unavailable: {error}</div>;
+    return <div className="empty-state">Project details unavailable: {error}</div>;
   }
 
   if (isLoading) {
-    return <div className="empty-state">Loading project info...</div>;
+    return <div className="empty-state">Loading project details…</div>;
   }
 
   if (!data.project) {
-    return <div className="empty-state">Select a project to inspect its info, context and responsibles.</div>;
+    return <div className="empty-state">Select a project to review its details.</div>;
   }
 
   const currentProject = data.project;
@@ -96,9 +96,9 @@ export const ProjectInfoPage = () => {
       });
       await Promise.all([reload(), refreshProjects()]);
       setSaveError(null);
-      setSaveFeedback("Project schedule and context updated.");
+      setSaveFeedback("Project details updated.");
     } catch (nextError) {
-      setSaveError(nextError instanceof Error ? nextError.message : "Unable to update project info.");
+      setSaveError(nextError instanceof Error ? nextError.message : "Unable to update project details.");
       setSaveFeedback(null);
     } finally {
       setIsSubmitting(false);
@@ -107,7 +107,7 @@ export const ProjectInfoPage = () => {
 
   return (
     <div className="page-stack page-stack-project">
-      <SectionHeader title="Info" />
+      <SectionHeader title="Details" />
 
       <div className="project-workspace-scroll">
         {saveFeedback ? <div className="action-feedback action-feedback-success">{saveFeedback}</div> : null}
@@ -116,7 +116,7 @@ export const ProjectInfoPage = () => {
         <div className="project-detail-support-grid">
           <SurfaceCard
             className="project-scroll-card"
-            title="Project base"
+            title="Project Details"
             aside={<StatusBadge>{currentProject.status}</StatusBadge>}
           >
             <div className="action-form-grid">
@@ -231,15 +231,12 @@ export const ProjectInfoPage = () => {
 
             <div className="action-panel-actions">
               <button className="action-primary-button" disabled={isSubmitting} onClick={() => void handleSave()} type="button">
-                {isSubmitting ? "Saving..." : "Save project info"}
+                {isSubmitting ? "Saving..." : "Save changes"}
               </button>
             </div>
           </SurfaceCard>
 
-          <SurfaceCard
-            className="project-scroll-card"
-            title="Schedule summary"
-          >
+          <SurfaceCard className="project-scroll-card" title="Schedule">
             <div className="summary-grid">
               <div className="summary-row">
                 <span className="summary-label">Window</span>
@@ -261,17 +258,29 @@ export const ProjectInfoPage = () => {
                 <span className="summary-label">Cancelled units</span>
                 <span className="summary-value">{data.timelineSummary?.cancelledUnits ?? 0}</span>
               </div>
-            </div>
-
-            <div className="chip-row">
-              <StatusBadge tone="info">{data.schedule?.startDate ?? "No start date"}</StatusBadge>
-              <StatusBadge tone="warning">{data.schedule?.endDate ?? "Open-ended"}</StatusBadge>
-              <StatusBadge>{data.schedule?.colorKey ?? "Default color"}</StatusBadge>
-              {currentProject.productionCompany !== "—" ? <StatusBadge>{currentProject.productionCompany}</StatusBadge> : null}
+              <div className="summary-row">
+                <span className="summary-label">Start</span>
+                <span className="summary-value">{data.schedule?.startDate ?? "No start date"}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">End</span>
+                <span className="summary-value">{data.schedule?.endDate ?? "Open-ended"}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Timeline color</span>
+                <span className="summary-value">{data.schedule?.colorKey ?? "Default"}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Production company</span>
+                <span className="summary-value">{currentProject.productionCompany !== "—" ? currentProject.productionCompany : "Not linked"}</span>
+              </div>
               {currentProject.hasPreproduction ? (
-                <StatusBadge tone="info">
-                  {currentProject.preproductionStartDate ?? "Open"} - {currentProject.preproductionEndDate ?? "Open"}
-                </StatusBadge>
+                <div className="summary-row">
+                  <span className="summary-label">Pre-production</span>
+                  <span className="summary-value">
+                    {currentProject.preproductionStartDate ?? "Open"} - {currentProject.preproductionEndDate ?? "Open"}
+                  </span>
+                </div>
               ) : null}
             </div>
           </SurfaceCard>

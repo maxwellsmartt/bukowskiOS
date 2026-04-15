@@ -1917,8 +1917,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .section-header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-width: 700px;
+  gap: 8px;
+  max-width: 820px;
 }
 
 .section-header-title-row {
@@ -1938,25 +1938,28 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .section-header-title {
   margin: 0;
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
 }
 
 .section-header-title-accent {
-  color: #d27070;
+  color: var(--text-primary);
 }
 
 .section-header-context-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.028);
-  color: var(--text-secondary);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text-muted);
   font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1989,15 +1992,16 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .surface-card-title {
   margin: 0;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .surface-card-subtitle {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .surface-card-action {
@@ -2530,13 +2534,37 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .action-field-control {
   min-width: 0;
-  min-height: 34px;
+  min-height: 38px;
   padding: 0 12px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.018);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.022);
   color: var(--text-primary);
   outline: none;
+}
+
+.detail-disclosure {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.detail-disclosure-summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  list-style: none;
+}
+
+.detail-disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-disclosure-content {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
 }
 
 .action-field-control[type="date"],
@@ -3022,26 +3050,35 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   align-items: center;
   min-height: 22px;
   padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
   font-size: 11px;
   color: var(--text-secondary);
 }
 
 .status-badge-info {
-  color: var(--accent-info);
+  border-color: rgba(115, 164, 255, 0.24);
+  background: rgba(115, 164, 255, 0.1);
+  color: #cadcff;
 }
 
 .status-badge-success {
-  color: var(--accent-success);
+  border-color: rgba(92, 190, 146, 0.22);
+  background: rgba(92, 190, 146, 0.1);
+  color: #b8f2d3;
 }
 
 .status-badge-warning {
-  color: var(--accent-warning);
+  border-color: rgba(245, 184, 101, 0.24);
+  background: rgba(245, 184, 101, 0.1);
+  color: #ffd7a1;
 }
 
 .status-badge-critical {
-  color: var(--accent-critical);
+  border-color: rgba(227, 113, 113, 0.24);
+  background: rgba(227, 113, 113, 0.1);
+  color: #ffcccc;
 }
 
 .table-shell {
@@ -3445,7 +3482,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .summary-value {
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .stock-inline-text {
@@ -5261,6 +5299,7 @@ button.timeline-signal-chip:focus-visible {
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-secondary);
   font-size: 11px;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -5297,15 +5336,15 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .mission-operational-pill-idle {
-  border-color: rgba(245, 184, 101, 0.24);
-  background: rgba(245, 184, 101, 0.1);
-  color: #ffd7a1;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
 }
 
 .mission-operational-pill-working {
-  border-color: rgba(92, 190, 146, 0.24);
-  background: rgba(92, 190, 146, 0.12);
-  color: #b8f2d3;
+  border-color: rgba(115, 164, 255, 0.24);
+  background: rgba(115, 164, 255, 0.1);
+  color: #cadcff;
 }
 
 .mission-operational-pill-not_working {
@@ -5938,7 +5977,80 @@ button.timeline-signal-chip:focus-visible {
 .models-provider-feedback-success {
   border: 1px solid rgba(92, 190, 146, 0.22);
   background: rgba(92, 190, 146, 0.08);
-  color: #b8f2d3;
+  color: #f7fffb;
+}
+
+.models-provider-feedback-success strong,
+.models-provider-feedback-success p,
+.models-provider-feedback-success code,
+.models-provider-feedback-success span {
+  color: inherit;
+}
+
+.telegram-link-command-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.telegram-link-feedback-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.telegram-link-command {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.telegram-link-copy-button {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.models-provider-feedback-success .ghost-control,
+.models-provider-feedback-success .icon-ghost-control {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.models-provider-feedback-success .ghost-control:hover,
+.models-provider-feedback-success .icon-ghost-control:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.models-provider-feedback-success .telegram-link-copy-button,
+.models-provider-feedback-success .telegram-link-copy-button:hover,
+.models-provider-feedback-success .telegram-link-copy-button:focus-visible {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.models-provider-feedback-success .telegram-link-copy-button:hover,
+.models-provider-feedback-success .telegram-link-copy-button:focus-visible {
+  color: #ffffff;
+  transform: scale(1.02);
 }
 
 .models-assignment-row {

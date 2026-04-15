@@ -10,7 +10,7 @@ export const SectionHeader = ({ eyebrow, title, body, contextLabel, titleTone = 
   <div className="section-header">
     {eyebrow ? <p className="section-header-eyebrow">{eyebrow}</p> : null}
     <div className="section-header-title-row">
-      <h2 className={`section-header-title section-header-title-${titleTone}`}>{title}</h2>
+      <h1 className={`section-header-title section-header-title-${titleTone}`}>{title}</h1>
       {contextLabel ? <span className="section-header-context-pill">{contextLabel}</span> : null}
     </div>
     {body ? <p className="section-header-body">{body}</p> : null}

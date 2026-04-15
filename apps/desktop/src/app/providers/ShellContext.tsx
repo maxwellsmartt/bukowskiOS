@@ -21,7 +21,6 @@ type ShellContextValue = {
   workspaceName: string;
   scopeMode: ScopeMode;
   scopeChipLabel: string | null;
-  syncLabel: string;
   projects: ProjectCardRow[];
   isScopeReady: boolean;
   activeProjectId: string | null;
@@ -309,8 +308,8 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   const scopeChipLabel =
     activeRoute.scopeMode === "project"
       ? activeProject
-        ? `Project · ${activeProject.code} / ${activeProject.name}`
-        : "Project mode"
+        ? `${activeProject.code} · ${activeProject.name}`
+        : "Project"
       : null;
 
   const value = useMemo<ShellContextValue>(
@@ -319,7 +318,6 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       workspaceName: shellBootstrap?.workspaceName ?? "Metadata Cine",
       scopeMode: activeRoute.scopeMode,
       scopeChipLabel,
-      syncLabel: shellBootstrap?.syncLabel ?? "Local-first",
       projects,
       isScopeReady,
       activeProjectId,

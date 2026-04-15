@@ -126,11 +126,7 @@ export const FinanceOverviewPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        title="Finance"
-        eyebrow="Finance > Overview"
-        body="Track current exposure, spend rhythm and category mix without leaving the operational shell."
-      />
+      <SectionHeader title="Finance" />
 
       {error ? <div className="empty-state">Finance overview unavailable: {error}</div> : null}
       {exportFeedback ? <div className="action-feedback action-feedback-success">{exportFeedback}</div> : null}
@@ -138,7 +134,6 @@ export const FinanceOverviewPage = () => {
 
       <SurfaceCard
         title="Period"
-        subtitle="Switch the reporting window without losing operational context."
         aside={
           <div className="finance-overview-aside">
             <StatusBadge tone="info">{data.activePeriodLabel}</StatusBadge>
@@ -202,23 +197,8 @@ export const FinanceOverviewPage = () => {
         ))}
       </div>
 
-      <div className="finance-grid finance-grid-secondary">
-        <SurfaceCard title="Tracked spend" subtitle="Entries recorded in the selected period.">
-          <span className="metric-value metric-tone-info">{data.totals.trackedSpend}</span>
-          <p className="metric-label">Tracked spend</p>
-        </SurfaceCard>
-        <SurfaceCard title="Reserve coverage" subtitle="Reserve entries registered in the selected period.">
-          <span className="metric-value metric-tone-warning">{data.totals.reserve}</span>
-          <p className="metric-label">Reserve total</p>
-        </SurfaceCard>
-        <SurfaceCard title="Burn rate" subtitle="Average monthly spend across the visible burn series.">
-          <span className="metric-value metric-tone-neutral">{data.totals.burnRateAverage}</span>
-          <p className="metric-label">Average monthly burn</p>
-        </SurfaceCard>
-      </div>
-
       <div className="finance-dashboard-grid">
-        <SurfaceCard title="Exposure by project" subtitle="Project pressure ranked by linked incident exposure.">
+        <SurfaceCard title="Exposure by Project">
           {isLoading ? (
             <TableSkeleton rows={5} />
           ) : exposureChartRows.length ? (
@@ -247,7 +227,7 @@ export const FinanceOverviewPage = () => {
           )}
         </SurfaceCard>
 
-        <SurfaceCard title="Monthly burn" subtitle="Spend rhythm over the last six monthly windows.">
+        <SurfaceCard title="Monthly Burn">
           {isLoading ? (
             <TableSkeleton rows={5} />
           ) : (
@@ -278,7 +258,7 @@ export const FinanceOverviewPage = () => {
           )}
         </SurfaceCard>
 
-        <SurfaceCard title="Category mix" subtitle="How the selected period is distributed across categories.">
+        <SurfaceCard title="Category Mix">
           {isLoading ? (
             <TableSkeleton rows={5} />
           ) : (
@@ -321,7 +301,7 @@ export const FinanceOverviewPage = () => {
       </div>
 
       <div className="split-layout">
-        <SurfaceCard title="Exposure by project table" subtitle="Keep a sortable operational table alongside the chart.">
+        <SurfaceCard title="Exposure Table">
           <DataTable
             getRowId={(row) => row.project}
             maxHeight="min(46vh, 520px)"
@@ -339,7 +319,7 @@ export const FinanceOverviewPage = () => {
           />
         </SurfaceCard>
 
-        <SurfaceCard title="Cost-link queue" subtitle="Incidents still waiting on financial follow-through.">
+        <SurfaceCard title="Review Queue">
           <div className="queue-list">
             {data.costLinks.map((row) => (
               <div key={row.incident} className="queue-item">

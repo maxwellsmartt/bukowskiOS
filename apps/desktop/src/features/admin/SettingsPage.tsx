@@ -68,14 +68,13 @@ type UserEditorDraft = {
   linkedCrewMemberId: string;
 };
 
-type SettingsSectionKey = "overview" | "users" | "operations" | "fidelity" | "support";
+type SettingsSectionKey = "overview" | "users" | "operations" | "advanced";
 
 const settingsSections: Array<{ key: SettingsSectionKey; label: string; description: string }> = [
-  { key: "overview", label: "Overview", description: "Build, health and readiness at a glance." },
-  { key: "users", label: "Users & Access", description: "Internal identities, roles and Telegram readiness." },
-  { key: "operations", label: "Operations", description: "Database health, backups and local sync." },
-  { key: "fidelity", label: "Render Fidelity", description: "Audit visual assets without changing layout." },
-  { key: "support", label: "Support & Export", description: "Logs, diagnostics and workspace export tools." },
+  { key: "overview", label: "General", description: "Quick health and access status." },
+  { key: "users", label: "Team", description: "People, roles and channel readiness." },
+  { key: "operations", label: "Data & Sync", description: "Database, backups and sync." },
+  { key: "advanced", label: "Advanced", description: "Diagnostics, exports and internal tools." },
 ];
 
 const permissionLabelMap: Record<string, string> = {
@@ -500,15 +499,12 @@ export const SettingsPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        title="Settings"
-        body="Admin tools for internal users, system health, support exports and visual audit work."
-      />
+      <SectionHeader title="Settings" />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
       {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
-      <SurfaceCard title="Settings areas" subtitle="Move between focused admin sections instead of scanning one long page.">
+      <SurfaceCard title="Sections">
         <div className="settings-subnav-grid">
           {settingsSections.map((section) => (
             <button
@@ -526,7 +522,7 @@ export const SettingsPage = () => {
 
       {activeSection === "overview" ? (
         <>
-          <SurfaceCard title="Overview" subtitle="Quick status before diving into a more specific admin area.">
+          <SurfaceCard title="General">
             <div className="summary-grid">
               {overviewRows.map((row) => (
                 <div key={row.label} className="summary-row">
@@ -538,46 +534,21 @@ export const SettingsPage = () => {
 
             <div className="action-panel-actions action-panel-actions-start">
               <button className="action-primary-button" onClick={() => setActiveSection("users")} type="button">
-                Open users & access
+                Open team
               </button>
               <button className="ghost-control" onClick={() => setActiveSection("operations")} type="button">
-                Open operations
+                Open data & sync
               </button>
-              <button className="ghost-control" onClick={() => setActiveSection("support")} type="button">
-                Open support & export
+              <button className="ghost-control" onClick={() => setActiveSection("advanced")} type="button">
+                Open advanced
               </button>
-            </div>
-          </SurfaceCard>
-
-          <SurfaceCard title="About" subtitle="Build identity for this local BukowskiOS installation.">
-            <div className="summary-grid">
-              <div className="summary-row">
-                <span className="summary-label">App</span>
-                <span className="summary-value">{appInfo?.appName ?? "bukowskiOS"}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Version</span>
-                <span className="summary-value">{appInfo?.version ?? "Unknown"}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Shell version</span>
-                <span className="summary-value">{appInfo?.shellVersion ?? "Unknown"}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Platform</span>
-                <span className="summary-value">{appInfo?.platform ?? "Unknown"}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Build type</span>
-                <span className="summary-value">{appInfo?.isPackaged ? "Packaged build" : "Development build"}</span>
-              </div>
             </div>
           </SurfaceCard>
         </>
       ) : null}
 
       {activeSection === "users" ? (
-        <SurfaceCard title="Users & access" subtitle="Create real internal users, assign a role, link crew, and track Telegram readiness.">
+        <SurfaceCard title="Team">
           <div className="summary-grid">
             {userSummaryRows.map((row) => (
               <div key={row.label} className="summary-row">
@@ -602,8 +573,8 @@ export const SettingsPage = () => {
                     <span className="subtle-pill">Create</span>
                   </div>
                   <div className="agent-detail-row">
-                    <span>Add a real internal identity</span>
-                    <span>Users + roles</span>
+                    <span>Add a new internal user</span>
+                    <span>Users & roles</span>
                   </div>
                 </div>
               </button>
@@ -717,9 +688,7 @@ export const SettingsPage = () => {
               <div className="models-provider-diagnostic">
                 <span className="agent-detail-kicker">Selected role</span>
                 <p>
-                  {selectedRole
-                    ? `${selectedRole.name} · ${selectedRole.description}`
-                    : "Pick the main operating role for this user. Roles are the authority for Telegram and tool access."}
+                  {selectedRole ? `${selectedRole.name} · ${selectedRole.description}` : "Choose the main role for this user."}
                 </p>
               </div>
 
@@ -791,7 +760,7 @@ export const SettingsPage = () => {
                   </button>
                 ) : null}
                 <button className="ghost-control" onClick={() => navigate("/agents/connectors")} type="button">
-                  Open Connectors
+                  Open channels
                 </button>
               </div>
             </div>
@@ -892,7 +861,7 @@ export const SettingsPage = () => {
 
       {activeSection === "operations" ? (
         <>
-          <SurfaceCard title="Database" subtitle="Health checks and backups for the local-first workspace.">
+          <SurfaceCard title="Database">
             <div className="summary-grid">
               {summaryRows.map((row) => (
                 <div key={row.label} className="summary-row">
@@ -925,12 +894,12 @@ export const SettingsPage = () => {
                 onClick={() => void runAction(() => window.bukowskiApp!.runLocalSync(), setIsRunningLocalSync)}
                 type="button"
               >
-                {isRunningLocalSync ? "Running local sync..." : "Run local sync now"}
+                {isRunningLocalSync ? "Syncing..." : "Run sync now"}
               </button>
             </div>
           </SurfaceCard>
 
-          <SurfaceCard title="Local sync queue" subtitle="Open the dedicated outbox view to inspect failures, retry rows and drill into related entities.">
+          <SurfaceCard title="Sync">
             <div className="summary-grid">
               <div className="summary-row">
                 <span className="summary-label">Visible rows</span>
@@ -952,7 +921,7 @@ export const SettingsPage = () => {
 
             <div className="action-panel-actions action-panel-actions-start">
               <button className="action-primary-button" onClick={() => navigate("/settings/sync")} type="button">
-                Open local sync queue
+                Open sync activity
               </button>
               <button
                 className="ghost-control"
@@ -973,37 +942,60 @@ export const SettingsPage = () => {
         </>
       ) : null}
 
-      {activeSection === "fidelity" ? (
-        <SurfaceCard title="Render fidelity audit" subtitle="Audit core assets and crispness without touching the current layout.">
-          <div className="summary-grid">
-            <div className="summary-row">
-              <span className="summary-label">Total audited</span>
-              <span className="summary-value">{fidelityAuditSummary.total}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Vector candidates</span>
-              <span className="summary-value">{fidelityAuditSummary.vectorCandidates}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Raster keepers</span>
-              <span className="summary-value">{fidelityAuditSummary.rasterItems}</span>
-            </div>
-            {renderFidelityAudit.map((item) => (
-              <div key={item.id} className="summary-row">
-                <span className="summary-label">{item.label}</span>
-                <span className="summary-value">{`${item.currentKind} to ${item.recommendedKind}`}</span>
-              </div>
-            ))}
-          </div>
-        </SurfaceCard>
-      ) : null}
-
-      {activeSection === "support" ? (
+      {activeSection === "advanced" ? (
         <>
-          <SurfaceCard title="Data export" subtitle="Export the full local workspace as a JSON snapshot.">
+          <SurfaceCard title="App Info">
             <div className="summary-grid">
               <div className="summary-row">
-                <span className="summary-label">Internal alpha package</span>
+                <span className="summary-label">App</span>
+                <span className="summary-value">{appInfo?.appName ?? "bukowskiOS"}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Version</span>
+                <span className="summary-value">{appInfo?.version ?? "Unknown"}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Desktop build</span>
+                <span className="summary-value">{appInfo?.shellVersion ?? "Unknown"}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Platform</span>
+                <span className="summary-value">{appInfo?.platform ?? "Unknown"}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Build type</span>
+                <span className="summary-value">{appInfo?.isPackaged ? "Packaged" : "Development"}</span>
+              </div>
+            </div>
+          </SurfaceCard>
+
+          <SurfaceCard title="Visual Audit">
+            <div className="summary-grid">
+              <div className="summary-row">
+                <span className="summary-label">Total audited</span>
+                <span className="summary-value">{fidelityAuditSummary.total}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Vector candidates</span>
+                <span className="summary-value">{fidelityAuditSummary.vectorCandidates}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Raster keepers</span>
+                <span className="summary-value">{fidelityAuditSummary.rasterItems}</span>
+              </div>
+              {renderFidelityAudit.map((item) => (
+                <div key={item.id} className="summary-row">
+                  <span className="summary-label">{item.label}</span>
+                  <span className="summary-value">{`${item.currentKind} to ${item.recommendedKind}`}</span>
+                </div>
+              ))}
+            </div>
+          </SurfaceCard>
+
+          <SurfaceCard title="Data Export">
+            <div className="summary-grid">
+              <div className="summary-row">
+                <span className="summary-label">Build artifacts</span>
                 <span className="summary-value">
                   {diagnostics.internalBuildArtifacts.length ? diagnostics.internalBuildArtifacts.join(", ") : "Not packaged yet"}
                 </span>
@@ -1022,7 +1014,7 @@ export const SettingsPage = () => {
             </div>
           </SurfaceCard>
 
-          <SurfaceCard title="Support" subtitle="Export diagnostics and recent logs when an internal alpha build needs debugging.">
+          <SurfaceCard title="Support">
             <div className="summary-grid">
               <div className="summary-row">
                 <span className="summary-label">Last crash</span>
@@ -1080,7 +1072,7 @@ export const SettingsPage = () => {
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(supportSummaryText);
-                    setFeedback("Copied the diagnostics summary to your clipboard.");
+                    setFeedback("Copied the diagnostics summary.");
                     setError(null);
                   } catch (copyError) {
                     setError(copyError instanceof Error ? copyError.message : "The app could not copy the diagnostics summary.");

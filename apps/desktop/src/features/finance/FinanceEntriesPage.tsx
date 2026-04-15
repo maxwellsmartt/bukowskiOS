@@ -112,18 +112,15 @@ export const FinanceEntriesPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        title="Entries"
-        body="Keep reserves, exposure and invoice tracking editable from the register instead of treating Finance as read-only."
-      />
+      <SectionHeader title="Entries" />
 
       {error ? <div className="empty-state">Entries unavailable: {error}</div> : null}
 
       <div className="chip-row">
-        <StatusBadge tone="success">{data.filter((entry) => hasItem("financial_entry", entry.id)).length} in compare</StatusBadge>
         {selectedRowIds.length ? <StatusBadge>{`${selectedRowIds.length} selected`}</StatusBadge> : null}
-        {feedback ? <StatusBadge tone="info">{feedback}</StatusBadge> : null}
       </div>
+
+      {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
       <div className="action-panel-actions action-panel-actions-start">
         <button
@@ -147,7 +144,7 @@ export const FinanceEntriesPage = () => {
             <span className="selection-action-title">
               {selectedRowIds.length === 1 ? "1 finance entry selected" : `${selectedRowIds.length} finance entries selected`}
             </span>
-            <span className="selection-action-subtitle">Add entries to compare for reserve and exposure review.</span>
+            <span className="selection-action-subtitle">Add them to compare.</span>
           </div>
           <div className="selection-action-buttons">
             <button
@@ -219,7 +216,7 @@ export const FinanceEntriesPage = () => {
         />
       ) : null}
 
-      <SurfaceCard title="Entry register">
+      <SurfaceCard title="Entries">
         <ListToolbar
           activeSortLabel={financeControls.activeSortOption?.label}
           onSearchValueChange={financeControls.setSearchValue}

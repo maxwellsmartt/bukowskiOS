@@ -40,7 +40,7 @@ export const PackingSlipDetailPanel = ({
 
   if (isLoading) {
     return (
-      <SurfaceCard title="Packing detail" subtitle="Loading selected slip...">
+      <SurfaceCard title="Packing Details">
         <TableSkeleton body="Preparing outgoing items, return state and document context for the selected slip." columns={5} />
       </SurfaceCard>
     );
@@ -48,7 +48,7 @@ export const PackingSlipDetailPanel = ({
 
   if (error) {
     return (
-      <SurfaceCard title="Packing detail" subtitle={`Packing detail unavailable: ${error}`}>
+      <SurfaceCard title="Packing Details">
         <div className="empty-state">Review the local document state and retry the action.</div>
       </SurfaceCard>
     );
@@ -56,8 +56,8 @@ export const PackingSlipDetailPanel = ({
 
   if (!data.slip) {
     return (
-      <SurfaceCard title="Packing detail" subtitle="Select a slip to inspect outgoing items, returns and document context.">
-        <div className="empty-state">Choose a packing slip from the registry to inspect its document state.</div>
+      <SurfaceCard title="Packing Details">
+        <div className="empty-state">Choose a packing slip to inspect its document state.</div>
       </SurfaceCard>
     );
   }
@@ -70,7 +70,6 @@ export const PackingSlipDetailPanel = ({
   return (
     <SurfaceCard
       title={data.slip.number}
-      subtitle="Document detail with outgoing items, return status and quick return controls."
       aside={<StatusBadge tone={data.slip.status === "Overdue" ? "critical" : data.slip.status === "Closed" ? "success" : "info"}>{data.slip.status}</StatusBadge>}
     >
       <div className="summary-grid">
@@ -115,7 +114,7 @@ export const PackingSlipDetailPanel = ({
       {data.slip.primaryCodeValue ? (
         <ScannableCodePanel
           codeValue={data.slip.primaryCodeValue}
-          subtitle="Slip-ready QR and Code128 preview for warehouse handoff and return tracking."
+          subtitle="Slip code"
           title={data.slip.number}
           qrLabel="Slip QR"
           barcodeLabel="Slip barcode"
@@ -139,7 +138,7 @@ export const PackingSlipDetailPanel = ({
           <input
             className="action-field-control"
             onChange={(event) => setNotes(event.target.value)}
-            placeholder="Optional note for the return event."
+            placeholder="Optional note"
             value={notes}
           />
         </label>

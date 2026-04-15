@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { getAgentApprovalDecisionLabel, getAgentRunStatusLabel } from "@shared/labels/statusLabels";
 
 import { reviewAgentRun, useAgentRuns } from "./useAgentsData";
 
@@ -47,18 +48,7 @@ export const AgentRunsPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        title="Runs"
-        titleTone="accent"
-        body="Intent classification, supervised drafts and routing stay visible here before any real command execution."
-      />
-
-      <SurfaceCard
-        title="Command visibility"
-        subtitle="These runs show orchestration state only. A run can be classified, routed or approved here without the Bukowski command layer executing yet."
-      >
-        <p className="agent-run-note">Intent classified first. Command execution remains outside this phase.</p>
-      </SurfaceCard>
+      <SectionHeader title="Activity" titleTone="accent" />
 
       <div className="agents-health-grid">
         {summaryCards.map((card) => (
@@ -69,7 +59,7 @@ export const AgentRunsPage = () => {
         ))}
       </div>
 
-      <SurfaceCard title="Recent runs" subtitle="Queued, supervised and completed work stays visible in one place.">
+      <SurfaceCard title="Recent Activity">
         {error ? <div className="empty-state">Runs unavailable: {error}</div> : null}
         {feedback ? <div className="form-inline-error">{feedback}</div> : null}
 
@@ -79,9 +69,7 @@ export const AgentRunsPage = () => {
               <div className="agent-run-row-copy">
                 <strong>{run.title}</strong>
                 <p>{run.summary}</p>
-                <p className="agent-run-note">
-                  Intent classified · {run.agentDisplayName || "Supervisor Agent"} · No changes made
-                </p>
+                <p className="agent-run-note">{run.agentDisplayName || "Supervisor Agent"} · No changes yet</p>
                 {run.status === "needs_approval" ? (
                   <div className="agent-run-approval-panel">
                     <div className="agent-run-approval-copy">
@@ -120,10 +108,10 @@ export const AgentRunsPage = () => {
                 ) : null}
               </div>
               <div className="agent-run-row-meta">
-                <span className={`run-status-pill run-status-pill-${run.status}`}>{run.status.replace(/_/g, " ")}</span>
+                <span className={`run-status-pill run-status-pill-${run.status}`}>{getAgentRunStatusLabel(run.status)}</span>
                 {run.approvalDecision && run.approvalDecision !== "pending" ? (
                   <span className={`run-status-pill run-status-pill-${run.approvalDecision}`}>
-                    {run.approvalDecision.replace(/_/g, " ")}
+                    {getAgentApprovalDecisionLabel(run.approvalDecision)}
                   </span>
                 ) : null}
                 <span className="agent-run-time">{run.updatedAtLabel}</span>

@@ -8,6 +8,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
+import { getSyncOutboxStatusLabel } from "@shared/labels/statusLabels";
 
 const emptyDiagnostics: AppDiagnosticsSnapshot = {
   databaseSizeBytes: 0,
@@ -89,10 +90,10 @@ const resolveEntityNavigationPath = (row: AppSyncOutboxRow) => {
 
 const summarizeSelection = (row: AppSyncOutboxRow | null) => {
   if (!row) {
-    return "Select any row to inspect payload, status and related entity.";
+    return "Select a row to inspect it.";
   }
 
-  return `${row.entityType} · ${row.operationType} · workspace ${DEFAULT_WORKSPACE_ID}`;
+  return `${row.entityType} · ${row.operationType}`;
 };
 
 export const SyncOutboxPage = () => {
@@ -125,7 +126,7 @@ export const SyncOutboxPage = () => {
       setRows(nextRows);
       setError(null);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "The app could not load the local sync queue.");
+      setError(nextError instanceof Error ? nextError.message : "The app could not load sync activity.");
     }
   };
 
@@ -233,7 +234,7 @@ export const SyncOutboxPage = () => {
       }
 
       if (lastResult) {
-        setFeedback(`${visibleRetryableRows.length} visible rows queued again locally.`);
+        setFeedback(`${visibleRetryableRows.length} visible rows queued again.`);
         setDiagnostics(lastResult.diagnostics);
       }
       setError(null);
@@ -248,18 +249,14 @@ export const SyncOutboxPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        eyebrow="Operations / Sync"
-        title="Local sync queue"
-        body="Inspect pending, failed or already acknowledged outbox rows, retry failures, and jump directly to the affected entity."
-      />
+      <SectionHeader title="Sync Activity" />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
       {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
       <div className="chip-row">
         <StatusBadge tone={diagnostics.syncOutboxFailedCount ? "critical" : "success"}>
-          {diagnostics.syncOutboxFailedCount ? `${diagnostics.syncOutboxFailedCount} failed` : "Queue healthy"}
+          {diagnostics.syncOutboxFailedCount ? `${diagnostics.syncOutboxFailedCount} failed` : "Up to date"}
         </StatusBadge>
         <StatusBadge tone="warning">{`${diagnostics.syncOutboxPendingCount} pending`}</StatusBadge>
         <StatusBadge tone="info">{`${diagnostics.syncOutboxProcessingCount} processing`}</StatusBadge>
@@ -274,7 +271,7 @@ export const SyncOutboxPage = () => {
           onClick={() => void runAction(() => window.bukowskiApp!.runLocalSync(), setIsRunningLocalSync)}
           type="button"
         >
-          {isRunningLocalSync ? "Running local sync..." : "Run local sync now"}
+          {isRunningLocalSync ? "Syncing..." : "Run sync now"}
         </button>
         <button
           className="ghost-control"
@@ -298,7 +295,7 @@ export const SyncOutboxPage = () => {
       </div>
 
       <div className="split-layout">
-        <SurfaceCard title="Outbox rows" subtitle="Filter by status and inspect the rows that still need attention.">
+        <SurfaceCard title="Rows">
           <div className="sync-outbox-toolbar">
             <div className="sync-outbox-filter-row">
               {syncFilters.map((item) => (
@@ -343,7 +340,7 @@ export const SyncOutboxPage = () => {
               {
                 key: "status",
                 label: "Status",
-                render: (row) => <StatusBadge tone={formatSyncStatusTone(row.status)}>{row.status}</StatusBadge>,
+                render: (row) => <StatusBadge tone={formatSyncStatusTone(row.status)}>{getSyncOutboxStatusLabel(row.status)}</StatusBadge>,
               },
               { key: "entityType", label: "Entity", render: (row) => row.entityType },
               { key: "entityId", label: "Entity ID", render: (row) => row.entityId },
@@ -356,7 +353,7 @@ export const SyncOutboxPage = () => {
           />
         </SurfaceCard>
 
-        <SurfaceCard title="Row detail" subtitle={summarizeSelection(activeRow)}>
+        <SurfaceCard title="Row Detail" subtitle={summarizeSelection(activeRow)}>
           {!activeRow ? (
             <div className="empty-state">Select any outbox row to inspect it.</div>
           ) : (
@@ -364,7 +361,7 @@ export const SyncOutboxPage = () => {
               <div className="summary-grid">
                 <div className="summary-row">
                   <span className="summary-label">Status</span>
-                  <span className="summary-value">{activeRow.status}</span>
+                  <span className="summary-value">{getSyncOutboxStatusLabel(activeRow.status)}</span>
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">Entity</span>

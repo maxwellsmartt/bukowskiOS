@@ -129,27 +129,6 @@ const getPanelTitle = (entityType: CatalogEntityType, mode: "create" | "edit") =
   return mode === "create" ? `New ${labelMap[entityType]}` : `Edit ${labelMap[entityType]}`;
 };
 
-const getPanelSubtitle = (entityType: CatalogEntityType) => {
-  switch (entityType) {
-    case "location":
-      return "Global locations become reusable anchors for assets, moves, returns and maintenance.";
-    case "department":
-      return "Departments stay global so projects can reuse the same operational structure cleanly.";
-    case "crew":
-      return "Crew is a reusable operational catalog, separate from auth users and permissions.";
-    case "client":
-      return "Clients now live as central records so projects stop depending on loose text fields.";
-    case "production_company":
-      return "Production companies stay reusable and historical snapshots keep project records audit-friendly.";
-    case "manufacturer":
-      return "Manufacturers keep support contacts reusable so RMA cases stay consistent and audit-ready.";
-    case "category":
-      return "Categories stay global to keep the registry consistent as inventory grows.";
-    case "kit":
-      return "Kits group assets that travel together and prepare future assignment and packing flows.";
-  }
-};
-
 const createEmptyBankAccount = (): CrewBankAccountDraft => ({
   bankName: "",
   accountHolder: "",
@@ -323,7 +302,6 @@ export const CatalogEditorPanel = ({
         </button>
       }
       title={getPanelTitle(entityType, mode)}
-      subtitle={getPanelSubtitle(entityType)}
     >
       <div className="action-form-grid">
         {entityType === "location" || entityType === "department" || entityType === "category" || entityType === "kit" ? (
@@ -363,21 +341,6 @@ export const CatalogEditorPanel = ({
                   </option>
                 ))}
               </SelectField>
-            </label>
-            <label className="action-field">
-              <span className="action-field-label">Linked user</span>
-              <SelectField onChange={(event) => setLinkedUserId(event.target.value)} value={linkedUserId}>
-                <option value="">No linked user</option>
-                {linkedUserOptions.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.fullName}
-                  </option>
-                ))}
-              </SelectField>
-            </label>
-            <label className="action-field">
-              <span className="action-field-label">Document ID</span>
-              <input className="action-field-control" onChange={(event) => setDocumentId(event.target.value)} value={documentId} />
             </label>
             <label className="action-field">
               <span className="action-field-label">Role label</span>
@@ -421,26 +384,52 @@ export const CatalogEditorPanel = ({
         {entityType === "crew" || entityType === "client" || entityType === "manufacturer" || entityType === "kit" ? (
           <label className="action-field action-field-wide">
             <span className="action-field-label">Notes</span>
-            <textarea className="action-field-control action-textarea" onChange={(event) => setNotes(event.target.value)} rows={3} value={notes} />
+            <textarea
+              className="action-field-control action-textarea"
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Optional note"
+              rows={3}
+              value={notes}
+            />
           </label>
         ) : null}
       </div>
 
-        {entityType === "crew" ? (
+      {entityType === "crew" ? (
+        <details className="detail-disclosure" open>
+          <summary className="detail-disclosure-summary">More details</summary>
+          <div className="detail-disclosure-content">
+            <div className="action-form-grid">
+              <label className="action-field">
+                <span className="action-field-label">Linked user</span>
+                <SelectField onChange={(event) => setLinkedUserId(event.target.value)} value={linkedUserId}>
+                  <option value="">No linked user</option>
+                  {linkedUserOptions.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.fullName}
+                    </option>
+                  ))}
+                </SelectField>
+              </label>
+              <label className="action-field">
+                <span className="action-field-label">Document ID</span>
+                <input className="action-field-control" onChange={(event) => setDocumentId(event.target.value)} value={documentId} />
+              </label>
+            </div>
+          </div>
+        </details>
+      ) : null}
+
+      {entityType === "crew" ? (
         <div className="catalog-crew-support-grid">
           <div className="catalog-crew-support-card">
             <div className="surface-card-header catalog-kit-assets-header">
               <div>
                 <h3 className="surface-card-title">Identity link</h3>
-                <p className="surface-card-subtitle">
-                  Link this crew member to an internal user when you want connectors like Telegram to resolve real roles and permissions.
-                </p>
               </div>
             </div>
             <div className="catalog-crew-support-empty">
-              {linkedUserId
-                ? `Linked to internal user ${linkedUserOptions.find((user) => user.id === linkedUserId)?.fullName ?? linkedUserId}.`
-                : "No internal user linked yet."}
+              {linkedUserId ? `Linked to ${linkedUserOptions.find((user) => user.id === linkedUserId)?.fullName ?? linkedUserId}.` : "No internal user linked yet."}
             </div>
           </div>
 
@@ -448,7 +437,6 @@ export const CatalogEditorPanel = ({
             <div className="surface-card-header catalog-kit-assets-header">
               <div>
                 <h3 className="surface-card-title">Bank accounts</h3>
-                <p className="surface-card-subtitle">Keep payout details here and decide whether the number should stay masked in preview.</p>
               </div>
               <button className="ghost-control catalog-inline-button" onClick={() => setBankAccounts((current) => [...current, createEmptyBankAccount()])} type="button">
                 <Plus size={14} />
@@ -627,11 +615,7 @@ export const CatalogEditorPanel = ({
               >
                 <div>
                   <h3 className="surface-card-title">Documents</h3>
-                  <p className="surface-card-subtitle">
-                    {canManageCrewDocuments
-                      ? "Attach PDFs, photos of IDs and other support files directly from Catalog, or drag them here."
-                      : "Save this crew profile first to enable file attachments and drag and drop."}
-                  </p>
+                  {canManageCrewDocuments ? null : <p className="surface-card-subtitle">Save this crew profile first to attach files.</p>}
                 </div>
                 <button
                   className="ghost-control catalog-inline-button"
@@ -700,7 +684,6 @@ export const CatalogEditorPanel = ({
           <div className="surface-card-header catalog-kit-assets-header">
             <div>
               <h3 className="surface-card-title">Kit members</h3>
-              <p className="surface-card-subtitle">Choose the assets that should live together as part of this package and set quantity when a row supports bulk stock.</p>
             </div>
             <span className="section-header-context-pill">
               {selectedKitMemberCount} members · {selectedKitItemCount} units

@@ -3,10 +3,10 @@ import { matchPath } from "react-router-dom";
 import { readStringPreference, uiPreferenceKeys } from "@shared/lib/preferences";
 
 export type ScopeMode = "global" | "project";
-export type GlobalDomainKey = "assets" | "finance" | "agents" | "utility";
+export type GlobalDomainKey = "projects" | "assets" | "finance" | "agents" | "utility";
 export type ProjectRouteSection = "overview" | "assets" | "packing" | "incidents" | "budget" | "info";
 export type DomainKey = GlobalDomainKey | "project";
-export type PrimaryNavKey = "assets" | "finance" | "agents";
+export type PrimaryNavKey = "projects" | "assets" | "finance" | "agents";
 
 export type AppRouteMeta = {
   path: string;
@@ -26,20 +26,20 @@ export const globalRouteMeta: AppRouteMeta[] = [
   { path: "/assets/:assetId", label: "Asset Detail", scopeMode: "global", domain: "assets" },
   { path: "/packing-slips", label: "Packing Slips", scopeMode: "global", domain: "assets" },
   { path: "/incidents", label: "Incidents", scopeMode: "global", domain: "assets" },
-  { path: "/projects", label: "Projects", scopeMode: "global", domain: "assets" },
+  { path: "/projects", label: "Projects", scopeMode: "global", domain: "projects" },
   { path: "/rma", label: "RMA", scopeMode: "global", domain: "assets" },
-  { path: "/catalog", label: "Catalog", scopeMode: "global", domain: "assets" },
+  { path: "/catalog", label: "Catalog", scopeMode: "global", domain: "utility" },
   { path: "/compare", label: "Compare", scopeMode: "global", domain: "utility" },
   { path: "/finance", label: "Finance Overview", scopeMode: "global", domain: "finance" },
-  { path: "/finance/cost-links", label: "Cost Links", scopeMode: "global", domain: "finance" },
+  { path: "/finance/cost-links", label: "Review Queue", scopeMode: "global", domain: "finance" },
   { path: "/finance/entries", label: "Entries", scopeMode: "global", domain: "finance" },
-  { path: "/agents/mission-control", label: "Mission Control", scopeMode: "global", domain: "agents" },
-  { path: "/agents", label: "Agents Directory", scopeMode: "global", domain: "agents" },
-  { path: "/agents/runs", label: "Agent Runs", scopeMode: "global", domain: "agents" },
-  { path: "/agents/models", label: "Agent Models", scopeMode: "global", domain: "agents" },
-  { path: "/agents/connectors", label: "Agent Connectors", scopeMode: "global", domain: "agents" },
+  { path: "/agents/mission-control", label: "Automation Overview", scopeMode: "global", domain: "agents" },
+  { path: "/agents", label: "Automation Team", scopeMode: "global", domain: "agents" },
+  { path: "/agents/runs", label: "Automation Activity", scopeMode: "global", domain: "agents" },
+  { path: "/agents/models", label: "AI Models", scopeMode: "global", domain: "agents" },
+  { path: "/agents/connectors", label: "Channels", scopeMode: "global", domain: "agents" },
   { path: "/settings", label: "Settings", scopeMode: "global", domain: "utility" },
-  { path: "/settings/sync", label: "Local Sync Queue", scopeMode: "global", domain: "utility" },
+  { path: "/settings/sync", label: "Sync Activity", scopeMode: "global", domain: "utility" },
 ];
 
 export const projectRouteMeta: AppRouteMeta[] = [
@@ -80,7 +80,7 @@ export const projectRouteMeta: AppRouteMeta[] = [
   },
   {
     path: "/projects/:projectId/info",
-    label: "Project Info",
+    label: "Project Details",
     scopeMode: "project",
     domain: "project",
     projectSection: "info",
@@ -151,6 +151,10 @@ export const resolvePrimaryNavKey = (pathname: string): PrimaryNavKey | null => 
 
   if (activeRoute.scopeMode !== "global") {
     return null;
+  }
+
+  if (activeRoute.domain === "projects") {
+    return "projects";
   }
 
   if (activeRoute.domain === "assets") {

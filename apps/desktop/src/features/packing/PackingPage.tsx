@@ -97,14 +97,8 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   return (
     <div className="page-stack">
       <SectionHeader
-        eyebrow={isProjectMode ? "Project / Packing" : "Packing slips"}
-        title={isProjectMode ? "Project dispatch and returns" : "Outgoing and return control"}
-        body={
-          isProjectMode
-            ? `Dispatches, pending returns and custody handoff linked to ${projectName ?? "the current project"}.`
-            : "Operational documents for dispatch, pending returns and custody handoff across active projects."
-        }
-        contextLabel={sectionScopeLabel}
+        title={isProjectMode ? "Project Packing" : "Packing Slips"}
+        contextLabel={isProjectMode ? sectionScopeLabel ?? undefined : undefined}
       />
 
       {error ? <div className="empty-state">Packing slips unavailable: {error}</div> : null}
@@ -112,14 +106,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
       {returnError ? <div className="action-feedback action-feedback-error">{returnError}</div> : null}
 
       <div className="split-layout">
-        <SurfaceCard
-          title={isProjectMode ? "Project slips" : "Slip registry"}
-          subtitle={
-            isProjectMode
-              ? "Issued, partial-return, overdue and closed slips for this project."
-              : "Issued, partial-return, overdue and closed slips visible in one operational queue."
-          }
-        >
+        <SurfaceCard title="Packing Slips">
           <ListToolbar
             activeSortLabel={packingControls.activeSortOption?.label}
             onSearchValueChange={packingControls.setSearchValue}

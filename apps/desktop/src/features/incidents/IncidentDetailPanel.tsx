@@ -126,7 +126,7 @@ export const IncidentDetailPanel = ({
 
   if (!incident) {
     return (
-      <SurfaceCard title="Incident detail" subtitle="Select an incident from the queue to review, edit or resolve it.">
+      <SurfaceCard title="Incident Details">
         <div className="empty-state">No incident selected.</div>
       </SurfaceCard>
     );
@@ -140,7 +140,6 @@ export const IncidentDetailPanel = ({
         </button>
       }
       title={incident.title}
-      subtitle="Operational detail, estimate tracking and resolution in one place."
     >
       <div className="page-stack">
         <div className="chip-row">
@@ -170,7 +169,6 @@ export const IncidentDetailPanel = ({
 
         <SurfaceCard
           title="Evidence files"
-          subtitle="Attach photos, PDFs or reports linked to this incident."
           aside={
             <button
               className="surface-card-action-text"

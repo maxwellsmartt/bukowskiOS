@@ -10,7 +10,7 @@ export const ProjectOverviewPage = () => {
 
   return (
     <div className="page-stack page-stack-project">
-      <SectionHeader title="Overview" />
+      <SectionHeader title="Project Overview" />
 
       <div className="project-workspace-scroll">
         <ProjectDetailPanel data={data} error={error} isLoading={isLoading} onIncidentCreated={reload} />

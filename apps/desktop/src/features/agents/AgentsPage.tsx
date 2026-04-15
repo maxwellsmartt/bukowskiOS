@@ -4,6 +4,7 @@ import { CopyPlus, PauseCircle, PlayCircle, Plus, X } from "lucide-react";
 import type { AgentRosterRow } from "@contracts";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { getAgentApprovalModeLabel, titleCaseEnum } from "@shared/labels/statusLabels";
 import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
 
 import { AgentDomainInsightPanel } from "./AgentDomainInsightPanel";
@@ -67,16 +68,11 @@ export const AgentsPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        title="Agents"
-        titleTone="accent"
-        body="Browse the roster, adjust supervision posture and shape each specialist through a visual builder."
-      />
+      <SectionHeader title="Automation Team" titleTone="accent" />
 
       <div className={`agents-directory-layout${selectedAgentId ? "" : " is-directory-expanded"}`}>
         <SurfaceCard
-          title="Agent directory"
-          subtitle="The current roster, models and operating posture."
+          title="Agents"
           aside={
             <button className="primary-control" onClick={() => setCreateOpen(true)} type="button">
               <Plus size={14} />
@@ -117,7 +113,7 @@ export const AgentsPage = () => {
                       <span className="subtle-pill agent-directory-model-pill" title={agent.modelLabel}>
                         {providerBrand.logoSrc ? (
                           <img
-                            alt={providerBrand.logoAlt ?? providerBrand.label ?? "Provider"}
+                            alt={providerBrand.logoAlt ?? providerBrand.label ?? "AI service"}
                             className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
                             src={providerBrand.logoSrc}
                           />
@@ -134,7 +130,7 @@ export const AgentsPage = () => {
                         }}
                         type="button"
                       >
-                        Configure
+                        Edit
                       </button>
                       <button
                         aria-label={agent.status === "active" ? `Pause ${agent.displayName}` : `Reactivate ${agent.displayName}`}
@@ -176,7 +172,6 @@ export const AgentsPage = () => {
         {selectedAgentId ? (
           <SurfaceCard
             title={detail.agent?.displayName ?? "Loading agent"}
-            subtitle={detail.agent?.role ?? "The selected agent opens here with scope, posture and recent activity."}
             aside={
               <div className="surface-card-actions">
                 <button
@@ -196,13 +191,13 @@ export const AgentsPage = () => {
                 <span className={`mission-operational-pill mission-operational-pill-${detail.agent.operationalState}`}>
                   {operationalStateLabelMap[detail.agent.operationalState]}
                 </span>
-                <span className={`mission-node-status mission-node-status-${detail.agent.status}`}>{detail.agent.status}</span>
+                <span className={`mission-node-status mission-node-status-${detail.agent.status}`}>{titleCaseEnum(detail.agent.status)}</span>
                 <span className="subtle-pill">
                   {(() => {
                     const providerBrand = getAgentProviderBrand(detail.agent.modelLabel);
                     return providerBrand.logoSrc ? (
                       <img
-                        alt={providerBrand.logoAlt ?? providerBrand.label ?? "Provider"}
+                        alt={providerBrand.logoAlt ?? providerBrand.label ?? "AI service"}
                         className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
                         src={providerBrand.logoSrc}
                       />
@@ -210,7 +205,7 @@ export const AgentsPage = () => {
                   })()}
                   <span>{detail.agent.modelLabel}</span>
                 </span>
-                <span className="subtle-pill">{detail.agent.approvalMode.replace(/_/g, " ")}</span>
+                <span className="subtle-pill">{getAgentApprovalModeLabel(detail.agent.approvalMode)}</span>
               </div>
               <div className="agent-detail-meta">
                 <div>
@@ -231,7 +226,7 @@ export const AgentsPage = () => {
               <AgentDomainInsightPanel domain={detail.agent.domain} missionControl={missionControl} />
 
               <div className="agent-detail-runs">
-                <span className="agent-detail-kicker">Recent runs</span>
+                <span className="agent-detail-kicker">Recent activity</span>
                 {detail.recentRuns.length ? (
                   detail.recentRuns.map((run) => (
                     <div key={run.id} className="agent-run-row">
@@ -240,13 +235,13 @@ export const AgentsPage = () => {
                         <p>{run.summary}</p>
                       </div>
                       <div className="agent-run-row-meta">
-                        <span className={`run-status-pill run-status-pill-${run.status}`}>{run.status.replace(/_/g, " ")}</span>
+                        <span className={`run-status-pill run-status-pill-${run.status}`}>{titleCaseEnum(run.status)}</span>
                         <span className="agent-run-time">{run.updatedAtLabel}</span>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="empty-state">No recent runs for this agent yet.</div>
+                  <div className="empty-state">No recent activity for this agent yet.</div>
                 )}
               </div>
             </div>

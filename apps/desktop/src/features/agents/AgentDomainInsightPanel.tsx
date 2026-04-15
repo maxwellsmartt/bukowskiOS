@@ -7,6 +7,7 @@ import { useIncidentsData } from "@features/incidents/useIncidentsData";
 import { useProjectsRegistry } from "@features/projects/useProjectsData";
 import { useRmaSnapshot } from "@features/rma/useRmaData";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { getAgentRunStatusLabel, titleCaseEnum } from "@shared/labels/statusLabels";
 
 import { useAgentConnectors } from "./useAgentsData";
 
@@ -56,23 +57,21 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
   const { data: connectors } = useAgentConnectors();
 
   let title = "";
-  let subtitle = "";
   let insights: string[] = [];
   let focusItems: FocusItem[] = [];
   let shortcuts: ShortcutItem[] = [];
 
   if (domain === "control") {
-    title = "Current system context";
-    subtitle = "A quick read-only pulse from Mission Control itself.";
+    title = "Overview";
     insights = [
       `${missionControl.health.activeAgents} active agents currently under supervision`,
-      `${missionControl.health.recentRuns} recent runs visible in the control plane`,
-      `${missionControl.health.connectorsConfigured} connectors already configured for future outreach`,
+      `${missionControl.health.recentRuns} recent activity items visible right now`,
+      `${missionControl.health.connectorsConfigured} channels already configured for outreach`,
     ];
     focusItems = [
       ...missionControl.queue.slice(0, 2).map((run) => ({
         title: run.title,
-        detail: `${run.agentDisplayName} · ${run.status.replace(/_/g, " ")} · ${run.updatedAtLabel}`,
+        detail: `${run.agentDisplayName} · ${getAgentRunStatusLabel(run.status)} · ${run.updatedAtLabel}`,
       })),
       ...missionControl.activity.slice(0, 1).map((activity) => ({
         title: activity.title,
@@ -80,15 +79,14 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
       })),
     ];
     shortcuts = [
-      { label: "Runs", path: "/agents/runs" },
-      { label: "Models", path: "/agents/models" },
-      { label: "Connectors", path: "/agents/connectors" },
+      { label: "Activity", path: "/agents/runs" },
+      { label: "AI Models", path: "/agents/models" },
+      { label: "Channels", path: "/agents/connectors" },
     ];
   }
 
   if (domain === "assets") {
-    title = "Assets context";
-    subtitle = "Live inventory and movement posture relevant to this agent.";
+    title = "Assets";
     insights = [
       `${assetsOverview.totalAssets} total inventory units currently registered`,
       `${assetsOverview.assignedAssets} units currently reserved or checked out`,
@@ -101,7 +99,7 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
     }));
     shortcuts = [
       { label: "Assets overview", path: "/assets/overview" },
-      { label: "Asset registry", path: "/assets" },
+      { label: "Assets", path: "/assets" },
       { label: "Packing slips", path: "/packing-slips" },
     ];
   }
@@ -109,10 +107,9 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
   if (domain === "incidents") {
     const openIncidents = incidents.filter((incident) => incident.status.toLowerCase() !== "closed").length;
     const readyRmas = rmaSnapshot.cases.filter((row) => row.status === "Ready").length;
-    title = "Incidents context";
-    subtitle = "Maintenance, reports and RMA visibility in one read-only lens.";
+    title = "Incidents";
     insights = [
-      `${openIncidents} open incident records across the workspace`,
+      `${openIncidents} open incident records across the app`,
       `${rmaSnapshot.maintenanceAssets.length} maintenance assets currently eligible for RMA follow-up`,
       `${readyRmas} RMA cases already prepared and waiting on next action`,
     ];
@@ -136,8 +133,7 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
   }
 
   if (domain === "finance") {
-    title = "Finance context";
-    subtitle = "Exposure and cost-link visibility available to this agent today.";
+    title = "Finance";
     insights = [
       `${financeOverview.totals.trackedSpend} tracked spend in ${financeOverview.activePeriodLabel.toLowerCase()}`,
       `${financeOverview.exposureByProject.length} projects currently represented in exposure tracking`,
@@ -163,10 +159,9 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
   if (domain === "projects") {
     const activeProjects = projects.filter((project) => project.status === "Active").length;
     const liveUnits = projects.reduce((sum, project) => sum + project.activeUnitCount, 0);
-    title = "Projects context";
-    subtitle = "Schedule and unit visibility this agent can reason over.";
+    title = "Projects";
     insights = [
-      `${projects.length} projects visible in the registry right now`,
+      `${projects.length} projects visible right now`,
       `${activeProjects} projects currently active`,
       `${liveUnits} active units across the current project surface`,
     ];
@@ -183,20 +178,19 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
   if (domain === "communications") {
     const configured = connectors.filter((connector) => connector.status === "configured").length;
     const disabled = connectors.filter((connector) => connector.status === "disabled").length;
-    title = "Communications context";
-    subtitle = "Connector posture available before any outbound channel goes live.";
+    title = "Channels";
     insights = [
-      `${configured} connectors already configured`,
-      `${disabled} connectors intentionally disabled until policy or setup is complete`,
-      `${connectors.length} total connector shells ready for future activation`,
+      `${configured} channels already configured`,
+      `${disabled} channels intentionally disabled`,
+      `${connectors.length} channels visible in this setup`,
     ];
     focusItems = connectors.slice(0, 3).map((connector) => ({
       title: connector.label,
-      detail: `${connector.status.replace(/_/g, " ")} · ${connector.capability}`,
+      detail: `${titleCaseEnum(connector.status)} · ${connector.capability}`,
     }));
     shortcuts = [
-      { label: "Connectors", path: "/agents/connectors" },
-      { label: "Mission Control", path: "/agents/mission-control" },
+      { label: "Channels", path: "/agents/connectors" },
+      { label: "Overview", path: "/agents/mission-control" },
     ];
   }
 
@@ -205,7 +199,7 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
   }
 
   return (
-    <SurfaceCard title={title} subtitle={subtitle}>
+    <SurfaceCard title={title}>
       <InsightsList items={insights} />
 
       {shortcuts.length ? (

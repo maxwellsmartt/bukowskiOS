@@ -6,19 +6,24 @@ type SurfaceCardProps = {
   aside?: ReactNode;
   children: ReactNode;
   className?: string;
+  titleLevel?: "h2" | "h3";
 };
 
-export const SurfaceCard = ({ title, subtitle, aside, children, className = "" }: SurfaceCardProps) => (
-  <section className={`surface-card ${className}`.trim()}>
-    {title || subtitle || aside ? (
-      <header className="surface-card-header">
-        <div>
-          {title ? <h2 className="surface-card-title">{title}</h2> : null}
-          {subtitle ? <p className="surface-card-subtitle">{subtitle}</p> : null}
-        </div>
-        {aside ? <div>{aside}</div> : null}
-      </header>
-    ) : null}
-    {children}
-  </section>
-);
+export const SurfaceCard = ({ title, subtitle, aside, children, className = "", titleLevel = "h2" }: SurfaceCardProps) => {
+  const TitleTag = titleLevel;
+
+  return (
+    <section className={`surface-card ${className}`.trim()}>
+      {title || subtitle || aside ? (
+        <header className="surface-card-header">
+          <div>
+            {title ? <TitleTag className="surface-card-title">{title}</TitleTag> : null}
+            {subtitle ? <p className="surface-card-subtitle">{subtitle}</p> : null}
+          </div>
+          {aside ? <div>{aside}</div> : null}
+        </header>
+      ) : null}
+      {children}
+    </section>
+  );
+};

@@ -109,7 +109,6 @@ export const PackingSlipBuilderPanel = ({
         </button>
       }
       title="Create packing slip"
-      subtitle="Issue a real outgoing document from the current asset selection. This writes slip items, checkout events and current state updates."
     >
       <div className="chip-row">
         <span className="action-panel-selection">{selectedLabel}</span>
@@ -149,13 +148,13 @@ export const PackingSlipBuilderPanel = ({
 
       {hasVariableQuantityAssets ? (
         <div className="action-feedback action-feedback-warning">
-          Bulk rows can issue a partial quantity here. Serialized or unitary assets still issue one item at a time.
+          You can adjust quantity for bulk assets here.
         </div>
       ) : null}
 
       {kitLockedAssets.length ? (
         <div className="action-feedback action-feedback-warning">
-          These assets are part of active kits and cannot be issued individually on a packing slip: {kitLockSummary}. Remove them from the kit first if you need to dispatch them as standalone items.
+          These assets are part of active kits and cannot be issued individually: {kitLockSummary}.
         </div>
       ) : null}
 
@@ -167,18 +166,6 @@ export const PackingSlipBuilderPanel = ({
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.code} · {project.name}
-              </option>
-            ))}
-          </SelectField>
-        </label>
-
-        <label className="action-field">
-          <span className="action-field-label">Responsible</span>
-          <SelectField onChange={(event) => setResponsibleUserId(event.target.value)} value={responsibleUserId}>
-            <option value="">Auto / current owner</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.fullName}
               </option>
             ))}
           </SelectField>
@@ -197,12 +184,12 @@ export const PackingSlipBuilderPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Department</span>
-          <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
-            <option value="">No department</option>
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.code} · {department.name}
+          <span className="action-field-label">Responsible</span>
+          <SelectField onChange={(event) => setResponsibleUserId(event.target.value)} value={responsibleUserId}>
+            <option value="">Auto / current owner</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.fullName}
               </option>
             ))}
           </SelectField>
@@ -217,18 +204,37 @@ export const PackingSlipBuilderPanel = ({
             value={returnDueAt}
           />
         </label>
-
-        <label className="action-field action-field-wide">
-          <span className="action-field-label">Notes</span>
-          <textarea
-            className="action-field-control action-textarea"
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Optional dispatch note for the slip and asset timeline."
-            rows={3}
-            value={notes}
-          />
-        </label>
       </div>
+
+      <details className="detail-disclosure">
+        <summary className="detail-disclosure-summary">More details</summary>
+        <div className="detail-disclosure-content">
+          <div className="action-form-grid">
+            <label className="action-field">
+              <span className="action-field-label">Department</span>
+              <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
+                <option value="">No department</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.code} · {department.name}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
+
+            <label className="action-field action-field-wide">
+              <span className="action-field-label">Notes</span>
+              <textarea
+                className="action-field-control action-textarea"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Optional note"
+                rows={3}
+                value={notes}
+              />
+            </label>
+          </div>
+        </div>
+      </details>
 
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 

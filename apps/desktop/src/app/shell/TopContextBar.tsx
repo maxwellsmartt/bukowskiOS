@@ -1,4 +1,4 @@
-import { Bell, RefreshCcw, Search } from "lucide-react";
+import { RefreshCcw, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -11,7 +11,7 @@ type TopContextBarProps = {
 };
 
 export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
-  const { scopeChipLabel, syncLabel, workspaceName } = useShellContext();
+  const { scopeChipLabel, workspaceName } = useShellContext();
   const navigate = useNavigate();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot | null>(null);
   const isMountedRef = useRef(true);
@@ -46,7 +46,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const syncState = useMemo(() => {
     if (!diagnostics) {
       return {
-        label: syncLabel,
+        label: "Sync",
         className: "sync-control-idle",
         badge: null as number | null,
       };
@@ -54,7 +54,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
     if (diagnostics.syncOutboxFailedCount > 0 || diagnostics.lastSyncStatus === "failed") {
       return {
-        label: `Local sync needs attention · ${diagnostics.syncOutboxFailedCount} failed`,
+        label: diagnostics.syncOutboxFailedCount > 0 ? `Sync needs attention · ${diagnostics.syncOutboxFailedCount} failed` : "Sync needs attention",
         className: "sync-control-failed",
         badge: diagnostics.syncOutboxFailedCount,
       };
@@ -64,18 +64,18 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
     if (queuedCount > 0) {
       return {
-        label: `Local sync queue active · ${queuedCount} queued`,
+        label: `Syncing · ${queuedCount} queued`,
         className: "sync-control-active",
         badge: queuedCount,
       };
     }
 
     return {
-      label: `${syncLabel} · queue healthy`,
+      label: "Up to date",
       className: "sync-control-healthy",
       badge: null as number | null,
     };
-  }, [diagnostics, syncLabel]);
+  }, [diagnostics]);
 
   return (
     <div className="top-context-bar">
@@ -106,9 +106,6 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
         >
           <RefreshCcw size={14} />
           {syncState.badge ? <span className="sync-control-badge">{syncState.badge}</span> : null}
-        </button>
-        <button aria-label="Alerts" className="icon-ghost-control" data-tooltip="Alerts" type="button">
-          <Bell size={14} />
         </button>
       </div>
     </div>

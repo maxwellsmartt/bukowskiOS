@@ -318,32 +318,21 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   return (
     <div className="page-stack">
       <SectionHeader
-        eyebrow={isProjectMode ? "Project / Assets" : "Assets"}
-        title={isProjectMode ? "Assigned assets" : "Asset registry"}
-        body={
-          isProjectMode
-            ? "Assets currently linked to this project for supervision, reassignment, packing and issue reporting."
-            : "Live inventory with current status, custody and location."
-        }
-        contextLabel={sectionScopeLabel}
+        title={isProjectMode ? "Project Assets" : "Assets"}
+        contextLabel={isProjectMode ? sectionScopeLabel ?? undefined : undefined}
       />
 
       {error ? <div className="empty-state">Assets unavailable: {error}</div> : null}
       {!error && isLoading ? (
-        <SurfaceCard title={isProjectMode ? "Assigned assets" : "Asset registry"} subtitle="Loading the latest local inventory snapshot.">
+        <SurfaceCard title={isProjectMode ? "Project Assets" : "Assets"}>
           <TableSkeleton
-            body={
-              isProjectMode
-                ? "Preparing assets already linked to this project, including custody and issue state."
-                : "Preparing current status, custody and location across the local registry."
-            }
+            body={isProjectMode ? "Loading assets linked to this project." : "Loading assets."}
             columns={6}
           />
         </SurfaceCard>
       ) : null}
 
       <div className="chip-row">
-        <StatusBadge tone="success">{assets.filter((asset) => hasItem("asset", asset.id)).length} in compare</StatusBadge>
         {selectedRowIds.length || isProjectMode ? (
           <StatusBadge>{selectedRowIds.length ? `${selectedRowIds.length} selected` : effectiveProjectName ?? "Project scope"}</StatusBadge>
         ) : null}
@@ -363,8 +352,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           title={isProjectMode ? "No assets are assigned to this project yet" : "Your asset registry is still empty"}
           body={
             isProjectMode
-              ? "This project does not have inventory linked yet. Start from the global registry or assign existing assets into this scope."
-              : "Create the first asset once catalog basics like locations and categories are ready. After that you can assign, move, pack and report incidents from the same surface."
+              ? "This project does not have assets yet."
+              : "Create the first asset once your catalog is ready."
           }
           tips={
             isProjectMode
@@ -393,9 +382,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               {selectedRowIds.length === 1 ? "1 asset selected" : `${selectedRowIds.length} assets selected`}
             </span>
             <span className="selection-action-subtitle">
-              {isProjectMode
-                ? "Operate on the assets already assigned to this project or move them to a new destination."
-                : "Assign, move or issue a packing slip from the current selection."}
+              {isProjectMode ? "Move or reassign these assets." : "Assign, move or create a packing slip."}
             </span>
           </div>
           <div className="selection-action-buttons">
@@ -505,8 +492,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       <div className={`list-layout${activeAsset ? " has-preview" : ""}`}>
         <SurfaceCard
-          title="Asset registry"
-          subtitle={isProjectMode ? "This view is scoped to the current project." : undefined}
+          title={isProjectMode ? "Assets" : "Assets"}
           aside={
             <button
               className="ghost-control"
@@ -541,7 +527,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             emptyMessage={
               isProjectMode
                 ? "No assets are assigned to this project yet."
-                : "No assets yet. Create the first asset after setting Catalog basics."
+                : "No assets yet. Create the first one after setting up the catalog."
             }
             getRowId={(row) => row.id}
             maxHeight="min(68vh, 760px)"
@@ -579,7 +565,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               </button>
             }
             title="Quick preview"
-            subtitle="Quick read of the selected asset before opening full detail."
           >
             <>
               <div className="summary-grid">

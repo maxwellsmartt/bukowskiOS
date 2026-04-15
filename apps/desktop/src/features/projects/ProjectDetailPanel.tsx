@@ -54,8 +54,8 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
 
   if (isLoading) {
     return (
-      <SurfaceCard title="Project detail" subtitle="Loading the selected project workspace.">
-        <TableSkeleton body="Preparing project context, linked assets, open incidents and budget signals." columns={5} />
+      <SurfaceCard title="Project Overview">
+        <TableSkeleton body="Loading the latest project details." columns={5} />
       </SurfaceCard>
     );
   }
@@ -63,9 +63,9 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   if (!data.project) {
     return (
       <GuidedEmptyState
-        title="Choose a project to inspect operations"
-        body="Project detail brings together assets, incidents, responsibles and budget context. Start by selecting a project from the sidebar or the projects registry."
-        tips={["Open a project to review units, inventory and issue exposure", "Use Project Info if you need to set up context before operations"]}
+        title="Choose a project"
+        body="Open a project to review inventory, issues, schedule and ownership."
+        tips={["Open a project to review units and inventory", "Use Details when you need to update project information"]}
         actionLabel="Open projects"
         onAction={() => navigate("/projects")}
       />
@@ -80,13 +80,6 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         aside={<StatusBadge tone={toneForStatus(data.project.status)}>{data.project.status}</StatusBadge>}
         className="project-overview-card"
       >
-        <div className="chip-row">
-          <StatusBadge>{data.project.client}</StatusBadge>
-          <StatusBadge>{data.project.departments}</StatusBadge>
-          <StatusBadge tone="warning">{data.project.exposure}</StatusBadge>
-          {data.schedule?.windowLabel ? <StatusBadge tone="info">{data.schedule.windowLabel}</StatusBadge> : null}
-        </div>
-
         <div className="compact-summary-grid project-overview-summary">
           <div className="summary-row">
             <span className="summary-label">Assigned assets</span>
@@ -101,8 +94,8 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             <span className="summary-value">{data.project.client}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Departments</span>
-            <span className="summary-value">{data.project.departments}</span>
+            <span className="summary-label">Exposure</span>
+            <span className="summary-value">{data.project.exposure}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">Timeline</span>
@@ -193,11 +186,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
       </div>
 
       <div className="project-detail-support-grid">
-        <SurfaceCard
-          className="project-scroll-card"
-          title="Unit snapshot"
-          subtitle="Active and upcoming units shaping the schedule of this project."
-        >
+        <SurfaceCard className="project-scroll-card" title="Units">
           {data.units.length ? (
             <div className="queue-list">
               {data.units.map((unit) => (
@@ -217,15 +206,11 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               ))}
             </div>
           ) : (
-            <div className="empty-state">No units defined yet. Open Project Info to model the first unit before assigning crew or inventory.</div>
+            <div className="empty-state">No units yet. Open Details to add the first one.</div>
           )}
         </SurfaceCard>
 
-        <SurfaceCard
-          className="project-scroll-card"
-          title="Responsibles"
-          subtitle="People currently carrying project inventory or open incidents."
-        >
+        <SurfaceCard className="project-scroll-card" title="Responsibility">
           {data.responsibles.length ? (
             <div className="queue-list project-scroll-list">
               {data.responsibles.map((row) => (
@@ -243,42 +228,12 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               ))}
             </div>
           ) : (
-            <div className="empty-state">No responsibles linked yet. Once assets are assigned, the current holders and open issues will appear here.</div>
+            <div className="empty-state">No owners assigned yet.</div>
           )}
-        </SurfaceCard>
-
-        <SurfaceCard
-          className="project-scroll-card"
-          title="Budget shell"
-          subtitle="Budget and exposure snapshot for this project."
-        >
-          <div className="project-budget-grid">
-            <div className="summary-row">
-              <span className="summary-label">Total entries</span>
-              <span className="summary-value">{data.budget.totalEntries}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Reserve</span>
-              <span className="summary-value">{data.budget.reserve}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Exposure</span>
-              <span className="summary-value">{data.budget.exposure}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Status</span>
-              <span className="summary-value">{data.budget.status}</span>
-            </div>
-          </div>
-          <p className="surface-card-subtitle project-budget-note">{data.budget.note}</p>
         </SurfaceCard>
       </div>
 
-      <SurfaceCard
-        className="project-scroll-card"
-        title="Assigned assets"
-        subtitle="Current inventory assigned to this project. Double click an asset to open its full profile."
-      >
+      <SurfaceCard className="project-scroll-card" title="Assets">
         <DataTable
           columns={[
             {
@@ -323,7 +278,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             },
           ]}
           getRowId={(row) => row.id}
-          emptyMessage="No assets assigned yet. Add inventory from the asset registry to make this project operational."
+          emptyMessage="No assets assigned yet. Add inventory from Assets to keep this project moving."
           onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
           persistKey="project-detail-assets"
           rows={data.assets}
@@ -334,11 +289,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         />
       </SurfaceCard>
 
-      <SurfaceCard
-        className="project-scroll-card"
-        title="Incident queue"
-        subtitle="Project incidents with direct operational and financial linkage."
-      >
+      <SurfaceCard className="project-scroll-card" title="Incidents">
         <DataTable
           columns={[
             {

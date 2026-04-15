@@ -22,7 +22,6 @@ export const CompareTrayBar = () => {
       <div className="compare-tray-header">
         <div>
           <h3 className="compare-tray-title">Compare tray</h3>
-          <p className="compare-tray-subtitle">Keep comparable items together while you review the workspace.</p>
         </div>
 
         <div className="compare-tray-actions">
@@ -87,7 +86,7 @@ export const CompareTrayBar = () => {
       </div>
 
       <p className="compare-tray-footnote">
-        {reasonDisabled ?? "The tray can hold mixed types. Compare activates only for same-type groups."}
+        {reasonDisabled ?? "Compare becomes available when you pick matching items."}
       </p>
     </aside>
   );

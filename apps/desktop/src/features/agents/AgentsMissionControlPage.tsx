@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
+import { getAgentApprovalModeLabel, getAgentRunStatusLabel, titleCaseEnum } from "@shared/labels/statusLabels";
 import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
 
 import { AgentWizardPanel } from "./AgentWizardPanel";
@@ -101,8 +102,8 @@ export const AgentsMissionControlPage = () => {
     () => [
       { label: "Active agents", value: data.health.activeAgents },
       { label: "Paused agents", value: data.health.pausedAgents },
-      { label: "Recent runs", value: data.health.recentRuns },
-      { label: "Configured connectors", value: data.health.connectorsConfigured },
+      { label: "Recent activity", value: data.health.recentRuns },
+      { label: "Active channels", value: data.health.connectorsConfigured },
       { label: "Assigned models", value: data.health.modelsAssigned },
     ],
     [data.health],
@@ -183,12 +184,11 @@ export const AgentsMissionControlPage = () => {
   return (
     <div className="page-stack">
       <SectionHeader
-        title="Mission Control"
+        title="Automation Overview"
         titleTone="accent"
-        body="Monitor agents, activity, and pending work from a clearer control view."
       />
 
-      {error ? <div className="empty-state">Mission Control unavailable: {error}</div> : null}
+      {error ? <div className="empty-state">Automation overview unavailable: {error}</div> : null}
       {approvalFeedback ? <div className="form-inline-error">{approvalFeedback}</div> : null}
 
       <div className="agents-health-grid">
@@ -203,7 +203,7 @@ export const AgentsMissionControlPage = () => {
       <div className={`agents-mission-layout${selectedAgent ? "" : " is-graph-expanded"}`}>
         <SurfaceCard
           className="agents-graph-card"
-          title="Mission graph"
+          title="Team Map"
         >
           <div className="mission-graph">
             {data.supervisor ? (
@@ -237,7 +237,7 @@ export const AgentsMissionControlPage = () => {
                       <span className="subtle-pill mission-node-model-pill" title={data.supervisor.modelLabel}>
                         {providerBrand.logoSrc ? (
                           <img
-                            alt={providerBrand.logoAlt ?? providerBrand.label ?? "Provider"}
+                            alt={providerBrand.logoAlt ?? providerBrand.label ?? "AI service"}
                             className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
                             src={providerBrand.logoSrc}
                           />
@@ -294,7 +294,7 @@ export const AgentsMissionControlPage = () => {
                           <span className="subtle-pill mission-node-model-pill" title={agent.modelLabel}>
                             {providerBrand.logoSrc ? (
                               <img
-                                alt={providerBrand.logoAlt ?? providerBrand.label ?? "Provider"}
+                                alt={providerBrand.logoAlt ?? providerBrand.label ?? "AI service"}
                                 className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
                                 src={providerBrand.logoSrc}
                               />
@@ -327,7 +327,7 @@ export const AgentsMissionControlPage = () => {
             aside={
               <div className="surface-card-actions">
                 <button className="ghost-control mission-control-configure" onClick={() => setEditorOpen(true)} type="button">
-                  Configure
+                  Edit
                 </button>
                 <button
                   aria-label="Close agent detail"
@@ -353,7 +353,7 @@ export const AgentsMissionControlPage = () => {
                     const providerBrand = getAgentProviderBrand(selectedAgent.modelLabel);
                     return providerBrand.logoSrc ? (
                       <img
-                        alt={providerBrand.logoAlt ?? providerBrand.label ?? "Provider"}
+                        alt={providerBrand.logoAlt ?? providerBrand.label ?? "AI service"}
                         className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
                         src={providerBrand.logoSrc}
                       />
@@ -361,7 +361,7 @@ export const AgentsMissionControlPage = () => {
                   })()}
                   <span>{selectedAgent.modelLabel}</span>
                 </span>
-                <span className="subtle-pill">{selectedAgent.approvalMode.replace(/_/g, " ")}</span>
+                <span className="subtle-pill">{getAgentApprovalModeLabel(selectedAgent.approvalMode)}</span>
               </div>
 
               <div className="agent-detail-meta">
@@ -390,12 +390,12 @@ export const AgentsMissionControlPage = () => {
                 </button>
                 <button className="ghost-control" onClick={handleApprovalModeCycle} type="button">
                   <ShieldCheck size={14} />
-                  <span>Cycle approval mode</span>
+                  <span>Change review mode</span>
                 </button>
               </div>
 
               <div className="agent-detail-runs">
-                <span className="agent-detail-kicker">Recent runs</span>
+                <span className="agent-detail-kicker">Recent activity</span>
                 {detail.recentRuns.length ? (
                   detail.recentRuns.map((run) => (
                     <div key={run.id} className="agent-run-row">
@@ -403,11 +403,11 @@ export const AgentsMissionControlPage = () => {
                         <strong>{run.title}</strong>
                         <p>{run.summary}</p>
                       </div>
-                      <span className={`run-status-pill run-status-pill-${run.status}`}>{run.status.replace(/_/g, " ")}</span>
+                      <span className={`run-status-pill run-status-pill-${run.status}`}>{getAgentRunStatusLabel(run.status)}</span>
                     </div>
                   ))
                 ) : (
-                  <div className="empty-state">No recent runs for this agent yet.</div>
+                  <div className="empty-state">No recent activity for this agent yet.</div>
                 )}
               </div>
             </div>
@@ -417,8 +417,7 @@ export const AgentsMissionControlPage = () => {
 
       {pendingApprovals.length ? (
         <SurfaceCard
-          title="Pending approvals"
-          subtitle={`${pendingApprovals.length} drafts are waiting for your review before anything can continue.`}
+          title="Needs Review"
         >
           <div className="agent-support-list">
             {pendingApprovals.map((run) => (
@@ -426,7 +425,7 @@ export const AgentsMissionControlPage = () => {
                 <div className="agent-run-row-copy">
                   <div className="agent-run-row-heading">
                     <strong>{run.title}</strong>
-                    <span className={`run-status-pill run-status-pill-${run.status}`}>{run.status.replace(/_/g, " ")}</span>
+                    <span className={`run-status-pill run-status-pill-${run.status}`}>{getAgentRunStatusLabel(run.status)}</span>
                   </div>
                   <p>{run.agentDisplayName}</p>
                   <p>{run.approvalReason ?? "This supervised draft is waiting for your review."}</p>
@@ -478,8 +477,7 @@ export const AgentsMissionControlPage = () => {
       <div className="agents-support-grid">
         <SurfaceCard
           className={collapsedSections.queue ? "is-collapsed" : ""}
-          title="Run queue"
-          subtitle={collapsedSections.queue ? undefined : "Trabajo reciente y drafts pendientes."}
+          title="Recent Activity"
           aside={
             <button
               aria-label={collapsedSections.queue ? "Expand queue" : "Collapse queue"}
@@ -529,7 +527,7 @@ export const AgentsMissionControlPage = () => {
                       <p>{run.status === "needs_approval" ? run.approvalReason ?? run.agentDisplayName : run.agentDisplayName}</p>
                     </div>
                     <div className="agent-run-row-meta">
-                      <span className={`run-status-pill run-status-pill-${run.status}`}>{run.status.replace(/_/g, " ")}</span>
+                      <span className={`run-status-pill run-status-pill-${run.status}`}>{getAgentRunStatusLabel(run.status)}</span>
                       <span className="agent-run-time">{run.updatedAtLabel}</span>
                     </div>
                   </button>
@@ -541,8 +539,7 @@ export const AgentsMissionControlPage = () => {
 
         <SurfaceCard
           className={collapsedSections.activity ? "is-collapsed" : ""}
-          title="Activity feed"
-          subtitle={collapsedSections.activity ? undefined : "Actividad reciente del sistema."}
+          title="Updates"
           aside={
             <button
               aria-label={collapsedSections.activity ? "Expand activity" : "Collapse activity"}
@@ -584,8 +581,7 @@ export const AgentsMissionControlPage = () => {
       <div className="agents-support-grid">
         <SurfaceCard
           className={collapsedSections.models ? "is-collapsed" : ""}
-          title="Models"
-          subtitle={collapsedSections.models ? undefined : "Asignaciones activas."}
+          title="AI Models"
           aside={
             <button
               aria-label={collapsedSections.models ? "Expand models" : "Collapse models"}
@@ -606,7 +602,7 @@ export const AgentsMissionControlPage = () => {
                     <strong>{model.label}</strong>
                     <p>{model.assignedAgents.join(" · ") || "No agents assigned yet"}</p>
                   </div>
-                  <span className={`run-status-pill run-status-pill-${model.status}`}>{model.status.replace(/_/g, " ")}</span>
+                  <span className={`run-status-pill run-status-pill-${model.status}`}>{titleCaseEnum(model.status)}</span>
                 </div>
               ))}
             </div>
@@ -615,8 +611,7 @@ export const AgentsMissionControlPage = () => {
 
         <SurfaceCard
           className={collapsedSections.connectors ? "is-collapsed" : ""}
-          title="Connectors"
-          subtitle={collapsedSections.connectors ? undefined : "Estado de disponibilidad."}
+          title="Channels"
           aside={
             <button
               aria-label={collapsedSections.connectors ? "Expand connectors" : "Collapse connectors"}
@@ -637,7 +632,7 @@ export const AgentsMissionControlPage = () => {
                     <strong>{connector.label}</strong>
                     <p>{connector.capability}</p>
                   </div>
-                  <span className={`run-status-pill run-status-pill-${connector.status}`}>{connector.status.replace(/_/g, " ")}</span>
+                  <span className={`run-status-pill run-status-pill-${connector.status}`}>{titleCaseEnum(connector.status)}</span>
                 </div>
               ))}
             </div>

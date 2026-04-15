@@ -17,14 +17,14 @@ export const ProjectBudgetPage = () => {
 
   if (isLoading) {
     return (
-      <SurfaceCard title="Budget" subtitle="Loading project-linked entries, reserve and exposure context.">
-        <TableSkeleton body="Preparing budget shell and cost-bearing incidents for this project." columns={4} />
+      <SurfaceCard title="Budget">
+        <TableSkeleton body="Loading budget details." columns={4} />
       </SurfaceCard>
     );
   }
 
   if (!data.project) {
-    return <div className="empty-state">Select a project to inspect its budget shell and operational exposure.</div>;
+    return <div className="empty-state">Select a project to review its budget.</div>;
   }
 
   return (
@@ -33,7 +33,7 @@ export const ProjectBudgetPage = () => {
 
       <div className="project-workspace-scroll">
         <div className="project-detail-support-grid">
-          <SurfaceCard className="project-scroll-card" title="Budget shell">
+          <SurfaceCard className="project-scroll-card" title="Budget Summary">
             <div className="project-budget-grid">
               <div className="summary-row">
                 <span className="summary-label">Total entries</span>
@@ -54,23 +54,9 @@ export const ProjectBudgetPage = () => {
             </div>
             <p className="surface-card-subtitle project-budget-note">{data.budget.note}</p>
           </SurfaceCard>
-
-          <SurfaceCard
-            className="project-scroll-card"
-            title="Project context"
-          >
-            <div className="chip-row">
-              <StatusBadge>{data.project.client}</StatusBadge>
-              <StatusBadge>{data.project.status}</StatusBadge>
-              <StatusBadge tone="warning">{data.project.exposure}</StatusBadge>
-            </div>
-          </SurfaceCard>
         </div>
 
-        <SurfaceCard
-          className="project-scroll-card"
-          title="Cost-bearing incidents"
-        >
+        <SurfaceCard className="project-scroll-card" title="Cost-Bearing Incidents">
           <DataTable
             columns={[
               {

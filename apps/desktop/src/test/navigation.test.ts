@@ -7,22 +7,16 @@ import { isSubnavItemActive } from "@app/shell/SubnavTabs";
 
 describe("foundation navigation shell", () => {
   it("keeps the approved primary domains visible", () => {
-    expect(primaryNav.map((item) => item.label)).toEqual(["Assets", "Finance", "Agents"]);
+    expect(primaryNav.map((item) => item.label)).toEqual(["Projects", "Assets", "Finance", "Automation"]);
   });
 
   it("keeps finance shell structurally real", () => {
-    expect(financeSubnav.map((item) => item.label)).toEqual(["Overview", "Cost Links", "Entries"]);
+    expect(financeSubnav.map((item) => item.label)).toEqual(["Overview", "Entries", "Review Queue"]);
     expect(appRoutes.some((route) => route.path === "/finance/entries")).toBe(true);
   });
 
   it("adds an agents control plane without breaking the rest of the shell", () => {
-    expect(agentsSubnav.map((item) => item.label)).toEqual([
-      "Mission Control",
-      "Agents",
-      "Runs",
-      "Models",
-      "Connectors",
-    ]);
+    expect(agentsSubnav.map((item) => item.label)).toEqual(["Overview", "Team", "Activity", "AI Models", "Channels"]);
     expect(resolveActiveRoute("/agents/mission-control").domain).toBe("agents");
   });
 
@@ -32,18 +26,11 @@ describe("foundation navigation shell", () => {
     expect(isSubnavItemActive("/agents/runs", "/agents")).toBe(false);
     expect(isSubnavItemActive("/agents/models", "/agents/models")).toBe(true);
     expect(isSubnavItemActive("/agents/connectors", "/agents/connectors")).toBe(true);
-    expect(resolveActiveRoute("/agents").label).toBe("Agents Directory");
+    expect(resolveActiveRoute("/agents").label).toBe("Automation Team");
   });
 
   it("preserves the full asset operations sub-navigation", () => {
-    expect(assetsSubnav.map((item) => item.label)).toEqual([
-      "Overview",
-      "Assets",
-      "Packing Slips",
-      "Projects",
-      "Incidents",
-      "Manage Catalog",
-    ]);
+    expect(assetsSubnav.map((item) => item.label)).toEqual(["Overview", "Assets", "Packing Slips", "Incidents"]);
   });
 
   it("treats project workspaces as their own scope mode", () => {

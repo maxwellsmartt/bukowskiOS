@@ -196,14 +196,14 @@ export const AppShell = () => {
           <main className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}`}>
             {!isScopeReady ? (
               <div className="shell-loading-state">
-                <div className="empty-state">Restoring your last workspace view and validating project scope…</div>
+                <div className="empty-state">Opening your last view…</div>
               </div>
             ) : (
               <ShellErrorBoundary>
                 <Suspense
                   fallback={
                     <div className="shell-loading-state">
-                      <div className="empty-state">Loading the next workspace view…</div>
+                      <div className="empty-state">Loading…</div>
                     </div>
                   }
                 >

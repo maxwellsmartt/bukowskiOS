@@ -265,7 +265,6 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
   return (
     <SurfaceCard
       title="Units"
-      subtitle="Parallel units let you model Main, Second or Splinter operations inside one project without losing scheduling clarity."
       aside={
         <button className="action-primary-button" onClick={beginCreate} type="button">
           <Check size={14} />
@@ -298,14 +297,27 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                   <span className="identity-meta">
                     Order {unit.sortOrder} · {unit.startDate ?? "No start"} - {unit.endDate ?? "Open"}
                   </span>
+                  <span className="identity-meta">
+                    {unit.crewAssignments.length} crew linked
+                    {unit.statusSource === "manual_override" ? " · Manual status" : ""}
+                    {unit.conflictCount ? ` · ${unit.conflictCount} conflicts` : ""}
+                  </span>
                 </div>
 
                 <div className="shell-project-item-actions">
-                  <button className="shell-project-action" onClick={() => beginEdit(unit)} type="button">
+                  <button
+                    aria-label={`Edit ${unit.name}`}
+                    className="shell-project-action"
+                    data-tooltip="Edit unit"
+                    onClick={() => beginEdit(unit)}
+                    type="button"
+                  >
                     <Pencil size={12} />
                   </button>
                   <button
+                    aria-label={`Wrap ${unit.name}`}
                     className="shell-project-action"
+                    data-tooltip="Mark wrapped"
                     onClick={() => {
                       const confirmed = window.confirm("Mark this unit as wrapped and set its end date to today?");
                       if (confirmed) {
@@ -317,6 +329,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                     <WrapText size={12} />
                   </button>
                   <button
+                    aria-label={unit.status === "cancelled" ? `Reactivate ${unit.name}` : `Cancel ${unit.name}`}
                     className="shell-project-action"
                     data-tooltip={unit.status === "cancelled" ? "Reactivate unit" : "Cancel unit"}
                     onClick={() => void runUnitAction(unit, unit.status === "cancelled" ? "reactivate" : "cancel")}
@@ -345,14 +358,6 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
               </div>
 
               {unit.notes ? <p className="surface-card-subtitle">{unit.notes}</p> : null}
-
-              <div className="chip-row">
-                <StatusBadge tone={unit.statusSource === "manual_override" ? "warning" : "neutral"}>
-                  {unit.statusSource === "manual_override" ? "Manual override" : "Derived status"}
-                </StatusBadge>
-                <StatusBadge>{unit.crewAssignments.length} crew linked</StatusBadge>
-                {unit.conflictCount ? <StatusBadge tone="warning">{unit.conflictCount} conflicts</StatusBadge> : null}
-              </div>
 
               {unit.conflictSummary ? <div className="action-feedback action-feedback-warning">{unit.conflictSummary}</div> : null}
 
@@ -401,65 +406,72 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                     ))}
                   </SelectField>
                 </label>
-
-                <label className="action-field">
-                  <span className="action-field-label">Role</span>
-                  <input
-                    className="action-field-control"
-                    onChange={(event) =>
-                      setCrewDrafts((current) => ({
-                        ...current,
-                        [unit.id]: { ...crewDraft, roleLabel: event.target.value },
-                      }))
-                    }
-                    value={crewDraft.roleLabel}
-                  />
-                </label>
-
-                <label className="action-field">
-                  <span className="action-field-label">Start</span>
-                  <input
-                    className="action-field-control"
-                    onChange={(event) =>
-                      setCrewDrafts((current) => ({
-                        ...current,
-                        [unit.id]: { ...crewDraft, startDate: event.target.value },
-                      }))
-                    }
-                    type="date"
-                    value={crewDraft.startDate}
-                  />
-                </label>
-
-                <label className="action-field">
-                  <span className="action-field-label">End</span>
-                  <input
-                    className="action-field-control"
-                    onChange={(event) =>
-                      setCrewDrafts((current) => ({
-                        ...current,
-                        [unit.id]: { ...crewDraft, endDate: event.target.value },
-                      }))
-                    }
-                    type="date"
-                    value={crewDraft.endDate}
-                  />
-                </label>
-
-                <label className="action-field action-field-wide">
-                  <span className="action-field-label">Notes</span>
-                  <input
-                    className="action-field-control"
-                    onChange={(event) =>
-                      setCrewDrafts((current) => ({
-                        ...current,
-                        [unit.id]: { ...crewDraft, notes: event.target.value },
-                      }))
-                    }
-                    value={crewDraft.notes}
-                  />
-                </label>
               </div>
+
+              <details className="detail-disclosure">
+                <summary className="detail-disclosure-summary">More details</summary>
+                <div className="detail-disclosure-content">
+                  <div className="action-form-grid project-unit-crew-form">
+                    <label className="action-field">
+                      <span className="action-field-label">Role</span>
+                      <input
+                        className="action-field-control"
+                        onChange={(event) =>
+                          setCrewDrafts((current) => ({
+                            ...current,
+                            [unit.id]: { ...crewDraft, roleLabel: event.target.value },
+                          }))
+                        }
+                        value={crewDraft.roleLabel}
+                      />
+                    </label>
+
+                    <label className="action-field">
+                      <span className="action-field-label">Start</span>
+                      <input
+                        className="action-field-control"
+                        onChange={(event) =>
+                          setCrewDrafts((current) => ({
+                            ...current,
+                            [unit.id]: { ...crewDraft, startDate: event.target.value },
+                          }))
+                        }
+                        type="date"
+                        value={crewDraft.startDate}
+                      />
+                    </label>
+
+                    <label className="action-field">
+                      <span className="action-field-label">End</span>
+                      <input
+                        className="action-field-control"
+                        onChange={(event) =>
+                          setCrewDrafts((current) => ({
+                            ...current,
+                            [unit.id]: { ...crewDraft, endDate: event.target.value },
+                          }))
+                        }
+                        type="date"
+                        value={crewDraft.endDate}
+                      />
+                    </label>
+
+                    <label className="action-field action-field-wide">
+                      <span className="action-field-label">Notes</span>
+                      <input
+                        className="action-field-control"
+                        onChange={(event) =>
+                          setCrewDrafts((current) => ({
+                            ...current,
+                            [unit.id]: { ...crewDraft, notes: event.target.value },
+                          }))
+                        }
+                        value={crewDraft.notes}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </details>
 
               <div className="action-panel-actions action-panel-actions-start">
                 <button
@@ -483,9 +495,6 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
           <div className="surface-card-header">
             <div>
               <h3 className="surface-card-title">{editorMode === "create" ? "New unit" : "Edit unit"}</h3>
-              <p className="surface-card-subtitle">
-                Define order, schedule window and color so the timeline stays readable.
-              </p>
             </div>
           </div>
 
@@ -509,31 +518,6 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Order</span>
-              <input
-                className="action-field-control"
-                inputMode="numeric"
-                onChange={(event) => setUnitDraft((current) => ({ ...current, sortOrder: event.target.value }))}
-                value={unitDraft.sortOrder}
-              />
-            </label>
-
-            <label className="action-field">
-              <span className="action-field-label">Color</span>
-              <SelectField
-                onChange={(event) => setUnitDraft((current) => ({ ...current, colorKey: event.target.value }))}
-                value={unitDraft.colorKey}
-              >
-                <option value="">Derive from project</option>
-                {projectColorPalette.map((color) => (
-                  <option key={color.key} value={color.key}>
-                    {color.label}
-                  </option>
-                ))}
-              </SelectField>
-            </label>
-
-            <label className="action-field">
               <span className="action-field-label">Start date</span>
               <input
                 className="action-field-control"
@@ -552,17 +536,49 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                 value={unitDraft.endDate}
               />
             </label>
-
-            <label className="action-field action-field-wide">
-              <span className="action-field-label">Notes</span>
-              <textarea
-                className="action-field-control action-textarea"
-                onChange={(event) => setUnitDraft((current) => ({ ...current, notes: event.target.value }))}
-                rows={3}
-                value={unitDraft.notes}
-              />
-            </label>
           </div>
+
+          <details className="detail-disclosure">
+            <summary className="detail-disclosure-summary">More details</summary>
+            <div className="detail-disclosure-content">
+              <div className="action-form-grid">
+                <label className="action-field">
+                  <span className="action-field-label">Order</span>
+                  <input
+                    className="action-field-control"
+                    inputMode="numeric"
+                    onChange={(event) => setUnitDraft((current) => ({ ...current, sortOrder: event.target.value }))}
+                    value={unitDraft.sortOrder}
+                  />
+                </label>
+
+                <label className="action-field">
+                  <span className="action-field-label">Color</span>
+                  <SelectField
+                    onChange={(event) => setUnitDraft((current) => ({ ...current, colorKey: event.target.value }))}
+                    value={unitDraft.colorKey}
+                  >
+                    <option value="">Use project color</option>
+                    {projectColorPalette.map((color) => (
+                      <option key={color.key} value={color.key}>
+                        {color.label}
+                      </option>
+                    ))}
+                  </SelectField>
+                </label>
+
+                <label className="action-field action-field-wide">
+                  <span className="action-field-label">Notes</span>
+                  <textarea
+                    className="action-field-control action-textarea"
+                    onChange={(event) => setUnitDraft((current) => ({ ...current, notes: event.target.value }))}
+                    rows={3}
+                    value={unitDraft.notes}
+                  />
+                </label>
+              </div>
+            </div>
+          </details>
 
           <div className="action-panel-actions">
             <button className="ghost-control" onClick={resetEditor} type="button">

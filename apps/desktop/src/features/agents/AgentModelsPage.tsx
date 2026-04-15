@@ -26,15 +26,6 @@ const providerStatusLabelMap: Record<AgentModelRow["status"], string> = {
   unavailable: "Unavailable",
 };
 
-const providerStatusSummaryMap: Record<AgentModelRow["status"], string> = {
-  not_configured: "Waiting for API credentials before this provider can answer real requests.",
-  configured: "Configured locally. Run a health test before routing live chat through it.",
-  testing: "A connection test is currently in progress.",
-  healthy: "Ready for supervised routing from the Agents chat.",
-  invalid_key: "The stored API key was rejected. Replace it before enabling this provider.",
-  unavailable: "The provider could not be reached with the current configuration.",
-};
-
 const providerModelOptions: Record<string, Array<{ key: string; label: string }>> = {
   openai: [
     { key: "openai:gpt-5.4", label: "GPT-5.4" },
@@ -151,7 +142,7 @@ export const AgentModelsPage = () => {
 
   const summaryCards = useMemo(
     () => [
-      { label: "Active providers", value: data.summary.activeProviders },
+      { label: "Active services", value: data.summary.activeProviders },
       { label: "Configured", value: data.summary.configuredProviders },
       { label: "Healthy", value: data.summary.healthyProviders },
       { label: "Assigned agents", value: data.summary.assignedAgents },
@@ -312,11 +303,7 @@ export const AgentModelsPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        title="Models"
-        titleTone="accent"
-        body="Configure live providers, verify their health and keep agent-to-model routing honest before chat starts using real AI."
-      />
+      <SectionHeader title="AI Models" titleTone="accent" />
 
       <div className="agents-health-grid">
         {summaryCards.map((card) => (
@@ -328,8 +315,8 @@ export const AgentModelsPage = () => {
       </div>
 
       <div className="agents-models-layout">
-        <SurfaceCard title="Providers" subtitle="One real provider now, future shells kept visible without pretending they already work.">
-          {error ? <div className="empty-state">Models unavailable: {error}</div> : null}
+        <SurfaceCard title="AI Services">
+          {error ? <div className="empty-state">AI models unavailable: {error}</div> : null}
 
           <div className="models-provider-list">
             {orderedProviders.map((provider) => (
@@ -363,14 +350,13 @@ export const AgentModelsPage = () => {
                           ) : null}
                           <span>{provider.label}</span>
                         </strong>
-                        {!provider.supportsLiveRequests ? <span className="subtle-pill">Shell</span> : null}
+                        {!provider.supportsLiveRequests ? <span className="subtle-pill">Coming soon</span> : null}
                       </div>
-                      <p>{providerStatusSummaryMap[provider.status]}</p>
                       <div className="agent-detail-row">
                         <span className={`run-status-pill run-status-pill-${provider.status}`}>
                           {providerStatusLabelMap[provider.status]}
                         </span>
-                        <span className="subtle-pill">{provider.assignedAgents.length} agents</span>
+                        <span>{provider.assignedAgents.length} agents</span>
                         {provider.hasStoredSecret ? (
                           <span className="subtle-pill">
                             <KeyRound size={12} />
@@ -403,13 +389,8 @@ export const AgentModelsPage = () => {
                 <span>{selectedProvider.label}</span>
               </span>
             ) : (
-              "Select a provider"
+              "Select an AI service"
             )
-          }
-          subtitle={
-            selectedProvider
-              ? "Provider configuration lives in the main process. Secrets never return to the renderer."
-              : "Choose a provider from the left to configure it here."
           }
           aside={
             selectedProvider ? (
@@ -419,7 +400,7 @@ export const AgentModelsPage = () => {
                   className={`agent-live-dot agent-live-dot-${providerStatusIndicatorToneMap[selectedProvider.status]}`}
                   data-tooltip={`${selectedProvider.label} · ${providerStatusLabelMap[selectedProvider.status]}`}
                 />
-                {!selectedProvider.supportsLiveRequests ? <span className="subtle-pill">Future shell</span> : null}
+                {!selectedProvider.supportsLiveRequests ? <span className="subtle-pill">Coming soon</span> : null}
               </div>
             ) : null
           }
@@ -465,7 +446,7 @@ export const AgentModelsPage = () => {
                     disabled={!selectedProvider.supportsLiveRequests}
                     onChange={(event) => handleProviderFieldChange("apiKey", event.target.value)}
                     placeholder={
-                      selectedProvider.hasStoredSecret ? "Leave blank to keep the stored key" : "Paste the OpenAI API key"
+                      selectedProvider.hasStoredSecret ? "Leave blank to keep the stored key" : "Paste the API key"
                     }
                     type="password"
                     value={providerDraft.apiKey}
@@ -477,7 +458,7 @@ export const AgentModelsPage = () => {
                     className="field-input"
                     disabled={!selectedProvider.supportsLiveRequests}
                     onChange={(event) => handleProviderFieldChange("baseUrl", event.target.value)}
-                    placeholder="Optional future gateway override"
+                    placeholder="Optional custom endpoint"
                     value={providerDraft.baseUrl}
                   />
                 </label>
@@ -552,7 +533,7 @@ export const AgentModelsPage = () => {
                   type="button"
                 >
                   <CheckCircle2 size={14} />
-                  <span>{isSavingProvider ? "Saving..." : "Save config"}</span>
+                  <span>{isSavingProvider ? "Saving..." : "Save"}</span>
                 </button>
                 <button
                   className="ghost-control"
@@ -572,15 +553,12 @@ export const AgentModelsPage = () => {
               </div>
             </div>
           ) : (
-            <div className="empty-state">Select a provider to inspect its configuration, health and local secret posture.</div>
+            <div className="empty-state">Select an AI service to review its setup and health.</div>
           )}
         </SurfaceCard>
       </div>
 
-      <SurfaceCard
-        title="Agent-to-model assignment"
-        subtitle="Keep provider usage explicit so routing stays readable before the real gateway starts answering chat."
-      >
+      <SurfaceCard title="Assignments">
         <div className="models-assignment-list">
           {data.assignments.map((assignment) => {
             const draft = assignmentDrafts[assignment.agentId] ?? {
@@ -593,7 +571,7 @@ export const AgentModelsPage = () => {
               <div key={assignment.agentId} className="models-assignment-row">
                 <div className="models-assignment-copy">
                   <strong>{assignment.displayName}</strong>
-                  <p>{assignment.isSupervisor ? "Supervisor / Orchestrator" : assignment.providerLabel}</p>
+                  <p>{assignment.isSupervisor ? "Supervisor" : assignment.providerLabel}</p>
                 </div>
 
                 <div className="models-assignment-controls">

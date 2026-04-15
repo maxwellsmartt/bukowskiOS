@@ -1,5 +1,6 @@
 import {
   ArrowDown,
+  ArrowUpDown,
   ArrowUp,
   CalendarDays,
   Check,
@@ -7,7 +8,6 @@ import {
   FolderKanban,
   Hash,
   Search,
-  SlidersHorizontal,
   TextCursorInput,
   UserRound,
 } from "lucide-react";
@@ -154,7 +154,7 @@ export const ListToolbar = <TSort extends string,>({
             ref={triggerRef}
             type="button"
           >
-            <SlidersHorizontal aria-hidden size={14} />
+            <ArrowUpDown aria-hidden size={14} />
           </button>
 
           {menuOpen && menuStyle

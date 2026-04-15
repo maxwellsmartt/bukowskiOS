@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { KeyRound, Link2, RadioTower, RotateCcw, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Copy, KeyRound, Link2, RadioTower, RotateCcw, ShieldCheck } from "lucide-react";
 
 import { DEFAULT_WORKSPACE_ID, type AgentConnectorRow, type AppUsersSnapshot } from "@contracts";
 import { SectionHeader } from "@shared/components/SectionHeader";
+import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { titleCaseEnum } from "@shared/labels/statusLabels";
 import { getConnectorBrand } from "@shared/lib/connectorBranding";
 
 import { useCatalogData } from "@features/projects/useProjectsData";
@@ -44,6 +46,62 @@ const buildConnectorDraft = (connector: AgentConnectorRow | null): ConnectorDraf
   botToken: "",
 });
 
+const getConnectorCapabilityLabel = (connectorKey: string) => {
+  if (connectorKey === "telegram") {
+    return "Direct messages";
+  }
+
+  if (connectorKey === "whatsapp") {
+    return "Messaging";
+  }
+
+  if (connectorKey === "email") {
+    return "Alerts and drafts";
+  }
+
+  return "Integrations";
+};
+
+const getConnectorStatusTone = (status: AgentConnectorRow["status"]) => {
+  if (status === "configured") {
+    return "success" as const;
+  }
+
+  if (status === "not_configured") {
+    return "warning" as const;
+  }
+
+  return "neutral" as const;
+};
+
+const getConnectorStatusLabel = (status: AgentConnectorRow["status"]) => {
+  if (status === "configured") {
+    return "Ready";
+  }
+
+  if (status === "not_configured") {
+    return "Needs setup";
+  }
+
+  return "Disabled";
+};
+
+const getIdentityTone = (state: LinkableIdentityOption["linkState"]) => {
+  if (state === "linked") {
+    return "success" as const;
+  }
+
+  if (state === "ready") {
+    return "info" as const;
+  }
+
+  if (state === "revoked") {
+    return "warning" as const;
+  }
+
+  return "critical" as const;
+};
+
 export const AgentConnectorsPage = () => {
   const { data, error } = useAgentConnectors();
   const { data: catalog } = useCatalogData();
@@ -54,6 +112,8 @@ export const AgentConnectorsPage = () => {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [generatedLinkToken, setGeneratedLinkToken] = useState<string | null>(null);
+  const [copiedLinkCommand, setCopiedLinkCommand] = useState(false);
+  const copiedLinkCommandTimeoutRef = useRef<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
@@ -82,7 +142,7 @@ export const AgentConnectorsPage = () => {
     () => [
       { label: "Ready", value: data.filter((connector) => connector.status === "configured").length },
       {
-        label: "Pending",
+        label: "Needs setup",
         value: data.filter((connector) => connector.status === "not_configured").length,
       },
       { label: "Disabled", value: data.filter((connector) => connector.status === "disabled").length },
@@ -120,11 +180,11 @@ export const AgentConnectorsPage = () => {
       statusLabel: user.readyForTelegram
         ? user.telegramLinkStatus === "linked"
           ? "Ready · Telegram linked"
-          : "Ready for Telegram"
+          : "Ready to link"
         : user.membershipStatus !== "active"
-          ? "Blocked · workspace inactive"
+          ? "Blocked · account inactive"
           : !user.roleId
-            ? "Blocked · no role"
+            ? "Blocked · assign a role"
             : !user.isActive
               ? "Blocked · user inactive"
               : "Needs setup",
@@ -141,7 +201,7 @@ export const AgentConnectorsPage = () => {
         ready: false,
         source: "crew",
         roleLabel: crewMember.roleLabel ?? null,
-        statusLabel: "Blocked · create or link a user first",
+        statusLabel: "Blocked · link a user first",
         linkState: "blocked",
       }));
 
@@ -212,9 +272,19 @@ export const AgentConnectorsPage = () => {
 
   useEffect(() => {
     setGeneratedLinkToken(null);
+    setCopiedLinkCommand(false);
     setFeedback(null);
     setErrorMessage(null);
   }, [selectedConnectorKey]);
+
+  useEffect(
+    () => () => {
+      if (copiedLinkCommandTimeoutRef.current !== null) {
+        window.clearTimeout(copiedLinkCommandTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!linkableIdentities.length) {
@@ -259,7 +329,7 @@ export const AgentConnectorsPage = () => {
         botToken: "",
       }));
     } catch (saveError) {
-      setErrorMessage(saveError instanceof Error ? saveError.message : "No se pudo guardar la configuración del connector.");
+      setErrorMessage(saveError instanceof Error ? saveError.message : "Unable to save channel settings.");
     } finally {
       setIsSaving(false);
     }
@@ -283,7 +353,7 @@ export const AgentConnectorsPage = () => {
       });
       setFeedback(result.summary);
     } catch (saveError) {
-      setErrorMessage(saveError instanceof Error ? saveError.message : "No se pudo desactivar el connector.");
+      setErrorMessage(saveError instanceof Error ? saveError.message : "Unable to disable this channel.");
     } finally {
       setIsSaving(false);
     }
@@ -309,7 +379,7 @@ export const AgentConnectorsPage = () => {
       setFeedback(result.summary);
       setGeneratedLinkToken(null);
     } catch (saveError) {
-      setErrorMessage(saveError instanceof Error ? saveError.message : "No se pudo borrar el secret almacenado.");
+      setErrorMessage(saveError instanceof Error ? saveError.message : "Unable to clear the stored token.");
     } finally {
       setIsSaving(false);
     }
@@ -331,7 +401,7 @@ export const AgentConnectorsPage = () => {
       });
       setFeedback(result.summary);
     } catch (testError) {
-      setErrorMessage(testError instanceof Error ? testError.message : "No se pudo probar la conexión con Telegram.");
+      setErrorMessage(testError instanceof Error ? testError.message : "Unable to test this channel.");
     } finally {
       setIsTesting(false);
     }
@@ -355,21 +425,38 @@ export const AgentConnectorsPage = () => {
         expiresInMinutes: 30,
       });
       setGeneratedLinkToken(result.linkToken ?? null);
+      setCopiedLinkCommand(false);
       setFeedback(result.summary);
     } catch (tokenError) {
-      setErrorMessage(tokenError instanceof Error ? tokenError.message : "No se pudo generar el token de vinculación.");
+      setErrorMessage(tokenError instanceof Error ? tokenError.message : "Unable to generate a link code.");
     } finally {
       setIsGeneratingToken(false);
     }
   };
 
+  const handleCopyLinkCommand = async () => {
+    if (!generatedLinkToken) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(`/link ${generatedLinkToken}`);
+      setCopiedLinkCommand(true);
+      if (copiedLinkCommandTimeoutRef.current !== null) {
+        window.clearTimeout(copiedLinkCommandTimeoutRef.current);
+      }
+      copiedLinkCommandTimeoutRef.current = window.setTimeout(() => {
+        setCopiedLinkCommand(false);
+        copiedLinkCommandTimeoutRef.current = null;
+      }, 2200);
+    } catch (copyError) {
+      setErrorMessage(copyError instanceof Error ? copyError.message : "Unable to copy the Telegram command.");
+    }
+  };
+
   return (
     <div className="page-stack">
-      <SectionHeader
-        title="Connectors"
-        titleTone="accent"
-        body="Connect channels, verify status, and generate access links."
-      />
+      <SectionHeader title="Channels" titleTone="accent" />
 
       <div className="agents-health-grid">
         {summaryCards.map((card) => (
@@ -381,7 +468,7 @@ export const AgentConnectorsPage = () => {
       </div>
 
       <div className="agents-models-layout">
-        <SurfaceCard title="Connectors" subtitle="Choose a channel to configure.">
+        <SurfaceCard title="Available Channels">
           <div className="models-provider-list">
             {orderedConnectors.map((connector) => {
               const connectorBrand = getConnectorBrand(connector.connectorKey);
@@ -396,11 +483,11 @@ export const AgentConnectorsPage = () => {
                   type="button"
                 >
                   <span
-                    aria-label={connector.status}
+                    aria-label={getConnectorStatusLabel(connector.status)}
                     className={`agent-live-dot agent-live-dot-${
                       connector.status === "configured" ? "green" : connector.status === "disabled" ? "red" : "amber"
                     }`}
-                    data-tooltip={`${connector.label} · ${connector.status.replace(/_/g, " ")}`}
+                    data-tooltip={`${connector.label} · ${getConnectorStatusLabel(connector.status)}`}
                   />
                   <div className="models-provider-row-copy">
                     <div className="models-provider-row-topline">
@@ -414,11 +501,13 @@ export const AgentConnectorsPage = () => {
                         ) : null}
                         <span>{connector.label}</span>
                       </strong>
-                      <span className="subtle-pill">{connector.operationalMode === "dm_first" ? "DM" : "Future"}</span>
+                      <StatusBadge tone={getConnectorStatusTone(connector.status)}>
+                        {getConnectorStatusLabel(connector.status)}
+                      </StatusBadge>
                     </div>
                     <div className="agent-detail-row">
-                      <span>{connector.connectorKey === "telegram" ? "DM and linking" : connector.connectorKey === "whatsapp" ? "Messaging" : connector.connectorKey === "email" ? "Alerts and drafts" : "Integrations"}</span>
-                      <span>{connector.botUsername ? `@${connector.botUsername}` : "Not verified"}</span>
+                      <span>{getConnectorCapabilityLabel(connector.connectorKey)}</span>
+                      {connector.botUsername ? <span>@{connector.botUsername}</span> : null}
                     </div>
                   </div>
                 </button>
@@ -445,33 +534,36 @@ export const AgentConnectorsPage = () => {
                 <span>{selectedConnector.label}</span>
               </span>
             ) : (
-              "Connector"
+              "Channel"
             )
-          }
-          subtitle={
-            selectedConnector?.connectorKey === "telegram"
-              ? "Save the bot, test the connection, and generate the link."
-              : selectedConnector?.connectorKey === "whatsapp"
-                ? "Visible for now. Activation comes later."
-                : selectedConnector?.connectorKey === "email"
-                  ? "Review status and readiness."
-                  : "Reserve this channel for future integrations."
           }
         >
           {selectedConnector ? (
             <div className="agent-detail-stack">
-              <div className="agent-detail-row">
-                <span className={`run-status-pill run-status-pill-${selectedConnector.status}`}>
-                  {selectedConnector.status.replace(/_/g, " ")}
-                </span>
-                {selectedConnector.hasStoredSecret ? <span className="subtle-pill">Stored secret</span> : <span className="subtle-pill">No secret</span>}
+              <div className="summary-grid">
+                <div className="summary-row">
+                  <span className="summary-label">Status</span>
+                  <span className="summary-value">
+                    <StatusBadge tone={getConnectorStatusTone(selectedConnector.status)}>
+                      {getConnectorStatusLabel(selectedConnector.status)}
+                    </StatusBadge>
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Channel</span>
+                  <span className="summary-value">{getConnectorCapabilityLabel(selectedConnector.connectorKey)}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Token stored</span>
+                  <span className="summary-value">{selectedConnector.hasStoredSecret ? "Yes" : "No"}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Bot username</span>
+                  <span className="summary-value">{selectedConnector.botUsername ? `@${selectedConnector.botUsername}` : "Not verified"}</span>
+                </div>
               </div>
 
               <div className="models-provider-health-grid">
-                <div className="models-provider-health-card">
-                  <span className="agent-detail-kicker">Bot username</span>
-                  <strong>{selectedConnector.botUsername ? `@${selectedConnector.botUsername}` : "Not verified"}</strong>
-                </div>
                 <div className="models-provider-health-card">
                   <span className="agent-detail-kicker">Last test</span>
                   <strong>{selectedConnector.lastTestedAtLabel}</strong>
@@ -484,32 +576,25 @@ export const AgentConnectorsPage = () => {
                   <span className="agent-detail-kicker">Pending</span>
                   <strong>{selectedConnector.pendingDeliveries}</strong>
                 </div>
-              </div>
-
-              {selectedConnector.connectorKey === "telegram" ? (
-                <div className="models-provider-health-grid">
-                  {identitySummaryCards.map((card) => (
-                    <div key={card.label} className="models-provider-health-card">
-                      <span className="agent-detail-kicker">{card.label}</span>
-                      <strong>{card.value}</strong>
-                    </div>
-                  ))}
+                <div className="models-provider-health-card">
+                  <span className="agent-detail-kicker">Last outbound</span>
+                  <strong>{selectedConnector.lastOutboundAtLabel}</strong>
                 </div>
-              ) : null}
+              </div>
 
               <div className="agent-form-grid">
                 <label className="field-block field-block-span-2">
-                  <span className="field-label">Bot token</span>
+                  <span className="field-label">Access token</span>
                   <input
                     className="field-input"
                     onChange={(event) => setDraft((current) => ({ ...current, botToken: event.target.value }))}
-                    placeholder={selectedConnector.hasStoredSecret ? "Leave empty to keep the stored token" : "Paste the bot token here"}
+                    placeholder={selectedConnector.hasStoredSecret ? "Leave blank to keep the stored token" : "Paste the token"}
                     type="password"
                     value={draft.botToken}
                   />
                 </label>
                 <label className="field-block">
-                  <span className="field-label">Mode</span>
+                  <span className="field-label">Availability</span>
                   <select
                     className="field-input"
                     onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.value === "enabled" }))}
@@ -517,17 +602,6 @@ export const AgentConnectorsPage = () => {
                   >
                     <option value="enabled">Enabled</option>
                     <option value="disabled">Disabled</option>
-                  </select>
-                </label>
-                <label className="field-block">
-                  <span className="field-label">Internal user</span>
-                  <select className="field-input" onChange={(event) => setSelectedUserId(event.target.value)} value={selectedUserId}>
-                    {linkableIdentities.map((identity) => (
-                      <option key={identity.value} value={identity.value}>
-                        {identity.ready ? "" : "[Blocked] "}
-                        {identity.label}
-                      </option>
-                    ))}
                   </select>
                 </label>
               </div>
@@ -543,34 +617,6 @@ export const AgentConnectorsPage = () => {
                 </div>
               ) : null}
 
-              {selectedIdentity ? (
-                <div className="agent-detail-row">
-                  <span className="agent-detail-key">Selected identity</span>
-                  <span>{selectedIdentity.helper}</span>
-                </div>
-              ) : null}
-
-              {selectedIdentity ? (
-                <div className="agent-detail-row">
-                  <span className="agent-detail-key">State</span>
-                  <span>{selectedIdentity.statusLabel}</span>
-                </div>
-              ) : null}
-
-              {selectedIdentity?.roleLabel ? (
-                <div className="agent-detail-row">
-                  <span className="agent-detail-key">Role</span>
-                  <span>{selectedIdentity.roleLabel}</span>
-                </div>
-              ) : null}
-
-              {selectedIdentity?.userId ? (
-                <div className="agent-detail-row">
-                  <span className="agent-detail-key">Resolved internal user</span>
-                  <span>{selectedIdentity.userId}</span>
-                </div>
-              ) : null}
-
               {selectedConnector.lastErrorSummary ? (
                 <div className="models-provider-diagnostic">
                   <span className="agent-detail-kicker">Last error</span>
@@ -579,66 +625,112 @@ export const AgentConnectorsPage = () => {
               ) : null}
 
               {selectedConnector.connectorKey === "telegram" ? (
-                <div className="connector-identity-directory">
-                  <div className="surface-card-header">
-                    <div>
-                      <h3 className="surface-card-title">Telegram identities</h3>
-                      <p className="surface-card-subtitle">
-                        Pick from real internal users first. Crew without an internal user stays visible only as a blocked reference.
-                      </p>
+                <details className="detail-disclosure">
+                  <summary className="detail-disclosure-summary">People & linking</summary>
+                  <div className="detail-disclosure-content">
+                    <div className="models-provider-health-grid">
+                      {identitySummaryCards.map((card) => (
+                        <div key={card.label} className="models-provider-health-card">
+                          <span className="agent-detail-kicker">{card.label}</span>
+                          <strong>{card.value}</strong>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="agent-form-grid">
+                      <label className="field-block field-block-span-2">
+                        <span className="field-label">Internal user</span>
+                        <select className="field-input" onChange={(event) => setSelectedUserId(event.target.value)} value={selectedUserId}>
+                          {linkableIdentities.map((identity) => (
+                            <option key={identity.value} value={identity.value}>
+                              {identity.ready ? "" : "[Blocked] "}
+                              {identity.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    {selectedIdentity ? (
+                      <div className="summary-grid">
+                        <div className="summary-row">
+                          <span className="summary-label">Selected user</span>
+                          <span className="summary-value">{selectedIdentity.label}</span>
+                        </div>
+                        <div className="summary-row">
+                          <span className="summary-label">Readiness</span>
+                          <span className="summary-value">{selectedIdentity.statusLabel}</span>
+                        </div>
+                        {selectedIdentity.roleLabel ? (
+                          <div className="summary-row">
+                            <span className="summary-label">Role</span>
+                            <span className="summary-value">{selectedIdentity.roleLabel}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    <div className="connector-identity-directory">
+                      <div className="surface-card-header">
+                        <div>
+                          <h3 className="surface-card-title">Telegram identities</h3>
+                        </div>
+                      </div>
+                      <div className="connector-identity-list">
+                        {linkableIdentities.map((identity) => (
+                          <button
+                            key={identity.value}
+                            className={`connector-identity-row${selectedUserId === identity.value ? " is-selected" : ""}`}
+                            onClick={() => setSelectedUserId(identity.value)}
+                            type="button"
+                          >
+                            <div className="connector-identity-topline">
+                              <strong>{identity.label}</strong>
+                              <StatusBadge tone={getIdentityTone(identity.linkState)}>
+                                {titleCaseEnum(identity.linkState)}
+                              </StatusBadge>
+                            </div>
+                            <span>{identity.helper}</span>
+                            <span>{identity.statusLabel}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <div className="connector-identity-list">
-                    {linkableIdentities.map((identity) => (
-                      <button
-                        key={identity.value}
-                        className={`connector-identity-row${selectedUserId === identity.value ? " is-selected" : ""}`}
-                        onClick={() => setSelectedUserId(identity.value)}
-                        type="button"
-                      >
-                        <div className="connector-identity-topline">
-                          <strong>{identity.label}</strong>
-                          <span className={`run-status-pill run-status-pill-${
-                            identity.linkState === "linked"
-                              ? "configured"
-                              : identity.linkState === "ready"
-                                ? "queued"
-                                : identity.linkState === "revoked"
-                                  ? "disabled"
-                                  : "blocked"
-                          }`}
-                          >
-                            {identity.linkState}
-                          </span>
-                        </div>
-                        <span>{identity.helper}</span>
-                        <span>{identity.statusLabel}</span>
-                      </button>
-                    ))}
-                  </div>
+                </details>
+              ) : (
+                <div className="summary-row">
+                  <span className="summary-label">Availability</span>
+                  <span className="summary-value">Visible now. Setup will appear here when this channel is ready.</span>
                 </div>
-              ) : null}
+              )}
 
-              <div className="agent-detail-row">
-                <span className="agent-detail-key">Summary</span>
-                <span>{selectedConnector.deliverySummary}</span>
-              </div>
-              <div className="agent-detail-row">
-                <span className="agent-detail-key">Last inbound</span>
-                <span>{selectedConnector.lastInboundAtLabel}</span>
-              </div>
-              <div className="agent-detail-row">
-                <span className="agent-detail-key">Last outbound</span>
-                <span>{selectedConnector.lastOutboundAtLabel}</span>
+              <div className="summary-row">
+                <span className="summary-label">Summary</span>
+                <span className="summary-value">{selectedConnector.deliverySummary}</span>
               </div>
 
               {generatedLinkToken ? (
                 <div className="models-provider-feedback models-provider-feedback-success">
-                  <div className="agent-detail-row">
-                    <strong>Link token ready</strong>
-                    <code>{generatedLinkToken}</code>
+                  <div className="telegram-link-feedback-header">
+                    <div className="agent-detail-row">
+                      <strong>Link token ready</strong>
+                      <code>{generatedLinkToken}</code>
+                    </div>
+                    <button
+                      aria-label={copiedLinkCommand ? "Command copied" : "Copy Telegram command"}
+                      className="icon-ghost-control telegram-link-copy-button"
+                      data-tooltip={copiedLinkCommand ? "Copied" : "Copy command"}
+                      onClick={() => void handleCopyLinkCommand()}
+                      type="button"
+                    >
+                      {copiedLinkCommand ? <Check size={12} /> : <Copy size={12} />}
+                    </button>
                   </div>
-                  <p>Open the bot in Telegram DM and send: <code>/link {generatedLinkToken}</code></p>
+                  <div className="telegram-link-command-row">
+                    <code className="telegram-link-command">/link {generatedLinkToken}</code>
+                  </div>
+                  <p>Copy this command and paste it into Telegram.</p>
                 </div>
               ) : null}
 
@@ -677,7 +769,7 @@ export const AgentConnectorsPage = () => {
                 {selectedConnector.hasStoredSecret ? (
                   <button className="ghost-control" disabled={isSaving} onClick={() => void handleClearSecret()} type="button">
                     <KeyRound size={16} />
-                    <span>Clear stored secret</span>
+                    <span>Clear token</span>
                   </button>
                 ) : null}
               </div>
@@ -688,7 +780,7 @@ export const AgentConnectorsPage = () => {
         </SurfaceCard>
       </div>
 
-      {error ? <div className="empty-state">Connectors unavailable: {error}</div> : null}
+      {error ? <div className="empty-state">Channels unavailable: {error}</div> : null}
     </div>
   );
 };

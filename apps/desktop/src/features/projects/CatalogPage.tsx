@@ -53,7 +53,6 @@ type CatalogTabConfig = {
   key: CatalogEntityType;
   label: string;
   title: string;
-  subtitle?: string;
   rows: Array<Record<string, unknown>>;
   columns: Array<{
     key: string;
@@ -940,23 +939,21 @@ export const CatalogPage = () => {
   return (
     <div className="page-stack">
       <SectionHeader
-        eyebrow="Catalog"
-        title="Global Catalog"
-        body="Shared databases that power projects, assignments, packing and the rest of the app."
+        title="Catalog"
         contextLabel={sectionScopeLabel}
       />
 
       {error ? <div className="empty-state">Catalog unavailable: {error}</div> : null}
       {!error && isLoading ? (
-        <SurfaceCard title="Global Catalog" subtitle="Loading your shared operational references.">
-          <TableSkeleton body="Preparing locations, departments, crew, clients and categories from the local workspace." columns={4} />
+        <SurfaceCard title="Catalog">
+          <TableSkeleton body="Loading locations, crew, clients and categories." columns={4} />
         </SurfaceCard>
       ) : null}
 
       {!error && !isLoading && totalCatalogRecords === 0 ? (
         <GuidedEmptyState
-          title="Start here before loading real operations"
-          body="Catalog is the shared foundation for locations, departments, crew, clients and categories. Filling it first keeps assets, projects and incidents consistent later."
+          title="Start with your shared records"
+          body="Add locations, departments, crew, clients and categories here so the rest of the app stays consistent."
           tips={[
             "Create locations before moving inventory",
             "Add departments and crew before assigning work",
@@ -1003,7 +1000,6 @@ export const CatalogPage = () => {
         <SurfaceCard
           className="catalog-surface-card"
           title={activeTabConfig.title}
-          subtitle={activeTabConfig.subtitle}
           aside={
             <div className="surface-card-actions catalog-toolbar-actions">
               <button
@@ -1084,7 +1080,7 @@ export const CatalogPage = () => {
                   {selectedCount === 1 ? `1 ${singularLabelMap[activeTab]} selected` : `${selectedCount} ${activeTabConfig.label.toLowerCase()} selected`}
                 </span>
                 <span className="selection-action-subtitle">
-                  {selectedCount === 1 ? "Edit, export or remove the selected record." : "Delete works in batch. Edit stays reserved for one row."}
+                  {selectedCount === 1 ? "Edit, export or delete this record." : "Delete works in batch. Edit stays for one row."}
                 </span>
               </div>
               <div className="selection-action-buttons">
@@ -1115,7 +1111,7 @@ export const CatalogPage = () => {
           <DataTable
             activeRowId={activePreviewIds[activeTab]}
             columns={activeTabConfig.columns}
-            emptyMessage={`No ${activeTabConfig.label.toLowerCase()} yet. Create the first one to make this workspace operational.`}
+            emptyMessage={`No ${activeTabConfig.label.toLowerCase()} yet. Create the first one here.`}
             getRowId={(row) => String(row.id)}
             maxHeight="min(68vh, 760px)"
             onRowClick={(row) => setActivePreviewIds((current) => ({ ...current, [activeTab]: String(row.id) }))}
@@ -1207,7 +1203,6 @@ export const CatalogPage = () => {
         ) : showPreview && previewRow ? (
           <SurfaceCard
             title={resolveCatalogPreviewTitle(activeTab, previewRow)}
-            subtitle={`Selected ${singularLabelMap[activeTab]} record.`}
             aside={
               <button
                 aria-label="Close catalog preview"
@@ -1221,7 +1216,7 @@ export const CatalogPage = () => {
           >
             <div className="summary-grid">
               <div className="summary-row">
-                <span className="summary-label">Database</span>
+                <span className="summary-label">Type</span>
                 <span className="summary-value">{activeTabConfig.label}</span>
               </div>
               {buildCatalogPreviewRows(activeTab, previewRow).map((row) => (
@@ -1238,9 +1233,6 @@ export const CatalogPage = () => {
                   <div className="surface-card-header">
                     <div>
                       <h3 className="surface-card-title">Internal user</h3>
-                      <p className="surface-card-subtitle">
-                        Reuse this crew profile to create the internal identity that Telegram, roles and permissions rely on.
-                      </p>
                     </div>
                   </div>
 
@@ -1268,7 +1260,7 @@ export const CatalogPage = () => {
                       </div>
                       <div className="summary-row">
                         <span className="summary-label">Ready</span>
-                        <span className="summary-value">{previewLinkedUser.readyForTelegram ? "Ready for Telegram" : "Needs setup"}</span>
+                        <span className="summary-value">{previewLinkedUser.readyForTelegram ? "Ready to link" : "Needs setup"}</span>
                       </div>
                     </div>
                   ) : (
@@ -1317,7 +1309,7 @@ export const CatalogPage = () => {
                         <p>
                           {previewCreateRole
                             ? `${previewCreateRole.name}: ${previewCreateRole.permissionKeys.join(", ")}`
-                            : "Pick the primary role first. You can refine permissions later from Users & access."}
+                            : "Pick a role first. You can refine permissions later in Users & access."}
                         </p>
                       </div>
 
@@ -1340,7 +1332,6 @@ export const CatalogPage = () => {
                     <div className="surface-card-header">
                       <div>
                         <h3 className="surface-card-title">Bank accounts</h3>
-                        <p className="surface-card-subtitle">Stored payout references for this crew member.</p>
                       </div>
                     </div>
                     <div className="catalog-preview-bank-accounts">
@@ -1360,7 +1351,6 @@ export const CatalogPage = () => {
                     <div className="surface-card-header">
                       <div>
                         <h3 className="surface-card-title">Documents</h3>
-                        <p className="surface-card-subtitle">Crew support files with inline preview when available.</p>
                       </div>
                     </div>
                     {(() => {
@@ -1442,7 +1432,6 @@ export const CatalogPage = () => {
                   <div className="surface-card-header">
                     <div>
                       <h3 className="surface-card-title">Package contents</h3>
-                      <p className="surface-card-subtitle">This kit is only a package template. Stock is debited later, when the kit is assigned operationally.</p>
                     </div>
                   </div>
 
@@ -1462,9 +1451,7 @@ export const CatalogPage = () => {
                                   : "Availability unavailable"}
                               </span>
                               {asset?.operationalStatus === "maintenance" ? (
-                                <span className="identity-meta">
-                                  In maintenance. This member blocks operational use of the full kit until it is back in service.
-                                </span>
+                                <span className="identity-meta">In maintenance.</span>
                               ) : null}
                             </div>
                             <span className="section-header-context-pill">Qty {selection.quantity}</span>
@@ -1530,7 +1517,6 @@ export const CatalogPage = () => {
             projects={projects}
             selectedAssets={activeKitAssignmentAssets}
             selectedCount={activeKitAssignmentAssets.length}
-            subtitle="Assign this kit as one operational package. The system will debit the underlying asset quantities using the stable asset assignment flow."
             title={`Assign kit · ${activeKitRow.code}`}
             users={data.users}
           />

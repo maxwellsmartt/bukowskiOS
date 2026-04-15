@@ -11,6 +11,61 @@ import { createTestDatabase } from "./helpers/createTestDatabase";
 const createAttachmentsRoot = (prefix: string) => fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
 
 describe("connector bridge service", () => {
+  it("creates telegram link tokens for active users without ambiguous joins", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-connector-bridge-link-token");
+    const attachmentsRootPath = createAttachmentsRoot("bukowski-connector-bridge-link-token");
+    const assistantChatService = createAssistantChatService(database, {
+      attachmentsRootPath,
+      assistantGatewayService: {
+        sendMessage: async () => {
+          throw new Error("Not used in this test.");
+        },
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
+      },
+      memoryService: {
+        extractAndPersist: () => [],
+        getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        pruneStaleEntries: () => undefined,
+        recordFailure: () => undefined,
+      },
+    });
+    const service = createConnectorBridgeService(database, {
+      assistantChatService,
+    });
+
+    const result = service.createLinkToken({
+      connectorKey: "telegram",
+      userId: "user-luis",
+      expiresInMinutes: 30,
+    });
+
+    expect(result.token).toHaveLength(6);
+    expect(result.summary).toContain("Luis");
+
+    const tokenRow = database
+      .prepare(
+        `
+          SELECT connector_key, target_user_id, status
+          FROM connector_link_tokens
+          WHERE target_user_id = ?
+          ORDER BY created_at DESC
+          LIMIT 1
+        `,
+      )
+      .get("user-luis") as { connector_key: string; target_user_id: string; status: string } | undefined;
+
+    expect(tokenRow).toMatchObject({
+      connector_key: "telegram",
+      target_user_id: "user-luis",
+      status: "pending",
+    });
+
+    cleanup();
+    fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
+  });
+
   it("blocks telegram DMs until the identity is explicitly linked", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-connector-bridge-unlinked");
     const attachmentsRootPath = createAttachmentsRoot("bukowski-connector-bridge-unlinked");

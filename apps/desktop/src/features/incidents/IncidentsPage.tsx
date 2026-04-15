@@ -266,14 +266,8 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
   return (
     <div className="page-stack">
       <SectionHeader
-        eyebrow={isProjectMode ? "Project / Incidents" : "Incidents"}
-        title={isProjectMode ? "Project incident queue" : "Incidents"}
-        body={
-          isProjectMode
-            ? "Damage, loss and malfunction reports currently linked to this project and ready for follow-up."
-            : "Incident queue, maintenance watch and RMA follow-up live together here so the full damage and repair workflow stays in one place."
-        }
-        contextLabel={sectionScopeLabel}
+        title="Incidents"
+        contextLabel={isProjectMode ? sectionScopeLabel ?? undefined : undefined}
       />
 
       {error ? <div className="empty-state">Incidents unavailable: {error}</div> : null}
@@ -281,14 +275,14 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       {!isProjectMode && rmaError ? <div className="empty-state">RMA unavailable: {rmaError}</div> : null}
 
       <div className="selection-action-bar">
-        <div className="selection-action-copy">
-          <span className="selection-action-title">Report incidents from here</span>
-          <span className="selection-action-subtitle">
-            {isProjectMode
-              ? `Create reports inside ${effectiveProjectName ?? "this project"} and keep them linked to the right context.`
-              : "Create reports, track maintenance cases and prepare manufacturer RMAs from one operational surface."}
-          </span>
-        </div>
+          <div className="selection-action-copy">
+            <span className="selection-action-title">Report incidents from here</span>
+            <span className="selection-action-subtitle">
+              {isProjectMode
+                ? `Create reports inside ${effectiveProjectName ?? "this project"}.`
+                : "Create reports and follow their progress."}
+            </span>
+          </div>
         <button
           className="action-primary-button"
           onClick={() => {
@@ -358,7 +352,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
         />
       ) : null}
 
-      <SurfaceCard title="Incident queue" subtitle="Severity, responsibility and estimated cost in one view.">
+      <SurfaceCard title="Incidents">
         <ListToolbar
           activeSortLabel={incidentControls.activeSortOption?.label}
           onSearchValueChange={incidentControls.setSearchValue}
@@ -506,7 +500,6 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
         <>
           <SurfaceCard
             title="Maintenance watch"
-            subtitle="Assets already in maintenance, ready either for internal bench follow-up or a manufacturer-facing RMA."
           >
             <DataTable
               getRowId={(row) => row.id}
@@ -547,7 +540,6 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
                 </button>
               }
               title="RMA"
-              subtitle="Drafts, sent cases and closed manufacturer reports linked to the maintenance queue."
             >
               <DataTable
                 activeRowId={activeRmaCaseId}
@@ -574,7 +566,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
                   },
                   { key: "assets", label: "Assets", align: "right", render: (row) => row.assetCount },
                 ]}
-                emptyMessage="No RMA cases yet. Create one from the maintenance queue."
+                emptyMessage="No RMA cases yet. Create one from the incidents list."
                 onRowClick={(row) => {
                   setActiveRmaCaseId(row.id);
                   setRmaEditorMode(null);
@@ -633,12 +625,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
                     </div>
                   ) : null
                 }
-                title={rmaDetail.caseRecord ? rmaDetail.caseRecord.title : "RMA detail"}
-                subtitle={
-                  rmaDetail.caseRecord
-                    ? "Manufacturer contact, summary and asset-level issue detail."
-                    : "Select a case from the RMA queue or create a new one."
-                }
+                title={rmaDetail.caseRecord ? rmaDetail.caseRecord.title : "RMA Details"}
               >
                 {rmaDetailError ? <div className="action-feedback action-feedback-error">{rmaDetailError}</div> : null}
                 {rmaEditorError && !rmaEditorMode ? <div className="action-feedback action-feedback-error">{rmaEditorError}</div> : null}

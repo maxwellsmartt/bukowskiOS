@@ -540,8 +540,8 @@ export const createConnectorBridgeService = (
             JOIN workspace_memberships
               ON workspace_memberships.user_id = users.id
               AND workspace_memberships.workspace_id = ?
-            WHERE id = ?
-              AND is_active = 1
+            WHERE users.id = ?
+              AND users.is_active = 1
               AND workspace_memberships.status = 'active'
             LIMIT 1
           `,

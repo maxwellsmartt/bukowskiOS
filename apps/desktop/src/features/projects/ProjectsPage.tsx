@@ -68,7 +68,6 @@ export const ProjectsPage = () => {
       {error ? <div className="empty-state">Projects unavailable: {error}</div> : null}
 
       <div className="chip-row">
-        <StatusBadge tone="success">{data.filter((project) => hasItem("project", project.id)).length} in compare</StatusBadge>
         {selectedRowIds.length ? <StatusBadge>{`${selectedRowIds.length} selected`}</StatusBadge> : null}
         <button className={`ghost-control${showArchived ? " is-active" : ""}`} onClick={() => setShowArchived((current) => !current)} type="button">
           {showArchived ? "Hide archived" : "Show archived"}
@@ -81,7 +80,7 @@ export const ProjectsPage = () => {
             <span className="selection-action-title">
               {selectedRowIds.length === 1 ? "1 project selected" : `${selectedRowIds.length} projects selected`}
             </span>
-            <span className="selection-action-subtitle">Add projects to compare for side-by-side schedule, resource and budget review.</span>
+            <span className="selection-action-subtitle">Add them to compare.</span>
           </div>
           <div className="selection-action-buttons">
             <button

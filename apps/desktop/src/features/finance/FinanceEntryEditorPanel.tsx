@@ -152,11 +152,20 @@ export const FinanceEntryEditorPanel = ({
         </button>
       }
       title={mode === "create" ? "New finance entry" : "Edit finance entry"}
-      subtitle="Track reserves, exposure and invoice visibility without leaving the finance register."
     >
-      <div className="chip-row">
-        <StatusBadge tone={mode === "create" ? "success" : "info"}>{mode === "create" ? "Create" : "Edit"}</StatusBadge>
-        {selectedProjectLabel ? <StatusBadge>{selectedProjectLabel}</StatusBadge> : null}
+      <div className="summary-grid compact-summary-grid">
+        <div className="summary-row">
+          <span className="summary-label">Mode</span>
+          <span className="summary-value">
+            <StatusBadge tone={mode === "create" ? "success" : "info"}>{mode === "create" ? "Create" : "Edit"}</StatusBadge>
+          </span>
+        </div>
+        {selectedProjectLabel ? (
+          <div className="summary-row">
+            <span className="summary-label">Project</span>
+            <span className="summary-value">{selectedProjectLabel}</span>
+          </div>
+        ) : null}
       </div>
 
       {error ? <div className="form-inline-error">{error}</div> : null}
@@ -190,7 +199,7 @@ export const FinanceEntryEditorPanel = ({
           <input
             className="action-field-control"
             onChange={(event) => setCategory(event.target.value)}
-            placeholder="Repair, Asset risk, Invoice, Travel, etc."
+            placeholder="Repairs, invoice, travel"
             value={category}
           />
         </label>
@@ -204,11 +213,6 @@ export const FinanceEntryEditorPanel = ({
             placeholder="0.00"
             value={amount}
           />
-        </label>
-
-        <label className="action-field">
-          <span className="action-field-label">Currency</span>
-          <input className="action-field-control" onChange={(event) => setCurrency(event.target.value)} value={currency} />
         </label>
 
         <label className="action-field">
@@ -229,27 +233,8 @@ export const FinanceEntryEditorPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Asset</span>
-          <SelectField onChange={(event) => setAssetId(event.target.value)} value={assetId}>
-            <option value="">Unlinked</option>
-            {assets.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.code} · {asset.name}
-              </option>
-            ))}
-          </SelectField>
-        </label>
-
-        <label className="action-field">
-          <span className="action-field-label">Incident</span>
-          <SelectField onChange={(event) => setIncidentId(event.target.value)} value={incidentId}>
-            <option value="">Unlinked</option>
-            {incidents.map((incident) => (
-              <option key={incident.id} value={incident.id}>
-                {incident.title}
-              </option>
-            ))}
-          </SelectField>
+          <span className="action-field-label">Currency</span>
+          <input className="action-field-control" onChange={(event) => setCurrency(event.target.value)} value={currency} />
         </label>
 
         <label className="action-field action-field-wide">
@@ -257,26 +242,57 @@ export const FinanceEntryEditorPanel = ({
           <textarea
             className="action-field-control action-textarea"
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="What does this entry represent and why does it exist?"
+            placeholder="What is this for?"
             rows={3}
             value={description}
           />
         </label>
-
-        <label className="action-field action-field-wide">
-          <span className="action-field-label">Notes</span>
-          <textarea
-            className="action-field-control action-textarea"
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Optional internal notes for audit and follow-up."
-            rows={3}
-            value={notes}
-          />
-        </label>
       </div>
 
+      <details className="detail-disclosure">
+        <summary className="detail-disclosure-summary">More details</summary>
+        <div className="detail-disclosure-content">
+          <div className="action-form-grid">
+            <label className="action-field">
+              <span className="action-field-label">Asset</span>
+              <SelectField onChange={(event) => setAssetId(event.target.value)} value={assetId}>
+                <option value="">Unlinked</option>
+                {assets.map((asset) => (
+                  <option key={asset.id} value={asset.id}>
+                    {asset.code} · {asset.name}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
+
+            <label className="action-field">
+              <span className="action-field-label">Incident</span>
+              <SelectField onChange={(event) => setIncidentId(event.target.value)} value={incidentId}>
+                <option value="">Unlinked</option>
+                {incidents.map((incident) => (
+                  <option key={incident.id} value={incident.id}>
+                    {incident.title}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
+
+            <label className="action-field action-field-wide">
+              <span className="action-field-label">Notes</span>
+              <textarea
+                className="action-field-control action-textarea"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Optional note"
+                rows={3}
+                value={notes}
+              />
+            </label>
+          </div>
+        </div>
+      </details>
+
       {mode === "edit" ? (
-        <SurfaceCard title="Documents" subtitle="Attach invoices, receipts and supporting PDFs directly to this entry.">
+        <SurfaceCard title="Documents">
           <div className="action-panel-actions action-panel-actions-inline">
             <button className="ghost-control" disabled={isUploadingDocuments} onClick={() => void onAttachDocuments()} type="button">
               <span>{isUploadingDocuments ? "Attaching..." : "Attach documents"}</span>
@@ -338,9 +354,7 @@ export const FinanceEntryEditorPanel = ({
                       <div className="guided-empty-state guided-empty-state-subtle">
                         <div className="guided-empty-state-copy">
                           <span className="guided-empty-state-title">Preview unavailable</span>
-                          <p className="guided-empty-state-body">
-                            This file can still be opened externally, but it is too large or not previewable inline.
-                          </p>
+                          <p className="guided-empty-state-body">Open the file to review it outside the app.</p>
                         </div>
                       </div>
                     )}
@@ -349,9 +363,7 @@ export const FinanceEntryEditorPanel = ({
                   <div className="guided-empty-state guided-empty-state-subtle">
                     <div className="guided-empty-state-copy">
                       <span className="guided-empty-state-title">No documents yet</span>
-                      <p className="guided-empty-state-body">
-                        Attach invoices, receipts or contracts to keep financial follow-through close to the entry.
-                      </p>
+                      <p className="guided-empty-state-body">Attach invoices, receipts or contracts here.</p>
                     </div>
                   </div>
                 )}
@@ -361,9 +373,7 @@ export const FinanceEntryEditorPanel = ({
             <div className="guided-empty-state guided-empty-state-subtle">
               <div className="guided-empty-state-copy">
                 <span className="guided-empty-state-title">No documents attached</span>
-                <p className="guided-empty-state-body">
-                  Add PDFs or images after the entry exists so the team can inspect the supporting evidence in one place.
-                </p>
+                <p className="guided-empty-state-body">Add PDFs or images once the entry is saved.</p>
               </div>
             </div>
           )}

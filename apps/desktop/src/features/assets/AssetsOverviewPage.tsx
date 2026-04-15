@@ -88,7 +88,7 @@ export const AssetsOverviewPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Overview" titleTone="accent" />
+      <SectionHeader title="Assets Overview" titleTone="accent" />
 
       {error ? <div className="empty-state">Assets overview unavailable: {error}</div> : null}
 
@@ -96,7 +96,6 @@ export const AssetsOverviewPage = () => {
         {overviewCards.map((card) => (
           <SurfaceCard key={card.label} className="overview-operational-card" title={card.label}>
             <span className={`overview-operational-value metric-tone-${card.tone}`}>{card.value}</span>
-            <p className="overview-operational-subtitle">{card.subtitle}</p>
           </SurfaceCard>
         ))}
       </div>
@@ -113,7 +112,7 @@ export const AssetsOverviewPage = () => {
         snapshot={timelineSnapshot}
       />
 
-      <SurfaceCard title="Recent movements">
+      <SurfaceCard title="Recent Movements">
         <DataTable
           columns={[
             {
