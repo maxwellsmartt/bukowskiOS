@@ -15,6 +15,7 @@ export const uiPreferenceKeys = {
   recentEntityKeys: "recent-entity-keys",
   shellSidebarWidth: "shell-sidebar-width",
   shellProjectsShowArchived: "shell-projects-show-archived",
+  activeWorkspaceId: "active-workspace-id",
 } as const;
 
 const buildPreferenceKey = (key: string) => `bukowski:${key}`;

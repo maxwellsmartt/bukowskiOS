@@ -148,6 +148,14 @@ declare global {
       exportRecentLogs: () => Promise<AppExportResult>;
       openExternal: (url: string) => Promise<void>;
     };
+    bukowskiAuth?: {
+      getStoredTokens: () => Promise<{
+        accessToken: string | null;
+        refreshToken: string | null;
+      }>;
+      setStoredTokens: (tokens: { accessToken: string | null; refreshToken: string | null }) => Promise<void>;
+      clearStoredTokens: () => Promise<void>;
+    };
     bukowskiShell?: {
       getBootstrap: () => Promise<ShellBootstrap>;
       searchGlobal: (query: GlobalSearchQuery) => Promise<GlobalSearchGroup[]>;

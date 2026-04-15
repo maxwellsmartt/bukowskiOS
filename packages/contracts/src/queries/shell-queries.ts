@@ -11,6 +11,10 @@ export type ShellAppAction =
   | {
       type: "navigate";
       path: string;
+    }
+  | {
+      type: "auth-deep-link";
+      url: string;
     };
 
 export type GlobalSearchEntityType = "asset" | "project" | "project_unit" | "packing_slip" | "incident" | "financial_entry";

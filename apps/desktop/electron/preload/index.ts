@@ -130,6 +130,11 @@ import type {
 
 const shellActionListeners = new Set<(action: ShellAppAction) => void>();
 
+type StoredSupabaseTokens = {
+  accessToken: string | null;
+  refreshToken: string | null;
+};
+
 ipcRenderer.on(ipcChannels.shell.appAction, (_event, action: ShellAppAction) => {
   shellActionListeners.forEach((listener) => {
     listener(action);
@@ -159,6 +164,13 @@ const bukowskiApp = {
   exportSupportBundle: () => ipcRenderer.invoke(ipcChannels.app.exportSupportBundle) as Promise<AppExportResult>,
   exportRecentLogs: () => ipcRenderer.invoke(ipcChannels.app.exportRecentLogs) as Promise<AppExportResult>,
   openExternal: (url: string) => ipcRenderer.invoke(ipcChannels.app.openExternal, url) as Promise<void>,
+};
+
+const bukowskiAuth = {
+  getStoredTokens: () => ipcRenderer.invoke(ipcChannels.auth.getStoredTokens) as Promise<StoredSupabaseTokens>,
+  setStoredTokens: (tokens: StoredSupabaseTokens) =>
+    ipcRenderer.invoke(ipcChannels.auth.setStoredTokens, tokens) as Promise<void>,
+  clearStoredTokens: () => ipcRenderer.invoke(ipcChannels.auth.clearStoredTokens) as Promise<void>,
 };
 
 const bukowskiShell = {
@@ -389,6 +401,7 @@ window.addEventListener("unhandledrejection", (event) => {
 });
 
 contextBridge.exposeInMainWorld("bukowskiApp", bukowskiApp);
+contextBridge.exposeInMainWorld("bukowskiAuth", bukowskiAuth);
 contextBridge.exposeInMainWorld("bukowskiShell", bukowskiShell);
 contextBridge.exposeInMainWorld("bukowskiAgents", bukowskiAgents);
 contextBridge.exposeInMainWorld("bukowskiOverview", bukowskiOverview);

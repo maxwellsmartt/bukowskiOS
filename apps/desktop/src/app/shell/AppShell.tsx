@@ -4,6 +4,7 @@ import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import { resolveActiveRoute } from "@app/routing/route-meta";
 import { AppRoutes } from "@app/routing/routes";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { useSession } from "@app/providers/SessionProvider";
 import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 import { pushRecentEntityKey } from "@shared/lib/recentEntities";
 
@@ -28,6 +29,7 @@ export const AppShell = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { activeProjectId, activeProjectRouteSection, isScopeReady } = useShellContext();
+  const { handleAuthDeepLink } = useSession();
   const activeRoute = resolveActiveRoute(location.pathname);
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     clampSidebarWidth(readNumberPreference(uiPreferenceKeys.shellSidebarWidth, sidebarWidthDefault)),
@@ -142,9 +144,14 @@ export const AppShell = () => {
 
       if (action.type === "navigate") {
         navigate(action.path);
+        return;
+      }
+
+      if (action.type === "auth-deep-link") {
+        void handleAuthDeepLink(action.url).then(() => navigate("/workspaces/select", { replace: true }));
       }
     });
-  }, [navigate]);
+  }, [handleAuthDeepLink, navigate]);
 
   useEffect(
     () => () => {

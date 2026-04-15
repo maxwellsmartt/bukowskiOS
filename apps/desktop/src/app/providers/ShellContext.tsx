@@ -15,6 +15,7 @@ import type {
 import type { ProjectRouteSection, ScopeMode } from "@app/routing/route-meta";
 import { resolveActiveRoute, resolveRememberedGlobalPath } from "@app/routing/route-meta";
 import { readJsonPreference, readStringPreference, uiPreferenceKeys, writeJsonPreference, writePreference } from "@shared/lib/preferences";
+import { useWorkspace } from "./WorkspaceProvider";
 
 type ShellContextValue = {
   appInfo: AppInfo | null;
@@ -68,6 +69,7 @@ const resolveProjectSectionPreference = () => {
 export const ShellContextProvider = ({ children }: ShellContextProviderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { activeWorkspaceName } = useWorkspace();
   const activeRoute = useMemo(() => resolveActiveRoute(location.pathname), [location.pathname]);
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [shellBootstrap, setShellBootstrap] = useState<ShellBootstrap | null>(null);
@@ -315,7 +317,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   const value = useMemo<ShellContextValue>(
     () => ({
       appInfo,
-      workspaceName: shellBootstrap?.workspaceName ?? "Metadata Cine",
+      workspaceName: activeWorkspaceName || shellBootstrap?.workspaceName || "Metadata Cine",
       scopeMode: activeRoute.scopeMode,
       scopeChipLabel,
       projects,
@@ -343,6 +345,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       activeProjectId,
       activeRoute.projectSection,
       activeRoute.scopeMode,
+      activeWorkspaceName,
       appInfo,
       createProject,
       archiveProject,

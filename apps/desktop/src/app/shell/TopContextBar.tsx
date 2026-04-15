@@ -5,13 +5,14 @@ import { useNavigate } from "react-router-dom";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import type { AppDiagnosticsSnapshot } from "@contracts";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 type TopContextBarProps = {
   onOpenSearch: () => void;
 };
 
 export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
-  const { scopeChipLabel, workspaceName } = useShellContext();
+  const { scopeChipLabel } = useShellContext();
   const navigate = useNavigate();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot | null>(null);
   const isMountedRef = useRef(true);
@@ -80,10 +81,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   return (
     <div className="top-context-bar">
       <div className="top-context-group top-context-group-primary">
-        <div className="context-meta-stack">
-          <span className="context-meta-label">Workspace</span>
-          <span className="context-meta-value">{workspaceName}</span>
-        </div>
+        <WorkspaceSwitcher />
       </div>
 
       <div className="top-context-group top-context-group-end">

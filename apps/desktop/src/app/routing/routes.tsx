@@ -1,6 +1,7 @@
 import { lazy, type ComponentType } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
+import { GuestOnlyRoute, AuthGuard } from "./AuthGuard";
 import { appRouteMeta, resolveInitialPath } from "./route-meta";
 
 const lazyPage = <TModule extends Record<string, ComponentType<object>>, TKey extends keyof TModule>(
@@ -40,6 +41,11 @@ const ProjectPackingPage = lazyPage(() => import("@features/projects/ProjectPack
 const ProjectsPage = lazyPage(() => import("@features/projects/ProjectsPage"), "ProjectsPage");
 const ProjectsSchedulePage = lazyPage(() => import("@features/projects/ProjectsSchedulePage"), "ProjectsSchedulePage");
 const RmaPage = lazyPage(() => import("@features/rma/RmaPage"), "RmaPage");
+const LoginScreen = lazyPage(() => import("@features/auth/LoginScreen"), "LoginScreen");
+const PasswordResetScreen = lazyPage(() => import("@features/auth/PasswordResetScreen"), "PasswordResetScreen");
+const TwoFactorChallengeScreen = lazyPage(() => import("@features/auth/TwoFactorChallengeScreen"), "TwoFactorChallengeScreen");
+const WorkspacePickerScreen = lazyPage(() => import("@features/auth/WorkspacePickerScreen"), "WorkspacePickerScreen");
+const WorkspaceCreateScreen = lazyPage(() => import("@features/auth/WorkspaceCreateScreen"), "WorkspaceCreateScreen");
 
 const routeElements = {
   "/assets": <AssetsPage />,
@@ -76,11 +82,51 @@ export const appRoutes = appRouteMeta.map((route) => ({
 
 export const AppRoutes = () => (
   <Routes>
-    <Route path="/" element={<Navigate to={resolveInitialPath()} replace />} />
-    <Route path="/overview" element={<Navigate to="/assets" replace />} />
-    <Route path="/assets/overview" element={<Navigate to="/assets" replace />} />
+    <Route
+      path="/login"
+      element={
+        <GuestOnlyRoute>
+          <LoginScreen />
+        </GuestOnlyRoute>
+      }
+    />
+    <Route
+      path="/login/recovery"
+      element={
+        <GuestOnlyRoute>
+          <PasswordResetScreen />
+        </GuestOnlyRoute>
+      }
+    />
+    <Route
+      path="/login/mfa"
+      element={
+        <GuestOnlyRoute>
+          <TwoFactorChallengeScreen />
+        </GuestOnlyRoute>
+      }
+    />
+    <Route
+      path="/workspaces/select"
+      element={
+        <AuthGuard>
+          <WorkspacePickerScreen />
+        </AuthGuard>
+      }
+    />
+    <Route
+      path="/workspaces/create"
+      element={
+        <AuthGuard>
+          <WorkspaceCreateScreen />
+        </AuthGuard>
+      }
+    />
+    <Route path="/" element={<AuthGuard><Navigate to={resolveInitialPath()} replace /></AuthGuard>} />
+    <Route path="/overview" element={<AuthGuard><Navigate to="/assets" replace /></AuthGuard>} />
+    <Route path="/assets/overview" element={<AuthGuard><Navigate to="/assets" replace /></AuthGuard>} />
     {appRoutes.map((route) => (
-      <Route key={route.path} path={route.path} element={route.element} />
+      <Route key={route.path} path={route.path} element={<AuthGuard>{route.element}</AuthGuard>} />
     ))}
   </Routes>
 );

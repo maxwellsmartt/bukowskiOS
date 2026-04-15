@@ -16,6 +16,8 @@
       "@domain/*": ["../../packages/domain/src/*"],
       "@db": ["../../packages/db/src/index.ts"],
       "@db/*": ["../../packages/db/src/*"],
+      "@bukowski/supabase-client": ["../../packages/supabase-client/src/index.ts"],
+      "@bukowski/supabase-client/*": ["../../packages/supabase-client/src/*"],
       "@sync": ["../../packages/sync/src/index.ts"],
       "@sync/*": ["../../packages/sync/src/*"],
       "@ui": ["../../packages/ui/src/index.ts"],

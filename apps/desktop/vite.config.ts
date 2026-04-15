@@ -13,6 +13,7 @@ const sharedAliases = {
   "@contracts": path.resolve(rootDir, "../../packages/contracts/src"),
   "@domain": path.resolve(rootDir, "../../packages/domain/src"),
   "@db": path.resolve(rootDir, "../../packages/db/src"),
+  "@bukowski/supabase-client": path.resolve(rootDir, "../../packages/supabase-client/src"),
   "@sync": path.resolve(rootDir, "../../packages/sync/src"),
   "@ui": path.resolve(rootDir, "../../packages/ui/src"),
   "node:sqlite": path.resolve(rootDir, "electron/main/services/data/nodeSqliteShim.ts"),
@@ -34,7 +35,7 @@ export default defineConfig(async () => {
           vite: {
             build: {
               rollupOptions: {
-                external: ["better-sqlite3", "bwip-js", "qrcode", "pdfkit"],
+                external: ["better-sqlite3", "bwip-js", "keytar", "qrcode", "pdfkit"],
               },
             },
             resolve: {

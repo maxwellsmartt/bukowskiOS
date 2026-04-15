@@ -20,6 +20,11 @@ export const ipcChannels = {
     openExternal: "bukowskiApp:openExternal",
     reportRuntimeError: "bukowskiApp:reportRuntimeError",
   },
+  auth: {
+    getStoredTokens: "bukowskiAuth:getStoredTokens",
+    setStoredTokens: "bukowskiAuth:setStoredTokens",
+    clearStoredTokens: "bukowskiAuth:clearStoredTokens",
+  },
   shell: {
     getBootstrap: "bukowskiShell:getBootstrap",
     searchGlobal: "bukowskiShell:searchGlobal",

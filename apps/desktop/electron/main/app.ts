@@ -1,9 +1,10 @@
 import { app, BrowserWindow, Menu, session } from "electron";
 import path from "node:path";
 import { format } from "date-fns";
-import type { CreateProjectBlueprintInput } from "@contracts";
+import { ipcChannels, type CreateProjectBlueprintInput } from "@contracts";
 
 import { buildContentSecurityPolicy } from "./security/securityConfig";
+import { registerAuthIpc } from "./ipc/registerAuthIpc";
 import { registerAppIpc } from "./ipc/registerAppIpc";
 import { registerFoundationIpc } from "./ipc/registerFoundationIpc";
 import { buildAppMenu } from "./menus/buildAppMenu";
@@ -16,6 +17,8 @@ import { createMainWindow } from "./windows/createMainWindow";
 const { devServerUrl, preloadPath, rendererDist } = getDesktopEnvironment(import.meta.url);
 const isE2E = process.env.BUKOWSKI_E2E === "1";
 const logger = getDesktopLogger("app");
+const authProtocol = "bukowskios";
+const pendingDeepLinks: string[] = [];
 
 const createAppWindow = () =>
   createMainWindow({
@@ -23,6 +26,37 @@ const createAppWindow = () =>
     preloadPath,
     rendererDist,
   });
+
+const isBukowskiDeepLink = (value: string | undefined) => {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    return new URL(value).protocol === `${authProtocol}:`;
+  } catch {
+    return false;
+  }
+};
+
+const sendAuthDeepLinkToRenderer = (url: string) => {
+  const targetWindow = BrowserWindow.getAllWindows()[0] ?? null;
+
+  if (!targetWindow || targetWindow.isDestroyed() || targetWindow.webContents.isLoading()) {
+    pendingDeepLinks.push(url);
+    return;
+  }
+
+  targetWindow.webContents.send(ipcChannels.shell.appAction, {
+    type: "auth-deep-link",
+    url,
+  });
+};
+
+const flushPendingDeepLinks = () => {
+  const queuedLinks = pendingDeepLinks.splice(0);
+  queuedLinks.forEach((url) => sendAuthDeepLinkToRenderer(url));
+};
 
 const attachWindowRuntimeTelemetry = (
   window: BrowserWindow,
@@ -93,13 +127,17 @@ app.setName("bukowskiOS");
 app.setPath("userData", path.join(app.getPath("appData"), "@bukowski/desktop"));
 
 if (!isE2E) {
+  app.setAsDefaultProtocolClient(authProtocol);
+}
+
+if (!isE2E) {
   const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
   if (!hasSingleInstanceLock) {
     app.quit();
   }
 
-  app.on("second-instance", () => {
+  app.on("second-instance", (_event, argv) => {
     const existingWindow = BrowserWindow.getAllWindows()[0];
 
     if (!existingWindow) {
@@ -111,8 +149,21 @@ if (!isE2E) {
     }
 
     existingWindow.focus();
+
+    const deepLink = argv.find(isBukowskiDeepLink);
+    if (deepLink) {
+      sendAuthDeepLinkToRenderer(deepLink);
+    }
   });
 }
+
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+
+  if (isBukowskiDeepLink(url)) {
+    sendAuthDeepLinkToRenderer(url);
+  }
+});
 
 app.whenReady().then(() => {
   initializeDesktopLogger();
@@ -131,6 +182,7 @@ app.whenReady().then(() => {
   const documentGeneration = createDocumentGenerationService();
   attachProcessRuntimeTelemetry(localDatabase.runtimeDiagnostics);
 
+  registerAuthIpc();
   registerAppIpc({
     database: localDatabase.database,
     getDiagnosticsSnapshot: localDatabase.getDiagnosticsSnapshot,
@@ -345,11 +397,15 @@ app.whenReady().then(() => {
     runtimeDiagnostics: localDatabase.runtimeDiagnostics,
   });
   Menu.setApplicationMenu(buildAppMenu());
-  attachWindowRuntimeTelemetry(createAppWindow(), localDatabase.runtimeDiagnostics);
+  const mainWindow = createAppWindow();
+  attachWindowRuntimeTelemetry(mainWindow, localDatabase.runtimeDiagnostics);
+  mainWindow.webContents.once("did-finish-load", flushPendingDeepLinks);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      attachWindowRuntimeTelemetry(createAppWindow(), localDatabase.runtimeDiagnostics);
+      const activatedWindow = createAppWindow();
+      attachWindowRuntimeTelemetry(activatedWindow, localDatabase.runtimeDiagnostics);
+      activatedWindow.webContents.once("did-finish-load", flushPendingDeepLinks);
     }
   });
 });
