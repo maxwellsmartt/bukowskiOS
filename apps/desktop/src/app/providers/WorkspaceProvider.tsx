@@ -30,6 +30,21 @@ type WorkspaceContextValue = {
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
+const readFunctionErrorMessage = async (response: Response) => {
+  try {
+    const payload = (await response.json()) as { error?: unknown; message?: unknown };
+    const detail =
+      typeof payload.error === "string"
+        ? payload.error
+        : typeof payload.message === "string"
+          ? payload.message
+          : response.statusText;
+    return `Workspace creation failed (${response.status}): ${detail}`;
+  } catch {
+    return `Workspace creation failed (${response.status}): ${response.statusText}`;
+  }
+};
+
 export type CreateWorkspaceInput = {
   name: string;
   slug: string;
@@ -131,18 +146,41 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       setWorkspaceError(null);
 
       try {
-        const { data, error } = await supabase.functions.invoke("admin-workspace-bootstrap", {
-          body: {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+
+        if (sessionError || !accessToken) {
+          throw new Error(sessionError?.message ?? "An authenticated session is required to create a workspace.");
+        }
+
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/+$/, "");
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        if (!supabaseUrl || !anonKey) {
+          throw new Error("Supabase is not configured. Workspace creation requires VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+        }
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/admin-workspace-bootstrap`, {
+          method: "POST",
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${accessToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
             name,
             slug,
             baseCurrency,
             iconColor: input.iconColor?.trim() || null,
-          },
+          }),
         });
 
-        if (error) {
-          throw error;
+        if (!response.ok) {
+          await refreshWorkspaces();
+          throw new Error(await readFunctionErrorMessage(response));
         }
+
+        const data = (await response.json()) as unknown;
 
         const workspaceId =
           data && typeof data === "object" && "workspaceId" in data && typeof data.workspaceId === "string"

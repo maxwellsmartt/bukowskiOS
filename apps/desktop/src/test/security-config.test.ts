@@ -19,9 +19,10 @@ describe("security config", () => {
   });
 
   it("builds a CSP that keeps OpenAI and the local dev server reachable", () => {
-    const policy = buildContentSecurityPolicy("http://localhost:5173");
+    const policy = buildContentSecurityPolicy("http://localhost:5173", ["https://jmxkejpdklrrzhvzjlqm.supabase.co"]);
 
     expect(policy).toContain("https://api.openai.com");
+    expect(policy).toContain("https://jmxkejpdklrrzhvzjlqm.supabase.co");
     expect(policy).toContain("http://localhost:5173");
     expect(policy).toContain("ws://localhost:5173");
     expect(policy).toContain("'unsafe-inline'");
@@ -34,6 +35,7 @@ describe("security config", () => {
 
     expect(policy).not.toContain("'unsafe-inline' 'unsafe-eval'");
     expect(policy).not.toContain("http://localhost:5173");
+    expect(policy).not.toContain("http://insecure.supabase.co");
     expect(policy).toContain("frame-ancestors 'none'");
   });
 });

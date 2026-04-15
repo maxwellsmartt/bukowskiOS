@@ -3,7 +3,7 @@ import path from "node:path";
 
 import react from "@vitejs/plugin-react";
 import electron from "vite-plugin-electron/simple";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const sharedAliases = {
@@ -19,7 +19,39 @@ const sharedAliases = {
   "node:sqlite": path.resolve(rootDir, "electron/main/services/data/nodeSqliteShim.ts"),
 };
 
-export default defineConfig(async () => {
+const toHttpsOrigin = (value: string | undefined) => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.origin : null;
+  } catch {
+    return null;
+  }
+};
+
+const appendConnectSource = (policy: string, source: string | null) => {
+  if (!source || policy.includes(source)) {
+    return policy;
+  }
+
+  return policy.replace(/connect-src([^;]*)/, (match) => `${match} ${source}`);
+};
+
+export default defineConfig(async ({ mode }) => {
+  const env = loadEnv(mode, rootDir, "VITE_");
+  const htmlCsp = appendConnectSource(env.VITE_HTML_CSP ?? "", toHttpsOrigin(env.VITE_SUPABASE_URL));
+  const htmlCspPlugin: Plugin = {
+    name: "bukowski-html-csp",
+    transformIndexHtml: {
+      order: "pre",
+      handler(html: string) {
+        return html.replace("%VITE_HTML_CSP%", htmlCsp);
+      },
+    },
+  };
   const electronPlugins = process.env.VITEST
     ? []
     : await electron({
@@ -38,6 +70,9 @@ export default defineConfig(async () => {
                 external: ["better-sqlite3", "bwip-js", "keytar", "qrcode", "pdfkit"],
               },
             },
+            define: {
+              "process.env.VITE_SUPABASE_URL": JSON.stringify(env.VITE_SUPABASE_URL ?? ""),
+            },
             resolve: {
               alias: sharedAliases,
             },
@@ -55,7 +90,11 @@ export default defineConfig(async () => {
       });
 
   return {
-    plugins: [react(), ...electronPlugins],
+    plugins: [
+      htmlCspPlugin,
+      react(),
+      ...electronPlugins,
+    ],
     build: {
       rollupOptions: {
         output: {

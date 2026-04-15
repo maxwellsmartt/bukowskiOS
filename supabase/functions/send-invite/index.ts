@@ -7,15 +7,67 @@ type SendInvitePayload = {
   message?: string;
 };
 
-const json = (body: unknown, status = 200) =>
+type SupabaseAuthUser = {
+  id: string;
+};
+
+const allowedOrigins = [/^https?:\/\/localhost(?::\d+)?$/, /^https?:\/\/127\.0\.0\.1(?::\d+)?$/];
+
+const corsHeaders = (request: Request) => {
+  const origin = request.headers.get("origin") ?? "";
+  const allowOrigin = allowedOrigins.some((allowedOrigin) => allowedOrigin.test(origin)) ? origin : "";
+
+  return {
+    ...(allowOrigin ? { "access-control-allow-origin": allowOrigin } : {}),
+    "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
+    "access-control-allow-methods": "POST, OPTIONS",
+    "access-control-max-age": "86400",
+    vary: "Origin",
+  };
+};
+
+const json = (request: Request, body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...corsHeaders(request) },
   });
 
+const readBearerToken = (request: Request) => {
+  const authHeader = request.headers.get("authorization") ?? "";
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() ?? "";
+};
+
+const getAuthenticatedUser = async (supabaseUrl: string, anonKey: string, bearerToken: string) => {
+  if (!bearerToken) {
+    return { user: null, error: "missing_bearer_token" };
+  }
+
+  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${bearerToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    return { user: null, error: `auth_user_lookup_failed_${response.status}` };
+  }
+
+  const user = (await response.json()) as SupabaseAuthUser;
+  return user.id ? { user, error: null } : { user: null, error: "auth_user_missing_id" };
+};
+
 Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders(request),
+    });
+  }
+
   if (request.method !== "POST") {
-    return json({ error: "method_not_allowed" }, 405);
+    return json(request, { error: "method_not_allowed" }, 405);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -23,12 +75,12 @@ Deno.serve(async (request) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-    return json({ error: "missing_supabase_env" }, 500);
+    return json(request, { error: "missing_supabase_env" }, 500);
   }
 
-  const authHeader = request.headers.get("authorization") ?? "";
+  const bearerToken = readBearerToken(request);
   const userClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { authorization: authHeader } },
+    global: { headers: { Authorization: bearerToken ? `Bearer ${bearerToken}` : "" } },
   });
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
   const payload = (await request.json()) as SendInvitePayload;
@@ -39,10 +91,10 @@ Deno.serve(async (request) => {
   });
 
   if (permissionError || allowed !== true) {
-    return json({ error: "forbidden" }, 403);
+    return json(request, { error: "forbidden" }, 403);
   }
 
-  const { data: caller } = await userClient.auth.getUser();
+  const caller = await getAuthenticatedUser(supabaseUrl, anonKey, bearerToken);
   const { data: invite, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(payload.email, {
     redirectTo: "bukowskios://auth/accept-invite",
     data: {
@@ -53,7 +105,7 @@ Deno.serve(async (request) => {
   });
 
   if (inviteError || !invite.user) {
-    return json({ error: inviteError?.message ?? "invite_failed" }, 400);
+    return json(request, { error: inviteError?.message ?? "invite_failed" }, 400);
   }
 
   const { error: membershipError } = await adminClient.from("workspace_memberships").upsert({
@@ -66,8 +118,8 @@ Deno.serve(async (request) => {
   });
 
   if (membershipError) {
-    return json({ error: membershipError.message }, 400);
+    return json(request, { error: membershipError.message }, 400);
   }
 
-  return json({ ok: true, userId: invite.user.id });
+  return json(request, { ok: true, userId: invite.user.id });
 });

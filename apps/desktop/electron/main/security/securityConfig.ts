@@ -59,10 +59,37 @@ export const assertAllowedExternalUrl = (value: string) => {
   }
 };
 
-export const buildContentSecurityPolicy = (devServerUrl?: string) => {
+const toAllowedConnectOrigin = (value: string | undefined) => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") {
+      return null;
+    }
+
+    return url.origin;
+  } catch {
+    return null;
+  }
+};
+
+export const buildContentSecurityPolicy = (
+  devServerUrl?: string,
+  remoteConnectUrls: Array<string | undefined> = [],
+) => {
   const connectSources = ["'self'", "https://api.openai.com"];
   const scriptSources = ["'self'"];
   const styleSources = ["'self'", "'unsafe-inline'"];
+
+  for (const remoteConnectUrl of remoteConnectUrls) {
+    const origin = toAllowedConnectOrigin(remoteConnectUrl);
+    if (origin && !connectSources.includes(origin)) {
+      connectSources.push(origin);
+    }
+  }
 
   if (devServerUrl) {
     try {

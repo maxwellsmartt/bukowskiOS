@@ -173,7 +173,9 @@ app.whenReady().then(() => {
       cancel: false,
       responseHeaders: {
         ...(details.responseHeaders ?? {}),
-        "Content-Security-Policy": [buildContentSecurityPolicy(devServerUrl)],
+        "Content-Security-Policy": [
+          buildContentSecurityPolicy(devServerUrl, [process.env.VITE_SUPABASE_URL, process.env.SUPABASE_URL]),
+        ],
       },
     });
   });
