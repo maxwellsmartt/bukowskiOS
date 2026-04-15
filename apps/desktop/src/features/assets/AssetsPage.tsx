@@ -142,8 +142,10 @@ const parseCsvQuantity = (value: string, rowNumber: number) => {
 };
 
 const joinCsvNotes = (parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join("\n");
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
 const isDuplicateRegistryCodeError = (error: unknown) =>
-  error instanceof Error && /registry code .* already in use/i.test(error.message);
+  /registry code .* already in use/i.test(getErrorMessage(error));
 
 export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageProps) => (
   <AssetsContent projectId={projectId} projectName={projectName} />
@@ -398,6 +400,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         throw new Error("Create at least one asset category before importing assets.");
       }
 
+      const existingCodes = new Set(assets.map((asset) => asset.code.trim().toUpperCase()).filter(Boolean));
+      const csvCodes = new Set<string>();
       const drafts = dataRows.map((values, index) => {
         const row = Object.fromEntries(headers.map((header, headerIndex) => [header, values[headerIndex] ?? ""]));
         const rowNumber = index + 2;
@@ -487,6 +491,12 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       for (const draft of drafts) {
         const { importRowNumber, ...assetDraft } = draft;
+        const normalizedCode = assetDraft.internalCode.trim().toUpperCase();
+
+        if (existingCodes.has(normalizedCode) || csvCodes.has(normalizedCode)) {
+          skippedDuplicateCount += 1;
+          continue;
+        }
 
         try {
           await createAsset({
@@ -498,15 +508,17 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             ...assetDraft,
           });
           importedCount += 1;
+          csvCodes.add(normalizedCode);
         } catch (error) {
           if (isDuplicateRegistryCodeError(error)) {
             skippedDuplicateCount += 1;
+            existingCodes.add(normalizedCode);
             continue;
           }
 
           throw new Error(
             `CSV row ${importRowNumber} could not be imported: ${
-              error instanceof Error ? error.message : "Unknown asset import error."
+              getErrorMessage(error) || "Unknown asset import error."
             }`,
           );
         }
