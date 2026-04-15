@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Plus, SquarePen, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { FileUp, Plus, SquarePen, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import type { AssetListQuery, AssetSortField } from "@contracts";
@@ -46,6 +46,75 @@ const assetSortOptions: Array<ListSortOption<AssetSortField>> = [
   { value: "updatedAt", label: "Updated" },
   { value: "createdAt", label: "Created" },
 ];
+
+const normalizeCsvHeader = (value: string) => value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+const allowedCsvConditions = new Set(["Good", "Review", "Damaged"]);
+
+const parseCsvText = (text: string) => {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let value = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    const nextCharacter = text[index + 1];
+
+    if (character === "\"" && inQuotes && nextCharacter === "\"") {
+      value += "\"";
+      index += 1;
+      continue;
+    }
+
+    if (character === "\"") {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (character === "," && !inQuotes) {
+      row.push(value.trim());
+      value = "";
+      continue;
+    }
+
+    if ((character === "\n" || character === "\r") && !inQuotes) {
+      if (character === "\r" && nextCharacter === "\n") {
+        index += 1;
+      }
+      row.push(value.trim());
+      if (row.some(Boolean)) {
+        rows.push(row);
+      }
+      row = [];
+      value = "";
+      continue;
+    }
+
+    value += character;
+  }
+
+  if (inQuotes) {
+    throw new Error("The CSV contains an unterminated quoted value.");
+  }
+
+  row.push(value.trim());
+  if (row.some(Boolean)) {
+    rows.push(row);
+  }
+
+  return rows;
+};
+
+const resolveCsvValue = (row: Record<string, string>, keys: string[]) => {
+  for (const key of keys) {
+    const value = row[normalizeCsvHeader(key)]?.trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+};
 
 export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageProps) => (
   <AssetsContent projectId={projectId} projectName={projectName} />
@@ -96,6 +165,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [editorError, setEditorError] = useState<string | null>(null);
   const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
   const [isArchivingAsset, setIsArchivingAsset] = useState(false);
+  const [isImportingAssets, setIsImportingAssets] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const editorAssetId = editorMode === "edit" ? selectedAssetId ?? undefined : undefined;
   const { data: editorDetail, reload: reloadEditorDetail } = useAssetDetail(editorAssetId);
@@ -261,6 +332,114 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     }
   };
 
+  const handleImportCsvFile = async (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    try {
+      setIsImportingAssets(true);
+      setEditorError(null);
+      setActionFeedback(null);
+      const csvText = await file.text();
+      const parsedRows = parseCsvText(csvText);
+      const headers = parsedRows[0]?.map(normalizeCsvHeader) ?? [];
+      const dataRows = parsedRows.slice(1);
+
+      if (!headers.length || !dataRows.length) {
+        throw new Error("The selected CSV must include a header row and at least one asset row.");
+      }
+
+      const categoryByCodeOrName = new Map(
+        catalog.categories.flatMap((category) => [
+          [category.code.trim().toLowerCase(), category.id] as const,
+          [category.name.trim().toLowerCase(), category.id] as const,
+        ]),
+      );
+      const locationByCodeOrName = new Map(
+        catalog.locations.flatMap((location) => [
+          [location.code.trim().toLowerCase(), location.id] as const,
+          [location.name.trim().toLowerCase(), location.id] as const,
+        ]),
+      );
+      const defaultCategoryId = catalog.categories[0]?.id;
+
+      if (!defaultCategoryId) {
+        throw new Error("Create at least one asset category before importing assets.");
+      }
+
+      const drafts = dataRows.map((values, index) => {
+        const row = Object.fromEntries(headers.map((header, headerIndex) => [header, values[headerIndex] ?? ""]));
+        const name = resolveCsvValue(row, ["name", "asset", "assetName"]);
+        const internalCode = resolveCsvValue(row, ["internalCode", "code", "assetCode", "sku"]);
+        const categoryValue = resolveCsvValue(row, ["categoryId", "categoryCode", "category"]);
+        const locationValue = resolveCsvValue(row, ["defaultLocationId", "locationCode", "location", "defaultLocation"]);
+        const categoryId = categoryByCodeOrName.get(categoryValue.trim().toLowerCase()) ?? defaultCategoryId;
+        const defaultLocationId = locationValue ? locationByCodeOrName.get(locationValue.trim().toLowerCase()) : undefined;
+        const replacementValueText = resolveCsvValue(row, ["replacementValue", "replacement", "value"]);
+        const replacementValue = replacementValueText ? Number(replacementValueText.replace(/[$,\s]/g, "")) : undefined;
+        const conditionStatus = resolveCsvValue(row, ["condition", "conditionStatus"]) || "Good";
+
+        if (!name || !internalCode) {
+          throw new Error(`CSV row ${index + 2} is missing name or code.`);
+        }
+
+        if (categoryValue && !categoryByCodeOrName.has(categoryValue.trim().toLowerCase())) {
+          throw new Error(`CSV row ${index + 2} references an unknown category: ${categoryValue}.`);
+        }
+
+        if (locationValue && !defaultLocationId) {
+          throw new Error(`CSV row ${index + 2} references an unknown location: ${locationValue}.`);
+        }
+
+        if (replacementValueText && Number.isNaN(replacementValue)) {
+          throw new Error(`CSV row ${index + 2} has an invalid replacement value.`);
+        }
+
+        if (!allowedCsvConditions.has(conditionStatus)) {
+          throw new Error(`CSV row ${index + 2} has an unsupported condition. Use Good, Review, or Damaged.`);
+        }
+
+        return {
+          name,
+          internalCode: internalCode.toUpperCase(),
+          categoryId,
+          defaultLocationId,
+          brand: resolveCsvValue(row, ["brand"]),
+          model: resolveCsvValue(row, ["model"]),
+          serialNumber: resolveCsvValue(row, ["serialNumber", "serial"]),
+          description: resolveCsvValue(row, ["description"]),
+          conditionStatus,
+          notes: resolveCsvValue(row, ["notes"]),
+          replacementValue,
+          ownershipType: resolveCsvValue(row, ["ownership", "ownershipType"]) || "owned",
+          qrCodeValue: resolveCsvValue(row, ["qr", "qrCode", "qrCodeValue", "barcode"]),
+        };
+      });
+
+      for (const draft of drafts) {
+        await createAsset({
+          commandId: crypto.randomUUID(),
+          workspaceId: activeWorkspaceId,
+          actorType: "user",
+          sourceChannel: "desktop",
+          isActive: true,
+          ...draft,
+        });
+      }
+
+      await Promise.all([reload(), refreshProjects()]);
+      setActionFeedback(`Imported ${drafts.length} asset${drafts.length === 1 ? "" : "s"} from ${file.name}.`);
+    } catch (error) {
+      setEditorError(error instanceof Error ? error.message : "Asset CSV import failed.");
+    } finally {
+      setIsImportingAssets(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   const assetColumns = useMemo(
     () => [
       {
@@ -339,6 +518,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
       {actionFeedback ? <div className="action-feedback action-feedback-success">{actionFeedback}</div> : null}
       {actionWarning ? <div className="action-feedback action-feedback-warning">{actionWarning}</div> : null}
+      {editorError && !editorMode ? <div className="action-feedback action-feedback-error">{editorError}</div> : null}
       {selectedKitLockSummary ? (
         <div className="action-feedback action-feedback-warning">
           These assets are part of active kits and cannot be assigned or moved individually: {selectedKitLockSummary}. Remove them from the kit first if you need to operate them as standalone items.
@@ -499,6 +679,22 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 <Plus size={14} />
                 <span>New asset</span>
               </button>
+              <button
+                className="ghost-control action-row-button"
+                disabled={isImportingAssets}
+                onClick={() => fileInputRef.current?.click()}
+                type="button"
+              >
+                <FileUp size={14} />
+                <span>{isImportingAssets ? "Importing..." : "Import CSV"}</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                accept=".csv,text/csv"
+                hidden
+                onChange={(event) => void handleImportCsvFile(event.target.files?.[0] ?? null)}
+                type="file"
+              />
             </div>
           }
         >

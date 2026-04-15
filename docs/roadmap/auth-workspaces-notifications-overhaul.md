@@ -114,6 +114,7 @@ Decisiones bloqueadas:
 | 2026-04-15 | Working tree | Se convierte `syncOutboxWorkerService` a async con transport injectable, se agrega `createSupabaseOutboxTransport`, migración `public.sync_outbox` con RLS por membership y bandera opt-in `VITE_SUPABASE_SYNC_ENABLED`. Verificación: `typecheck` pasa y `corepack pnpm --filter @bukowski/desktop test -- sync-outbox-worker-service.test.ts` pasa con 26 archivos/99 tests. | Preparar push remoto idempotente y auditable sin romper modo local ni activar red antes de aplicar migración remota. |
 | 2026-04-15 | Working tree | Usuario aplica migración `20260415150000_sync_outbox_bridge.sql`; se valida REST `public.sync_outbox` con sesión guardada y respuesta 200. Se detecta que SQLite local solo tenía `workspace-metadata`, por lo que se agrega IPC `ensureLocalWorkspaces` y `WorkspaceProvider` cachea los workspaces Supabase en local. Verificación: `typecheck`, `build` y tests focalizados pasan; tras reiniciar dev, SQLite contiene `Metadata Cine2` con UUID remoto. | Evitar fallos de foreign key al crear assets con UUID remoto de workspace y mantener la cache local consistente antes de probar outbox real. |
 | 2026-04-15 | Working tree | Se corrige inconsistencia reportada en Assets: el fallback local ya no muestra temporalmente assets de `workspace-metadata` cuando hay sesión Supabase, y `getAssetSummary`/`getAssetsOverview` aceptan `workspaceId` para que métricas y tabla usen el mismo scope. Verificación: `typecheck`, `build` y test de assets pasan. | Evitar parpadeo de datos cruzados y métricas engañosas en workspaces remotos vacíos. |
+| 2026-04-15 | Working tree | Se completa el scope de las cards operativas de Assets (`overdueReturns`, `openPackingSlips`, `activeIncidents`, `maintenanceWatch`) por workspace y se agrega botón `Import CSV` junto a `New asset` con parser CSV local para first-run imports. Verificación: `typecheck`, `build` y tests focalizados pasan. | Evitar métricas globales en workspaces nuevos y dar una ruta práctica para cargar inventarios preexistentes. |
 
 ## Decisiones tomadas
 
@@ -144,6 +145,7 @@ Decisiones bloqueadas:
 | medio | Activar Supabase sync antes de aplicar la migración `sync_outbox` marcaría filas como failed/retry. | Mantener `VITE_SUPABASE_SYNC_ENABLED=false` hasta correr la migración y validar una fila real. | Abierto. |
 | medio | Workspace remoto existe en Supabase pero no en SQLite local, bloqueando writes workspace-scoped por foreign key. | Cachear memberships/workspaces remotos vía IPC al refrescar `WorkspaceProvider`. | Mitigado y validado en SQLite local. |
 | medio | Métricas y tabla de assets pueden mostrar scopes diferentes durante la migración multi-workspace. | Pasar `workspaceId` también a summary/overview y evitar fallback visual a `workspace-metadata` en sesión Supabase. | Mitigado en Assets. |
+| medio | CSV import inicial depende de catálogos existentes y aún no crea categorías/ubicaciones faltantes. | MVP importa contra categorías/ubicaciones conocidas; Slice 3 debe cubrir plantillas, preview avanzado y mapeo de catálogos por workspace. | Abierto como deuda UX/data. |
 
 ## Incompletos / deuda técnica
 
@@ -156,6 +158,7 @@ Decisiones bloqueadas:
 - El transport Supabase está opt-in y la migración remota ya fue aplicada; falta generar un asset real y confirmar una fila `sent` en Supabase.
 - Falta validar visualmente en app que el cambio de workspace aísla assets creados en cada workspace.
 - Deuda técnica: los catálogos base por workspace todavía no se clonan/filtran; para el MVP se desbloquea workspace FK, pero Slice 2/3 debe separar catálogos por workspace con más rigor.
+- Import CSV de assets ya existe como MVP sin preview; falta agregar template descargable, pantalla de preview/errores por fila y creación guiada de categorías/ubicaciones faltantes.
 
 ## Próximo paso recomendado
 

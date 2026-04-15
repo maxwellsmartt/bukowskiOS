@@ -862,7 +862,6 @@ const resolveSearchRank = (query: string, code: string | null | undefined, title
 
 export const createFoundationReadService = (db: DatabaseSync) => {
   const catalogReads = createCatalogReadService(db);
-  let getOverviewSnapshotRef: (() => OverviewSnapshot) | null = null;
   const assetReads = createAssetReadService(db, {
     defaultAssetListQuery,
     formatCurrency,
@@ -875,7 +874,6 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     formatTimelineTimestamp,
     toIsoDate,
     addDays,
-    getOverviewSnapshot: () => getOverviewSnapshotRef!(),
   });
   const projectReads = createProjectReadService(db, {
     defaultProjectListQuery,
@@ -3633,7 +3631,6 @@ export const createFoundationReadService = (db: DatabaseSync) => {
   },
 };
 
-  getOverviewSnapshotRef = foundationReads.getOverviewSnapshot;
   return foundationReads;
 };
 

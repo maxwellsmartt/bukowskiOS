@@ -11,7 +11,6 @@ import type {
   AssetLinkedIncidentRow,
   AssetListRow,
   AssetTimelineItem,
-  OverviewSnapshot,
   ListSortDirection,
 } from "@contracts";
 
@@ -35,7 +34,6 @@ type AssetReadDeps = {
   formatTimelineTimestamp: (value: string) => string;
   toIsoDate: (value?: string | null) => string;
   addDays: (date: string, days: number) => string;
-  getOverviewSnapshot: () => OverviewSnapshot;
 };
 
 type CountRow = {
@@ -115,14 +113,119 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
     },
 
     getAssetsOverview(query: AssetWorkspaceQuery = {}): AssetsOverviewSnapshot {
-      const overviewSnapshot = deps.getOverviewSnapshot();
       const assetSummary = service.getAssetSummary(query);
+      const workspaceId = query.workspaceId ?? null;
+      const overdueReturns = db
+        .prepare(
+          `
+            SELECT COUNT(*) AS count
+            FROM packing_slips
+            WHERE status IN ('Partial return', 'Overdue')
+              AND (? IS NULL OR workspace_id = ?)
+          `,
+        )
+        .get(workspaceId, workspaceId) as CountRow;
+      const openPackingSlips = db
+        .prepare(
+          `
+            SELECT COUNT(*) AS count
+            FROM packing_slips
+            WHERE status IN ('Issued', 'Partial return', 'Overdue')
+              AND (? IS NULL OR workspace_id = ?)
+          `,
+        )
+        .get(workspaceId, workspaceId) as CountRow;
+      const activeIncidents = db
+        .prepare(
+          `
+            SELECT COUNT(*) AS count
+            FROM incidents
+            WHERE status IN ('Open', 'In review')
+              AND (? IS NULL OR workspace_id = ?)
+          `,
+        )
+        .get(workspaceId, workspaceId) as CountRow;
+      const maintenanceWatch = db
+        .prepare(
+          `
+            SELECT COUNT(*) AS count
+            FROM asset_current_state
+            JOIN assets ON assets.id = asset_current_state.asset_id
+            WHERE asset_current_state.operational_status = 'maintenance'
+              AND assets.is_active = 1
+              AND (? IS NULL OR assets.workspace_id = ?)
+          `,
+        )
+        .get(workspaceId, workspaceId) as CountRow;
+      const recentMovements = db
+        .prepare(
+          `
+            SELECT
+              assets.name AS asset,
+              assets.internal_code AS code,
+              COALESCE(from_location.name, '—') AS from_location,
+              COALESCE(to_location.name, location.name, '—') AS to_location,
+              COALESCE(departments.name, users.full_name, 'Operations') AS actor,
+              asset_events.event_timestamp AS event_timestamp
+            FROM asset_events
+            JOIN assets ON assets.id = asset_events.asset_id
+            LEFT JOIN locations AS from_location ON from_location.id = asset_events.from_location_id
+            LEFT JOIN locations AS to_location ON to_location.id = asset_events.to_location_id
+            LEFT JOIN locations AS location ON location.id = asset_events.location_id
+            LEFT JOIN departments ON departments.id = asset_events.department_id
+            LEFT JOIN users ON users.id = asset_events.performed_by_user_id
+            WHERE asset_events.event_type IN ('asset_created', 'check_out', 'assigned', 'moved', 'maintenance_started', 'check_in')
+              AND (? IS NULL OR asset_events.workspace_id = ?)
+            ORDER BY asset_events.event_timestamp DESC
+            LIMIT 3
+          `,
+        )
+        .all(workspaceId, workspaceId) as Array<{
+        asset: string;
+        code: string;
+        from_location: string;
+        to_location: string;
+        actor: string;
+        event_timestamp: string;
+      }>;
 
       return {
         totalAssets: assetSummary.totalAssets,
         assignedAssets: assetSummary.assignedAssets,
-        cards: overviewSnapshot.cards,
-        recentMovements: overviewSnapshot.recentMovements,
+        cards: {
+          overdueReturns: {
+            label: "Overdue returns",
+            value: String(overdueReturns.count),
+            subtitle: "Slips nearing or past due return need review.",
+            tone: "warning",
+          },
+          openPackingSlips: {
+            label: "Open packing slips",
+            value: String(openPackingSlips.count),
+            subtitle: "Issued slips still active across warehouse and set.",
+            tone: "warning",
+          },
+          activeIncidents: {
+            label: "Active incidents",
+            value: String(activeIncidents.count),
+            subtitle: "Open issues with pending follow-up or missing estimates.",
+            tone: "critical",
+          },
+          maintenanceWatch: {
+            label: "Maintenance watch",
+            value: String(maintenanceWatch.count),
+            subtitle: "Assets flagged for bench review or spare-part follow-up.",
+            tone: "success",
+          },
+        },
+        recentMovements: recentMovements.map((row) => ({
+          asset: row.asset,
+          code: row.code,
+          from: row.from_location,
+          to: row.to_location,
+          actor: row.actor,
+          timestamp: deps.formatTimelineTimestamp(row.event_timestamp),
+        })),
       };
     },
 
