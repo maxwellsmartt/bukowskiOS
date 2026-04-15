@@ -296,7 +296,7 @@ const assetEditorSchema = z
     ownershipType: optionalTrimmedString,
     qrCodeValue: optionalTrimmedString,
     isActive: z.boolean().optional(),
-    totalQuantity: z.number().int().positive().optional(),
+    totalQuantity: z.number().int().nonnegative().optional(),
   })
   .strict();
 

@@ -1132,7 +1132,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
     db.exec("BEGIN");
 
     try {
-      const totalQuantity = Math.max(1, Math.trunc(input.totalQuantity ?? 1));
+      const totalQuantity = Math.max(0, Math.trunc(input.totalQuantity ?? 1));
       const primaryCode = codeService.ensurePrimaryCode({
         workspaceId: input.workspaceId,
         entityType: "asset",

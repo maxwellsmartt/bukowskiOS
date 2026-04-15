@@ -134,7 +134,7 @@ const parseCsvQuantity = (value: string, rowNumber: number) => {
   }
 
   const parsed = Number.parseInt(value.replace(/[,\s]/g, ""), 10);
-  if (!Number.isInteger(parsed) || parsed < 1) {
+  if (!Number.isInteger(parsed) || parsed < 0) {
     throw new Error(`CSV row ${rowNumber} has an invalid quantity.`);
   }
 
