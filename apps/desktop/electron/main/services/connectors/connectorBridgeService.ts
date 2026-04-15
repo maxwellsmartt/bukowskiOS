@@ -105,6 +105,13 @@ const toPlainTelegramText = (value: string) =>
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
+const degradedServiceStates = new Set(["provider_error", "tool_error", "structured_error"]);
+const reconnectingReceiptStatuses = new Set(["service_reconnecting", "delivery_failed", "pending_delivery"]);
+
+const isDegradedServiceState = (value: string | null | undefined) => degradedServiceStates.has(value ?? "");
+
+const isReconnectReceiptStatus = (value: string | null | undefined) => reconnectingReceiptStatuses.has(value ?? "");
+
 const buildOperationalReply = (args: {
   status: string;
   assistantMessage?: string;
@@ -117,7 +124,7 @@ const buildOperationalReply = (args: {
   }
 
   if (args.status === "provider_error" || args.status === "tool_error" || args.status === "structured_error") {
-    return "No pude completar esto ahora. Lo registré y puedes reintentar.";
+    return "Estoy teniendo problemas para conectarme al servicio. Ya estoy intentando reconectar. Vuelve a escribirme en un momento.";
   }
 
   if (args.approvalDecision === "pending") {
@@ -480,6 +487,27 @@ export const createConnectorBridgeService = (
     return threadId;
   };
 
+  const loadLatestInboundReceipt = (channelId: string) =>
+    db
+      .prepare(
+        `
+          SELECT status, payload_json, updated_at
+          FROM connector_message_receipts
+          WHERE connector_key = 'telegram'
+            AND direction = 'inbound'
+            AND channel_id = ?
+          ORDER BY updated_at DESC
+          LIMIT 1
+        `,
+      )
+      .get(channelId) as
+      | {
+          status: string;
+          payload_json: string | null;
+          updated_at: string;
+        }
+      | undefined;
+
   const deliverOutboundReply = async (externalChannelId: string, body: string, correlationId: string, channelId: string, threadId: string | null) => {
     if (!options.deliveryAdapter?.sendTelegramMessage) {
       upsertReceipt({
@@ -692,6 +720,7 @@ export const createConnectorBridgeService = (
       const channelId = upsertChannel(input.externalChannelId, input.displayName);
       const account = upsertAccount(input);
       upsertMembership(channelId, input.externalUserId, account.linkedUserId);
+      const previousInboundReceipt = loadLatestInboundReceipt(channelId);
 
       if (!connectorConfig || connectorConfig.status === "disabled" || connectorConfig.status === "not_configured") {
         const replyText = "Bloqueado. Telegram todavía no está habilitado para operación en este workspace.";
@@ -818,27 +847,45 @@ export const createConnectorBridgeService = (
         approvalDecision: lastAssistantMessage?.meta?.approvalDecision ?? null,
         routedAgentName: lastAssistantMessage?.meta?.routedAgentName ?? null,
       });
+      const recoveredFromReconnect =
+        !isDegradedServiceState(thread?.state) && isReconnectReceiptStatus(previousInboundReceipt?.status);
+      const replyTextWithRecovery = recoveredFromReconnect
+        ? `Conexión restablecida. Ya estoy online.\n\n${replyText}`
+        : replyText;
+      const inboundStatus =
+        lastAssistantMessage?.meta?.approvalDecision === "pending"
+          ? "draft_pending"
+          : isDegradedServiceState(thread?.state)
+            ? "service_reconnecting"
+            : "processed";
 
       upsertReceipt({
         direction: "inbound",
         externalMessageId: input.externalMessageId,
         channelId,
         correlationId,
-        status: lastAssistantMessage?.meta?.approvalDecision === "pending" ? "draft_pending" : "processed",
+        status: inboundStatus,
         threadId,
         payload: {
-          reply_text: replyText,
+          reply_text: replyTextWithRecovery,
           reply_to_message_id: input.replyToMessageId ?? null,
           required_permissions: requiredPermissions,
+          recovered_from_reconnect: recoveredFromReconnect,
         },
       });
 
-      const deliveryStatus = await deliverOutboundReply(input.externalChannelId, replyText, correlationId, channelId, threadId);
+      const deliveryStatus = await deliverOutboundReply(
+        input.externalChannelId,
+        replyTextWithRecovery,
+        correlationId,
+        channelId,
+        threadId,
+      );
       return {
         status: lastAssistantMessage?.meta?.approvalDecision === "pending" ? "draft_pending" : deliveryStatus === "pending_delivery" ? "delivery_pending" : "answered",
         threadId,
         correlationId,
-        replyText,
+        replyText: replyTextWithRecovery,
       };
     },
   };

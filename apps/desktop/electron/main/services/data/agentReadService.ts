@@ -15,6 +15,7 @@ import type {
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
+const recentConnectorBusyWindowSeconds = 15;
 
 const relativeFormatter = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" });
 const absoluteFormatter = new Intl.DateTimeFormat("en-US", {
@@ -210,9 +211,25 @@ const loadBusyAgentIds = (db: DatabaseSync) => {
     )
     .all() as Array<{ last_routed_agent_id: string }>;
 
+  const recentConnectorRows = db
+    .prepare(
+      `
+        SELECT DISTINCT assistant_chat_thread_state.last_routed_agent_id
+        FROM assistant_chat_messages
+        JOIN assistant_chat_thread_state ON assistant_chat_thread_state.thread_id = assistant_chat_messages.thread_id
+        WHERE assistant_chat_messages.role = 'user'
+          AND assistant_chat_messages.source_connector_key = 'telegram'
+          AND assistant_chat_messages.deleted_at IS NULL
+          AND assistant_chat_thread_state.last_routed_agent_id IS NOT NULL
+          AND julianday(assistant_chat_messages.created_at) >= julianday('now', ?)
+      `,
+    )
+    .all(`-${recentConnectorBusyWindowSeconds} seconds`) as Array<{ last_routed_agent_id: string }>;
+
   return new Set([
     ...runRows.map((row) => row.agent_id),
     ...threadRows.map((row) => row.last_routed_agent_id),
+    ...recentConnectorRows.map((row) => row.last_routed_agent_id),
   ]);
 };
 

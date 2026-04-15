@@ -6,10 +6,12 @@ import {
   Building2,
   ClipboardList,
   FolderCog,
+  FolderOpenDot,
   Info,
   PackageSearch,
   ScrollText,
   Settings,
+  SwatchBook,
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -24,7 +26,7 @@ export type NavItem = {
 };
 
 export const primaryNav: NavItem[] = [
-  { label: "Projects", path: "/projects", icon: Building2 },
+  { label: "Projects", path: "/projects", icon: FolderOpenDot },
   { label: "Assets", path: "/assets/overview", icon: Boxes },
   { label: "Finance", path: "/finance", icon: BriefcaseBusiness },
   { label: "Automation", path: "/agents/mission-control", icon: Bot },
@@ -60,13 +62,15 @@ const projectSectionMeta: Record<ProjectRouteSection, Omit<NavItem, "path">> = {
   info: { label: "Details", icon: Info },
 };
 
+const projectSectionOrder: ProjectRouteSection[] = ["info", "overview", "assets", "packing", "incidents", "budget"];
+
 export const buildProjectSubnav = (projectId: string): NavItem[] =>
-  (Object.entries(projectSectionMeta) as Array<[ProjectRouteSection, Omit<NavItem, "path">]>).map(([section, item]) => ({
-    ...item,
+  projectSectionOrder.map((section) => ({
+    ...projectSectionMeta[section],
     path: `/projects/${projectId}/${section}`,
   }));
 
 export const utilityNav: NavItem[] = [
-  { label: "Catalog", path: "/catalog", icon: FolderCog },
+  { label: "Catalog", path: "/catalog", icon: SwatchBook },
   { label: "Settings", path: "/settings", icon: Settings },
 ];

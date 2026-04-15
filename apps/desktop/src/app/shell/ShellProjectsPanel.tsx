@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Archive, createLucideIcon } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -8,6 +8,25 @@ import {
   type WizardTab,
 } from "@features/projects/ProjectSetupWizard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+
+const LayersPlus = createLucideIcon("layers-plus", [
+  [
+    "path",
+    {
+      d: "M13 13.74a2 2 0 0 1-2 0L2.5 8.87a1 1 0 0 1 0-1.74L11 2.26a2 2 0 0 1 2 0l8.5 4.87a1 1 0 0 1 0 1.74z",
+      key: "layers-plus-top",
+    },
+  ],
+  [
+    "path",
+    {
+      d: "m20 14.285 1.5.845a1 1 0 0 1 0 1.74L13 21.74a2 2 0 0 1-2 0l-8.5-4.87a1 1 0 0 1 0-1.74l1.5-.845",
+      key: "layers-plus-bottom",
+    },
+  ],
+  ["path", { d: "M19 8h4", key: "layers-plus-horizontal" }],
+  ["path", { d: "M21 6v4", key: "layers-plus-vertical" }],
+]);
 
 export const ShellProjectsPanel = () => {
   const {
@@ -30,14 +49,16 @@ export const ShellProjectsPanel = () => {
         <span className="shell-nav-label">Projects</span>
         <div className="shell-projects-header-actions">
           <button
-            className={`shell-project-toggle${showArchivedProjects ? " is-active" : ""}`}
+            aria-label={showArchivedProjects ? "Hide archived projects" : "Show archived projects"}
+            className={`icon-ghost-control shell-project-toggle${showArchivedProjects ? " is-active" : ""}`}
             onClick={() => setShowArchivedProjects(!showArchivedProjects)}
             type="button"
           >
-            {showArchivedProjects ? "Hide archived" : "Show archived"}
+            <Archive size={14} />
           </button>
           <button
-            className="shell-project-create-button"
+            aria-label="New project"
+            className="icon-ghost-control shell-project-create-button"
             onClick={() => {
               setWizardOpen(true);
               setWizardTab("general");
@@ -45,8 +66,7 @@ export const ShellProjectsPanel = () => {
             }}
             type="button"
           >
-            <Plus size={12} />
-            <span>New project</span>
+            <LayersPlus size={14} />
           </button>
         </div>
       </div>

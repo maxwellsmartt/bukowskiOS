@@ -165,15 +165,22 @@ export const ProjectInfoPage = () => {
                 </SelectField>
               </label>
 
-              <label className="action-field">
-                <span className="action-field-label">Start date</span>
-                <input className="action-field-control" onChange={(event) => setStartDate(event.target.value)} type="date" value={startDate} />
-              </label>
+              <div className="action-field-pair">
+                <label className="action-field">
+                  <span className="action-field-label">Start date</span>
+                  <input
+                    className="action-field-control"
+                    onChange={(event) => setStartDate(event.target.value)}
+                    type="date"
+                    value={startDate}
+                  />
+                </label>
 
-              <label className="action-field">
-                <span className="action-field-label">End date</span>
-                <input className="action-field-control" onChange={(event) => setEndDate(event.target.value)} type="date" value={endDate} />
-              </label>
+                <label className="action-field">
+                  <span className="action-field-label">End date</span>
+                  <input className="action-field-control" onChange={(event) => setEndDate(event.target.value)} type="date" value={endDate} />
+                </label>
+              </div>
 
               <label className="project-setup-toggle">
                 <input checked={hasPreproduction} onChange={(event) => setHasPreproduction(event.target.checked)} type="checkbox" />
@@ -183,7 +190,7 @@ export const ProjectInfoPage = () => {
               <div />
 
               {hasPreproduction ? (
-                <>
+                <div className="action-field-pair">
                   <label className="action-field">
                     <span className="action-field-label">Pre-production start</span>
                     <input
@@ -203,7 +210,7 @@ export const ProjectInfoPage = () => {
                       value={preproductionEndDate}
                     />
                   </label>
-                </>
+                </div>
               ) : null}
 
               <label className="action-field">

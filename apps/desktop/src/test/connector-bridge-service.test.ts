@@ -309,4 +309,145 @@ describe("connector bridge service", () => {
     cleanup();
     fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
   });
+
+  it("warns Telegram users while reconnecting and confirms when service is back online", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-connector-bridge-recovery");
+    const attachmentsRootPath = createAttachmentsRoot("bukowski-connector-bridge-recovery");
+    database.prepare("UPDATE agent_connector_configs SET status = 'configured' WHERE connector_key = 'telegram'").run();
+    database.prepare(
+      `
+        INSERT INTO connector_accounts (
+          id,
+          workspace_id,
+          connector_key,
+          external_user_id,
+          external_username,
+          display_name,
+          linked_user_id,
+          link_status,
+          linked_at,
+          created_at,
+          updated_at
+        ) VALUES (?, 'workspace-metadata', 'telegram', ?, ?, ?, ?, 'linked', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+    ).run("connector-account-recovery", "telegram-user-recovery", "ana_ops", "Ana via Telegram", "user-luis");
+
+    let responseMode: "degraded" | "healthy" = "degraded";
+    const assistantChatService = createAssistantChatService(database, {
+      attachmentsRootPath,
+      assistantGatewayService: {
+        sendMessage: async () =>
+          responseMode === "degraded"
+            ? {
+                status: "provider_error" as const,
+                stateLabel: "Provider unavailable",
+                stateBody: "The model provider is reconnecting.",
+                assistantMessage: "",
+                routedAgentId: "agent-supervisor",
+                routedAgentName: "Supervisor Agent",
+                routedAgentRole: "Supervisor Agent",
+                intentLabel: "Telegram DM intent",
+                commandStateLabel: "No changes applied",
+                draftRunId: null,
+                providerKey: "openai",
+                modelKey: "openai:gpt-5.4",
+                toolTraces: [],
+                orchestration: {
+                  intent: "telegram_dm_summary",
+                  targetAgentId: "agent-supervisor",
+                  targetAgentName: "Supervisor Agent",
+                  confidence: 0.1,
+                  requiresApproval: false,
+                  toolCallRequested: false,
+                  toolCalls: [],
+                  userFacingSummary: "Provider reconnecting.",
+                  answerKind: "informational",
+                  draftRunTitle: null,
+                  draftRunDescription: null,
+                },
+              }
+            : {
+                status: "answered" as const,
+                stateLabel: "Routed to Supervisor Agent",
+                stateBody: "Supervisor answered from the Telegram DM bridge.",
+                assistantMessage: "El sistema ya volvió y tu pedido está procesado.",
+                routedAgentId: "agent-supervisor",
+                routedAgentName: "Supervisor Agent",
+                routedAgentRole: "Supervisor Agent",
+                intentLabel: "Telegram DM intent",
+                commandStateLabel: "No changes applied",
+                draftRunId: null,
+                providerKey: "openai",
+                modelKey: "openai:gpt-5.4",
+                toolTraces: [],
+                orchestration: {
+                  intent: "telegram_dm_summary",
+                  targetAgentId: "agent-supervisor",
+                  targetAgentName: "Supervisor Agent",
+                  confidence: 0.92,
+                  requiresApproval: false,
+                  toolCallRequested: false,
+                  toolCalls: [],
+                  userFacingSummary: "Operational summary prepared.",
+                  answerKind: "informational",
+                  draftRunTitle: null,
+                  draftRunDescription: null,
+                },
+              },
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
+      },
+      memoryService: {
+        extractAndPersist: () => [],
+        getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        pruneStaleEntries: () => undefined,
+        recordFailure: () => undefined,
+      },
+    });
+    const service = createConnectorBridgeService(database, {
+      assistantChatService,
+    });
+
+    const degraded = await service.processTelegramDm({
+      externalUserId: "telegram-user-recovery",
+      externalUsername: "ana_ops",
+      displayName: "Ana via Telegram",
+      externalChannelId: "telegram-dm-recovery",
+      externalMessageId: "telegram-recovery-msg-1",
+      message: "Necesito el estado del proyecto",
+    });
+
+    responseMode = "healthy";
+
+    const restored = await service.processTelegramDm({
+      externalUserId: "telegram-user-recovery",
+      externalUsername: "ana_ops",
+      displayName: "Ana via Telegram",
+      externalChannelId: "telegram-dm-recovery",
+      externalMessageId: "telegram-recovery-msg-2",
+      message: "Estoy de vuelta, intenta otra vez",
+    });
+
+    const recoveryReceipt = database
+      .prepare(
+        `
+          SELECT status, payload_json
+          FROM connector_message_receipts
+          WHERE connector_key = 'telegram'
+            AND direction = 'inbound'
+            AND external_message_id = ?
+          LIMIT 1
+        `,
+      )
+      .get("telegram-recovery-msg-2") as { status: string; payload_json: string } | undefined;
+
+    expect(degraded.replyText).toContain("intentando reconectar");
+    expect(restored.replyText).toContain("Conexión restablecida. Ya estoy online.");
+    expect(recoveryReceipt?.status).toBe("processed");
+    expect(recoveryReceipt?.payload_json).toContain("recovered_from_reconnect");
+
+    cleanup();
+    fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
+  });
 });

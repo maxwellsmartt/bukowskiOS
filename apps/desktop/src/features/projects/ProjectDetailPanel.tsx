@@ -72,49 +72,59 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
     );
   }
 
+  const project = data.project;
+
   return (
     <div className="project-detail-stack">
       <SurfaceCard
-        title={`${data.project.code} · ${data.project.name}`}
-        subtitle={data.project.description}
-        aside={<StatusBadge tone={toneForStatus(data.project.status)}>{data.project.status}</StatusBadge>}
+        title={
+          <span className="project-detail-title-group">
+            <span>{`${project.code} · ${project.name}`}</span>
+            <StatusBadge tone={toneForStatus(project.status)}>{project.status}</StatusBadge>
+          </span>
+        }
+        subtitle={project.description}
+        aside={
+          <div className="project-detail-header-actions">
+            <button className="ghost-control" onClick={() => navigate(`/projects/${project.id}/info`)} type="button">
+              Edit project
+            </button>
+            <button
+              className="action-primary-button"
+              onClick={() => {
+                setReportOpen(true);
+                setReportError(null);
+                setReportFeedback(null);
+              }}
+              type="button"
+            >
+              Report incident
+            </button>
+          </div>
+        }
         className="project-overview-card"
       >
         <div className="compact-summary-grid project-overview-summary">
           <div className="summary-row">
             <span className="summary-label">Assigned assets</span>
-            <span className="summary-value">{data.project.assetCount}</span>
+            <span className="summary-value">{project.assetCount}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">Open incidents</span>
-            <span className="summary-value">{data.project.incidentCount}</span>
+            <span className="summary-value">{project.incidentCount}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">Client</span>
-            <span className="summary-value">{data.project.client}</span>
+            <span className="summary-value">{project.client}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">Exposure</span>
-            <span className="summary-value">{data.project.exposure}</span>
+            <span className="summary-value">{project.exposure}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">Timeline</span>
             <span className="summary-value">{data.schedule?.windowLabel ?? "Unscheduled"}</span>
           </div>
-        </div>
-
-        <div className="action-panel-actions action-panel-actions-start">
-          <button
-            className="action-primary-button"
-            onClick={() => {
-              setReportOpen(true);
-              setReportError(null);
-              setReportFeedback(null);
-            }}
-            type="button"
-          >
-            Report incident for this project
-          </button>
         </div>
       </SurfaceCard>
 
@@ -146,7 +156,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
                 commandId: crypto.randomUUID(),
                 workspaceId,
                 assetId: value.assetId,
-                projectId: value.projectId ?? data.project?.id,
+                projectId: value.projectId ?? project.id,
                 projectUnitId: value.projectUnitId,
                 departmentId: value.departmentId,
                 responsibleUserId: value.responsibleUserId,

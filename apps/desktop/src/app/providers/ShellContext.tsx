@@ -49,7 +49,7 @@ type ShellContextProviderProps = {
 };
 
 const resolveProjectSectionPreference = () => {
-  const section = readStringPreference(uiPreferenceKeys.lastProjectRouteSection, "overview");
+  const section = readStringPreference(uiPreferenceKeys.lastProjectRouteSection, "info");
 
   if (
     section === "overview" ||
@@ -62,7 +62,7 @@ const resolveProjectSectionPreference = () => {
     return section;
   }
 
-  return "overview";
+  return "info";
 };
 
 export const ShellContextProvider = ({ children }: ShellContextProviderProps) => {

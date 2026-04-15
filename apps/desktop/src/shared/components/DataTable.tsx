@@ -45,6 +45,7 @@ type DataTableProps<T = unknown> = {
   } | null;
   onSortRequest?: (columnKey: string) => void;
   autoScrollToActiveRow?: boolean;
+  controlsAddon?: ReactNode;
 };
 
 const selectionColumnWidth = 44;
@@ -70,6 +71,7 @@ export const DataTable = <T = unknown,>({
   sortState = null,
   onSortRequest,
   autoScrollToActiveRow = false,
+  controlsAddon,
 }: DataTableProps<T>) => {
   const defaultMinColumnWidth = 56;
   const tableShellRef = useRef<HTMLDivElement | null>(null);
@@ -367,6 +369,7 @@ export const DataTable = <T = unknown,>({
     <div className="data-table-stack">
       {showColumnVisibilityControl ? (
         <div className="data-table-columns-trigger-shell">
+          {controlsAddon ? <div className="data-table-columns-extra-controls">{controlsAddon}</div> : null}
           <button
             aria-expanded={columnsMenuOpen}
             aria-haspopup="menu"

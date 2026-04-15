@@ -1206,41 +1206,20 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .shell-project-create-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-height: 28px;
-  padding: 0 9px;
-  border: 1px solid rgba(104, 211, 145, 0.45);
-  border-radius: 10px;
-  background: rgba(56, 161, 105, 0.1);
-  color: #9ae6b4;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-  box-shadow: inset 0 0 0 1px rgba(11, 18, 15, 0.18);
-  transition:
-    border-color 120ms ease,
-    background 120ms ease,
-    color 120ms ease,
-    transform 120ms ease;
+  min-height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow: none;
 }
 
 .shell-project-create-button:hover {
-  border-color: rgba(104, 211, 145, 0.7);
-  background: rgba(56, 161, 105, 0.16);
-  color: #c6f6d5;
-  transform: translateY(-1px);
+  color: #ffffff;
 }
 
 .shell-project-create-button:focus-visible {
-  outline: none;
-  border-color: rgba(134, 239, 172, 0.9);
-  box-shadow:
-    0 0 0 3px rgba(34, 197, 94, 0.18),
-    inset 0 0 0 1px rgba(11, 18, 15, 0.18);
+  color: #ffffff;
 }
 
 .shell-project-create-button svg {
@@ -2140,6 +2119,12 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-wrap: wrap;
 }
 
+.list-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .list-toolbar-menu-shell {
   position: relative;
 }
@@ -2225,6 +2210,17 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .list-toolbar-menu-item:hover,
 .list-toolbar-menu-item.is-active {
   background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.data-table-columns-menu .list-toolbar-menu-item {
+  padding: 8px 0;
+  border-radius: 0;
+}
+
+.data-table-columns-menu .list-toolbar-menu-item:hover,
+.data-table-columns-menu .list-toolbar-menu-item.is-active {
+  background: transparent;
   color: var(--text-primary);
 }
 
@@ -2521,6 +2517,13 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   gap: 6px;
 }
 
+.action-field-pair {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .action-field-wide {
   grid-column: 1 / -1;
 }
@@ -2703,7 +2706,14 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .action-panel-actions-start {
-  justify-content: flex-start;
+  justify-content: flex-end;
+}
+
+.action-panel-actions .ghost-control,
+.project-detail-header-actions .ghost-control {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
 }
 
 .catalog-tab-row {
@@ -3100,7 +3110,15 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .data-table-columns-trigger-shell {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 6px;
+}
+
+.data-table-columns-extra-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .data-table-columns-trigger {
@@ -3397,12 +3415,54 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   min-height: 0;
 }
 
+.projects-registry-card {
+  min-height: min(76vh, 820px);
+}
+
+.projects-registry-card,
+.projects-registry-card .data-table-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.projects-registry-card .data-table-stack {
+  flex: 1;
+  min-height: 0;
+}
+
+.projects-registry-card .table-shell-fill {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.table-shell-fill {
+  overflow-x: auto;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
 .project-detail-stack {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
   min-width: 0;
   min-height: 0;
+}
+
+.project-detail-header-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.project-detail-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .project-detail-support-grid {
@@ -7902,6 +7962,7 @@ button.timeline-signal-chip:focus-visible {
   .users-admin-layout,
   .roles-directory-layout,
   .action-form-grid,
+  .action-field-pair,
   .selection-action-bar,
   .rma-asset-card-fields {
     grid-template-columns: 1fr;

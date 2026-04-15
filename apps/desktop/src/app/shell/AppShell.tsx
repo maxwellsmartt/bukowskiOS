@@ -60,7 +60,7 @@ export const AppShell = () => {
 
       if (activeRoute.scopeMode === "project") {
         writePreference(uiPreferenceKeys.lastProjectRoutePath, location.pathname);
-        writePreference(uiPreferenceKeys.lastProjectRouteSection, activeProjectRouteSection ?? "overview");
+        writePreference(uiPreferenceKeys.lastProjectRouteSection, activeProjectRouteSection ?? "info");
       } else {
         writePreference(uiPreferenceKeys.lastGlobalRoutePath, location.pathname);
       }

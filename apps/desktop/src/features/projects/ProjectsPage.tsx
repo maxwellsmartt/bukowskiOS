@@ -1,3 +1,4 @@
+import { Archive } from "lucide-react";
 import { useState } from "react";
 
 import type { ProjectListQuery, ProjectSortField } from "@contracts";
@@ -69,9 +70,6 @@ export const ProjectsPage = () => {
 
       <div className="chip-row">
         {selectedRowIds.length ? <StatusBadge>{`${selectedRowIds.length} selected`}</StatusBadge> : null}
-        <button className={`ghost-control${showArchived ? " is-active" : ""}`} onClick={() => setShowArchived((current) => !current)} type="button">
-          {showArchived ? "Hide archived" : "Show archived"}
-        </button>
       </div>
 
       {selectedRowIds.length ? (
@@ -107,7 +105,7 @@ export const ProjectsPage = () => {
       ) : null}
 
       <div className="projects-layout">
-        <SurfaceCard title="Projects">
+        <SurfaceCard className="projects-registry-card" title="Projects">
           <ListToolbar
             activeSortLabel={projectControls.activeSortOption?.label}
             onSearchValueChange={projectControls.setSearchValue}
@@ -206,8 +204,19 @@ export const ProjectsPage = () => {
             onSortRequest={projectControls.handleColumnSortRequest}
             persistKey="projects-registry"
             rows={data}
+            shellClassName="table-shell-fill"
             selectable
             selectedRowIds={selectedRowIds}
+            controlsAddon={
+              <button
+                aria-label={showArchived ? "Hide archived projects" : "Show archived projects"}
+                className={`icon-ghost-control${showArchived ? " is-active" : ""}`}
+                onClick={() => setShowArchived((current) => !current)}
+                type="button"
+              >
+                <Archive size={14} />
+              </button>
+            }
             sortState={
               projectControls.activeColumnKey
                 ? {

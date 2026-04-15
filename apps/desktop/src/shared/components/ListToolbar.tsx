@@ -1,17 +1,17 @@
 import {
   ArrowDown,
-  ArrowUpDown,
   ArrowUp,
   CalendarDays,
   Check,
   CircleDot,
   FolderKanban,
   Hash,
+  ListFilter,
   Search,
   TextCursorInput,
   UserRound,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import type { ListSortDirection } from "@contracts";
@@ -33,6 +33,7 @@ type ListToolbarProps<TSort extends string> = {
   resultCount?: number;
   resultLabel?: string;
   activeSortLabel?: string | null;
+  rightActions?: ReactNode;
 };
 
 const resolveSortOptionIcon = (value: string, label: string) => {
@@ -73,6 +74,7 @@ export const ListToolbar = <TSort extends string,>({
   resultCount,
   resultLabel = "results",
   activeSortLabel,
+  rightActions,
 }: ListToolbarProps<TSort>) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<{ top: number; left: number; placement: "bottom" | "top" } | null>(null);
@@ -143,6 +145,7 @@ export const ListToolbar = <TSort extends string,>({
       </label>
 
       <div className="list-toolbar-controls">
+        {rightActions ? <div className="list-toolbar-actions">{rightActions}</div> : null}
         <div className="list-toolbar-menu-shell" ref={menuRef}>
           <button
             aria-expanded={menuOpen}
@@ -154,7 +157,7 @@ export const ListToolbar = <TSort extends string,>({
             ref={triggerRef}
             type="button"
           >
-            <ArrowUpDown aria-hidden size={14} />
+            <ListFilter aria-hidden size={14} />
           </button>
 
           {menuOpen && menuStyle

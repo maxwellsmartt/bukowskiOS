@@ -1053,7 +1053,7 @@ export const ProjectSetupWizard = ({
       onClose();
 
       if (createdProject) {
-        openProject(createdProject.id, "overview");
+        openProject(createdProject.id, "info");
       }
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Unable to create project setup.");

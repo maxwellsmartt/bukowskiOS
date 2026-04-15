@@ -26,6 +26,7 @@ export const createTelegramConnectorService = (
 ) => {
   let running = false;
   let currentOffset = 0;
+  let pollingDegraded = false;
 
   const getConfig = () =>
     db
@@ -195,9 +196,22 @@ export const createTelegramConnectorService = (
           currentOffset = Math.max(currentOffset, Number(update.update_id ?? 0) + 1);
           await processUpdate(update);
         }
+
+        if (pollingDegraded) {
+          updateConnectorHealth({
+            status: "configured",
+            error: null,
+            testedAt: new Date().toISOString(),
+          });
+          pollingDegraded = false;
+        }
       } catch (error) {
+        pollingDegraded = true;
         updateConnectorHealth({
-          error: error instanceof Error ? error.message : "Telegram polling failed.",
+          error:
+            error instanceof Error
+              ? `Telegram temporalmente fuera de línea. Reintentando automáticamente. ${error.message}`
+              : "Telegram temporalmente fuera de línea. Reintentando automáticamente.",
           testedAt: new Date().toISOString(),
         });
         await sleep(3000);
