@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Plus, Settings } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
@@ -8,10 +8,34 @@ export const WorkspaceSwitcher = () => {
   const navigate = useNavigate();
   const { activeWorkspaceId, activeWorkspaceName, memberships, switchWorkspace } = useWorkspace();
   const [open, setOpen] = useState(false);
+  const switcherRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!switcherRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [open]);
 
   return (
-    <div className="workspace-switcher">
-      <button className="workspace-switcher-trigger" onClick={() => setOpen((current) => !current)} type="button">
+    <div className="workspace-switcher" ref={switcherRef}>
+      <button
+        aria-expanded={open}
+        className="workspace-switcher-trigger"
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
         <span className="workspace-avatar">{activeWorkspaceName.slice(0, 1).toUpperCase()}</span>
         <span className="context-meta-stack">
           <span className="context-meta-label">Workspace</span>
@@ -24,7 +48,7 @@ export const WorkspaceSwitcher = () => {
         <div className="workspace-switcher-menu">
           {memberships.map((membership) => (
             <button
-              className="workspace-switcher-item"
+              className={`workspace-switcher-item${membership.workspaceId === activeWorkspaceId ? " is-active" : ""}`}
               key={membership.workspaceId}
               onClick={() => {
                 switchWorkspace(membership.workspaceId);
@@ -38,15 +62,27 @@ export const WorkspaceSwitcher = () => {
                 <strong>{membership.workspaceName}</strong>
                 <small>{membership.roleName}</small>
               </span>
-              {membership.workspaceId === activeWorkspaceId ? <Check size={14} /> : null}
+              {membership.workspaceId === activeWorkspaceId ? <Check className="workspace-switcher-check" size={14} /> : null}
             </button>
           ))}
           <div className="workspace-switcher-footer">
-            <button onClick={() => { setOpen(false); navigate("/workspaces/create"); }} type="button">
+            <button
+              onClick={() => {
+                setOpen(false);
+                navigate("/workspaces/create");
+              }}
+              type="button"
+            >
               <Plus size={14} />
               <span>Create workspace</span>
             </button>
-            <button onClick={() => { setOpen(false); navigate("/settings"); }} type="button">
+            <button
+              onClick={() => {
+                setOpen(false);
+                navigate("/settings");
+              }}
+              type="button"
+            >
               <Settings size={14} />
               <span>Workspace settings</span>
             </button>

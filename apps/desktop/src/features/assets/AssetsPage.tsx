@@ -165,6 +165,26 @@ type AssetCsvDraft = {
   totalQuantity: number;
 };
 
+type AssetCsvCatalogOption = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+type AssetCsvPreview = {
+  fileName: string;
+  drafts: AssetCsvDraft[];
+  summary: {
+    totalRows: number;
+    uniqueCodes: number;
+    duplicateRows: number;
+    existingCodes: number;
+    importableCount: number;
+    importableStock: number;
+    warnings: string[];
+  };
+};
+
 const aggregateAssetCsvDrafts = (drafts: AssetCsvDraft[]) => {
   const draftsByCode = new Map<string, AssetCsvDraft & { importRowNumbers: number[]; serialNumbers: string[] }>();
   let mergedDuplicateRows = 0;
@@ -202,6 +222,161 @@ const aggregateAssetCsvDrafts = (drafts: AssetCsvDraft[]) => {
       ]),
     })),
     mergedDuplicateRows,
+  };
+};
+
+const buildAssetCsvPreview = ({
+  assets,
+  catalog,
+  csvText,
+  fileName,
+}: {
+  assets: Array<{ code: string }>;
+  catalog: {
+    categories: AssetCsvCatalogOption[];
+    locations: AssetCsvCatalogOption[];
+  };
+  csvText: string;
+  fileName: string;
+}): AssetCsvPreview => {
+  const parsedRows = parseCsvText(csvText);
+  const headers = parsedRows[0]?.map(normalizeCsvHeader) ?? [];
+  const dataRows = parsedRows.slice(1);
+
+  if (!headers.length || !dataRows.length) {
+    throw new Error("The selected CSV must include a header row and at least one asset row.");
+  }
+
+  const categoryByCodeOrName = new Map(
+    catalog.categories.flatMap((category) => [
+      [category.code.trim().toLowerCase(), category.id] as const,
+      [normalizeCsvLookup(category.code), category.id] as const,
+      [normalizeCsvLookup(category.name), category.id] as const,
+    ]),
+  );
+  const locationByCodeOrName = new Map(
+    catalog.locations.flatMap((location) => [
+      [normalizeCsvLookup(location.code), location.id] as const,
+      [normalizeCsvLookup(location.name), location.id] as const,
+    ]),
+  );
+  const defaultCategory = catalog.categories[0];
+
+  if (!defaultCategory) {
+    throw new Error("Create at least one asset category before importing assets.");
+  }
+
+  const warnings = new Set<string>();
+  let unmatchedWarehouseSlots = 0;
+  const existingCodes = new Set(assets.map((asset) => asset.code.trim().toUpperCase()).filter(Boolean));
+  const rawDrafts = dataRows.map((values, index): AssetCsvDraft => {
+    const row = Object.fromEntries(headers.map((header, headerIndex) => [header, values[headerIndex] ?? ""]));
+    const rowNumber = index + 2;
+    const name = resolveCsvValue(row, [
+      "name",
+      "asset",
+      "assetName",
+      "Nombre (en la base de datos)",
+      "Nombre (en la base de datos) 2",
+      "nombre",
+    ]);
+    const internalCode = resolveCsvValue(row, [
+      "internalCode",
+      "code",
+      "assetCode",
+      "sku",
+      "Código",
+      "ID (Número de serie)",
+      "Códigos QR",
+    ]);
+    const categoryValue = resolveCsvValue(row, ["categoryId", "categoryCode", "category"]);
+    const explicitLocationValue = resolveCsvValue(row, ["defaultLocationId", "locationCode", "location", "defaultLocation"]);
+    const warehouseSlot = resolveCsvValue(row, ["Ubicado en almacén", "warehouseSlot", "warehouse"]);
+    const categoryId = categoryValue ? categoryByCodeOrName.get(normalizeCsvLookup(categoryValue)) : undefined;
+    const defaultLocationId = explicitLocationValue
+      ? locationByCodeOrName.get(normalizeCsvLookup(explicitLocationValue))
+      : warehouseSlot
+        ? locationByCodeOrName.get(normalizeCsvLookup(warehouseSlot))
+        : undefined;
+    const replacementValueText = resolveCsvValue(row, ["replacementValue", "replacement", "value"]);
+    const replacementValue = replacementValueText ? Number(replacementValueText.replace(/[$,\s]/g, "")) : undefined;
+    const conditionStatus = resolveCsvValue(row, ["condition", "conditionStatus"]) || "Good";
+    const totalQuantity = parseCsvQuantity(resolveCsvValue(row, ["quantity", "Cantidad actual", "currentQuantity"]), rowNumber);
+    const folderPath = resolveCsvValue(row, ["Estructura de la carpeta (Carpeta)", "folderPath"]);
+    const folderType = resolveCsvValue(row, ["Tipo de articulo (Carpeta)", "folderType"]);
+    const positionType = resolveCsvValue(row, ["Tipo (posición/case/set)", "positionType"]);
+    const externalNote = resolveCsvValue(row, ["Nota externa", "externalNote", "notes"]);
+    const serialNumber = resolveCsvValue(row, ["serialNumber", "serial", "Número de Serie (Número de serie)"]);
+
+    if (!name || !internalCode) {
+      throw new Error(`CSV row ${rowNumber} is missing name or code.`);
+    }
+
+    if (categoryValue && !categoryId) {
+      warnings.add(`Unknown category "${categoryValue}" will use ${defaultCategory.name}.`);
+    }
+
+    if (explicitLocationValue && !defaultLocationId) {
+      warnings.add(`Unknown location "${explicitLocationValue}" will be left blank.`);
+    }
+
+    if (!explicitLocationValue && warehouseSlot && !defaultLocationId) {
+      unmatchedWarehouseSlots += 1;
+    }
+
+    if (replacementValueText && Number.isNaN(replacementValue)) {
+      throw new Error(`CSV row ${rowNumber} has an invalid replacement value.`);
+    }
+
+    if (!allowedCsvConditions.has(conditionStatus)) {
+      throw new Error(`CSV row ${rowNumber} has an unsupported condition. Use Good, Review, or Damaged.`);
+    }
+
+    return {
+      importRowNumber: rowNumber,
+      name,
+      internalCode: internalCode.toUpperCase(),
+      categoryId: categoryId ?? defaultCategory.id,
+      defaultLocationId,
+      brand: resolveCsvValue(row, ["brand"]),
+      model: resolveCsvValue(row, ["model"]),
+      serialNumber,
+      description: resolveCsvValue(row, ["description"]),
+      conditionStatus,
+      notes: joinCsvNotes([
+        externalNote,
+        warehouseSlot && `Warehouse slot: ${warehouseSlot}`,
+        folderPath && `Source folder: ${folderPath}`,
+        folderType && `Source folder type: ${folderType}`,
+        positionType && `Source item type: ${positionType}`,
+      ]),
+      replacementValue,
+      ownershipType: resolveCsvValue(row, ["ownership", "ownershipType"]) || "owned",
+      qrCodeValue: resolveCsvValue(row, ["qr", "qrCode", "qrCodeValue", "barcode", "Códigos QR"]),
+      totalQuantity,
+    };
+  });
+  const { drafts, mergedDuplicateRows } = aggregateAssetCsvDrafts(rawDrafts);
+  const importableDrafts = drafts.filter((draft) => !existingCodes.has(draft.internalCode.trim().toUpperCase()));
+
+  if (unmatchedWarehouseSlots) {
+    warnings.add(
+      `${unmatchedWarehouseSlots} warehouse slot value${unmatchedWarehouseSlots === 1 ? "" : "s"} will be preserved in notes.`,
+    );
+  }
+
+  return {
+    fileName,
+    drafts,
+    summary: {
+      totalRows: dataRows.length,
+      uniqueCodes: drafts.length,
+      duplicateRows: mergedDuplicateRows,
+      existingCodes: drafts.length - importableDrafts.length,
+      importableCount: importableDrafts.length,
+      importableStock: importableDrafts.reduce((total, draft) => total + draft.totalQuantity, 0),
+      warnings: Array.from(warnings),
+    },
   };
 };
 
@@ -255,6 +430,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
   const [isArchivingAsset, setIsArchivingAsset] = useState(false);
   const [isImportingAssets, setIsImportingAssets] = useState(false);
+  const [csvImportPreview, setCsvImportPreview] = useState<AssetCsvPreview | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const editorAssetId = editorMode === "edit" ? selectedAssetId ?? undefined : undefined;
@@ -427,127 +603,36 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     }
 
     try {
+      setEditorError(null);
+      setActionFeedback(null);
+      setActionWarning(null);
+      const csvText = await file.text();
+      setCsvImportPreview(buildAssetCsvPreview({ assets, catalog, csvText, fileName: file.name }));
+    } catch (error) {
+      setCsvImportPreview(null);
+      setEditorError(error instanceof Error ? error.message : "Asset CSV import failed.");
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleConfirmCsvImport = async () => {
+    if (!csvImportPreview) {
+      return;
+    }
+
+    try {
       setIsImportingAssets(true);
       setEditorError(null);
       setActionFeedback(null);
-      const csvText = await file.text();
-      const parsedRows = parseCsvText(csvText);
-      const headers = parsedRows[0]?.map(normalizeCsvHeader) ?? [];
-      const dataRows = parsedRows.slice(1);
-
-      if (!headers.length || !dataRows.length) {
-        throw new Error("The selected CSV must include a header row and at least one asset row.");
-      }
-
-      const categoryByCodeOrName = new Map(
-        catalog.categories.flatMap((category) => [
-          [category.code.trim().toLowerCase(), category.id] as const,
-          [normalizeCsvLookup(category.code), category.id] as const,
-          [normalizeCsvLookup(category.name), category.id] as const,
-        ]),
-      );
-      const locationByCodeOrName = new Map(
-        catalog.locations.flatMap((location) => [
-          [normalizeCsvLookup(location.code), location.id] as const,
-          [normalizeCsvLookup(location.name), location.id] as const,
-        ]),
-      );
-      const defaultCategoryId = catalog.categories[0]?.id;
-
-      if (!defaultCategoryId) {
-        throw new Error("Create at least one asset category before importing assets.");
-      }
-
+      setActionWarning(null);
       const existingCodes = new Set(assets.map((asset) => asset.code.trim().toUpperCase()).filter(Boolean));
-      const rawDrafts = dataRows.map((values, index): AssetCsvDraft => {
-        const row = Object.fromEntries(headers.map((header, headerIndex) => [header, values[headerIndex] ?? ""]));
-        const rowNumber = index + 2;
-        const name = resolveCsvValue(row, [
-          "name",
-          "asset",
-          "assetName",
-          "Nombre (en la base de datos)",
-          "Nombre (en la base de datos) 2",
-          "nombre",
-        ]);
-        const internalCode = resolveCsvValue(row, [
-          "internalCode",
-          "code",
-          "assetCode",
-          "sku",
-          "Código",
-          "ID (Número de serie)",
-          "Códigos QR",
-        ]);
-        const categoryValue = resolveCsvValue(row, ["categoryId", "categoryCode", "category"]);
-        const explicitLocationValue = resolveCsvValue(row, ["defaultLocationId", "locationCode", "location", "defaultLocation"]);
-        const warehouseSlot = resolveCsvValue(row, ["Ubicado en almacén", "warehouseSlot", "warehouse"]);
-        const categoryId = categoryByCodeOrName.get(normalizeCsvLookup(categoryValue)) ?? defaultCategoryId;
-        const defaultLocationId = explicitLocationValue
-          ? locationByCodeOrName.get(normalizeCsvLookup(explicitLocationValue))
-          : warehouseSlot
-            ? locationByCodeOrName.get(normalizeCsvLookup(warehouseSlot))
-            : undefined;
-        const replacementValueText = resolveCsvValue(row, ["replacementValue", "replacement", "value"]);
-        const replacementValue = replacementValueText ? Number(replacementValueText.replace(/[$,\s]/g, "")) : undefined;
-        const conditionStatus = resolveCsvValue(row, ["condition", "conditionStatus"]) || "Good";
-        const totalQuantity = parseCsvQuantity(resolveCsvValue(row, ["quantity", "Cantidad actual", "currentQuantity"]), rowNumber);
-        const folderPath = resolveCsvValue(row, ["Estructura de la carpeta (Carpeta)", "folderPath"]);
-        const folderType = resolveCsvValue(row, ["Tipo de articulo (Carpeta)", "folderType"]);
-        const positionType = resolveCsvValue(row, ["Tipo (posición/case/set)", "positionType"]);
-        const externalNote = resolveCsvValue(row, ["Nota externa", "externalNote", "notes"]);
-        const serialNumber = resolveCsvValue(row, ["serialNumber", "serial", "Número de Serie (Número de serie)"]);
-
-        if (!name || !internalCode) {
-          throw new Error(`CSV row ${rowNumber} is missing name or code.`);
-        }
-
-        if (categoryValue && !categoryByCodeOrName.has(normalizeCsvLookup(categoryValue))) {
-          throw new Error(`CSV row ${rowNumber} references an unknown category: ${categoryValue}.`);
-        }
-
-        if (explicitLocationValue && !defaultLocationId) {
-          throw new Error(`CSV row ${rowNumber} references an unknown location: ${explicitLocationValue}.`);
-        }
-
-        if (replacementValueText && Number.isNaN(replacementValue)) {
-          throw new Error(`CSV row ${rowNumber} has an invalid replacement value.`);
-        }
-
-        if (!allowedCsvConditions.has(conditionStatus)) {
-          throw new Error(`CSV row ${rowNumber} has an unsupported condition. Use Good, Review, or Damaged.`);
-        }
-
-        return {
-          importRowNumber: rowNumber,
-          name,
-          internalCode: internalCode.toUpperCase(),
-          categoryId,
-          defaultLocationId,
-          brand: resolveCsvValue(row, ["brand"]),
-          model: resolveCsvValue(row, ["model"]),
-          serialNumber,
-          description: resolveCsvValue(row, ["description"]),
-          conditionStatus,
-          notes: joinCsvNotes([
-            externalNote,
-            warehouseSlot && `Warehouse slot: ${warehouseSlot}`,
-            folderPath && `Source folder: ${folderPath}`,
-            folderType && `Source folder type: ${folderType}`,
-            positionType && `Source item type: ${positionType}`,
-          ]),
-          replacementValue,
-          ownershipType: resolveCsvValue(row, ["ownership", "ownershipType"]) || "owned",
-          qrCodeValue: resolveCsvValue(row, ["qr", "qrCode", "qrCodeValue", "barcode", "Códigos QR"]),
-          totalQuantity,
-        };
-      });
-      const { drafts, mergedDuplicateRows } = aggregateAssetCsvDrafts(rawDrafts);
-
       let importedCount = 0;
       let skippedDuplicateCount = 0;
 
-      for (const draft of drafts) {
+      for (const draft of csvImportPreview.drafts) {
         const { importRowNumber, ...assetDraft } = draft;
         const normalizedCode = assetDraft.internalCode.trim().toUpperCase();
 
@@ -583,9 +668,14 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       }
 
       await Promise.all([reload(), refreshProjects()]);
+      setCsvImportPreview(null);
       setActionFeedback(
-        `Imported ${importedCount} asset${importedCount === 1 ? "" : "s"} from ${file.name}.${
-          mergedDuplicateRows ? ` Merged ${mergedDuplicateRows} duplicate CSV row${mergedDuplicateRows === 1 ? "" : "s"}.` : ""
+        `Imported ${importedCount} asset${importedCount === 1 ? "" : "s"} from ${csvImportPreview.fileName}.${
+          csvImportPreview.summary.duplicateRows
+            ? ` Merged ${csvImportPreview.summary.duplicateRows} duplicate CSV row${
+                csvImportPreview.summary.duplicateRows === 1 ? "" : "s"
+              }.`
+            : ""
         }${
           skippedDuplicateCount ? ` Skipped ${skippedDuplicateCount} existing code${skippedDuplicateCount === 1 ? "" : "s"}.` : ""
         }`,
@@ -594,9 +684,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setEditorError(error instanceof Error ? error.message : "Asset CSV import failed.");
     } finally {
       setIsImportingAssets(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
@@ -871,6 +958,68 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             sortDirection={assetControls.sortDirection}
             sortOptions={assetSortOptions}
           />
+          {csvImportPreview ? (
+            <div className="asset-import-preview">
+              <div className="asset-import-preview-copy">
+                <span className="asset-import-preview-kicker">CSV preview</span>
+                <strong>{csvImportPreview.fileName}</strong>
+              </div>
+              <div className="asset-import-preview-stats">
+                <span>
+                  <strong>{csvImportPreview.summary.totalRows}</strong>
+                  rows
+                </span>
+                <span>
+                  <strong>{csvImportPreview.summary.uniqueCodes}</strong>
+                  unique codes
+                </span>
+                <span>
+                  <strong>{csvImportPreview.summary.importableCount}</strong>
+                  to import
+                </span>
+                <span>
+                  <strong>{csvImportPreview.summary.importableStock}</strong>
+                  stock
+                </span>
+                <span>
+                  <strong>{csvImportPreview.summary.existingCodes}</strong>
+                  existing
+                </span>
+                <span>
+                  <strong>{csvImportPreview.summary.duplicateRows}</strong>
+                  merged
+                </span>
+              </div>
+              {csvImportPreview.summary.warnings.length ? (
+                <div className="asset-import-preview-warnings">
+                  {csvImportPreview.summary.warnings.slice(0, 3).map((warning) => (
+                    <span key={warning}>{warning}</span>
+                  ))}
+                  {csvImportPreview.summary.warnings.length > 3 ? (
+                    <span>{csvImportPreview.summary.warnings.length - 3} more warning(s).</span>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="asset-import-preview-actions">
+                <button
+                  className="ghost-control action-row-button"
+                  disabled={isImportingAssets}
+                  onClick={() => setCsvImportPreview(null)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="asset-create-button action-row-button"
+                  disabled={isImportingAssets || csvImportPreview.summary.importableCount === 0}
+                  onClick={() => void handleConfirmCsvImport()}
+                  type="button"
+                >
+                  {isImportingAssets ? "Importing..." : "Import assets"}
+                </button>
+              </div>
+            </div>
+          ) : null}
           <DataTable
             activeRowId={selectedAssetId}
             autoScrollToActiveRow
