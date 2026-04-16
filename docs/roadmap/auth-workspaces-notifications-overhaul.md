@@ -22,7 +22,7 @@ Decisiones bloqueadas:
 | Slice | Estado | Inicio | Cierre | Owner | Evidencia de verificación |
 | --- | --- | --- | --- | --- | --- |
 | 0 — Foundation Supabase + Seguridad | In progress | 2026-04-15 |  | Codex | Dependencias instaladas; roadmap, paquete Supabase, Keychain IPC, deep links, migración y Edge Functions desplegadas. Migración validada con REST `workspaces` 200; functions responden `authentication_required`/`forbidden` sin sesión. Typecheck/build/tests pasan. |
-| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Login real Supabase y creación real de workspace remoto validados en app. Providers/rutas/guardas/switcher creados. Assets list/create/edit/archive consumen active workspace local. Outbox async con transport Supabase opt-in. Workspaces remotos se cachean en SQLite local. Typecheck/build/tests pasan. |
+| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Login real Supabase y creación real de workspace remoto validados en app. Providers/rutas/guardas/switcher creados. Assets list/create/edit/archive consumen active workspace local. Outbox async con transport Supabase opt-in. Workspaces remotos se cachean en SQLite local. Import CSV Rentman probado con CSV real y reconciliado localmente. Typecheck/build/tests pasan. |
 | 2 — Roles, Permissions e Invites | Todo |  |  | Codex | Pendiente. |
 | 3 — Workspaces CRUD + Sharing | Todo |  |  | Codex | Pendiente. |
 | 4 — Archiving Wrapped-Gate | Todo |  |  | Codex | Pendiente. |
@@ -59,7 +59,10 @@ Decisiones bloqueadas:
 - Done — Agregar transport Supabase opt-in para auditar filas en `public.sync_outbox`.
 - Done — Validar migración remota `sync_outbox` y activar `VITE_SUPABASE_SYNC_ENABLED=true` en dev.
 - Done — Cachear memberships/workspaces Supabase en SQLite local para desbloquear writes workspace-scoped.
-- Doing — Validar push real de una fila `sync_outbox` generada por create/edit asset.
+- Done — Import CSV de Assets MVP con soporte para export real Rentman en español, cantidades, duplicados internos y reintentos.
+- Done — Reconciliar SQLite local de `Metadata Cine2` con seriales/filas fuente del CSV ya importado.
+- Doing — Validar que `sync_outbox` termine de drenar y que Supabase reciba las filas esperadas.
+- Todo — Agregar preview/resumen antes de importar CSV.
 - Todo — Conectar MFA TOTP real con Supabase MFA.
 
 ### Slice 2 — Roles, Permissions e Invites
@@ -116,6 +119,9 @@ Decisiones bloqueadas:
 | 2026-04-15 | Working tree | Se corrige inconsistencia reportada en Assets: el fallback local ya no muestra temporalmente assets de `workspace-metadata` cuando hay sesión Supabase, y `getAssetSummary`/`getAssetsOverview` aceptan `workspaceId` para que métricas y tabla usen el mismo scope. Verificación: `typecheck`, `build` y test de assets pasan. | Evitar parpadeo de datos cruzados y métricas engañosas en workspaces remotos vacíos. |
 | 2026-04-15 | Working tree | Se completa el scope de las cards operativas de Assets (`overdueReturns`, `openPackingSlips`, `activeIncidents`, `maintenanceWatch`) por workspace y se agrega botón `Import CSV` junto a `New asset` con parser CSV local para first-run imports. Verificación: `typecheck`, `build` y tests focalizados pasan. | Evitar métricas globales en workspaces nuevos y dar una ruta práctica para cargar inventarios preexistentes. |
 | 2026-04-15 | Working tree | Se valida el CSV real `Exportación_Equipos_20211015 (1).csv`: headers en español/Rentman (`Nombre (en la base de datos)`, `Código`, `Cantidad actual`, `Códigos QR`, `Ubicado en almacén`) no eran reconocidos. Se amplía el parser, se preserva `Cantidad actual` como `totalQuantity` y se evita error no manejado de `setStoredTokens`. Verificación: `typecheck`, `build` y tests focalizados pasan. | Convertir el import de un demo técnico a un first-run import tolerante con exportaciones reales. |
+| 2026-04-15 | `f94e516` y previos | Se endurece import CSV de Assets: acepta cantidad cero, detecta duplicados aunque el error venga envuelto por IPC, salta códigos existentes en reintentos y mergea filas duplicadas internas por código conservando seriales/filas fuente en notes. Verificación: `typecheck`, `build` y tests focalizados pasan. | Evitar fallos en imports reales, no duplicar stock por filas serializadas y hacer reintentos idempotentes. |
+| 2026-04-15 | Data repair local | Se crea backup SQLite `bukowski-foundation.pre-csv-reconcile-20260415.sqlite` y se reconcilia `Metadata Cine2`: 629 assets, stock total/disponible 1727, 45 assets actualizados con seriales/filas fuente, 2 ajustes de cantidad, 45 eventos `asset_csv_reconciled`. | Dejar consistente el workspace ya importado antes del handoff y mantener auditoría en `asset_events`/`sync_outbox`. |
+| 2026-04-15 | `docs/handoff/2026-04-15-auth-workspaces-assets-handoff.md` | Se crea documento de handoff para continuar en otro thread con estado, commits, datos locales, riesgos, deuda y prompt sugerido. | Permitir continuidad del trabajo desde otra máquina/sesión sin perder contexto operativo. |
 
 ## Decisiones tomadas
 
@@ -148,6 +154,7 @@ Decisiones bloqueadas:
 | medio | Métricas y tabla de assets pueden mostrar scopes diferentes durante la migración multi-workspace. | Pasar `workspaceId` también a summary/overview y evitar fallback visual a `workspace-metadata` en sesión Supabase. | Mitigado en Assets. |
 | medio | CSV import inicial depende de catálogos existentes y aún no crea categorías/ubicaciones faltantes. | MVP importa contra categorías/ubicaciones conocidas; Slice 3 debe cubrir plantillas, preview avanzado y mapeo de catálogos por workspace. | Abierto como deuda UX/data. |
 | bajo | Exports reales pueden traer headers localizados, acentos, columnas duplicadas o ubicaciones de almacén que no existen como catálogo. | Normalizar headers con acentos/puntuación, soportar aliases Rentman en español y guardar ubicación/carpeta fuente en notas cuando no hay catálogo local. | Mitigado para CSV probado; mantener abierto para preview/import wizard. |
+| medio | Import CSV sin preview escribe inmediatamente y dificulta anticipar duplicados, merges y warnings. | Agregar preview antes de import con códigos únicos, duplicados mergeados, códigos existentes, stock total y warnings. | Abierto. |
 
 ## Incompletos / deuda técnica
 
@@ -160,8 +167,9 @@ Decisiones bloqueadas:
 - El transport Supabase está opt-in y la migración remota ya fue aplicada; falta generar un asset real y confirmar una fila `sent` en Supabase.
 - Falta validar visualmente en app que el cambio de workspace aísla assets creados en cada workspace.
 - Deuda técnica: los catálogos base por workspace todavía no se clonan/filtran; para el MVP se desbloquea workspace FK, pero Slice 2/3 debe separar catálogos por workspace con más rigor.
-- Import CSV de assets ya existe como MVP sin preview; falta agregar template descargable, pantalla de preview/errores por fila, resumen de warnings antes de importar y creación guiada de categorías/ubicaciones faltantes.
+- Import CSV de assets ya existe como MVP probado con CSV real Rentman; falta agregar template descargable, pantalla de preview/errores por fila, resumen de warnings antes de importar y creación guiada de categorías/ubicaciones faltantes.
+- Documento de handoff creado en `docs/handoff/2026-04-15-auth-workspaces-assets-handoff.md`.
 
 ## Próximo paso recomendado
 
-Reload del app, confirmar que `Metadata Cine2` queda en SQLite local, crear/editar un asset y validar que el outbox sube una fila `sent` a `public.sync_outbox`.
+Continuar desde el handoff: esperar/verificar que `sync_outbox` termine de drenar para `Metadata Cine2`, validar filas remotas en Supabase y luego implementar preview del import CSV o hardening del sync remoto de assets antes de pasar a Slice 2.
