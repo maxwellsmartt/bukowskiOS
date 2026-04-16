@@ -123,6 +123,19 @@ const isSupabaseSyncEnabled = () => {
   return value === "1" || value === "true";
 };
 
+const parseJsonObject = (value: string | null) => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+
 const withRecoveredDatabase = (databasePath: string, backupPath: string) => {
   const openDatabase = () => {
     const database = new DatabaseSync(databasePath);
@@ -321,6 +334,188 @@ const createRuntime = (): LocalDatabaseRuntime => {
     return getDiagnosticsSnapshot();
   };
 
+  const resolveSupabaseAssetSnapshot = (row: { entity_type: string; entity_id: string; event_id: string | null }) => {
+    if (row.entity_type !== "asset_event") {
+      return null;
+    }
+
+    const asset = database
+      .prepare(
+        `
+          SELECT
+            id,
+            workspace_id,
+            category_id,
+            name,
+            brand,
+            model,
+            serial_number,
+            internal_code,
+            description,
+            purchase_date,
+            purchase_price,
+            currency,
+            replacement_value,
+            current_book_value,
+            ownership_type,
+            default_location_id,
+            qr_code_value,
+            notes,
+            is_active,
+            created_at,
+            updated_at
+          FROM assets
+          WHERE id = ?
+          LIMIT 1
+        `,
+      )
+      .get(row.entity_id) as
+      | {
+          id: string;
+          workspace_id: string;
+          category_id: string;
+          name: string;
+          brand: string | null;
+          model: string | null;
+          serial_number: string | null;
+          internal_code: string;
+          description: string | null;
+          purchase_date: string | null;
+          purchase_price: number | null;
+          currency: string | null;
+          replacement_value: number | null;
+          current_book_value: number | null;
+          ownership_type: string | null;
+          default_location_id: string | null;
+          qr_code_value: string | null;
+          notes: string | null;
+          is_active: number;
+          created_at: string;
+          updated_at: string;
+        }
+      | undefined;
+
+    const currentState = database
+      .prepare(
+        `
+          SELECT
+            asset_id,
+            workspace_id,
+            current_location_id,
+            current_project_id,
+            current_department_id,
+            current_responsible_user_id,
+            active_assignment_id,
+            condition_status,
+            operational_status,
+            custody_status,
+            last_event_id,
+            version,
+            updated_at,
+            project_unit_id,
+            total_quantity,
+            available_quantity,
+            assigned_quantity,
+            checked_out_quantity
+          FROM asset_current_state
+          WHERE asset_id = ?
+          LIMIT 1
+        `,
+      )
+      .get(row.entity_id) as
+      | {
+          asset_id: string;
+          workspace_id: string;
+          current_location_id: string | null;
+          current_project_id: string | null;
+          current_department_id: string | null;
+          current_responsible_user_id: string | null;
+          active_assignment_id: string | null;
+          condition_status: string;
+          operational_status: string;
+          custody_status: string;
+          last_event_id: string;
+          version: number;
+          updated_at: string;
+          project_unit_id: string | null;
+          total_quantity: number;
+          available_quantity: number;
+          assigned_quantity: number;
+          checked_out_quantity: number;
+        }
+      | undefined;
+
+    if (!asset || !currentState) {
+      throw new Error(`Asset snapshot missing locally for ${row.entity_id}.`);
+    }
+
+    const event = row.event_id
+      ? ((database
+          .prepare(
+            `
+              SELECT
+                id,
+                workspace_id,
+                asset_id,
+                assignment_id,
+                project_id,
+                department_id,
+                performed_by_user_id,
+                event_type,
+                location_id,
+                from_location_id,
+                to_location_id,
+                event_timestamp,
+                command_id,
+                actor_type,
+                source_channel,
+                notes,
+                metadata_json,
+                created_at
+              FROM asset_events
+              WHERE id = ?
+              LIMIT 1
+            `,
+          )
+          .get(row.event_id) as
+          | {
+              id: string;
+              workspace_id: string;
+              asset_id: string;
+              assignment_id: string | null;
+              project_id: string | null;
+              department_id: string | null;
+              performed_by_user_id: string;
+              event_type: string;
+              location_id: string | null;
+              from_location_id: string | null;
+              to_location_id: string | null;
+              event_timestamp: string;
+              command_id: string;
+              actor_type: string;
+              source_channel: string;
+              notes: string | null;
+              metadata_json: string | null;
+              created_at: string;
+            }
+          | undefined) ?? null)
+      : null;
+
+    return {
+      asset: {
+        ...asset,
+        is_active: asset.is_active === 1,
+      },
+      currentState,
+      event: event
+        ? {
+            ...event,
+            metadata_json: parseJsonObject(event.metadata_json),
+          }
+        : null,
+    };
+  };
+
   const supabaseTokenStore = createSupabaseTokenStore();
   const syncOutboxWorker = createSyncOutboxWorkerService(database, {
     transport: isSupabaseSyncEnabled()
@@ -328,6 +523,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
           supabaseUrl: process.env.VITE_SUPABASE_URL ?? "",
           anonKey: process.env.VITE_SUPABASE_ANON_KEY ?? "",
           getAccessToken: async () => (await supabaseTokenStore.getTokens()).accessToken,
+          resolveAssetSnapshot: resolveSupabaseAssetSnapshot,
         })
       : undefined,
   });

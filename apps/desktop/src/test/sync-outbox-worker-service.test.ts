@@ -383,4 +383,95 @@ describe("sync outbox worker service", () => {
       attempt_count: 2,
     });
   });
+
+  it("upserts asset projections before acknowledging asset_event rows remotely", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveAssetSnapshot: async () => ({
+        asset: {
+          id: "asset-1",
+          workspace_id: "11111111-1111-4111-8111-111111111111",
+          internal_code: "CAM-001",
+          name: "A camera",
+          is_active: true,
+          created_at: "2026-04-12T18:00:00.000Z",
+          updated_at: "2026-04-12T18:01:00.000Z",
+        },
+        currentState: {
+          asset_id: "asset-1",
+          workspace_id: "11111111-1111-4111-8111-111111111111",
+          condition_status: "Good",
+          operational_status: "available",
+          custody_status: "available",
+          last_event_id: "event-1",
+          version: 2,
+          total_quantity: 3,
+          available_quantity: 3,
+          assigned_quantity: 0,
+          checked_out_quantity: 0,
+          updated_at: "2026-04-12T18:01:00.000Z",
+        },
+        event: {
+          id: "event-1",
+          workspace_id: "11111111-1111-4111-8111-111111111111",
+          asset_id: "asset-1",
+          event_type: "asset_created",
+          event_timestamp: "2026-04-12T18:00:00.000Z",
+          command_id: "command-1",
+          actor_type: "user",
+          source_channel: "desktop",
+          metadata_json: { kind: "asset_created" },
+          created_at: "2026-04-12T18:00:00.000Z",
+        },
+      }),
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(null, { status: 201 });
+      }) as typeof fetch,
+    });
+
+    await transport({
+      id: "outbox-event-1",
+      workspace_id: "11111111-1111-4111-8111-111111111111",
+      entity_type: "asset_event",
+      entity_id: "asset-1",
+      event_id: "event-1",
+      operation_type: "upsert",
+      payload_json: JSON.stringify({ kind: "asset_created" }),
+      attempt_count: 1,
+      created_at: "2026-04-12T18:00:00.000Z",
+      updated_at: "2026-04-12T18:01:00.000Z",
+    });
+
+    expect(requests.map((request) => request.url)).toEqual([
+      "https://bukowski.test/rest/v1/assets?on_conflict=id",
+      "https://bukowski.test/rest/v1/asset_current_state?on_conflict=asset_id",
+      "https://bukowski.test/rest/v1/asset_events?on_conflict=id",
+      "https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
+    ]);
+    expect(JSON.parse(String(requests[0]?.init.body))).toMatchObject({
+      id: "asset-1",
+      internal_code: "CAM-001",
+      name: "A camera",
+      is_active: true,
+    });
+    expect(JSON.parse(String(requests[1]?.init.body))).toMatchObject({
+      asset_id: "asset-1",
+      version: 2,
+      total_quantity: 3,
+    });
+    expect(JSON.parse(String(requests[2]?.init.body))).toMatchObject({
+      id: "event-1",
+      asset_id: "asset-1",
+      metadata_json: { kind: "asset_created" },
+    });
+    expect(JSON.parse(String(requests[3]?.init.body))).toMatchObject({
+      id: "outbox-event-1",
+      entity_type: "asset_event",
+      payload_json: { kind: "asset_created" },
+    });
+  });
 });

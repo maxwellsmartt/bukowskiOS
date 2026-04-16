@@ -124,6 +124,7 @@ Decisiones bloqueadas:
 | 2026-04-15 | Data repair local | Se crea backup SQLite `bukowski-foundation.pre-csv-reconcile-20260415.sqlite` y se reconcilia `Metadata Cine2`: 629 assets, stock total/disponible 1727, 45 assets actualizados con seriales/filas fuente, 2 ajustes de cantidad, 45 eventos `asset_csv_reconciled`. | Dejar consistente el workspace ya importado antes del handoff y mantener auditoría en `asset_events`/`sync_outbox`. |
 | 2026-04-15 | `docs/handoff/2026-04-15-auth-workspaces-assets-handoff.md` | Se crea documento de handoff para continuar en otro thread con estado, commits, datos locales, riesgos, deuda y prompt sugerido. | Permitir continuidad del trabajo desde otra máquina/sesión sin perder contexto operativo. |
 | 2026-04-15 | Working tree casa | Se aplica handoff en casa, se copia `.env.local` y SQLite, se aprueba build nativo de `keytar`, `sync_outbox` de `Metadata Cine2` drena a `sent=674`, Supabase confirma `0-673/674`, y se agrega preview de CSV antes de importar assets. Verificación: `corepack pnpm --filter @bukowski/desktop typecheck` pasa. | Continuar el Slice 1 sin escrituras ciegas de CSV y confirmar que la cola local/remota ya no queda pendiente. |
+| 2026-04-15 | Working tree casa | Se endurece el sync remoto de assets: `createSupabaseOutboxTransport` ahora resuelve snapshots locales para filas `asset_event` y hace upsert idempotente en `public.assets`, `public.asset_current_state` y `public.asset_events` antes de confirmar `public.sync_outbox`. Se agrega migración `20260416003000_asset_sync_snapshots.sql` con RLS por workspace membership y prueba focalizada del transporte. Verificación: `corepack pnpm --filter @bukowski/desktop test -- sync-outbox-worker-service.test.ts`, `typecheck` y `build` pasan. | Dejar proyecciones remotas auditables y comparables contra SQLite sin depender solo del log crudo del outbox. |
 
 ## Decisiones tomadas
 
@@ -164,9 +165,10 @@ Decisiones bloqueadas:
 - Guards de sesión/workspace ya existen, pero falta endurecer comportamiento prod sin fallback.
 - Aún no hay validación workspace-scoped aplicada a handlers existentes.
 - Aún no se ha iniciado reemplazo de `DEFAULT_WORKSPACE_ID`.
-- Aún no se ha implementado sync remoto real; el worker actual sigue haciendo acknowledge local.
+- El worker ya escribe remoto en `public.sync_outbox` y, para filas `asset_event`, ahora proyecta snapshots en `public.assets`, `public.asset_current_state` y `public.asset_events`.
 - MFA TOTP está como pantalla placeholder; falta wiring real Supabase MFA.
 - El transport Supabase está opt-in y la migración remota ya fue aplicada; `Metadata Cine2` confirmó 674 filas remotas en `public.sync_outbox`.
+- Falta aplicar y validar en Supabase la nueva migración `20260416003000_asset_sync_snapshots.sql`, además de decidir si se hará backfill histórico para poblar snapshots remotos de eventos ya enviados.
 - Falta validar visualmente en app que el cambio de workspace aísla assets creados en cada workspace.
 - Deuda técnica: los catálogos base por workspace todavía no se clonan/filtran; para el MVP se desbloquea workspace FK, pero Slice 2/3 debe separar catálogos por workspace con más rigor.
 - Import CSV de assets ya existe como MVP probado con CSV real Rentman y ahora muestra preview/resumen antes de escribir; falta agregar template descargable, errores por fila más detallados y creación guiada de categorías/ubicaciones faltantes.
@@ -174,4 +176,4 @@ Decisiones bloqueadas:
 
 ## Próximo paso recomendado
 
-Continuar desde el handoff: seguir con hardening de sync remoto de assets antes de pasar a Slice 2.
+Continuar desde el handoff: aplicar la nueva migración remota de snapshots, validar escritura real en `public.assets` / `public.asset_current_state` / `public.asset_events`, y luego decidir si hace falta backfill histórico antes de pasar a Slice 2.

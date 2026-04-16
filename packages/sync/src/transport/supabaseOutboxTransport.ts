@@ -11,10 +11,25 @@ export type SupabaseOutboxTransportRow = {
   updated_at: string;
 };
 
+export type SupabaseAssetSnapshotRecord = {
+  [key: string]: boolean | number | string | null;
+};
+
+export type SupabaseAssetEventSnapshotRecord = {
+  [key: string]: boolean | number | string | Record<string, unknown> | null;
+};
+
+export type SupabaseOutboxAssetSnapshot = {
+  asset: SupabaseAssetSnapshotRecord;
+  currentState: SupabaseAssetSnapshotRecord;
+  event?: SupabaseAssetEventSnapshotRecord | null;
+};
+
 export type SupabaseOutboxTransportOptions = {
   supabaseUrl: string;
   anonKey: string;
   getAccessToken: () => Promise<string | null>;
+  resolveAssetSnapshot?: (row: SupabaseOutboxTransportRow) => Promise<SupabaseOutboxAssetSnapshot | null> | SupabaseOutboxAssetSnapshot | null;
   fetchImpl?: typeof fetch;
 };
 
@@ -29,10 +44,41 @@ const readErrorBody = async (response: Response) => {
   }
 };
 
+const upsertSupabaseRow = async ({
+  accessToken,
+  anonKey,
+  endpoint,
+  payload,
+  fetchImpl,
+}: {
+  accessToken: string;
+  anonKey: string;
+  endpoint: string;
+  payload: Record<string, unknown>;
+  fetchImpl: typeof fetch;
+}) => {
+  const response = await fetchImpl(endpoint, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const detail = await readErrorBody(response);
+    throw new Error(`Supabase outbox push failed (${response.status}): ${detail}`);
+  }
+};
+
 export const createSupabaseOutboxTransport = ({
   supabaseUrl,
   anonKey,
   getAccessToken,
+  resolveAssetSnapshot,
   fetchImpl = fetch,
 }: SupabaseOutboxTransportOptions) => {
   const normalizedUrl = normalizeUrl(supabaseUrl);
@@ -54,15 +100,44 @@ export const createSupabaseOutboxTransport = ({
       throw new Error("Outbox payload must be a JSON object.");
     }
 
-    const response = await fetchImpl(`${normalizedUrl}/rest/v1/sync_outbox?on_conflict=id`, {
-      method: "POST",
-      headers: {
-        apikey: anonKey,
-        Authorization: `Bearer ${accessToken}`,
-        "content-type": "application/json",
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      },
-      body: JSON.stringify({
+    if (row.entity_type === "asset_event" && resolveAssetSnapshot) {
+      const snapshot = await resolveAssetSnapshot(row);
+
+      if (!snapshot) {
+        throw new Error(`Supabase asset snapshot unavailable for outbox row ${row.id}.`);
+      }
+
+      await upsertSupabaseRow({
+        accessToken,
+        anonKey,
+        endpoint: `${normalizedUrl}/rest/v1/assets?on_conflict=id`,
+        payload: snapshot.asset,
+        fetchImpl,
+      });
+      await upsertSupabaseRow({
+        accessToken,
+        anonKey,
+        endpoint: `${normalizedUrl}/rest/v1/asset_current_state?on_conflict=asset_id`,
+        payload: snapshot.currentState,
+        fetchImpl,
+      });
+
+      if (snapshot.event) {
+        await upsertSupabaseRow({
+          accessToken,
+          anonKey,
+          endpoint: `${normalizedUrl}/rest/v1/asset_events?on_conflict=id`,
+          payload: snapshot.event,
+          fetchImpl,
+        });
+      }
+    }
+
+    await upsertSupabaseRow({
+      accessToken,
+      anonKey,
+      endpoint: `${normalizedUrl}/rest/v1/sync_outbox?on_conflict=id`,
+      payload: {
         id: row.id,
         workspace_id: row.workspace_id,
         entity_type: row.entity_type,
@@ -76,12 +151,8 @@ export const createSupabaseOutboxTransport = ({
         next_retry_at: null,
         created_at: row.created_at,
         updated_at: row.updated_at,
-      }),
+      },
+      fetchImpl,
     });
-
-    if (!response.ok) {
-      const detail = await readErrorBody(response);
-      throw new Error(`Supabase outbox push failed (${response.status}): ${detail}`);
-    }
   };
 };
