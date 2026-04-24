@@ -125,6 +125,7 @@ Decisiones bloqueadas:
 | 2026-04-15 | `docs/handoff/2026-04-15-auth-workspaces-assets-handoff.md` | Se crea documento de handoff para continuar en otro thread con estado, commits, datos locales, riesgos, deuda y prompt sugerido. | Permitir continuidad del trabajo desde otra máquina/sesión sin perder contexto operativo. |
 | 2026-04-15 | Working tree casa | Se aplica handoff en casa, se copia `.env.local` y SQLite, se aprueba build nativo de `keytar`, `sync_outbox` de `Metadata Cine2` drena a `sent=674`, Supabase confirma `0-673/674`, y se agrega preview de CSV antes de importar assets. Verificación: `corepack pnpm --filter @bukowski/desktop typecheck` pasa. | Continuar el Slice 1 sin escrituras ciegas de CSV y confirmar que la cola local/remota ya no queda pendiente. |
 | 2026-04-15 | Working tree casa | Se endurece el sync remoto de assets: `createSupabaseOutboxTransport` ahora resuelve snapshots locales para filas `asset_event` y hace upsert idempotente en `public.assets`, `public.asset_current_state` y `public.asset_events` antes de confirmar `public.sync_outbox`. Se agrega migración `20260416003000_asset_sync_snapshots.sql` con RLS por workspace membership y prueba focalizada del transporte. Verificación: `corepack pnpm --filter @bukowski/desktop test -- sync-outbox-worker-service.test.ts`, `typecheck` y `build` pasan. | Dejar proyecciones remotas auditables y comparables contra SQLite sin depender solo del log crudo del outbox. |
+| 2026-04-24 | Working tree casa | Se aplica la migración remota `20260416003000_asset_sync_snapshots.sql`, se valida una asignación real de asset end-to-end (`asset-695-mo0p70bb`) y se confirma escritura en `public.sync_outbox`, `public.assets`, `public.asset_current_state` y `public.asset_events` bajo RLS. Luego se ejecuta backfill idempotente con `scripts/backfill-supabase-asset-snapshots.mjs`: remoto queda con 629 assets, 629 current state rows y 675 asset events para `Metadata Cine2`. | Cerrar la comparabilidad SQLite/Supabase del vertical Assets Sync antes de pasar a seguridad/IPC de Slice 1. |
 
 ## Decisiones tomadas
 
@@ -167,8 +168,8 @@ Decisiones bloqueadas:
 - Aún no se ha iniciado reemplazo de `DEFAULT_WORKSPACE_ID`.
 - El worker ya escribe remoto en `public.sync_outbox` y, para filas `asset_event`, ahora proyecta snapshots en `public.assets`, `public.asset_current_state` y `public.asset_events`.
 - MFA TOTP está como pantalla placeholder; falta wiring real Supabase MFA.
-- El transport Supabase está opt-in y la migración remota ya fue aplicada; `Metadata Cine2` confirmó 674 filas remotas en `public.sync_outbox`.
-- Falta aplicar y validar en Supabase la nueva migración `20260416003000_asset_sync_snapshots.sql`, además de decidir si se hará backfill histórico para poblar snapshots remotos de eventos ya enviados.
+- El transport Supabase está opt-in; `Metadata Cine2` confirmó 675 filas remotas en `public.sync_outbox`.
+- La migración `20260416003000_asset_sync_snapshots.sql` ya fue aplicada y validada con una asignación real; el backfill histórico dejó remotas `public.assets`, `public.asset_current_state` y `public.asset_events` en paridad con SQLite para `Metadata Cine2`.
 - Falta validar visualmente en app que el cambio de workspace aísla assets creados en cada workspace.
 - Deuda técnica: los catálogos base por workspace todavía no se clonan/filtran; para el MVP se desbloquea workspace FK, pero Slice 2/3 debe separar catálogos por workspace con más rigor.
 - Import CSV de assets ya existe como MVP probado con CSV real Rentman y ahora muestra preview/resumen antes de escribir; falta agregar template descargable, errores por fila más detallados y creación guiada de categorías/ubicaciones faltantes.
@@ -176,4 +177,4 @@ Decisiones bloqueadas:
 
 ## Próximo paso recomendado
 
-Continuar desde el handoff: aplicar la nueva migración remota de snapshots, validar escritura real en `public.assets` / `public.asset_current_state` / `public.asset_events`, y luego decidir si hace falta backfill histórico antes de pasar a Slice 2.
+Cerrar Slice 1 con validación workspace-scoped en main/IPC antes de pasar a Slice 2: los handlers que reciben `workspaceId` desde renderer deben verificar sesión, membership y permisos en main, no solo confiar en UI/RLS.

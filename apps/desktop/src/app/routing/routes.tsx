@@ -43,6 +43,7 @@ const ProjectsSchedulePage = lazyPage(() => import("@features/projects/ProjectsS
 const RmaPage = lazyPage(() => import("@features/rma/RmaPage"), "RmaPage");
 const LoginScreen = lazyPage(() => import("@features/auth/LoginScreen"), "LoginScreen");
 const PasswordResetScreen = lazyPage(() => import("@features/auth/PasswordResetScreen"), "PasswordResetScreen");
+const ResetPasswordScreen = lazyPage(() => import("@features/auth/ResetPasswordScreen"), "ResetPasswordScreen");
 const TwoFactorChallengeScreen = lazyPage(() => import("@features/auth/TwoFactorChallengeScreen"), "TwoFactorChallengeScreen");
 const WorkspacePickerScreen = lazyPage(() => import("@features/auth/WorkspacePickerScreen"), "WorkspacePickerScreen");
 const WorkspaceCreateScreen = lazyPage(() => import("@features/auth/WorkspaceCreateScreen"), "WorkspaceCreateScreen");
@@ -98,6 +99,7 @@ export const AppRoutes = () => (
         </GuestOnlyRoute>
       }
     />
+    <Route path="/login/reset-password" element={<ResetPasswordScreen />} />
     <Route
       path="/login/mfa"
       element={

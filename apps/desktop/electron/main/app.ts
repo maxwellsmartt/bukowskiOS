@@ -197,6 +197,7 @@ app.whenReady().then(() => {
     createBackupNow: localDatabase.createBackupNow,
     runIntegrityCheckNow: localDatabase.runIntegrityCheckNow,
     ensureLocalWorkspaces: localDatabase.ensureLocalWorkspaces,
+    getLocalWorkspaces: localDatabase.getLocalWorkspaces,
     runLocalSyncNow: localDatabase.runLocalSyncNow,
     getSyncOutboxRows: localDatabase.getSyncOutboxRows,
     retrySyncOutboxRow: localDatabase.retrySyncOutboxRow,

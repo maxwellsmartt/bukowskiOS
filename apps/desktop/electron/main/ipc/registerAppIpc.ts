@@ -27,6 +27,7 @@ type RegisterAppIpcOptions = {
   createBackupNow: () => import("@contracts").AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => import("@contracts").AppDiagnosticsSnapshot;
   ensureLocalWorkspaces: (workspaces: import("@contracts").EnsureLocalWorkspaceInput[]) => import("@contracts").AppDiagnosticsSnapshot;
+  getLocalWorkspaces: () => import("@contracts").AppLocalWorkspaceRow[];
   runLocalSyncNow: () => Promise<import("@contracts").AppDiagnosticsSnapshot>;
   getSyncOutboxRows: () => import("@contracts").AppSyncOutboxRow[];
   retrySyncOutboxRow: (id: string) => Promise<import("@contracts").AppDiagnosticsSnapshot>;
@@ -112,6 +113,7 @@ export const registerAppIpc = ({
   createBackupNow,
   runIntegrityCheckNow,
   ensureLocalWorkspaces,
+  getLocalWorkspaces,
   runLocalSyncNow,
   getSyncOutboxRows,
   retrySyncOutboxRow,
@@ -129,6 +131,12 @@ export const registerAppIpc = ({
   safeHandleReadWithSchema(ipcChannels.app.getDiagnostics, emptyReadArgsSchema, () => getDiagnosticsSnapshot());
   safeHandleReadWithSchema(ipcChannels.app.getSupportSnapshot, emptyReadArgsSchema, () => getSupportSnapshot());
   safeHandleReadWithSchema(ipcChannels.app.getUsersSnapshot, emptyReadArgsSchema, () => getUsersSnapshot());
+  safeHandleReadWithSchema(
+    ipcChannels.app.getLocalWorkspaces,
+    emptyReadArgsSchema,
+    () => getLocalWorkspaces(),
+    "The app could not load the local workspace cache.",
+  );
   ipcMain.handle(ipcChannels.app.createUser, (event, input) => {
     try {
       assertTrustedIpcSender(event);

@@ -148,7 +148,7 @@ export const AppShell = () => {
       }
 
       if (action.type === "auth-deep-link") {
-        void handleAuthDeepLink(action.url).then(() => navigate("/workspaces/select", { replace: true }));
+        void handleAuthDeepLink(action.url).then((targetPath) => navigate(targetPath, { replace: true }));
       }
     });
   }, [handleAuthDeepLink, navigate]);

@@ -60,6 +60,17 @@ const localMembership: WorkspaceMembership = {
   permissions: ["*"],
 };
 
+const toCachedMembership = (workspace: {
+  id: string;
+  name: string;
+}): WorkspaceMembership => ({
+  workspaceId: workspace.id,
+  workspaceName: workspace.name,
+  roleName: "Cached access",
+  status: "active",
+  permissions: ["*"],
+});
+
 export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const { status, user, supabase, isLocalFallback } = useSession();
   const [memberships, setMemberships] = useState<WorkspaceMembership[]>(() => [localMembership]);
@@ -87,63 +98,75 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
     setWorkspaceError(null);
 
-    const { data, error } = await supabase
-      .from("workspace_memberships")
-      .select("workspace_id,status,workspaces(name,slug,base_currency,icon_color),roles(name)")
-      .eq("user_id", user.id)
-      .eq("status", "active");
+    try {
+      const { data, error } = await supabase
+        .from("workspace_memberships")
+        .select("workspace_id,status,workspaces(name,slug,base_currency,icon_color),roles(name)")
+        .eq("user_id", user.id)
+        .eq("status", "active");
 
-    if (error) {
-      setWorkspaceError(error.message);
-      setMemberships([]);
-      return;
-    }
+      if (error) {
+        throw error;
+      }
 
-    const nextMemberships = ((data ?? []) as unknown[]).map((row) => {
-      const typedRow = row as {
-        workspace_id: string;
-        status: "active" | "invited" | "inactive";
-        workspaces?: { name?: string | null; slug?: string | null; base_currency?: string | null; icon_color?: string | null } | null;
-        roles?: { name?: string | null } | null;
-      };
-
-      return {
-        workspaceId: typedRow.workspace_id,
-        workspaceName: typedRow.workspaces?.name ?? "Workspace",
-        roleName: typedRow.roles?.name ?? "Member",
-        status: typedRow.status,
-        permissions: [],
-      };
-    });
-
-    await window.bukowskiApp?.ensureLocalWorkspaces(
-      nextMemberships.map((membership, index) => {
-        const sourceRow = (data ?? [])[index] as
-          | {
-              workspaces?: {
-                slug?: string | null;
-                base_currency?: string | null;
-                icon_color?: string | null;
-              } | null;
-            }
-          | undefined;
+      const nextMemberships = ((data ?? []) as unknown[]).map((row) => {
+        const typedRow = row as {
+          workspace_id: string;
+          status: "active" | "invited" | "inactive";
+          workspaces?: { name?: string | null; slug?: string | null; base_currency?: string | null; icon_color?: string | null } | null;
+          roles?: { name?: string | null } | null;
+        };
 
         return {
-          id: membership.workspaceId,
-          name: membership.workspaceName,
-          slug: sourceRow?.workspaces?.slug ?? membership.workspaceId,
-          baseCurrency: sourceRow?.workspaces?.base_currency ?? "USD",
-          iconColor: sourceRow?.workspaces?.icon_color ?? null,
+          workspaceId: typedRow.workspace_id,
+          workspaceName: typedRow.workspaces?.name ?? "Workspace",
+          roleName: typedRow.roles?.name ?? "Member",
+          status: typedRow.status,
+          permissions: [],
         };
-      }),
-    );
+      });
 
-    setMemberships(nextMemberships);
-    setActiveWorkspaceId((current) =>
-      nextMemberships.some((membership) => membership.workspaceId === current)
-        ? current
-        : nextMemberships[0]?.workspaceId ?? "",
-    );
+      await window.bukowskiApp?.ensureLocalWorkspaces(
+        nextMemberships.map((membership, index) => {
+          const sourceRow = (data ?? [])[index] as
+            | {
+                workspaces?: {
+                  slug?: string | null;
+                  base_currency?: string | null;
+                  icon_color?: string | null;
+                } | null;
+              }
+            | undefined;
+
+          return {
+            id: membership.workspaceId,
+            name: membership.workspaceName,
+            slug: sourceRow?.workspaces?.slug ?? membership.workspaceId,
+            baseCurrency: sourceRow?.workspaces?.base_currency ?? "USD",
+            iconColor: sourceRow?.workspaces?.icon_color ?? null,
+          };
+        }),
+      );
+
+      setMemberships(nextMemberships);
+      setActiveWorkspaceId((current) =>
+        nextMemberships.some((membership) => membership.workspaceId === current)
+          ? current
+          : nextMemberships[0]?.workspaceId ?? "",
+      );
+    } catch (error) {
+      const localWorkspaces = (await window.bukowskiApp?.getLocalWorkspaces?.().catch(() => [])) ?? [];
+      const cachedMemberships = localWorkspaces.length > 0 ? localWorkspaces.map(toCachedMembership) : [localMembership];
+      const message = error instanceof Error ? error.message : "Unable to load remote workspaces.";
+
+      setWorkspaceError(`Supabase no responde ahora mismo. Se cargó el cache local de workspaces. ${message}`);
+      setMemberships(cachedMemberships);
+      setActiveWorkspaceId((current) =>
+        cachedMemberships.some((membership) => membership.workspaceId === current)
+          ? current
+          : cachedMemberships[0]?.workspaceId ?? current ?? DEFAULT_WORKSPACE_ID,
+      );
+    }
   }, [isLocalFallback, status, supabase, user]);
 
   useEffect(() => {

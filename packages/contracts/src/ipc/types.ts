@@ -91,6 +91,13 @@ export type EnsureLocalWorkspaceInput = {
   iconColor?: string | null;
 };
 
+export type AppLocalWorkspaceRow = {
+  id: string;
+  name: string;
+  slug: string;
+  baseCurrency: string;
+};
+
 export type AppActionResult = {
   summary: string;
   diagnostics: AppDiagnosticsSnapshot;

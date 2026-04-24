@@ -20,12 +20,15 @@ type SessionContextValue = {
   supabase: BukowskiSupabaseClient | null;
   isSupabaseConfigured: boolean;
   isLocalFallback: boolean;
+  isPasswordRecovery: boolean;
   authError: string | null;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   signInWithOAuth: (provider: "google" | "github") => Promise<void>;
   signOut: () => Promise<void>;
-  handleAuthDeepLink: (url: string) => Promise<void>;
+  handleAuthDeepLink: (url: string) => Promise<string>;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -54,6 +57,58 @@ const createSupabaseClientFromEnv = () => {
   }
 };
 
+const isNetworkAuthError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return (
+    message.includes("Failed to fetch") ||
+    message.includes("Load failed") ||
+    message.includes("NetworkError") ||
+    message.includes("ERR_NAME_NOT_RESOLVED")
+  );
+};
+
+const decodeJwtSegment = (segment: string) => {
+  const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  return JSON.parse(globalThis.atob(padded)) as Record<string, unknown>;
+};
+
+const buildCachedSessionUser = (accessToken: string | null | undefined): BukowskiSessionUser | null => {
+  const token = accessToken?.trim();
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const [, payloadSegment] = token.split(".");
+
+    if (!payloadSegment) {
+      return null;
+    }
+
+    const payload = decodeJwtSegment(payloadSegment);
+    const userId = typeof payload.sub === "string" ? payload.sub : null;
+    const email = typeof payload.email === "string" ? payload.email : null;
+    const userMetadata =
+      payload.user_metadata && typeof payload.user_metadata === "object" && !Array.isArray(payload.user_metadata)
+        ? (payload.user_metadata as Record<string, unknown>)
+        : {};
+
+    if (!userId) {
+      return null;
+    }
+
+    return toSessionUser({
+      id: userId,
+      email,
+      user_metadata: userMetadata,
+    });
+  } catch {
+    return null;
+  }
+};
+
 const persistStoredTokens = (tokens: { accessToken: string | null; refreshToken: string | null }) => {
   void window.bukowskiAuth?.setStoredTokens(tokens).catch((error) => {
     console.warn("Unable to persist the Supabase session locally.", error);
@@ -73,6 +128,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         },
   );
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -83,43 +139,113 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const hydrateSession = async () => {
       const storedTokens = await window.bukowskiAuth?.getStoredTokens();
+      const cachedUser = buildCachedSessionUser(storedTokens?.accessToken);
 
-      if (storedTokens?.accessToken && storedTokens.refreshToken) {
-        const { error } = await supabase.auth.setSession({
-          access_token: storedTokens.accessToken,
-          refresh_token: storedTokens.refreshToken,
-        });
-
-        if (error && isMounted) {
-          setAuthError(error.message);
-          await window.bukowskiAuth?.clearStoredTokens();
-        }
+      if (cachedUser && isMounted) {
+        setUser(cachedUser);
+        setStatus("authenticated");
       }
 
-      return supabase.auth.getSession();
+      try {
+        if (storedTokens?.accessToken && storedTokens.refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: storedTokens.accessToken,
+            refresh_token: storedTokens.refreshToken,
+          });
+
+          if (error) {
+            if (isNetworkAuthError(error) && cachedUser) {
+              return {
+                sessionUser: cachedUser,
+                status: "authenticated" as const,
+                authError: "Supabase no responde ahora mismo. Se cargó la sesión local en modo offline.",
+                shouldPersistTokens: false,
+              };
+            }
+
+            if (isMounted) {
+              setAuthError(error.message);
+              await window.bukowskiAuth?.clearStoredTokens();
+            }
+          }
+        }
+
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          if (isNetworkAuthError(error) && cachedUser) {
+            return {
+              sessionUser: cachedUser,
+              status: "authenticated" as const,
+              authError: "Supabase no responde ahora mismo. Se cargó la sesión local en modo offline.",
+              shouldPersistTokens: false,
+            };
+          }
+
+          return {
+            sessionUser: null,
+            status: "unauthenticated" as const,
+            authError: error.message,
+            shouldPersistTokens: false,
+          };
+        }
+
+        return {
+          sessionUser: data.session?.user ? toSessionUser(data.session.user) : null,
+          status: data.session?.user ? ("authenticated" as const) : ("unauthenticated" as const),
+          authError: null,
+          shouldPersistTokens: Boolean(data.session),
+          accessToken: data.session?.access_token ?? null,
+          refreshToken: data.session?.refresh_token ?? null,
+        };
+      } catch (error) {
+        if (isNetworkAuthError(error) && cachedUser) {
+          return {
+            sessionUser: cachedUser,
+            status: "authenticated" as const,
+            authError: "Supabase no responde ahora mismo. Se cargó la sesión local en modo offline.",
+            shouldPersistTokens: false,
+          };
+        }
+
+        return {
+          sessionUser: null,
+          status: "unauthenticated" as const,
+          authError: error instanceof Error ? error.message : "Unable to restore the secure session.",
+          shouldPersistTokens: false,
+        };
+      }
     };
 
-    void hydrateSession().then(({ data, error }) => {
-      if (!isMounted) {
-        return;
-      }
+    void hydrateSession()
+      .then((result) => {
+        if (!isMounted) {
+          return;
+        }
 
-      if (error) {
-        setAuthError(error.message);
-      }
+        setUser(result.sessionUser);
+        setStatus(result.status);
+        setAuthError(result.authError);
 
-      setUser(data.session?.user ? toSessionUser(data.session.user) : null);
-      setStatus(data.session?.user ? "authenticated" : "unauthenticated");
+        if (result.shouldPersistTokens) {
+          persistStoredTokens({
+            accessToken: result.accessToken ?? null,
+            refreshToken: result.refreshToken ?? null,
+          });
+        }
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
 
-      if (data.session) {
-        persistStoredTokens({
-          accessToken: data.session.access_token,
-          refreshToken: data.session.refresh_token,
-        });
-      }
-    });
+        setUser(null);
+        setStatus("unauthenticated");
+        setAuthError(error instanceof Error ? error.message : "Unable to restore the secure session.");
+      });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      setIsPasswordRecovery(event === "PASSWORD_RECOVERY");
       setUser(nextSession?.user ? toSessionUser(nextSession.user) : null);
       setStatus(nextSession?.user ? "authenticated" : "unauthenticated");
       setAuthError(null);
@@ -176,6 +302,46 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     [supabase],
   );
 
+  const requestPasswordReset = useCallback(
+    async (email: string) => {
+      if (!supabase) {
+        throw new Error("Password recovery is unavailable in local-dev fallback mode.");
+      }
+
+      setAuthError(null);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: "bukowskios://auth/callback?flow=password-recovery",
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        throw error;
+      }
+    },
+    [supabase],
+  );
+
+  const updatePassword = useCallback(
+    async (password: string) => {
+      if (!supabase) {
+        throw new Error("Password update is unavailable in local-dev fallback mode.");
+      }
+
+      setAuthError(null);
+      const { error } = await supabase.auth.updateUser({
+        password,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        throw error;
+      }
+
+      setIsPasswordRecovery(false);
+    },
+    [supabase],
+  );
+
   const signInWithOAuth = useCallback(
     async (provider: "google" | "github") => {
       if (!supabase) {
@@ -206,6 +372,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = useCallback(async () => {
     setAuthError(null);
+    setIsPasswordRecovery(false);
 
     if (supabase) {
       const { error } = await supabase.auth.signOut();
@@ -223,7 +390,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const handleAuthDeepLink = useCallback(
     async (url: string) => {
       if (!supabase) {
-        return;
+        return "/";
       }
 
       setAuthError(null);
@@ -231,9 +398,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       try {
         const parsedUrl = new URL(url);
         const code = parsedUrl.searchParams.get("code");
+        const flow = parsedUrl.searchParams.get("flow");
+        const type = parsedUrl.searchParams.get("type");
+        const isRecoveryFlow = flow === "password-recovery" || type === "recovery";
 
         if (!code) {
-          return;
+          return isRecoveryFlow ? "/login/reset-password" : "/workspaces/select";
         }
 
         const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -241,6 +411,9 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
           setAuthError(error.message);
           throw error;
         }
+
+        setIsPasswordRecovery(isRecoveryFlow);
+        return isRecoveryFlow ? "/login/reset-password" : "/workspaces/select";
       } catch (error) {
         setAuthError(error instanceof Error ? error.message : "The auth callback could not be processed.");
         throw error;
@@ -256,14 +429,30 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       supabase,
       isSupabaseConfigured: Boolean(supabase),
       isLocalFallback: !supabase,
+      isPasswordRecovery,
       authError,
       signInWithPassword,
       signInWithMagicLink,
+      requestPasswordReset,
+      updatePassword,
       signInWithOAuth,
       signOut,
       handleAuthDeepLink,
     }),
-    [authError, handleAuthDeepLink, signInWithMagicLink, signInWithOAuth, signInWithPassword, signOut, status, supabase, user],
+    [
+      authError,
+      handleAuthDeepLink,
+      isPasswordRecovery,
+      requestPasswordReset,
+      signInWithMagicLink,
+      signInWithOAuth,
+      signInWithPassword,
+      signOut,
+      status,
+      supabase,
+      updatePassword,
+      user,
+    ],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

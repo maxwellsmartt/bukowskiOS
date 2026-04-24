@@ -95,6 +95,7 @@ type LocalDatabaseRuntime = {
   createBackupNow: () => AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => AppDiagnosticsSnapshot;
   ensureLocalWorkspaces: (workspaces: EnsureLocalWorkspaceInput[]) => AppDiagnosticsSnapshot;
+  getLocalWorkspaces: () => import("@contracts").AppLocalWorkspaceRow[];
   runLocalSyncNow: () => Promise<AppDiagnosticsSnapshot>;
   getSyncOutboxRows: () => AppSyncOutboxRow[];
   retrySyncOutboxRow: (id: string) => Promise<AppDiagnosticsSnapshot>;
@@ -333,6 +334,34 @@ const createRuntime = (): LocalDatabaseRuntime => {
 
     return getDiagnosticsSnapshot();
   };
+
+  const getLocalWorkspaces = () =>
+    (
+      database
+        .prepare(
+          `
+            SELECT
+              id,
+              name,
+              slug,
+              base_currency AS baseCurrency
+            FROM workspaces
+            WHERE is_active = 1
+            ORDER BY created_at ASC, name ASC
+          `,
+        )
+        .all() as Array<{
+        id: string;
+        name: string;
+        slug: string;
+        baseCurrency: string;
+      }>
+    ).map((workspace) => ({
+      id: workspace.id,
+      name: workspace.name,
+      slug: workspace.slug,
+      baseCurrency: workspace.baseCurrency,
+    }));
 
   const resolveSupabaseAssetSnapshot = (row: { entity_type: string; entity_id: string; event_id: string | null }) => {
     if (row.entity_type !== "asset_event") {
@@ -681,6 +710,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     createBackupNow,
     runIntegrityCheckNow,
     ensureLocalWorkspaces,
+    getLocalWorkspaces,
     runLocalSyncNow,
     getSyncOutboxRows,
     retrySyncOutboxRow,
