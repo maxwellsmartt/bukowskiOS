@@ -141,6 +141,7 @@ import type {
 import { ipcChannels } from "@contracts";
 
 import type { FoundationReadService } from "../services/data/foundationReadService";
+import type { WorkspaceAccessGuard } from "../services/auth/workspaceAccessGuard";
 import { safeHandle, safeHandleRead, safeHandleReadWithSchema } from "./ipcSafeHandler";
 
 type RegisterFoundationIpcOptions = {
@@ -182,6 +183,7 @@ type RegisterFoundationIpcOptions = {
     updateAsset: (input: UpdateAssetCommand) => unknown;
     archiveAsset: (input: ArchiveAssetCommand) => unknown;
   };
+  workspaceAccess: WorkspaceAccessGuard;
   fileUploads: {
     importAssetFiles: (assetId: string, sourceFilePaths: string[]) => unknown;
     importIncidentFiles: (incidentId: string, sourceFilePaths: string[]) => unknown;
@@ -269,6 +271,7 @@ export const registerFoundationIpc = ({
   projectMutations,
   catalogMutations,
   assetMutations,
+  workspaceAccess,
   fileUploads,
   incidentMutations,
   financeMutations,
@@ -424,35 +427,108 @@ export const registerFoundationIpc = ({
   safeHandleReadWithSchema(
     ipcChannels.assets.getList,
     assetListReadArgsSchema,
-    (_event, query: AssetListQuery | undefined) => foundationReads.getAssets(query),
+    async (_event, query: AssetListQuery | undefined) => {
+      if (query?.workspaceId) {
+        await workspaceAccess.assertWorkspaceAccess({
+          workspaceId: query.workspaceId,
+          action: "load assets",
+          accessLevel: "read",
+          requiredPermission: "assets.read",
+        });
+      }
+
+      return foundationReads.getAssets(query);
+    },
     "The app could not load assets.",
   );
   safeHandleReadWithSchema(
     ipcChannels.assets.getSummary,
     assetWorkspaceReadArgsSchema,
-    (_event, query: AssetWorkspaceQuery | undefined) => foundationReads.getAssetSummary(query),
+    async (_event, query: AssetWorkspaceQuery | undefined) => {
+      if (query?.workspaceId) {
+        await workspaceAccess.assertWorkspaceAccess({
+          workspaceId: query.workspaceId,
+          action: "load the asset summary",
+          accessLevel: "read",
+          requiredPermission: "assets.read",
+        });
+      }
+
+      return foundationReads.getAssetSummary(query);
+    },
     "The app could not load the asset summary.",
   );
   safeHandleReadWithSchema(
     ipcChannels.assets.getOverview,
     assetWorkspaceReadArgsSchema,
-    (_event, query: AssetWorkspaceQuery | undefined) => foundationReads.getAssetsOverview(query),
+    async (_event, query: AssetWorkspaceQuery | undefined) => {
+      if (query?.workspaceId) {
+        await workspaceAccess.assertWorkspaceAccess({
+          workspaceId: query.workspaceId,
+          action: "load the asset overview",
+          accessLevel: "read",
+          requiredPermission: "assets.read",
+        });
+      }
+
+      return foundationReads.getAssetsOverview(query);
+    },
     "The app could not load the asset overview.",
   );
   safeHandleReadWithSchema(
     ipcChannels.assets.getDetail,
     idReadArgsSchema,
-    (_event, assetId: string) => foundationReads.getAssetDetail(assetId),
+    async (_event, assetId: string) => {
+      await workspaceAccess.assertAssetAccess(assetId, "load that asset", "read", "assets.read");
+      return foundationReads.getAssetDetail(assetId);
+    },
     "The app could not load that asset.",
   );
-  safeHandle(ipcChannels.assets.assignMove, assignMoveAssetsSchema, (_event, input) => assetMutations.assignMoveAssets(input));
-  safeHandle(ipcChannels.assets.create, createAssetSchema, (_event, input) => assetMutations.createAsset(input));
-  safeHandle(ipcChannels.assets.update, updateAssetSchema, (_event, input) => assetMutations.updateAsset(input));
-  safeHandle(ipcChannels.assets.archive, archiveAssetSchema, (_event, input) => assetMutations.archiveAsset(input));
+  safeHandle(ipcChannels.assets.assignMove, assignMoveAssetsSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "assign or move assets",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+
+    return assetMutations.assignMoveAssets(input);
+  });
+  safeHandle(ipcChannels.assets.create, createAssetSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "create assets",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+
+    return assetMutations.createAsset(input);
+  });
+  safeHandle(ipcChannels.assets.update, updateAssetSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update assets",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+
+    return assetMutations.updateAsset(input);
+  });
+  safeHandle(ipcChannels.assets.archive, archiveAssetSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "archive assets",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+
+    return assetMutations.archiveAsset(input);
+  });
   safeHandleReadWithSchema(
     ipcChannels.assets.uploadFiles,
     idReadArgsSchema,
     async (_event, assetId: string) => {
+      await workspaceAccess.assertAssetAccess(assetId, "attach files to that asset", "write", "assets.manage");
       const detail = foundationReads.getAssetDetail(assetId);
 
       if (!detail.asset) {
@@ -485,6 +561,7 @@ export const registerFoundationIpc = ({
     ipcChannels.assets.openFile,
     idReadArgsSchema,
     async (_event, fileId: string) => {
+      await workspaceAccess.assertAssetFileAccess(fileId, "open that asset file", "read", "assets.read");
       await fileUploads.openAssetFile(fileId);
       return null;
     },

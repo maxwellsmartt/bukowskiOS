@@ -211,6 +211,7 @@ app.whenReady().then(() => {
     projectMutations: localDatabase.projectMutations,
     catalogMutations: localDatabase.catalogMutations,
     assetMutations: localDatabase.assetMutations,
+    workspaceAccess: localDatabase.workspaceAccess,
     fileUploads: localDatabase.fileUploads,
     incidentMutations: localDatabase.incidentMutations,
     financeMutations: localDatabase.financeMutations,

@@ -51,6 +51,7 @@ import { createSupportDiagnosticsService, type SupportDiagnosticsService } from 
 import { createSyncOutboxWorkerService, summarizeSyncOutboxWorker } from "./syncOutboxWorkerService";
 import { createUserAdminService, type UserAdminService } from "./userAdminService";
 import { createSupabaseTokenStore } from "../auth/tokenStore";
+import { createWorkspaceAccessGuard, type WorkspaceAccessGuard } from "../auth/workspaceAccessGuard";
 import { createConnectorBridgeService } from "../connectors/connectorBridgeService";
 import { createTelegramConnectorService } from "../connectors/telegramConnectorService";
 import {
@@ -86,6 +87,7 @@ type LocalDatabaseRuntime = {
   packingMutations: PackingMutationService;
   rmaMutations: RmaMutationService;
   agentMutations: AgentMutationService;
+  workspaceAccess: WorkspaceAccessGuard;
   runtimeDiagnostics: RuntimeDiagnosticsService;
   supportDiagnostics: SupportDiagnosticsService;
   userAdmin: UserAdminService;
@@ -546,6 +548,12 @@ const createRuntime = (): LocalDatabaseRuntime => {
   };
 
   const supabaseTokenStore = createSupabaseTokenStore();
+  const workspaceAccess = createWorkspaceAccessGuard({
+    database,
+    supabaseUrl: process.env.VITE_SUPABASE_URL,
+    anonKey: process.env.VITE_SUPABASE_ANON_KEY,
+    getTokens: () => supabaseTokenStore.getTokens(),
+  });
   const syncOutboxWorker = createSyncOutboxWorkerService(database, {
     transport: isSupabaseSyncEnabled()
       ? createSupabaseOutboxTransport({
@@ -697,6 +705,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     }),
     catalogMutations: createCatalogMutationService(database),
     assetMutations: createAssetMutationService(database),
+    workspaceAccess,
     incidentMutations: createIncidentMutationService(database),
     financeMutations: createFinanceMutationService(database),
     packingMutations: createPackingMutationService(database),
