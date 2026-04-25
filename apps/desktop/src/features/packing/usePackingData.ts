@@ -33,7 +33,7 @@ export const usePackingList = (query: PackingSlipListQuery = defaultPackingListQ
       return window.bukowskiPacking.getList(query);
     },
     emptyPackingSlips,
-    [query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
+    [query.workspaceId, query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
   );
 
 export const usePackingDetail = (packingSlipId: string | null) =>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import type { PackingSlipListQuery, PackingSlipSortField } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -32,9 +32,8 @@ const packingSortOptions: Array<ListSortOption<PackingSlipSortField>> = [
   { value: "returnedCount", label: "Returned count", columnKey: "returnedCount" },
 ];
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
-
 export const PackingPage = ({ projectId = null, projectName = null }: PackingPageProps) => {
+  const { activeWorkspaceId } = useWorkspace();
   const isProjectMode = Boolean(projectId);
   const sectionScopeLabel = useSectionScopeLabel();
   const [searchParams] = useSearchParams();
@@ -53,6 +52,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
       returnedCount: "desc",
     },
     buildQuery: ({ search, sortBy, sortDirection }) => ({
+      workspaceId: activeWorkspaceId,
       scopeProjectId: projectId,
       search,
       sortBy,
@@ -214,7 +214,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               setIsSubmittingReturn(true);
               const result = await returnPackingSlipItems({
                 commandId: crypto.randomUUID(),
-                workspaceId,
+                workspaceId: activeWorkspaceId,
                 packingSlipId: activePackingSlipId,
                 assetIds,
                 conditionIn,

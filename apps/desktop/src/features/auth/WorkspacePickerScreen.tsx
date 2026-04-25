@@ -5,7 +5,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 
 export const WorkspacePickerScreen = () => {
   const navigate = useNavigate();
-  const { activeWorkspaceId, memberships, switchWorkspace, workspaceError } = useWorkspace();
+  const { activeWorkspaceId, isLoadingWorkspaces, memberships, switchWorkspace, workspaceError } = useWorkspace();
 
   return (
     <div className="auth-screen">
@@ -19,6 +19,15 @@ export const WorkspacePickerScreen = () => {
         </div>
 
         <div className="workspace-picker-list">
+          {isLoadingWorkspaces ? (
+            <div className="workspace-picker-loading">
+              <span className="workspace-avatar">B</span>
+              <span>
+                <strong>Loading workspaces</strong>
+                <small>Restoring your latest access...</small>
+              </span>
+            </div>
+          ) : null}
           {memberships.map((membership) => (
             <button
               className={`workspace-picker-item${membership.workspaceId === activeWorkspaceId ? " is-active" : ""}`}

@@ -34,7 +34,7 @@ export const useIncidentsData = (query: IncidentListQuery = defaultIncidentListQ
       return window.bukowskiIncidents.getList(query);
     },
     emptyIncidents,
-    [query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
+    [query.workspaceId, query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
   );
 
 export const useIncidentDetail = (incidentId: string | null) =>

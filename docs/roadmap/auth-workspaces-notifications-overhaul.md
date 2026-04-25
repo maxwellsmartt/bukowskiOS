@@ -22,7 +22,7 @@ Decisiones bloqueadas:
 | Slice | Estado | Inicio | Cierre | Owner | Evidencia de verificación |
 | --- | --- | --- | --- | --- | --- |
 | 0 — Foundation Supabase + Seguridad | In progress | 2026-04-15 |  | Codex | Dependencias instaladas; roadmap, paquete Supabase, Keychain IPC, deep links, migración y Edge Functions desplegadas. Migración validada con REST `workspaces` 200; functions responden `authentication_required`/`forbidden` sin sesión. Typecheck/build/tests pasan. |
-| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Login real Supabase y creación real de workspace remoto validados en app. Providers/rutas/guardas/switcher creados. Assets list/create/edit/archive consumen active workspace local. Outbox async con transport Supabase opt-in. Workspaces remotos se cachean en SQLite local. Import CSV Rentman probado con CSV real, reconciliado localmente y con preview antes de escribir. Outbox de Metadata Cine2 drenó localmente a `sent=674` y Supabase confirmó `0-673/674`. Snapshots remotos de Assets quedaron en paridad con SQLite y Assets IPC ya valida workspace access en main. Typecheck/build/tests pasan; typecheck volvió a pasar en casa. |
+| 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Login real Supabase y creación real de workspace remoto validados en app. Providers/rutas/guardas/switcher creados. Assets/Packing/Incidents consumen active workspace y validan workspace access en main. Outbox async con transport Supabase opt-in. Workspaces remotos se cachean en SQLite local. Import CSV Rentman probado con CSV real, reconciliado localmente y con preview antes de escribir. Outbox de Metadata Cine2 drenó localmente a `sent=674` y Supabase confirmó `0-673/674`. Snapshots remotos de Assets quedaron en paridad con SQLite. Typecheck/build/tests pasan; typecheck volvió a pasar en casa. |
 | 2 — Roles, Permissions e Invites | Todo |  |  | Codex | Pendiente. |
 | 3 — Workspaces CRUD + Sharing | Todo |  |  | Codex | Pendiente. |
 | 4 — Archiving Wrapped-Gate | Todo |  |  | Codex | Pendiente. |
@@ -66,8 +66,10 @@ Decisiones bloqueadas:
 - Done — Agregar preview/resumen antes de importar CSV.
 - Done — Agregar guard reusable `workspaceAccess` en main para validar workspace remoto con token Supabase, membership y permisos.
 - Done — Aplicar validación workspace-scoped al vertical Assets en IPC: list/summary/overview/detail, create/update/archive/assign, attach/open files.
+- Done — Extender validación workspace-scoped a Packing e Incidents, incluyendo filtros de read service por workspace activo.
+- Done — Agregar migración Supabase y bootstrap admin para asegurar permisos operativos remotos (`assets`, `incidents`, `packing-slips`, `rma`, `finance`).
 - Todo — Conectar MFA TOTP real con Supabase MFA.
-- Todo — Extender `workspaceAccess` a Projects, Packing, Incidents, Finance, Catalog y Agents.
+- Todo — Extender `workspaceAccess` a Projects, Finance, Catalog, RMA y Agents.
 
 ### Slice 2 — Roles, Permissions e Invites
 
@@ -130,6 +132,8 @@ Decisiones bloqueadas:
 | 2026-04-15 | Working tree casa | Se endurece el sync remoto de assets: `createSupabaseOutboxTransport` ahora resuelve snapshots locales para filas `asset_event` y hace upsert idempotente en `public.assets`, `public.asset_current_state` y `public.asset_events` antes de confirmar `public.sync_outbox`. Se agrega migración `20260416003000_asset_sync_snapshots.sql` con RLS por workspace membership y prueba focalizada del transporte. Verificación: `corepack pnpm --filter @bukowski/desktop test -- sync-outbox-worker-service.test.ts`, `typecheck` y `build` pasan. | Dejar proyecciones remotas auditables y comparables contra SQLite sin depender solo del log crudo del outbox. |
 | 2026-04-24 | Working tree casa | Se aplica la migración remota `20260416003000_asset_sync_snapshots.sql`, se valida una asignación real de asset end-to-end (`asset-695-mo0p70bb`) y se confirma escritura en `public.sync_outbox`, `public.assets`, `public.asset_current_state` y `public.asset_events` bajo RLS. Luego se ejecuta backfill idempotente con `scripts/backfill-supabase-asset-snapshots.mjs`: remoto queda con 629 assets, 629 current state rows y 675 asset events para `Metadata Cine2`. | Cerrar la comparabilidad SQLite/Supabase del vertical Assets Sync antes de pasar a seguridad/IPC de Slice 1. |
 | 2026-04-24 | Working tree casa | Se agrega `workspaceAccess` en main con validación local de workspace, token Supabase, membership/permisos remotos vía `has_permission` y cache breve; se aplica al vertical Assets en IPC incluyendo lecturas, mutaciones y archivos. Verificación: `npm run test -- workspace-access-guard` pasa con 4 tests y `npm run typecheck` pasa. | Reducir el riesgo crítico de confiar en `workspaceId` del renderer antes de extender permisos al resto de dominios. |
+| 2026-04-24 | Working tree casa | Se extiende `workspaceAccess` a Packing e Incidents; sus query contracts/read services ahora aceptan y filtran `workspaceId`, las páginas usan active workspace y el IPC valida permisos (`packing-slips.read/create`, `incidents.read/create`) antes de leer, mutar, exportar o abrir archivos. Se agrega migración Supabase `20260424190000_operational_permissions.sql` y bootstrap admin para permisos remotos. Verificación: `npm run test -- workspace-access-guard packing-mutation-service incident-mutation-service` y `npm run typecheck` pasan. | Cerrar los dominios operativos con mayor riesgo de writes cruzados después de Assets. |
+| 2026-04-25 | Working tree casa | Usuario aplica en Supabase la migración `20260424190000_operational_permissions.sql`. Se ajusta `WorkspaceProvider` para no mostrar el workspace local como placeholder durante rehidratación remota, y se centra/suaviza el overlay de búsqueda global para reducir banding visual. Verificación: `npm run typecheck` y tests focalizados de workspace/Packing/Incidents pasan. | Evitar confusión en el picker y pulir la UX de comandos globales antes de seguir extendiendo guards. |
 
 ## Decisiones tomadas
 
@@ -150,7 +154,7 @@ Decisiones bloqueadas:
 | Impacto | Riesgo | Mitigación | Estado |
 | --- | --- | --- | --- |
 | crítico | Exponer service role en Electron compromete toda la base. | Solo anon/JWT en app; admin por Edge Functions/RPC. | Abierto, mitigación aplicada en diseño. |
-| crítico | Confiar en `workspaceId` del renderer permite acceso cruzado. | Validar sesión, membership y permisos en main/RLS. | Mitigado en Assets; abierto para el resto de dominios. |
+| crítico | Confiar en `workspaceId` del renderer permite acceso cruzado. | Validar sesión, membership y permisos en main/RLS. | Mitigado en Assets, Packing e Incidents; abierto para el resto de dominios. |
 | medio | `DEFAULT_WORKSPACE_ID` está distribuido y puede romper flujos. | Migración por dominio + grep final limitado a seeds/tests. | Abierto. |
 | medio | Roadmap desactualizado pierde valor. | Actualizarlo como parte obligatoria del Definition of Done. | Abierto. |
 | medio | Online-first puede confundir con mala conexión. | Estados visibles de sync, outbox auditable y retries claros. | Abierto. |
@@ -168,7 +172,7 @@ Decisiones bloqueadas:
 
 - El schema remoto foundation, las Edge Functions y el flujo autenticado login -> create workspace ya fueron validados contra Supabase dev.
 - Guards de sesión/workspace ya existen, pero falta endurecer comportamiento prod sin fallback.
-- Validación workspace-scoped ya existe en main para el vertical Assets; falta extenderla a Projects, Packing, Incidents, Finance, Catalog y Agents.
+- Validación workspace-scoped ya existe en main para Assets, Packing e Incidents; falta extenderla a Projects, Finance, Catalog, RMA y Agents.
 - Aún no se ha iniciado reemplazo de `DEFAULT_WORKSPACE_ID`.
 - El worker ya escribe remoto en `public.sync_outbox` y, para filas `asset_event`, ahora proyecta snapshots en `public.assets`, `public.asset_current_state` y `public.asset_events`.
 - MFA TOTP está como pantalla placeholder; falta wiring real Supabase MFA.
@@ -181,4 +185,4 @@ Decisiones bloqueadas:
 
 ## Próximo paso recomendado
 
-Extender el guard `workspaceAccess` a los demás dominios que aceptan `workspaceId` desde renderer: Projects, Packing, Incidents, Finance, Catalog y Agents. Prioridad recomendada: Packing/Incidents después de Assets porque escriben estado operativo y outbox.
+Extender el guard `workspaceAccess` a Projects y Finance. Prioridad recomendada: Projects primero si queremos cerrar navegación/detalle multi-workspace; Finance primero si queremos reducir riesgo de exposición/costos cruzados.

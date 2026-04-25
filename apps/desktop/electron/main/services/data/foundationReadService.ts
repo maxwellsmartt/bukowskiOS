@@ -1451,6 +1451,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           LEFT JOIN departments ON departments.id = packing_slips.department_id
           LEFT JOIN users ON users.id = packing_slips.responsible_user_id
           LEFT JOIN packing_slip_items ON packing_slip_items.packing_slip_id = packing_slips.id
+          WHERE (? IS NULL OR packing_slips.workspace_id = ?)
           GROUP BY
             packing_slips.id,
             packing_slips.status,
@@ -1463,7 +1464,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             users.full_name
         `,
       )
-      .all() as Array<{
+      .all(query.workspaceId ?? null, query.workspaceId ?? null) as Array<{
       id: string;
       status: string;
       lifecycle_state: "operational" | "staging";
@@ -1676,9 +1677,10 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           LEFT JOIN assets ON assets.id = incidents.asset_id
           LEFT JOIN projects ON projects.id = incidents.project_id
           LEFT JOIN users ON users.id = incidents.responsible_user_id
+          WHERE (? IS NULL OR incidents.workspace_id = ?)
         `,
       )
-      .all() as Array<{
+      .all(query.workspaceId ?? null, query.workspaceId ?? null) as Array<{
       id: string;
       title: string;
       asset_code: string;

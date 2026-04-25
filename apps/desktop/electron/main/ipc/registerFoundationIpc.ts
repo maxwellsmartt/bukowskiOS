@@ -570,19 +570,36 @@ export const registerFoundationIpc = ({
   safeHandleReadWithSchema(
     ipcChannels.packing.getList,
     packingSlipListReadArgsSchema,
-    (_event, query: PackingSlipListQuery | undefined) => foundationReads.getPackingSlips(query),
+    async (_event, query: PackingSlipListQuery | undefined) => {
+      if (!query?.workspaceId) {
+        throw new Error("Workspace scope is required to load packing slips.");
+      }
+
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load packing slips",
+        accessLevel: "read",
+        requiredPermission: "packing-slips.read",
+      });
+
+      return foundationReads.getPackingSlips(query);
+    },
     "The app could not load packing slips.",
   );
   safeHandleReadWithSchema(
     ipcChannels.packing.getDetail,
     idReadArgsSchema,
-    (_event, packingSlipId: string) => foundationReads.getPackingSlipDetail(packingSlipId),
+    async (_event, packingSlipId: string) => {
+      await workspaceAccess.assertPackingSlipAccess(packingSlipId, "load that packing slip", "read", "packing-slips.read");
+      return foundationReads.getPackingSlipDetail(packingSlipId);
+    },
     "The app could not load that packing slip.",
   );
   safeHandleReadWithSchema(
     ipcChannels.packing.exportPdf,
     idReadArgsSchema,
     async (_event, packingSlipId: string) => {
+      await workspaceAccess.assertPackingSlipAccess(packingSlipId, "export that packing slip", "read", "packing-slips.read");
       const detail = foundationReads.getPackingSlipDetail(packingSlipId);
 
       if (!detail.slip) {
@@ -616,29 +633,89 @@ export const registerFoundationIpc = ({
     },
     "The app could not export that packing slip PDF.",
   );
-  safeHandle(ipcChannels.packing.create, createPackingSlipSchema, (_event, input) => packingMutations.createPackingSlip(input));
-  safeHandle(ipcChannels.packing.returnItems, returnPackingSlipItemsSchema, (_event, input) =>
-    packingMutations.returnPackingSlipItems(input),
-  );
+  safeHandle(ipcChannels.packing.create, createPackingSlipSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "create packing slips",
+      accessLevel: "write",
+      requiredPermission: "packing-slips.create",
+    });
+
+    return packingMutations.createPackingSlip(input);
+  });
+  safeHandle(ipcChannels.packing.returnItems, returnPackingSlipItemsSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "return packing slip items",
+      accessLevel: "write",
+      requiredPermission: "packing-slips.create",
+    });
+
+    return packingMutations.returnPackingSlipItems(input);
+  });
   safeHandleReadWithSchema(
     ipcChannels.incidents.getList,
     incidentListReadArgsSchema,
-    (_event, query: IncidentListQuery | undefined) => foundationReads.getIncidents(query),
+    async (_event, query: IncidentListQuery | undefined) => {
+      if (!query?.workspaceId) {
+        throw new Error("Workspace scope is required to load incidents.");
+      }
+
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load incidents",
+        accessLevel: "read",
+        requiredPermission: "incidents.read",
+      });
+
+      return foundationReads.getIncidents(query);
+    },
     "The app could not load incidents.",
   );
   safeHandleReadWithSchema(
     ipcChannels.incidents.getDetail,
     idReadArgsSchema,
-    (_event, incidentId: string) => foundationReads.getIncidentDetail(incidentId),
+    async (_event, incidentId: string) => {
+      await workspaceAccess.assertIncidentAccess(incidentId, "load that incident", "read", "incidents.read");
+      return foundationReads.getIncidentDetail(incidentId);
+    },
     "The app could not load that incident.",
   );
-  safeHandle(ipcChannels.incidents.report, reportIncidentSchema, (_event, input) => incidentMutations.reportIncident(input));
-  safeHandle(ipcChannels.incidents.update, updateIncidentSchema, (_event, input) => incidentMutations.updateIncident(input));
-  safeHandle(ipcChannels.incidents.resolve, resolveIncidentSchema, (_event, input) => incidentMutations.resolveIncident(input));
+  safeHandle(ipcChannels.incidents.report, reportIncidentSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "report incidents",
+      accessLevel: "write",
+      requiredPermission: "incidents.create",
+    });
+
+    return incidentMutations.reportIncident(input);
+  });
+  safeHandle(ipcChannels.incidents.update, updateIncidentSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update incidents",
+      accessLevel: "write",
+      requiredPermission: "incidents.create",
+    });
+
+    return incidentMutations.updateIncident(input);
+  });
+  safeHandle(ipcChannels.incidents.resolve, resolveIncidentSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "resolve incidents",
+      accessLevel: "write",
+      requiredPermission: "incidents.create",
+    });
+
+    return incidentMutations.resolveIncident(input);
+  });
   safeHandleReadWithSchema(
     ipcChannels.incidents.uploadFiles,
     idReadArgsSchema,
     async (_event, incidentId: string) => {
+      await workspaceAccess.assertIncidentAccess(incidentId, "attach files to that incident", "write", "incidents.create");
       const detail = foundationReads.getIncidentDetail(incidentId);
 
       if (!detail.incident) {
@@ -671,6 +748,7 @@ export const registerFoundationIpc = ({
     ipcChannels.incidents.openFile,
     idReadArgsSchema,
     async (_event, fileId: string) => {
+      await workspaceAccess.assertIncidentFileAccess(fileId, "open that incident file", "read", "incidents.read");
       await fileUploads.openIncidentFile(fileId);
       return null;
     },

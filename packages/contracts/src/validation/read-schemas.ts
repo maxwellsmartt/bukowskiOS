@@ -120,6 +120,7 @@ export const assetListReadArgsSchema = z.tuple([assetListQuerySchema.optional()]
 export const assetWorkspaceReadArgsSchema = z.tuple([assetWorkspaceQuerySchema.optional()]);
 
 export const packingSlipListQuerySchema = z.object({
+  workspaceId: nonEmptyId.optional(),
   scopeProjectId: nonEmptyId.nullable().optional(),
   search: boundedSearch.optional(),
   sortBy: packingSlipSortFieldSchema,
@@ -129,6 +130,7 @@ export const packingSlipListQuerySchema = z.object({
 export const packingSlipListReadArgsSchema = z.tuple([packingSlipListQuerySchema.optional()]);
 
 export const incidentListQuerySchema = z.object({
+  workspaceId: nonEmptyId.optional(),
   scopeProjectId: nonEmptyId.nullable().optional(),
   search: boundedSearch.optional(),
   sortBy: incidentSortFieldSchema,

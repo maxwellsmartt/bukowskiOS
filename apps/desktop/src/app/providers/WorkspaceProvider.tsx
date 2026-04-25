@@ -20,6 +20,7 @@ type WorkspaceContextValue = {
   activeMembership: WorkspaceMembership | null;
   permissions: string[];
   isWorkspaceReady: boolean;
+  isLoadingWorkspaces: boolean;
   isCreatingWorkspace: boolean;
   workspaceError: string | null;
   switchWorkspace: (workspaceId: string) => void;
@@ -73,8 +74,9 @@ const toCachedMembership = (workspace: {
 
 export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const { status, user, supabase, isLocalFallback } = useSession();
-  const [memberships, setMemberships] = useState<WorkspaceMembership[]>(() => [localMembership]);
+  const [memberships, setMemberships] = useState<WorkspaceMembership[]>(() => []);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true);
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(
     () => readStringPreference(uiPreferenceKeys.activeWorkspaceId, DEFAULT_WORKSPACE_ID) ?? DEFAULT_WORKSPACE_ID,
@@ -86,13 +88,17 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshWorkspaces = useCallback(async () => {
     if (status === "loading") {
+      setIsLoadingWorkspaces(true);
       return;
     }
+
+    setIsLoadingWorkspaces(true);
 
     if (isLocalFallback || !supabase || !user) {
       setMemberships([localMembership]);
       setActiveWorkspaceId((current) => current || DEFAULT_WORKSPACE_ID);
       setWorkspaceError(null);
+      setIsLoadingWorkspaces(false);
       return;
     }
 
@@ -154,6 +160,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
           ? current
           : nextMemberships[0]?.workspaceId ?? "",
       );
+      setIsLoadingWorkspaces(false);
     } catch (error) {
       const localWorkspaces = (await window.bukowskiApp?.getLocalWorkspaces?.().catch(() => [])) ?? [];
       const cachedMemberships = localWorkspaces.length > 0 ? localWorkspaces.map(toCachedMembership) : [localMembership];
@@ -166,6 +173,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
           ? current
           : cachedMemberships[0]?.workspaceId ?? current ?? DEFAULT_WORKSPACE_ID,
       );
+      setIsLoadingWorkspaces(false);
     }
   }, [isLocalFallback, status, supabase, user]);
 
@@ -278,7 +286,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       memberships,
       activeMembership,
       permissions: activeMembership?.permissions ?? [],
-      isWorkspaceReady: status === "authenticated" && Boolean(activeMembership),
+      isWorkspaceReady: status === "authenticated" && !isLoadingWorkspaces && Boolean(activeMembership),
+      isLoadingWorkspaces,
       isCreatingWorkspace,
       workspaceError,
       switchWorkspace,
@@ -292,6 +301,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       createWorkspace,
       hasPermission,
       isCreatingWorkspace,
+      isLoadingWorkspaces,
       isLocalFallback,
       memberships,
       refreshWorkspaces,

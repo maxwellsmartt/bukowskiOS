@@ -13,6 +13,18 @@ type SupabaseAuthUser = {
 
 const allowedOrigins = [/^https?:\/\/localhost(?::\d+)?$/, /^https?:\/\/127\.0\.0\.1(?::\d+)?$/];
 
+const adminPermissions = [
+  { key: "assets.read", label: "Read assets", description: "View asset registry and current state" },
+  { key: "assets.manage", label: "Manage assets", description: "Create movements and update assets" },
+  { key: "incidents.read", label: "Read incidents", description: "View incident queues and details" },
+  { key: "incidents.create", label: "Create incidents", description: "Report, update and resolve incidents" },
+  { key: "packing-slips.read", label: "Read packing slips", description: "View packing slip detail and status" },
+  { key: "packing-slips.create", label: "Create packing slips", description: "Issue and return packing slips" },
+  { key: "finance.read", label: "Read finance", description: "View finance exposure and entries" },
+  { key: "rma.read", label: "Read RMAs", description: "Review RMA queues and manufacturer cases" },
+  { key: "rma.create", label: "Create RMAs", description: "Open or prepare new RMA cases" },
+];
+
 const corsHeaders = (request: Request) => {
   const origin = request.headers.get("origin") ?? "";
   const allowOrigin = allowedOrigins.some((allowedOrigin) => allowedOrigin.test(origin)) ? origin : "";
@@ -131,6 +143,33 @@ Deno.serve(async (request) => {
 
   if (roleError || !adminRole) {
     return json(request, { error: roleError?.message ?? "role_create_failed" }, 400);
+  }
+
+  const { data: permissions, error: permissionsError } = await adminClient
+    .from("permissions")
+    .upsert(adminPermissions, {
+      onConflict: "key",
+      ignoreDuplicates: false,
+    })
+    .select("id,key");
+
+  if (permissionsError || !permissions) {
+    return json(request, { error: permissionsError?.message ?? "permissions_create_failed" }, 400);
+  }
+
+  const { error: rolePermissionsError } = await adminClient.from("role_permissions").upsert(
+    permissions.map((permission) => ({
+      role_id: adminRole.id,
+      permission_id: permission.id,
+    })),
+    {
+      onConflict: "role_id,permission_id",
+      ignoreDuplicates: true,
+    },
+  );
+
+  if (rolePermissionsError) {
+    return json(request, { error: rolePermissionsError.message }, 400);
   }
 
   const { error: membershipError } = await adminClient.from("workspace_memberships").upsert({

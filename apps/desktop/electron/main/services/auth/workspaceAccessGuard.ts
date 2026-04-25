@@ -122,6 +122,35 @@ export const createWorkspaceAccessGuard = ({
     return row?.workspace_id ?? null;
   };
 
+  const getPackingSlipWorkspaceId = (packingSlipId: string) => {
+    const row = database.prepare("SELECT workspace_id FROM packing_slips WHERE id = ? LIMIT 1").get(packingSlipId) as
+      | { workspace_id: string }
+      | undefined;
+    return row?.workspace_id ?? null;
+  };
+
+  const getIncidentWorkspaceId = (incidentId: string) => {
+    const row = database.prepare("SELECT workspace_id FROM incidents WHERE id = ? LIMIT 1").get(incidentId) as
+      | { workspace_id: string }
+      | undefined;
+    return row?.workspace_id ?? null;
+  };
+
+  const getIncidentFileWorkspaceId = (fileId: string) => {
+    const row = database
+      .prepare(
+        `
+          SELECT incidents.workspace_id
+          FROM incident_files
+          JOIN incidents ON incidents.id = incident_files.incident_id
+          WHERE incident_files.id = ?
+          LIMIT 1
+        `,
+      )
+      .get(fileId) as { workspace_id: string } | undefined;
+    return row?.workspace_id ?? null;
+  };
+
   const assertWorkspaceAccess = async ({
     workspaceId,
     action,
@@ -243,6 +272,51 @@ export const createWorkspaceAccessGuard = ({
 
       if (!workspaceId) {
         throw new Error("Asset file was not found.");
+      }
+
+      await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });
+    },
+
+    async assertPackingSlipAccess(
+      packingSlipId: string,
+      action: string,
+      accessLevel: WorkspaceAccessLevel = "read",
+      requiredPermission?: string,
+    ) {
+      const workspaceId = getPackingSlipWorkspaceId(packingSlipId);
+
+      if (!workspaceId) {
+        throw new Error("Packing slip was not found.");
+      }
+
+      await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });
+    },
+
+    async assertIncidentAccess(
+      incidentId: string,
+      action: string,
+      accessLevel: WorkspaceAccessLevel = "read",
+      requiredPermission?: string,
+    ) {
+      const workspaceId = getIncidentWorkspaceId(incidentId);
+
+      if (!workspaceId) {
+        throw new Error("Incident was not found.");
+      }
+
+      await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });
+    },
+
+    async assertIncidentFileAccess(
+      fileId: string,
+      action: string,
+      accessLevel: WorkspaceAccessLevel = "read",
+      requiredPermission?: string,
+    ) {
+      const workspaceId = getIncidentFileWorkspaceId(fileId);
+
+      if (!workspaceId) {
+        throw new Error("Incident file was not found.");
       }
 
       await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });

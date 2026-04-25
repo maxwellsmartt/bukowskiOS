@@ -1211,7 +1211,8 @@ button:disabled {
   gap: 10px;
 }
 
-.workspace-picker-item {
+.workspace-picker-item,
+.workspace-picker-loading {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -1225,12 +1226,18 @@ button:disabled {
   text-align: left;
 }
 
+.workspace-picker-loading {
+  grid-template-columns: auto minmax(0, 1fr);
+  color: var(--text-secondary);
+}
+
 .workspace-picker-item.is-active,
 .workspace-picker-item:hover {
   border-color: var(--accent-info);
 }
 
-.workspace-picker-item strong {
+.workspace-picker-item strong,
+.workspace-picker-loading strong {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1238,7 +1245,8 @@ button:disabled {
   font-size: 13px;
 }
 
-.workspace-picker-item small {
+.workspace-picker-item small,
+.workspace-picker-loading small {
   display: block;
   margin-top: 2px;
   color: var(--text-muted);
@@ -2604,11 +2612,13 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   inset: 0;
   z-index: 30;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: max(72px, calc(var(--window-top-safe) + 40px)) 20px 20px;
-  background: rgba(12, 14, 16, 0.58);
-  backdrop-filter: blur(10px);
+  padding: max(24px, var(--window-top-safe)) 20px 24px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(23, 27, 31, 0.34), rgba(9, 11, 13, 0.72) 58%),
+    rgba(9, 11, 13, 0.42);
+  backdrop-filter: blur(5px) saturate(0.9);
 }
 
 .command-palette {
@@ -2616,6 +2626,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-direction: column;
   width: min(760px, calc(100vw - 40px));
   max-height: min(72vh, 760px);
+  transform: translateY(-4vh);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   background:

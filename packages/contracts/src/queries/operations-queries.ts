@@ -28,6 +28,7 @@ export type PackingSlipSortField =
   | "status";
 
 export type PackingSlipListQuery = {
+  workspaceId?: string;
   scopeProjectId?: string | null;
   search?: string;
   sortBy: PackingSlipSortField;
@@ -88,6 +89,7 @@ export type IncidentListRow = {
 export type IncidentSortField = "title" | "asset" | "project" | "responsible" | "severity" | "costEstimate" | "status" | "reportedAt";
 
 export type IncidentListQuery = {
+  workspaceId?: string;
   scopeProjectId?: string | null;
   search?: string;
   sortBy: IncidentSortField;

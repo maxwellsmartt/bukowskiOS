@@ -117,4 +117,28 @@ describe("workspace access guard", () => {
 
     cleanup();
   });
+
+  it("resolves packing slip and incident workspace before checking access", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-access");
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(true), { status: 200 }));
+    const guard = createWorkspaceAccessGuard({
+      database,
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon-key",
+      getTokens: async () => ({ accessToken: createJwt({ sub: "user-remote", exp: 9_999_999_999 }) }),
+      fetchImpl,
+      now: () => 1_000,
+    });
+
+    await expect(
+      guard.assertPackingSlipAccess("packing-1042", "load that packing slip", "read", "packing-slips.read"),
+    ).resolves.toBeUndefined();
+    await expect(
+      guard.assertIncidentAccess("incident-cine7-scratch", "load that incident", "read", "incidents.read"),
+    ).resolves.toBeUndefined();
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    cleanup();
+  });
 });
