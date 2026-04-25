@@ -303,7 +303,19 @@ export const registerFoundationIpc = ({
   safeHandleReadWithSchema(
     ipcChannels.shell.searchGlobal,
     globalSearchReadArgsSchema,
-    (_event, query: GlobalSearchQuery) => foundationReads.getGlobalSearch(query),
+    async (_event, query: GlobalSearchQuery) => {
+      if (!query.workspaceId) {
+        throw new Error("Select a workspace before searching.");
+      }
+
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "search this workspace",
+        accessLevel: "read",
+      });
+
+      return foundationReads.getGlobalSearch(query);
+    },
     "The app could not complete that search.",
   );
   safeHandleRead(
@@ -937,29 +949,62 @@ export const registerFoundationIpc = ({
   safeHandleReadWithSchema(
     ipcChannels.catalog.getSnapshot,
     catalogListReadArgsSchema,
-    (_event, query: CatalogListQuery | undefined) => foundationReads.getCatalogSnapshot(query),
+    async (_event, query: CatalogListQuery | undefined) => {
+      const workspaceId = query?.workspaceId ?? DEFAULT_WORKSPACE_ID;
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId,
+        action: "view this catalog",
+        accessLevel: "read",
+      });
+      return foundationReads.getCatalogSnapshot({ ...query, workspaceId });
+    },
     "The app could not load the catalog snapshot.",
   );
-  safeHandle(ipcChannels.catalog.create, createCatalogEntitySchema, (_event, input) => {
+  safeHandle(ipcChannels.catalog.create, createCatalogEntitySchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update this catalog",
+      accessLevel: "write",
+    });
     catalogMutations.createEntity(input);
-    return foundationReads.getCatalogSnapshot();
+    return foundationReads.getCatalogSnapshot({ workspaceId: input.workspaceId });
   });
-  safeHandle(ipcChannels.catalog.update, updateCatalogEntitySchema, (_event, input) => {
+  safeHandle(ipcChannels.catalog.update, updateCatalogEntitySchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update this catalog",
+      accessLevel: "write",
+    });
     catalogMutations.updateEntity(input);
-    return foundationReads.getCatalogSnapshot();
+    return foundationReads.getCatalogSnapshot({ workspaceId: input.workspaceId });
   });
-  safeHandle(ipcChannels.catalog.delete, deleteCatalogEntitySchema, (_event, input) => {
+  safeHandle(ipcChannels.catalog.delete, deleteCatalogEntitySchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update this catalog",
+      accessLevel: "write",
+    });
     catalogMutations.deleteEntity(input);
-    return foundationReads.getCatalogSnapshot();
+    return foundationReads.getCatalogSnapshot({ workspaceId: input.workspaceId });
   });
-  safeHandle(ipcChannels.catalog.deleteMany, deleteCatalogEntitiesSchema, (_event, input) => {
+  safeHandle(ipcChannels.catalog.deleteMany, deleteCatalogEntitiesSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update this catalog",
+      accessLevel: "write",
+    });
     catalogMutations.deleteEntities(input);
-    return foundationReads.getCatalogSnapshot();
+    return foundationReads.getCatalogSnapshot({ workspaceId: input.workspaceId });
   });
   safeHandle(
     ipcChannels.catalog.exportCsv,
     exportCatalogCsvSchema,
     async (_event, input: ExportCatalogCsvInput) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "export this catalog",
+        accessLevel: "read",
+      });
       const exportPayload = catalogMutations.buildCsvExport(input);
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: `Export ${input.entityType} CSV`,
@@ -986,23 +1031,39 @@ export const registerFoundationIpc = ({
       };
     },
   );
-  safeHandle(ipcChannels.catalog.previewImportCsv, previewCatalogCsvImportSchema, (_event, input) =>
-    catalogMutations.previewCsvImport(input),
-  );
-  safeHandle(ipcChannels.catalog.importCsv, importCatalogCsvSchema, (_event, input) => {
+  safeHandle(ipcChannels.catalog.previewImportCsv, previewCatalogCsvImportSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "import this catalog",
+      accessLevel: "write",
+    });
+    return catalogMutations.previewCsvImport(input);
+  });
+  safeHandle(ipcChannels.catalog.importCsv, importCatalogCsvSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "import this catalog",
+      accessLevel: "write",
+    });
     const result = catalogMutations.importCsv(input);
     return {
       result,
-      snapshot: foundationReads.getCatalogSnapshot(),
+      snapshot: foundationReads.getCatalogSnapshot({ workspaceId: input.workspaceId }),
     };
   });
   safeHandleReadWithSchema(
     ipcChannels.catalog.uploadCrewDocuments,
     uploadCrewCatalogDocumentsReadArgsSchema,
-    async (_event, input: { crewMemberId: string; sourceFilePaths?: string[] }) => {
+    async (_event, input: { workspaceId: string; crewMemberId: string; sourceFilePaths?: string[] }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "attach crew documents",
+        accessLevel: "write",
+      });
       const crewMemberId = input.crewMemberId;
       const crewMember = foundationReads
         .getCatalogSnapshot({
+          workspaceId: input.workspaceId,
           entityType: "crew",
           search: "",
           sortBy: "fullName",

@@ -161,6 +161,85 @@ describe("foundation read service", () => {
     cleanup();
   });
 
+  it("scopes global search and catalog reads to the requested workspace", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-foundation-search-catalog-workspace");
+    const reads = createFoundationReadService(database);
+    const now = "2026-04-10T00:00:00.000Z";
+
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, name, slug, base_currency, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run("workspace-search-other", "Search Other", "search-other", "USD", now, now);
+    database
+      .prepare(
+        `
+          INSERT INTO projects (
+            id,
+            workspace_id,
+            code,
+            name,
+            client_name,
+            status,
+            start_date,
+            end_date,
+            description,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run(
+        "project-search-other",
+        "workspace-search-other",
+        "ONLYOTHER",
+        "Only Other Workspace Project",
+        "Other Client",
+        "Prep",
+        "2026-04-14",
+        "2026-04-28",
+        null,
+        now,
+        now,
+      );
+    database
+      .prepare(
+        `
+          INSERT INTO clients (id, workspace_id, name, contact_name, email, phone, notes, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+        `,
+      )
+      .run("client-search-other", "workspace-search-other", "Only Other Catalog Client", null, null, null, null, now, now);
+
+    const defaultSearch = reads.getGlobalSearch({ workspaceId: "workspace-metadata", query: "Only Other", recentEntityKeys: [] });
+    const otherSearch = reads.getGlobalSearch({ workspaceId: "workspace-search-other", query: "Only Other", recentEntityKeys: [] });
+    const defaultCatalog = reads.getCatalogSnapshot({
+      workspaceId: "workspace-metadata",
+      entityType: "client",
+      search: "Only Other",
+      sortBy: "name",
+      sortDirection: "asc",
+    });
+    const otherCatalog = reads.getCatalogSnapshot({
+      workspaceId: "workspace-search-other",
+      entityType: "client",
+      search: "Only Other",
+      sortBy: "name",
+      sortDirection: "asc",
+    });
+
+    expect(defaultSearch.flatMap((group) => group.results).some((result) => result.entityId === "project-search-other")).toBe(false);
+    expect(otherSearch.flatMap((group) => group.results).some((result) => result.entityId === "project-search-other")).toBe(true);
+    expect(defaultCatalog.clients.some((client) => client.id === "client-search-other")).toBe(false);
+    expect(otherCatalog.clients.map((client) => client.id)).toEqual(["client-search-other"]);
+
+    cleanup();
+  });
+
   it("hides archived projects from default lists and timeline until explicitly included", () => {
     const { cleanup, database } = createTestDatabase("bukowski-foundation-archived-projects");
     const reads = createFoundationReadService(database);
@@ -192,6 +271,7 @@ describe("foundation read service", () => {
     const catalogMutations = createCatalogMutationService(database);
 
     catalogMutations.createEntity({
+      workspaceId: "workspace-metadata",
       entityType: "kit",
       code: "READKIT",
       name: "Read Model Kit",

@@ -273,7 +273,7 @@ declare global {
       exportCsv: (input: ExportCatalogCsvInput) => Promise<AppExportResult>;
       previewImportCsv: (input: PreviewCatalogCsvImportInput) => Promise<CatalogCsvImportPreview>;
       importCsv: (input: ImportCatalogCsvInput) => Promise<{ result: CatalogCsvImportResult; snapshot: CatalogSnapshot }>;
-      uploadCrewDocuments: (crewMemberId: string, sourceFilePaths?: string[]) => Promise<FileUploadMutationResult>;
+      uploadCrewDocuments: (workspaceId: string, crewMemberId: string, sourceFilePaths?: string[]) => Promise<FileUploadMutationResult>;
       openCrewDocument: (fileId: string) => Promise<void>;
       deleteCrewDocument: (fileId: string) => Promise<FileDeleteMutationResult>;
     };

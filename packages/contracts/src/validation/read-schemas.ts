@@ -89,6 +89,7 @@ export const workspaceQuerySchema = z.object({
 });
 
 export const globalSearchQuerySchema = z.object({
+  workspaceId: nonEmptyId.optional(),
   query: boundedSearch,
   recentEntityKeys: z.array(nonEmptyId).max(50).optional(),
   limit: z.number().int().min(1).max(50).optional(),

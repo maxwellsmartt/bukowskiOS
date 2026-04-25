@@ -334,6 +334,7 @@ describe("packing mutation service", () => {
     });
 
     catalogMutations.createEntity({
+      workspaceId: "workspace-metadata",
       entityType: "kit",
       code: "PACKKIT",
       name: "Packing Guard Kit",

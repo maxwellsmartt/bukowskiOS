@@ -319,6 +319,7 @@ describe("asset mutation service", () => {
     });
 
     catalogMutations.createEntity({
+      workspaceId: "workspace-metadata",
       entityType: "kit",
       code: "FIELDKIT",
       name: "Field Monitor Kit",
@@ -380,6 +381,7 @@ describe("asset mutation service", () => {
     });
 
     catalogMutations.createEntity({
+      workspaceId: "workspace-metadata",
       entityType: "kit",
       code: "MAINTKIT",
       name: "Maintenance Sensitive Kit",

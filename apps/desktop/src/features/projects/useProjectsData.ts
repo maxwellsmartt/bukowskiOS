@@ -210,12 +210,12 @@ export const importCatalogCsv = async (
   return window.bukowskiCatalog.importCsv(input);
 };
 
-export const uploadCrewCatalogDocuments = async (crewMemberId: string, sourceFilePaths?: string[]) => {
+export const uploadCrewCatalogDocuments = async (workspaceId: string, crewMemberId: string, sourceFilePaths?: string[]) => {
   if (!window.bukowskiCatalog) {
     throw new Error("Catalog bridge unavailable");
   }
 
-  return window.bukowskiCatalog.uploadCrewDocuments(crewMemberId, sourceFilePaths);
+  return window.bukowskiCatalog.uploadCrewDocuments(workspaceId, crewMemberId, sourceFilePaths);
 };
 
 export const openCrewCatalogDocument = async (fileId: string) => {

@@ -6,6 +6,9 @@ import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
 
+type WithoutWorkspace<T> = T extends unknown ? Omit<T, "workspaceId"> : never;
+type CatalogEditorSubmitInput = WithoutWorkspace<CreateCatalogEntityInput | UpdateCatalogEntityInput>;
+
 type CatalogEditorPanelProps = {
   assetOptions: CatalogSnapshot["assetOptions"];
   crewDocuments?: CatalogSnapshot["crewMembers"][number]["documents"];
@@ -20,7 +23,7 @@ type CatalogEditorPanelProps = {
   onClose: () => void;
   onDeleteCrewDocument?: (fileId: string) => Promise<void>;
   onOpenCrewDocument?: (fileId: string) => Promise<void>;
-  onSubmit: (input: CreateCatalogEntityInput | UpdateCatalogEntityInput) => Promise<void>;
+  onSubmit: (input: CatalogEditorSubmitInput) => Promise<void>;
   onUploadCrewDocuments?: () => Promise<void>;
   onUploadCrewDocumentsFromPaths?: (filePaths: string[]) => Promise<void>;
 };
@@ -206,7 +209,7 @@ export const CatalogEditorPanel = ({
           name: name.trim(),
           locationType,
           description: normalizeOptional(description),
-        } as CreateCatalogEntityInput | UpdateCatalogEntityInput);
+        } as CatalogEditorSubmitInput);
         return;
       case "department":
         await onSubmit({
@@ -215,7 +218,7 @@ export const CatalogEditorPanel = ({
           code: code.trim().toUpperCase(),
           name: name.trim(),
           description: normalizeOptional(description),
-        } as CreateCatalogEntityInput | UpdateCatalogEntityInput);
+        } as CatalogEditorSubmitInput);
         return;
       case "crew":
         await onSubmit({
@@ -240,7 +243,7 @@ export const CatalogEditorPanel = ({
               notes: normalizeOptional(entry.notes),
               maskInPreview: entry.maskInPreview,
             })),
-        } as CreateCatalogEntityInput | UpdateCatalogEntityInput);
+        } as CatalogEditorSubmitInput);
         return;
       case "client":
       case "production_company":
@@ -252,7 +255,7 @@ export const CatalogEditorPanel = ({
           email: normalizeOptional(email),
           phone: normalizeOptional(phone),
           notes: normalizeOptional(notes),
-        } as CreateCatalogEntityInput | UpdateCatalogEntityInput);
+        } as CatalogEditorSubmitInput);
         return;
       case "manufacturer":
         await onSubmit({
@@ -263,7 +266,7 @@ export const CatalogEditorPanel = ({
           supportEmail: normalizeOptional(email),
           phone: normalizeOptional(phone),
           notes: normalizeOptional(notes),
-        } as CreateCatalogEntityInput | UpdateCatalogEntityInput);
+        } as CatalogEditorSubmitInput);
         return;
       case "category":
         await onSubmit({
@@ -272,7 +275,7 @@ export const CatalogEditorPanel = ({
           code: code.trim().toUpperCase(),
           name: name.trim(),
           description: normalizeOptional(description),
-        } as CreateCatalogEntityInput | UpdateCatalogEntityInput);
+        } as CatalogEditorSubmitInput);
         return;
       case "kit":
         await onSubmit({
@@ -284,7 +287,7 @@ export const CatalogEditorPanel = ({
           notes: normalizeOptional(notes),
           assetIds: kitAssetSelections.map((selection) => selection.assetId),
           assetSelections: kitAssetSelections,
-        } as CreateCatalogEntityInput | UpdateCatalogEntityInput);
+        } as CatalogEditorSubmitInput);
     }
   };
 

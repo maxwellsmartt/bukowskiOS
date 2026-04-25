@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
 import { pushRecentEntityKey, readRecentEntityKeys } from "@shared/lib/recentEntities";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 
 type GlobalSearchPaletteProps = {
   open: boolean;
@@ -15,6 +16,7 @@ const emptyGroups: GlobalSearchGroup[] = [];
 
 export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps) => {
   const navigate = useNavigate();
+  const { activeWorkspaceId } = useWorkspace();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState("");
   const [groups, setGroups] = useState<GlobalSearchGroup[]>(emptyGroups);
@@ -69,6 +71,7 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
 
     window.bukowskiShell
       .searchGlobal({
+        workspaceId: activeWorkspaceId,
         query: debouncedQuery,
         recentEntityKeys: readRecentEntityKeys(),
         limit: 20,
@@ -97,7 +100,7 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
     return () => {
       isCancelled = true;
     };
-  }, [debouncedQuery, open]);
+  }, [activeWorkspaceId, debouncedQuery, open]);
 
   useEffect(() => {
     if (!flattenedResults.length) {

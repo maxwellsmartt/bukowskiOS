@@ -933,6 +933,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
 
   getGlobalSearch(query: GlobalSearchQuery): GlobalSearchGroup[] {
     const normalizedQuery = normalizeSearchText(query.query);
+    const workspaceId = query.workspaceId ?? DEFAULT_WORKSPACE_ID;
 
     if (!normalizedQuery) {
       return [];
@@ -957,9 +958,10 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           LEFT JOIN asset_current_state ON asset_current_state.asset_id = assets.id
           LEFT JOIN projects ON projects.id = asset_current_state.current_project_id
           WHERE assets.is_active = 1
+            AND assets.workspace_id = ?
         `,
       )
-      .all() as Array<{ id: string; name: string; code: string; project_name: string }>;
+      .all(workspaceId) as Array<{ id: string; name: string; code: string; project_name: string }>;
 
     const projects = db
       .prepare(
@@ -971,10 +973,11 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             COALESCE(clients.name, projects.client_name, '—') AS client_name
           FROM projects
           LEFT JOIN clients ON clients.id = projects.client_id
-          WHERE projects.archived_at IS NULL
+          WHERE projects.workspace_id = ?
+            AND projects.archived_at IS NULL
         `,
       )
-      .all() as Array<{ id: string; code: string; name: string; client_name: string }>;
+      .all(workspaceId) as Array<{ id: string; code: string; name: string; client_name: string }>;
 
     const units = db
       .prepare(
@@ -989,10 +992,11 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           FROM project_units
           JOIN projects ON projects.id = project_units.project_id
           WHERE COALESCE(project_units.is_primary, 0) = 0
+            AND projects.workspace_id = ?
             AND projects.archived_at IS NULL
         `,
       )
-      .all() as Array<{
+      .all(workspaceId) as Array<{
       id: string;
       code: string;
       name: string;
@@ -1009,10 +1013,11 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             projects.name AS project_name
           FROM packing_slips
           JOIN projects ON projects.id = packing_slips.project_id
-          WHERE projects.archived_at IS NULL
+          WHERE packing_slips.workspace_id = ?
+            AND projects.archived_at IS NULL
         `,
       )
-      .all() as Array<{ id: string; project_name: string }>;
+      .all(workspaceId) as Array<{ id: string; project_name: string }>;
 
     const incidents = db
       .prepare(
@@ -1025,10 +1030,11 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           FROM incidents
           LEFT JOIN assets ON assets.id = incidents.asset_id
           LEFT JOIN projects ON projects.id = incidents.project_id
-          WHERE projects.archived_at IS NULL OR projects.id IS NULL
+          WHERE incidents.workspace_id = ?
+            AND (projects.archived_at IS NULL OR projects.id IS NULL)
         `,
       )
-      .all() as Array<{ id: string; title: string; asset_code: string; project_name: string }>;
+      .all(workspaceId) as Array<{ id: string; title: string; asset_code: string; project_name: string }>;
 
     const rankedResults: Array<GlobalSearchResult & { score: number; recentRank: number }> = [];
 
@@ -1721,47 +1727,48 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     ).map(({ reportedAt: _reportedAt, ...row }) => row);
   },
 
-  getCatalogSnapshot(query: CatalogListQuery = defaultCatalogListQuery): CatalogSnapshot {
-    const snapshot = catalogReads.getSnapshot({ workspaceId: query.workspaceId });
+  getCatalogSnapshot(query: Partial<CatalogListQuery> = defaultCatalogListQuery): CatalogSnapshot {
+    const normalizedQuery = { ...defaultCatalogListQuery, ...query };
+    const snapshot = catalogReads.getSnapshot({ workspaceId: normalizedQuery.workspaceId });
 
     const sortCatalogRows = <T extends Record<string, unknown>>(rows: T[]) =>
       sortRows(rows, (left, right) => {
         const leftStatus = "isActive" in left ? ((left.isActive as boolean) ? "active" : "inactive") : "";
         const rightStatus = "isActive" in right ? ((right.isActive as boolean) ? "active" : "inactive") : "";
 
-        switch (query.sortBy) {
+        switch (normalizedQuery.sortBy) {
           case "code":
-            return compareTextValue(String(left.code ?? ""), String(right.code ?? ""), query.sortDirection);
+            return compareTextValue(String(left.code ?? ""), String(right.code ?? ""), normalizedQuery.sortDirection);
           case "fullName":
-            return compareTextValue(String(left.fullName ?? ""), String(right.fullName ?? ""), query.sortDirection);
+            return compareTextValue(String(left.fullName ?? ""), String(right.fullName ?? ""), normalizedQuery.sortDirection);
           case "status":
-            return compareTextValue(leftStatus, rightStatus, query.sortDirection);
+            return compareTextValue(leftStatus, rightStatus, normalizedQuery.sortDirection);
           case "type":
-            return compareTextValue(String(left.type ?? ""), String(right.type ?? ""), query.sortDirection);
+            return compareTextValue(String(left.type ?? ""), String(right.type ?? ""), normalizedQuery.sortDirection);
           case "description":
-            return compareTextValue(String(left.description ?? ""), String(right.description ?? ""), query.sortDirection);
+            return compareTextValue(String(left.description ?? ""), String(right.description ?? ""), normalizedQuery.sortDirection);
           case "roleLabel":
-            return compareTextValue(String(left.roleLabel ?? ""), String(right.roleLabel ?? ""), query.sortDirection);
+            return compareTextValue(String(left.roleLabel ?? ""), String(right.roleLabel ?? ""), normalizedQuery.sortDirection);
           case "contactName":
-            return compareTextValue(String(left.contactName ?? ""), String(right.contactName ?? ""), query.sortDirection);
+            return compareTextValue(String(left.contactName ?? ""), String(right.contactName ?? ""), normalizedQuery.sortDirection);
           case "supportEmail":
-            return compareTextValue(String(left.supportEmail ?? ""), String(right.supportEmail ?? ""), query.sortDirection);
+            return compareTextValue(String(left.supportEmail ?? ""), String(right.supportEmail ?? ""), normalizedQuery.sortDirection);
           case "email":
-            return compareTextValue(String(left.email ?? ""), String(right.email ?? ""), query.sortDirection);
+            return compareTextValue(String(left.email ?? ""), String(right.email ?? ""), normalizedQuery.sortDirection);
           case "phone":
-            return compareTextValue(String(left.phone ?? ""), String(right.phone ?? ""), query.sortDirection);
+            return compareTextValue(String(left.phone ?? ""), String(right.phone ?? ""), normalizedQuery.sortDirection);
           case "assetCount":
-            return compareNumberValue(Number(left.assetCount ?? 0), Number(right.assetCount ?? 0), query.sortDirection);
+            return compareNumberValue(Number(left.assetCount ?? 0), Number(right.assetCount ?? 0), normalizedQuery.sortDirection);
           case "name":
           default:
-            return compareTextValue(String(left.name ?? ""), String(right.name ?? ""), query.sortDirection);
+            return compareTextValue(String(left.name ?? ""), String(right.name ?? ""), normalizedQuery.sortDirection);
         }
       });
 
     const filterCatalogRows = <T extends Record<string, unknown>>(rows: T[], values: (row: T) => Array<string | null | undefined>) =>
-      rows.filter((row) => matchesSearch(query.search, values(row)));
+      rows.filter((row) => matchesSearch(normalizedQuery.search, values(row)));
 
-    switch (query.entityType) {
+    switch (normalizedQuery.entityType) {
       case "location":
         return {
           ...snapshot,

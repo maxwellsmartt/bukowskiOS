@@ -357,8 +357,8 @@ const bukowskiCatalog = {
     ipcRenderer.invoke(ipcChannels.catalog.previewImportCsv, input) as Promise<CatalogCsvImportPreview>,
   importCsv: (input: ImportCatalogCsvInput) =>
     ipcRenderer.invoke(ipcChannels.catalog.importCsv, input) as Promise<{ result: CatalogCsvImportResult; snapshot: CatalogSnapshot }>,
-  uploadCrewDocuments: (crewMemberId: string, sourceFilePaths?: string[]) =>
-    ipcRenderer.invoke(ipcChannels.catalog.uploadCrewDocuments, { crewMemberId, sourceFilePaths }) as Promise<FileUploadMutationResult>,
+  uploadCrewDocuments: (workspaceId: string, crewMemberId: string, sourceFilePaths?: string[]) =>
+    ipcRenderer.invoke(ipcChannels.catalog.uploadCrewDocuments, { workspaceId, crewMemberId, sourceFilePaths }) as Promise<FileUploadMutationResult>,
   openCrewDocument: (fileId: string) => ipcRenderer.invoke(ipcChannels.catalog.openCrewDocument, fileId) as Promise<void>,
   deleteCrewDocument: (fileId: string) => ipcRenderer.invoke(ipcChannels.catalog.deleteCrewDocument, fileId) as Promise<FileDeleteMutationResult>,
 };

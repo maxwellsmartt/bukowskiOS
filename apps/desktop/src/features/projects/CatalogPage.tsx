@@ -12,7 +12,7 @@ import type {
   CatalogSnapshot,
   CatalogSortField,
 } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { AssetAssignMovePanel, type AssetAssignSelectionRow, type AssetAssignMoveFormValue } from "@features/assets/AssetAssignMovePanel";
 import { assignMoveAssets } from "@features/assets/useAssetsData";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
@@ -372,6 +372,7 @@ const CatalogCsvImportDialog = ({
 
 export const CatalogPage = () => {
   const { refreshProjects } = useShellContext();
+  const { activeWorkspaceId } = useWorkspace();
   const { data: projects } = useProjectsData();
   const [activeTab, setActiveTab] = useState<CatalogEntityType>("crew");
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -389,6 +390,7 @@ export const CatalogPage = () => {
       assetCount: "desc",
     },
     buildQuery: ({ search, sortBy, sortDirection }) => ({
+      workspaceId: activeWorkspaceId,
       entityType: activeTab,
       search,
       sortBy,
@@ -764,6 +766,7 @@ export const CatalogPage = () => {
   const runExport = async (mode: "template" | "data") => {
     try {
       const result = await exportCatalogCsv({
+        workspaceId: activeWorkspaceId,
         entityType: activeTab,
         mode,
         ids: mode === "data" && selectedCount ? selectedRowIds : undefined,
@@ -778,7 +781,7 @@ export const CatalogPage = () => {
 
   const refreshImportPreview = async (strategy: CatalogCsvImportStrategy, csvText: string, fileName: string) => {
     try {
-      const preview = await previewCatalogCsvImport({ entityType: activeTab, csvText, strategy });
+      const preview = await previewCatalogCsvImport({ workspaceId: activeWorkspaceId, entityType: activeTab, csvText, strategy });
       setImportDialogState({
         fileName,
         csvText,
@@ -800,7 +803,7 @@ export const CatalogPage = () => {
   const handleUploadCrewDocuments = async (crewMemberId: string, sourceFilePaths?: string[]) => {
     try {
       setIsUploadingCrewDocuments(true);
-      const result = await uploadCrewCatalogDocuments(crewMemberId, sourceFilePaths);
+      const result = await uploadCrewCatalogDocuments(activeWorkspaceId, crewMemberId, sourceFilePaths);
       setCatalogActionMessage(result.summary);
       await reload();
     } catch (nextError) {
@@ -833,7 +836,7 @@ export const CatalogPage = () => {
     try {
       setIsCreatingCrewUser(true);
       const result = await window.bukowskiApp.createUser({
-        workspaceId: DEFAULT_WORKSPACE_ID,
+        workspaceId: activeWorkspaceId,
         fullName: previewCrewRow.fullName,
         email: previewCrewRow.email ?? "",
         phone: previewCrewRow.phone ?? "",
@@ -872,6 +875,7 @@ export const CatalogPage = () => {
     try {
       setIsSubmittingImport(true);
       const { result } = await importCatalogCsv({
+        workspaceId: activeWorkspaceId,
         entityType: activeTab,
         csvText: importDialogState.csvText,
         strategy: importDialogState.strategy,
@@ -904,7 +908,7 @@ export const CatalogPage = () => {
       setIsSubmittingKitAssign(true);
       const result = await assignMoveAssets({
         commandId: crypto.randomUUID(),
-        workspaceId: DEFAULT_WORKSPACE_ID,
+        workspaceId: activeWorkspaceId,
         assetIds: activeKitSelections.map((selection) => selection.assetId),
         assetSelections: activeKitSelections.map((selection) => ({
           assetId: selection.assetId,
@@ -1185,7 +1189,10 @@ export const CatalogPage = () => {
             onOpenCrewDocument={openCrewCatalogDocument}
             onSubmit={async (payload) =>
               applyCatalogMutation(
-                () => (editorMode === "create" ? createCatalogEntity(payload as never) : updateCatalogEntity(payload as never)),
+                () =>
+                  editorMode === "create"
+                    ? createCatalogEntity({ ...payload, workspaceId: activeWorkspaceId } as never)
+                    : updateCatalogEntity({ ...payload, workspaceId: activeWorkspaceId } as never),
                 editorMode === "edit" && selectedCount === 1 && typeof editTargetRow?.id === "string" ? [editTargetRow.id as string] : [],
               )
             }
@@ -1563,12 +1570,14 @@ export const CatalogPage = () => {
           await applyCatalogMutation(() => {
             if (selectedCount === 1 && selectedRow && typeof selectedRow.id === "string") {
               return deleteCatalogEntity({
+                workspaceId: activeWorkspaceId,
                 entityType: activeTab,
                 id: selectedRow.id as string,
               });
             }
 
             return deleteCatalogEntities({
+              workspaceId: activeWorkspaceId,
               entityType: activeTab,
               ids: selectedRowIds,
             });

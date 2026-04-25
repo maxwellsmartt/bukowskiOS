@@ -1,6 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import type {
   CatalogCsvImportError,
   CatalogCsvImportPreview,
@@ -13,8 +12,6 @@ import type {
 } from "@contracts";
 
 import type { CodeGenerationService } from "./codeGenerationService";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const slugify = (value: string) =>
   value
@@ -245,7 +242,7 @@ const buildIdFilterClause = (ids: string[] | undefined) => {
   };
 };
 
-const getExistingRows = (db: DatabaseSync, entityType: CatalogEntityType): ExistingCatalogRow[] => {
+const getExistingRows = (db: DatabaseSync, workspaceId: string, entityType: CatalogEntityType): ExistingCatalogRow[] => {
   switch (entityType) {
     case "location":
       return db
@@ -322,7 +319,7 @@ const getExistingRows = (db: DatabaseSync, entityType: CatalogEntityType): Exist
   }
 };
 
-const getAssetIdByCode = (db: DatabaseSync) => {
+const getAssetIdByCode = (db: DatabaseSync, workspaceId: string) => {
   const rows = db
     .prepare(
       `
@@ -341,7 +338,7 @@ const getAssetIdByCode = (db: DatabaseSync) => {
   return new Map(rows.map((row) => [normalizeKey(row.code), row.id]));
 };
 
-const getDepartmentIdByLookup = (db: DatabaseSync) => {
+const getDepartmentIdByLookup = (db: DatabaseSync, workspaceId: string) => {
   const rows = db
     .prepare(
       `
@@ -405,6 +402,7 @@ const parseCrewBankAccounts = (value: string | undefined) => {
 };
 
 const analyzeImport = (db: DatabaseSync, input: PreviewCatalogCsvImportInput): ImportAnalysis => {
+  const workspaceId = input.workspaceId;
   const errors: CatalogCsvImportError[] = [];
   const parsedRows = parseCsv(input.csvText);
 
@@ -421,10 +419,10 @@ const analyzeImport = (db: DatabaseSync, input: PreviewCatalogCsvImportInput): I
   }
 
   const dataRows = parsedRows.slice(1);
-  const existingRows = getExistingRows(db, input.entityType);
+  const existingRows = getExistingRows(db, workspaceId, input.entityType);
   const existingByKey = new Map(existingRows.map((row) => [row.key, row]));
-  const assetIdByCode = input.entityType === "kit" ? getAssetIdByCode(db) : null;
-  const departmentIdByLookup = input.entityType === "crew" ? getDepartmentIdByLookup(db) : null;
+  const assetIdByCode = input.entityType === "kit" ? getAssetIdByCode(db, workspaceId) : null;
+  const departmentIdByLookup = input.entityType === "crew" ? getDepartmentIdByLookup(db, workspaceId) : null;
   const seenKeys = new Set<string>();
   const operations: ImportAnalysisRow[] = [];
 
@@ -782,6 +780,7 @@ const replaceCrewBankAccounts = (
 const runImportRow = (
   db: DatabaseSync,
   codeService: CodeGenerationService,
+  workspaceId: string,
   row: ImportAnalysisRow,
   now: string,
 ) => {
@@ -1134,6 +1133,7 @@ const deactivateMissingRows = (db: DatabaseSync, entityType: CatalogEntityType, 
 
 export const createCatalogCsvService = (db: DatabaseSync, codeService: CodeGenerationService) => ({
   buildExport(input: ExportCatalogCsvInput) {
+    const workspaceId = input.workspaceId;
     const headers = expectedHeadersByEntity[input.entityType];
     const idFilter = buildIdFilterClause(input.ids);
     if (input.mode === "template") {
@@ -1362,6 +1362,7 @@ export const createCatalogCsvService = (db: DatabaseSync, codeService: CodeGener
   },
 
   importCsv(input: ImportCatalogCsvInput): CatalogCsvImportResult {
+    const workspaceId = input.workspaceId;
     const analysis = analyzeImport(db, input);
     if (analysis.invalid > 0) {
       const firstError = analysis.errors[0];
@@ -1373,7 +1374,7 @@ export const createCatalogCsvService = (db: DatabaseSync, codeService: CodeGener
 
     try {
       analysis.rows.forEach((row) => {
-        runImportRow(db, codeService, row, now);
+        runImportRow(db, codeService, workspaceId, row, now);
       });
       if (input.strategy === "replace") {
         deactivateMissingRows(db, input.entityType, analysis.missingActiveIds, now);

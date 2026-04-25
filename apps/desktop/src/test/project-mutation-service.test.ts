@@ -342,6 +342,7 @@ describe("project mutation service", () => {
     const mutations = createProjectMutationService(database);
 
     catalogMutations.createEntity({
+      workspaceId: "workspace-metadata",
       entityType: "kit",
       code: "WIZKIT",
       name: "Wizard Locked Kit",

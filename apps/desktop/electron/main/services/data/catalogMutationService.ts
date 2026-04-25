@@ -13,10 +13,6 @@ import type {
 import { createCodeGenerationService } from "./codeGenerationService";
 import { createCatalogCsvService } from "./catalogCsvService";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
-
 const slugify = (value: string) =>
   value
     .normalize("NFD")
@@ -144,6 +140,7 @@ const replaceCrewBankAccounts = (
 const assertUniqueCode = (
   db: DatabaseSync,
   tableName: "locations" | "departments" | "asset_categories" | "kits",
+  workspaceId: string,
   code: string,
   currentId?: string,
 ) => {
@@ -165,7 +162,7 @@ const assertUniqueCode = (
   }
 };
 
-const assertUniqueClientName = (db: DatabaseSync, name: string, currentId?: string) => {
+const assertUniqueClientName = (db: DatabaseSync, workspaceId: string, name: string, currentId?: string) => {
   const existing = db
     .prepare(
       `
@@ -184,7 +181,7 @@ const assertUniqueClientName = (db: DatabaseSync, name: string, currentId?: stri
   }
 };
 
-const assertUniqueProductionCompanyName = (db: DatabaseSync, name: string, currentId?: string) => {
+const assertUniqueProductionCompanyName = (db: DatabaseSync, workspaceId: string, name: string, currentId?: string) => {
   const existing = db
     .prepare(
       `
@@ -203,7 +200,7 @@ const assertUniqueProductionCompanyName = (db: DatabaseSync, name: string, curre
   }
 };
 
-const assertUniqueManufacturerName = (db: DatabaseSync, name: string, currentId?: string) => {
+const assertUniqueManufacturerName = (db: DatabaseSync, workspaceId: string, name: string, currentId?: string) => {
   const existing = db
     .prepare(
       `
@@ -222,7 +219,7 @@ const assertUniqueManufacturerName = (db: DatabaseSync, name: string, currentId?
   }
 };
 
-const assertLinkableUserExists = (db: DatabaseSync, userId: string | undefined) => {
+const assertLinkableUserExists = (db: DatabaseSync, workspaceId: string, userId: string | undefined) => {
   const nextUserId = optionalValue(userId);
 
   if (!nextUserId) {
@@ -251,7 +248,7 @@ const assertLinkableUserExists = (db: DatabaseSync, userId: string | undefined) 
   return nextUserId;
 };
 
-const assertAssetIdsExist = (db: DatabaseSync, assetIds: string[]) => {
+const assertAssetIdsExist = (db: DatabaseSync, workspaceId: string, assetIds: string[]) => {
   if (!assetIds.length) {
     return;
   }
@@ -369,6 +366,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
   const csvService = createCatalogCsvService(db, codeService);
   const service = {
     createEntity(input: CreateCatalogEntityInput) {
+      const workspaceId = input.workspaceId;
       const now = new Date().toISOString();
 
       db.exec("BEGIN");
@@ -377,7 +375,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
         switch (input.entityType) {
           case "location": {
             const code = ensureValue(input.code, "Location code").toUpperCase();
-            assertUniqueCode(db, "locations", code);
+            assertUniqueCode(db, "locations", workspaceId, code);
 
             db.prepare(
               `
@@ -398,7 +396,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
 
           case "department": {
             const code = ensureValue(input.code, "Department code").toUpperCase();
-            assertUniqueCode(db, "departments", code);
+            assertUniqueCode(db, "departments", workspaceId, code);
 
             db.prepare(
               `
@@ -419,7 +417,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
           case "crew": {
             const crewName = ensureValue(input.fullName, "Crew name");
             const crewId = `crew-${slugify(crewName)}-${Date.now().toString(36)}`;
-            const linkedUserId = assertLinkableUserExists(db, input.linkedUserId);
+            const linkedUserId = assertLinkableUserExists(db, workspaceId, input.linkedUserId);
             db.prepare(
               `
                 INSERT INTO crew_members (
@@ -447,7 +445,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
 
           case "client": {
             const name = ensureValue(input.name, "Client name");
-            assertUniqueClientName(db, name);
+            assertUniqueClientName(db, workspaceId, name);
 
             db.prepare(
               `
@@ -472,7 +470,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
 
           case "production_company": {
             const name = ensureValue(input.name, "Production company name");
-            assertUniqueProductionCompanyName(db, name);
+            assertUniqueProductionCompanyName(db, workspaceId, name);
 
             db.prepare(
               `
@@ -497,7 +495,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
 
           case "manufacturer": {
             const name = ensureValue(input.name, "Manufacturer name");
-            assertUniqueManufacturerName(db, name);
+            assertUniqueManufacturerName(db, workspaceId, name);
 
             db.prepare(
               `
@@ -522,7 +520,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
 
           case "category": {
             const code = ensureValue(input.code, "Category code").toUpperCase();
-            assertUniqueCode(db, "asset_categories", code);
+            assertUniqueCode(db, "asset_categories", workspaceId, code);
 
             db.prepare(
               `
@@ -544,8 +542,8 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const code = ensureValue(input.code, "Kit code").toUpperCase();
             const assetSelections = normalizeKitAssetSelections(input.assetSelections, input.assetIds);
             const assetIds = assetSelections.map((selection) => selection.assetId);
-            assertUniqueCode(db, "kits", code);
-            assertAssetIdsExist(db, assetIds);
+            assertUniqueCode(db, "kits", workspaceId, code);
+            assertAssetIdsExist(db, workspaceId, assetIds);
 
             const kitId = `kit-${slugify(code)}-${Date.now().toString(36)}`;
 
@@ -584,6 +582,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
     },
 
     updateEntity(input: UpdateCatalogEntityInput) {
+      const workspaceId = input.workspaceId;
       const now = new Date().toISOString();
 
       db.exec("BEGIN");
@@ -592,12 +591,12 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
         switch (input.entityType) {
           case "location": {
             const code = ensureValue(input.code, "Location code").toUpperCase();
-            assertUniqueCode(db, "locations", code, input.id);
+            assertUniqueCode(db, "locations", workspaceId, code, input.id);
             const result = db.prepare(
               `
                 UPDATE locations
                 SET code = ?, name = ?, type = ?, description = ?
-                WHERE id = ?
+                WHERE id = ? AND workspace_id = ?
               `,
             ).run(
               code,
@@ -605,6 +604,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               ensureValue(input.locationType, "Location type"),
               optionalValue(input.description),
               input.id,
+              workspaceId,
             );
             if (!result.changes) {
               throw new Error("Location not found.");
@@ -614,14 +614,14 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
 
           case "department": {
             const code = ensureValue(input.code, "Department code").toUpperCase();
-            assertUniqueCode(db, "departments", code, input.id);
+            assertUniqueCode(db, "departments", workspaceId, code, input.id);
             const result = db.prepare(
               `
                 UPDATE departments
                 SET code = ?, name = ?, description = ?
-                WHERE id = ?
+                WHERE id = ? AND workspace_id = ?
               `,
-            ).run(code, ensureValue(input.name, "Department name"), optionalValue(input.description), input.id);
+            ).run(code, ensureValue(input.name, "Department name"), optionalValue(input.description), input.id, workspaceId);
             if (!result.changes) {
               throw new Error("Department not found.");
             }
@@ -629,12 +629,12 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
           }
 
           case "crew": {
-            const linkedUserId = assertLinkableUserExists(db, input.linkedUserId);
+            const linkedUserId = assertLinkableUserExists(db, workspaceId, input.linkedUserId);
             const result = db.prepare(
               `
                 UPDATE crew_members
                 SET full_name = ?, primary_department_id = ?, linked_user_id = ?, document_id = ?, role_label = ?, email = ?, phone = ?, notes = ?, updated_at = ?
-                WHERE id = ?
+                WHERE id = ? AND workspace_id = ?
               `,
             ).run(
               ensureValue(input.fullName, "Crew name"),
@@ -647,6 +647,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               optionalValue(input.notes),
               now,
               input.id,
+              workspaceId,
             );
             if (!result.changes) {
               throw new Error("Crew member not found.");
@@ -657,12 +658,12 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
 
           case "client": {
             const name = ensureValue(input.name, "Client name");
-            assertUniqueClientName(db, name, input.id);
+            assertUniqueClientName(db, workspaceId, name, input.id);
             const result = db.prepare(
               `
                 UPDATE clients
                 SET name = ?, contact_name = ?, email = ?, phone = ?, notes = ?, updated_at = ?
-                WHERE id = ?
+                WHERE id = ? AND workspace_id = ?
               `,
             ).run(
               name,
@@ -672,23 +673,24 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               optionalValue(input.notes),
               now,
               input.id,
+              workspaceId,
             );
             if (!result.changes) {
               throw new Error("Client not found.");
             }
 
-            db.prepare("UPDATE projects SET client_name = ? WHERE client_id = ?").run(name, input.id);
+            db.prepare("UPDATE projects SET client_name = ? WHERE client_id = ? AND workspace_id = ?").run(name, input.id, workspaceId);
             break;
           }
 
           case "production_company": {
             const name = ensureValue(input.name, "Production company name");
-            assertUniqueProductionCompanyName(db, name, input.id);
+            assertUniqueProductionCompanyName(db, workspaceId, name, input.id);
             const result = db.prepare(
               `
                 UPDATE production_companies
                 SET name = ?, contact_name = ?, email = ?, phone = ?, notes = ?, updated_at = ?
-                WHERE id = ?
+                WHERE id = ? AND workspace_id = ?
               `,
             ).run(
               name,
@@ -698,24 +700,29 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               optionalValue(input.notes),
               now,
               input.id,
+              workspaceId,
             );
 
             if (!result.changes) {
               throw new Error("Production company not found.");
             }
 
-            db.prepare("UPDATE projects SET production_company_name = ? WHERE production_company_id = ?").run(name, input.id);
+            db.prepare("UPDATE projects SET production_company_name = ? WHERE production_company_id = ? AND workspace_id = ?").run(
+              name,
+              input.id,
+              workspaceId,
+            );
             break;
           }
 
           case "manufacturer": {
             const name = ensureValue(input.name, "Manufacturer name");
-            assertUniqueManufacturerName(db, name, input.id);
+            assertUniqueManufacturerName(db, workspaceId, name, input.id);
             const result = db.prepare(
               `
                 UPDATE manufacturers
                 SET name = ?, contact_name = ?, support_email = ?, phone = ?, notes = ?, updated_at = ?
-                WHERE id = ?
+                WHERE id = ? AND workspace_id = ?
               `,
             ).run(
               name,
@@ -725,28 +732,32 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               optionalValue(input.notes),
               now,
               input.id,
+              workspaceId,
             );
             if (!result.changes) {
               throw new Error("Manufacturer not found.");
             }
 
-            db.prepare("UPDATE rma_cases SET support_email = COALESCE(?, support_email) WHERE manufacturer_id = ? AND (support_email IS NULL OR trim(support_email) = '')").run(
+            db.prepare(
+              "UPDATE rma_cases SET support_email = COALESCE(?, support_email) WHERE manufacturer_id = ? AND workspace_id = ? AND (support_email IS NULL OR trim(support_email) = '')",
+            ).run(
               optionalValue(input.supportEmail),
               input.id,
+              workspaceId,
             );
             break;
           }
 
           case "category": {
             const code = ensureValue(input.code, "Category code").toUpperCase();
-            assertUniqueCode(db, "asset_categories", code, input.id);
+            assertUniqueCode(db, "asset_categories", workspaceId, code, input.id);
             const result = db.prepare(
               `
                 UPDATE asset_categories
                 SET code = ?, name = ?, description = ?
-                WHERE id = ?
+                WHERE id = ? AND workspace_id = ?
               `,
-            ).run(code, ensureValue(input.name, "Category name"), optionalValue(input.description), input.id);
+            ).run(code, ensureValue(input.name, "Category name"), optionalValue(input.description), input.id, workspaceId);
             if (!result.changes) {
               throw new Error("Category not found.");
             }
@@ -757,13 +768,13 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const code = ensureValue(input.code, "Kit code").toUpperCase();
             const assetSelections = normalizeKitAssetSelections(input.assetSelections, input.assetIds);
             const assetIds = assetSelections.map((selection) => selection.assetId);
-            assertUniqueCode(db, "kits", code, input.id);
-            assertAssetIdsExist(db, assetIds);
+            assertUniqueCode(db, "kits", workspaceId, code, input.id);
+            assertAssetIdsExist(db, workspaceId, assetIds);
             const result = db.prepare(
               `
                 UPDATE kits
                 SET code = ?, name = ?, description = ?, notes = ?, updated_at = ?
-                WHERE id = ?
+                WHERE id = ? AND workspace_id = ?
               `,
             ).run(
               code,
@@ -772,6 +783,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               optionalValue(input.notes),
               now,
               input.id,
+              workspaceId,
             );
             if (!result.changes) {
               throw new Error("Kit not found.");
@@ -807,49 +819,49 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
       try {
         switch (input.entityType) {
           case "location": {
-            const result = db.prepare("DELETE FROM locations WHERE id = ?").run(input.id);
+            const result = db.prepare("DELETE FROM locations WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
             if (!result.changes) {
               throw new Error("Location not found.");
             }
             break;
           }
           case "department": {
-            const result = db.prepare("DELETE FROM departments WHERE id = ?").run(input.id);
+            const result = db.prepare("DELETE FROM departments WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
             if (!result.changes) {
               throw new Error("Department not found.");
             }
             break;
           }
           case "crew": {
-            const result = db.prepare("DELETE FROM crew_members WHERE id = ?").run(input.id);
+            const result = db.prepare("DELETE FROM crew_members WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
             if (!result.changes) {
               throw new Error("Crew member not found.");
             }
             break;
           }
           case "client": {
-            const result = db.prepare("DELETE FROM clients WHERE id = ?").run(input.id);
+            const result = db.prepare("DELETE FROM clients WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
             if (!result.changes) {
               throw new Error("Client not found.");
             }
             break;
           }
           case "production_company": {
-            const result = db.prepare("DELETE FROM production_companies WHERE id = ?").run(input.id);
+            const result = db.prepare("DELETE FROM production_companies WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
             if (!result.changes) {
               throw new Error("Production company not found.");
             }
             break;
           }
           case "manufacturer": {
-            const result = db.prepare("DELETE FROM manufacturers WHERE id = ?").run(input.id);
+            const result = db.prepare("DELETE FROM manufacturers WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
             if (!result.changes) {
               throw new Error("Manufacturer not found.");
             }
             break;
           }
           case "category": {
-            const result = db.prepare("DELETE FROM asset_categories WHERE id = ?").run(input.id);
+            const result = db.prepare("DELETE FROM asset_categories WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
             if (!result.changes) {
               throw new Error("Category not found.");
             }
@@ -858,7 +870,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
           case "kit": {
             db.prepare("DELETE FROM kit_assets WHERE kit_id = ?").run(input.id);
             db.prepare("DELETE FROM scannable_codes WHERE entity_type = 'kit' AND entity_id = ?").run(input.id);
-            const result = db.prepare("DELETE FROM kits WHERE id = ?").run(input.id);
+            const result = db.prepare("DELETE FROM kits WHERE id = ? AND workspace_id = ?").run(input.id, input.workspaceId);
             if (!result.changes) {
               throw new Error("Kit not found.");
             }
@@ -881,7 +893,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
       }
 
       uniqueIds.forEach((id) => {
-        const relationCount = getDeleteGuardCount(db, { entityType: input.entityType, id });
+        const relationCount = getDeleteGuardCount(db, { workspaceId: input.workspaceId, entityType: input.entityType, id });
 
         if (relationCount > 0) {
           throw new Error("One or more selected records already have linked operational data and cannot be deleted.");
@@ -889,7 +901,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
       });
 
       uniqueIds.forEach((id) => {
-        service.deleteEntity({ entityType: input.entityType, id });
+        service.deleteEntity({ workspaceId: input.workspaceId, entityType: input.entityType, id });
       });
     },
 

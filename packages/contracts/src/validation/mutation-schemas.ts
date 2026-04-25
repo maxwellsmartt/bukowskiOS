@@ -645,6 +645,7 @@ export const createProjectBlueprintSchema = z
 
 const createCatalogLocationSchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.literal("location"),
     code: nonEmptyString,
     name: nonEmptyString,
@@ -655,6 +656,7 @@ const createCatalogLocationSchema = z
 
 const createCatalogDepartmentSchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.literal("department"),
     code: nonEmptyString,
     name: nonEmptyString,
@@ -664,6 +666,7 @@ const createCatalogDepartmentSchema = z
 
 const createCatalogCrewSchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.literal("crew"),
     fullName: nonEmptyString,
     primaryDepartmentId: optionalTrimmedString,
@@ -693,6 +696,7 @@ const createCatalogCrewSchema = z
 
 const createCatalogClientSchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.literal("client"),
     name: nonEmptyString,
     contactName: optionalTrimmedString,
@@ -704,6 +708,7 @@ const createCatalogClientSchema = z
 
 const createCatalogProductionCompanySchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.literal("production_company"),
     name: nonEmptyString,
     contactName: optionalTrimmedString,
@@ -715,6 +720,7 @@ const createCatalogProductionCompanySchema = z
 
 const createCatalogManufacturerSchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.literal("manufacturer"),
     name: nonEmptyString,
     contactName: optionalTrimmedString,
@@ -726,6 +732,7 @@ const createCatalogManufacturerSchema = z
 
 const createCatalogCategorySchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.literal("category"),
     code: nonEmptyString,
     name: nonEmptyString,
@@ -735,6 +742,7 @@ const createCatalogCategorySchema = z
 
 const createCatalogKitSchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.literal("kit"),
     code: nonEmptyString,
     name: nonEmptyString,
@@ -778,6 +786,7 @@ export const updateCatalogEntitySchema = z.discriminatedUnion("entityType", [
 
 export const deleteCatalogEntitySchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.enum(["location", "department", "crew", "client", "production_company", "manufacturer", "category", "kit"]),
     id: nonEmptyString,
   })
@@ -785,6 +794,7 @@ export const deleteCatalogEntitySchema = z
 
 export const deleteCatalogEntitiesSchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.enum(["location", "department", "crew", "client", "production_company", "manufacturer", "category", "kit"]),
     ids: z.array(nonEmptyString).min(1),
   })
@@ -792,6 +802,7 @@ export const deleteCatalogEntitiesSchema = z
 
 export const exportCatalogCsvSchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.enum(["location", "department", "crew", "client", "production_company", "manufacturer", "category", "kit"]),
     mode: z.enum(["template", "data"]),
     ids: z.array(nonEmptyString).optional(),
@@ -800,6 +811,7 @@ export const exportCatalogCsvSchema = z
 
 export const previewCatalogCsvImportSchema = z
   .object({
+    workspaceId: nonEmptyString,
     entityType: z.enum(["location", "department", "crew", "client", "production_company", "manufacturer", "category", "kit"]),
     csvText: nonEmptyString,
     strategy: z.enum(["merge", "replace"]),
@@ -811,6 +823,7 @@ export const importCatalogCsvSchema = previewCatalogCsvImportSchema;
 export const uploadCrewCatalogDocumentsReadArgsSchema = z.tuple([
   z
     .object({
+      workspaceId: nonEmptyString,
       crewMemberId: nonEmptyString,
       sourceFilePaths: z.array(nonEmptyString).optional(),
     })

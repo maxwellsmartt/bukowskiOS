@@ -20,6 +20,7 @@ export type ShellAppAction =
 export type GlobalSearchEntityType = "asset" | "project" | "project_unit" | "packing_slip" | "incident" | "financial_entry";
 
 export type GlobalSearchQuery = {
+  workspaceId?: string;
   query: string;
   recentEntityKeys?: string[];
   limit?: number;

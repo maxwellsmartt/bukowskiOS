@@ -10,6 +10,7 @@ describe("catalog mutation service", () => {
     const reads = createFoundationReadService(database);
 
     mutations.createEntity({
+      workspaceId: "workspace-metadata",
       entityType: "client",
       name: "HBO",
       contactName: "Ops Desk",
@@ -19,6 +20,7 @@ describe("catalog mutation service", () => {
     });
 
     mutations.createEntity({
+      workspaceId: "workspace-metadata",
       entityType: "category",
       code: "BATT",
       name: "Batteries",
@@ -26,6 +28,7 @@ describe("catalog mutation service", () => {
     });
 
     mutations.createEntity({
+      workspaceId: "workspace-metadata",
       entityType: "kit",
       code: "MONKIT",
       name: "Monitor Travel Kit",
@@ -45,6 +48,7 @@ describe("catalog mutation service", () => {
     expect(createdKit?.primaryCodeValue.startsWith("KIT-MONKIT")).toBe(true);
 
     mutations.updateEntity({
+      workspaceId: "workspace-metadata",
       entityType: "client",
       id: createdClient!.id,
       name: "HBO LatAm",
@@ -59,6 +63,7 @@ describe("catalog mutation service", () => {
 
     expect(() =>
       mutations.deleteEntity({
+      workspaceId: "workspace-metadata",
         entityType: "location",
         id: "loc-warehouse-a",
       }),
@@ -67,12 +72,14 @@ describe("catalog mutation service", () => {
     const alturaClient = snapshot.clients.find((client) => client.name === "Altura");
     expect(() =>
       mutations.deleteEntity({
+      workspaceId: "workspace-metadata",
         entityType: "client",
         id: alturaClient!.id,
       }),
     ).toThrow("linked operational data");
 
     mutations.deleteEntity({
+      workspaceId: "workspace-metadata",
       entityType: "category",
       id: createdCategory!.id,
     });
@@ -89,6 +96,7 @@ describe("catalog mutation service", () => {
     const reads = createFoundationReadService(database);
 
     const template = mutations.buildCsvExport({
+      workspaceId: "workspace-metadata",
       entityType: "department",
       mode: "template",
     });
@@ -96,6 +104,7 @@ describe("catalog mutation service", () => {
     expect(template.csvText.trim()).toBe("code,name,description,isActive");
 
     const kitTemplate = mutations.buildCsvExport({
+      workspaceId: "workspace-metadata",
       entityType: "kit",
       mode: "template",
     });
@@ -103,6 +112,7 @@ describe("catalog mutation service", () => {
     expect(kitTemplate.csvText.trim()).toBe("code,name,description,notes,assetQuantities,isActive");
 
     mutations.createEntity({
+      workspaceId: "workspace-metadata",
       entityType: "department",
       code: "ZZCSV1",
       name: "Operations",
@@ -116,6 +126,7 @@ describe("catalog mutation service", () => {
     ].join("\n");
 
     const mergePreview = mutations.previewCsvImport({
+      workspaceId: "workspace-metadata",
       entityType: "department",
       csvText: mergeCsv,
       strategy: "merge",
@@ -126,6 +137,7 @@ describe("catalog mutation service", () => {
     expect(mergePreview.invalid).toBe(0);
 
     const mergeResult = mutations.importCsv({
+      workspaceId: "workspace-metadata",
       entityType: "department",
       csvText: mergeCsv,
       strategy: "merge",
@@ -144,6 +156,7 @@ describe("catalog mutation service", () => {
     ].join("\n");
 
     const replaceResult = mutations.importCsv({
+      workspaceId: "workspace-metadata",
       entityType: "department",
       csvText: replaceCsv,
       strategy: "replace",
@@ -165,6 +178,7 @@ describe("catalog mutation service", () => {
     const reads = createFoundationReadService(database);
 
     mutations.createEntity({
+      workspaceId: "workspace-metadata",
       entityType: "crew",
       fullName: "Ana Perez",
       primaryDepartmentId: "dept-camera",
@@ -193,6 +207,7 @@ describe("catalog mutation service", () => {
     expect(crew?.documentId).toBe("001-0000000-1");
 
     mutations.updateEntity({
+      workspaceId: "workspace-metadata",
       entityType: "crew",
       id: crew!.id,
       fullName: "Ana Perez Updated",
@@ -223,6 +238,7 @@ describe("catalog mutation service", () => {
     expect(updatedCrew?.bankAccounts[0]?.maskInPreview).toBe(false);
 
     const exportPayload = mutations.buildCsvExport({
+      workspaceId: "workspace-metadata",
       entityType: "crew",
       mode: "data",
       ids: [crew!.id],
@@ -241,6 +257,7 @@ describe("catalog mutation service", () => {
     ].join("\n");
 
     const preview = mutations.previewCsvImport({
+      workspaceId: "workspace-metadata",
       entityType: "crew",
       csvText: importCsv,
       strategy: "merge",
@@ -250,6 +267,7 @@ describe("catalog mutation service", () => {
     expect(preview.invalid).toBe(0);
 
     const importResult = mutations.importCsv({
+      workspaceId: "workspace-metadata",
       entityType: "crew",
       csvText: importCsv,
       strategy: "merge",
@@ -273,6 +291,7 @@ describe("catalog mutation service", () => {
     const reads = createFoundationReadService(database);
 
     mutations.createEntity({
+      workspaceId: "workspace-metadata",
       entityType: "kit",
       code: "DITBULK",
       name: "DIT Bulk Kit",
@@ -295,6 +314,7 @@ describe("catalog mutation service", () => {
     );
 
     const csvExport = mutations.buildCsvExport({
+      workspaceId: "workspace-metadata",
       entityType: "kit",
       mode: "data",
       ids: [createdKit!.id],

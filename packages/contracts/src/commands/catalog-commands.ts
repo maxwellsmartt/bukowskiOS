@@ -13,6 +13,10 @@ export type CatalogKitAssetSelectionInput = {
   quantity: number;
 };
 
+type CatalogWorkspaceInput = {
+  workspaceId: string;
+};
+
 export type CreateCatalogLocationInput = {
   entityType: "location";
   code: string;
@@ -42,6 +46,7 @@ export type CreateCatalogCrewInput = {
 };
 
 export type UploadCrewCatalogDocumentsInput = {
+  workspaceId: string;
   crewMemberId: string;
   sourceFilePaths?: string[];
 };
@@ -100,15 +105,17 @@ export type CreateCatalogKitInput = {
   assetSelections?: CatalogKitAssetSelectionInput[];
 };
 
-export type CreateCatalogEntityInput =
-  | CreateCatalogLocationInput
-  | CreateCatalogDepartmentInput
-  | CreateCatalogCrewInput
-  | CreateCatalogClientInput
-  | CreateCatalogProductionCompanyInput
-  | CreateCatalogManufacturerInput
-  | CreateCatalogCategoryInput
-  | CreateCatalogKitInput;
+export type CreateCatalogEntityInput = CatalogWorkspaceInput &
+  (
+    | CreateCatalogLocationInput
+    | CreateCatalogDepartmentInput
+    | CreateCatalogCrewInput
+    | CreateCatalogClientInput
+    | CreateCatalogProductionCompanyInput
+    | CreateCatalogManufacturerInput
+    | CreateCatalogCategoryInput
+    | CreateCatalogKitInput
+  );
 
 export type UpdateCatalogLocationInput = CreateCatalogLocationInput & {
   id: string;
@@ -142,29 +149,31 @@ export type UpdateCatalogKitInput = CreateCatalogKitInput & {
   id: string;
 };
 
-export type UpdateCatalogEntityInput =
-  | UpdateCatalogLocationInput
-  | UpdateCatalogDepartmentInput
-  | UpdateCatalogCrewInput
-  | UpdateCatalogClientInput
-  | UpdateCatalogProductionCompanyInput
-  | UpdateCatalogManufacturerInput
-  | UpdateCatalogCategoryInput
-  | UpdateCatalogKitInput;
+export type UpdateCatalogEntityInput = CatalogWorkspaceInput &
+  (
+    | UpdateCatalogLocationInput
+    | UpdateCatalogDepartmentInput
+    | UpdateCatalogCrewInput
+    | UpdateCatalogClientInput
+    | UpdateCatalogProductionCompanyInput
+    | UpdateCatalogManufacturerInput
+    | UpdateCatalogCategoryInput
+    | UpdateCatalogKitInput
+  );
 
-export type DeleteCatalogEntityInput = {
+export type DeleteCatalogEntityInput = CatalogWorkspaceInput & {
   entityType: CatalogEntityType;
   id: string;
 };
 
-export type DeleteCatalogEntitiesInput = {
+export type DeleteCatalogEntitiesInput = CatalogWorkspaceInput & {
   entityType: CatalogEntityType;
   ids: string[];
 };
 
 export type CatalogCsvExportMode = "template" | "data";
 
-export type ExportCatalogCsvInput = {
+export type ExportCatalogCsvInput = CatalogWorkspaceInput & {
   entityType: CatalogEntityType;
   mode: CatalogCsvExportMode;
   ids?: string[];
@@ -172,7 +181,7 @@ export type ExportCatalogCsvInput = {
 
 export type CatalogCsvImportStrategy = "merge" | "replace";
 
-export type PreviewCatalogCsvImportInput = {
+export type PreviewCatalogCsvImportInput = CatalogWorkspaceInput & {
   entityType: CatalogEntityType;
   csvText: string;
   strategy: CatalogCsvImportStrategy;
