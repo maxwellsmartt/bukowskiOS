@@ -14,6 +14,8 @@ type SupabaseAuthUser = {
 const allowedOrigins = [/^https?:\/\/localhost(?::\d+)?$/, /^https?:\/\/127\.0\.0\.1(?::\d+)?$/];
 
 const adminPermissions = [
+  { key: "projects.read", label: "Read projects", description: "View project registry, details and schedule" },
+  { key: "projects.manage", label: "Manage projects", description: "Create, edit and archive projects" },
   { key: "assets.read", label: "Read assets", description: "View asset registry and current state" },
   { key: "assets.manage", label: "Manage assets", description: "Create movements and update assets" },
   { key: "incidents.read", label: "Read incidents", description: "View incident queues and details" },

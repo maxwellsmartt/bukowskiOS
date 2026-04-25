@@ -23,7 +23,7 @@ import {
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const fallbackWorkspaceId = DEFAULT_WORKSPACE_ID;
 const placeholderTimestamp = "2026-04-09T18:45:00.000Z";
 
 const placeholderProjects = [
@@ -222,6 +222,7 @@ const normalizeUnitDepartments = (
   unit: CreateProjectBlueprintInput["mainUnit"],
   projectDepartmentIds: string[],
   label: string,
+  workspaceId = fallbackWorkspaceId,
 ) => {
   const normalizedDepartments = (unit.unitDepartments ?? []).map((bucket) => {
     const departmentId = ensureValue(bucket.departmentId, `${label} department`);
@@ -232,11 +233,11 @@ const normalizeUnitDepartments = (
 
     ensureDepartmentExists(db, departmentId, `${label} department`);
     const normalizedAssetIds = uniqueValues(bucket.assetIds);
-    ensureAssetIdsExist(db, normalizedAssetIds);
+    ensureAssetIdsExist(db, normalizedAssetIds, workspaceId);
     ensureAssetsAreNotLockedInActiveKits(db, normalizedAssetIds, label);
 
     const normalizedCrewAssignments = (bucket.crewAssignments ?? []).map((assignment) => {
-      ensureCrewMemberExists(db, assignment.crewMemberId);
+      ensureCrewMemberExists(db, assignment.crewMemberId, workspaceId);
       const startDate = normalizeDateOnly(assignment.startDate);
       const endDate = normalizeDateOnly(assignment.endDate);
       assertDateWindow(startDate, endDate, `${label} crew assignment`);
@@ -307,7 +308,7 @@ const windowsOverlap = (leftWindows: Array<{ startDate: string | null; endDate: 
     rightWindows.some((rightWindow) => resolveDateOverlap(leftWindow.startDate, leftWindow.endDate, rightWindow.startDate, rightWindow.endDate)),
   );
 
-const resolveClientReference = (db: DatabaseSync, input: { clientId?: string; clientName?: string }) => {
+const resolveClientReference = (db: DatabaseSync, input: { clientId?: string; clientName?: string }, workspaceId = fallbackWorkspaceId) => {
   const directClientId = input.clientId?.trim();
 
   if (directClientId) {
@@ -374,6 +375,7 @@ const resolveClientReference = (db: DatabaseSync, input: { clientId?: string; cl
 const resolveProductionCompanyReference = (
   db: DatabaseSync,
   input: { productionCompanyId?: string; productionCompanyName?: string },
+  workspaceId = fallbackWorkspaceId,
 ) => {
   const directId = input.productionCompanyId?.trim();
 
@@ -487,7 +489,7 @@ const ensureDepartmentExists = (db: DatabaseSync, departmentId: string | undefin
   }
 };
 
-const ensureAssetIdsExist = (db: DatabaseSync, assetIds: string[]) => {
+const ensureAssetIdsExist = (db: DatabaseSync, assetIds: string[], workspaceId = fallbackWorkspaceId) => {
   if (!assetIds.length) {
     return;
   }
@@ -537,7 +539,7 @@ const resolveDateOverlap = (
   return leftStartDate <= rightEndDate && rightStartDate <= leftEndDate;
 };
 
-const assertCodeAvailability = (db: DatabaseSync, code: string, currentProjectId?: string) => {
+const assertCodeAvailability = (db: DatabaseSync, code: string, workspaceId = fallbackWorkspaceId, currentProjectId?: string) => {
   const existingProject = db
     .prepare(
       `
@@ -579,12 +581,12 @@ const buildGeneratedProjectCodeBase = (projectName: string) => {
   return "PRJ";
 };
 
-const resolveBlueprintProjectCode = (db: DatabaseSync, inputCode: string | undefined, projectName: string) => {
+const resolveBlueprintProjectCode = (db: DatabaseSync, inputCode: string | undefined, projectName: string, workspaceId = fallbackWorkspaceId) => {
   const explicitCode = inputCode?.trim();
 
   if (explicitCode) {
     const normalizedCode = ensureValue(explicitCode, "Project code").toUpperCase();
-    assertCodeAvailability(db, normalizedCode);
+    assertCodeAvailability(db, normalizedCode, workspaceId);
     return normalizedCode;
   }
 
@@ -594,7 +596,7 @@ const resolveBlueprintProjectCode = (db: DatabaseSync, inputCode: string | undef
     const candidateCode = attempt === 0 ? baseCode : `${baseCode}-${attempt + 1}`;
 
     try {
-      assertCodeAvailability(db, candidateCode);
+      assertCodeAvailability(db, candidateCode, workspaceId);
       return candidateCode;
     } catch {
       continue;
@@ -730,7 +732,7 @@ const getProjectRow = (db: DatabaseSync, projectId: string) =>
     .prepare(
       `
         SELECT id, start_date, end_date, color_key, description, status, archived_at
-             , production_company_id, production_company_name, has_preproduction, preproduction_start_date, preproduction_end_date
+             , workspace_id, production_company_id, production_company_name, has_preproduction, preproduction_start_date, preproduction_end_date
         FROM projects
         WHERE id = ?
         LIMIT 1
@@ -739,6 +741,7 @@ const getProjectRow = (db: DatabaseSync, projectId: string) =>
     .get(projectId) as
     | {
         id: string;
+        workspace_id: string;
         start_date: string | null;
         end_date: string | null;
         color_key: string | null;
@@ -815,7 +818,7 @@ const ensureProjectUnitExists = (db: DatabaseSync, projectId: string, unitId: st
   return unit;
 };
 
-const ensureCrewMemberExists = (db: DatabaseSync, crewMemberId: string) => {
+const ensureCrewMemberExists = (db: DatabaseSync, crewMemberId: string, workspaceId = fallbackWorkspaceId) => {
   const crewMember = db
     .prepare(
       `
@@ -914,7 +917,7 @@ export const ensureProjectShellDefaults = (db: DatabaseSync) => {
   for (const project of placeholderProjects) {
     statement.run(
       project.id,
-      workspaceId,
+      fallbackWorkspaceId,
       project.code,
       project.name,
       project.clientName,
@@ -928,11 +931,12 @@ export const ensureProjectShellDefaults = (db: DatabaseSync) => {
 
 export const createProjectMutationService = (db: DatabaseSync, options: ProjectMutationServiceOptions = {}) => ({
   createProject(input: CreateProjectInput) {
+    const workspaceId = input.workspaceId;
     const code = ensureValue(input.code, "Project code").toUpperCase();
     const name = ensureValue(input.name, "Project name");
     const now = new Date().toISOString();
-    const client = resolveClientReference(db, input);
-    const productionCompany = resolveProductionCompanyReference(db, input);
+    const client = resolveClientReference(db, input, workspaceId);
+    const productionCompany = resolveProductionCompanyReference(db, input, workspaceId);
     const startDate = normalizeDateOnly(input.startDate);
     const endDate = normalizeDateOnly(input.endDate);
     const hasPreproduction = Boolean(input.hasPreproduction);
@@ -942,7 +946,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
 
     assertDateWindow(startDate, endDate, "Project");
     assertPreproductionWindow(hasPreproduction, preproductionStartDate, preproductionEndDate, startDate);
-    assertCodeAvailability(db, code);
+    assertCodeAvailability(db, code, workspaceId);
 
     const projectId = `project-${slugify(code)}-${Date.now().toString(36)}`;
 
@@ -993,11 +997,12 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
   },
 
   createProjectBlueprint(input: CreateProjectBlueprintInput) {
+    const workspaceId = input.workspaceId;
     const now = new Date().toISOString();
     const name = ensureValue(input.generalInfo.name, "Project name");
-    const code = resolveBlueprintProjectCode(db, input.generalInfo.code, name);
-    const client = resolveClientReference(db, input.generalInfo);
-    const productionCompany = resolveProductionCompanyReference(db, input.generalInfo);
+    const code = resolveBlueprintProjectCode(db, input.generalInfo.code, name, workspaceId);
+    const client = resolveClientReference(db, input.generalInfo, workspaceId);
+    const productionCompany = resolveProductionCompanyReference(db, input.generalInfo, workspaceId);
     const startDate = normalizeDateOnly(input.generalInfo.startDate);
     const endDate = normalizeDateOnly(input.generalInfo.endDate);
     const hasPreproduction = Boolean(input.generalInfo.hasPreproduction);
@@ -1042,7 +1047,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       windows: mainUnitWindows,
       notes: normalizeOptionalText(input.mainUnit.notes),
       departmentIds: normalizeDepartmentIds(input.mainUnit.departmentIds),
-      unitDepartments: normalizeUnitDepartments(db, input.mainUnit, projectDepartmentIds, "Main Unit"),
+      unitDepartments: normalizeUnitDepartments(db, input.mainUnit, projectDepartmentIds, "Main Unit", workspaceId),
     };
 
     normalizedMainUnit.departmentIds.forEach((departmentId) => {
@@ -1076,7 +1081,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
         windows: unitWindows,
         notes: normalizeOptionalText(unit.notes),
         departmentIds,
-        unitDepartments: normalizeUnitDepartments(db, unit, projectDepartmentIds, unit.name || `Additional unit ${index + 1}`),
+        unitDepartments: normalizeUnitDepartments(db, unit, projectDepartmentIds, unit.name || `Additional unit ${index + 1}`, workspaceId),
       };
     });
 
@@ -1178,7 +1183,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       })),
     );
 
-    allAssetAssignments.forEach((bucket) => ensureAssetIdsExist(db, bucket.assetIds));
+    allAssetAssignments.forEach((bucket) => ensureAssetIdsExist(db, bucket.assetIds, workspaceId));
 
     for (let index = 0; index < allAssetAssignments.length; index += 1) {
       for (let nextIndex = index + 1; nextIndex < allAssetAssignments.length; nextIndex += 1) {
@@ -1802,11 +1807,12 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
     const code = ensureValue(input.code, "Project code").toUpperCase();
     const name = ensureValue(input.name, "Project name");
     const now = new Date().toISOString();
-    const client = resolveClientReference(db, input);
-    const productionCompany = resolveProductionCompanyReference(db, input);
     const currentProject = ensureProjectExists(db, input.projectId);
+    const workspaceId = currentProject.workspace_id;
+    const client = resolveClientReference(db, input, workspaceId);
+    const productionCompany = resolveProductionCompanyReference(db, input, workspaceId);
 
-    assertCodeAvailability(db, code, input.projectId);
+    assertCodeAvailability(db, code, workspaceId, input.projectId);
 
     const startDate = input.startDate === undefined ? currentProject.start_date : normalizeDateOnly(input.startDate);
     const endDate = input.endDate === undefined ? currentProject.end_date : normalizeDateOnly(input.endDate);
@@ -1955,6 +1961,7 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
 
   createProjectUnit(input: CreateProjectUnitInput) {
     const project = ensureProjectExists(db, input.projectId);
+    const workspaceId = project.workspace_id;
     const code = ensureValue(input.code, "Unit code").toUpperCase();
     const name = ensureValue(input.name, "Unit name");
     const startDate = normalizeDateOnly(input.startDate);
@@ -2148,8 +2155,10 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
   },
 
   assignCrewToProjectUnit(input: AssignCrewToProjectUnitInput) {
+    const project = ensureProjectExists(db, input.projectId);
     const unit = ensureProjectUnitExists(db, input.projectId, input.unitId);
-    ensureCrewMemberExists(db, input.crewMemberId);
+    const workspaceId = project.workspace_id;
+    ensureCrewMemberExists(db, input.crewMemberId, workspaceId);
     const startDate = normalizeDateOnly(input.startDate);
     const endDate = normalizeDateOnly(input.endDate);
     const now = new Date().toISOString();

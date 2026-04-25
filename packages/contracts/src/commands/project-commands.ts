@@ -1,4 +1,5 @@
 export type CreateProjectInput = {
+  workspaceId: string;
   code: string;
   name: string;
   clientId?: string;
@@ -161,6 +162,7 @@ export type ProjectBlueprintGeneralInfoInput = {
 };
 
 export type CreateProjectBlueprintInput = {
+  workspaceId: string;
   generalInfo: ProjectBlueprintGeneralInfoInput;
   mainUnit: ProjectBlueprintUnitDraftInput;
   additionalUnits: ProjectBlueprintUnitDraftInput[];

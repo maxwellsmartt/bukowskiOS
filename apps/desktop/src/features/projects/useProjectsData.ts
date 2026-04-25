@@ -72,6 +72,7 @@ export const useProjectsData = () => {
 };
 
 const defaultProjectListQuery: ProjectListQuery = {
+  workspaceId: undefined,
   search: "",
   sortBy: "name",
   sortDirection: "asc",
@@ -115,7 +116,7 @@ export const useProjectsRegistry = (query: ProjectListQuery = defaultProjectList
       return window.bukowskiProjects.getList(query);
     },
     emptyProjects,
-    [query.includeArchived, query.search, query.sortBy, query.sortDirection],
+    [query.includeArchived, query.search, query.sortBy, query.sortDirection, query.workspaceId],
   );
 
 export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery) => {

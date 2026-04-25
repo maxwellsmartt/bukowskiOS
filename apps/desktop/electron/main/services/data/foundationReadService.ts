@@ -630,6 +630,7 @@ const defaultIncidentListQuery: IncidentListQuery = {
 };
 
 const defaultProjectListQuery: ProjectListQuery = {
+  workspaceId,
   search: "",
   sortBy: "name",
   sortDirection: "asc",

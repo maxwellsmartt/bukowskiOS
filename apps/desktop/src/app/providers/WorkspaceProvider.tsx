@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
@@ -78,6 +78,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true);
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
+  const hasLoadedWorkspacesRef = useRef(false);
+  const userId = user?.id ?? null;
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(
     () => readStringPreference(uiPreferenceKeys.activeWorkspaceId, DEFAULT_WORKSPACE_ID) ?? DEFAULT_WORKSPACE_ID,
   );
@@ -88,14 +90,19 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshWorkspaces = useCallback(async () => {
     if (status === "loading") {
-      setIsLoadingWorkspaces(true);
+      if (!hasLoadedWorkspacesRef.current) {
+        setIsLoadingWorkspaces(true);
+      }
       return;
     }
 
-    setIsLoadingWorkspaces(true);
+    if (!hasLoadedWorkspacesRef.current) {
+      setIsLoadingWorkspaces(true);
+    }
 
-    if (isLocalFallback || !supabase || !user) {
+    if (isLocalFallback || !supabase || !userId) {
       setMemberships([localMembership]);
+      hasLoadedWorkspacesRef.current = true;
       setActiveWorkspaceId((current) => current || DEFAULT_WORKSPACE_ID);
       setWorkspaceError(null);
       setIsLoadingWorkspaces(false);
@@ -108,7 +115,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       const { data, error } = await supabase
         .from("workspace_memberships")
         .select("workspace_id,status,workspaces(name,slug,base_currency,icon_color),roles(name)")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("status", "active");
 
       if (error) {
@@ -155,6 +162,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       );
 
       setMemberships(nextMemberships);
+      hasLoadedWorkspacesRef.current = true;
       setActiveWorkspaceId((current) =>
         nextMemberships.some((membership) => membership.workspaceId === current)
           ? current
@@ -168,6 +176,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
 
       setWorkspaceError(`Supabase no responde ahora mismo. Se cargó el cache local de workspaces. ${message}`);
       setMemberships(cachedMemberships);
+      hasLoadedWorkspacesRef.current = true;
       setActiveWorkspaceId((current) =>
         cachedMemberships.some((membership) => membership.workspaceId === current)
           ? current
@@ -175,7 +184,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       );
       setIsLoadingWorkspaces(false);
     }
-  }, [isLocalFallback, status, supabase, user]);
+  }, [isLocalFallback, status, supabase, userId]);
 
   useEffect(() => {
     void refreshWorkspaces();

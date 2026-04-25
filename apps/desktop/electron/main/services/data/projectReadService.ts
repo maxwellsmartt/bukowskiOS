@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import type {
   CreateProjectBlueprintInput,
   ListSortDirection,
@@ -14,6 +15,7 @@ import type {
   ProjectResponsibleRow,
   ProjectSortField,
   ScheduleTimelinePagination,
+  ScheduleTimelineQuery,
   ProjectUnitRow,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
@@ -69,6 +71,10 @@ type CrewAssignmentConflictRow = {
   unitStartDate: string | null;
   unitEndDate: string | null;
 };
+
+const isScheduleTimelineQuery = (
+  query: ScheduleTimelineQuery | ScheduleTimelinePagination,
+): query is ScheduleTimelineQuery => "workspaceId" in query || "pagination" in query;
 
 type UnitConflictSnapshot = {
   conflictCount: number;
@@ -292,8 +298,15 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
     range: ScheduleTimelineRange,
     scale: ScheduleTimelineScale,
     anchorDate?: string,
-    pagination?: ScheduleTimelinePagination,
+    query?: ScheduleTimelineQuery | ScheduleTimelinePagination,
   ): ScheduleTimelineSnapshot {
+    const timelineQuery: ScheduleTimelineQuery | undefined = query
+      ? isScheduleTimelineQuery(query)
+        ? query
+        : { pagination: query }
+      : undefined;
+    const workspaceId = timelineQuery?.workspaceId ?? deps.defaultProjectListQuery.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    const pagination = timelineQuery?.pagination;
     const window = deps.resolveTimelineWindow(range, scale, anchorDate);
     const rows = db
       .prepare(
@@ -323,11 +336,12 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           LEFT JOIN clients ON clients.id = projects.client_id
           LEFT JOIN project_units ON project_units.project_id = projects.id
             AND COALESCE(project_units.is_primary, 0) = 0
-          WHERE projects.archived_at IS NULL
+          WHERE projects.workspace_id = ?
+            AND projects.archived_at IS NULL
           ORDER BY projects.name, project_units.sort_order, project_units.start_date, project_units.name
         `,
       )
-      .all() as Array<{
+      .all(workspaceId) as Array<{
       project_id: string;
       project_code: string;
       project_name: string;
@@ -354,17 +368,24 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       .prepare(
         `
           SELECT
-            id,
-            project_unit_id,
-            start_date,
-            end_date,
-            sort_order,
-            label
+            project_unit_windows.id,
+            project_unit_windows.project_unit_id,
+            project_unit_windows.start_date,
+            project_unit_windows.end_date,
+            project_unit_windows.sort_order,
+            project_unit_windows.label
           FROM project_unit_windows
-          ORDER BY project_unit_id, sort_order, start_date, end_date
+          JOIN project_units ON project_units.id = project_unit_windows.project_unit_id
+          JOIN projects ON projects.id = project_units.project_id
+          WHERE projects.workspace_id = ?
+          ORDER BY
+            project_unit_windows.project_unit_id,
+            project_unit_windows.sort_order,
+            project_unit_windows.start_date,
+            project_unit_windows.end_date
         `,
       )
-      .all() as Array<{
+      .all(workspaceId) as Array<{
       id: string;
       project_unit_id: string;
       start_date: string | null;
@@ -588,10 +609,11 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
             JOIN projects ON projects.id = project_units.project_id
             LEFT JOIN crew_members ON crew_members.id = project_unit_crew_assignments.crew_member_id
             WHERE projects.archived_at IS NULL
+              AND projects.workspace_id = ?
             ORDER BY project_units.project_id, project_units.sort_order, crew_members.full_name
           `,
         )
-        .all() as CrewAssignmentConflictRow[];
+        .all(workspaceId) as CrewAssignmentConflictRow[];
       const crewConflictMap = buildCrewConflictMap(allCrewAssignmentRows);
 
       const projectAssetCounts = db
@@ -865,6 +887,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
   },
 
   getProjects(query: ProjectListQuery = deps.defaultProjectListQuery): ProjectCardRow[] {
+    const workspaceId = query.workspaceId ?? deps.defaultProjectListQuery.workspaceId;
     const rows = db
       .prepare(
         `
@@ -932,10 +955,11 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
           FROM projects
           LEFT JOIN clients ON clients.id = projects.client_id
           LEFT JOIN production_companies ON production_companies.id = projects.production_company_id
-          WHERE (? = 1 OR projects.archived_at IS NULL)
+          WHERE (? IS NULL OR projects.workspace_id = ?)
+            AND (? = 1 OR projects.archived_at IS NULL)
         `,
       )
-      .all(query.includeArchived ? 1 : 0) as Array<{
+      .all(workspaceId ?? null, workspaceId ?? null, query.includeArchived ? 1 : 0) as Array<{
       id: string;
       code: string;
       name: string;
@@ -1846,19 +1870,20 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
   },
 
   getProjectCreationConflicts(input: CreateProjectBlueprintInput): ProjectCreationConflictsSnapshot {
+    const workspaceId = input.workspaceId;
     const mainWindowStart = input.generalInfo.startDate?.trim() || null;
     const mainWindowEnd = input.generalInfo.endDate?.trim() || null;
     const crewMembers = db
       .prepare("SELECT id, full_name FROM crew_members WHERE workspace_id = ?")
-      .all("workspace-default") as Array<{ id: string; full_name: string }>;
+      .all(workspaceId) as Array<{ id: string; full_name: string }>;
     const crewNameMap = new Map(crewMembers.map((row) => [row.id, row.full_name] as const));
     const departmentRows = db
       .prepare("SELECT id, name FROM departments WHERE workspace_id = ?")
-      .all("workspace-default") as Array<{ id: string; name: string }>;
+      .all(workspaceId) as Array<{ id: string; name: string }>;
     const departmentNameMap = new Map(departmentRows.map((row) => [row.id, row.name] as const));
     const assetLabelRows = db
       .prepare("SELECT id, name FROM assets WHERE workspace_id = ?")
-      .all("workspace-default") as Array<{ id: string; name: string }>;
+      .all(workspaceId) as Array<{ id: string; name: string }>;
     const assetLabelMap = new Map(assetLabelRows.map((row) => [row.id, row.name] as const));
 
     const resolveUnitWindows = (

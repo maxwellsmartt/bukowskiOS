@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { ProjectDetailSnapshot } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
 import { useCatalogData } from "@features/projects/useProjectsData";
@@ -21,8 +21,6 @@ type ProjectDetailPanelProps = {
   onIncidentCreated: () => void | Promise<void>;
 };
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
-
 const toneForStatus = (status: string) => {
   switch (status) {
     case "Active":
@@ -39,6 +37,7 @@ const toneForStatus = (status: string) => {
 
 export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }: ProjectDetailPanelProps) => {
   const navigate = useNavigate();
+  const { activeWorkspaceId } = useWorkspace();
   const { projects, refreshProjects } = useShellContext();
   const { data: catalog, error: catalogError } = useCatalogData();
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
@@ -154,7 +153,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               setIsSubmitting(true);
               const result = await reportIncident({
                 commandId: crypto.randomUUID(),
-                workspaceId,
+                workspaceId: activeWorkspaceId,
                 assetId: value.assetId,
                 projectId: value.projectId ?? project.id,
                 projectUnitId: value.projectUnitId,

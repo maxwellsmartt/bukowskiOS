@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { createCatalogMutationService } from "../../electron/main/services/data/catalogMutationService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
@@ -21,6 +22,7 @@ describe("project mutation service", () => {
     const internalClient = catalog.clients.find((client) => client.name === "Internal");
 
     mutations.createProject({
+      workspaceId: DEFAULT_WORKSPACE_ID,
       code: "TEST",
       name: "Test Project",
       clientId: internalClient?.id,
@@ -121,6 +123,7 @@ describe("project mutation service", () => {
     const client = catalog.clients.find((row) => row.name === "Internal");
 
     mutations.createProjectBlueprint({
+      workspaceId: DEFAULT_WORKSPACE_ID,
       generalInfo: {
         code: "BLUE",
         name: "Blueprint Launch",
@@ -179,6 +182,7 @@ describe("project mutation service", () => {
     const mutations = createProjectMutationService(database, { createBackupBeforeDelete: backupSpy });
 
     mutations.createProjectBlueprint({
+      workspaceId: DEFAULT_WORKSPACE_ID,
       generalInfo: {
         name: "Delete Me Blueprint",
         status: "Prep",
@@ -235,6 +239,7 @@ describe("project mutation service", () => {
     const mutations = createProjectMutationService(database);
 
     mutations.createProjectBlueprint({
+      workspaceId: DEFAULT_WORKSPACE_ID,
       generalInfo: {
         name: "Silent River",
         status: "Prep",
@@ -265,6 +270,7 @@ describe("project mutation service", () => {
 
     expect(() =>
       mutations.createProjectBlueprint({
+        workspaceId: DEFAULT_WORKSPACE_ID,
         generalInfo: {
           name: "Crew Conflict Setup",
           status: "Prep",
@@ -300,6 +306,7 @@ describe("project mutation service", () => {
 
     expect(() =>
       mutations.createProjectBlueprint({
+        workspaceId: DEFAULT_WORKSPACE_ID,
         generalInfo: {
           name: "Asset Conflict Setup",
           status: "Prep",
@@ -343,6 +350,7 @@ describe("project mutation service", () => {
 
     expect(() =>
       mutations.createProjectBlueprint({
+        workspaceId: DEFAULT_WORKSPACE_ID,
         generalInfo: {
           name: "Kit Locked Setup",
           status: "Prep",
@@ -370,6 +378,7 @@ describe("project mutation service", () => {
     const mutations = createProjectMutationService(database);
 
     mutations.createProjectBlueprint({
+      workspaceId: DEFAULT_WORKSPACE_ID,
       generalInfo: {
         name: "Segmented Unit Setup",
         status: "Prep",
@@ -432,6 +441,7 @@ describe("project mutation service", () => {
     const catalog = reads.getCatalogSnapshot();
 
     mutations.createProject({
+      workspaceId: DEFAULT_WORKSPACE_ID,
       code: "SHELL",
       name: "Shell Only",
       clientId: catalog.clients[0]?.id,

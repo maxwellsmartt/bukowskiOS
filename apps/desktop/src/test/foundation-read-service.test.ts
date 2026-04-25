@@ -87,6 +87,60 @@ describe("foundation read service", () => {
     cleanup();
   });
 
+  it("scopes the schedule timeline to the requested workspace", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-foundation-timeline-workspace");
+    const reads = createFoundationReadService(database);
+
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, name, slug, base_currency, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run("workspace-timeline-other", "Other Workspace", "other-workspace", "USD", "2026-04-10T00:00:00.000Z", "2026-04-10T00:00:00.000Z");
+    database
+      .prepare(
+        `
+          INSERT INTO projects (
+            id,
+            workspace_id,
+            code,
+            name,
+            client_name,
+            status,
+            start_date,
+            end_date,
+            description,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run(
+        "project-other-workspace",
+        "workspace-timeline-other",
+        "OTHER",
+        "Other workspace project",
+        "Other Client",
+        "Prep",
+        "2026-04-14",
+        "2026-04-28",
+        null,
+        "2026-04-10T00:00:00.000Z",
+        "2026-04-10T00:00:00.000Z",
+      );
+
+    const defaultTimeline = reads.getScheduleTimeline("90d", "week", "2026-04-10", { workspaceId: "workspace-metadata" });
+    const otherTimeline = reads.getScheduleTimeline("90d", "week", "2026-04-10", { workspaceId: "workspace-timeline-other" });
+
+    expect(defaultTimeline.projects.some((project) => project.id === "project-other-workspace")).toBe(false);
+    expect(otherTimeline.projects.map((project) => project.id)).toEqual(["project-other-workspace"]);
+
+    cleanup();
+  });
+
   it("hides archived projects from default lists and timeline until explicitly included", () => {
     const { cleanup, database } = createTestDatabase("bukowski-foundation-archived-projects");
     const reads = createFoundationReadService(database);

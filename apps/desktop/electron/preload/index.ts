@@ -95,6 +95,7 @@ import type {
   ReturnPackingSlipItemsResult,
   ScheduleTimelineRange,
   ScheduleTimelinePagination,
+  ScheduleTimelineQuery,
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
   ShellAppAction,
@@ -197,9 +198,9 @@ const bukowskiOverview = {
     range: ScheduleTimelineRange,
     scale: ScheduleTimelineScale,
     anchorDate?: string,
-    pagination?: ScheduleTimelinePagination,
+    query?: ScheduleTimelineQuery,
   ) =>
-    ipcRenderer.invoke(ipcChannels.overview.getTimeline, range, scale, anchorDate, pagination) as Promise<ScheduleTimelineSnapshot>,
+    ipcRenderer.invoke(ipcChannels.overview.getTimeline, range, scale, anchorDate, query) as Promise<ScheduleTimelineSnapshot>,
 };
 
 const bukowskiAgents = {

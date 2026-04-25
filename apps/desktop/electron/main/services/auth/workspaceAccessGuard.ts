@@ -136,6 +136,13 @@ export const createWorkspaceAccessGuard = ({
     return row?.workspace_id ?? null;
   };
 
+  const getProjectWorkspaceId = (projectId: string) => {
+    const row = database.prepare("SELECT workspace_id FROM projects WHERE id = ? LIMIT 1").get(projectId) as
+      | { workspace_id: string }
+      | undefined;
+    return row?.workspace_id ?? null;
+  };
+
   const getIncidentFileWorkspaceId = (fileId: string) => {
     const row = database
       .prepare(
@@ -260,6 +267,7 @@ export const createWorkspaceAccessGuard = ({
       }
 
       await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });
+      return workspaceId;
     },
 
     async assertAssetFileAccess(
@@ -290,6 +298,22 @@ export const createWorkspaceAccessGuard = ({
       }
 
       await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });
+    },
+
+    async assertProjectAccess(
+      projectId: string,
+      action: string,
+      accessLevel: WorkspaceAccessLevel = "read",
+      requiredPermission?: string,
+    ) {
+      const workspaceId = getProjectWorkspaceId(projectId);
+
+      if (!workspaceId) {
+        throw new Error("Project was not found.");
+      }
+
+      await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });
+      return workspaceId;
     },
 
     async assertIncidentAccess(

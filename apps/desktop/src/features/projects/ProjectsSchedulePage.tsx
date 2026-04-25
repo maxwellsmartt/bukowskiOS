@@ -24,7 +24,7 @@ const isTimelineScale = (value: string | null): value is ScheduleTimelineScale =
   value === "day" || value === "week" || value === "month";
 
 export const ProjectsSchedulePage = () => {
-  const { projectDataVersion } = useShellContext();
+  const { activeWorkspaceId, projectDataVersion } = useShellContext();
   const [timelineRange, setTimelineRange] = useState<ScheduleTimelineRange>(() => {
     const storedValue = readStringPreference(uiPreferenceKeys.overviewTimelineRange, "90d");
     return isTimelineRange(storedValue) ? storedValue : "90d";
@@ -41,7 +41,7 @@ export const ProjectsSchedulePage = () => {
     timelineRange,
     timelineScale,
     timelineAnchorDate,
-    { limit: timelineProjectLimit, offset: 0 },
+    { workspaceId: activeWorkspaceId, pagination: { limit: timelineProjectLimit, offset: 0 } },
     projectDataVersion,
   );
 

@@ -30,6 +30,11 @@ export type ScheduleTimelinePagination = {
   offset?: number;
 };
 
+export type ScheduleTimelineQuery = {
+  workspaceId?: string;
+  pagination?: ScheduleTimelinePagination;
+};
+
 export type ScheduleTimelineMarker = {
   key: string;
   label: string;

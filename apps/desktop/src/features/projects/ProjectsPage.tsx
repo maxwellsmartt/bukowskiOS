@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import type { ProjectListQuery, ProjectSortField } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -30,6 +31,7 @@ const projectSortOptions: Array<ListSortOption<ProjectSortField>> = [
 ];
 
 export const ProjectsPage = () => {
+  const { activeWorkspaceId } = useWorkspace();
   const [showArchived, setShowArchived] = useState(false);
   const projectControls = useListControls<ProjectSortField, ProjectListQuery>({
     viewKey: "projects-registry-list",
@@ -50,6 +52,7 @@ export const ProjectsPage = () => {
       endDate: "asc",
     },
     buildQuery: ({ search, sortBy, sortDirection }) => ({
+      workspaceId: activeWorkspaceId,
       search,
       sortBy,
       sortDirection,

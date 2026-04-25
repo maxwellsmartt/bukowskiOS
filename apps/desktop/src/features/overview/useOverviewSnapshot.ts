@@ -1,6 +1,7 @@
 import type {
   OverviewSnapshot,
   ScheduleTimelinePagination,
+  ScheduleTimelineQuery,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
@@ -53,6 +54,10 @@ const emptyTimeline: ScheduleTimelineSnapshot = {
   unscheduled: [],
 };
 
+const isScheduleTimelineQuery = (
+  query: ScheduleTimelineQuery | ScheduleTimelinePagination,
+): query is ScheduleTimelineQuery => "workspaceId" in query || "pagination" in query;
+
 export const useOverviewSnapshot = (refreshKey = 0) =>
   useAsyncValue(
     async () => {
@@ -70,17 +75,32 @@ export const useOverviewTimeline = (
   range: ScheduleTimelineRange = "90d",
   scale: ScheduleTimelineScale = "week",
   anchorDate?: string,
-  pagination?: ScheduleTimelinePagination,
+  query?: ScheduleTimelineQuery | ScheduleTimelinePagination,
   refreshKey = 0,
-) =>
-  useAsyncValue(
+) => {
+  const timelineQuery: ScheduleTimelineQuery | undefined = query
+    ? isScheduleTimelineQuery(query)
+      ? query
+      : { pagination: query }
+    : undefined;
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiOverview) {
         return emptyTimeline;
       }
 
-      return window.bukowskiOverview.getTimeline(range, scale, anchorDate, pagination);
+      return window.bukowskiOverview.getTimeline(range, scale, anchorDate, timelineQuery);
     },
     emptyTimeline,
-    [range, scale, anchorDate ?? "", pagination?.limit ?? 24, pagination?.offset ?? 0, refreshKey],
+    [
+      range,
+      scale,
+      anchorDate ?? "",
+      timelineQuery?.pagination?.limit ?? 24,
+      timelineQuery?.pagination?.offset ?? 0,
+      timelineQuery?.workspaceId ?? "",
+      refreshKey,
+    ],
   );
+};

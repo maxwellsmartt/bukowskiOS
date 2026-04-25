@@ -17,6 +17,7 @@ import type {
   StagingPackingSlipRow,
 } from "@contracts";
 import { projectColorPalette } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useCatalogData, exportProjectBlueprintPdf, getProjectCreationConflicts, getStagingPackingSlips } from "@features/projects/useProjectsData";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { SelectField } from "@shared/components/SelectField";
@@ -158,7 +159,9 @@ const normalizeBucketForSubmit = (bucket: ProjectBlueprintUnitDepartmentDraftInp
           },
 });
 
-const normalizeDraftForSubmit = (draft: ProjectSetupDraft): CreateProjectBlueprintInput => ({
+type ProjectBlueprintDraftSubmitInput = Omit<CreateProjectBlueprintInput, "workspaceId">;
+
+const normalizeDraftForSubmit = (draft: ProjectSetupDraft): ProjectBlueprintDraftSubmitInput => ({
   generalInfo: {
     code: draft.generalInfo.code.trim(),
     name: draft.generalInfo.name.trim(),
@@ -432,6 +435,7 @@ export const ProjectSetupWizard = ({
   open,
 }: ProjectSetupWizardProps) => {
   const { data: catalog } = useCatalogData();
+  const { activeWorkspaceId } = useWorkspace();
   const { createProjectBlueprint, openProject } = useShellContext();
   const [stagingSlips, setStagingSlips] = useState<StagingPackingSlipRow[]>([]);
   const [stagingError, setStagingError] = useState<string | null>(null);
@@ -498,7 +502,7 @@ export const ProjectSetupWizard = ({
 
     const timeout = window.setTimeout(() => {
       setIsCheckingConflicts(true);
-      void getProjectCreationConflicts(normalizeDraftForSubmit(draft))
+      void getProjectCreationConflicts({ ...normalizeDraftForSubmit(draft), workspaceId: activeWorkspaceId })
         .then((snapshot) => {
           setConflicts(snapshot);
           setConflictsError(null);
@@ -511,7 +515,7 @@ export const ProjectSetupWizard = ({
     }, 200);
 
     return () => window.clearTimeout(timeout);
-  }, [draft, open]);
+  }, [activeWorkspaceId, draft, open]);
 
   useEffect(() => {
     if (activeAssignmentUnitId === "main") {
@@ -1065,7 +1069,7 @@ export const ProjectSetupWizard = ({
   const handleExportPdf = async () => {
     try {
       setSubmitError(null);
-      const result = await exportProjectBlueprintPdf(normalizeDraftForSubmit(draft));
+      const result = await exportProjectBlueprintPdf({ ...normalizeDraftForSubmit(draft), workspaceId: activeWorkspaceId });
       setSubmitFeedback(result.summary);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Unable to export project setup summary.");

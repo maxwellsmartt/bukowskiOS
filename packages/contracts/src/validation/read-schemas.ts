@@ -97,11 +97,16 @@ export const scheduleTimelinePaginationSchema = z.object({
   offset: z.number().int().min(0).max(1000).optional(),
 });
 
+export const scheduleTimelineQuerySchema = z.object({
+  workspaceId: nonEmptyId.optional(),
+  pagination: scheduleTimelinePaginationSchema.optional(),
+});
+
 export const scheduleTimelineReadArgsSchema = z.tuple([
   z.enum(["30d", "90d", "6m"]),
   z.enum(["day", "week", "month"]),
   isoDateSchema.optional(),
-  scheduleTimelinePaginationSchema.optional(),
+  scheduleTimelineQuerySchema.optional(),
 ]);
 
 export const assetListQuerySchema = z.object({
@@ -140,6 +145,7 @@ export const incidentListQuerySchema = z.object({
 export const incidentListReadArgsSchema = z.tuple([incidentListQuerySchema.optional()]);
 
 export const projectListQuerySchema = z.object({
+  workspaceId: nonEmptyId.optional(),
   search: boundedSearch.optional(),
   sortBy: projectSortFieldSchema,
   sortDirection: sortDirectionSchema,

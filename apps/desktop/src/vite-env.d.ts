@@ -102,6 +102,7 @@ import type {
   SaveAIProviderConfigCommand,
   SaveConnectorConfigCommand,
   ScheduleTimelinePagination,
+  ScheduleTimelineQuery,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
@@ -200,7 +201,7 @@ declare global {
         range: ScheduleTimelineRange,
         scale: ScheduleTimelineScale,
         anchorDate?: string,
-        pagination?: ScheduleTimelinePagination,
+        query?: ScheduleTimelineQuery,
       ) => Promise<ScheduleTimelineSnapshot>;
     };
     bukowskiAssets?: {

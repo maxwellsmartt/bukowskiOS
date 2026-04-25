@@ -7,6 +7,8 @@ import { DEFAULT_WORKSPACE_ID } from "@contracts";
 const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const operationalPermissions = [
+  ["perm-projects-read", "projects.read", "Read projects", "View project registry, details and schedule"],
+  ["perm-projects-manage", "projects.manage", "Manage projects", "Create, edit and archive projects"],
   ["perm-assets-read", "assets.read", "Read assets", "View asset registry and current state"],
   ["perm-assets-manage", "assets.manage", "Manage assets", "Create movements and update assets"],
   ["perm-incidents-read", "incidents.read", "Read incidents", "View incident queues and details"],

@@ -66,6 +66,7 @@ import {
   updateRmaCaseSchema,
   scheduleTimelineReadArgsSchema,
   uploadCrewCatalogDocumentsReadArgsSchema,
+  DEFAULT_WORKSPACE_ID,
 } from "@contracts";
 import type {
   AssistantChatSnapshot,
@@ -120,7 +121,7 @@ import type {
   ReportIncidentCommand,
   ResolveIncidentCommand,
   ReturnPackingSlipItemsCommand,
-  ScheduleTimelinePagination,
+  ScheduleTimelineQuery,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
   ScheduleTimelineSnapshot,
@@ -283,6 +284,14 @@ export const registerFoundationIpc = ({
   agentMutations,
   runtimeDiagnostics,
 }: RegisterFoundationIpcOptions) => {
+  const normalizeProjectListQuery = (query: ProjectListQuery | undefined): ProjectListQuery => ({
+    workspaceId: query?.workspaceId ?? DEFAULT_WORKSPACE_ID,
+    search: query?.search ?? "",
+    sortBy: query?.sortBy ?? "name",
+    sortDirection: query?.sortDirection ?? "asc",
+    includeArchived: query?.includeArchived,
+  });
+
   safeHandleReadWithSchema(
     ipcChannels.shell.getBootstrap,
     emptyReadArgsSchema,
@@ -415,13 +424,24 @@ export const registerFoundationIpc = ({
   safeHandleReadWithSchema(
     ipcChannels.overview.getTimeline,
     scheduleTimelineReadArgsSchema,
-    (
+    async (
       _event,
       range: ScheduleTimelineRange,
       scale: ScheduleTimelineScale,
       anchorDate?: string,
-      pagination?: ScheduleTimelinePagination,
-    ) => foundationReads.getScheduleTimeline(range, scale, anchorDate, pagination),
+      query?: ScheduleTimelineQuery,
+    ) => {
+      if (query?.workspaceId) {
+        await workspaceAccess.assertWorkspaceAccess({
+          workspaceId: query.workspaceId,
+          action: "load schedule overview",
+          accessLevel: "read",
+          requiredPermission: "projects.read",
+        });
+      }
+
+      return foundationReads.getScheduleTimeline(range, scale, anchorDate, query);
+    },
     "The app could not load the schedule timeline.",
   );
   safeHandleReadWithSchema(
@@ -757,25 +777,46 @@ export const registerFoundationIpc = ({
   safeHandleReadWithSchema(
     ipcChannels.projects.getList,
     projectListReadArgsSchema,
-    (_event, query: ProjectListQuery | undefined) => foundationReads.getProjects(query),
+    async (_event, query: ProjectListQuery | undefined) => {
+      const scopedQuery = normalizeProjectListQuery(query);
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: scopedQuery.workspaceId ?? DEFAULT_WORKSPACE_ID,
+        action: "load projects",
+        accessLevel: "read",
+        requiredPermission: "projects.read",
+      });
+      return foundationReads.getProjects(scopedQuery);
+    },
     "The app could not load projects.",
   );
   safeHandleReadWithSchema(
     ipcChannels.projects.getDetail,
     idReadArgsSchema,
-    (_event, projectId: string) => foundationReads.getProjectDetail(projectId),
+    async (_event, projectId: string) => {
+      await workspaceAccess.assertProjectAccess(projectId, "load that project", "read", "projects.read");
+      return foundationReads.getProjectDetail(projectId);
+    },
     "The app could not load that project.",
   );
   safeHandleReadWithSchema(
     ipcChannels.projects.getDeletePreview,
     idReadArgsSchema,
-    (_event, projectId: string) => foundationReads.getProjectDeletePreview(projectId),
+    async (_event, projectId: string) => {
+      await workspaceAccess.assertProjectAccess(projectId, "load that project lifecycle preview", "read", "projects.manage");
+      return foundationReads.getProjectDeletePreview(projectId);
+    },
     "The app could not load that project lifecycle preview.",
   );
   safeHandleRead(ipcChannels.projects.getCatalog, () => foundationReads.getCatalogSnapshot(), "The app could not load the catalog.");
-  safeHandle(ipcChannels.projects.create, createProjectSchema, (_event, input) => {
+  safeHandle(ipcChannels.projects.create, createProjectSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "create projects",
+      accessLevel: "write",
+      requiredPermission: "projects.manage",
+    });
     projectMutations.createProject(input);
-    return foundationReads.getProjects();
+    return foundationReads.getProjects(normalizeProjectListQuery({ workspaceId: input.workspaceId, search: "", sortBy: "name", sortDirection: "asc" }));
   });
   safeHandleReadWithSchema(
     ipcChannels.projects.getStagingPackingSlips,
@@ -786,17 +827,37 @@ export const registerFoundationIpc = ({
   safeHandleReadWithSchema(
     ipcChannels.projects.getCreationConflicts,
     createProjectBlueprintReadArgsSchema,
-    (_event, input: CreateProjectBlueprintInput) => foundationReads.getProjectCreationConflicts(input),
+    async (_event, input: CreateProjectBlueprintInput) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "preview project setup",
+        accessLevel: "read",
+        requiredPermission: "projects.read",
+      });
+      return foundationReads.getProjectCreationConflicts(input);
+    },
     "The app could not preview project setup conflicts.",
   );
-  safeHandle(ipcChannels.projects.createBlueprint, createProjectBlueprintSchema, (_event, input) => {
+  safeHandle(ipcChannels.projects.createBlueprint, createProjectBlueprintSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "create projects",
+      accessLevel: "write",
+      requiredPermission: "projects.manage",
+    });
     projectMutations.createProjectBlueprint(input);
-    return foundationReads.getProjects();
+    return foundationReads.getProjects(normalizeProjectListQuery({ workspaceId: input.workspaceId, search: "", sortBy: "name", sortDirection: "asc" }));
   });
   safeHandleReadWithSchema(
     ipcChannels.projects.exportBlueprintPdf,
     createProjectBlueprintReadArgsSchema,
     async (_event, input: CreateProjectBlueprintInput) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "export project setup",
+        accessLevel: "read",
+        requiredPermission: "projects.read",
+      });
       const baseName = input.generalInfo.code?.trim() || input.generalInfo.name?.trim() || "project-setup-summary";
       const safeBaseName = baseName.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "project-setup-summary";
       const { canceled, filePath } = await dialog.showSaveDialog({
@@ -826,39 +887,48 @@ export const registerFoundationIpc = ({
     },
     "The app could not export that project setup summary.",
   );
-  safeHandle(ipcChannels.projects.update, updateProjectSchema, (_event, input) => {
+  safeHandle(ipcChannels.projects.update, updateProjectSchema, async (_event, input) => {
+    const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "update that project", "write", "projects.manage");
     projectMutations.updateProject(input);
-    return foundationReads.getProjects();
+    return foundationReads.getProjects(normalizeProjectListQuery({ workspaceId, search: "", sortBy: "name", sortDirection: "asc" }));
   });
-  safeHandle(ipcChannels.projects.archive, archiveProjectSchema, (_event, input) => {
+  safeHandle(ipcChannels.projects.archive, archiveProjectSchema, async (_event, input) => {
+    const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "archive that project", "write", "projects.manage");
     projectMutations.archiveProject(input);
-    return foundationReads.getProjects({ search: "", sortBy: "name", sortDirection: "asc", includeArchived: true });
+    return foundationReads.getProjects({ workspaceId, search: "", sortBy: "name", sortDirection: "asc", includeArchived: true });
   });
-  safeHandle(ipcChannels.projects.unarchive, unarchiveProjectSchema, (_event, input) => {
+  safeHandle(ipcChannels.projects.unarchive, unarchiveProjectSchema, async (_event, input) => {
+    const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "restore that project", "write", "projects.manage");
     projectMutations.unarchiveProject(input);
-    return foundationReads.getProjects({ search: "", sortBy: "name", sortDirection: "asc", includeArchived: true });
+    return foundationReads.getProjects({ workspaceId, search: "", sortBy: "name", sortDirection: "asc", includeArchived: true });
   });
-  safeHandle(ipcChannels.projects.delete, deleteProjectSchema, (_event, input) => {
+  safeHandle(ipcChannels.projects.delete, deleteProjectSchema, async (_event, input) => {
+    const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "delete that project", "write", "projects.manage");
     projectMutations.deleteProject(input);
-    return foundationReads.getProjects();
+    return foundationReads.getProjects(normalizeProjectListQuery({ workspaceId, search: "", sortBy: "name", sortDirection: "asc" }));
   });
-  safeHandle(ipcChannels.projects.createUnit, createProjectUnitSchema, (_event, input) => {
+  safeHandle(ipcChannels.projects.createUnit, createProjectUnitSchema, async (_event, input) => {
+    await workspaceAccess.assertProjectAccess(input.projectId, "create project units", "write", "projects.manage");
     projectMutations.createProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });
-  safeHandle(ipcChannels.projects.updateUnit, updateProjectUnitSchema, (_event, input) => {
+  safeHandle(ipcChannels.projects.updateUnit, updateProjectUnitSchema, async (_event, input) => {
+    await workspaceAccess.assertProjectAccess(input.projectId, "update project units", "write", "projects.manage");
     projectMutations.updateProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });
-  safeHandle(ipcChannels.projects.deleteUnit, deleteProjectUnitSchema, (_event, input) => {
+  safeHandle(ipcChannels.projects.deleteUnit, deleteProjectUnitSchema, async (_event, input) => {
+    await workspaceAccess.assertProjectAccess(input.projectId, "delete project units", "write", "projects.manage");
     projectMutations.deleteProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });
-  safeHandle(ipcChannels.projects.assignCrewToUnit, assignCrewToProjectUnitSchema, (_event, input) => {
+  safeHandle(ipcChannels.projects.assignCrewToUnit, assignCrewToProjectUnitSchema, async (_event, input) => {
+    await workspaceAccess.assertProjectAccess(input.projectId, "assign crew to project units", "write", "projects.manage");
     projectMutations.assignCrewToProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });
-  safeHandle(ipcChannels.projects.unassignCrewFromUnit, unassignCrewFromProjectUnitSchema, (_event, input) => {
+  safeHandle(ipcChannels.projects.unassignCrewFromUnit, unassignCrewFromProjectUnitSchema, async (_event, input) => {
+    await workspaceAccess.assertProjectAccess(input.projectId, "remove crew from project units", "write", "projects.manage");
     projectMutations.unassignCrewFromProjectUnit(input);
     return foundationReads.getProjectDetail(input.projectId);
   });

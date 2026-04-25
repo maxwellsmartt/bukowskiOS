@@ -118,7 +118,7 @@ describe("workspace access guard", () => {
     cleanup();
   });
 
-  it("resolves packing slip and incident workspace before checking access", async () => {
+  it("resolves project, packing slip and incident workspace before checking access", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-workspace-access");
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify(true), { status: 200 }));
     const guard = createWorkspaceAccessGuard({
@@ -130,6 +130,9 @@ describe("workspace access guard", () => {
       now: () => 1_000,
     });
 
+    await expect(
+      guard.assertProjectAccess("project-aurora", "load that project", "read", "projects.read"),
+    ).resolves.toBe("workspace-metadata");
     await expect(
       guard.assertPackingSlipAccess("packing-1042", "load that packing slip", "read", "packing-slips.read"),
     ).resolves.toBeUndefined();

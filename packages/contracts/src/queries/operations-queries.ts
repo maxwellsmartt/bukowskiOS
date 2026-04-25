@@ -174,6 +174,7 @@ export type ProjectSortField =
   | "updatedAt";
 
 export type ProjectListQuery = {
+  workspaceId?: string;
   search?: string;
   sortBy: ProjectSortField;
   sortDirection: ListSortDirection;

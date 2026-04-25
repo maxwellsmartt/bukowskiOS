@@ -19,6 +19,7 @@ import { useWorkspace } from "./WorkspaceProvider";
 
 type ShellContextValue = {
   appInfo: AppInfo | null;
+  activeWorkspaceId: string;
   workspaceName: string;
   scopeMode: ScopeMode;
   scopeChipLabel: string | null;
@@ -34,8 +35,8 @@ type ShellContextValue = {
   setActiveProjectId: (projectId: string | null) => void;
   openProject: (projectId: string, section?: ProjectRouteSection) => void;
   refreshProjects: () => Promise<void>;
-  createProject: (input: CreateProjectInput) => Promise<void>;
-  createProjectBlueprint: (input: CreateProjectBlueprintInput) => Promise<ProjectCardRow | null>;
+  createProject: (input: Omit<CreateProjectInput, "workspaceId">) => Promise<void>;
+  createProjectBlueprint: (input: Omit<CreateProjectBlueprintInput, "workspaceId">) => Promise<ProjectCardRow | null>;
   updateProject: (input: UpdateProjectInput) => Promise<void>;
   getProjectDeletePreview: (projectId: string) => Promise<ProjectDeletePreview>;
   archiveProject: (input: ArchiveProjectInput) => Promise<void>;
@@ -69,7 +70,7 @@ const resolveProjectSectionPreference = () => {
 export const ShellContextProvider = ({ children }: ShellContextProviderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { activeWorkspaceName } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspaceName, isWorkspaceReady } = useWorkspace();
   const activeRoute = useMemo(() => resolveActiveRoute(location.pathname), [location.pathname]);
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [shellBootstrap, setShellBootstrap] = useState<ShellBootstrap | null>(null);
@@ -114,12 +115,20 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   }, [activeRoute.projectId, activeRoute.scopeMode]);
 
   const refreshProjects = useCallback(async () => {
+    if (!isWorkspaceReady) {
+      setProjects([]);
+      setProjectsError(null);
+      setProjectsHydrated(false);
+      return;
+    }
+
     if (!window.bukowskiProjects) {
       return;
     }
 
     try {
       const nextProjects = await window.bukowskiProjects.getList({
+        workspaceId: activeWorkspaceId,
         search: "",
         sortBy: "name",
         sortDirection: "asc",
@@ -141,7 +150,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       setProjectsError(error instanceof Error ? error.message : "Project shell unavailable");
       setProjectsHydrated(true);
     }
-  }, [showArchivedProjects]);
+  }, [activeWorkspaceId, isWorkspaceReady, showArchivedProjects]);
 
   useEffect(() => {
     void refreshProjects();
@@ -200,12 +209,16 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     [navigate],
   );
 
-  const createProject = async (input: CreateProjectInput) => {
+  const createProject = async (input: Omit<CreateProjectInput, "workspaceId">) => {
+    if (!isWorkspaceReady) {
+      throw new Error("Wait for the workspace to finish loading before creating a project.");
+    }
+
     if (!window.bukowskiProjects) {
       throw new Error("Projects bridge unavailable");
     }
 
-    const nextProjects = await window.bukowskiProjects.create(input);
+    const nextProjects = await window.bukowskiProjects.create({ ...input, workspaceId: activeWorkspaceId });
     setProjects(nextProjects);
     setProjectsError(null);
 
@@ -217,17 +230,22 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
     setProjectDataVersion((current) => current + 1);
   };
 
-  const createProjectBlueprint = async (input: CreateProjectBlueprintInput) => {
+  const createProjectBlueprint = async (input: Omit<CreateProjectBlueprintInput, "workspaceId">) => {
+    if (!isWorkspaceReady) {
+      throw new Error("Wait for the workspace to finish loading before creating a project.");
+    }
+
     if (!window.bukowskiProjects) {
       throw new Error("Projects bridge unavailable");
     }
 
-    const nextProjects = await window.bukowskiProjects.createBlueprint(input);
+    const nextInput = { ...input, workspaceId: activeWorkspaceId };
+    const nextProjects = await window.bukowskiProjects.createBlueprint(nextInput);
     setProjects(nextProjects);
     setProjectsError(null);
 
-    const requestedCode = input.generalInfo.code?.trim().toUpperCase();
-    const requestedName = input.generalInfo.name.trim();
+    const requestedCode = nextInput.generalInfo.code?.trim().toUpperCase();
+    const requestedName = nextInput.generalInfo.name.trim();
     const createdProject =
       nextProjects.find(
         (project) =>
@@ -317,6 +335,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   const value = useMemo<ShellContextValue>(
     () => ({
       appInfo,
+      activeWorkspaceId,
       workspaceName: activeWorkspaceName || shellBootstrap?.workspaceName || "Metadata Cine",
       scopeMode: activeRoute.scopeMode,
       scopeChipLabel,
@@ -345,6 +364,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       activeProjectId,
       activeRoute.projectSection,
       activeRoute.scopeMode,
+      activeWorkspaceId,
       activeWorkspaceName,
       appInfo,
       createProject,

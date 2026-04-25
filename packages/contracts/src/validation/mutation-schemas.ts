@@ -463,6 +463,7 @@ export const returnPackingSlipItemsSchema = z
 
 export const createProjectSchema = z
   .object({
+    workspaceId: nonEmptyString,
     code: nonEmptyString,
     name: nonEmptyString,
     clientId: optionalTrimmedString,
@@ -635,6 +636,7 @@ const projectBlueprintUnitSchema = z
 
 export const createProjectBlueprintSchema = z
   .object({
+    workspaceId: nonEmptyString,
     generalInfo: projectBlueprintGeneralInfoSchema,
     mainUnit: projectBlueprintUnitSchema,
     additionalUnits: z.array(projectBlueprintUnitSchema),

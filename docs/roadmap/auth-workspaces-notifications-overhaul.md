@@ -68,8 +68,9 @@ Decisiones bloqueadas:
 - Done — Aplicar validación workspace-scoped al vertical Assets en IPC: list/summary/overview/detail, create/update/archive/assign, attach/open files.
 - Done — Extender validación workspace-scoped a Packing e Incidents, incluyendo filtros de read service por workspace activo.
 - Done — Agregar migración Supabase y bootstrap admin para asegurar permisos operativos remotos (`assets`, `incidents`, `packing-slips`, `rma`, `finance`).
+- Done — Extender validación workspace-scoped a Projects: list/detail/preview/create/update/archive/delete/units y wizard de setup.
 - Todo — Conectar MFA TOTP real con Supabase MFA.
-- Todo — Extender `workspaceAccess` a Projects, Finance, Catalog, RMA y Agents.
+- Todo — Extender `workspaceAccess` a Finance, Catalog, RMA y Agents.
 
 ### Slice 2 — Roles, Permissions e Invites
 
@@ -134,6 +135,7 @@ Decisiones bloqueadas:
 | 2026-04-24 | Working tree casa | Se agrega `workspaceAccess` en main con validación local de workspace, token Supabase, membership/permisos remotos vía `has_permission` y cache breve; se aplica al vertical Assets en IPC incluyendo lecturas, mutaciones y archivos. Verificación: `npm run test -- workspace-access-guard` pasa con 4 tests y `npm run typecheck` pasa. | Reducir el riesgo crítico de confiar en `workspaceId` del renderer antes de extender permisos al resto de dominios. |
 | 2026-04-24 | Working tree casa | Se extiende `workspaceAccess` a Packing e Incidents; sus query contracts/read services ahora aceptan y filtran `workspaceId`, las páginas usan active workspace y el IPC valida permisos (`packing-slips.read/create`, `incidents.read/create`) antes de leer, mutar, exportar o abrir archivos. Se agrega migración Supabase `20260424190000_operational_permissions.sql` y bootstrap admin para permisos remotos. Verificación: `npm run test -- workspace-access-guard packing-mutation-service incident-mutation-service` y `npm run typecheck` pasan. | Cerrar los dominios operativos con mayor riesgo de writes cruzados después de Assets. |
 | 2026-04-25 | Working tree casa | Usuario aplica en Supabase la migración `20260424190000_operational_permissions.sql`. Se ajusta `WorkspaceProvider` para no mostrar el workspace local como placeholder durante rehidratación remota, y se centra/suaviza el overlay de búsqueda global para reducir banding visual. Verificación: `npm run typecheck` y tests focalizados de workspace/Packing/Incidents pasan. | Evitar confusión en el picker y pulir la UX de comandos globales antes de seguir extendiendo guards. |
+| 2026-04-25 | Working tree casa | Se extiende `workspaceAccess` a Projects: la lista filtra por `workspaceId`, detail/delete preview/mutaciones resuelven workspace desde `projectId`, create/project blueprint escriben en el workspace activo, el wizard/conflict preview usa el workspace activo y se agrega permiso remoto `projects.read/manage` vía migración `20260425113000_project_permissions.sql`. Verificación: `npm run typecheck` y `npm run test -- workspace-access-guard project-mutation-service foundation-read-service` pasan. | Cerrar navegación y acciones de proyectos antes de seguir con Finance/Catalog, reduciendo riesgo de mezcla entre workspaces. |
 
 ## Decisiones tomadas
 
@@ -172,7 +174,7 @@ Decisiones bloqueadas:
 
 - El schema remoto foundation, las Edge Functions y el flujo autenticado login -> create workspace ya fueron validados contra Supabase dev.
 - Guards de sesión/workspace ya existen, pero falta endurecer comportamiento prod sin fallback.
-- Validación workspace-scoped ya existe en main para Assets, Packing e Incidents; falta extenderla a Projects, Finance, Catalog, RMA y Agents.
+- Validación workspace-scoped ya existe en main para Assets, Packing, Incidents y Projects; falta extenderla a Finance, Catalog, RMA y Agents.
 - Aún no se ha iniciado reemplazo de `DEFAULT_WORKSPACE_ID`.
 - El worker ya escribe remoto en `public.sync_outbox` y, para filas `asset_event`, ahora proyecta snapshots en `public.assets`, `public.asset_current_state` y `public.asset_events`.
 - MFA TOTP está como pantalla placeholder; falta wiring real Supabase MFA.
@@ -185,4 +187,4 @@ Decisiones bloqueadas:
 
 ## Próximo paso recomendado
 
-Extender el guard `workspaceAccess` a Projects y Finance. Prioridad recomendada: Projects primero si queremos cerrar navegación/detalle multi-workspace; Finance primero si queremos reducir riesgo de exposición/costos cruzados.
+Extender el guard `workspaceAccess` a Finance como siguiente dominio, porque exposición/costos cruzados tienen impacto operativo alto. Después seguir con Catalog, RMA y Agents.

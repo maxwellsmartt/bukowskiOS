@@ -6,7 +6,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 export const AuthGuard = ({ children }: { children: JSX.Element }) => {
   const location = useLocation();
   const { status } = useSession();
-  const { isWorkspaceReady } = useWorkspace();
+  const { isLoadingWorkspaces, isWorkspaceReady } = useWorkspace();
 
   if (status === "loading") {
     return (
@@ -18,6 +18,14 @@ export const AuthGuard = ({ children }: { children: JSX.Element }) => {
 
   if (status !== "authenticated") {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  if (isLoadingWorkspaces && !isWorkspaceReady) {
+    return (
+      <div className="shell-loading-state">
+        <div className="empty-state">Loading workspace...</div>
+      </div>
+    );
   }
 
   if (!isWorkspaceReady && !location.pathname.startsWith("/workspaces")) {
