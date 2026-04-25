@@ -135,7 +135,7 @@ export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery
       return window.bukowskiCatalog ? window.bukowskiCatalog.getSnapshot(query) : window.bukowskiProjects.getCatalog();
     },
     emptyCatalog,
-    [query.entityType, query.search, query.sortBy, query.sortDirection, refreshVersion],
+    [query.entityType, query.search, query.sortBy, query.sortDirection, query.workspaceId, refreshVersion],
   );
 };
 

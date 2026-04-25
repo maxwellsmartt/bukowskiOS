@@ -143,6 +143,13 @@ export const createWorkspaceAccessGuard = ({
     return row?.workspace_id ?? null;
   };
 
+  const getRmaCaseWorkspaceId = (rmaCaseId: string) => {
+    const row = database.prepare("SELECT workspace_id FROM rma_cases WHERE id = ? LIMIT 1").get(rmaCaseId) as
+      | { workspace_id: string }
+      | undefined;
+    return row?.workspace_id ?? null;
+  };
+
   const getIncidentFileWorkspaceId = (fileId: string) => {
     const row = database
       .prepare(
@@ -329,6 +336,22 @@ export const createWorkspaceAccessGuard = ({
       }
 
       await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });
+    },
+
+    async assertRmaCaseAccess(
+      rmaCaseId: string,
+      action: string,
+      accessLevel: WorkspaceAccessLevel = "read",
+      requiredPermission?: string,
+    ) {
+      const workspaceId = getRmaCaseWorkspaceId(rmaCaseId);
+
+      if (!workspaceId) {
+        throw new Error("RMA case was not found.");
+      }
+
+      await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });
+      return workspaceId;
     },
 
     async assertIncidentFileAccess(

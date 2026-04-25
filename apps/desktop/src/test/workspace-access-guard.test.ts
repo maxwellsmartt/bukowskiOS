@@ -118,7 +118,7 @@ describe("workspace access guard", () => {
     cleanup();
   });
 
-  it("resolves project, packing slip and incident workspace before checking access", async () => {
+  it("resolves project, packing slip, incident and RMA workspace before checking access", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-workspace-access");
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify(true), { status: 200 }));
     const guard = createWorkspaceAccessGuard({
@@ -139,6 +139,9 @@ describe("workspace access guard", () => {
     await expect(
       guard.assertIncidentAccess("incident-cine7-scratch", "load that incident", "read", "incidents.read"),
     ).resolves.toBeUndefined();
+    await expect(
+      guard.assertRmaCaseAccess("rma-flowtech-latch", "load that RMA case", "read", "rma.read"),
+    ).resolves.toBe("workspace-metadata");
 
     expect(fetchImpl).not.toHaveBeenCalled();
 

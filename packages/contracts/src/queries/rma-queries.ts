@@ -61,6 +61,10 @@ export type RmaSnapshot = {
   manufacturers: RmaManufacturerRow[];
 };
 
+export type RmaSnapshotQuery = {
+  workspaceId?: string;
+};
+
 export type RmaCaseDetailSnapshot = {
   caseRecord: RmaCaseDetailRow | null;
   assets: RmaCaseAssetRow[];

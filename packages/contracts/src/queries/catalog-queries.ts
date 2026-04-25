@@ -26,6 +26,7 @@ export type CatalogSortField =
   | "assetCount";
 
 export type CatalogListQuery = {
+  workspaceId?: string;
   entityType: CatalogEntityType;
   search?: string;
   sortBy: CatalogSortField;

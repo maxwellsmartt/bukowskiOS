@@ -44,6 +44,7 @@ import {
   returnPackingSlipItemsSchema,
   importCatalogCsvSchema,
   previewCatalogCsvImportSchema,
+  rmaSnapshotReadArgsSchema,
   reviewAgentRunSchema,
   saveAiProviderConfigSchema,
   saveConnectorConfigSchema,
@@ -121,6 +122,7 @@ import type {
   ReportIncidentCommand,
   ResolveIncidentCommand,
   ReturnPackingSlipItemsCommand,
+  RmaSnapshotQuery,
   ScheduleTimelineQuery,
   ScheduleTimelineRange,
   ScheduleTimelineScale,
@@ -1058,15 +1060,51 @@ export const registerFoundationIpc = ({
     async (_event, fileId: string) => fileUploads.deleteCrewDocument(fileId),
     "The app could not remove that crew document.",
   );
-  safeHandleRead(ipcChannels.rma.getSnapshot, () => foundationReads.getRmaSnapshot(), "The app could not load the RMA snapshot.");
+  safeHandleReadWithSchema(
+    ipcChannels.rma.getSnapshot,
+    rmaSnapshotReadArgsSchema,
+    async (_event, query: RmaSnapshotQuery | undefined) => {
+      if (!query?.workspaceId) {
+        throw new Error("Select a workspace before loading RMAs.");
+      }
+
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load RMAs",
+        accessLevel: "read",
+        requiredPermission: "rma.read",
+      });
+
+      return foundationReads.getRmaSnapshot(query);
+    },
+    "The app could not load the RMA snapshot.",
+  );
   safeHandleReadWithSchema(
     ipcChannels.rma.getDetail,
     idReadArgsSchema,
-    (_event, rmaCaseId: string) => foundationReads.getRmaCaseDetail(rmaCaseId),
+    async (_event, rmaCaseId: string) => {
+      await workspaceAccess.assertRmaCaseAccess(rmaCaseId, "load that RMA case", "read", "rma.read");
+      return foundationReads.getRmaCaseDetail(rmaCaseId);
+    },
     "The app could not load that RMA case.",
   );
-  safeHandle(ipcChannels.rma.create, createRmaCaseSchema, (_event, input) => rmaMutations.createRmaCase(input));
-  safeHandle(ipcChannels.rma.update, updateRmaCaseSchema, (_event, input) => rmaMutations.updateRmaCase(input));
+  safeHandle(ipcChannels.rma.create, createRmaCaseSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "create RMAs",
+      accessLevel: "write",
+      requiredPermission: "rma.create",
+    });
+    return rmaMutations.createRmaCase(input);
+  });
+  safeHandle(ipcChannels.rma.update, updateRmaCaseSchema, async (_event, input) => {
+    const workspaceId = await workspaceAccess.assertRmaCaseAccess(input.rmaCaseId, "update that RMA case", "write", "rma.create");
+    if (workspaceId !== input.workspaceId) {
+      throw new Error("That RMA case belongs to another workspace.");
+    }
+
+    return rmaMutations.updateRmaCase(input);
+  });
   safeHandleReadWithSchema(
     ipcChannels.finance.getOverview,
     financeOverviewReadArgsSchema,

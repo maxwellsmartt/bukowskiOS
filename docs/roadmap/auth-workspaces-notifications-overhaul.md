@@ -187,4 +187,8 @@ Decisiones bloqueadas:
 
 ## Próximo paso recomendado
 
-Extender el guard `workspaceAccess` a Finance como siguiente dominio, porque exposición/costos cruzados tienen impacto operativo alto. Después seguir con Catalog, RMA y Agents.
+Pausa táctica: antes de continuar con Finance/Agents, cerrar el vertical operativo de inventario documentado en `docs/roadmap/inventory-core-product-roadmap.md`.
+
+Motivo: Assets, Projects, Assign/Move, Packing, Incidents, RMA e Import CSV son el centro del producto. Si ese flujo no está sólido end-to-end, seguir con hardening horizontal puede dejar infraestructura correcta pero producto incompleto.
+
+Cuando el sub-roadmap `Inventory Core Product Roadmap` pase sus criterios de salida, volver a este roadmap con Finance como siguiente dominio de `workspaceAccess`, seguido por Catalog, RMA y Agents si no quedaron cubiertos por el vertical.

@@ -141,6 +141,26 @@ describe("foundation read service", () => {
     cleanup();
   });
 
+  it("scopes the RMA snapshot to the requested workspace", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-foundation-rma-workspace");
+    const reads = createFoundationReadService(database);
+
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, name, slug, base_currency, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run("workspace-rma-empty", "RMA Empty", "rma-empty", "USD", "2026-04-10T00:00:00.000Z", "2026-04-10T00:00:00.000Z");
+
+    expect(reads.getRmaSnapshot({ workspaceId: "workspace-metadata" }).cases.length).toBeGreaterThan(0);
+    expect(reads.getRmaSnapshot({ workspaceId: "workspace-rma-empty" }).cases).toEqual([]);
+    expect(reads.getRmaSnapshot({ workspaceId: "workspace-rma-empty" }).maintenanceAssets).toEqual([]);
+
+    cleanup();
+  });
+
   it("hides archived projects from default lists and timeline until explicitly included", () => {
     const { cleanup, database } = createTestDatabase("bukowski-foundation-archived-projects");
     const reads = createFoundationReadService(database);

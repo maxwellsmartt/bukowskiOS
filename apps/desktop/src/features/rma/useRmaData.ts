@@ -2,6 +2,7 @@ import type {
   CreateRmaCaseCommand,
   RmaCaseDetailSnapshot,
   RmaCaseMutationResult,
+  RmaSnapshotQuery,
   RmaSnapshot,
   UpdateRmaCaseCommand,
 } from "@contracts";
@@ -18,17 +19,17 @@ const emptyRmaDetail: RmaCaseDetailSnapshot = {
   assets: [],
 };
 
-export const useRmaSnapshot = () =>
+export const useRmaSnapshot = (query?: RmaSnapshotQuery) =>
   useAsyncValue(
     async () => {
       if (!window.bukowskiRma) {
         return emptyRmaSnapshot;
       }
 
-      return window.bukowskiRma.getSnapshot();
+      return window.bukowskiRma.getSnapshot(query);
     },
     emptyRmaSnapshot,
-    [],
+    [query?.workspaceId ?? ""],
   );
 
 export const useRmaCaseDetail = (rmaCaseId: string | null) =>

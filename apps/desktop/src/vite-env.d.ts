@@ -98,6 +98,7 @@ import type {
   ReturnPackingSlipItemsResult,
   RmaCaseDetailSnapshot,
   RmaCaseMutationResult,
+  RmaSnapshotQuery,
   RmaSnapshot,
   SaveAIProviderConfigCommand,
   SaveConnectorConfigCommand,
@@ -277,7 +278,7 @@ declare global {
       deleteCrewDocument: (fileId: string) => Promise<FileDeleteMutationResult>;
     };
     bukowskiRma?: {
-      getSnapshot: () => Promise<RmaSnapshot>;
+      getSnapshot: (query?: RmaSnapshotQuery) => Promise<RmaSnapshot>;
       getDetail: (rmaCaseId: string) => Promise<RmaCaseDetailSnapshot>;
       create: (input: CreateRmaCaseCommand) => Promise<RmaCaseMutationResult>;
       update: (input: UpdateRmaCaseCommand) => Promise<RmaCaseMutationResult>;

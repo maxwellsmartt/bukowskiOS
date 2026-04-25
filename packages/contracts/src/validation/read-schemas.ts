@@ -84,6 +84,10 @@ export const emptyReadArgsSchema = z.tuple([]);
 
 export const idReadArgsSchema = z.tuple([nonEmptyId]);
 
+export const workspaceQuerySchema = z.object({
+  workspaceId: nonEmptyId.optional(),
+});
+
 export const globalSearchQuerySchema = z.object({
   query: boundedSearch,
   recentEntityKeys: z.array(nonEmptyId).max(50).optional(),
@@ -193,7 +197,10 @@ export const financeOverviewQuerySchema = z
 
 export const financeOverviewReadArgsSchema = z.tuple([financeOverviewQuerySchema.optional()]);
 
+export const rmaSnapshotReadArgsSchema = z.tuple([workspaceQuerySchema.optional()]);
+
 export const catalogListQuerySchema = z.object({
+  workspaceId: nonEmptyId.optional(),
   entityType: catalogEntityTypeSchema,
   search: boundedSearch.optional(),
   sortBy: catalogSortFieldSchema,

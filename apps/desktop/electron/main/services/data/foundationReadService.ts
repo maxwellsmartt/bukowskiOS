@@ -49,6 +49,7 @@ import type {
   ScheduleTimelineSnapshot,
   ShellBootstrap,
   RmaCaseDetailSnapshot,
+  RmaSnapshotQuery,
   RmaSnapshot,
 } from "@contracts";
 
@@ -1238,7 +1239,8 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     };
   },
 
-  getRmaSnapshot(): RmaSnapshot {
+  getRmaSnapshot(query: RmaSnapshotQuery = {}): RmaSnapshot {
+    const workspaceId = query.workspaceId ?? DEFAULT_WORKSPACE_ID;
     const maintenanceAssets = db
       .prepare(
         `
@@ -1261,11 +1263,12 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           JOIN assets ON assets.id = asset_current_state.asset_id
           LEFT JOIN locations ON locations.id = asset_current_state.current_location_id
           WHERE asset_current_state.operational_status = 'maintenance'
+            AND asset_current_state.workspace_id = ?
             AND assets.is_active = 1
           ORDER BY assets.name
         `,
       )
-      .all() as Array<{
+      .all(workspaceId) as Array<{
       id: string;
       name: string;
       brand: string;
@@ -1325,7 +1328,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         location: row.location,
         latestIssue: row.latest_issue,
       })),
-      manufacturers: catalogReads.getSnapshot().manufacturers,
+      manufacturers: catalogReads.getSnapshot({ workspaceId }).manufacturers,
     };
   },
 
@@ -1719,7 +1722,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
   },
 
   getCatalogSnapshot(query: CatalogListQuery = defaultCatalogListQuery): CatalogSnapshot {
-    const snapshot = catalogReads.getSnapshot();
+    const snapshot = catalogReads.getSnapshot({ workspaceId: query.workspaceId });
 
     const sortCatalogRows = <T extends Record<string, unknown>>(rows: T[]) =>
       sortRows(rows, (left, right) => {

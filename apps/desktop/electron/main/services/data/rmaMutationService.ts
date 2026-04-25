@@ -2,10 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import type { CreateRmaCaseCommand, RmaCaseAssetInput, RmaCaseMutationResult, UpdateRmaCaseCommand } from "@contracts";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { resolveAuthorizedActor } from "./mutationAuthorization";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const ensureValue = (value: string | undefined, label: string) => {
   const nextValue = value?.trim() ?? "";
@@ -42,7 +39,7 @@ const uniqueAssetItems = (assetItems: RmaCaseAssetInput[]) => {
   });
 };
 
-const loadManufacturer = (db: DatabaseSync, manufacturerId: string) => {
+const loadManufacturer = (db: DatabaseSync, workspaceId: string, manufacturerId: string) => {
   const row = db
     .prepare(
       `
@@ -63,7 +60,7 @@ const loadManufacturer = (db: DatabaseSync, manufacturerId: string) => {
   return row;
 };
 
-const assertAssetsEligibleForCreate = (db: DatabaseSync, assetIds: string[]) => {
+const assertAssetsEligibleForCreate = (db: DatabaseSync, workspaceId: string, assetIds: string[]) => {
   if (!assetIds.length) {
     throw new Error("At least one maintenance asset is required.");
   }
@@ -86,7 +83,7 @@ const assertAssetsEligibleForCreate = (db: DatabaseSync, assetIds: string[]) => 
   }
 };
 
-const assertAssetsEligibleForUpdate = (db: DatabaseSync, rmaCaseId: string, assetIds: string[]) => {
+const assertAssetsEligibleForUpdate = (db: DatabaseSync, workspaceId: string, rmaCaseId: string, assetIds: string[]) => {
   if (!assetIds.length) {
     throw new Error("At least one maintenance asset is required.");
   }
@@ -102,7 +99,7 @@ const assertAssetsEligibleForUpdate = (db: DatabaseSync, rmaCaseId: string, asse
     return;
   }
 
-  assertAssetsEligibleForCreate(db, newAssetIds);
+  assertAssetsEligibleForCreate(db, workspaceId, newAssetIds);
 };
 
 const replaceCaseAssets = (db: DatabaseSync, rmaCaseId: string, assetItems: ReturnType<typeof uniqueAssetItems>, now: string) => {
@@ -136,15 +133,17 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
       requiredPermission: "rma.create",
       actionLabel: "create RMAs",
     });
+    const workspaceId = input.workspaceId;
     const now = new Date().toISOString();
     const assetItems = uniqueAssetItems(input.assetItems);
-    const manufacturer = loadManufacturer(db, ensureValue(input.manufacturerId, "Manufacturer"));
+    const manufacturer = loadManufacturer(db, workspaceId, ensureValue(input.manufacturerId, "Manufacturer"));
     const supportEmail = optionalValue(input.supportEmail) ?? optionalValue(manufacturer.support_email) ?? "";
     const title = ensureValue(input.title, "RMA title");
     const problemSummary = ensureValue(input.problemSummary, "Problem summary");
 
     assertAssetsEligibleForCreate(
       db,
+      workspaceId,
       assetItems.map((item) => item.assetId),
     );
 
@@ -194,9 +193,10 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
       requiredPermission: "rma.create",
       actionLabel: "update RMAs",
     });
+    const workspaceId = input.workspaceId;
     const now = new Date().toISOString();
     const assetItems = uniqueAssetItems(input.assetItems);
-    const manufacturer = loadManufacturer(db, ensureValue(input.manufacturerId, "Manufacturer"));
+    const manufacturer = loadManufacturer(db, workspaceId, ensureValue(input.manufacturerId, "Manufacturer"));
     const supportEmail = optionalValue(input.supportEmail) ?? optionalValue(manufacturer.support_email) ?? "";
     const title = ensureValue(input.title, "RMA title");
     const problemSummary = ensureValue(input.problemSummary, "Problem summary");
@@ -204,13 +204,14 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
 
     assertAssetsEligibleForUpdate(
       db,
+      workspaceId,
       input.rmaCaseId,
       assetItems.map((item) => item.assetId),
     );
 
     const previous = db
-      .prepare("SELECT sent_at, closed_at FROM rma_cases WHERE id = ? LIMIT 1")
-      .get(input.rmaCaseId) as { sent_at: string | null; closed_at: string | null } | undefined;
+      .prepare("SELECT sent_at, closed_at FROM rma_cases WHERE id = ? AND workspace_id = ? LIMIT 1")
+      .get(input.rmaCaseId, workspaceId) as { sent_at: string | null; closed_at: string | null } | undefined;
 
     if (!previous) {
       throw new Error("RMA case not found.");
@@ -235,6 +236,7 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
               sent_at = ?,
               closed_at = ?
           WHERE id = ?
+            AND workspace_id = ?
         `,
       ).run(
         manufacturer.id,
@@ -247,6 +249,7 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
         nextSentAt,
         nextClosedAt,
         input.rmaCaseId,
+        workspaceId,
       );
 
       if (!result.changes) {

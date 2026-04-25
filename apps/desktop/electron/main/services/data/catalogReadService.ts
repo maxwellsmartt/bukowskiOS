@@ -1,11 +1,10 @@
 import fs from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 
-import type { CatalogSnapshot } from "@contracts";
+import type { CatalogListQuery, CatalogSnapshot } from "@contracts";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
 const activeProjectStatuses = new Set(["Prep", "Active", "On hold"]);
 const maxInlinePreviewBytes = 5 * 1024 * 1024;
 
@@ -44,7 +43,8 @@ const mapAssetStatus = (
 };
 
 export const createCatalogReadService = (db: DatabaseSync) => ({
-  getSnapshot(): CatalogSnapshot {
+  getSnapshot(query?: Pick<CatalogListQuery, "workspaceId">): CatalogSnapshot {
+    const workspaceId = query?.workspaceId ?? DEFAULT_WORKSPACE_ID;
     const locations = db
       .prepare(
         `

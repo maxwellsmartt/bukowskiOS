@@ -122,6 +122,7 @@ import type {
   UpdateIncidentCommand,
   RmaCaseDetailSnapshot,
   RmaCaseMutationResult,
+  RmaSnapshotQuery,
   RmaSnapshot,
   ReviewAgentRunCommand,
   AgentRunReviewResult,
@@ -363,7 +364,7 @@ const bukowskiCatalog = {
 };
 
 const bukowskiRma = {
-  getSnapshot: () => ipcRenderer.invoke(ipcChannels.rma.getSnapshot) as Promise<RmaSnapshot>,
+  getSnapshot: (query?: RmaSnapshotQuery) => ipcRenderer.invoke(ipcChannels.rma.getSnapshot, query) as Promise<RmaSnapshot>,
   getDetail: (rmaCaseId: string) => ipcRenderer.invoke(ipcChannels.rma.getDetail, rmaCaseId) as Promise<RmaCaseDetailSnapshot>,
   create: (input: CreateRmaCaseCommand) => ipcRenderer.invoke(ipcChannels.rma.create, input) as Promise<RmaCaseMutationResult>,
   update: (input: UpdateRmaCaseCommand) => ipcRenderer.invoke(ipcChannels.rma.update, input) as Promise<RmaCaseMutationResult>,
