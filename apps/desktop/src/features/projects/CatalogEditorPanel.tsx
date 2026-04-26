@@ -428,11 +428,11 @@ export const CatalogEditorPanel = ({
           <div className="catalog-crew-support-card">
             <div className="surface-card-header catalog-kit-assets-header">
               <div>
-                <h3 className="surface-card-title">Identity link</h3>
+                <h3 className="surface-card-title">App access</h3>
               </div>
             </div>
             <div className="catalog-crew-support-empty">
-              {linkedUserId ? `Linked to ${linkedUserOptions.find((user) => user.id === linkedUserId)?.fullName ?? linkedUserId}.` : "No internal user linked yet."}
+              {linkedUserId ? `Linked to ${linkedUserOptions.find((user) => user.id === linkedUserId)?.fullName ?? linkedUserId}.` : "No app user linked yet."}
             </div>
           </div>
 

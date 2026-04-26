@@ -142,6 +142,17 @@ type ImportAnalysis = {
   missingActiveIds: string[];
 };
 
+const catalogEntityLabels: Record<CatalogEntityType, string> = {
+  location: "locations",
+  department: "departments",
+  crew: "crew",
+  client: "clients",
+  production_company: "production companies",
+  manufacturer: "manufacturers",
+  category: "categories",
+  kit: "kits",
+};
+
 const parseBooleanValue = (value: string | undefined, fallback = true) => {
   const normalized = trimValue(value).toLowerCase();
 
@@ -513,13 +524,13 @@ const analyzeImport = (db: DatabaseSync, input: PreviewCatalogCsvImportInput): I
             ? (departmentIdByLookup?.get(departmentLookupKey) ?? null)
             : null;
           if (!key) {
-            throw new Error("Crew fullName is required.");
+            throw new Error("Crew name is required.");
           }
           if (seenKeys.has(key)) {
-            throw new Error(`Duplicate crew fullName ${fullName} inside the CSV.`);
+            throw new Error(`Duplicate crew name ${fullName} inside the CSV.`);
           }
           if (trimValue(record.primaryDepartmentCode) && !primaryDepartmentId) {
-            throw new Error(`Department ${trimValue(record.primaryDepartmentCode)} was not found for this workspace.`);
+            throw new Error(`Department ${trimValue(record.primaryDepartmentCode)} was not found.`);
           }
           seenKeys.add(key);
           operations.push({
@@ -654,7 +665,7 @@ const analyzeImport = (db: DatabaseSync, input: PreviewCatalogCsvImportInput): I
 
                   const assetId = assetIdByCode?.get(normalizeKey(assetCode));
                   if (!assetId) {
-                    throw new Error(`Asset code ${assetCode} was not found for this workspace.`);
+                    throw new Error(`Asset code ${assetCode} was not found.`);
                   }
 
                   return { assetId, quantity };
@@ -1402,8 +1413,8 @@ export const createCatalogCsvService = (db: DatabaseSync, codeService: CodeGener
     return {
       ...buildPreview(analysis),
       summary: summaryParts.length
-        ? `Imported ${input.entityType} CSV: ${summaryParts.join(", ")}.`
-        : `No ${input.entityType} rows changed.`,
+        ? `Imported ${catalogEntityLabels[input.entityType]}: ${summaryParts.join(", ")}.`
+        : `No ${catalogEntityLabels[input.entityType]} changed.`,
     };
   },
 });
