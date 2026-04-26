@@ -78,8 +78,36 @@ export const AssetDetailPage = () => {
     return <div className="empty-state">This asset does not exist anymore or was removed from the workspace.</div>;
   }
 
+  const stockSummary = `${data.asset.quantity} available · ${data.asset.assignedQuantity} reserved · ${data.asset.checkedOutQuantity} checked out`;
+  const secondaryCodes = data.scannableCodes.filter((code) => !code.isPrimary);
+
   return (
     <div className="page-stack">
+      <div className="entity-detail-action-bar">
+        <button
+          className="ghost-control"
+          onClick={() => {
+            setEditorOpen(true);
+            setEditorError(null);
+            setEditorFeedback(null);
+          }}
+          type="button"
+        >
+          Edit asset
+        </button>
+        <button
+          className="action-primary-button"
+          onClick={() => {
+            setReportOpen(true);
+            setReportError(null);
+            setReportFeedback(null);
+          }}
+          type="button"
+        >
+          Report incident
+        </button>
+      </div>
+
       <SurfaceCard
         title={data.asset.name}
         aside={<StatusBadge tone={data.asset.status === "Maintenance" ? "warning" : "info"}>{data.asset.status}</StatusBadge>}
@@ -94,16 +122,8 @@ export const AssetDetailPage = () => {
             <span className="summary-value">{data.asset.location}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Available</span>
-            <span className="summary-value">{data.asset.quantity}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label">Reserved</span>
-            <span className="summary-value">{data.asset.assignedQuantity}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label">Checked out</span>
-            <span className="summary-value">{data.asset.checkedOutQuantity}</span>
+            <span className="summary-label">Stock</span>
+            <span className="summary-value">{stockSummary}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">Project</span>
@@ -117,31 +137,6 @@ export const AssetDetailPage = () => {
             <span className="summary-label">Condition</span>
             <span className="summary-value">{data.asset.condition}</span>
           </div>
-        </div>
-
-        <div className="action-panel-actions action-panel-actions-start">
-          <button
-            className="ghost-control"
-            onClick={() => {
-              setEditorOpen(true);
-              setEditorError(null);
-              setEditorFeedback(null);
-            }}
-            type="button"
-          >
-            Edit asset
-          </button>
-          <button
-            className="action-primary-button"
-            onClick={() => {
-              setReportOpen(true);
-              setReportError(null);
-              setReportFeedback(null);
-            }}
-            type="button"
-          >
-            Report incident
-          </button>
         </div>
       </SurfaceCard>
 
@@ -273,19 +268,7 @@ export const AssetDetailPage = () => {
         />
       ) : null}
 
-      <div className="split-layout">
-        <SurfaceCard title="Timeline">
-          <div className="timeline-list">
-            {data.timeline.map((event) => (
-              <div key={event.timestamp + event.title} className="timeline-item">
-                <span className="timeline-time">{event.timestamp}</span>
-                <strong>{event.title}</strong>
-                <span>{event.body}</span>
-              </div>
-            ))}
-          </div>
-        </SurfaceCard>
-
+      <div className="split-layout asset-detail-layout">
         <div className="page-stack">
           <SurfaceCard title="Details">
             <div className="summary-grid">
@@ -302,10 +285,6 @@ export const AssetDetailPage = () => {
                 <span className="summary-value">
                   {data.asset.linkedKitCount ? data.asset.linkedKitCodes.join(" · ") : "Standalone"}
                 </span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Primary code</span>
-                <span className="summary-value">{data.editor?.primaryCodeValue ?? "Pending"}</span>
               </div>
             </div>
 
@@ -329,12 +308,21 @@ export const AssetDetailPage = () => {
             <details className="detail-disclosure">
               <summary className="detail-disclosure-summary">More details</summary>
               <div className="detail-disclosure-content">
-                {data.legacy ? (
-                  <div className="summary-grid">
+                <div className="summary-grid">
+                  <div className="summary-row">
+                    <span className="summary-label">Primary code</span>
+                    <span className="summary-value">{data.editor?.primaryCodeValue ?? "Pending"}</span>
+                  </div>
+                  {data.legacy ? (
                     <div className="summary-row">
                       <span className="summary-label">Source</span>
                       <span className="summary-value">{data.legacy.source}</span>
                     </div>
+                  ) : null}
+                </div>
+
+                {data.legacy ? (
+                  <div className="summary-grid">
                     <div className="summary-row">
                       <span className="summary-label">Legacy code</span>
                       <span className="summary-value">{data.legacy.legacyCode}</span>
@@ -354,49 +342,38 @@ export const AssetDetailPage = () => {
                   </div>
                 ) : null}
 
-                {data.scannableCodes.filter((code) => !code.isPrimary).length ? (
+                {secondaryCodes.length ? (
                   <div className="queue-list">
-                    {data.scannableCodes
-                      .filter((code) => !code.isPrimary)
-                      .map((code) => (
-                        <div key={code.id} className="queue-item">
-                          <div className="identity-cell">
-                            <span className="identity-title">{code.codeValue}</span>
-                            <span className="identity-meta">{code.symbology.toUpperCase()}</span>
-                          </div>
-                          <StatusBadge tone="neutral">Secondary</StatusBadge>
+                    {secondaryCodes.map((code) => (
+                      <div key={code.id} className="queue-item">
+                        <div className="identity-cell">
+                          <span className="identity-title">{code.codeValue}</span>
+                          <span className="identity-meta">{code.symbology.toUpperCase()}</span>
                         </div>
-                      ))}
+                      </div>
+                    ))}
                   </div>
                 ) : null}
               </div>
             </details>
           </SurfaceCard>
 
-          <SurfaceCard title="Linked incidents">
-            {data.linkedIncidents.length ? (
-              <div className="queue-list">
-                {data.linkedIncidents.map((incident) => (
-                  <div key={incident.id} className="queue-item">
-                    <div className="identity-cell">
-                      <span className="identity-title">{incident.title}</span>
-                      <span className="identity-meta">
-                        {incident.project} · {incident.costEstimate}
-                      </span>
-                    </div>
-                    <StatusBadge tone={incident.severity === "High" ? "critical" : "warning"}>
-                      {incident.severity}
-                    </StatusBadge>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">No linked incidents for this asset yet.</div>
-            )}
+          <SurfaceCard title="Timeline">
+            <div className="timeline-list">
+              {data.timeline.map((event) => (
+                <div key={event.timestamp + event.title} className="timeline-item">
+                  <span className="timeline-time">{event.timestamp}</span>
+                  <strong>{event.title}</strong>
+                  <span>{event.body}</span>
+                </div>
+              ))}
+            </div>
           </SurfaceCard>
+        </div>
 
+        <div className="page-stack">
           <SurfaceCard
-            title="Files"
+            title="Operations"
             aside={
               <button
                 className="surface-card-action-text"
@@ -425,51 +402,84 @@ export const AssetDetailPage = () => {
               </button>
             }
           >
-            {data.files.length ? (
-              <div className="entity-file-list">
-                {data.files.map((file) => (
-                  <div key={file.id} className="entity-file-row">
-                    <div className="entity-file-main">
-                      <div className="entity-file-head">
-                        <span className="entity-file-name">{file.originalName}</span>
-                        <StatusBadge tone={resolveFileTone(file.status)}>{file.status}</StatusBadge>
-                        {file.isPreviewable ? <StatusBadge tone="info">Preview</StatusBadge> : null}
+            <div className="entity-detail-section-stack">
+              <section className="entity-detail-section">
+                <header className="entity-detail-section-header">
+                  <h3>Incidents</h3>
+                  <span>{data.linkedIncidents.length || "None"}</span>
+                </header>
+                {data.linkedIncidents.length ? (
+                  <div className="queue-list entity-detail-compact-list">
+                    {data.linkedIncidents.map((incident) => (
+                      <div key={incident.id} className="queue-item">
+                        <div className="identity-cell">
+                          <span className="identity-title">{incident.title}</span>
+                          <span className="identity-meta">
+                            {incident.project} · {incident.costEstimate}
+                          </span>
+                        </div>
+                        <StatusBadge tone={incident.severity === "High" ? "critical" : "warning"}>
+                          {incident.severity}
+                        </StatusBadge>
                       </div>
-                      <div className="entity-file-meta">
-                        <span>{file.fileType}</span>
-                        <span>{formatByteSize(file.byteSize)}</span>
-                        <span>{fileDateFormatter.format(new Date(file.createdAt))}</span>
-                      </div>
-                    </div>
-                    <div className="entity-file-actions">
-                      <button
-                        className="ghost-control"
-                        disabled={file.status !== "available" || openingFileId === file.id}
-                        onClick={() => {
-                          setFilesError(null);
-                          void (async () => {
-                            try {
-                              setOpeningFileId(file.id);
-                              await openAssetFile(file.id);
-                            } catch (nextError) {
-                              setFilesError(nextError instanceof Error ? nextError.message : "Unable to open that asset file.");
-                              await reload();
-                            } finally {
-                              setOpeningFileId(null);
-                            }
-                          })();
-                        }}
-                        type="button"
-                      >
-                        {openingFileId === file.id ? "Opening..." : "Open"}
-                      </button>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">No files attached yet.</div>
-            )}
+                ) : (
+                  <div className="empty-state">No incidents linked.</div>
+                )}
+              </section>
+
+              <section className="entity-detail-section">
+                <header className="entity-detail-section-header">
+                  <h3>Files</h3>
+                  <span>{data.files.length || "None"}</span>
+                </header>
+                {data.files.length ? (
+                  <div className="entity-file-list entity-detail-compact-list">
+                    {data.files.map((file) => (
+                      <div key={file.id} className="entity-file-row">
+                        <div className="entity-file-main">
+                          <div className="entity-file-head">
+                            <span className="entity-file-name">{file.originalName}</span>
+                            <StatusBadge tone={resolveFileTone(file.status)}>{file.status}</StatusBadge>
+                          </div>
+                          <div className="entity-file-meta">
+                            <span>{file.fileType}</span>
+                            <span>{formatByteSize(file.byteSize)}</span>
+                            <span>{fileDateFormatter.format(new Date(file.createdAt))}</span>
+                          </div>
+                        </div>
+                        <div className="entity-file-actions">
+                          <button
+                            className="ghost-control"
+                            disabled={file.status !== "available" || openingFileId === file.id}
+                            onClick={() => {
+                              setFilesError(null);
+                              void (async () => {
+                                try {
+                                  setOpeningFileId(file.id);
+                                  await openAssetFile(file.id);
+                                } catch (nextError) {
+                                  setFilesError(nextError instanceof Error ? nextError.message : "Unable to open that asset file.");
+                                  await reload();
+                                } finally {
+                                  setOpeningFileId(null);
+                                }
+                              })();
+                            }}
+                            type="button"
+                          >
+                            {openingFileId === file.id ? "Opening..." : "Open"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">No files attached.</div>
+                )}
+              </section>
+            </div>
           </SurfaceCard>
         </div>
       </div>

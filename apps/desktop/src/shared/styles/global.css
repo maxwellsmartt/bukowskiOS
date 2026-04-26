@@ -3060,6 +3060,20 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   padding-top: 4px;
 }
 
+.entity-detail-action-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+}
+
+.entity-detail-action-bar .ghost-control,
+.entity-detail-action-bar .action-primary-button {
+  min-height: 36px;
+  padding: 0 14px;
+}
+
 .action-field-control[type="date"],
 .action-field-control[type="datetime-local"] {
   position: relative;
@@ -4169,6 +4183,51 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .entity-file-actions {
   flex-shrink: 0;
+}
+
+.asset-detail-layout {
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+}
+
+.entity-detail-section-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.entity-detail-section {
+  display: grid;
+  gap: 10px;
+}
+
+.entity-detail-section + .entity-detail-section {
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.entity-detail-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.entity-detail-section-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.entity-detail-section-header span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.entity-detail-compact-list {
+  max-height: min(34vh, 320px);
 }
 
 .sync-outbox-row {
