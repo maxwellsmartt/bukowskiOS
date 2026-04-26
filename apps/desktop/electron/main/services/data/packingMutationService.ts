@@ -104,6 +104,7 @@ const createPlaceholders = (values: string[]) => values.map(() => "?").join(", "
 const loadNamedEntities = (
   db: DatabaseSync,
   tableName: "projects" | "departments" | "locations",
+  workspaceId: string,
   values: string[],
 ) => {
   if (!values.length) {
@@ -115,15 +116,16 @@ const loadNamedEntities = (
       `
         SELECT id, name
         FROM ${tableName}
-        WHERE id IN (${createPlaceholders(values)})
+        WHERE workspace_id = ?
+          AND id IN (${createPlaceholders(values)})
       `,
     )
-    .all(...values) as NamedEntityRow[];
+    .all(workspaceId, ...values) as NamedEntityRow[];
 
   return new Map(rows.map((row) => [row.id, row.name]));
 };
 
-const loadProjectEntities = (db: DatabaseSync, values: string[]) => {
+const loadProjectEntities = (db: DatabaseSync, workspaceId: string, values: string[]) => {
   if (!values.length) {
     return new Map<string, ProjectEntityRow>();
   }
@@ -133,15 +135,16 @@ const loadProjectEntities = (db: DatabaseSync, values: string[]) => {
       `
         SELECT id, name, status
         FROM projects
-        WHERE id IN (${createPlaceholders(values)})
+        WHERE workspace_id = ?
+          AND id IN (${createPlaceholders(values)})
       `,
     )
-    .all(...values) as ProjectEntityRow[];
+    .all(workspaceId, ...values) as ProjectEntityRow[];
 
   return new Map(rows.map((row) => [row.id, row]));
 };
 
-const loadUserEntities = (db: DatabaseSync, values: string[]) => {
+const loadUserEntities = (db: DatabaseSync, workspaceId: string, values: string[]) => {
   if (!values.length) {
     return new Map<string, string>();
   }
@@ -149,17 +152,21 @@ const loadUserEntities = (db: DatabaseSync, values: string[]) => {
   const rows = db
     .prepare(
       `
-        SELECT id, full_name AS name
+        SELECT users.id, users.full_name AS name
         FROM users
-        WHERE id IN (${createPlaceholders(values)})
+        JOIN workspace_memberships ON workspace_memberships.user_id = users.id
+        WHERE workspace_memberships.workspace_id = ?
+          AND workspace_memberships.status = 'active'
+          AND users.is_active = 1
+          AND users.id IN (${createPlaceholders(values)})
       `,
     )
-    .all(...values) as NamedEntityRow[];
+    .all(workspaceId, ...values) as NamedEntityRow[];
 
   return new Map(rows.map((row) => [row.id, row.name]));
 };
 
-const loadProjectUnitEntities = (db: DatabaseSync, values: string[]) => {
+const loadProjectUnitEntities = (db: DatabaseSync, workspaceId: string, values: string[]) => {
   if (!values.length) {
     return new Map<string, ProjectUnitRow>();
   }
@@ -167,12 +174,14 @@ const loadProjectUnitEntities = (db: DatabaseSync, values: string[]) => {
   const rows = db
     .prepare(
       `
-        SELECT id, project_id, name, status, status_source, start_date, end_date
+        SELECT project_units.id, project_units.project_id, project_units.name, project_units.status, project_units.status_source, project_units.start_date, project_units.end_date
         FROM project_units
-        WHERE id IN (${createPlaceholders(values)})
+        JOIN projects ON projects.id = project_units.project_id
+        WHERE projects.workspace_id = ?
+          AND project_units.id IN (${createPlaceholders(values)})
       `,
     )
-    .all(...values) as ProjectUnitRow[];
+    .all(workspaceId, ...values) as ProjectUnitRow[];
 
   return new Map(rows.map((row) => [row.id, row]));
 };
@@ -388,11 +397,11 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       throw new Error(buildFailedCommandMessage("packing issue", existingReceipt.error_message));
     }
 
-    const projectMap = loadNamedEntities(db, "projects", uniqueValues([input.projectId]));
-    const projectEntityMap = loadProjectEntities(db, uniqueValues([input.projectId]));
-    const departmentMap = loadNamedEntities(db, "departments", uniqueValues([input.departmentId]));
-    const projectUnitMap = loadProjectUnitEntities(db, uniqueValues([input.projectUnitId]));
-    const userMap = loadUserEntities(db, uniqueValues([input.responsibleUserId, actor.actorUserId]));
+    const projectMap = loadNamedEntities(db, "projects", input.workspaceId, uniqueValues([input.projectId]));
+    const projectEntityMap = loadProjectEntities(db, input.workspaceId, uniqueValues([input.projectId]));
+    const departmentMap = loadNamedEntities(db, "departments", input.workspaceId, uniqueValues([input.departmentId]));
+    const projectUnitMap = loadProjectUnitEntities(db, input.workspaceId, uniqueValues([input.projectUnitId]));
+    const userMap = loadUserEntities(db, input.workspaceId, uniqueValues([input.responsibleUserId, actor.actorUserId]));
 
     if (input.projectId && !projectMap.has(input.projectId)) {
       fail("Project not found.");
@@ -1000,7 +1009,7 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
 
     const resolvedSlip = slip ?? fail("Packing slip not found in the local registry.");
 
-    const actorUserMap = loadUserEntities(db, [actor.actorUserId]);
+    const actorUserMap = loadUserEntities(db, input.workspaceId, [actor.actorUserId]);
     if (!actorUserMap.has(actor.actorUserId)) {
       fail("Actor user not found.");
     }

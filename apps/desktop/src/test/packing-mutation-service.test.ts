@@ -152,6 +152,73 @@ describe("packing mutation service", () => {
     cleanup();
   });
 
+  it("rejects packing references that belong to another workspace", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-packing-cross-workspace-reference-test");
+    const mutations = createPackingMutationService(database);
+    const now = "2026-04-10T00:00:00.000Z";
+
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, name, slug, base_currency, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run("workspace-packing-other", "Other Packing Workspace", "other-packing-workspace", "USD", now, now);
+    database
+      .prepare(
+        `
+          INSERT INTO projects (
+            id,
+            workspace_id,
+            code,
+            name,
+            client_name,
+            status,
+            start_date,
+            end_date,
+            description,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run(
+        "project-packing-other",
+        "workspace-packing-other",
+        "OTHERPACK",
+        "Other Packing Workspace Project",
+        "Other Client",
+        "Prep",
+        "2026-04-14",
+        "2026-04-28",
+        null,
+        now,
+        now,
+      );
+
+    expect(() =>
+      mutations.createPackingSlip({
+        commandId: "cmd-test-packing-cross-workspace-project",
+        workspaceId: "workspace-metadata",
+        assetIds: ["asset-legacy-rentman-1"],
+        projectId: "project-packing-other",
+        actorType: "user",
+        sourceChannel: "desktop",
+      }),
+    ).toThrow("Project not found.");
+
+    const failedReceipt = database
+      .prepare("SELECT outcome_status, error_message FROM command_receipts WHERE command_id = ?")
+      .get("cmd-test-packing-cross-workspace-project") as { outcome_status: string; error_message: string | null } | undefined;
+
+    expect(failedReceipt?.outcome_status).toBe("failed");
+    expect(failedReceipt?.error_message).toBe("Project not found.");
+
+    cleanup();
+  });
+
   it("stores requested partial quantities on packing slips and reads them back as quantity totals", () => {
     const { cleanup, database } = createTestDatabase("bukowski-packing-quantity-test");
     const reads = createFoundationReadService(database);

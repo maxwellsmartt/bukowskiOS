@@ -118,6 +118,74 @@ describe("asset mutation service", () => {
     cleanup();
   });
 
+  it("rejects assign references that belong to another workspace", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-cross-workspace-reference-test");
+    const mutations = createAssetMutationService(database);
+    const now = "2026-04-10T00:00:00.000Z";
+
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, name, slug, base_currency, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run("workspace-asset-other", "Other Asset Workspace", "other-asset-workspace", "USD", now, now);
+    database
+      .prepare(
+        `
+          INSERT INTO projects (
+            id,
+            workspace_id,
+            code,
+            name,
+            client_name,
+            status,
+            start_date,
+            end_date,
+            description,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run(
+        "project-asset-other",
+        "workspace-asset-other",
+        "OTHERASSET",
+        "Other Asset Workspace Project",
+        "Other Client",
+        "Prep",
+        "2026-04-14",
+        "2026-04-28",
+        null,
+        now,
+        now,
+      );
+
+    expect(() =>
+      mutations.assignMoveAssets({
+        commandId: "cmd-test-asset-cross-workspace-project",
+        workspaceId: "workspace-metadata",
+        assetIds: ["asset-legacy-rentman-1"],
+        mode: "assign",
+        projectId: "project-asset-other",
+        actorType: "user",
+        sourceChannel: "desktop",
+      }),
+    ).toThrow("Project not found.");
+
+    const failedReceipt = database
+      .prepare("SELECT outcome_status, error_message FROM command_receipts WHERE command_id = ?")
+      .get("cmd-test-asset-cross-workspace-project") as { outcome_status: string; error_message: string | null } | undefined;
+
+    expect(failedReceipt?.outcome_status).toBe("failed");
+    expect(failedReceipt?.error_message).toBe("Project not found.");
+
+    cleanup();
+  });
+
   it("updates multiple assets in a single assignment transaction", () => {
     const { cleanup, database } = createTestDatabase("bukowski-asset-bulk-test");
     const reads = createFoundationReadService(database);
