@@ -38,6 +38,7 @@ type DataTableProps<T = unknown> = {
   maxHeight?: number | string;
   emptyMessage?: string;
   persistKey?: string;
+  defaultVisibleColumnKeys?: string[];
   shellClassName?: string;
   sortState?: {
     columnKey: string;
@@ -67,6 +68,7 @@ export const DataTable = <T = unknown,>({
   maxHeight,
   emptyMessage = "No rows available.",
   persistKey,
+  defaultVisibleColumnKeys,
   shellClassName,
   sortState = null,
   onSortRequest,
@@ -106,13 +108,14 @@ export const DataTable = <T = unknown,>({
   });
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>(() => {
     const defaultKeys = columns.map((column) => column.key);
+    const preferredDefaultKeys = defaultVisibleColumnKeys?.filter((key) => defaultKeys.includes(key)) ?? defaultKeys;
     if (!persistKey) {
-      return defaultKeys;
+      return preferredDefaultKeys.length ? preferredDefaultKeys : defaultKeys;
     }
 
-    const savedKeys = readJsonPreference<string[]>(`table-columns:${persistKey}`, defaultKeys);
+    const savedKeys = readJsonPreference<string[]>(`table-columns:${persistKey}`, preferredDefaultKeys);
     const validKeys = savedKeys.filter((key) => defaultKeys.includes(key));
-    return validKeys.length ? validKeys : defaultKeys;
+    return validKeys.length ? validKeys : preferredDefaultKeys;
   });
 
   const setSelection = (nextSelection: string[]) => {
@@ -154,11 +157,12 @@ export const DataTable = <T = unknown,>({
     const defaultKeys = columns.map((column) => column.key);
     setVisibleColumnKeys((currentKeys) => {
       const nextKeys = currentKeys.filter((key) => defaultKeys.includes(key));
-      const missingKeys = defaultKeys.filter((key) => !nextKeys.includes(key));
+      const fallbackKeys = defaultVisibleColumnKeys?.filter((key) => defaultKeys.includes(key)) ?? defaultKeys;
+      const missingKeys = fallbackKeys.filter((key) => !nextKeys.includes(key));
       const resolvedKeys = [...nextKeys, ...missingKeys];
-      return resolvedKeys.length ? resolvedKeys : defaultKeys;
+      return resolvedKeys.length ? resolvedKeys : fallbackKeys;
     });
-  }, [columns]);
+  }, [columns, defaultVisibleColumnKeys]);
 
   useEffect(() => {
     if (!persistKey || typeof window === "undefined") {
@@ -637,7 +641,9 @@ export const DataTable = <T = unknown,>({
                 <button
                   className="list-toolbar-menu-item"
                   onClick={() => {
-                    setVisibleColumnKeys(columns.map((column) => column.key));
+                    const defaultKeys = columns.map((column) => column.key);
+                    const preferredDefaultKeys = defaultVisibleColumnKeys?.filter((key) => defaultKeys.includes(key)) ?? defaultKeys;
+                    setVisibleColumnKeys(preferredDefaultKeys.length ? preferredDefaultKeys : defaultKeys);
                     setColumnsMenuOpen(false);
                   }}
                   role="menuitem"

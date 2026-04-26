@@ -316,7 +316,7 @@ const ensureInternalCodeAvailable = (db: DatabaseSync, workspaceId: string, inte
     .get(workspaceId, internalCode, currentAssetId ?? null, currentAssetId ?? null) as { id: string } | undefined;
 
   if (existing) {
-    throw new Error(`Registry code ${internalCode} is already in use.`);
+    throw new Error(`Asset code ${internalCode} is already in use.`);
   }
 };
 

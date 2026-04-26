@@ -89,20 +89,22 @@ export const AssetEditorPanel = ({
       }
       title={title}
     >
-      <div className="summary-grid compact-summary-grid">
-        <div className="summary-row">
-          <span className="summary-label">Primary code</span>
-          <span className="summary-value">{primaryCodeValue}</span>
+      {mode === "edit" ? (
+        <div className="summary-grid compact-summary-grid">
+          <div className="summary-row">
+            <span className="summary-label">Primary code</span>
+            <span className="summary-value">{primaryCodeValue}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Status</span>
+            <span className="summary-value">
+              <StatusBadge tone={initialValue?.isActive ? "success" : "neutral"}>
+                {initialValue?.isActive ? "Active" : "Archived"}
+              </StatusBadge>
+            </span>
+          </div>
         </div>
-        <div className="summary-row">
-          <span className="summary-label">Status</span>
-          <span className="summary-value">
-            <StatusBadge tone={initialValue ? (initialValue.isActive ? "success" : "neutral") : "info"}>
-              {initialValue ? (initialValue.isActive ? "Active" : "Archived") : "New"}
-            </StatusBadge>
-          </span>
-        </div>
-      </div>
+      ) : null}
 
       <div className="action-form-grid">
         <label className="action-field">

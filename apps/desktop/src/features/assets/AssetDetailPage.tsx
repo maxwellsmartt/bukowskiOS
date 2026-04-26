@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
 import { useCatalogData } from "@features/projects/useProjectsData";
@@ -14,7 +14,6 @@ import { printScannableLabel } from "@shared/utils/printScannableLabel";
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
 import { archiveAsset, openAssetFile, updateAsset, uploadAssetFiles, useAssetDetail } from "./useAssetsData";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
 const fileDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "2-digit",
@@ -51,9 +50,16 @@ const resolveFileTone = (status: "available" | "missing" | "deleted") => {
 
 export const AssetDetailPage = () => {
   const { assetId } = useParams();
+  const { activeWorkspaceId } = useWorkspace();
   const { data, reload } = useAssetDetail(assetId);
   const { projects, refreshProjects } = useShellContext();
-  const { data: catalog, error: catalogError } = useCatalogData();
+  const { data: catalog, error: catalogError } = useCatalogData({
+    workspaceId: activeWorkspaceId,
+    entityType: "location",
+    search: "",
+    sortBy: "name",
+    sortDirection: "asc",
+  });
   const [reportOpen, setReportOpen] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
@@ -164,7 +170,7 @@ export const AssetDetailPage = () => {
               setIsArchivingAsset(true);
               const result = await archiveAsset({
                 commandId: crypto.randomUUID(),
-                workspaceId,
+                workspaceId: activeWorkspaceId,
                 assetId: data.asset!.id,
                 actorType: "user",
                 sourceChannel: "desktop",
@@ -189,7 +195,7 @@ export const AssetDetailPage = () => {
               setIsSubmittingEditor(true);
               const result = await updateAsset({
                 commandId: crypto.randomUUID(),
-                workspaceId,
+                workspaceId: activeWorkspaceId,
                 assetId: data.asset!.id,
                 actorType: "user",
                 sourceChannel: "desktop",
@@ -236,7 +242,7 @@ export const AssetDetailPage = () => {
               setIsSubmitting(true);
               const result = await reportIncident({
                 commandId: crypto.randomUUID(),
-                workspaceId,
+                workspaceId: activeWorkspaceId,
                 assetId: value.assetId,
                 projectId: value.projectId,
                 projectUnitId: value.projectUnitId,

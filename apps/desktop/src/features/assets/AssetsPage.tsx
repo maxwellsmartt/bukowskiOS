@@ -47,6 +47,8 @@ const assetSortOptions: Array<ListSortOption<AssetSortField>> = [
   { value: "createdAt", label: "Created" },
 ];
 
+const assetDefaultColumnKeys = ["asset", "category", "quantity", "status", "condition", "location", "project", "responsible"];
+
 const normalizeCsvHeader = (value: string) =>
   value
     .normalize("NFD")
@@ -145,7 +147,7 @@ const joinCsvNotes = (parts: Array<string | false | null | undefined>) => parts.
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
 const isDuplicateRegistryCodeError = (error: unknown) =>
-  /registry code .* already in use/i.test(getErrorMessage(error));
+  /(?:registry|asset) code .* already in use/i.test(getErrorMessage(error));
 
 type AssetCsvDraft = {
   importRowNumber: number;
@@ -413,7 +415,13 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     }),
   });
   const { data: assets, error, isLoading, reload } = useAssetsList(assetControls.query);
-  const { data: catalog, error: catalogError } = useCatalogData();
+  const { data: catalog, error: catalogError } = useCatalogData({
+    workspaceId: activeWorkspaceId,
+    entityType: "location",
+    search: "",
+    sortBy: "name",
+    sortDirection: "asc",
+  });
   const navigate = useNavigate();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
@@ -866,9 +874,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             <div className="asset-registry-header-actions">
               {selectedRowIds.length ? (
                 <>
-                  <span className="asset-selection-count">
-                    {selectedRowIds.length === 1 ? "1 selected" : `${selectedRowIds.length} selected`}
-                  </span>
                   <button
                     className="ghost-control action-row-button"
                     onClick={() =>
@@ -1024,6 +1029,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             activeRowId={selectedAssetId}
             autoScrollToActiveRow
             columns={assetColumns}
+            defaultVisibleColumnKeys={assetDefaultColumnKeys}
             emptyMessage={
               isProjectMode
                 ? "No assets are assigned to this project yet."
@@ -1034,7 +1040,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             onRowClick={(row) => setSelectedAssetId(row.id)}
             onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
             onSortRequest={assetControls.handleColumnSortRequest}
-            persistKey="assets-registry"
+            persistKey={isProjectMode ? "project-assets-registry-v2" : "assets-registry-v2"}
             rows={assets}
             shellClassName="table-shell-wide-scroll"
             selectable
@@ -1063,21 +1069,13 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 <X size={14} />
               </button>
             }
-            title="Quick preview"
+            title={activeAsset.name}
           >
             <>
               <div className="summary-grid">
                 <div className="summary-row">
-                  <span className="summary-label">Current asset</span>
-                  <span className="summary-value">{activeAsset.name}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Registry code</span>
+                  <span className="summary-label">Asset code</span>
                   <span className="summary-value">{activeAsset.code}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Tracking</span>
-                  <span className="summary-value">{activeAsset.tracking}</span>
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">Location</span>
@@ -1101,15 +1099,9 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   </span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Serial / QR</span>
+                  <span className="summary-label">Serial</span>
                   <span className="summary-value">
-                    {activeAsset.serialNumber} · {activeAsset.qrCode}
-                  </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Warehouse / folder</span>
-                  <span className="summary-value">
-                    {activeAsset.warehouseSlot} · {activeAsset.folderPath}
+                    {activeAsset.serialNumber}
                   </span>
                 </div>
                 <div className="summary-row">
@@ -1122,12 +1114,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   <span className="summary-label">Kit membership</span>
                   <span className="summary-value">
                     {activeAsset.linkedKitCount ? activeAsset.linkedKitCodes.join(" · ") : "Standalone"}
-                  </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Source / accessories</span>
-                  <span className="summary-value">
-                    {activeAsset.source} · {activeAsset.hasAccessories}
                   </span>
                 </div>
               </div>
