@@ -108,15 +108,14 @@ export const RmaCaseEditorPanel = ({
   return (
     <SurfaceCard
       aside={
-        <button aria-label="Close RMA editor" className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label="Close repair case editor" className="surface-card-action" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }
-      title={mode === "create" ? "New RMA case" : "Edit RMA case"}
-      subtitle="Prepare manufacturer-ready reports from assets currently in maintenance and keep the full trace inside the app."
+      title={mode === "create" ? "New repair case" : "Edit repair case"}
     >
-      <div className="chip-row">
-        <span className="action-panel-selection">{selectedCountLabel}</span>
+      <div className="action-panel-summary">
+        <span>{selectedCountLabel}</span>
         {mode === "edit" && initialValue?.caseRecord ? <StatusBadge>{initialValue.caseRecord.status}</StatusBadge> : null}
       </div>
 
@@ -167,46 +166,52 @@ export const RmaCaseEditorPanel = ({
           <textarea
             className="action-field-control action-textarea"
             onChange={(event) => setProblemSummary(event.target.value)}
-            placeholder="Describe the overall issue, escalation context and what support should review."
+            placeholder="Describe what support should review."
             rows={3}
             value={problemSummary}
           />
         </label>
-
-        <label className="action-field action-field-wide">
-          <span className="action-field-label">Internal notes</span>
-          <textarea
-            className="action-field-control action-textarea"
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Optional internal follow-up notes, shipping details or warranty references."
-            rows={3}
-            value={notes}
-          />
-        </label>
-
-        {mode === "edit" ? (
-          <label className="action-field">
-            <span className="action-field-label">Status</span>
-            <SelectField onChange={(event) => setStatus(event.target.value as RmaCaseStatus)} value={status}>
-              {statusOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </SelectField>
-          </label>
-        ) : null}
       </div>
+
+      <details className="detail-disclosure">
+        <summary className="detail-disclosure-summary">More details</summary>
+        <div className="detail-disclosure-content">
+          <div className="action-form-grid">
+            <label className="action-field action-field-wide">
+              <span className="action-field-label">Notes</span>
+              <textarea
+                className="action-field-control action-textarea"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Shipping, warranty or follow-up notes"
+                rows={3}
+                value={notes}
+              />
+            </label>
+
+            {mode === "edit" ? (
+              <label className="action-field">
+                <span className="action-field-label">Status</span>
+                <SelectField onChange={(event) => setStatus(event.target.value as RmaCaseStatus)} value={status}>
+                  {statusOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </SelectField>
+              </label>
+            ) : null}
+          </div>
+        </div>
+      </details>
 
       <div className="surface-card-header rma-editor-assets-header">
         <div>
-          <h3 className="surface-card-title">Maintenance assets</h3>
-          <p className="surface-card-subtitle">Only assets already in maintenance can enter a new RMA case.</p>
+          <h3 className="surface-card-title">Assets in maintenance</h3>
         </div>
         {onOpenCatalog ? (
           <button className="ghost-control" onClick={onOpenCatalog} type="button">
             <Mail size={14} />
-            <span>Manage manufacturers</span>
+            <span>Manufacturers</span>
           </button>
         ) : null}
       </div>
@@ -235,7 +240,7 @@ export const RmaCaseEditorPanel = ({
 
               <div className="rma-asset-card-meta">
                 <span>Serial: {asset.serialNumber || "Pending"}</span>
-                <span>{asset.latestIssue || "Maintenance review pending summary."}</span>
+                <span>{asset.latestIssue || "Needs review."}</span>
               </div>
 
               {selection ? (
@@ -311,7 +316,7 @@ export const RmaCaseEditorPanel = ({
           type="button"
         >
           <Save size={14} />
-          <span>{isSubmitting ? "Saving..." : mode === "create" ? "Create RMA case" : "Save RMA case"}</span>
+          <span>{isSubmitting ? "Saving..." : mode === "create" ? "Create case" : "Save case"}</span>
         </button>
       </div>
     </SurfaceCard>

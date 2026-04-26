@@ -1,6 +1,7 @@
 import type { MissionControlSnapshot } from "@contracts";
 import { useNavigate } from "react-router-dom";
 
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAssetsOverview } from "@features/assets/useAssetsData";
 import { useFinanceOverview } from "@features/finance/useFinanceData";
 import { useIncidentsData } from "@features/incidents/useIncidentsData";
@@ -49,11 +50,23 @@ const FocusList = ({ items }: { items: FocusItem[] }) => (
 
 export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainInsightPanelProps) => {
   const navigate = useNavigate();
-  const { data: assetsOverview } = useAssetsOverview();
+  const { activeWorkspaceId } = useWorkspace();
+  const { data: assetsOverview } = useAssetsOverview({ workspaceId: activeWorkspaceId });
   const { data: financeOverview } = useFinanceOverview();
-  const { data: incidents } = useIncidentsData();
-  const { data: projects } = useProjectsRegistry();
-  const { data: rmaSnapshot } = useRmaSnapshot();
+  const { data: incidents } = useIncidentsData({
+    workspaceId: activeWorkspaceId,
+    scopeProjectId: null,
+    search: "",
+    sortBy: "reportedAt",
+    sortDirection: "desc",
+  });
+  const { data: projects } = useProjectsRegistry({
+    workspaceId: activeWorkspaceId,
+    search: "",
+    sortBy: "name",
+    sortDirection: "asc",
+  });
+  const { data: rmaSnapshot } = useRmaSnapshot({ workspaceId: activeWorkspaceId });
   const { data: connectors } = useAgentConnectors();
 
   let title = "";

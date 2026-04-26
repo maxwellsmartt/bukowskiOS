@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import type { AssetListQuery, IncidentListQuery, IncidentSortField, RmaCaseDetailSnapshot, RmaCaseStatus } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAssetsList } from "@features/assets/useAssetsData";
 import { buildAvailableRmaAssets, RmaCaseEditorPanel, type RmaCaseEditorDraft } from "@features/rma/RmaCaseEditorPanel";
@@ -38,8 +37,6 @@ const incidentSortOptions: Array<ListSortOption<IncidentSortField>> = [
   { value: "status", label: "Status", columnKey: "status" },
 ];
 
-const rmaWorkspaceId = DEFAULT_WORKSPACE_ID;
-
 const resolveRmaStatusTone = (status: RmaCaseStatus) => {
   if (status === "Closed") {
     return "success" as const;
@@ -67,7 +64,7 @@ const buildRmaMailtoUrl = (detail: RmaCaseDetailSnapshot) => {
     "",
     detail.caseRecord.problemSummary,
     "",
-    "Assets included in this RMA:",
+    "Assets included:",
     ...detail.assets.map(
       (asset, index) =>
         `${index + 1}. ${asset.assetName} | ${[asset.brand, asset.model].filter(Boolean).join(" ")} | Serial: ${asset.serialNumber || "Pending"} | Year: ${asset.equipmentYear || "Pending"} | Issue: ${asset.issueSummary}`,
@@ -117,8 +114,14 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
     sortBy: "name",
     sortDirection: "asc",
   } satisfies AssetListQuery);
-  const { data: catalog, error: catalogError } = useCatalogData();
-  const { data: rmaSnapshot, error: rmaError, reload: reloadRma } = useRmaSnapshot();
+  const { data: catalog, error: catalogError } = useCatalogData({
+    workspaceId: activeWorkspaceId,
+    entityType: "location",
+    search: "",
+    sortBy: "name",
+    sortDirection: "asc",
+  });
+  const { data: rmaSnapshot, error: rmaError, reload: reloadRma } = useRmaSnapshot({ workspaceId: activeWorkspaceId });
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -187,7 +190,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       if (rmaEditorMode === "edit" && rmaDetail.caseRecord) {
         const result = await updateRmaCase({
           commandId: crypto.randomUUID(),
-          workspaceId: rmaWorkspaceId,
+          workspaceId: activeWorkspaceId,
           rmaCaseId: rmaDetail.caseRecord.id,
           manufacturerId: draft.manufacturerId,
           supportEmail: draft.supportEmail,
@@ -205,7 +208,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       } else {
         const result = await createRmaCase({
           commandId: crypto.randomUUID(),
-          workspaceId: rmaWorkspaceId,
+          workspaceId: activeWorkspaceId,
           manufacturerId: draft.manufacturerId,
           supportEmail: draft.supportEmail,
           title: draft.title,
@@ -225,7 +228,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       setRmaEditorError(null);
       setRmaEditorMode(null);
     } catch (nextError) {
-      setRmaEditorError(nextError instanceof Error ? nextError.message : "Unable to save RMA case.");
+      setRmaEditorError(nextError instanceof Error ? nextError.message : "Unable to save repair case.");
     } finally {
       setIsSubmittingRma(false);
     }
@@ -240,7 +243,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       setIsSubmittingRma(true);
       const result = await updateRmaCase({
         commandId: crypto.randomUUID(),
-        workspaceId: rmaWorkspaceId,
+        workspaceId: activeWorkspaceId,
         rmaCaseId: rmaDetail.caseRecord.id,
         manufacturerId: rmaDetail.caseRecord.manufacturerId,
         supportEmail: rmaDetail.caseRecord.supportEmail,
@@ -261,7 +264,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       setRmaFeedback(result.summary);
       setRmaEditorError(null);
     } catch (nextError) {
-      setRmaEditorError(nextError instanceof Error ? nextError.message : "Unable to update RMA status.");
+      setRmaEditorError(nextError instanceof Error ? nextError.message : "Unable to update repair status.");
     } finally {
       setIsSubmittingRma(false);
     }
@@ -276,17 +279,17 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
 
       {error ? <div className="empty-state">Incidents unavailable: {error}</div> : null}
       {catalogError ? <div className="empty-state">Incident catalog unavailable: {catalogError}</div> : null}
-      {!isProjectMode && rmaError ? <div className="empty-state">RMA unavailable: {rmaError}</div> : null}
+      {!isProjectMode && rmaError ? <div className="empty-state">Repair cases unavailable: {rmaError}</div> : null}
 
       <div className="selection-action-bar">
-          <div className="selection-action-copy">
-            <span className="selection-action-title">Report incidents from here</span>
-            <span className="selection-action-subtitle">
-              {isProjectMode
-                ? `Create reports inside ${effectiveProjectName ?? "this project"}.`
-                : "Create reports and follow their progress."}
-            </span>
-          </div>
+        <div className="selection-action-copy">
+          <span className="selection-action-title">Report incidents from here</span>
+          <span className="selection-action-subtitle">
+            {isProjectMode
+              ? `Create reports inside ${effectiveProjectName ?? "this project"}.`
+              : "Create reports and follow their progress."}
+          </span>
+        </div>
         <button
           className="action-primary-button"
           onClick={() => {
@@ -540,10 +543,10 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
                   type="button"
                 >
                   <Plus size={14} />
-                  <span>New RMA case</span>
+                  <span>New repair case</span>
                 </button>
               }
-              title="RMA"
+              title="Repair cases"
             >
               <DataTable
                 activeRowId={activeRmaCaseId}
@@ -570,7 +573,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
                   },
                   { key: "assets", label: "Assets", align: "right", render: (row) => row.assetCount },
                 ]}
-                emptyMessage="No RMA cases yet. Create one from the incidents list."
+                emptyMessage="No repair cases yet."
                 onRowClick={(row) => {
                   setActiveRmaCaseId(row.id);
                   setRmaEditorMode(null);
@@ -629,11 +632,11 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
                     </div>
                   ) : null
                 }
-                title={rmaDetail.caseRecord ? rmaDetail.caseRecord.title : "RMA Details"}
+                title={rmaDetail.caseRecord ? rmaDetail.caseRecord.title : "Repair details"}
               >
                 {rmaDetailError ? <div className="action-feedback action-feedback-error">{rmaDetailError}</div> : null}
                 {rmaEditorError && !rmaEditorMode ? <div className="action-feedback action-feedback-error">{rmaEditorError}</div> : null}
-                {!rmaDetail.caseRecord && !rmaDetailLoading ? <div className="empty-state">No RMA case selected.</div> : null}
+                {!rmaDetail.caseRecord && !rmaDetailLoading ? <div className="empty-state">No repair case selected.</div> : null}
 
                 {rmaDetail.caseRecord ? (
                   <div className="page-stack">
