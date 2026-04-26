@@ -37,6 +37,18 @@ const incidentSortOptions: Array<ListSortOption<IncidentSortField>> = [
   { value: "status", label: "Status", columnKey: "status" },
 ];
 
+const resolveIncidentStatusTone = (status: string) => {
+  if (status === "Resolved") {
+    return "success" as const;
+  }
+
+  if (status === "In review") {
+    return "info" as const;
+  }
+
+  return "warning" as const;
+};
+
 const resolveRmaStatusTone = (status: RmaCaseStatus) => {
   if (status === "Closed") {
     return "success" as const;
@@ -283,11 +295,11 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
 
       <div className="selection-action-bar">
         <div className="selection-action-copy">
-          <span className="selection-action-title">Report incidents from here</span>
+          <span className="selection-action-title">Report an issue</span>
           <span className="selection-action-subtitle">
             {isProjectMode
-              ? `Create reports inside ${effectiveProjectName ?? "this project"}.`
-              : "Create reports and follow their progress."}
+              ? effectiveProjectName ?? "This project"
+              : "Track open issues and repair follow-up."}
           </span>
         </div>
         <button
@@ -411,7 +423,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
             {
               key: "status",
               label: "Status",
-              render: (row) => <StatusBadge tone={row.status === "Open" ? "warning" : "info"}>{row.status}</StatusBadge>,
+              render: (row) => <StatusBadge tone={resolveIncidentStatusTone(row.status)}>{row.status}</StatusBadge>,
             },
           ]}
           rows={data}

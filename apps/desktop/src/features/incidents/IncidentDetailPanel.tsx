@@ -142,16 +142,21 @@ export const IncidentDetailPanel = ({
       title={incident.title}
     >
       <div className="page-stack">
-        <div className="chip-row">
+        <div className="entity-detail-status-row">
           <StatusBadge tone={resolveStatusTone(incident.status)}>{incident.status}</StatusBadge>
-          <StatusBadge>{incident.severity}</StatusBadge>
-          {incident.project !== "—" ? <StatusBadge>{incident.project}</StatusBadge> : null}
+          <StatusBadge tone={incident.severity === "High" ? "critical" : incident.severity === "Medium" ? "warning" : "neutral"}>
+            {incident.severity}
+          </StatusBadge>
         </div>
 
         <div className="summary-grid compact-summary-grid">
           <div className="summary-row">
             <span className="summary-label">Asset</span>
             <span className="summary-value">{incident.asset}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Project</span>
+            <span className="summary-value">{incident.project}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">Department</span>
@@ -166,84 +171,6 @@ export const IncidentDetailPanel = ({
             <span className="summary-value">{incident.resolvedAt ?? "Still open"}</span>
           </div>
         </div>
-
-        <SurfaceCard
-          title="Evidence files"
-          aside={
-            <button
-              className="surface-card-action-text"
-              disabled={isUploadingFiles}
-              onClick={() => {
-                setFilesError(null);
-                setFilesFeedback(null);
-                void (async () => {
-                  try {
-                    setIsUploadingFiles(true);
-                    const result = await uploadIncidentFiles(incident.id);
-                    setFilesFeedback(result.summary);
-                    await onRefresh();
-                  } catch (nextError) {
-                    setFilesError(nextError instanceof Error ? nextError.message : "Unable to attach files to this incident.");
-                  } finally {
-                    setIsUploadingFiles(false);
-                  }
-                })();
-              }}
-              type="button"
-            >
-              {isUploadingFiles ? "Uploading..." : "Attach evidence"}
-            </button>
-          }
-        >
-          {detail.files.length ? (
-            <div className="entity-file-list">
-              {detail.files.map((file) => (
-                <div key={file.id} className="entity-file-row">
-                  <div className="entity-file-main">
-                    <div className="entity-file-head">
-                      <span className="entity-file-name">{file.originalName}</span>
-                      <StatusBadge tone={resolveFileTone(file.status)}>{file.status}</StatusBadge>
-                      {file.isPreviewable ? <StatusBadge tone="info">previewable</StatusBadge> : null}
-                    </div>
-                    <div className="entity-file-meta">
-                      <span>{file.fileType}</span>
-                      <span>{formatByteSize(file.byteSize)}</span>
-                      <span>{fileDateFormatter.format(new Date(file.createdAt))}</span>
-                    </div>
-                  </div>
-                  <div className="entity-file-actions">
-                    <button
-                      className="ghost-control"
-                      disabled={file.status !== "available" || openingFileId === file.id}
-                      onClick={() => {
-                        setFilesError(null);
-                        void (async () => {
-                          try {
-                            setOpeningFileId(file.id);
-                            await openIncidentFile(file.id);
-                          } catch (nextError) {
-                            setFilesError(nextError instanceof Error ? nextError.message : "Unable to open that incident file.");
-                            await onRefresh();
-                          } finally {
-                            setOpeningFileId(null);
-                          }
-                        })();
-                      }}
-                      type="button"
-                    >
-                      {openingFileId === file.id ? "Opening..." : "Open"}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">No evidence files attached yet.</div>
-          )}
-        </SurfaceCard>
-
-        {filesFeedback ? <div className="action-feedback action-feedback-success">{filesFeedback}</div> : null}
-        {filesError ? <div className="action-feedback action-feedback-error">{filesError}</div> : null}
 
         <div className="action-form-grid">
           <label className="action-field action-field-wide">
@@ -295,37 +222,6 @@ export const IncidentDetailPanel = ({
             </SelectField>
           </label>
 
-          <label className="action-field">
-            <span className="action-field-label">Cost estimate</span>
-            <input
-              className="action-field-control"
-              inputMode="decimal"
-              onChange={(event) => setCostEstimate(event.target.value)}
-              placeholder="Optional"
-              value={costEstimate}
-            />
-          </label>
-
-          <label className="action-field">
-            <span className="action-field-label">Financial status</span>
-            <input
-              className="action-field-control"
-              onChange={(event) => setFinancialStatus(event.target.value)}
-              placeholder="Optional"
-              value={financialStatus}
-            />
-          </label>
-
-          <label className="action-field action-field-wide">
-            <span className="action-field-label">Notes</span>
-            <textarea
-              className="action-field-control action-textarea"
-              onChange={(event) => setNotes(event.target.value)}
-              rows={3}
-              value={notes}
-            />
-          </label>
-
           <label className="action-field action-field-wide">
             <span className="action-field-label">Resolution notes</span>
             <textarea
@@ -337,6 +233,121 @@ export const IncidentDetailPanel = ({
             />
           </label>
         </div>
+
+        <details className="detail-disclosure">
+          <summary className="detail-disclosure-summary">More details</summary>
+          <div className="detail-disclosure-content">
+            <div className="action-form-grid">
+              <label className="action-field">
+                <span className="action-field-label">Cost estimate</span>
+                <input
+                  className="action-field-control"
+                  inputMode="decimal"
+                  onChange={(event) => setCostEstimate(event.target.value)}
+                  placeholder="Optional"
+                  value={costEstimate}
+                />
+              </label>
+
+              <label className="action-field">
+                <span className="action-field-label">Financial status</span>
+                <input
+                  className="action-field-control"
+                  onChange={(event) => setFinancialStatus(event.target.value)}
+                  placeholder="Optional"
+                  value={financialStatus}
+                />
+              </label>
+
+              <label className="action-field action-field-wide">
+                <span className="action-field-label">Notes</span>
+                <textarea
+                  className="action-field-control action-textarea"
+                  onChange={(event) => setNotes(event.target.value)}
+                  rows={3}
+                  value={notes}
+                />
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <SurfaceCard
+          title="Files"
+          aside={
+            <button
+              className="surface-card-action-text"
+              disabled={isUploadingFiles}
+              onClick={() => {
+                setFilesError(null);
+                setFilesFeedback(null);
+                void (async () => {
+                  try {
+                    setIsUploadingFiles(true);
+                    const result = await uploadIncidentFiles(incident.id);
+                    setFilesFeedback(result.summary);
+                    await onRefresh();
+                  } catch (nextError) {
+                    setFilesError(nextError instanceof Error ? nextError.message : "Unable to attach files to this incident.");
+                  } finally {
+                    setIsUploadingFiles(false);
+                  }
+                })();
+              }}
+              type="button"
+            >
+              {isUploadingFiles ? "Uploading..." : "Attach files"}
+            </button>
+          }
+        >
+          {detail.files.length ? (
+            <div className="entity-file-list entity-detail-compact-list">
+              {detail.files.map((file) => (
+                <div key={file.id} className="entity-file-row">
+                  <div className="entity-file-main">
+                    <div className="entity-file-head">
+                      <span className="entity-file-name">{file.originalName}</span>
+                      <StatusBadge tone={resolveFileTone(file.status)}>{file.status}</StatusBadge>
+                    </div>
+                    <div className="entity-file-meta">
+                      <span>{file.fileType}</span>
+                      <span>{formatByteSize(file.byteSize)}</span>
+                      <span>{fileDateFormatter.format(new Date(file.createdAt))}</span>
+                    </div>
+                  </div>
+                  <div className="entity-file-actions">
+                    <button
+                      className="ghost-control"
+                      disabled={file.status !== "available" || openingFileId === file.id}
+                      onClick={() => {
+                        setFilesError(null);
+                        void (async () => {
+                          try {
+                            setOpeningFileId(file.id);
+                            await openIncidentFile(file.id);
+                          } catch (nextError) {
+                            setFilesError(nextError instanceof Error ? nextError.message : "Unable to open that incident file.");
+                            await onRefresh();
+                          } finally {
+                            setOpeningFileId(null);
+                          }
+                        })();
+                      }}
+                      type="button"
+                    >
+                      {openingFileId === file.id ? "Opening..." : "Open"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">No files attached.</div>
+          )}
+        </SurfaceCard>
+
+        {filesFeedback ? <div className="action-feedback action-feedback-success">{filesFeedback}</div> : null}
+        {filesError ? <div className="action-feedback action-feedback-error">{filesError}</div> : null}
 
         {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
         {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}

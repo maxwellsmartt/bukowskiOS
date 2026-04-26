@@ -3088,6 +3088,13 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   padding: 0 14px;
 }
 
+.entity-detail-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .action-field-control[type="date"],
 .action-field-control[type="datetime-local"] {
   position: relative;

@@ -121,10 +121,12 @@ export const IncidentReportPanel = ({
       }
       title={title}
     >
-      <div className="summary-row">
-        <span className="summary-label">Asset</span>
-        <span className="summary-value">{selectedAssetLabel}</span>
-      </div>
+      {assetLocked || projectLocked ? (
+        <div className="action-panel-summary">
+          {assetLocked ? <span>{selectedAssetLabel}</span> : null}
+          {projectLocked ? <span>Project selected</span> : null}
+        </div>
+      ) : null}
 
       <div className="action-form-grid">
         <label className="action-field">
