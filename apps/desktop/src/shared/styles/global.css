@@ -2803,6 +2803,20 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   font-weight: 500;
 }
 
+.action-panel-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.action-panel-summary span:first-child {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 .selection-action-subtitle {
   color: var(--text-secondary);
   font-size: 11px;
@@ -3096,7 +3110,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .packing-builder-selection-list {
   display: grid;
   gap: 10px;
-  margin-bottom: 18px;
+  margin: 2px 0 4px;
 }
 
 .packing-builder-selection-row {

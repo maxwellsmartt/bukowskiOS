@@ -87,6 +87,7 @@ export const PackingSlipBuilderPanel = ({
     [quantityByAssetId, selectedAssets],
   );
   const totalIssueQuantity = selectedAssetDetails.reduce((sum, asset) => sum + asset.requestedQuantity, 0);
+  const issueQuantityLabel = totalIssueQuantity === 1 ? "1 item" : `${totalIssueQuantity} items`;
   const hasVariableQuantityAssets = selectedAssetDetails.some((asset) => asset.quantity > 1);
   const kitLockedAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount > 0);
   const kitLockSummary = kitLockedAssets.map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`).join(", ");
@@ -110,11 +111,9 @@ export const PackingSlipBuilderPanel = ({
       }
       title="Create packing slip"
     >
-      <div className="chip-row">
-        <span className="action-panel-selection">{selectedLabel}</span>
-        <span className="action-panel-selection">
-          {totalIssueQuantity} {totalIssueQuantity === 1 ? "item to issue" : "items to issue"}
-        </span>
+      <div className="action-panel-summary">
+        <span>{selectedLabel}</span>
+        <span>{issueQuantityLabel} to issue</span>
       </div>
 
       <div className="packing-builder-selection-list">
@@ -148,7 +147,7 @@ export const PackingSlipBuilderPanel = ({
 
       {hasVariableQuantityAssets ? (
         <div className="action-feedback action-feedback-warning">
-          You can adjust quantity for bulk assets here.
+          Adjust quantity for bulk assets before creating the slip.
         </div>
       ) : null}
 
@@ -172,24 +171,24 @@ export const PackingSlipBuilderPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Unit</span>
-          <SelectField disabled={!projectId} onChange={(event) => setProjectUnitId(event.target.value)} value={projectUnitId}>
-            <option value="">{projectId ? "No specific unit" : "Choose project first"}</option>
-            {projectDetail.units.map((unit) => (
-              <option key={unit.id} value={unit.id}>
-                {unit.code} · {unit.name}
-              </option>
-            ))}
-          </SelectField>
-        </label>
-
-        <label className="action-field">
           <span className="action-field-label">Responsible</span>
           <SelectField onChange={(event) => setResponsibleUserId(event.target.value)} value={responsibleUserId}>
             <option value="">Auto / current owner</option>
             {users.map((user) => (
               <option key={user.id} value={user.id}>
                 {user.fullName}
+              </option>
+            ))}
+          </SelectField>
+        </label>
+
+        <label className="action-field">
+          <span className="action-field-label">Unit</span>
+          <SelectField disabled={!projectId} onChange={(event) => setProjectUnitId(event.target.value)} value={projectUnitId}>
+            <option value="">{projectId ? "No specific unit" : "Choose project first"}</option>
+            {projectDetail.units.map((unit) => (
+              <option key={unit.id} value={unit.id}>
+                {unit.code} · {unit.name}
               </option>
             ))}
           </SelectField>

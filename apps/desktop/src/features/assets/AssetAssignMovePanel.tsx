@@ -157,6 +157,7 @@ export const AssetAssignMovePanel = ({
   };
 
   const selectedLabel = selectedCount === 1 ? "1 asset selected" : `${selectedCount} assets selected`;
+  const quantityLabel = totalAssignQuantity === 1 ? "1 item" : `${totalAssignQuantity} items`;
 
   return (
     <SurfaceCard
@@ -166,14 +167,12 @@ export const AssetAssignMovePanel = ({
         </button>
       }
       title={title ?? "Assign / move"}
-      subtitle={subtitle ?? "Run one auditable operational command against the full selection. This writes timeline events and updates current state together."}
+      subtitle={subtitle}
     >
-      <div className="chip-row">
-        <span className="action-panel-selection">{selectedLabel}</span>
+      <div className="action-panel-summary">
+        <span>{selectedLabel}</span>
         {mode === "assign" ? (
-          <span className="action-panel-selection">
-            {totalAssignQuantity} {totalAssignQuantity === 1 ? "item to assign" : "items to assign"}
-          </span>
+          <span>{quantityLabel} to assign</span>
         ) : null}
       </div>
 
@@ -213,7 +212,7 @@ export const AssetAssignMovePanel = ({
 
           {hasVariableQuantityAssets ? (
             <div className="action-feedback action-feedback-warning">
-              Bulk rows can assign a partial quantity here. This MVP keeps one active assignment context per bulk row.
+              Adjust quantity for bulk assets before applying the assignment.
             </div>
           ) : null}
         </>
@@ -272,18 +271,6 @@ export const AssetAssignMovePanel = ({
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Department</span>
-              <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
-                <option value="">No department</option>
-                {departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.code} · {department.name}
-                  </option>
-                ))}
-              </SelectField>
-            </label>
-
-            <label className="action-field">
               <span className="action-field-label">Unit</span>
               <SelectField disabled={!projectId} onChange={(event) => setProjectUnitId(event.target.value)} value={projectUnitId}>
                 <option value="">{projectId ? "No specific unit" : "Choose project first"}</option>
@@ -293,16 +280,6 @@ export const AssetAssignMovePanel = ({
                   </option>
                 ))}
               </SelectField>
-            </label>
-
-            <label className="action-field">
-              <span className="action-field-label">Expected return</span>
-              <input
-                className="action-field-control"
-                onChange={(event) => setExpectedReturnAt(event.target.value)}
-                type="datetime-local"
-                value={expectedReturnAt}
-              />
             </label>
           </>
         ) : null}
@@ -318,18 +295,51 @@ export const AssetAssignMovePanel = ({
             ))}
           </SelectField>
         </label>
-
-        <label className="action-field action-field-wide">
-          <span className="action-field-label">Notes</span>
-          <textarea
-            className="action-field-control action-textarea"
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Optional operational note for the timeline."
-            rows={3}
-            value={notes}
-          />
-        </label>
       </div>
+
+      <details className="detail-disclosure">
+        <summary className="detail-disclosure-summary">More details</summary>
+        <div className="detail-disclosure-content">
+          <div className="action-form-grid">
+            {mode === "assign" ? (
+              <>
+                <label className="action-field">
+                  <span className="action-field-label">Department</span>
+                  <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
+                    <option value="">No department</option>
+                    {departments.map((department) => (
+                      <option key={department.id} value={department.id}>
+                        {department.code} · {department.name}
+                      </option>
+                    ))}
+                  </SelectField>
+                </label>
+
+                <label className="action-field">
+                  <span className="action-field-label">Expected return</span>
+                  <input
+                    className="action-field-control"
+                    onChange={(event) => setExpectedReturnAt(event.target.value)}
+                    type="datetime-local"
+                    value={expectedReturnAt}
+                  />
+                </label>
+              </>
+            ) : null}
+
+            <label className="action-field action-field-wide">
+              <span className="action-field-label">Notes</span>
+              <textarea
+                className="action-field-control action-textarea"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Optional note"
+                rows={3}
+                value={notes}
+              />
+            </label>
+          </div>
+        </div>
+      </details>
 
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 

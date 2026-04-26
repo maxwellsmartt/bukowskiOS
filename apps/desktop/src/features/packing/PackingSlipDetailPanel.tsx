@@ -41,7 +41,7 @@ export const PackingSlipDetailPanel = ({
   if (isLoading) {
     return (
       <SurfaceCard title="Packing Details">
-        <TableSkeleton body="Preparing outgoing items, return state and document context for the selected slip." columns={5} />
+        <TableSkeleton body="Loading slip details." columns={5} />
       </SurfaceCard>
     );
   }
@@ -49,7 +49,7 @@ export const PackingSlipDetailPanel = ({
   if (error) {
     return (
       <SurfaceCard title="Packing Details">
-        <div className="empty-state">Review the local document state and retry the action.</div>
+        <div className="empty-state">Unable to load this slip. Try again.</div>
       </SurfaceCard>
     );
   }
@@ -57,7 +57,7 @@ export const PackingSlipDetailPanel = ({
   if (!data.slip) {
     return (
       <SurfaceCard title="Packing Details">
-        <div className="empty-state">Choose a packing slip to inspect its document state.</div>
+        <div className="empty-state">Choose a packing slip to see details.</div>
       </SurfaceCard>
     );
   }
