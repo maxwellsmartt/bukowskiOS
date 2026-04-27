@@ -275,6 +275,8 @@ const bukowskiPacking = {
     ipcRenderer.invoke(ipcChannels.packing.getDetail, packingSlipId) as Promise<PackingSlipDetailSnapshot>,
   exportPdf: (packingSlipId: string) =>
     ipcRenderer.invoke(ipcChannels.packing.exportPdf, packingSlipId) as Promise<AppExportResult>,
+  exportInsurancePdf: (packingSlipId: string) =>
+    ipcRenderer.invoke(ipcChannels.packing.exportInsurancePdf, packingSlipId) as Promise<AppExportResult>,
   create: (input: CreatePackingSlipCommand) =>
     ipcRenderer.invoke(ipcChannels.packing.create, input) as Promise<CreatePackingSlipResult>,
   returnItems: (input: ReturnPackingSlipItemsCommand) =>

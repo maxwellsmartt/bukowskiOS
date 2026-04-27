@@ -80,6 +80,7 @@ export const ipcChannels = {
     getList: "bukowskiPacking:getList",
     getDetail: "bukowskiPacking:getDetail",
     exportPdf: "bukowskiPacking:exportPdf",
+    exportInsurancePdf: "bukowskiPacking:exportInsurancePdf",
     create: "bukowskiPacking:create",
     returnItems: "bukowskiPacking:returnItems",
   },

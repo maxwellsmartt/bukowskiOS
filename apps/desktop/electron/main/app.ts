@@ -271,6 +271,46 @@ app.whenReady().then(() => {
           itemCount: detail.slip.itemCount,
           returnedCount: detail.slip.returnedCount,
           pendingCount: detail.slip.pendingCount,
+        },
+        items: detail.items.map((item) => ({
+          code: item.code,
+          name: item.asset,
+          serialNumber: item.serialNumber,
+          quantity: item.quantity,
+          conditionOut: item.conditionOut,
+          conditionIn: item.conditionIn,
+          location: item.location,
+          responsible: item.responsible,
+          status: item.status,
+        })),
+      });
+
+      return {
+        ...pdf,
+        targetFilePath,
+      };
+    },
+    exportPackingSlipInsurancePdf: async (packingSlipId, targetFilePath) => {
+      const detail = localDatabase.foundationReads.getPackingSlipDetail(packingSlipId);
+      if (!detail.slip) {
+        throw new Error("Packing slip was not found.");
+      }
+
+      const pdf = await documentGeneration.createPackingSlipInsurancePdf({
+        slipNumber: detail.slip.number,
+        projectName: detail.slip.project,
+        departmentName: detail.slip.department,
+        responsibleName: detail.slip.responsible,
+        preparedByName: detail.slip.preparedBy,
+        issueDate: detail.slip.issueDate,
+        dueDate: detail.slip.dueDate,
+        status: detail.slip.status,
+        notes: detail.slip.notes ?? "",
+        primaryCodeValue: detail.slip.primaryCodeValue,
+        summary: {
+          itemCount: detail.slip.itemCount,
+          returnedCount: detail.slip.returnedCount,
+          pendingCount: detail.slip.pendingCount,
           insuredTotal: detail.slip.insuredTotal,
         },
         items: detail.items.map((item) => ({
@@ -279,9 +319,7 @@ app.whenReady().then(() => {
           serialNumber: item.serialNumber,
           quantity: item.quantity,
           unitInsuredValueAmount: item.unitInsuredValueAmount,
-          unitInsuredValue: item.unitInsuredValue,
           insuredTotalAmount: item.insuredTotalAmount,
-          insuredTotal: item.insuredTotal,
           conditionOut: item.conditionOut,
           conditionIn: item.conditionIn,
           location: item.location,

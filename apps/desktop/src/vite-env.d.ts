@@ -221,6 +221,7 @@ declare global {
       getList: (query?: PackingSlipListQuery) => Promise<PackingSlipRow[]>;
       getDetail: (packingSlipId: string) => Promise<PackingSlipDetailSnapshot>;
       exportPdf: (packingSlipId: string) => Promise<AppExportResult>;
+      exportInsurancePdf: (packingSlipId: string) => Promise<AppExportResult>;
       create: (input: CreatePackingSlipCommand) => Promise<CreatePackingSlipResult>;
       returnItems: (input: ReturnPackingSlipItemsCommand) => Promise<ReturnPackingSlipItemsResult>;
     };

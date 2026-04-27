@@ -19,22 +19,27 @@ type PackingSlipPdfPayload = {
     itemCount: number;
     returnedCount: number;
     pendingCount: number;
-    insuredTotal: string;
   };
   items: Array<{
     code: string;
     name: string;
     serialNumber: string;
     quantity: number;
-    unitInsuredValueAmount: number | null;
-    unitInsuredValue: string;
-    insuredTotalAmount: number | null;
-    insuredTotal: string;
     conditionOut: string;
     conditionIn: string;
     location: string;
     responsible: string;
     status: string;
+  }>;
+};
+
+type PackingSlipInsurancePdfPayload = Omit<PackingSlipPdfPayload, "summary" | "items"> & {
+  summary: PackingSlipPdfPayload["summary"] & {
+    insuredTotal: string;
+  };
+  items: Array<PackingSlipPdfPayload["items"][number] & {
+    unitInsuredValueAmount: number | null;
+    insuredTotalAmount: number | null;
   }>;
 };
 
@@ -214,8 +219,6 @@ export const createDocumentGenerationService = () => ({
             location: string;
             quantity: number;
             serialNumbers: string[];
-            unitInsuredValueAmount: number | null;
-            insuredTotalAmount: number | null;
           }
         >
       >((map, item) => {
@@ -224,10 +227,6 @@ export const createDocumentGenerationService = () => ({
 
         if (existing) {
           existing.quantity += item.quantity;
-          existing.insuredTotalAmount =
-            typeof existing.insuredTotalAmount === "number" || typeof item.insuredTotalAmount === "number"
-              ? (existing.insuredTotalAmount ?? 0) + (item.insuredTotalAmount ?? 0)
-              : null;
           if (item.serialNumber && item.serialNumber !== "—" && !existing.serialNumbers.includes(item.serialNumber)) {
             existing.serialNumbers.push(item.serialNumber);
           }
@@ -240,16 +239,12 @@ export const createDocumentGenerationService = () => ({
           location: item.location || "—",
           quantity: item.quantity,
           serialNumbers: item.serialNumber && item.serialNumber !== "—" ? [item.serialNumber] : [],
-          unitInsuredValueAmount: item.unitInsuredValueAmount,
-          insuredTotalAmount: item.insuredTotalAmount,
         });
         return map;
       }, new Map()),
     ).map(([, item]) => ({
       ...item,
       serialLabel: item.serialNumbers.length ? item.serialNumbers.join(" · ") : "—",
-      unitInsuredValue: formatPdfCurrency(item.unitInsuredValueAmount),
-      insuredTotal: formatPdfCurrency(item.insuredTotalAmount),
     }));
 
     document.roundedRect(cardLeft, top, cardWidth, headerHeight, 18).fillAndStroke(accentBackground, "#22262c");
@@ -300,21 +295,19 @@ export const createDocumentGenerationService = () => ({
     cursorY += 46;
     drawMetaRow("Issued", payload.issueDate, cardLeft, cursorY, 130);
     drawMetaRow("Due", payload.dueDate, cardLeft + 146, cursorY, 130);
-    drawMetaRow("Items", String(payload.summary.itemCount), cardLeft + 292, cursorY, 72);
-    drawMetaRow("Insured total", payload.summary.insuredTotal, cardLeft + 380, cursorY, 124);
+    drawMetaRow("Department", payload.departmentName, cardLeft + 292, cursorY, 140);
+    drawMetaRow("Items", String(payload.summary.itemCount), cardLeft + 448, cursorY, 56);
 
     cursorY += 48;
 
     drawSectionHeading("Issued items", "Grouped view of the exact assets linked to this slip.");
 
     const columns = [
-      { label: "Qty", width: 42, align: "right" as const },
-      { label: "Asset", width: 132, align: "left" as const },
-      { label: "Code", width: 64, align: "left" as const },
-      { label: "Serial", width: 78, align: "left" as const },
-      { label: "Unit value", width: 68, align: "right" as const },
-      { label: "Total", width: 68, align: "right" as const },
-      { label: "Location", width: cardWidth - 42 - 132 - 64 - 78 - 68 - 68, align: "left" as const },
+      { label: "Qty", width: 48, align: "right" as const },
+      { label: "Asset", width: 160, align: "left" as const },
+      { label: "Code", width: 86, align: "left" as const },
+      { label: "Serial", width: 108, align: "left" as const },
+      { label: "Location", width: cardWidth - 48 - 160 - 86 - 108, align: "left" as const },
     ] as const;
 
     const drawTableHeader = () => {
@@ -351,8 +344,6 @@ export const createDocumentGenerationService = () => ({
           item.name,
           item.code || "—",
           item.serialLabel,
-          item.unitInsuredValue,
-          item.insuredTotal,
           item.location,
         ];
         const contentHeights = rowValues.map((value, valueIndex) =>
@@ -457,6 +448,222 @@ export const createDocumentGenerationService = () => ({
 
     return {
       fileName: `${payload.slipNumber}.pdf`,
+      mimeType: "application/pdf" as const,
+      buffer: await bufferPromise,
+    };
+  },
+
+  async createPackingSlipInsurancePdf(payload: PackingSlipInsurancePdfPayload) {
+    const document = new PDFDocument({
+      margin: 40,
+      size: "A4",
+    });
+    const bufferPromise = collectPdfBuffer(document);
+
+    const pageWidth = document.page.width - document.page.margins.left - document.page.margins.right;
+    const cardLeft = document.page.margins.left;
+    const surfaceBorder = "#d7dbe2";
+    const surfaceMuted = "#6c7585";
+    const surfaceText = "#1a2029";
+    const surfaceBackground = "#f7f8fa";
+    const accentBackground = "#141619";
+    const accentSoft = "#efe8dc";
+    const columnGap = 16;
+    let cursorY = document.page.margins.top;
+
+    const ensurePageSpace = (spaceNeeded: number) => {
+      if (cursorY + spaceNeeded <= document.page.height - document.page.margins.bottom) {
+        return;
+      }
+
+      document.addPage();
+      cursorY = document.page.margins.top;
+    };
+
+    const groupedItems = Array.from(
+      payload.items.reduce<
+        Map<
+          string,
+          {
+            name: string;
+            code: string;
+            serialNumbers: string[];
+            quantity: number;
+            unitInsuredValueAmount: number | null;
+            insuredTotalAmount: number | null;
+          }
+        >
+      >((map, item) => {
+        const key = [item.code, item.name, item.unitInsuredValueAmount ?? "pending"].join("::");
+        const existing = map.get(key);
+
+        if (existing) {
+          existing.quantity += item.quantity;
+          existing.insuredTotalAmount =
+            typeof existing.insuredTotalAmount === "number" || typeof item.insuredTotalAmount === "number"
+              ? (existing.insuredTotalAmount ?? 0) + (item.insuredTotalAmount ?? 0)
+              : null;
+          if (item.serialNumber && item.serialNumber !== "—" && !existing.serialNumbers.includes(item.serialNumber)) {
+            existing.serialNumbers.push(item.serialNumber);
+          }
+          return map;
+        }
+
+        map.set(key, {
+          name: item.name,
+          code: item.code,
+          serialNumbers: item.serialNumber && item.serialNumber !== "—" ? [item.serialNumber] : [],
+          quantity: item.quantity,
+          unitInsuredValueAmount: item.unitInsuredValueAmount,
+          insuredTotalAmount: item.insuredTotalAmount,
+        });
+        return map;
+      }, new Map()),
+    ).map(([, item]) => ({
+      ...item,
+      serialLabel: item.serialNumbers.length ? item.serialNumbers.join(" · ") : "—",
+      unitInsuredValue: formatPdfCurrency(item.unitInsuredValueAmount),
+      insuredTotal: formatPdfCurrency(item.insuredTotalAmount),
+    }));
+
+    const missingValueCount = payload.items.filter((item) => item.unitInsuredValueAmount === null).length;
+
+    document.roundedRect(cardLeft, cursorY, pageWidth, 118, 18).fillAndStroke(accentBackground, "#22262c");
+    document.fillColor("#7d8595").fontSize(10).text("INSURANCE LIST", cardLeft + 24, cursorY + 18, {
+      width: 220,
+      characterSpacing: 1.2,
+    });
+    document.fillColor("#f4f5f7").fontSize(24).text(payload.slipNumber, cardLeft + 24, cursorY + 36, {
+      width: pageWidth - 48,
+    });
+    document.fillColor("#c2c7d0").fontSize(10).text("For production and insurance use only. Not for crew handoff.", cardLeft + 24, cursorY + 70, {
+      width: pageWidth - 48,
+    });
+    document.roundedRect(cardLeft + pageWidth - 168, cursorY + 22, 140, 58, 14).fill(accentSoft);
+    document.fillColor("#5d4a2d").fontSize(8).text("INSURED TOTAL", cardLeft + pageWidth - 152, cursorY + 34, {
+      width: 108,
+      characterSpacing: 0.8,
+    });
+    document.fillColor("#1f2126").fontSize(15).text(payload.summary.insuredTotal, cardLeft + pageWidth - 152, cursorY + 48, {
+      width: 108,
+      ellipsis: true,
+    });
+
+    cursorY += 140;
+
+    const drawMetaRow = (label: string, value: string, x: number, y: number, width: number) => {
+      document.fillColor(surfaceMuted).fontSize(9).text(label.toUpperCase(), x, y, {
+        width,
+        characterSpacing: 0.9,
+      });
+      document.fillColor(surfaceText).fontSize(11).text(value || "—", x, y + 14, {
+        width,
+      });
+    };
+
+    drawMetaRow("Project", payload.projectName, cardLeft, cursorY, 210);
+    drawMetaRow("Department", payload.departmentName, cardLeft + 226, cursorY, 132);
+    drawMetaRow("Responsible", payload.responsibleName, cardLeft + 374, cursorY, pageWidth - 374);
+    cursorY += 46;
+    drawMetaRow("Issued", payload.issueDate, cardLeft, cursorY, 120);
+    drawMetaRow("Due", payload.dueDate, cardLeft + 136, cursorY, 120);
+    drawMetaRow("Items", String(payload.summary.itemCount), cardLeft + 272, cursorY, 72);
+    drawMetaRow("Pending values", String(missingValueCount), cardLeft + 360, cursorY, 120);
+    cursorY += 54;
+
+    if (missingValueCount) {
+      document.roundedRect(cardLeft, cursorY, pageWidth, 42, 12).fillAndStroke("#fff6df", "#e4c878");
+      document.fillColor("#7b5b13").fontSize(9).text(`${missingValueCount} item(s) are missing insured value and are marked as pending.`, cardLeft + 14, cursorY + 14, {
+        width: pageWidth - 28,
+      });
+      cursorY += 58;
+    }
+
+    const columns = [
+      { label: "Qty", width: 42, align: "right" as const },
+      { label: "Asset", width: 162, align: "left" as const },
+      { label: "Code", width: 70, align: "left" as const },
+      { label: "Serial", width: 92, align: "left" as const },
+      { label: "Unit value", width: 76, align: "right" as const },
+      { label: "Total", width: pageWidth - 42 - 162 - 70 - 92 - 76, align: "right" as const },
+    ] as const;
+
+    const drawTableHeader = () => {
+      ensurePageSpace(42);
+      document.roundedRect(cardLeft, cursorY, pageWidth, 30, 10).fill(accentBackground);
+      let x = cardLeft + 10;
+      columns.forEach((column) => {
+        document.font("Helvetica-Bold");
+        document.fillColor("#eef2f8").fontSize(8.5).text(column.label, x, cursorY + 11, {
+          width: column.width - 10,
+          align: column.align,
+          lineBreak: false,
+          ellipsis: true,
+        });
+        document.font("Helvetica");
+        x += column.width;
+      });
+      cursorY += 40;
+    };
+
+    drawTableHeader();
+
+    if (!groupedItems.length) {
+      document.roundedRect(cardLeft, cursorY - 2, pageWidth, 42, 10).fillAndStroke(surfaceBackground, surfaceBorder);
+      document.fillColor(surfaceMuted).fontSize(10).text("No issued items are linked to this packing slip yet.", cardLeft + 14, cursorY + 12, {
+        width: pageWidth - 28,
+      });
+      cursorY += 54;
+    } else {
+      groupedItems.forEach((item, index) => {
+        const rowValues = [
+          String(item.quantity),
+          item.name,
+          item.code || "—",
+          item.serialLabel,
+          item.unitInsuredValue,
+          item.insuredTotal,
+        ];
+        const contentHeights = rowValues.map((value, valueIndex) =>
+          document.heightOfString(value, {
+            width: columns[valueIndex]!.width - 14,
+            align: columns[valueIndex]!.align,
+          }),
+        );
+        const rowHeight = Math.max(32, Math.ceil(Math.max(...contentHeights)) + 12);
+
+        if (cursorY + rowHeight > document.page.height - document.page.margins.bottom) {
+          document.addPage();
+          cursorY = document.page.margins.top;
+          drawTableHeader();
+        }
+
+        if (index % 2 === 0) {
+          document.roundedRect(cardLeft, cursorY - 4, pageWidth, rowHeight, 10).fill(surfaceBackground);
+        }
+
+        let x = cardLeft + 10;
+        rowValues.forEach((value, valueIndex) => {
+          const isPrimaryCell = valueIndex === 1;
+          document.font(isPrimaryCell ? "Helvetica-Bold" : "Helvetica");
+          document.fillColor(isPrimaryCell ? "#18202a" : surfaceText).fontSize(isPrimaryCell ? 10 : 9.25).text(value, x, cursorY + 6, {
+            width: columns[valueIndex]!.width - 14,
+            align: columns[valueIndex]!.align,
+            ellipsis: valueIndex !== 0,
+            lineBreak: false,
+          });
+          document.font("Helvetica");
+          x += columns[valueIndex]!.width;
+        });
+
+        cursorY += rowHeight;
+      });
+    }
+
+    document.end();
+
+    return {
+      fileName: `${payload.slipNumber}-insurance.pdf`,
       mimeType: "application/pdf" as const,
       buffer: await bufferPromise,
     };

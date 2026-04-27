@@ -13,7 +13,13 @@ import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 import { PackingSlipDetailPanel } from "./PackingSlipDetailPanel";
-import { exportPackingSlipPdf, returnPackingSlipItems, usePackingDetail, usePackingList } from "./usePackingData";
+import {
+  exportPackingSlipInsurancePdf,
+  exportPackingSlipPdf,
+  returnPackingSlipItems,
+  usePackingDetail,
+  usePackingList,
+} from "./usePackingData";
 
 type PackingPageProps = {
   projectId?: string | null;
@@ -68,6 +74,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const [returnFeedback, setReturnFeedback] = useState<string | null>(null);
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingInsurancePdf, setIsExportingInsurancePdf] = useState(false);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = usePackingDetail(activePackingSlipId);
   const focusedPackingSlipId = searchParams.get("focus");
 
@@ -186,9 +193,26 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
         <PackingSlipDetailPanel
           data={detail}
           error={detailError}
+          isExportingInsurancePdf={isExportingInsurancePdf}
           isExportingPdf={isExportingPdf}
           isLoading={detailLoading}
           isSubmittingReturn={isSubmittingReturn}
+          onExportInsurancePdf={async () => {
+            if (!activePackingSlipId) {
+              return;
+            }
+
+            try {
+              setIsExportingInsurancePdf(true);
+              const result = await exportPackingSlipInsurancePdf(activePackingSlipId);
+              setReturnError(null);
+              setReturnFeedback(result.summary);
+            } catch (nextError) {
+              setReturnError(nextError instanceof Error ? nextError.message : "Unable to export insurance list PDF.");
+            } finally {
+              setIsExportingInsurancePdf(false);
+            }
+          }}
           onExportPdf={async () => {
             if (!activePackingSlipId) {
               return;

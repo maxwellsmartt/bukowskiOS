@@ -1,4 +1,4 @@
-import { Download, RotateCcw } from "lucide-react";
+import { Download, FileText, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { PackingSlipDetailSnapshot } from "@contracts";
@@ -15,8 +15,10 @@ type PackingSlipDetailPanelProps = {
   isLoading: boolean;
   isSubmittingReturn: boolean;
   isExportingPdf: boolean;
+  isExportingInsurancePdf: boolean;
   onReturnItems: (assetIds: string[], conditionIn?: string, notes?: string) => Promise<void>;
   onExportPdf: () => Promise<void>;
+  onExportInsurancePdf: () => Promise<void>;
 };
 
 const conditionOptions = ["Good", "Review", "Damaged"] as const;
@@ -27,8 +29,10 @@ export const PackingSlipDetailPanel = ({
   isLoading,
   isSubmittingReturn,
   isExportingPdf,
+  isExportingInsurancePdf,
   onReturnItems,
   onExportPdf,
+  onExportInsurancePdf,
 }: PackingSlipDetailPanelProps) => {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [conditionIn, setConditionIn] = useState("Good");
@@ -63,6 +67,7 @@ export const PackingSlipDetailPanel = ({
   }
 
   const selectedPendingAssetIds = pendingAssetIds.filter((assetId) => selectedItemIds.includes(assetId));
+  const missingInsuranceValueCount = data.items.filter((item) => item.unitInsuredValueAmount === null).length;
   const returnLabel = selectedPendingAssetIds.length
     ? `Return ${selectedPendingAssetIds.length} selected`
     : `Return all pending (${pendingAssetIds.length})`;
@@ -102,10 +107,6 @@ export const PackingSlipDetailPanel = ({
           </span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Insured total</span>
-          <span className="summary-value">{data.slip.insuredTotal}</span>
-        </div>
-        <div className="summary-row">
           <span className="summary-label">QR ready</span>
           <span className="summary-value">{data.slip.primaryCodeValue}</span>
         </div>
@@ -123,6 +124,12 @@ export const PackingSlipDetailPanel = ({
           qrLabel="Slip QR"
           barcodeLabel="Slip barcode"
         />
+      ) : null}
+
+      {missingInsuranceValueCount ? (
+        <div className="action-feedback action-feedback-warning">
+          {missingInsuranceValueCount} item{missingInsuranceValueCount === 1 ? "" : "s"} missing insured value. Insurance PDF will mark them as pending.
+        </div>
       ) : null}
 
       <div className="action-form-grid">
@@ -156,7 +163,16 @@ export const PackingSlipDetailPanel = ({
           type="button"
         >
           <Download size={14} />
-          <span>{isExportingPdf ? "Exporting PDF..." : "Export PDF"}</span>
+          <span>{isExportingPdf ? "Exporting slip..." : "Export packing slip"}</span>
+        </button>
+        <button
+          className="ghost-control"
+          disabled={isExportingInsurancePdf}
+          onClick={() => void onExportInsurancePdf()}
+          type="button"
+        >
+          <FileText size={14} />
+          <span>{isExportingInsurancePdf ? "Exporting insurance..." : "Export insurance list"}</span>
         </button>
         <button
           className="action-primary-button"
@@ -187,8 +203,6 @@ export const PackingSlipDetailPanel = ({
             ),
           },
           { key: "quantity", label: "Units", align: "right", width: 72, minWidth: 60, render: (row) => row.quantity },
-          { key: "unitInsuredValue", label: "Unit value", align: "right", width: 120, minWidth: 100, render: (row) => row.unitInsuredValue },
-          { key: "insuredTotal", label: "Insured total", align: "right", width: 126, minWidth: 108, render: (row) => row.insuredTotal },
           { key: "conditionOut", label: "Condition out", width: 116, minWidth: 100, render: (row) => row.conditionOut },
           { key: "conditionIn", label: "Condition in", width: 116, minWidth: 100, render: (row) => row.conditionIn },
           { key: "location", label: "Location", width: 170, minWidth: 136, render: (row) => row.location },

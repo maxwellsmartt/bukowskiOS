@@ -74,3 +74,11 @@ export const exportPackingSlipPdf = async (packingSlipId: string): Promise<AppEx
 
   return window.bukowskiPacking.exportPdf(packingSlipId);
 };
+
+export const exportPackingSlipInsurancePdf = async (packingSlipId: string): Promise<AppExportResult> => {
+  if (!window.bukowskiPacking) {
+    throw new Error("Packing bridge unavailable");
+  }
+
+  return window.bukowskiPacking.exportInsurancePdf(packingSlipId);
+};

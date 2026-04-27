@@ -20,6 +20,57 @@ test("document generation service creates a packing slip pdf buffer", async () =
       itemCount: 2,
       returnedCount: 1,
       pendingCount: 1,
+    },
+    items: [
+      {
+        code: "CAM-001",
+        name: "Cinema Camera",
+        serialNumber: "SN-CAM-001",
+        quantity: 1,
+        conditionOut: "Good",
+        conditionIn: "Good",
+        location: "Warehouse A",
+        responsible: "Ana Guerrero",
+        status: "Returned",
+      },
+      {
+        code: "LGT-101",
+        name: "Key Light",
+        serialNumber: "SN-LGT-101",
+        quantity: 2,
+        conditionOut: "Good",
+        conditionIn: "",
+        location: "Truck 3",
+        responsible: "Carlos Pena",
+        status: "Out",
+      },
+    ],
+  });
+
+  expect(result.fileName).toBe("PS-2026-0412.pdf");
+  expect(result.mimeType).toBe("application/pdf");
+  expect(result.buffer.length).toBeGreaterThan(1000);
+  expect(result.buffer.subarray(0, 4).toString("utf8")).toBe("%PDF");
+});
+
+test("document generation service creates an insurance list pdf buffer", async () => {
+  const service = createDocumentGenerationService();
+
+  const result = await service.createPackingSlipInsurancePdf({
+    slipNumber: "PS-2026-0412",
+    projectName: "Aurora Campaign",
+    departmentName: "Production",
+    responsibleName: "Ana Guerrero",
+    preparedByName: "Ops Desk",
+    issueDate: "2026-04-12",
+    dueDate: "2026-04-14",
+    status: "Issued",
+    notes: "Confirm camera bodies before transport.",
+    primaryCodeValue: "packing-slip-0412",
+    summary: {
+      itemCount: 2,
+      returnedCount: 1,
+      pendingCount: 1,
       insuredTotal: "$9,200",
     },
     items: [
@@ -29,9 +80,7 @@ test("document generation service creates a packing slip pdf buffer", async () =
         serialNumber: "SN-CAM-001",
         quantity: 1,
         unitInsuredValueAmount: 7200,
-        unitInsuredValue: "$7,200",
         insuredTotalAmount: 7200,
-        insuredTotal: "$7,200",
         conditionOut: "Good",
         conditionIn: "Good",
         location: "Warehouse A",
@@ -44,9 +93,7 @@ test("document generation service creates a packing slip pdf buffer", async () =
         serialNumber: "SN-LGT-101",
         quantity: 2,
         unitInsuredValueAmount: 1000,
-        unitInsuredValue: "$1,000",
         insuredTotalAmount: 2000,
-        insuredTotal: "$2,000",
         conditionOut: "Good",
         conditionIn: "",
         location: "Truck 3",
@@ -56,7 +103,7 @@ test("document generation service creates a packing slip pdf buffer", async () =
     ],
   });
 
-  expect(result.fileName).toBe("PS-2026-0412.pdf");
+  expect(result.fileName).toBe("PS-2026-0412-insurance.pdf");
   expect(result.mimeType).toBe("application/pdf");
   expect(result.buffer.length).toBeGreaterThan(1000);
   expect(result.buffer.subarray(0, 4).toString("utf8")).toBe("%PDF");

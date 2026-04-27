@@ -220,6 +220,15 @@ type RegisterFoundationIpcOptions = {
     buffer: Buffer;
     targetFilePath: string;
   }>;
+  exportPackingSlipInsurancePdf: (
+    packingSlipId: string,
+    targetFilePath: string,
+  ) => Promise<{
+    fileName: string;
+    mimeType: "application/pdf";
+    buffer: Buffer;
+    targetFilePath: string;
+  }>;
   exportFinanceReportPdf: (
     query: FinanceOverviewQuery | undefined,
     targetFilePath: string,
@@ -281,6 +290,7 @@ export const registerFoundationIpc = ({
   packingMutations,
   exportFinanceReportPdf,
   exportPackingSlipPdf,
+  exportPackingSlipInsurancePdf,
   exportProjectBlueprintPdf,
   rmaMutations,
   agentMutations,
@@ -666,6 +676,44 @@ export const registerFoundationIpc = ({
       };
     },
     "The app could not export that packing slip PDF.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.packing.exportInsurancePdf,
+    idReadArgsSchema,
+    async (_event, packingSlipId: string) => {
+      await workspaceAccess.assertPackingSlipAccess(packingSlipId, "export that insurance list", "read", "packing-slips.read");
+      const detail = foundationReads.getPackingSlipDetail(packingSlipId);
+
+      if (!detail.slip) {
+        throw new Error("Packing slip was not found.");
+      }
+
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: "Export insurance list PDF",
+        defaultPath: path.join(app.getPath("documents"), `${detail.slip.number}-insurance.pdf`),
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+
+      if (canceled || !filePath) {
+        return {
+          saved: false,
+          fileName: null,
+          savedPath: null,
+          summary: "Insurance list PDF export cancelled.",
+        };
+      }
+
+      const pdf = await exportPackingSlipInsurancePdf(packingSlipId, filePath);
+      fs.writeFileSync(filePath, pdf.buffer);
+
+      return {
+        saved: true,
+        fileName: path.basename(filePath),
+        savedPath: filePath,
+        summary: `Exported ${pdf.fileName} to ${path.basename(filePath)}.`,
+      };
+    },
+    "The app could not export that insurance list PDF.",
   );
   safeHandle(ipcChannels.packing.create, createPackingSlipSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({
