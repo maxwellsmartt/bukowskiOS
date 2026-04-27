@@ -505,7 +505,10 @@ describe("asset mutation service", () => {
       defaultLocationId: "loc-warehouse-a",
       conditionStatus: "Good",
       notes: "Created from admin foundation coverage.",
+      purchasePrice: 520,
+      additionalCosts: 80,
       replacementValue: 640,
+      currentBookValue: 575,
       ownershipType: "owned",
       qrCodeValue: "POWER-001-QR",
       isActive: true,
@@ -518,6 +521,10 @@ describe("asset mutation service", () => {
     let detail = reads.getAssetDetail(createResult.assetId);
     expect(detail.asset?.code).toBe("POWER-001");
     expect(detail.editor?.primaryCodeValue).toBe("POWER-001-QR");
+    expect(detail.editor?.purchasePrice).toBe(520);
+    expect(detail.editor?.additionalCosts).toBe(80);
+    expect(detail.editor?.currentBookValue).toBe(575);
+    expect(detail.asset?.insuredValue).toBe("$575");
     expect(detail.scannableCodes[0]?.codeValue).toBe("POWER-001-QR");
 
     const legacyBefore = reads.getAssetDetail("asset-legacy-rentman-1");
@@ -536,7 +543,10 @@ describe("asset mutation service", () => {
       defaultLocationId: legacyBefore.editor!.defaultLocationId ?? undefined,
       conditionStatus: "Review",
       notes: "Updated from test coverage.",
+      purchasePrice: 140,
+      additionalCosts: 25,
       replacementValue: 180,
+      currentBookValue: 160,
       ownershipType: "owned",
       qrCodeValue: "LEGACY-UPDATED-QR",
       isActive: true,
@@ -550,6 +560,10 @@ describe("asset mutation service", () => {
     expect(detail.asset?.condition).toBe("Review");
     expect(detail.editor?.brand).toBe("Legacy Updated");
     expect(detail.editor?.primaryCodeValue).toBe("LEGACY-UPDATED-QR");
+    expect(detail.editor?.purchasePrice).toBe(140);
+    expect(detail.editor?.additionalCosts).toBe(25);
+    expect(detail.editor?.currentBookValue).toBe(160);
+    expect(detail.asset?.insuredValue).toBe("$160");
 
     const archiveResult = mutations.archiveAsset({
       commandId: "cmd-test-asset-archive",

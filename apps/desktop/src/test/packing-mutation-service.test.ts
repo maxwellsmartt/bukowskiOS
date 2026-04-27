@@ -13,6 +13,9 @@ describe("packing mutation service", () => {
     const reads = createFoundationReadService(database);
     const mutations = createPackingMutationService(database);
 
+    database.prepare("UPDATE assets SET current_book_value = ? WHERE id = ?").run(1200, "asset-legacy-rentman-1");
+    database.prepare("UPDATE assets SET purchase_price = ?, additional_costs = ? WHERE id = ?").run(500, 75, "asset-legacy-rentman-2");
+
     const issueResult = mutations.createPackingSlip({
       commandId: "cmd-test-packing-issue",
       workspaceId: "workspace-metadata",
@@ -31,6 +34,9 @@ describe("packing mutation service", () => {
     const issuedSlip = reads.getPackingSlipDetail(issueResult.packingSlipId);
     expect(issuedSlip.slip?.status).toBe("Issued");
     expect(issuedSlip.slip?.itemCount).toBe(3);
+    expect(issuedSlip.slip?.insuredTotal).toBe("$2,975");
+    expect(issuedSlip.items.find((item) => item.assetId === "asset-legacy-rentman-1")?.unitInsuredValueAmount).toBe(1200);
+    expect(issuedSlip.items.find((item) => item.assetId === "asset-legacy-rentman-2")?.unitInsuredValueAmount).toBe(575);
     expect(issuedSlip.items.every((item) => item.status === "Out")).toBe(true);
 
     const checkedOutAsset = reads.getAssetDetail("asset-legacy-rentman-1");

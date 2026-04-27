@@ -26,6 +26,10 @@ export type AssetListRow = {
   folderPath: string;
   hasAccessories: string;
   source: string;
+  purchasePrice: string;
+  additionalCosts: string;
+  currentBookValue: string;
+  replacementValue: string;
   incidentsOpen: number;
   linkedKitCount: number;
   linkedKitCodes: string[];
@@ -104,7 +108,11 @@ export type AssetDetailRow = {
   location: string;
   project: string;
   responsible: string;
+  purchasePrice: string;
+  additionalCosts: string;
+  currentBookValue: string;
   replacementValue: string;
+  insuredValue: string;
   condition: string;
   custody: string;
   linkedKitCount: number;
@@ -124,7 +132,10 @@ export type AssetEditorSnapshot = {
   defaultLocationId: string | null;
   conditionStatus: string;
   notes: string;
+  purchasePrice: number | null;
+  additionalCosts: number | null;
   replacementValue: number | null;
+  currentBookValue: number | null;
   ownershipType: string;
   isActive: boolean;
   qrCodeValue: string;

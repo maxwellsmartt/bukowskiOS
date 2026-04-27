@@ -50,6 +50,7 @@ export type PackingSlipDetailSummary = {
   itemCount: number;
   returnedCount: number;
   pendingCount: number;
+  insuredTotal: string;
   primaryCodeValue: string;
   lifecycleState: "operational" | "staging";
 };
@@ -67,6 +68,10 @@ export type PackingSlipItemRow = {
   status: string;
   location: string;
   responsible: string;
+  unitInsuredValueAmount: number | null;
+  unitInsuredValue: string;
+  insuredTotalAmount: number | null;
+  insuredTotal: string;
 };
 
 export type PackingSlipDetailSnapshot = {

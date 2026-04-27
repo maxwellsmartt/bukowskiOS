@@ -277,16 +277,42 @@ export const AssetDetailPage = () => {
                 <span className="summary-value">{data.asset.tracking}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Replacement</span>
-                <span className="summary-value">{data.asset.replacementValue}</span>
-              </div>
-              <div className="summary-row">
                 <span className="summary-label">Kit membership</span>
                 <span className="summary-value">
                   {data.asset.linkedKitCount ? data.asset.linkedKitCodes.join(" · ") : "Standalone"}
                 </span>
               </div>
             </div>
+
+            {[
+              data.asset.purchasePrice,
+              data.asset.additionalCosts,
+              data.asset.currentBookValue,
+              data.asset.replacementValue,
+            ].some((value) => value !== "Pending") ? (
+              <div className="summary-grid compact-summary-grid">
+                <div className="summary-row">
+                  <span className="summary-label">Insured value</span>
+                  <span className="summary-value">{data.asset.insuredValue}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Purchase price</span>
+                  <span className="summary-value">{data.asset.purchasePrice}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Additional costs</span>
+                  <span className="summary-value">{data.asset.additionalCosts}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Current value</span>
+                  <span className="summary-value">{data.asset.currentBookValue}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Replacement value</span>
+                  <span className="summary-value">{data.asset.replacementValue}</span>
+                </div>
+              </div>
+            ) : null}
 
             {data.editor?.primaryCodeValue ? (
               <ScannableCodePanel

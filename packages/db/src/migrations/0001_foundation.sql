@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS assets (
   description TEXT,
   purchase_date TEXT,
   purchase_price REAL,
+  additional_costs REAL,
   currency TEXT,
   replacement_value REAL,
   current_book_value REAL,

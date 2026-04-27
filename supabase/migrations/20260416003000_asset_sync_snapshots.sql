@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.assets (
   description text,
   purchase_date timestamptz,
   purchase_price numeric,
+  additional_costs numeric,
   currency text,
   replacement_value numeric,
   current_book_value numeric,

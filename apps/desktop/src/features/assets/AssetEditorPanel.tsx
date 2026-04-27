@@ -18,7 +18,10 @@ export type AssetEditorDraft = {
   defaultLocationId?: string;
   conditionStatus: string;
   notes?: string;
+  purchasePrice?: number;
+  additionalCosts?: number;
   replacementValue?: number;
+  currentBookValue?: number;
   ownershipType?: string;
   qrCodeValue?: string;
 };
@@ -71,8 +74,17 @@ export const AssetEditorPanel = ({
   const [defaultLocationId, setDefaultLocationId] = useState(initialValue?.defaultLocationId ?? "");
   const [conditionStatus, setConditionStatus] = useState(initialValue?.conditionStatus ?? "Good");
   const [notes, setNotes] = useState(initialValue?.notes ?? "");
+  const [purchasePrice, setPurchasePrice] = useState(
+    typeof initialValue?.purchasePrice === "number" ? String(initialValue.purchasePrice) : "",
+  );
+  const [additionalCosts, setAdditionalCosts] = useState(
+    typeof initialValue?.additionalCosts === "number" ? String(initialValue.additionalCosts) : "",
+  );
   const [replacementValue, setReplacementValue] = useState(
     typeof initialValue?.replacementValue === "number" ? String(initialValue.replacementValue) : "",
+  );
+  const [currentBookValue, setCurrentBookValue] = useState(
+    typeof initialValue?.currentBookValue === "number" ? String(initialValue.currentBookValue) : "",
   );
   const [ownershipType, setOwnershipType] = useState(initialValue?.ownershipType ?? "owned");
   const [qrCodeValue, setQrCodeValue] = useState(initialValue?.qrCodeValue ?? initialValue?.primaryCodeValue ?? "");
@@ -188,6 +200,41 @@ export const AssetEditorPanel = ({
               </SelectField>
             </label>
 
+            <div className="action-form-section-label action-field-wide">Insurance values</div>
+
+            <label className="action-field">
+              <span className="action-field-label">Purchase price</span>
+              <input
+                className="action-field-control"
+                inputMode="decimal"
+                onChange={(event) => setPurchasePrice(event.target.value)}
+                placeholder="Optional"
+                value={purchasePrice}
+              />
+            </label>
+
+            <label className="action-field">
+              <span className="action-field-label">Additional costs</span>
+              <input
+                className="action-field-control"
+                inputMode="decimal"
+                onChange={(event) => setAdditionalCosts(event.target.value)}
+                placeholder="Shipping, customs, handling"
+                value={additionalCosts}
+              />
+            </label>
+
+            <label className="action-field">
+              <span className="action-field-label">Current value</span>
+              <input
+                className="action-field-control"
+                inputMode="decimal"
+                onChange={(event) => setCurrentBookValue(event.target.value)}
+                placeholder="Manual insured value"
+                value={currentBookValue}
+              />
+            </label>
+
             <label className="action-field">
               <span className="action-field-label">Replacement value</span>
               <input
@@ -263,7 +310,10 @@ export const AssetEditorPanel = ({
               defaultLocationId: normalizeOptional(defaultLocationId),
               conditionStatus,
               notes: normalizeOptional(notes),
+              purchasePrice: normalizeOptional(purchasePrice) ? Number(purchasePrice) : undefined,
+              additionalCosts: normalizeOptional(additionalCosts) ? Number(additionalCosts) : undefined,
               replacementValue: normalizeOptional(replacementValue) ? Number(replacementValue) : undefined,
+              currentBookValue: normalizeOptional(currentBookValue) ? Number(currentBookValue) : undefined,
               ownershipType: normalizeOptional(ownershipType) ?? "owned",
               qrCodeValue: normalizeOptional(qrCodeValue),
             })

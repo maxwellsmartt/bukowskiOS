@@ -136,7 +136,10 @@ export type AssetEditorInput = {
   defaultLocationId?: string;
   conditionStatus: string;
   notes?: string;
+  purchasePrice?: number;
+  additionalCosts?: number;
   replacementValue?: number;
+  currentBookValue?: number;
   ownershipType?: string;
   qrCodeValue?: string;
   isActive?: boolean;

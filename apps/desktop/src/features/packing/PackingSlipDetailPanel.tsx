@@ -102,6 +102,10 @@ export const PackingSlipDetailPanel = ({
           </span>
         </div>
         <div className="summary-row">
+          <span className="summary-label">Insured total</span>
+          <span className="summary-value">{data.slip.insuredTotal}</span>
+        </div>
+        <div className="summary-row">
           <span className="summary-label">QR ready</span>
           <span className="summary-value">{data.slip.primaryCodeValue}</span>
         </div>
@@ -183,6 +187,8 @@ export const PackingSlipDetailPanel = ({
             ),
           },
           { key: "quantity", label: "Units", align: "right", width: 72, minWidth: 60, render: (row) => row.quantity },
+          { key: "unitInsuredValue", label: "Unit value", align: "right", width: 120, minWidth: 100, render: (row) => row.unitInsuredValue },
+          { key: "insuredTotal", label: "Insured total", align: "right", width: 126, minWidth: 108, render: (row) => row.insuredTotal },
           { key: "conditionOut", label: "Condition out", width: 116, minWidth: 100, render: (row) => row.conditionOut },
           { key: "conditionIn", label: "Condition in", width: 116, minWidth: 100, render: (row) => row.conditionIn },
           { key: "location", label: "Location", width: 170, minWidth: 136, render: (row) => row.location },

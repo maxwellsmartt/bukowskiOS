@@ -31,6 +31,7 @@ import {
 } from "./aiGatewayFoundationBootstrap";
 import { createFoundationReadService, type FoundationReadService } from "./foundationReadService";
 import { applyAssetQuantityFoundationMigration } from "./assetQuantityFoundationBootstrap";
+import { applyAssetValuationFoundationMigration } from "./assetValuationFoundationBootstrap";
 import { createAssetMutationService } from "./assetMutationService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
@@ -463,6 +464,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   ensureProjectShellDefaults(database);
   bootstrapLegacyRentmanDemo(database);
   applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database));
+  applyTrackedStep(database, "runtime_asset_valuation_foundation_v1", () => applyAssetValuationFoundationMigration(database));
   bootstrapAdminFoundation(database);
   bootstrapSchedulingFoundation(database);
   if (process.env.BUKOWSKI_PROFILE_DATASET === "1") {
@@ -645,6 +647,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
             description,
             purchase_date,
             purchase_price,
+            additional_costs,
             currency,
             replacement_value,
             current_book_value,
@@ -673,6 +676,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
           description: string | null;
           purchase_date: string | null;
           purchase_price: number | null;
+          additional_costs: number | null;
           currency: string | null;
           replacement_value: number | null;
           current_book_value: number | null;

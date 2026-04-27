@@ -145,6 +145,19 @@ const parseCsvQuantity = (value: string, rowNumber: number) => {
   return parsed;
 };
 
+const parseCsvMoney = (value: string, rowNumber: number, label: string) => {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number(value.replace(/[$,\s]/g, ""));
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`Row ${rowNumber}: ${label} must be a valid amount.`);
+  }
+
+  return parsed;
+};
+
 const joinCsvNotes = (parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join("\n");
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
@@ -163,7 +176,10 @@ type AssetCsvDraft = {
   description: string;
   conditionStatus: string;
   notes: string;
+  purchasePrice: number | undefined;
+  additionalCosts: number | undefined;
   replacementValue: number | undefined;
+  currentBookValue: number | undefined;
   ownershipType: string;
   qrCodeValue: string;
   totalQuantity: number;
@@ -333,8 +349,18 @@ const buildAssetCsvPreview = ({
         : warehouseSlot
           ? locationByCodeOrName.get(normalizeCsvLookup(warehouseSlot))
           : undefined;
-      const replacementValueText = resolveCsvValue(row, ["replacementValue", "replacement", "value"]);
-      const replacementValue = replacementValueText ? Number(replacementValueText.replace(/[$,\s]/g, "")) : undefined;
+      const purchasePrice = parseCsvMoney(resolveCsvValue(row, ["purchasePrice", "purchase price", "precio compra", "precio de compra"]), rowNumber, "purchase price");
+      const shippingCost = parseCsvMoney(resolveCsvValue(row, ["shipping", "freight", "envio", "flete"]), rowNumber, "shipping");
+      const customsCost = parseCsvMoney(resolveCsvValue(row, ["customs", "customsTax", "taxes", "impuestos", "aduana"]), rowNumber, "customs/taxes");
+      const explicitAdditionalCosts = parseCsvMoney(resolveCsvValue(row, ["additionalCosts", "additional costs", "gastos adicionales"]), rowNumber, "additional costs");
+      const additionalCosts =
+        typeof explicitAdditionalCosts === "number"
+          ? explicitAdditionalCosts
+          : [shippingCost, customsCost].some((value) => typeof value === "number")
+            ? (shippingCost ?? 0) + (customsCost ?? 0)
+            : undefined;
+      const replacementValue = parseCsvMoney(resolveCsvValue(row, ["replacementValue", "replacement", "replacement value", "value", "valor reposicion", "valor de reposicion"]), rowNumber, "replacement value");
+      const currentBookValue = parseCsvMoney(resolveCsvValue(row, ["currentBookValue", "current book value", "current value", "insured value", "valor asegurado", "valor actual"]), rowNumber, "current value");
       const conditionStatus = resolveCsvValue(row, ["condition", "conditionStatus"]) || "Good";
       const totalQuantity = parseCsvQuantity(resolveCsvValue(row, ["quantity", "Cantidad actual", "currentQuantity"]), rowNumber);
       const folderPath = resolveCsvValue(row, ["Estructura de la carpeta (Carpeta)", "folderPath"]);
@@ -357,10 +383,6 @@ const buildAssetCsvPreview = ({
 
       if (!explicitLocationValue && warehouseSlot && !defaultLocationId) {
         unmatchedWarehouseSlots += 1;
-      }
-
-      if (replacementValueText && Number.isNaN(replacementValue)) {
-        throw new Error("replacement value must be a number.");
       }
 
       if (!allowedCsvConditions.has(conditionStatus)) {
@@ -389,7 +411,10 @@ const buildAssetCsvPreview = ({
           folderType && `Source folder type: ${folderType}`,
           positionType && `Source item type: ${positionType}`,
         ]),
+        purchasePrice,
+        additionalCosts,
         replacementValue,
+        currentBookValue,
         ownershipType: resolveCsvValue(row, ["ownership", "ownershipType"]) || "owned",
         qrCodeValue: resolveCsvValue(row, ["qr", "qrCode", "qrCodeValue", "barcode", "Códigos QR"]),
         totalQuantity,
@@ -883,6 +908,10 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       { key: "responsible", label: "Responsible", width: 160, minWidth: 132, render: (row: (typeof assets)[number]) => row.responsible },
       { key: "serialNumber", label: "Serial", width: 150, minWidth: 120, render: (row: (typeof assets)[number]) => row.serialNumber },
       { key: "qrCode", label: "QR", width: 130, minWidth: 108, render: (row: (typeof assets)[number]) => row.qrCode },
+      { key: "purchasePrice", label: "Purchase price", align: "right" as const, width: 132, minWidth: 112, render: (row: (typeof assets)[number]) => row.purchasePrice },
+      { key: "additionalCosts", label: "Additional costs", align: "right" as const, width: 140, minWidth: 120, render: (row: (typeof assets)[number]) => row.additionalCosts },
+      { key: "currentBookValue", label: "Current value", align: "right" as const, width: 132, minWidth: 112, render: (row: (typeof assets)[number]) => row.currentBookValue },
+      { key: "replacementValue", label: "Replacement value", align: "right" as const, width: 148, minWidth: 124, render: (row: (typeof assets)[number]) => row.replacementValue },
       { key: "warehouseSlot", label: "Warehouse", width: 126, minWidth: 108, render: (row: (typeof assets)[number]) => row.warehouseSlot },
       { key: "folderPath", label: "Folder path", width: 250, minWidth: 200, render: (row: (typeof assets)[number]) => row.folderPath },
       { key: "hasAccessories", label: "Accessories", width: 110, minWidth: 96, render: (row: (typeof assets)[number]) => row.hasAccessories },

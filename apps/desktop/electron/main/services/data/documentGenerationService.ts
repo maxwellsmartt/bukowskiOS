@@ -19,12 +19,17 @@ type PackingSlipPdfPayload = {
     itemCount: number;
     returnedCount: number;
     pendingCount: number;
+    insuredTotal: string;
   };
   items: Array<{
     code: string;
     name: string;
     serialNumber: string;
     quantity: number;
+    unitInsuredValueAmount: number | null;
+    unitInsuredValue: string;
+    insuredTotalAmount: number | null;
+    insuredTotal: string;
     conditionOut: string;
     conditionIn: string;
     location: string;
@@ -138,6 +143,15 @@ const loadOptionalAssetBuffer = (relativePath: string) => {
 
 const metadataLogoBuffer = loadOptionalAssetBuffer("apps/desktop/electron/main/assets/logos/metadata-cine-logo.png");
 
+const formatPdfCurrency = (value: number | null | undefined) =>
+  typeof value === "number"
+    ? new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 0,
+      }).format(value)
+    : "—";
+
 export const createDocumentGenerationService = () => ({
   async createPackingSlipPdf(payload: PackingSlipPdfPayload) {
     const qrBuffer = await QRCode.toBuffer(payload.primaryCodeValue, {
@@ -200,6 +214,8 @@ export const createDocumentGenerationService = () => ({
             location: string;
             quantity: number;
             serialNumbers: string[];
+            unitInsuredValueAmount: number | null;
+            insuredTotalAmount: number | null;
           }
         >
       >((map, item) => {
@@ -208,6 +224,10 @@ export const createDocumentGenerationService = () => ({
 
         if (existing) {
           existing.quantity += item.quantity;
+          existing.insuredTotalAmount =
+            typeof existing.insuredTotalAmount === "number" || typeof item.insuredTotalAmount === "number"
+              ? (existing.insuredTotalAmount ?? 0) + (item.insuredTotalAmount ?? 0)
+              : null;
           if (item.serialNumber && item.serialNumber !== "—" && !existing.serialNumbers.includes(item.serialNumber)) {
             existing.serialNumbers.push(item.serialNumber);
           }
@@ -220,12 +240,16 @@ export const createDocumentGenerationService = () => ({
           location: item.location || "—",
           quantity: item.quantity,
           serialNumbers: item.serialNumber && item.serialNumber !== "—" ? [item.serialNumber] : [],
+          unitInsuredValueAmount: item.unitInsuredValueAmount,
+          insuredTotalAmount: item.insuredTotalAmount,
         });
         return map;
       }, new Map()),
     ).map(([, item]) => ({
       ...item,
       serialLabel: item.serialNumbers.length ? item.serialNumbers.join(" · ") : "—",
+      unitInsuredValue: formatPdfCurrency(item.unitInsuredValueAmount),
+      insuredTotal: formatPdfCurrency(item.insuredTotalAmount),
     }));
 
     document.roundedRect(cardLeft, top, cardWidth, headerHeight, 18).fillAndStroke(accentBackground, "#22262c");
@@ -276,19 +300,21 @@ export const createDocumentGenerationService = () => ({
     cursorY += 46;
     drawMetaRow("Issued", payload.issueDate, cardLeft, cursorY, 130);
     drawMetaRow("Due", payload.dueDate, cardLeft + 146, cursorY, 130);
-    drawMetaRow("Department", payload.departmentName, cardLeft + 292, cursorY, 140);
-    drawMetaRow("Items", String(payload.summary.itemCount), cardLeft + 448, cursorY, 56);
+    drawMetaRow("Items", String(payload.summary.itemCount), cardLeft + 292, cursorY, 72);
+    drawMetaRow("Insured total", payload.summary.insuredTotal, cardLeft + 380, cursorY, 124);
 
     cursorY += 48;
 
     drawSectionHeading("Issued items", "Grouped view of the exact assets linked to this slip.");
 
     const columns = [
-      { label: "Cantidad", width: 56, align: "right" as const },
-      { label: "Nombre", width: 170, align: "left" as const },
-      { label: "Código", width: 92, align: "left" as const },
-      { label: "Serial", width: 112, align: "left" as const },
-      { label: "Location", width: cardWidth - 56 - 170 - 92 - 112, align: "left" as const },
+      { label: "Qty", width: 42, align: "right" as const },
+      { label: "Asset", width: 132, align: "left" as const },
+      { label: "Code", width: 64, align: "left" as const },
+      { label: "Serial", width: 78, align: "left" as const },
+      { label: "Unit value", width: 68, align: "right" as const },
+      { label: "Total", width: 68, align: "right" as const },
+      { label: "Location", width: cardWidth - 42 - 132 - 64 - 78 - 68 - 68, align: "left" as const },
     ] as const;
 
     const drawTableHeader = () => {
@@ -325,6 +351,8 @@ export const createDocumentGenerationService = () => ({
           item.name,
           item.code || "—",
           item.serialLabel,
+          item.unitInsuredValue,
+          item.insuredTotal,
           item.location,
         ];
         const contentHeights = rowValues.map((value, valueIndex) =>

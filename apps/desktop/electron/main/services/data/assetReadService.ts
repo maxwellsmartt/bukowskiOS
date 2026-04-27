@@ -262,6 +262,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
                 ELSE 'Unknown'
               END AS has_accessories,
               COALESCE(legacy_rentman_imports.source_label, 'Operational registry') AS source_label,
+              assets.purchase_price,
+              assets.additional_costs,
+              assets.current_book_value,
+              assets.replacement_value,
               assets.created_at,
               assets.updated_at,
               (
@@ -309,6 +313,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
         folder_path: string;
         has_accessories: string;
         source_label: string;
+        purchase_price: number | null;
+        additional_costs: number | null;
+        current_book_value: number | null;
+        replacement_value: number | null;
         created_at: string | null;
         updated_at: string | null;
         incidents_open: number;
@@ -346,6 +354,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           folderPath: row.folder_path,
           hasAccessories: row.has_accessories,
           source: row.source_label,
+          purchasePrice: deps.formatCurrency(row.purchase_price),
+          additionalCosts: deps.formatCurrency(row.additional_costs),
+          currentBookValue: deps.formatCurrency(row.current_book_value),
+          replacementValue: deps.formatCurrency(row.replacement_value),
           incidentsOpen: row.incidents_open,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -400,6 +412,9 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
               assets.serial_number,
               assets.description,
               assets.replacement_value,
+              assets.purchase_price,
+              assets.additional_costs,
+              assets.current_book_value,
               assets.default_location_id,
               assets.notes,
               assets.ownership_type,
@@ -450,6 +465,9 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
             serial_number: string | null;
             description: string | null;
             replacement_value: number | null;
+            purchase_price: number | null;
+            additional_costs: number | null;
+            current_book_value: number | null;
             default_location_id: string | null;
             notes: string | null;
             ownership_type: string | null;
@@ -608,7 +626,11 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           location: asset.location,
           project: asset.project,
           responsible: asset.responsible,
+          purchasePrice: deps.formatCurrency(asset.purchase_price),
+          additionalCosts: deps.formatCurrency(asset.additional_costs),
+          currentBookValue: deps.formatCurrency(asset.current_book_value),
           replacementValue: deps.formatCurrency(asset.replacement_value),
+          insuredValue: deps.formatCurrency(asset.current_book_value ?? asset.replacement_value ?? ((asset.purchase_price ?? 0) + (asset.additional_costs ?? 0) || null)),
           condition: asset.condition_status,
           custody: asset.custody_status,
           linkedKitCount: kitMemberships.length,
@@ -637,7 +659,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           defaultLocationId: asset.default_location_id,
           conditionStatus: asset.condition_status,
           notes: asset.notes ?? "",
+          purchasePrice: asset.purchase_price,
+          additionalCosts: asset.additional_costs,
           replacementValue: asset.replacement_value,
+          currentBookValue: asset.current_book_value,
           ownershipType: asset.ownership_type ?? "owned",
           isActive: Boolean(asset.is_active),
           qrCodeValue: asset.qr_code_value === "—" ? "" : asset.qr_code_value,

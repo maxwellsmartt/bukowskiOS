@@ -1598,6 +1598,10 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             assets.name AS asset_name,
             COALESCE(legacy_rentman_items.legacy_code, assets.internal_code) AS code,
             COALESCE(assets.serial_number, '—') AS serial_number,
+            assets.purchase_price,
+            assets.additional_costs,
+            assets.replacement_value,
+            assets.current_book_value,
             packing_slip_items.quantity,
             COALESCE(packing_slip_items.condition_out, '—') AS condition_out,
             COALESCE(packing_slip_items.condition_in, '—') AS condition_in,
@@ -1621,6 +1625,10 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       asset_name: string;
       code: string;
       serial_number: string;
+      purchase_price: number | null;
+      additional_costs: number | null;
+      replacement_value: number | null;
+      current_book_value: number | null;
       quantity: number;
       condition_out: string;
       condition_in: string;
@@ -1630,20 +1638,34 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     }>;
 
     const returnedCount = slip.returned_count ?? 0;
-    const itemRows: PackingSlipItemRow[] = items.map((row) => ({
-      id: row.id,
-      assetId: row.asset_id,
-      asset: row.asset_name,
-      code: row.code,
-      serialNumber: row.serial_number,
-      quantity: row.quantity,
-      conditionOut: row.condition_out,
-      conditionIn: row.condition_in,
-      returnedAt: row.returned_at ? formatTimelineTimestamp(row.returned_at) : "Pending return",
-      status: row.returned_at ? "Returned" : "Out",
-      location: row.location,
-      responsible: row.responsible,
-    }));
+    const resolveUnitInsuredValue = (row: (typeof items)[number]) =>
+      row.current_book_value ?? row.replacement_value ?? ((row.purchase_price ?? 0) + (row.additional_costs ?? 0) || null);
+    const itemRows: PackingSlipItemRow[] = items.map((row) => {
+      const unitInsuredValue = resolveUnitInsuredValue(row);
+      const insuredTotalAmount = typeof unitInsuredValue === "number" ? unitInsuredValue * row.quantity : null;
+      return {
+        id: row.id,
+        assetId: row.asset_id,
+        asset: row.asset_name,
+        code: row.code,
+        serialNumber: row.serial_number,
+        quantity: row.quantity,
+        conditionOut: row.condition_out,
+        conditionIn: row.condition_in,
+        returnedAt: row.returned_at ? formatTimelineTimestamp(row.returned_at) : "Pending return",
+        status: row.returned_at ? "Returned" : "Out",
+        location: row.location,
+        responsible: row.responsible,
+        unitInsuredValueAmount: unitInsuredValue,
+        unitInsuredValue: formatCurrency(unitInsuredValue),
+        insuredTotalAmount,
+        insuredTotal: formatCurrency(insuredTotalAmount),
+      };
+    });
+    const insuredTotal = items.reduce((total, row) => {
+      const unitInsuredValue = resolveUnitInsuredValue(row);
+      return total + (typeof unitInsuredValue === "number" ? unitInsuredValue * row.quantity : 0);
+    }, 0);
 
     return {
       slip: {
@@ -1661,6 +1683,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         itemCount: slip.item_count,
         returnedCount,
         pendingCount: Math.max(0, slip.item_count - returnedCount),
+        insuredTotal: insuredTotal > 0 ? formatCurrency(insuredTotal) : "Pending",
         primaryCodeValue: slip.primary_code_value,
         lifecycleState: slip.lifecycle_state,
       },

@@ -1163,7 +1163,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             serial_number,
             internal_code,
             description,
+            purchase_price,
+            additional_costs,
             replacement_value,
+            current_book_value,
             ownership_type,
             default_location_id,
             qr_code_value,
@@ -1172,7 +1175,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             created_at,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       ).run(
         assetId,
@@ -1184,7 +1187,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         normalizeOptionalText(input.serialNumber),
         internalCode,
         normalizeOptionalText(input.description),
+        typeof input.purchasePrice === "number" ? input.purchasePrice : null,
+        typeof input.additionalCosts === "number" ? input.additionalCosts : null,
         typeof input.replacementValue === "number" ? input.replacementValue : null,
+        typeof input.currentBookValue === "number" ? input.currentBookValue : null,
         normalizeOptionalText(input.ownershipType) ?? "owned",
         input.defaultLocationId?.trim() || null,
         primaryCode.codeValue,
@@ -1201,6 +1207,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         defaultLocationId: input.defaultLocationId?.trim() || null,
         primaryCodeValue: primaryCode.codeValue,
         totalQuantity,
+        purchasePrice: input.purchasePrice ?? null,
+        additionalCosts: input.additionalCosts ?? null,
+        replacementValue: input.replacementValue ?? null,
+        currentBookValue: input.currentBookValue ?? null,
       });
 
       db.prepare(
@@ -1442,7 +1452,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
             serial_number = ?,
             internal_code = ?,
             description = ?,
+            purchase_price = ?,
+            additional_costs = ?,
             replacement_value = ?,
+            current_book_value = ?,
             ownership_type = ?,
             default_location_id = ?,
             qr_code_value = ?,
@@ -1459,7 +1472,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         normalizeOptionalText(input.serialNumber),
         internalCode,
         normalizeOptionalText(input.description),
+        typeof input.purchasePrice === "number" ? input.purchasePrice : null,
+        typeof input.additionalCosts === "number" ? input.additionalCosts : null,
         typeof input.replacementValue === "number" ? input.replacementValue : null,
+        typeof input.currentBookValue === "number" ? input.currentBookValue : null,
         normalizeOptionalText(input.ownershipType) ?? "owned",
         input.defaultLocationId?.trim() || null,
         primaryCode.codeValue,
@@ -1475,6 +1491,10 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         categoryId: input.categoryId,
         defaultLocationId: input.defaultLocationId?.trim() || null,
         primaryCodeValue: primaryCode.codeValue,
+        purchasePrice: input.purchasePrice ?? null,
+        additionalCosts: input.additionalCosts ?? null,
+        replacementValue: input.replacementValue ?? null,
+        currentBookValue: input.currentBookValue ?? null,
       });
 
       db.prepare(
