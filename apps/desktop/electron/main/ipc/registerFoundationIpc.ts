@@ -277,6 +277,35 @@ type RegisterFoundationIpcOptions = {
   };
 };
 
+const sanitizePdfFileNamePart = (value: string | null | undefined, fallback: string) => {
+  const sanitized = (value ?? "")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  return sanitized || fallback;
+};
+
+const buildPackingSlipPdfFileName = (
+  slip: {
+    number: string;
+    projectCode: string;
+    project: string;
+    departmentCode: string;
+    issueDateCompact: string;
+  },
+  prefix: "PS" | "IL",
+) => {
+  const slipNumericId = slip.number.replace(/^PS[-_\s]*/i, "");
+  const slipLabel = `${prefix}-${sanitizePdfFileNamePart(slipNumericId, slip.number)}`;
+  const projectCode = sanitizePdfFileNamePart(slip.projectCode, "NO-PROJECT");
+  const projectName = sanitizePdfFileNamePart(slip.project, "Unassigned");
+  const departmentCode = sanitizePdfFileNamePart(slip.departmentCode, "NO-DEPT");
+  const issuedDate = sanitizePdfFileNamePart(slip.issueDateCompact, "undated");
+
+  return `${slipLabel}_${projectCode}_${projectName}_${departmentCode}_Packing_${issuedDate}.pdf`;
+};
+
 export const registerFoundationIpc = ({
   foundationReads,
   agentReads,
@@ -652,7 +681,7 @@ export const registerFoundationIpc = ({
 
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: "Export packing slip PDF",
-        defaultPath: path.join(app.getPath("documents"), `${detail.slip.number}.pdf`),
+        defaultPath: path.join(app.getPath("documents"), buildPackingSlipPdfFileName(detail.slip, "PS")),
         filters: [{ name: "PDF", extensions: ["pdf"] }],
       });
 
@@ -690,7 +719,7 @@ export const registerFoundationIpc = ({
 
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: "Export insurance list PDF",
-        defaultPath: path.join(app.getPath("documents"), `${detail.slip.number}-insurance.pdf`),
+        defaultPath: path.join(app.getPath("documents"), buildPackingSlipPdfFileName(detail.slip, "IL")),
         filters: [{ name: "PDF", extensions: ["pdf"] }],
       });
 

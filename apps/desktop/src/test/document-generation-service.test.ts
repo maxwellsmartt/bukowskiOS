@@ -7,11 +7,14 @@ test("document generation service creates a packing slip pdf buffer", async () =
 
   const result = await service.createPackingSlipPdf({
     slipNumber: "PS-2026-0412",
+    projectCode: "AUR",
     projectName: "Aurora Campaign",
+    departmentCode: "PROD",
     departmentName: "Production",
     responsibleName: "Ana Guerrero",
     preparedByName: "Ops Desk",
     issueDate: "2026-04-12",
+    issueDateCompact: "12042026",
     dueDate: "2026-04-14",
     status: "Issued",
     notes: "Confirm camera bodies before transport.",
@@ -47,7 +50,7 @@ test("document generation service creates a packing slip pdf buffer", async () =
     ],
   });
 
-  expect(result.fileName).toBe("PS-2026-0412.pdf");
+  expect(result.fileName).toBe("PS-2026-0412_AUR_Aurora Campaign_PROD_Packing_12042026.pdf");
   expect(result.mimeType).toBe("application/pdf");
   expect(result.buffer.length).toBeGreaterThan(1000);
   expect(result.buffer.subarray(0, 4).toString("utf8")).toBe("%PDF");
@@ -58,11 +61,14 @@ test("document generation service creates an insurance list pdf buffer", async (
 
   const result = await service.createPackingSlipInsurancePdf({
     slipNumber: "PS-2026-0412",
+    projectCode: "AUR",
     projectName: "Aurora Campaign",
+    departmentCode: "PROD",
     departmentName: "Production",
     responsibleName: "Ana Guerrero",
     preparedByName: "Ops Desk",
     issueDate: "2026-04-12",
+    issueDateCompact: "12042026",
     dueDate: "2026-04-14",
     status: "Issued",
     notes: "Confirm camera bodies before transport.",
@@ -79,6 +85,8 @@ test("document generation service creates an insurance list pdf buffer", async (
         name: "Cinema Camera",
         serialNumber: "SN-CAM-001",
         quantity: 1,
+        purchasePriceAmount: 6800,
+        additionalCostsAmount: 400,
         unitInsuredValueAmount: 7200,
         insuredTotalAmount: 7200,
         conditionOut: "Good",
@@ -92,6 +100,8 @@ test("document generation service creates an insurance list pdf buffer", async (
         name: "Key Light",
         serialNumber: "SN-LGT-101",
         quantity: 2,
+        purchasePriceAmount: 800,
+        additionalCostsAmount: 120,
         unitInsuredValueAmount: 1000,
         insuredTotalAmount: 2000,
         conditionOut: "Good",
@@ -103,7 +113,7 @@ test("document generation service creates an insurance list pdf buffer", async (
     ],
   });
 
-  expect(result.fileName).toBe("PS-2026-0412-insurance.pdf");
+  expect(result.fileName).toBe("IL-2026-0412_AUR_Aurora Campaign_PROD_Packing_12042026.pdf");
   expect(result.mimeType).toBe("application/pdf");
   expect(result.buffer.length).toBeGreaterThan(1000);
   expect(result.buffer.subarray(0, 4).toString("utf8")).toBe("%PDF");

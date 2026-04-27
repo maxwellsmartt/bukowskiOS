@@ -6,11 +6,14 @@ import QRCode from "qrcode";
 
 type PackingSlipPdfPayload = {
   slipNumber: string;
+  projectCode: string;
   projectName: string;
+  departmentCode: string;
   departmentName: string;
   responsibleName: string;
   preparedByName: string;
   issueDate: string;
+  issueDateCompact: string;
   dueDate: string;
   status: string;
   notes: string;
@@ -38,6 +41,8 @@ type PackingSlipInsurancePdfPayload = Omit<PackingSlipPdfPayload, "summary" | "i
     insuredTotal: string;
   };
   items: Array<PackingSlipPdfPayload["items"][number] & {
+    purchasePriceAmount: number | null;
+    additionalCostsAmount: number | null;
     unitInsuredValueAmount: number | null;
     insuredTotalAmount: number | null;
   }>;
@@ -146,7 +151,9 @@ const loadOptionalAssetBuffer = (relativePath: string) => {
   return null;
 };
 
-const metadataLogoBuffer = loadOptionalAssetBuffer("apps/desktop/electron/main/assets/logos/metadata-cine-logo.png");
+const metadataLogoBuffer =
+  loadOptionalAssetBuffer("apps/desktop/src/shared/assets/inbox/logos/metadata-logo-black@2x.png") ??
+  loadOptionalAssetBuffer("apps/desktop/electron/main/assets/logos/metadata-cine-logo.png");
 
 const formatPdfCurrency = (value: number | null | undefined) =>
   typeof value === "number"
@@ -156,6 +163,51 @@ const formatPdfCurrency = (value: number | null | undefined) =>
         maximumFractionDigits: 0,
       }).format(value)
     : "—";
+
+const sanitizePdfFileNamePart = (value: string | null | undefined, fallback: string) => {
+  const sanitized = (value ?? "")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  return sanitized || fallback;
+};
+
+const buildPackingSlipPdfFileName = (payload: PackingSlipPdfPayload, prefix: "PS" | "IL") => {
+  const slipNumericId = payload.slipNumber.replace(/^PS[-_\s]*/i, "");
+  const slipLabel = `${prefix}-${sanitizePdfFileNamePart(slipNumericId, payload.slipNumber)}`;
+  const projectCode = sanitizePdfFileNamePart(payload.projectCode, "NO-PROJECT");
+  const projectName = sanitizePdfFileNamePart(payload.projectName, "Unassigned");
+  const departmentCode = sanitizePdfFileNamePart(payload.departmentCode, "NO-DEPT");
+  const issuedDate = sanitizePdfFileNamePart(payload.issueDateCompact, "undated");
+
+  return `${slipLabel}_${projectCode}_${projectName}_${departmentCode}_Packing_${issuedDate}.pdf`;
+};
+
+const drawMetadataLogo = (document: PDFKit.PDFDocument, x: number, y: number, color = "#141619") => {
+  if (metadataLogoBuffer) {
+    document.image(metadataLogoBuffer, x, y, {
+      fit: [66, 46],
+    });
+    return;
+  }
+
+  document.font("Helvetica-Bold").fillColor(color).fontSize(16).text("META", x, y, {
+    width: 66,
+    characterSpacing: 1.4,
+    lineBreak: false,
+  });
+  document.text("DATA", x, y + 15, {
+    width: 66,
+    characterSpacing: 1.4,
+    lineBreak: false,
+  });
+  document.font("Helvetica").fontSize(7).text("C I N E", x + 2, y + 34, {
+    width: 60,
+    characterSpacing: 4,
+    lineBreak: false,
+  });
+};
 
 export const createDocumentGenerationService = () => ({
   async createPackingSlipPdf(payload: PackingSlipPdfPayload) {
@@ -183,9 +235,8 @@ export const createDocumentGenerationService = () => ({
     const surfaceText = "#1a2029";
     const surfaceBackground = "#f7f8fa";
     const accentBackground = "#141619";
-    const accentSoft = "#efe8dc";
     const columnGap = 16;
-    const headerHeight = 90;
+    const headerHeight = 78;
     const footerReserve = 124;
     let cursorY = top + headerHeight + 18;
 
@@ -200,12 +251,12 @@ export const createDocumentGenerationService = () => ({
 
     const drawSectionHeading = (title: string, subtitle?: string) => {
       ensurePageSpace(40);
-      document.fillColor(surfaceText).fontSize(13).text(title, cardLeft, cursorY, { width: cardWidth });
-      cursorY += 18;
+      document.fillColor(surfaceText).fontSize(11).text(title, cardLeft, cursorY, { width: cardWidth });
+      cursorY += 15;
 
       if (subtitle) {
-        document.fillColor(surfaceMuted).fontSize(10).text(subtitle, cardLeft, cursorY, { width: cardWidth });
-        cursorY += 18;
+        document.fillColor(surfaceMuted).fontSize(8).text(subtitle, cardLeft, cursorY, { width: cardWidth });
+        cursorY += 14;
       }
     };
 
@@ -247,77 +298,77 @@ export const createDocumentGenerationService = () => ({
       serialLabel: item.serialNumbers.length ? item.serialNumbers.join(" · ") : "—",
     }));
 
-    document.roundedRect(cardLeft, top, cardWidth, headerHeight, 18).fillAndStroke(accentBackground, "#22262c");
+    document.roundedRect(cardLeft, top, cardWidth, headerHeight, 16).strokeColor(accentBackground).lineWidth(1.1).stroke();
+    drawMetadataLogo(document, cardLeft + 20, top + 16);
 
-    const logoWidth = metadataLogoBuffer ? 118 : 0;
-    const logoGap = metadataLogoBuffer ? 2 : 0;
-    const slipInfoX = cardLeft + 24 + logoWidth + logoGap - 42;
-
-    if (metadataLogoBuffer) {
-      document.image(metadataLogoBuffer, cardLeft + 24, top + 24, {
-        fit: [118, 44],
-        valign: "center",
-      });
-    }
-
-    document.fillColor("#7d8595").fontSize(10).text("Packing slip", slipInfoX, top + 33, {
-      width: 220,
-      characterSpacing: 1.2,
+    const slipInfoX = cardLeft + 112;
+    document.fillColor(surfaceMuted).fontSize(8).text("PACKING SLIP", slipInfoX, top + 18, {
+      width: 180,
+      characterSpacing: 1.1,
+      lineBreak: false,
     });
-    document.fillColor("#f4f5f7").fontSize(22).text(payload.slipNumber, slipInfoX, top + 47, {
-      width: 220,
+    document.fillColor(surfaceText).fontSize(20).text(payload.slipNumber, slipInfoX, top + 31, {
+      width: 180,
+      lineBreak: false,
+      ellipsis: true,
     });
-    document.image(qrBuffer, cardLeft + cardWidth - 80, top + 18, {
-      width: 56,
-      height: 56,
+    document.fillColor(surfaceMuted).fontSize(8).text("Crew handoff / return control", slipInfoX, top + 56, {
+      width: 220,
+      lineBreak: false,
+      ellipsis: true,
+    });
+    document.image(qrBuffer, cardLeft + cardWidth - 70, top + 14, {
+      width: 50,
+      height: 50,
     });
 
     const drawMetaRow = (label: string, value: string, x: number, y: number, width: number) => {
-      document.fillColor(surfaceMuted).fontSize(9).text(label.toUpperCase(), x, y, {
+      document.fillColor(surfaceMuted).fontSize(7.5).text(label.toUpperCase(), x, y, {
         width,
         characterSpacing: 0.9,
+        lineBreak: false,
+        ellipsis: true,
       });
-      document.fillColor(surfaceText).fontSize(11).text(value || "—", x, y + 14, {
+      document.fillColor(surfaceText).fontSize(9.5).text(value || "—", x, y + 12, {
         width,
+        lineBreak: false,
+        ellipsis: true,
       });
     };
 
-    const leftColumnWidth = 280;
-    const rightColumnWidth = cardWidth - leftColumnWidth - columnGap;
+    const metaColumnWidth = Math.floor((cardWidth - columnGap * 2) / 3);
 
-    drawMetaRow("Project", payload.projectName, cardLeft, cursorY, leftColumnWidth);
-    drawMetaRow("Department", payload.departmentName, cardLeft + leftColumnWidth + columnGap, cursorY, rightColumnWidth);
+    drawMetaRow("Project", payload.projectName, cardLeft, cursorY, metaColumnWidth);
+    drawMetaRow("Department", payload.departmentName, cardLeft + metaColumnWidth + columnGap, cursorY, metaColumnWidth);
+    drawMetaRow("Responsible", payload.responsibleName, cardLeft + (metaColumnWidth + columnGap) * 2, cursorY, metaColumnWidth);
 
-    cursorY += 46;
-    drawMetaRow("Responsible", payload.responsibleName, cardLeft, cursorY, leftColumnWidth);
-    drawMetaRow("Prepared by", payload.preparedByName, cardLeft + leftColumnWidth + columnGap, cursorY, rightColumnWidth);
+    cursorY += 34;
+    drawMetaRow("Prepared by", payload.preparedByName, cardLeft, cursorY, metaColumnWidth);
+    drawMetaRow("Issued / due", `${payload.issueDate} -> ${payload.dueDate}`, cardLeft + metaColumnWidth + columnGap, cursorY, metaColumnWidth);
+    drawMetaRow("Items", String(payload.summary.itemCount), cardLeft + (metaColumnWidth + columnGap) * 2, cursorY, metaColumnWidth);
 
-    cursorY += 46;
-    drawMetaRow("Issued", payload.issueDate, cardLeft, cursorY, 130);
-    drawMetaRow("Due", payload.dueDate, cardLeft + 146, cursorY, 130);
-    drawMetaRow("Department", payload.departmentName, cardLeft + 292, cursorY, 140);
-    drawMetaRow("Items", String(payload.summary.itemCount), cardLeft + 448, cursorY, 56);
-
-    cursorY += 48;
+    cursorY += 42;
 
     drawSectionHeading("Issued items", "Grouped view of the exact assets linked to this slip.");
 
+    const tableInset = 10;
+    const tableContentWidth = cardWidth - tableInset * 2;
     const columns = [
       { label: "Qty", width: 48, align: "right" as const },
       { label: "Asset", width: 160, align: "left" as const },
       { label: "Code", width: 86, align: "left" as const },
       { label: "Serial", width: 108, align: "left" as const },
-      { label: "Location", width: cardWidth - 48 - 160 - 86 - 108, align: "left" as const },
+      { label: "Location", width: tableContentWidth - 48 - 160 - 86 - 108, align: "left" as const },
     ] as const;
 
     const drawTableHeader = () => {
       ensurePageSpace(42);
-      const headerHeight = 30;
-      document.roundedRect(cardLeft, cursorY, cardWidth, headerHeight, 10).fill(accentBackground);
-      let x = cardLeft + 10;
+      const headerHeight = 24;
+      document.roundedRect(cardLeft, cursorY, cardWidth, headerHeight, 8).fill(accentBackground);
+      let x = cardLeft + tableInset;
       columns.forEach((column) => {
         document.font("Helvetica-Bold");
-        document.fillColor("#eef2f8").fontSize(8.5).text(column.label, x, cursorY + 11, {
+        document.fillColor("#eef2f8").fontSize(7.4).text(column.label, x, cursorY + 8, {
           width: column.width - 10,
           align: column.align,
           lineBreak: false,
@@ -326,7 +377,7 @@ export const createDocumentGenerationService = () => ({
         document.font("Helvetica");
         x += column.width;
       });
-      cursorY += headerHeight + 10;
+      cursorY += headerHeight + 9;
     };
 
     drawTableHeader();
@@ -352,7 +403,7 @@ export const createDocumentGenerationService = () => ({
             align: columns[valueIndex]!.align,
           }),
         );
-        const rowHeight = Math.max(32, Math.ceil(Math.max(...contentHeights)) + 12);
+        const rowHeight = Math.max(26, Math.ceil(Math.max(...contentHeights)) + 10);
 
         if (cursorY + rowHeight > document.page.height - document.page.margins.bottom - footerReserve) {
           document.addPage();
@@ -361,18 +412,19 @@ export const createDocumentGenerationService = () => ({
         }
 
         if (index % 2 === 0) {
-          document.roundedRect(cardLeft, cursorY - 4, cardWidth, rowHeight, 10).fill(surfaceBackground);
+          document.roundedRect(cardLeft, cursorY - 3, cardWidth, rowHeight, 8).fill(surfaceBackground);
         }
 
-        let x = cardLeft + 10;
+        let x = cardLeft + tableInset;
         rowValues.forEach((value, valueIndex) => {
           const isPrimaryCell = valueIndex === 1;
           document.font(isPrimaryCell ? "Helvetica-Bold" : "Helvetica");
-          document.fillColor(isPrimaryCell ? "#18202a" : surfaceText).fontSize(isPrimaryCell ? 10 : 9.25).text(value, x, cursorY + 6, {
+          document.fillColor(isPrimaryCell ? "#18202a" : surfaceText).fontSize(isPrimaryCell ? 8.4 : 7.8).text(value, x, cursorY + 5, {
             width: columns[valueIndex]!.width - 14,
             align: columns[valueIndex]!.align,
             ellipsis: valueIndex !== 0,
-            lineBreak: false,
+            lineBreak: valueIndex === 1,
+            height: rowHeight - 8,
           });
           document.font("Helvetica");
           x += columns[valueIndex]!.width;
@@ -447,7 +499,7 @@ export const createDocumentGenerationService = () => ({
     document.end();
 
     return {
-      fileName: `${payload.slipNumber}.pdf`,
+      fileName: buildPackingSlipPdfFileName(payload, "PS"),
       mimeType: "application/pdf" as const,
       buffer: await bufferPromise,
     };
@@ -467,8 +519,8 @@ export const createDocumentGenerationService = () => ({
     const surfaceText = "#1a2029";
     const surfaceBackground = "#f7f8fa";
     const accentBackground = "#141619";
-    const accentSoft = "#efe8dc";
     const columnGap = 16;
+    const footerReserve = 120;
     let cursorY = document.page.margins.top;
 
     const ensurePageSpace = (spaceNeeded: number) => {
@@ -489,6 +541,8 @@ export const createDocumentGenerationService = () => ({
             code: string;
             serialNumbers: string[];
             quantity: number;
+            purchasePriceAmount: number | null;
+            additionalCostsAmount: number | null;
             unitInsuredValueAmount: number | null;
             insuredTotalAmount: number | null;
           }
@@ -514,6 +568,8 @@ export const createDocumentGenerationService = () => ({
           code: item.code,
           serialNumbers: item.serialNumber && item.serialNumber !== "—" ? [item.serialNumber] : [],
           quantity: item.quantity,
+          purchasePriceAmount: item.purchasePriceAmount,
+          additionalCostsAmount: item.additionalCostsAmount,
           unitInsuredValueAmount: item.unitInsuredValueAmount,
           insuredTotalAmount: item.insuredTotalAmount,
         });
@@ -522,79 +578,82 @@ export const createDocumentGenerationService = () => ({
     ).map(([, item]) => ({
       ...item,
       serialLabel: item.serialNumbers.length ? item.serialNumbers.join(" · ") : "—",
+      purchasePrice: formatPdfCurrency(item.purchasePriceAmount),
+      additionalCosts: formatPdfCurrency(item.additionalCostsAmount),
       unitInsuredValue: formatPdfCurrency(item.unitInsuredValueAmount),
       insuredTotal: formatPdfCurrency(item.insuredTotalAmount),
     }));
 
     const missingValueCount = payload.items.filter((item) => item.unitInsuredValueAmount === null).length;
+    const headerHeight = 78;
 
-    document.roundedRect(cardLeft, cursorY, pageWidth, 118, 18).fillAndStroke(accentBackground, "#22262c");
-    document.fillColor("#7d8595").fontSize(10).text("INSURANCE LIST", cardLeft + 24, cursorY + 18, {
+    document.roundedRect(cardLeft, cursorY, pageWidth, headerHeight, 16).strokeColor(accentBackground).lineWidth(1.1).stroke();
+    drawMetadataLogo(document, cardLeft + 20, cursorY + 16);
+
+    const headerTop = cursorY;
+    const slipInfoX = cardLeft + 112;
+    document.fillColor(surfaceMuted).fontSize(8).text("INSURANCE LIST", slipInfoX, headerTop + 18, {
+      width: 180,
+      characterSpacing: 1.1,
+      lineBreak: false,
+    });
+    document.fillColor(surfaceText).fontSize(20).text(payload.slipNumber, slipInfoX, headerTop + 31, {
+      width: 180,
+      lineBreak: false,
+      ellipsis: true,
+    });
+    document.fillColor(surfaceMuted).fontSize(8).text("Production / insurance only", slipInfoX, headerTop + 56, {
       width: 220,
-      characterSpacing: 1.2,
-    });
-    document.fillColor("#f4f5f7").fontSize(24).text(payload.slipNumber, cardLeft + 24, cursorY + 36, {
-      width: pageWidth - 48,
-    });
-    document.fillColor("#c2c7d0").fontSize(10).text("For production and insurance use only. Not for crew handoff.", cardLeft + 24, cursorY + 70, {
-      width: pageWidth - 48,
-    });
-    document.roundedRect(cardLeft + pageWidth - 168, cursorY + 22, 140, 58, 14).fill(accentSoft);
-    document.fillColor("#5d4a2d").fontSize(8).text("INSURED TOTAL", cardLeft + pageWidth - 152, cursorY + 34, {
-      width: 108,
-      characterSpacing: 0.8,
-    });
-    document.fillColor("#1f2126").fontSize(15).text(payload.summary.insuredTotal, cardLeft + pageWidth - 152, cursorY + 48, {
-      width: 108,
+      lineBreak: false,
       ellipsis: true,
     });
 
-    cursorY += 140;
+    cursorY += headerHeight + 18;
 
     const drawMetaRow = (label: string, value: string, x: number, y: number, width: number) => {
-      document.fillColor(surfaceMuted).fontSize(9).text(label.toUpperCase(), x, y, {
+      document.fillColor(surfaceMuted).fontSize(7.5).text(label.toUpperCase(), x, y, {
         width,
         characterSpacing: 0.9,
+        lineBreak: false,
+        ellipsis: true,
       });
-      document.fillColor(surfaceText).fontSize(11).text(value || "—", x, y + 14, {
+      document.fillColor(surfaceText).fontSize(9.5).text(value || "—", x, y + 12, {
         width,
+        lineBreak: false,
+        ellipsis: true,
       });
     };
 
-    drawMetaRow("Project", payload.projectName, cardLeft, cursorY, 210);
-    drawMetaRow("Department", payload.departmentName, cardLeft + 226, cursorY, 132);
-    drawMetaRow("Responsible", payload.responsibleName, cardLeft + 374, cursorY, pageWidth - 374);
-    cursorY += 46;
-    drawMetaRow("Issued", payload.issueDate, cardLeft, cursorY, 120);
-    drawMetaRow("Due", payload.dueDate, cardLeft + 136, cursorY, 120);
-    drawMetaRow("Items", String(payload.summary.itemCount), cardLeft + 272, cursorY, 72);
-    drawMetaRow("Pending values", String(missingValueCount), cardLeft + 360, cursorY, 120);
-    cursorY += 54;
+    const metaColumnWidth = Math.floor((pageWidth - columnGap * 2) / 3);
+    drawMetaRow("Project", payload.projectName, cardLeft, cursorY, metaColumnWidth);
+    drawMetaRow("Department", payload.departmentName, cardLeft + metaColumnWidth + columnGap, cursorY, metaColumnWidth);
+    drawMetaRow("Responsible", payload.responsibleName, cardLeft + (metaColumnWidth + columnGap) * 2, cursorY, metaColumnWidth);
+    cursorY += 34;
+    drawMetaRow("Issued / due", `${payload.issueDate} -> ${payload.dueDate}`, cardLeft, cursorY, metaColumnWidth);
+    drawMetaRow("Items", String(payload.summary.itemCount), cardLeft + metaColumnWidth + columnGap, cursorY, metaColumnWidth);
+    drawMetaRow("Pending values", String(missingValueCount), cardLeft + (metaColumnWidth + columnGap) * 2, cursorY, metaColumnWidth);
+    cursorY += 42;
 
-    if (missingValueCount) {
-      document.roundedRect(cardLeft, cursorY, pageWidth, 42, 12).fillAndStroke("#fff6df", "#e4c878");
-      document.fillColor("#7b5b13").fontSize(9).text(`${missingValueCount} item(s) are missing insured value and are marked as pending.`, cardLeft + 14, cursorY + 14, {
-        width: pageWidth - 28,
-      });
-      cursorY += 58;
-    }
-
+    const tableInset = 10;
+    const tableContentWidth = pageWidth - tableInset * 2;
     const columns = [
-      { label: "Qty", width: 42, align: "right" as const },
-      { label: "Asset", width: 162, align: "left" as const },
-      { label: "Code", width: 70, align: "left" as const },
-      { label: "Serial", width: 92, align: "left" as const },
-      { label: "Unit value", width: 76, align: "right" as const },
-      { label: "Total", width: pageWidth - 42 - 162 - 70 - 92 - 76, align: "right" as const },
+      { label: "Qty", width: 28, align: "right" as const },
+      { label: "Asset", width: 110, align: "left" as const },
+      { label: "Code", width: 42, align: "left" as const },
+      { label: "Serial", width: 54, align: "left" as const },
+      { label: "Purchase", width: 62, align: "right" as const },
+      { label: "Add. costs", width: 58, align: "right" as const },
+      { label: "Unit value", width: 68, align: "right" as const },
+      { label: "Total", width: tableContentWidth - 28 - 110 - 42 - 54 - 62 - 58 - 68, align: "right" as const },
     ] as const;
 
     const drawTableHeader = () => {
       ensurePageSpace(42);
-      document.roundedRect(cardLeft, cursorY, pageWidth, 30, 10).fill(accentBackground);
-      let x = cardLeft + 10;
+      document.roundedRect(cardLeft, cursorY, pageWidth, 24, 8).fill(accentBackground);
+      let x = cardLeft + tableInset;
       columns.forEach((column) => {
         document.font("Helvetica-Bold");
-        document.fillColor("#eef2f8").fontSize(8.5).text(column.label, x, cursorY + 11, {
+        document.fillColor("#eef2f8").fontSize(6.6).text(column.label, x, cursorY + 8, {
           width: column.width - 10,
           align: column.align,
           lineBreak: false,
@@ -603,7 +662,7 @@ export const createDocumentGenerationService = () => ({
         document.font("Helvetica");
         x += column.width;
       });
-      cursorY += 40;
+      cursorY += 33;
     };
 
     drawTableHeader();
@@ -621,6 +680,8 @@ export const createDocumentGenerationService = () => ({
           item.name,
           item.code || "—",
           item.serialLabel,
+          item.purchasePrice,
+          item.additionalCosts,
           item.unitInsuredValue,
           item.insuredTotal,
         ];
@@ -630,27 +691,28 @@ export const createDocumentGenerationService = () => ({
             align: columns[valueIndex]!.align,
           }),
         );
-        const rowHeight = Math.max(32, Math.ceil(Math.max(...contentHeights)) + 12);
+        const rowHeight = Math.max(26, Math.ceil(Math.max(...contentHeights)) + 10);
 
-        if (cursorY + rowHeight > document.page.height - document.page.margins.bottom) {
+        if (cursorY + rowHeight > document.page.height - document.page.margins.bottom - footerReserve) {
           document.addPage();
           cursorY = document.page.margins.top;
           drawTableHeader();
         }
 
         if (index % 2 === 0) {
-          document.roundedRect(cardLeft, cursorY - 4, pageWidth, rowHeight, 10).fill(surfaceBackground);
+          document.roundedRect(cardLeft, cursorY - 3, pageWidth, rowHeight, 8).fill(surfaceBackground);
         }
 
-        let x = cardLeft + 10;
+        let x = cardLeft + tableInset;
         rowValues.forEach((value, valueIndex) => {
           const isPrimaryCell = valueIndex === 1;
           document.font(isPrimaryCell ? "Helvetica-Bold" : "Helvetica");
-          document.fillColor(isPrimaryCell ? "#18202a" : surfaceText).fontSize(isPrimaryCell ? 10 : 9.25).text(value, x, cursorY + 6, {
+          document.fillColor(isPrimaryCell ? "#18202a" : surfaceText).fontSize(isPrimaryCell ? 7.2 : 6.6).text(value, x, cursorY + 5, {
             width: columns[valueIndex]!.width - 14,
             align: columns[valueIndex]!.align,
             ellipsis: valueIndex !== 0,
-            lineBreak: false,
+            lineBreak: valueIndex === 1,
+            height: rowHeight - 8,
           });
           document.font("Helvetica");
           x += columns[valueIndex]!.width;
@@ -660,10 +722,62 @@ export const createDocumentGenerationService = () => ({
       });
     }
 
+    cursorY += 12;
+    ensurePageSpace(44);
+    document.roundedRect(cardLeft, cursorY, pageWidth, 34, 10).fillAndStroke(surfaceBackground, surfaceBorder);
+    document.fillColor(surfaceMuted).fontSize(7.5).text("INSURED TOTAL", cardLeft + pageWidth - 220, cursorY + 12, {
+      width: 100,
+      align: "right",
+      characterSpacing: 0.8,
+      lineBreak: false,
+    });
+    document.font("Helvetica-Bold").fillColor(surfaceText).fontSize(10.5).text(payload.summary.insuredTotal, cardLeft + pageWidth - 108, cursorY + 10, {
+      width: 94,
+      align: "right",
+      lineBreak: false,
+      ellipsis: true,
+    });
+    document.font("Helvetica");
+    cursorY += 54;
+
+    const signatureLabelY = document.page.height - document.page.margins.bottom - 58;
+    const signatureLineY = document.page.height - document.page.margins.bottom - 22;
+
+    if (cursorY > signatureLabelY - 18) {
+      document.addPage();
+      cursorY = document.page.margins.top;
+    }
+
+    const signatureWidth = Math.floor((pageWidth - columnGap) / 2);
+
+    document.fillColor(surfaceMuted).fontSize(8).text("PREPARED BY", cardLeft, signatureLabelY, {
+      width: signatureWidth,
+      characterSpacing: 0.9,
+    });
+    document.fillColor(surfaceMuted).fontSize(8).text("PRODUCTION / INSURANCE", cardLeft + signatureWidth + columnGap, signatureLabelY, {
+      width: signatureWidth,
+      characterSpacing: 0.9,
+    });
+
+    document.moveTo(cardLeft, signatureLineY).lineTo(cardLeft + signatureWidth - 18, signatureLineY).strokeColor(surfaceBorder).lineWidth(1).stroke();
+    document
+      .moveTo(cardLeft + signatureWidth + columnGap, signatureLineY)
+      .lineTo(cardLeft + pageWidth, signatureLineY)
+      .strokeColor(surfaceBorder)
+      .lineWidth(1)
+      .stroke();
+
+    document.fillColor(surfaceMuted).fontSize(8).text(payload.preparedByName || "Operations", cardLeft, signatureLineY + 6, {
+      width: signatureWidth,
+    });
+    document.fillColor(surfaceMuted).fontSize(8).text("Name / signature", cardLeft + signatureWidth + columnGap, signatureLineY + 6, {
+      width: signatureWidth,
+    });
+
     document.end();
 
     return {
-      fileName: `${payload.slipNumber}-insurance.pdf`,
+      fileName: buildPackingSlipPdfFileName(payload, "IL"),
       mimeType: "application/pdf" as const,
       buffer: await bufferPromise,
     };

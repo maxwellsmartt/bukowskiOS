@@ -316,6 +316,22 @@ const formatShortDate = (value: string | null) => {
   return dateFormatter.format(new Date(value));
 };
 
+const formatCompactDate = (value: string | null) => {
+  if (!value) {
+    return "undated";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "undated";
+  }
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear());
+  return `${day}${month}${year}`;
+};
+
 const isoDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "2-digit",
@@ -1527,7 +1543,9 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             packing_slips.return_due_date,
             COALESCE(packing_slips.notes, 'No operational notes yet.') AS notes,
             packing_slips.project_id,
+            COALESCE(projects.code, 'UNASSIGNED') AS project_code,
             COALESCE(projects.name, 'Unassigned staging') AS project,
+            COALESCE(departments.code, 'NO-DEPT') AS department_code,
             COALESCE(departments.name, '—') AS department,
             COALESCE(responsible.full_name, '—') AS responsible,
             COALESCE(prepared.full_name, '—') AS prepared_by,
@@ -1556,7 +1574,9 @@ export const createFoundationReadService = (db: DatabaseSync) => {
             packing_slips.return_due_date,
             packing_slips.notes,
             packing_slips.project_id,
+            projects.code,
             projects.name,
+            departments.code,
             departments.name,
             responsible.full_name,
             prepared.full_name
@@ -1572,7 +1592,9 @@ export const createFoundationReadService = (db: DatabaseSync) => {
           return_due_date: string | null;
           notes: string;
           project_id: string | null;
+          project_code: string;
           project: string;
+          department_code: string;
           department: string;
           responsible: string;
           prepared_by: string;
@@ -1656,6 +1678,10 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         status: row.returned_at ? "Returned" : "Out",
         location: row.location,
         responsible: row.responsible,
+        purchasePriceAmount: row.purchase_price,
+        purchasePrice: formatCurrency(row.purchase_price),
+        additionalCostsAmount: row.additional_costs,
+        additionalCosts: formatCurrency(row.additional_costs),
         unitInsuredValueAmount: unitInsuredValue,
         unitInsuredValue: formatCurrency(unitInsuredValue),
         insuredTotalAmount,
@@ -1672,11 +1698,14 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         id: slip.id,
         number: slip.id.replace("packing-", "PS-"),
         projectId: slip.project_id,
+        projectCode: slip.project_code,
         project: slip.project,
+        departmentCode: slip.department_code,
         department: slip.department,
         responsible: slip.responsible,
         preparedBy: slip.prepared_by,
         issueDate: formatShortDate(slip.issue_date),
+        issueDateCompact: formatCompactDate(slip.issue_date),
         dueDate: formatShortDate(slip.return_due_date),
         status: resolvePackingStatus(slip.status, slip.return_due_date, slip.item_count, returnedCount),
         notes: slip.notes,

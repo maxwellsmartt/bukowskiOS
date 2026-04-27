@@ -39,11 +39,14 @@ export type PackingSlipDetailSummary = {
   id: string;
   number: string;
   projectId: string | null;
+  projectCode: string;
   project: string;
+  departmentCode: string;
   department: string;
   responsible: string;
   preparedBy: string;
   issueDate: string;
+  issueDateCompact: string;
   dueDate: string;
   status: string;
   notes: string;
@@ -68,6 +71,10 @@ export type PackingSlipItemRow = {
   status: string;
   location: string;
   responsible: string;
+  purchasePriceAmount: number | null;
+  purchasePrice: string;
+  additionalCostsAmount: number | null;
+  additionalCosts: string;
   unitInsuredValueAmount: number | null;
   unitInsuredValue: string;
   insuredTotalAmount: number | null;

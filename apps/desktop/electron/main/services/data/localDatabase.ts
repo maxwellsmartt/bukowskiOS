@@ -571,10 +571,26 @@ const createRuntime = (): LocalDatabaseRuntime => {
           updated_at = excluded.updated_at
       `,
     );
+    const ensureCommandActorUser = database.prepare(
+      `
+        INSERT OR IGNORE INTO users (id, full_name, email, phone, is_active, created_at, updated_at)
+        VALUES ('user-ops', 'Ops Repair', 'ops@metadata.cine', '+1 809 555 0199', 1, ?, ?)
+      `,
+    );
+    const ensureCommandActorMembership = database.prepare(
+      `
+        INSERT INTO workspace_memberships (id, workspace_id, user_id, role_id, status, joined_at, created_at)
+        VALUES (?, ?, 'user-ops', 'role-admin', 'active', ?, ?)
+        ON CONFLICT(workspace_id, user_id) DO UPDATE SET
+          role_id = 'role-admin',
+          status = 'active'
+      `,
+    );
 
     try {
       database.exec("BEGIN");
       let seededProjectCount = 0;
+      ensureCommandActorUser.run(timestamp, timestamp);
       workspaces.forEach((workspace) => {
         statement.run(
           workspace.id,
@@ -584,6 +600,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
           timestamp,
           timestamp,
         );
+        ensureCommandActorMembership.run(`membership-${workspace.id}-ops`, workspace.id, timestamp, timestamp);
         seededProjectCount += seedProjectShellForWorkspace(database, workspace.id, timestamp);
       });
       database.exec("COMMIT");

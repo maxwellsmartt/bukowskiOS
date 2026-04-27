@@ -5,6 +5,7 @@ import { createFoundationReadService } from "../../electron/main/services/data/f
 import { createPackingMutationService } from "../../electron/main/services/data/packingMutationService";
 import { createProjectMutationService } from "../../electron/main/services/data/projectMutationService";
 import { createUserAdminService } from "../../electron/main/services/data/userAdminService";
+import { bootstrapAdminFoundation } from "../../electron/main/services/data/adminFoundationBootstrap";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("packing mutation service", () => {
@@ -154,6 +155,44 @@ describe("packing mutation service", () => {
         sourceChannel: "telegram",
       }),
     ).toThrow("does not have permission");
+
+    cleanup();
+  });
+
+  it("bootstraps the default command actor for synced workspaces", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-packing-command-actor-test");
+    const now = "2026-04-10T00:00:00.000Z";
+
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, name, slug, base_currency, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run("workspace-remote-smoke", "Remote Smoke", "remote-smoke", "USD", now, now);
+
+    bootstrapAdminFoundation(database);
+
+    const actor = database
+      .prepare(
+        `
+          SELECT
+            workspace_memberships.status,
+            GROUP_CONCAT(permissions.key) AS permission_keys
+          FROM workspace_memberships
+          JOIN roles ON roles.id = workspace_memberships.role_id
+          JOIN role_permissions ON role_permissions.role_id = roles.id
+          JOIN permissions ON permissions.id = role_permissions.permission_id
+          WHERE workspace_memberships.workspace_id = ?
+            AND workspace_memberships.user_id = 'user-ops'
+          GROUP BY workspace_memberships.status
+        `,
+      )
+      .get("workspace-remote-smoke") as { status: string; permission_keys: string } | undefined;
+
+    expect(actor?.status).toBe("active");
+    expect(actor?.permission_keys.split(",")).toContain("packing-slips.create");
 
     cleanup();
   });

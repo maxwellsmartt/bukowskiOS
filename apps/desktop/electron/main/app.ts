@@ -258,11 +258,14 @@ app.whenReady().then(() => {
 
       const pdf = await documentGeneration.createPackingSlipPdf({
         slipNumber: detail.slip.number,
+        projectCode: detail.slip.projectCode,
         projectName: detail.slip.project,
+        departmentCode: detail.slip.departmentCode,
         departmentName: detail.slip.department,
         responsibleName: detail.slip.responsible,
         preparedByName: detail.slip.preparedBy,
         issueDate: detail.slip.issueDate,
+        issueDateCompact: detail.slip.issueDateCompact,
         dueDate: detail.slip.dueDate,
         status: detail.slip.status,
         notes: detail.slip.notes ?? "",
@@ -298,11 +301,14 @@ app.whenReady().then(() => {
 
       const pdf = await documentGeneration.createPackingSlipInsurancePdf({
         slipNumber: detail.slip.number,
+        projectCode: detail.slip.projectCode,
         projectName: detail.slip.project,
+        departmentCode: detail.slip.departmentCode,
         departmentName: detail.slip.department,
         responsibleName: detail.slip.responsible,
         preparedByName: detail.slip.preparedBy,
         issueDate: detail.slip.issueDate,
+        issueDateCompact: detail.slip.issueDateCompact,
         dueDate: detail.slip.dueDate,
         status: detail.slip.status,
         notes: detail.slip.notes ?? "",
@@ -318,6 +324,8 @@ app.whenReady().then(() => {
           name: item.asset,
           serialNumber: item.serialNumber,
           quantity: item.quantity,
+          purchasePriceAmount: item.purchasePriceAmount,
+          additionalCostsAmount: item.additionalCostsAmount,
           unitInsuredValueAmount: item.unitInsuredValueAmount,
           insuredTotalAmount: item.insuredTotalAmount,
           conditionOut: item.conditionOut,

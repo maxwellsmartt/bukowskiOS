@@ -73,6 +73,8 @@ const operationalRolePermissions = [
   ["role-finance-viewer", "perm-finance-read"],
 ] as const;
 
+const defaultCommandActor = ["user-ops", "Ops Repair", "ops@metadata.cine", "+1 809 555 0199"] as const;
+
 const hasColumn = (db: DatabaseSync, tableName: string, columnName: string) => {
   const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
   return rows.some((row) => row.name === columnName);
@@ -85,6 +87,39 @@ const slugify = (value: string) =>
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
+
+const ensureDefaultCommandActorAccess = (db: DatabaseSync, now: string) => {
+  db.prepare(
+    `
+      INSERT OR IGNORE INTO users (id, full_name, email, phone, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 1, ?, ?)
+    `,
+  ).run(defaultCommandActor[0], defaultCommandActor[1], defaultCommandActor[2], defaultCommandActor[3], now, now);
+
+  db.prepare(
+    `
+      UPDATE users
+      SET is_active = 1,
+          updated_at = ?
+      WHERE id = ?
+    `,
+  ).run(now, defaultCommandActor[0]);
+
+  const workspaces = db.prepare("SELECT id FROM workspaces").all() as Array<{ id: string }>;
+  const upsertMembership = db.prepare(
+    `
+      INSERT INTO workspace_memberships (id, workspace_id, user_id, role_id, status, joined_at, created_at)
+      VALUES (?, ?, ?, 'role-admin', 'active', ?, ?)
+      ON CONFLICT(workspace_id, user_id) DO UPDATE SET
+        role_id = 'role-admin',
+        status = 'active'
+    `,
+  );
+
+  workspaces.forEach((workspace) => {
+    upsertMembership.run(`membership-${workspace.id}-ops`, workspace.id, defaultCommandActor[0], now, now);
+  });
+};
 
 export const applyAdminFoundationMigration = (db: DatabaseSync) => {
   if (!hasColumn(db, "projects", "client_id")) {
@@ -131,6 +166,8 @@ export const bootstrapAdminFoundation = (db: DatabaseSync) => {
         `,
       ).run(roleId, permissionId, now);
     });
+
+    ensureDefaultCommandActorAccess(db, now);
 
     const projectsWithClients = db
       .prepare(
