@@ -404,7 +404,7 @@ export const FinanceEntryEditorPanel = ({
           <Save size={14} />
           <span>{isSubmitting ? "Saving..." : mode === "create" ? "Create entry" : "Save changes"}</span>
         </button>
-        <button className="ghost-control" disabled={isSubmitting} onClick={onClose} type="button">
+        <button className="ghost-control cancel-control" disabled={isSubmitting} onClick={onClose} type="button">
           Cancel
         </button>
       </div>

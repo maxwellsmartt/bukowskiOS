@@ -361,7 +361,7 @@ const CatalogCsvImportDialog = ({
         </div>
 
         <div className="confirm-dialog-actions">
-          <button className="ghost-control" disabled={isSubmitting} onClick={onClose} type="button">
+          <button className="ghost-control cancel-control" disabled={isSubmitting} onClick={onClose} type="button">
             Cancel
           </button>
           <button

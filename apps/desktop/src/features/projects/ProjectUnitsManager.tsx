@@ -581,7 +581,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
           </details>
 
           <div className="action-panel-actions">
-            <button className="ghost-control" onClick={resetEditor} type="button">
+            <button className="ghost-control cancel-control" onClick={resetEditor} type="button">
               Cancel
             </button>
             <button className="action-primary-button" disabled={isSubmitting} onClick={() => void handleSave()} type="button">

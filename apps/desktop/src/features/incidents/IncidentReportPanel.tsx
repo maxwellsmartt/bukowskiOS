@@ -269,7 +269,7 @@ export const IncidentReportPanel = ({
       ) : null}
 
       <div className="action-panel-actions">
-        <button className="ghost-control" onClick={onClose} type="button">
+        <button className="ghost-control cancel-control" onClick={onClose} type="button">
           Cancel
         </button>
         <button className="action-primary-button" disabled={isSubmitting} onClick={() => void handleSubmit()} type="button">

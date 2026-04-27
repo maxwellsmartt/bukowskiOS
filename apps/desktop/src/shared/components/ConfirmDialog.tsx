@@ -41,7 +41,7 @@ export const ConfirmDialog = ({
         </div>
 
         <div className="confirm-dialog-actions">
-          <button className="ghost-control" disabled={isSubmitting} onClick={onCancel} type="button">
+          <button className="ghost-control cancel-control" disabled={isSubmitting} onClick={onCancel} type="button">
             {cancelLabel}
           </button>
           <button

@@ -2091,6 +2091,22 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   color: #ffd2d2;
 }
 
+.ghost-control.cancel-control {
+  background: rgba(214, 74, 74, 0.78);
+  border-color: rgba(255, 153, 153, 0.18);
+  color: #fff;
+}
+
+.ghost-control.cancel-control:hover:not(:disabled) {
+  background: rgba(232, 88, 88, 0.9);
+  border-color: rgba(255, 180, 180, 0.26);
+  color: #fff;
+}
+
+.ghost-control.cancel-control:disabled {
+  opacity: 0.58;
+}
+
 .icon-ghost-control.is-danger {
   color: rgba(231, 154, 154, 0.82);
 }
@@ -3050,6 +3066,20 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .asset-import-preview-issue-card.info strong {
   color: rgba(235, 242, 250, 0.96);
+}
+
+.asset-import-preview-issue-card.neutral {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(210, 218, 228, 0.88);
+}
+
+.asset-import-preview-issue-card.neutral strong {
+  color: var(--text-primary);
+}
+
+.asset-import-more-matches {
+  color: rgba(255, 219, 132, 0.96);
 }
 
 .asset-import-preview-issue-card.error {

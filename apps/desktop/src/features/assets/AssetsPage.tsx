@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { ClipboardList, FileUp, Plus, SquarePen, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import type { AssetListQuery, AssetSortField } from "@contracts";
+import type { AssetListQuery, AssetListRow, AssetSortField } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { PackingSlipBuilderPanel, type PackingSlipBuilderDraft } from "@features/packing/PackingSlipBuilderPanel";
@@ -178,6 +178,14 @@ type AssetCsvCatalogOption = {
 type AssetCsvPreview = {
   fileName: string;
   drafts: AssetCsvDraft[];
+  existingMatches: Array<{
+    code: string;
+    csvName: string;
+    existingName: string;
+    existingStock: number;
+    category: string;
+    location: string;
+  }>;
   errors: Array<{
     rowNumber: number;
     message: string;
@@ -251,7 +259,7 @@ const buildAssetCsvPreview = ({
   csvText,
   fileName,
 }: {
-  assets: Array<{ code: string }>;
+  assets: AssetListRow[];
   catalog: {
     categories: AssetCsvCatalogOption[];
     locations: AssetCsvCatalogOption[];
@@ -291,6 +299,7 @@ const buildAssetCsvPreview = ({
   let unmatchedWarehouseSlots = 0;
   let zeroQuantityRows = 0;
   const existingCodes = new Set(assets.map((asset) => asset.code.trim().toUpperCase()).filter(Boolean));
+  const existingAssetByCode = new Map(assets.map((asset) => [asset.code.trim().toUpperCase(), asset] as const));
   const hasCategoryColumn = hasCsvColumn(headers, ["categoryId", "categoryCode", "category"]);
   const hasLegacyFolderColumn = hasCsvColumn(headers, ["Estructura de la carpeta (Carpeta)", "folderPath"]);
   const rawDrafts = dataRows.reduce<AssetCsvDraft[]>((drafts, values, index) => {
@@ -396,6 +405,24 @@ const buildAssetCsvPreview = ({
   }, []);
   const { drafts, mergedDuplicateRows, duplicateGroups, ambiguousQuantityGroups } = aggregateAssetCsvDrafts(rawDrafts);
   const importableDrafts = drafts.filter((draft) => !existingCodes.has(draft.internalCode.trim().toUpperCase()));
+  const existingMatches = drafts
+    .map((draft) => {
+      const existingAsset = existingAssetByCode.get(draft.internalCode.trim().toUpperCase());
+
+      if (!existingAsset) {
+        return null;
+      }
+
+      return {
+        code: draft.internalCode,
+        csvName: draft.name,
+        existingName: existingAsset.name,
+        existingStock: existingAsset.totalQuantity,
+        category: existingAsset.category,
+        location: existingAsset.location,
+      };
+    })
+    .filter((match): match is NonNullable<typeof match> => Boolean(match));
   const stockSource = mergedDuplicateRows ? "declaredQuantity" : "mergedRows";
 
   if (unmatchedWarehouseSlots) {
@@ -427,6 +454,7 @@ const buildAssetCsvPreview = ({
   return {
     fileName,
     drafts,
+    existingMatches,
     errors,
     summary: {
       totalRows: dataRows.length,
@@ -454,6 +482,19 @@ const buildAssetCsvIssueReport = (preview: AssetCsvPreview) => {
     preview.summary.allRowsExist ? "Result: all assets in this CSV already exist. Import is disabled to avoid duplicates." : "",
     "",
   ].filter((line) => line !== "");
+
+  if (preview.existingMatches.length) {
+    lines.push("Existing matches");
+    preview.existingMatches.slice(0, 40).forEach((match) => {
+      lines.push(
+        `- ${match.code}: CSV "${match.csvName}" matched "${match.existingName}" (${match.existingStock} unit${match.existingStock === 1 ? "" : "s"}, ${match.category}, ${match.location})`,
+      );
+    });
+    if (preview.existingMatches.length > 40) {
+      lines.push(`- ${preview.existingMatches.length - 40} more existing match(es).`);
+    }
+    lines.push("");
+  }
 
   if (preview.errors.length) {
     lines.push("Errors");
@@ -1087,7 +1128,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     </button>
                   ) : null}
                   <button
-                    className="ghost-control action-row-button"
+                    className="ghost-control cancel-control action-row-button"
                     disabled={isImportingAssets}
                     onClick={() => setCsvImportPreview(null)}
                     type="button"
@@ -1136,6 +1177,22 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       <strong>Nothing new to import</strong>
                       <span>All assets in this CSV already exist in this workspace.</span>
                       <span>Import is disabled to avoid duplicate asset records.</span>
+                    </div>
+                  ) : null}
+
+                  {csvImportPreview.existingMatches.length ? (
+                    <div className="asset-import-preview-issue-card neutral">
+                      <strong>{csvImportPreview.existingMatches.length} existing match(es)</strong>
+                      {csvImportPreview.existingMatches.slice(0, 5).map((match) => (
+                        <span key={match.code}>
+                          {match.code}: {match.existingName} · {match.existingStock} unit{match.existingStock === 1 ? "" : "s"}
+                        </span>
+                      ))}
+                      {csvImportPreview.existingMatches.length > 5 ? (
+                        <span className="asset-import-more-matches">
+                          {csvImportPreview.existingMatches.length - 5} more match(es). Copy report for the full list.
+                        </span>
+                      ) : null}
                     </div>
                   ) : null}
 

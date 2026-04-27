@@ -243,7 +243,7 @@ export const AssetEditorPanel = ({
             <span>{isArchiving ? "Archiving..." : "Archive asset"}</span>
           </button>
         ) : (
-          <button className="ghost-control" onClick={onClose} type="button">
+          <button className="ghost-control cancel-control" onClick={onClose} type="button">
             Cancel
           </button>
         )}

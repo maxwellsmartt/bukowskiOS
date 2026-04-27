@@ -266,7 +266,7 @@ export const AgentWizardPanel = ({
             {error ? <div className="form-inline-error">{error}</div> : null}
 
             <div className="agent-wizard-actions">
-              <button className="ghost-control" onClick={onClose} type="button">
+              <button className="ghost-control cancel-control" onClick={onClose} type="button">
                 Cancel
               </button>
               <button className="primary-control" disabled={!mission.trim()} onClick={handleGenerateConfig} type="button">
@@ -440,7 +440,7 @@ export const AgentWizardPanel = ({
                 Refine
               </button>
               <div className="agent-wizard-actions-end">
-                <button className="ghost-control" onClick={onClose} type="button">
+                <button className="ghost-control cancel-control" onClick={onClose} type="button">
                   Cancel
                 </button>
                 <button className="primary-control" disabled={isSaving} onClick={handleSave} type="button">

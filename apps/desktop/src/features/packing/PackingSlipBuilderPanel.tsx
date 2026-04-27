@@ -238,7 +238,7 @@ export const PackingSlipBuilderPanel = ({
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
       <div className="action-panel-actions">
-        <button className="ghost-control" onClick={onClose} type="button">
+        <button className="ghost-control cancel-control" onClick={onClose} type="button">
           Cancel
         </button>
         <button
