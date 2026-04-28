@@ -151,7 +151,7 @@ Pruebas:
 
 ### Slice IC-3 — Assign / move como flujo operacional central
 
-**Estado:** Todo
+**Estado:** Doing
 
 Objetivo:
 
@@ -159,11 +159,18 @@ Hacer que assign/move sea simple para casos normales y seguro para casos complej
 
 Incluye:
 
-- Reducir copy técnico del panel.
+- Done — Agregar bandeja operacional persistente en Assets para seleccionar assets a través de múltiples búsquedas.
+- Done — La selección visible en tabla ya no borra assets seleccionados fuera del resultado actual.
+- Done — Cantidad por defecto = 1 unidad y editable desde la bandeja antes de abrir Assign/Move o Packing.
+- Done — `DataTable` soporta `pruneSelectionOnRowsChange=false` sólo para flujos que necesitan selección cross-search.
+- Done — Packing usa las mismas cantidades acumuladas en la bandeja.
+- Done — Bandeja movida a rail derecho compacto para no empujar la tabla ni romper acceso durante selección bulk.
+- Doing — Reducir copy técnico del panel.
 - Orden progresivo: selección -> modo -> proyecto/unidad/responsable -> cantidad/fechas -> ubicación/notas.
-- Mostrar warnings de stock, conflicto y proyecto solapado sin bloquear operaciones válidas.
+- Done — Mostrar warnings de stock/kit lock y bloquear acciones que perderían cantidad o emitirían assets de kit individualmente.
 - Confirmar auditoría en `asset_events` y outbox.
 - Hacer que success/error explique qué cambió.
+- Deferred — Multi-incident y multi-RMA desde la bandeja; en este slice quedan acciones single-asset que llevan al contexto correspondiente.
 
 Pruebas:
 
@@ -172,6 +179,18 @@ Pruebas:
 - Mover asset asignado.
 - Intentar operación con permisos insuficientes.
 - Simular mala conexión/outbox pending.
+- Done — Verificación: `corepack pnpm --filter @bukowski/desktop typecheck`.
+- Done — Verificación: `corepack pnpm --filter @bukowski/desktop test -- asset-mutation-service.test.ts packing-mutation-service.test.ts foundation-read-service.test.ts` pasa con 27 archivos/116 tests.
+- Done — Verificación: `corepack pnpm --filter @bukowski/desktop build`.
+
+Findings 2026-04-28:
+
+- Crítico mitigado — El flujo anterior perdía selección al cambiar búsqueda porque `DataTable` podaba selección contra rows visibles. Ahora Assets preserva selección cross-search sin cambiar el default de otras tablas.
+- Crítico mitigado — Técnicos podían terminar asignando/packing en pasos repetidos porque sólo podían seleccionar dentro de una búsqueda. La bandeja permite acumular assets, editar cantidades y ejecutar una sola operación.
+- Medio mitigado — Assets con stock > 1 ya no toman todo disponible por defecto; la bandeja arranca en 1 unidad para reducir sobre-asignación.
+- Medio mitigado — La primera versión de la bandeja crecía arriba de la tabla y hacía difícil seguir buscando/seleccionando. Ahora vive en un rail derecho con scroll propio y el quick preview queda debajo.
+- Medio abierto — Falta smoke manual recreando un packing slip real completo con búsqueda multi-paso, cantidades y export.
+- Bajo abierto — Falta revisión visual completa de Packing/Incidents/RMA para aplicar el mismo patrón de rail compacto donde corresponda.
 
 ### Slice IC-4 — Packing Slips end-to-end
 

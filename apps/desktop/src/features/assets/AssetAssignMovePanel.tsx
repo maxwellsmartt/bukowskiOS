@@ -33,9 +33,11 @@ type AssetAssignMovePanelProps = {
   defaultProjectId: string | null;
   departments: CatalogSnapshot["departments"];
   error: string | null;
+  initialAssetSelections?: Array<{ assetId: string; quantity: number }>;
   isSubmitting: boolean;
   lockedAssetSelections?: Array<{ assetId: string; quantity: number }>;
   locations: CatalogSnapshot["locations"];
+  onAssetSelectionsChange?: (selections: Array<{ assetId: string; quantity: number }>) => void;
   onClose: () => void;
   onSubmit: (value: AssetAssignMoveFormValue) => Promise<void>;
   projects: ProjectCardRow[];
@@ -56,9 +58,11 @@ export const AssetAssignMovePanel = ({
   defaultProjectId,
   departments,
   error,
+  initialAssetSelections,
   isSubmitting,
   lockedAssetSelections,
   locations,
+  onAssetSelectionsChange,
   onClose,
   onSubmit,
   projects,
@@ -78,6 +82,10 @@ export const AssetAssignMovePanel = ({
   const [notes, setNotes] = useState("");
   const [quantityByAssetId, setQuantityByAssetId] = useState<Record<string, number>>({});
   const { data: projectDetail } = useProjectDetail(mode === "assign" ? normalizeOptional(projectId) ?? null : null);
+  const initialQuantityByAssetId = useMemo(
+    () => new Map((initialAssetSelections ?? []).map((selection) => [selection.assetId, selection.quantity] as const)),
+    [initialAssetSelections],
+  );
 
   useEffect(() => {
     if (!allowedModes.includes(mode)) {
@@ -95,12 +103,12 @@ export const AssetAssignMovePanel = ({
 
       selectedAssets.forEach((asset) => {
         const maxQuantity = Math.max(1, asset.quantity);
-        nextState[asset.id] = Math.min(maxQuantity, Math.max(1, current[asset.id] ?? maxQuantity));
+        nextState[asset.id] = Math.min(maxQuantity, Math.max(1, current[asset.id] ?? initialQuantityByAssetId.get(asset.id) ?? 1));
       });
 
       return nextState;
     });
-  }, [selectedAssets]);
+  }, [initialQuantityByAssetId, selectedAssets]);
 
   const selectedAssetDetails = useMemo(
     () =>
@@ -125,15 +133,23 @@ export const AssetAssignMovePanel = ({
   );
   const totalAssignQuantity = selectedAssetDetails.reduce((sum, asset) => sum + asset.requestedQuantity, 0);
   const hasVariableQuantityAssets = !lockedAssetSelections?.length && selectedAssetDetails.some((asset) => asset.sourceQuantity > 1);
+  const unavailableAssignAssets = selectedAssetDetails.filter((asset) => asset.sourceQuantity <= 0);
 
   const handleQuantityChange = (assetId: string, availableQuantity: number, rawValue: string) => {
     const parsedValue = Number.parseInt(rawValue, 10);
     const nextValue = Number.isFinite(parsedValue) ? parsedValue : 1;
+    const nextQuantity = Math.min(Math.max(nextValue, 1), Math.max(1, availableQuantity));
 
     setQuantityByAssetId((current) => ({
       ...current,
-      [assetId]: Math.min(Math.max(nextValue, 1), Math.max(1, availableQuantity)),
+      [assetId]: nextQuantity,
     }));
+    onAssetSelectionsChange?.(
+      selectedAssetDetails.map((asset) => ({
+        assetId: asset.id,
+        quantity: asset.id === assetId ? nextQuantity : asset.requestedQuantity,
+      })),
+    );
   };
 
   const handleSubmit = async () => {
@@ -213,6 +229,11 @@ export const AssetAssignMovePanel = ({
           {hasVariableQuantityAssets ? (
             <div className="action-feedback action-feedback-warning">
               Adjust quantity for bulk assets before applying the assignment.
+            </div>
+          ) : null}
+          {unavailableAssignAssets.length ? (
+            <div className="action-feedback action-feedback-warning">
+              {unavailableAssignAssets.length} selected asset{unavailableAssignAssets.length === 1 ? "" : "s"} have no available units for assignment.
             </div>
           ) : null}
         </>
@@ -347,7 +368,12 @@ export const AssetAssignMovePanel = ({
         <button className="ghost-control cancel-control" onClick={onClose} type="button">
           Cancel
         </button>
-        <button className="action-primary-button" disabled={isSubmitting} onClick={() => void handleSubmit()} type="button">
+        <button
+          className="action-primary-button"
+          disabled={isSubmitting || (mode === "assign" && unavailableAssignAssets.length > 0)}
+          onClick={() => void handleSubmit()}
+          type="button"
+        >
           {isSubmitting ? "Applying..." : mode === "assign" ? "Apply assignment" : "Move assets"}
         </button>
       </div>

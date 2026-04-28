@@ -1,6 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
@@ -54,6 +54,7 @@ const isAssetImageFile = (file: { mimeType: string }) => file.mimeType.startsWit
 
 export const AssetDetailPage = () => {
   const { assetId } = useParams();
+  const [searchParams] = useSearchParams();
   const { activeWorkspaceId } = useWorkspace();
   const { data, reload } = useAssetDetail(assetId);
   const { projects, refreshProjects } = useShellContext();
@@ -64,7 +65,7 @@ export const AssetDetailPage = () => {
     sortBy: "name",
     sortDirection: "asc",
   });
-  const [reportOpen, setReportOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(() => searchParams.get("report") === "incident");
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -20,7 +20,9 @@ type PackingSlipBuilderPanelProps = {
   defaultProjectId: string | null;
   departments: CatalogSnapshot["departments"];
   error: string | null;
+  initialAssetSelections?: PackingSlipAssetSelection[];
   isSubmitting: boolean;
+  onAssetSelectionsChange?: (selections: PackingSlipAssetSelection[]) => void;
   onClose: () => void;
   onSubmit: (value: PackingSlipBuilderDraft) => Promise<void>;
   projects: ProjectCardRow[];
@@ -38,7 +40,9 @@ export const PackingSlipBuilderPanel = ({
   defaultProjectId,
   departments,
   error,
+  initialAssetSelections,
   isSubmitting,
+  onAssetSelectionsChange,
   onClose,
   onSubmit,
   projects,
@@ -54,6 +58,10 @@ export const PackingSlipBuilderPanel = ({
   const [notes, setNotes] = useState("");
   const [quantityByAssetId, setQuantityByAssetId] = useState<Record<string, number>>({});
   const { data: projectDetail } = useProjectDetail(normalizeOptional(projectId) ?? null);
+  const initialQuantityByAssetId = useMemo(
+    () => new Map((initialAssetSelections ?? []).map((selection) => [selection.assetId, selection.quantity] as const)),
+    [initialAssetSelections],
+  );
 
   useEffect(() => {
     setQuantityByAssetId((current) => {
@@ -61,12 +69,12 @@ export const PackingSlipBuilderPanel = ({
 
       selectedAssets.forEach((asset) => {
         const maxQuantity = Math.max(1, asset.quantity);
-        nextState[asset.id] = Math.min(maxQuantity, Math.max(1, current[asset.id] ?? maxQuantity));
+        nextState[asset.id] = Math.min(maxQuantity, Math.max(1, current[asset.id] ?? initialQuantityByAssetId.get(asset.id) ?? 1));
       });
 
       return nextState;
     });
-  }, [selectedAssets]);
+  }, [initialQuantityByAssetId, selectedAssets]);
 
   useEffect(() => {
     setProjectUnitId((current) =>
@@ -90,16 +98,24 @@ export const PackingSlipBuilderPanel = ({
   const issueQuantityLabel = totalIssueQuantity === 1 ? "1 item" : `${totalIssueQuantity} items`;
   const hasVariableQuantityAssets = selectedAssetDetails.some((asset) => asset.quantity > 1);
   const kitLockedAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount > 0);
+  const unavailableAssets = selectedAssetDetails.filter((asset) => asset.quantity <= 0);
   const kitLockSummary = kitLockedAssets.map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`).join(", ");
 
   const handleQuantityChange = (assetId: string, availableQuantity: number, rawValue: string) => {
     const parsedValue = Number.parseInt(rawValue, 10);
     const nextValue = Number.isFinite(parsedValue) ? parsedValue : 1;
+    const nextQuantity = Math.min(Math.max(nextValue, 1), Math.max(1, availableQuantity));
 
     setQuantityByAssetId((current) => ({
       ...current,
-      [assetId]: Math.min(Math.max(nextValue, 1), Math.max(1, availableQuantity)),
+      [assetId]: nextQuantity,
     }));
+    onAssetSelectionsChange?.(
+      selectedAssetDetails.map((asset) => ({
+        assetId: asset.id,
+        quantity: asset.id === assetId ? nextQuantity : asset.requestedQuantity,
+      })),
+    );
   };
 
   return (
@@ -154,6 +170,12 @@ export const PackingSlipBuilderPanel = ({
       {kitLockedAssets.length ? (
         <div className="action-feedback action-feedback-warning">
           These assets are part of active kits and cannot be issued individually: {kitLockSummary}.
+        </div>
+      ) : null}
+
+      {unavailableAssets.length ? (
+        <div className="action-feedback action-feedback-warning">
+          {unavailableAssets.length} selected asset{unavailableAssets.length === 1 ? "" : "s"} have no available units to issue.
         </div>
       ) : null}
 
@@ -243,7 +265,7 @@ export const PackingSlipBuilderPanel = ({
         </button>
         <button
           className="action-primary-button"
-          disabled={isSubmitting || kitLockedAssets.length > 0}
+          disabled={isSubmitting || kitLockedAssets.length > 0 || unavailableAssets.length > 0}
           onClick={() =>
             void onSubmit({
               assetSelections: selectedAssetDetails.map((asset) => ({

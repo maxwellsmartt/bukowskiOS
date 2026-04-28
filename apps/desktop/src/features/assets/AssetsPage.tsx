@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { ClipboardList, FileUp, Plus, SquarePen, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ClipboardList, FileUp, Plus, SquarePen, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import type { AssetListQuery, AssetListRow, AssetSortField } from "@contracts";
@@ -228,6 +228,165 @@ type AssetCsvPreview = {
     stockSource: "declaredQuantity" | "mergedRows";
     warnings: string[];
   };
+};
+
+type AssetOperationCartItem = AssetListRow & {
+  requestedQuantity: number;
+};
+
+const resolveAssignableQuantity = (asset: Pick<AssetListRow, "quantity">) => Math.max(0, asset.quantity);
+
+const clampOperationQuantity = (asset: Pick<AssetListRow, "quantity">, quantity: number | undefined) => {
+  const maxQuantity = resolveAssignableQuantity(asset);
+
+  if (maxQuantity <= 0) {
+    return 0;
+  }
+
+  const nextQuantity = Math.trunc(quantity ?? 1);
+  return Math.min(maxQuantity, Math.max(1, Number.isFinite(nextQuantity) ? nextQuantity : 1));
+};
+
+const buildOperationCartItem = (asset: AssetListRow, quantity?: number): AssetOperationCartItem => ({
+  ...asset,
+  requestedQuantity: clampOperationQuantity(asset, quantity),
+});
+
+type AssetOperationCartProps = {
+  items: AssetOperationCartItem[];
+  onAddToCompare: () => void;
+  onClear: () => void;
+  onCreatePackingSlip: () => void;
+  onCreateRma: () => void;
+  onOpenAssignMove: () => void;
+  onOpenAssetDetail: (assetId: string) => void;
+  onQuantityChange: (assetId: string, quantity: number) => void;
+  onRemove: (assetId: string) => void;
+};
+
+const AssetOperationCart = ({
+  items,
+  onAddToCompare,
+  onClear,
+  onCreatePackingSlip,
+  onCreateRma,
+  onOpenAssignMove,
+  onOpenAssetDetail,
+  onQuantityChange,
+  onRemove,
+}: AssetOperationCartProps) => {
+  if (!items.length) {
+    return null;
+  }
+
+  const lockedItems = items.filter((asset) => asset.linkedKitCount > 0);
+  const unavailableItems = items.filter((asset) => resolveAssignableQuantity(asset) <= 0);
+  const totalUnits = items.reduce((total, asset) => total + asset.requestedQuantity, 0);
+  const issueActionsDisabled = lockedItems.length > 0 || unavailableItems.length > 0;
+  const singleAsset = items.length === 1 ? items[0] : null;
+
+  return (
+    <div className="asset-operation-cart">
+      <div className="asset-operation-cart-header">
+        <div className="asset-operation-cart-copy">
+          <span className="asset-operation-cart-kicker">Operation cart</span>
+          <strong>{items.length === 1 ? "1 asset selected" : `${items.length} assets selected`}</strong>
+          <span>{totalUnits === 1 ? "1 unit queued" : `${totalUnits} units queued`}</span>
+        </div>
+        <button aria-label="Clear operation cart" className="icon-ghost-control" data-tooltip="Clear cart" onClick={onClear} type="button">
+          <Trash2 size={14} />
+        </button>
+      </div>
+      <div className="asset-operation-cart-actions">
+        <button className="ghost-control action-row-button" onClick={onAddToCompare} type="button">
+          Add to compare
+        </button>
+        <button
+          className="ghost-control action-row-button"
+          data-tooltip={singleAsset ? "Open asset detail to report an issue" : "Select one asset to report an issue"}
+          disabled={!singleAsset}
+          onClick={() => singleAsset && onOpenAssetDetail(singleAsset.id)}
+          type="button"
+        >
+          Report issue
+        </button>
+        <button
+          className="ghost-control action-row-button"
+          data-tooltip={singleAsset ? "Open RMA workspace" : "Select one asset to prepare an RMA"}
+          disabled={!singleAsset}
+          onClick={onCreateRma}
+          type="button"
+        >
+          Create RMA
+        </button>
+        <button
+          className="ghost-control action-row-button"
+          disabled={issueActionsDisabled}
+          onClick={onCreatePackingSlip}
+          type="button"
+        >
+          Create packing slip
+        </button>
+        <button
+          className="action-primary-button action-row-button"
+          disabled={lockedItems.length > 0}
+          onClick={onOpenAssignMove}
+          type="button"
+        >
+          Assign / move
+        </button>
+      </div>
+
+      {lockedItems.length || unavailableItems.length ? (
+        <div className="asset-operation-cart-warning">
+          {lockedItems.length ? `${lockedItems.length} asset${lockedItems.length === 1 ? "" : "s"} locked by active kit.` : null}
+          {lockedItems.length && unavailableItems.length ? " " : ""}
+          {unavailableItems.length ? `${unavailableItems.length} asset${unavailableItems.length === 1 ? "" : "s"} with no available units.` : null}
+        </div>
+      ) : null}
+
+      <div className="asset-operation-cart-list">
+        {items.map((asset) => {
+          const maxQuantity = resolveAssignableQuantity(asset);
+          const isLocked = asset.linkedKitCount > 0;
+          const isUnavailable = maxQuantity <= 0;
+
+          return (
+            <div className={`asset-operation-cart-row${isLocked || isUnavailable ? " is-warning" : ""}`} key={asset.id}>
+              <div className="asset-operation-cart-row-copy">
+                <span className="asset-operation-cart-title">{asset.name}</span>
+                <span className="asset-operation-cart-meta">
+                  {asset.code} · Available {maxQuantity} · {asset.project}
+                  {isLocked ? ` · In kit ${asset.linkedKitCodes.join(", ")}` : ""}
+                </span>
+              </div>
+              <label className="asset-operation-cart-quantity">
+                <span className="action-field-label">Qty</span>
+                <input
+                  className="action-field-control"
+                  disabled={isUnavailable}
+                  max={Math.max(1, maxQuantity)}
+                  min={isUnavailable ? 0 : 1}
+                  onChange={(event) => onQuantityChange(asset.id, Number.parseInt(event.target.value, 10))}
+                  type="number"
+                  value={isUnavailable ? 0 : Math.max(1, asset.requestedQuantity)}
+                />
+              </label>
+              <button
+                aria-label={`Remove ${asset.name} from operation cart`}
+                className="icon-ghost-control"
+                data-tooltip="Remove"
+                onClick={() => onRemove(asset.id)}
+                type="button"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 const aggregateAssetCsvDrafts = (drafts: AssetCsvDraft[]) => {
@@ -557,7 +716,7 @@ export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageP
 const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const { activeWorkspaceId } = useWorkspace();
   const { activeProject, projects, refreshProjects } = useShellContext();
-  const { addItems, hasItem } = useCompareTray();
+  const { addItems } = useCompareTray();
   const isProjectMode = Boolean(projectId);
   const effectiveProjectName = projectName ?? (isProjectMode ? activeProject?.name ?? null : null);
   const sectionScopeLabel = useSectionScopeLabel();
@@ -592,7 +751,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   });
   const navigate = useNavigate();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [cartItemsById, setCartItemsById] = useState<Record<string, AssetOperationCartItem>>({});
   const [actionPanelOpen, setActionPanelOpen] = useState(false);
   const [packingPanelOpen, setPackingPanelOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -628,12 +787,16 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     [selectedAssetDetail.files],
   );
   const activeAssetImageSlots = Math.max(0, 2 - activeAssetImages.length);
-  const selectedAssets = useMemo(() => {
-    const assetMap = new Map(assets.map((asset) => [asset.id, asset] as const));
-    return selectedRowIds
-      .map((assetId) => assetMap.get(assetId))
-      .filter((asset): asset is (typeof assets)[number] => Boolean(asset));
-  }, [assets, selectedRowIds]);
+  const selectedRowIds = useMemo(() => Object.keys(cartItemsById), [cartItemsById]);
+  const selectedAssets = useMemo(() => selectedRowIds.map((assetId) => cartItemsById[assetId]).filter(Boolean), [cartItemsById, selectedRowIds]);
+  const selectedAssetSelections = useMemo(
+    () =>
+      selectedAssets.map((asset) => ({
+        assetId: asset.id,
+        quantity: asset.requestedQuantity,
+      })),
+    [selectedAssets],
+  );
   const selectedKitLockedAssets = useMemo(
     () => selectedAssets.filter((asset) => asset.linkedKitCount > 0),
     [selectedAssets],
@@ -647,6 +810,91 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       .map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`)
       .join(", ");
   }, [selectedKitLockedAssets]);
+
+  useEffect(() => {
+    if (!assets.length) {
+      return;
+    }
+
+    setCartItemsById((current) => {
+      let changed = false;
+      const nextItems = { ...current };
+
+      assets.forEach((asset) => {
+        const currentItem = current[asset.id];
+        if (!currentItem) {
+          return;
+        }
+
+        nextItems[asset.id] = buildOperationCartItem(asset, currentItem.requestedQuantity);
+        changed = true;
+      });
+
+      return changed ? nextItems : current;
+    });
+  }, [assets]);
+
+  const handleCartSelectionChange = (nextSelectedRowIds: string[]) => {
+    const visibleAssetById = new Map(assets.map((asset) => [asset.id, asset] as const));
+    const nextSelected = new Set(nextSelectedRowIds);
+
+    setCartItemsById((current) => {
+      const nextItems: Record<string, AssetOperationCartItem> = {};
+
+      Object.entries(current).forEach(([assetId, item]) => {
+        if (nextSelected.has(assetId)) {
+          nextItems[assetId] = item;
+        }
+      });
+
+      nextSelectedRowIds.forEach((assetId) => {
+        const visibleAsset = visibleAssetById.get(assetId);
+        if (visibleAsset) {
+          nextItems[assetId] = buildOperationCartItem(visibleAsset, current[assetId]?.requestedQuantity);
+        }
+      });
+
+      return nextItems;
+    });
+  };
+
+  const updateCartQuantity = (assetId: string, quantity: number) => {
+    setCartItemsById((current) => {
+      const item = current[assetId];
+      if (!item) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [assetId]: buildOperationCartItem(item, quantity),
+      };
+    });
+  };
+
+  const updateCartSelections = (selections: Array<{ assetId: string; quantity: number }>) => {
+    setCartItemsById((current) => {
+      const nextItems = { ...current };
+
+      selections.forEach((selection) => {
+        const item = nextItems[selection.assetId];
+        if (item) {
+          nextItems[selection.assetId] = buildOperationCartItem(item, selection.quantity);
+        }
+      });
+
+      return nextItems;
+    });
+  };
+
+  const removeFromCart = (assetId: string) => {
+    setCartItemsById((current) => {
+      const { [assetId]: _removed, ...nextItems } = current;
+      return nextItems;
+    });
+  };
+
+  const clearOperationCart = () => setCartItemsById({});
 
   const handleAssignMove = async (formValue: AssetAssignMoveFormValue) => {
     try {
@@ -673,7 +921,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setActionFeedback(result.summary);
       setActionWarning(result.warningSummary ?? null);
       setActionPanelOpen(false);
-      setSelectedRowIds([]);
+      clearOperationCart();
     } catch (nextError) {
       setActionError(getUserFacingErrorMessage(nextError, "Unable to apply assign or move."));
     } finally {
@@ -705,7 +953,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setActionFeedback(result.summary);
       setActionWarning(null);
       setPackingPanelOpen(false);
-      setSelectedRowIds([]);
+      clearOperationCart();
       navigate("/packing-slips");
     } catch (nextError) {
       setPackingError(getUserFacingErrorMessage(nextError, "Unable to issue packing slip."));
@@ -1007,8 +1255,10 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           defaultProjectId={isProjectMode ? projectId ?? null : null}
           departments={catalog.departments}
           error={actionError}
+          initialAssetSelections={selectedAssetSelections}
           isSubmitting={isSubmittingAction}
           locations={catalog.locations}
+          onAssetSelectionsChange={updateCartSelections}
           onClose={() => {
             setActionPanelOpen(false);
             setActionError(null);
@@ -1026,7 +1276,9 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           defaultProjectId={isProjectMode ? projectId ?? null : null}
           departments={catalog.departments}
           error={packingError}
+          initialAssetSelections={selectedAssetSelections}
           isSubmitting={isSubmittingPacking}
+          onAssetSelectionsChange={updateCartSelections}
           onClose={() => {
             setPackingPanelOpen(false);
             setPackingError(null);
@@ -1060,60 +1312,12 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       {!isProjectMode ? <GlobalAssetsMetrics /> : null}
 
-      <div className={`list-layout asset-list-layout${activeAsset ? " has-preview" : ""}`}>
+      <div className={`asset-workbench-layout asset-list-layout${selectedAssets.length || activeAsset ? " has-side-rail" : ""}`}>
         <SurfaceCard
           className="asset-registry-card"
           title={isProjectMode ? "Assets" : "Assets"}
           aside={
             <div className="asset-registry-header-actions">
-              {selectedRowIds.length ? (
-                <>
-                  <button
-                    className="ghost-control action-row-button"
-                    onClick={() =>
-                      addItems(
-                        assets
-                          .filter((asset) => selectedRowIds.includes(asset.id))
-                          .map((asset) => ({
-                            id: asset.id,
-                            entityType: "asset" as const,
-                            label: `${asset.code} · ${asset.name}`,
-                            subtitle: `${asset.location} · ${asset.project}`,
-                            meta: asset.projectUnit && asset.projectUnit !== "—" ? `Unit · ${asset.projectUnit}` : undefined,
-                          })),
-                      )
-                    }
-                    type="button"
-                  >
-                    Add to compare
-                  </button>
-                  <button
-                    className="ghost-control action-row-button"
-                    disabled={selectedKitLockedAssets.length > 0}
-                    onClick={() => {
-                      setPackingPanelOpen(true);
-                      setActionPanelOpen(false);
-                      setPackingError(null);
-                      setActionFeedback(null);
-                    }}
-                    type="button"
-                  >
-                    Create packing slip
-                  </button>
-                  <button
-                    className="action-primary-button action-row-button"
-                    disabled={selectedKitLockedAssets.length > 0}
-                    onClick={() => {
-                      setActionPanelOpen(true);
-                      setPackingPanelOpen(false);
-                      setActionFeedback(null);
-                    }}
-                    type="button"
-                  >
-                    Assign / move selected
-                  </button>
-                </>
-              ) : null}
               <button
                 className="asset-create-button action-row-button"
                 onClick={() => {
@@ -1292,6 +1496,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
             onSortRequest={assetControls.handleColumnSortRequest}
             persistKey={isProjectMode ? "project-assets-registry-v2" : "assets-registry-v2"}
+            pruneSelectionOnRowsChange={false}
             rows={assets}
             shellClassName="table-shell-wide-scroll"
             selectable
@@ -1304,148 +1509,184 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   }
                 : null
             }
-            onSelectedRowIdsChange={setSelectedRowIds}
+            onSelectedRowIdsChange={handleCartSelectionChange}
           />
         </SurfaceCard>
 
-        {activeAsset ? (
-          <SurfaceCard
-            aside={
-              <button
-                aria-label="Close quick preview"
-                className="surface-card-action"
-                onClick={() => setSelectedAssetId(null)}
-                type="button"
-              >
-                <X size={14} />
-              </button>
-            }
-            title={activeAsset.name}
-          >
-            <>
-              <div className="summary-grid">
-                <div className="summary-row">
-                  <span className="summary-label">Asset code</span>
-                  <span className="summary-value">{activeAsset.code}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Location</span>
-                  <span className="summary-value">{activeAsset.location}</span>
-                </div>
-                {formatAssetStockDetailRows({
-                  totalQuantity: activeAsset.totalQuantity,
-                  availableQuantity: activeAsset.quantity,
-                  assignedQuantity: activeAsset.assignedQuantity,
-                  checkedOutQuantity: activeAsset.checkedOutQuantity,
-                }).map((row) => (
-                  <div key={row.label} className="summary-row">
-                    <span className="summary-label">{row.label}</span>
-                    <span className="summary-value">{row.value}</span>
-                  </div>
-                ))}
-                <div className="summary-row">
-                  <span className="summary-label">Project / responsible</span>
-                  <span className="summary-value">
-                    {activeAsset.project} · {activeAsset.responsible}
-                  </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Serial</span>
-                  <span className="summary-value">
-                    {activeAsset.serialNumber}
-                  </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Condition / custody</span>
-                  <span className="summary-value">
-                    {activeAsset.condition} · {activeAsset.custody}
-                  </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Kit membership</span>
-                  <span className="summary-value">
-                    {activeAsset.linkedKitCount ? activeAsset.linkedKitCodes.join(" · ") : "Standalone"}
-                  </span>
-                </div>
-              </div>
+        {selectedAssets.length || activeAsset ? (
+          <div className="asset-side-rail">
+            <AssetOperationCart
+              items={selectedAssets}
+              onAddToCompare={() =>
+                addItems(
+                  selectedAssets.map((asset) => ({
+                    id: asset.id,
+                    entityType: "asset" as const,
+                    label: `${asset.code} · ${asset.name}`,
+                    subtitle: `${asset.location} · ${asset.project}`,
+                    meta: asset.projectUnit && asset.projectUnit !== "—" ? `Unit · ${asset.projectUnit}` : undefined,
+                  })),
+                )
+              }
+              onClear={clearOperationCart}
+              onCreatePackingSlip={() => {
+                setPackingPanelOpen(true);
+                setActionPanelOpen(false);
+                setPackingError(null);
+                setActionFeedback(null);
+              }}
+              onCreateRma={() => navigate("/incidents")}
+              onOpenAssignMove={() => {
+                setActionPanelOpen(true);
+                setPackingPanelOpen(false);
+                setActionFeedback(null);
+              }}
+              onOpenAssetDetail={(assetId) => navigate(`/assets/${assetId}?report=incident`)}
+              onQuantityChange={updateCartQuantity}
+              onRemove={removeFromCart}
+            />
 
-              <div className="asset-preview-image-strip">
-                {activeAssetImages.length ? (
-                  activeAssetImages.map((file) => (
+            {activeAsset ? (
+              <SurfaceCard
+                aside={
+                  <button
+                    aria-label="Close quick preview"
+                    className="surface-card-action"
+                    onClick={() => setSelectedAssetId(null)}
+                    type="button"
+                  >
+                    <X size={14} />
+                  </button>
+                }
+                className="asset-quick-preview-card"
+                title={activeAsset.name}
+              >
+                <>
+                  <div className="summary-grid">
+                    <div className="summary-row">
+                      <span className="summary-label">Asset code</span>
+                      <span className="summary-value">{activeAsset.code}</span>
+                    </div>
+                    <div className="summary-row">
+                      <span className="summary-label">Location</span>
+                      <span className="summary-value">{activeAsset.location}</span>
+                    </div>
+                    {formatAssetStockDetailRows({
+                      totalQuantity: activeAsset.totalQuantity,
+                      availableQuantity: activeAsset.quantity,
+                      assignedQuantity: activeAsset.assignedQuantity,
+                      checkedOutQuantity: activeAsset.checkedOutQuantity,
+                    }).map((row) => (
+                      <div key={row.label} className="summary-row">
+                        <span className="summary-label">{row.label}</span>
+                        <span className="summary-value">{row.value}</span>
+                      </div>
+                    ))}
+                    <div className="summary-row">
+                      <span className="summary-label">Project / responsible</span>
+                      <span className="summary-value">
+                        {activeAsset.project} · {activeAsset.responsible}
+                      </span>
+                    </div>
+                    <div className="summary-row">
+                      <span className="summary-label">Serial</span>
+                      <span className="summary-value">
+                        {activeAsset.serialNumber}
+                      </span>
+                    </div>
+                    <div className="summary-row">
+                      <span className="summary-label">Condition / custody</span>
+                      <span className="summary-value">
+                        {activeAsset.condition} · {activeAsset.custody}
+                      </span>
+                    </div>
+                    <div className="summary-row">
+                      <span className="summary-label">Kit membership</span>
+                      <span className="summary-value">
+                        {activeAsset.linkedKitCount ? activeAsset.linkedKitCodes.join(" · ") : "Standalone"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="asset-preview-image-strip">
+                    {activeAssetImages.length ? (
+                      activeAssetImages.map((file) => (
+                        <button
+                          key={file.id}
+                          className="asset-preview-image-card"
+                          disabled={openingPreviewImageId === file.id}
+                          onClick={() => {
+                            setActionError(null);
+                            void (async () => {
+                              try {
+                                setOpeningPreviewImageId(file.id);
+                                await openAssetFile(file.id);
+                              } catch (nextError) {
+                                setActionError(getUserFacingErrorMessage(nextError, "Unable to open that asset image."));
+                                await reloadSelectedAssetDetail();
+                              } finally {
+                                setOpeningPreviewImageId(null);
+                              }
+                            })();
+                          }}
+                          type="button"
+                        >
+                          {file.previewDataUrl ? (
+                            <img alt={file.originalName} src={file.previewDataUrl} />
+                          ) : (
+                            <span>Preview unavailable</span>
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="asset-preview-image-empty">No images yet.</div>
+                    )}
+                  </div>
+
+                  <div className="action-panel-actions action-panel-actions-start">
                     <button
-                      key={file.id}
-                      className="asset-preview-image-card"
-                      disabled={openingPreviewImageId === file.id}
+                      className="ghost-control"
+                      disabled={isUploadingPreviewImages || activeAssetImageSlots <= 0}
                       onClick={() => {
                         setActionError(null);
+                        setActionFeedback(null);
                         void (async () => {
                           try {
-                            setOpeningPreviewImageId(file.id);
-                            await openAssetFile(file.id);
+                            setIsUploadingPreviewImages(true);
+                            const result = await uploadAssetImages(activeAsset.id);
+                            await Promise.all([reloadSelectedAssetDetail(), reload()]);
+                            setActionFeedback(result.summary);
                           } catch (nextError) {
-                            setActionError(getUserFacingErrorMessage(nextError, "Unable to open that asset image."));
-                            await reloadSelectedAssetDetail();
+                            setActionError(getUserFacingErrorMessage(nextError, "Unable to add images to this asset."));
                           } finally {
-                            setOpeningPreviewImageId(null);
+                            setIsUploadingPreviewImages(false);
                           }
                         })();
                       }}
                       type="button"
                     >
-                      {file.previewDataUrl ? (
-                        <img alt={file.originalName} src={file.previewDataUrl} />
-                      ) : (
-                        <span>Preview unavailable</span>
-                      )}
+                      <FileUp size={14} />
+                      <span>{isUploadingPreviewImages ? "Adding..." : activeAssetImageSlots <= 0 ? "2 images max" : "Add images"}</span>
                     </button>
-                  ))
-                ) : (
-                  <div className="asset-preview-image-empty">No images yet.</div>
-                )}
-              </div>
-
-              <div className="action-panel-actions action-panel-actions-start">
-                <button
-                  className="ghost-control"
-                  disabled={isUploadingPreviewImages || activeAssetImageSlots <= 0}
-                  onClick={() => {
-                    setActionError(null);
-                    setActionFeedback(null);
-                    void (async () => {
-                      try {
-                        setIsUploadingPreviewImages(true);
-                        const result = await uploadAssetImages(activeAsset.id);
-                        await Promise.all([reloadSelectedAssetDetail(), reload()]);
-                        setActionFeedback(result.summary);
-                      } catch (nextError) {
-                        setActionError(getUserFacingErrorMessage(nextError, "Unable to add images to this asset."));
-                      } finally {
-                        setIsUploadingPreviewImages(false);
-                      }
-                    })();
-                  }}
-                  type="button"
-                >
-                  <FileUp size={14} />
-                  <span>{isUploadingPreviewImages ? "Adding..." : activeAssetImageSlots <= 0 ? "2 images max" : "Add images"}</span>
-                </button>
-                <button
-                  className="ghost-control"
-                  onClick={() => {
-                    setEditorMode("edit");
-                    setEditorError(null);
-                  }}
-                  type="button"
-                >
-                  <SquarePen size={14} />
-                  <span>Edit asset</span>
-                </button>
-                <button className="action-primary-button" onClick={() => navigate(`/assets/${activeAsset.id}`)} type="button">
-                  Open detail
-                </button>
-              </div>
-            </>
-          </SurfaceCard>
+                    <button
+                      className="ghost-control"
+                      onClick={() => {
+                        setEditorMode("edit");
+                        setEditorError(null);
+                      }}
+                      type="button"
+                    >
+                      <SquarePen size={14} />
+                      <span>Edit asset</span>
+                    </button>
+                    <button className="action-primary-button" onClick={() => navigate(`/assets/${activeAsset.id}`)} type="button">
+                      Open detail
+                    </button>
+                  </div>
+                </>
+              </SurfaceCard>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </div>

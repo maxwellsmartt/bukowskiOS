@@ -47,6 +47,7 @@ type DataTableProps<T = unknown> = {
   onSortRequest?: (columnKey: string) => void;
   autoScrollToActiveRow?: boolean;
   controlsAddon?: ReactNode;
+  pruneSelectionOnRowsChange?: boolean;
 };
 
 const selectionColumnWidth = 44;
@@ -74,6 +75,7 @@ export const DataTable = <T = unknown,>({
   onSortRequest,
   autoScrollToActiveRow = false,
   controlsAddon,
+  pruneSelectionOnRowsChange = true,
 }: DataTableProps<T>) => {
   const defaultMinColumnWidth = 56;
   const tableShellRef = useRef<HTMLDivElement | null>(null);
@@ -128,13 +130,17 @@ export const DataTable = <T = unknown,>({
   };
 
   useEffect(() => {
+    if (!pruneSelectionOnRowsChange) {
+      return;
+    }
+
     const validRowIds = new Set(resolvedRowIds);
     const nextSelection = activeSelection.filter((rowId) => validRowIds.has(rowId));
 
     if (nextSelection.length !== activeSelection.length) {
       setSelection(nextSelection);
     }
-  }, [activeSelection, resolvedRowIds]);
+  }, [activeSelection, pruneSelectionOnRowsChange, resolvedRowIds]);
 
   useEffect(() => {
     setColumnWidths((currentWidths) =>
@@ -293,7 +299,10 @@ export const DataTable = <T = unknown,>({
   }, [columnsMenuOpen]);
 
   const allRowsSelected = resolvedRowIds.length > 0 && resolvedRowIds.every((rowId) => activeSelection.includes(rowId));
-  const someRowsSelected = activeSelection.length > 0 && !allRowsSelected;
+  const someRowsSelected =
+    (pruneSelectionOnRowsChange
+      ? activeSelection.length > 0
+      : resolvedRowIds.some((rowId) => activeSelection.includes(rowId))) && !allRowsSelected;
   const visibleColumns = useMemo(() => {
     const resolvedKeys = visibleColumnKeys.filter((key) => columns.some((column) => column.key === key));
     const columnByKey = new Map(columns.map((column) => [column.key, column] as const));
@@ -313,7 +322,17 @@ export const DataTable = <T = unknown,>({
   };
 
   const toggleAllRows = (checked: boolean) => {
-    setSelection(checked ? resolvedRowIds : []);
+    if (pruneSelectionOnRowsChange) {
+      setSelection(checked ? resolvedRowIds : []);
+      return;
+    }
+
+    const visibleRowIds = new Set(resolvedRowIds);
+    setSelection(
+      checked
+        ? Array.from(new Set([...activeSelection, ...resolvedRowIds]))
+        : activeSelection.filter((rowId) => !visibleRowIds.has(rowId)),
+    );
   };
 
   const handleResizeStart = (event: ReactMouseEvent<HTMLButtonElement>, columnKey: string) => {
