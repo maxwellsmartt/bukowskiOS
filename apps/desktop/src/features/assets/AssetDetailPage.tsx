@@ -1,3 +1,4 @@
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -13,7 +14,7 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
-import { archiveAsset, openAssetFile, updateAsset, uploadAssetFiles, uploadAssetImages, useAssetDetail } from "./useAssetsData";
+import { archiveAsset, deleteAssetFile, openAssetFile, updateAsset, uploadAssetFiles, uploadAssetImages, useAssetDetail } from "./useAssetsData";
 
 const fileDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -75,6 +76,7 @@ export const AssetDetailPage = () => {
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [openingFileId, setOpeningFileId] = useState<string | null>(null);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
   const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
   const [isArchivingAsset, setIsArchivingAsset] = useState(false);
 
@@ -191,33 +193,69 @@ export const AssetDetailPage = () => {
         {assetImages.length ? (
           <div className="asset-image-gallery">
             {assetImages.map((file) => (
-              <button
+              <div
                 key={file.id}
                 className="asset-image-card"
-                disabled={openingFileId === file.id}
-                onClick={() => {
-                  setFilesError(null);
-                  void (async () => {
-                    try {
-                      setOpeningFileId(file.id);
-                      await openAssetFile(file.id);
-                    } catch (nextError) {
-                      setFilesError(getUserFacingErrorMessage(nextError, "Unable to open that asset image."));
-                      await reload();
-                    } finally {
-                      setOpeningFileId(null);
-                    }
-                  })();
-                }}
-                type="button"
               >
-                {file.previewDataUrl ? (
-                  <img alt={file.originalName} className="asset-image-preview" src={file.previewDataUrl} />
-                ) : (
-                  <span className="asset-image-preview asset-image-preview-placeholder">Preview unavailable</span>
-                )}
-                <span className="asset-image-caption">{file.originalName}</span>
-              </button>
+                <button
+                  className="asset-image-open"
+                  disabled={openingFileId === file.id || deletingFileId === file.id}
+                  onClick={() => {
+                    setFilesError(null);
+                    void (async () => {
+                      try {
+                        setOpeningFileId(file.id);
+                        await openAssetFile(file.id);
+                      } catch (nextError) {
+                        setFilesError(getUserFacingErrorMessage(nextError, "Unable to open that asset image."));
+                        await reload();
+                      } finally {
+                        setOpeningFileId(null);
+                      }
+                    })();
+                  }}
+                  type="button"
+                >
+                  {file.previewDataUrl ? (
+                    <img alt={file.originalName} className="asset-image-preview" src={file.previewDataUrl} />
+                  ) : (
+                    <span className="asset-image-preview asset-image-preview-placeholder">Preview unavailable</span>
+                  )}
+                </button>
+                <div className="asset-image-meta-row">
+                  <span className="asset-image-caption">{file.originalName}</span>
+                  <button
+                    aria-label={`Remove ${file.originalName}`}
+                    className="asset-image-remove"
+                    data-tooltip="Remove image"
+                    disabled={deletingFileId === file.id}
+                    onClick={() => {
+                      const confirmed = window.confirm("Remove this asset image?");
+                      if (!confirmed) {
+                        return;
+                      }
+
+                      setFilesError(null);
+                      setFilesFeedback(null);
+                      void (async () => {
+                        try {
+                          setDeletingFileId(file.id);
+                          const result = await deleteAssetFile(file.id);
+                          await reload();
+                          setFilesFeedback(result.summary);
+                        } catch (nextError) {
+                          setFilesError(getUserFacingErrorMessage(nextError, "Unable to remove that asset image."));
+                        } finally {
+                          setDeletingFileId(null);
+                        }
+                      })();
+                    }}
+                    type="button"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         ) : (

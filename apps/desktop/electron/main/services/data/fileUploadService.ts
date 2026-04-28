@@ -339,6 +339,41 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
       await openStoredRow(row, "asset_files", fileId);
     },
 
+    deleteAssetFile(fileId: string): FileDeleteMutationResult {
+      const row = db
+        .prepare(
+          `
+            SELECT id, storage_path, status
+            FROM asset_files
+            WHERE id = ?
+            LIMIT 1
+          `,
+        )
+        .get(fileId) as AssetFileRow | undefined;
+
+      if (!row) {
+        throw new Error("Asset file was not found.");
+      }
+
+      if (row.storage_path && fileSystem.existsSync(row.storage_path)) {
+        fileSystem.unlinkSync(row.storage_path);
+      }
+
+      db.prepare(
+        `
+          UPDATE asset_files
+          SET status = 'deleted',
+              deleted_at = ?
+          WHERE id = ?
+        `,
+      ).run(options.now?.() ?? new Date().toISOString(), fileId);
+
+      return {
+        deletedCount: 1,
+        summary: "Asset file removed.",
+      };
+    },
+
     async openIncidentFile(fileId: string) {
       const row = db
         .prepare(

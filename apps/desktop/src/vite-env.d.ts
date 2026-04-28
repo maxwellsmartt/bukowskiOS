@@ -213,6 +213,7 @@ declare global {
       uploadFiles: (assetId: string) => Promise<FileUploadMutationResult>;
       uploadImages: (assetId: string) => Promise<FileUploadMutationResult>;
       openFile: (fileId: string) => Promise<void>;
+      deleteFile: (fileId: string) => Promise<FileDeleteMutationResult>;
       assignMove: (input: AssignMoveAssetsInput) => Promise<AssignMoveAssetsResult>;
       create: (input: CreateAssetCommand) => Promise<AssetEditorMutationResult>;
       update: (input: UpdateAssetCommand) => Promise<AssetEditorMutationResult>;

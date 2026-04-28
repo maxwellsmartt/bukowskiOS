@@ -177,3 +177,11 @@ export const openAssetFile = async (fileId: string) => {
 
   return window.bukowskiAssets.openFile(fileId);
 };
+
+export const deleteAssetFile = async (fileId: string) => {
+  if (!window.bukowskiAssets) {
+    throw new Error("Assets bridge unavailable");
+  }
+
+  return window.bukowskiAssets.deleteFile(fileId);
+};

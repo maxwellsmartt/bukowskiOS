@@ -194,6 +194,7 @@ type RegisterFoundationIpcOptions = {
     importFinanceDocuments: (entryId: string, sourceFilePaths: string[]) => unknown;
     importCrewDocuments: (crewMemberId: string, sourceFilePaths: string[]) => unknown;
     openAssetFile: (fileId: string) => Promise<void>;
+    deleteAssetFile: (fileId: string) => { deletedCount: number; summary: string };
     openIncidentFile: (fileId: string) => Promise<void>;
     openFinanceDocument: (fileId: string) => Promise<void>;
     openCrewDocument: (fileId: string) => Promise<void>;
@@ -689,6 +690,15 @@ export const registerFoundationIpc = ({
       return null;
     },
     "The app could not open that asset file.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.assets.deleteFile,
+    idReadArgsSchema,
+    async (_event, fileId: string) => {
+      await workspaceAccess.assertAssetFileAccess(fileId, "remove that asset file", "write", "assets.manage");
+      return fileUploads.deleteAssetFile(fileId);
+    },
+    "The app could not remove that asset file.",
   );
   safeHandleReadWithSchema(
     ipcChannels.packing.getList,

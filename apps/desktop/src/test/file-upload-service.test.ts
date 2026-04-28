@@ -64,6 +64,36 @@ describe("file upload service", () => {
     fs.rmSync(tempRoot, { force: true, recursive: true });
   });
 
+  it("removes asset images and frees them from asset detail reads", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-file-delete-asset-image");
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-asset-image-delete-"));
+    const sourceFilePath = path.join(tempRoot, "fixture-asset.png");
+    fs.writeFileSync(sourceFilePath, "asset-image");
+
+    const service = createFileUploadService(database, {
+      userDataPath: tempRoot,
+      shellApi: {
+        openPath: vi.fn().mockResolvedValue(""),
+      },
+    });
+
+    service.importAssetFiles("asset-legacy-rentman-1", [sourceFilePath]);
+    const reads = createFoundationReadService(database);
+    const uploadedFile = reads.getAssetDetail("asset-legacy-rentman-1").files[0];
+
+    expect(uploadedFile?.status).toBe("available");
+
+    const result = service.deleteAssetFile(uploadedFile!.id);
+    const detail = reads.getAssetDetail("asset-legacy-rentman-1");
+
+    expect(result.deletedCount).toBe(1);
+    expect(result.summary).toBe("Asset file removed.");
+    expect(detail.files).toHaveLength(0);
+
+    cleanup();
+    fs.rmSync(tempRoot, { force: true, recursive: true });
+  });
+
   it("marks missing incident evidence when the stored file disappears", () => {
     const { cleanup, database } = createTestDatabase("bukowski-file-upload-incident");
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-incident-files-"));
