@@ -10,6 +10,7 @@ import { createRmaCase, updateRmaCase, useRmaCaseDetail, useRmaSnapshot } from "
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -544,7 +545,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
             />
           </SurfaceCard>
 
-          <div className="split-layout">
+          <ResizableSideRailLayout className="split-layout" defaultWidth={420} maxWidth={680} minWidth={320} storageKey="rma-side-rail-width">
             <SurfaceCard
               aside={
                 <button
@@ -727,7 +728,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
                 ) : null}
               </SurfaceCard>
             )}
-          </div>
+          </ResizableSideRailLayout>
         </>
       ) : null}
     </div>

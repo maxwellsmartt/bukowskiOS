@@ -50,7 +50,6 @@ export const ShellSidebar = () => {
 
       <div className="shell-sidebar-utility-zone">
         <nav className="shell-nav">
-          <span className="shell-nav-label">Setup</span>
           {utilityNav.map((item) => {
             const Icon = item.icon;
             const isActive = activeRoute.scopeMode === "global" && location.pathname === item.path;

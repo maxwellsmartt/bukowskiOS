@@ -11,6 +11,7 @@ import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -293,7 +294,7 @@ const AssetOperationCart = ({
           <strong>{items.length === 1 ? "1 asset selected" : `${items.length} assets selected`}</strong>
           <span>{totalUnits === 1 ? "1 unit queued" : `${totalUnits} units queued`}</span>
         </div>
-        <button aria-label="Clear operation cart" className="icon-ghost-control" data-tooltip="Clear cart" onClick={onClear} type="button">
+        <button aria-label="Clear operation cart" className="icon-ghost-control is-danger" data-tooltip="Clear cart" onClick={onClear} type="button">
           <Trash2 size={14} />
         </button>
       </div>
@@ -1312,7 +1313,13 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       {!isProjectMode ? <GlobalAssetsMetrics /> : null}
 
-      <div className={`asset-workbench-layout asset-list-layout${selectedAssets.length || activeAsset ? " has-side-rail" : ""}`}>
+      <ResizableSideRailLayout
+        className="asset-list-layout"
+        defaultWidth={360}
+        maxWidth={560}
+        minWidth={300}
+        storageKey={uiPreferenceKeys.assetOperationSideRailWidth}
+      >
         <SurfaceCard
           className="asset-registry-card"
           title={isProjectMode ? "Assets" : "Assets"}
@@ -1688,7 +1695,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             ) : null}
           </div>
         ) : null}
-      </div>
+      </ResizableSideRailLayout>
     </div>
   );
 };

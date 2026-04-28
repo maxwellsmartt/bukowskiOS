@@ -4,6 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { DataTable } from "@shared/components/DataTable";
+import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -295,7 +296,7 @@ export const SyncOutboxPage = () => {
         </button>
       </div>
 
-      <div className="split-layout">
+      <ResizableSideRailLayout className="split-layout" defaultWidth={420} maxWidth={680} minWidth={320} storageKey="sync-outbox-side-rail-width">
         <SurfaceCard title="Rows">
           <div className="sync-outbox-toolbar">
             <div className="sync-outbox-filter-row">
@@ -417,7 +418,7 @@ export const SyncOutboxPage = () => {
             </div>
           )}
         </SurfaceCard>
-      </div>
+      </ResizableSideRailLayout>
     </div>
   );
 };

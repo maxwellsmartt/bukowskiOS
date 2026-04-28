@@ -198,7 +198,7 @@ export const CompareView = () => {
           <ArrowLeft size={14} />
           <span>Back</span>
         </button>
-        <button className="ghost-control" onClick={clear} type="button">
+        <button className="ghost-control is-danger" onClick={clear} type="button">
           <Trash2 size={14} />
           <span>Clear tray</span>
         </button>

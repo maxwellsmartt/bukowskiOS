@@ -5,6 +5,7 @@ import type { PackingSlipListQuery, PackingSlipSortField } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -113,7 +114,13 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
       {returnFeedback ? <div className="action-feedback action-feedback-success">{returnFeedback}</div> : null}
       {returnError ? <div className="action-feedback action-feedback-error">{returnError}</div> : null}
 
-      <div className="split-layout">
+      <ResizableSideRailLayout
+        className="split-layout"
+        defaultWidth={420}
+        maxWidth={640}
+        minWidth={320}
+        storageKey={uiPreferenceKeys.splitSideRailWidth}
+      >
         <SurfaceCard title="Packing Slips">
           <ListToolbar
             activeSortLabel={packingControls.activeSortOption?.label}
@@ -258,7 +265,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             }
           }}
         />
-      </div>
+      </ResizableSideRailLayout>
     </div>
   );
 };

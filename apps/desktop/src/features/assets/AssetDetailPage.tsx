@@ -6,6 +6,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
 import { useCatalogData } from "@features/projects/useProjectsData";
+import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { ScannableCodePanel } from "@shared/components/ScannableCodePanel";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -383,7 +384,7 @@ export const AssetDetailPage = () => {
         />
       ) : null}
 
-      <div className="split-layout asset-detail-layout">
+      <ResizableSideRailLayout className="split-layout asset-detail-layout" defaultWidth={420} maxWidth={640} minWidth={320} storageKey="asset-detail-side-rail-width">
         <div className="page-stack">
           <SurfaceCard title="Details">
             <div className="summary-grid">
@@ -623,7 +624,7 @@ export const AssetDetailPage = () => {
             </div>
           </SurfaceCard>
         </div>
-      </div>
+      </ResizableSideRailLayout>
     </div>
   );
 };

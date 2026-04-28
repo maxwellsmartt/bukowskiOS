@@ -165,6 +165,9 @@ Incluye:
 - Done — `DataTable` soporta `pruneSelectionOnRowsChange=false` sólo para flujos que necesitan selección cross-search.
 - Done — Packing usa las mismas cantidades acumuladas en la bandeja.
 - Done — Bandeja movida a rail derecho compacto para no empujar la tabla ni romper acceso durante selección bulk.
+- Done — Ajuste visual fino: quantity inputs más compactos, zafacones en rojo y rail con scroll usable en pantallas de menor altura.
+- Done — Sidebar principal actualizado a panel dark glass con bordes redondeados, manteniendo navegación y resize existentes.
+- Done — Patrón reusable de rail derecho redimensionable para Assets, Packing, Asset Detail, RMA, Finance Overview y Sync Outbox; el mínimo conserva el tamaño operativo actual.
 - Doing — Reducir copy técnico del panel.
 - Orden progresivo: selección -> modo -> proyecto/unidad/responsable -> cantidad/fechas -> ubicación/notas.
 - Done — Mostrar warnings de stock/kit lock y bloquear acciones que perderían cantidad o emitirían assets de kit individualmente.
@@ -189,6 +192,7 @@ Findings 2026-04-28:
 - Crítico mitigado — Técnicos podían terminar asignando/packing en pasos repetidos porque sólo podían seleccionar dentro de una búsqueda. La bandeja permite acumular assets, editar cantidades y ejecutar una sola operación.
 - Medio mitigado — Assets con stock > 1 ya no toman todo disponible por defecto; la bandeja arranca en 1 unidad para reducir sobre-asignación.
 - Medio mitigado — La primera versión de la bandeja crecía arriba de la tabla y hacía difícil seguir buscando/seleccionando. Ahora vive en un rail derecho con scroll propio y el quick preview queda debajo.
+- Bajo mitigado — Inputs de cantidad, iconos destructivos y sidebar no estaban visualmente alineados con la densidad/pulido esperado; se ajustaron antes de pasar a Packing.
 - Medio abierto — Falta smoke manual recreando un packing slip real completo con búsqueda multi-paso, cantidades y export.
 - Bajo abierto — Falta revisión visual completa de Packing/Incidents/RMA para aplicar el mismo patrón de rail compacto donde corresponda.
 

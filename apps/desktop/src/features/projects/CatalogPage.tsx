@@ -1048,7 +1048,7 @@ export const CatalogPage = () => {
                 <span>Edit</span>
               </button>
               <button
-                className="catalog-toolbar-button"
+                className="catalog-toolbar-button is-danger"
                 disabled={!selectedCount}
                 onClick={() => {
                   setConfirmDeleteOpen(true);

@@ -18,6 +18,7 @@ import {
 import type { FinanceOverviewPeriodPreset, FinanceOverviewQuery } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
+import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -301,7 +302,7 @@ export const FinanceOverviewPage = () => {
         </SurfaceCard>
       </div>
 
-      <div className="split-layout">
+      <ResizableSideRailLayout className="split-layout" defaultWidth={420} maxWidth={640} minWidth={320} storageKey="finance-overview-side-rail-width">
         <SurfaceCard title="Exposure Table">
           <DataTable
             getRowId={(row) => row.project}
@@ -337,7 +338,7 @@ export const FinanceOverviewPage = () => {
             ))}
           </div>
         </SurfaceCard>
-      </div>
+      </ResizableSideRailLayout>
     </div>
   );
 };
