@@ -159,6 +159,45 @@ describe("packing mutation service", () => {
     cleanup();
   });
 
+  it("repairs default command actor workspace access before issuing packing slips", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-packing-command-actor-repair-test");
+    const packingMutations = createPackingMutationService(database);
+
+    database
+      .prepare("UPDATE workspace_memberships SET status = 'inactive' WHERE workspace_id = ? AND user_id = ?")
+      .run("workspace-metadata", "user-ops");
+
+    const result = packingMutations.createPackingSlip({
+      commandId: "cmd-test-packing-actor-repair",
+      workspaceId: "workspace-metadata",
+      assetIds: ["asset-legacy-rentman-1"],
+      projectId: "project-archipielago",
+      responsibleUserId: "user-paola",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(result.packingSlipId).toMatch(/^packing-/);
+
+    const repairedMembership = database
+      .prepare(
+        `
+          SELECT workspace_memberships.status, roles.key AS role_key
+          FROM workspace_memberships
+          JOIN roles ON roles.id = workspace_memberships.role_id
+          WHERE workspace_memberships.workspace_id = ?
+            AND workspace_memberships.user_id = ?
+          LIMIT 1
+        `,
+      )
+      .get("workspace-metadata", "user-ops") as { status: string; role_key: string } | undefined;
+
+    expect(repairedMembership?.status).toBe("active");
+    expect(repairedMembership?.role_key).toBe("admin");
+
+    cleanup();
+  });
+
   it("bootstraps the default command actor for synced workspaces", () => {
     const { cleanup, database } = createTestDatabase("bukowski-packing-command-actor-test");
     const now = "2026-04-10T00:00:00.000Z";
