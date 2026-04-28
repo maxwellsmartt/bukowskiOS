@@ -211,6 +211,7 @@ declare global {
       getOverview: (query?: AssetWorkspaceQuery) => Promise<AssetsOverviewSnapshot>;
       getDetail: (assetId: string) => Promise<AssetDetailSnapshot>;
       uploadFiles: (assetId: string) => Promise<FileUploadMutationResult>;
+      uploadImages: (assetId: string) => Promise<FileUploadMutationResult>;
       openFile: (fileId: string) => Promise<void>;
       assignMove: (input: AssignMoveAssetsInput) => Promise<AssignMoveAssetsResult>;
       create: (input: CreateAssetCommand) => Promise<AssetEditorMutationResult>;

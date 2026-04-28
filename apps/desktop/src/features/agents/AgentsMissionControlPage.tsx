@@ -7,6 +7,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { getAgentApprovalModeLabel, getAgentRunStatusLabel, titleCaseEnum } from "@shared/labels/statusLabels";
 import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { AgentWizardPanel } from "./AgentWizardPanel";
 import { reviewAgentRun, setAgentApprovalMode, setAgentStatus, useAgentDetail, useMissionControlSnapshot } from "./useAgentsData";
@@ -175,7 +176,7 @@ export const AgentsMissionControlPage = () => {
         reloadDetail();
       }
     } catch (error) {
-      setApprovalFeedback(error instanceof Error ? error.message : "I could not record that decision.");
+      setApprovalFeedback(getUserFacingErrorMessage(error, "I could not record that decision."));
     } finally {
       setProcessingRunId(null);
     }

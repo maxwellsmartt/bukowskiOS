@@ -5,6 +5,7 @@ import {
   resolveBukowskiSupabaseEnv,
   type BukowskiSupabaseClient,
 } from "@bukowski/supabase-client";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -211,7 +212,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         return {
           sessionUser: null,
           status: "unauthenticated" as const,
-          authError: error instanceof Error ? error.message : "Unable to restore the secure session.",
+          authError: getUserFacingErrorMessage(error, "Unable to restore the secure session."),
           shouldPersistTokens: false,
         };
       }
@@ -241,7 +242,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
         setUser(null);
         setStatus("unauthenticated");
-        setAuthError(error instanceof Error ? error.message : "Unable to restore the secure session.");
+        setAuthError(getUserFacingErrorMessage(error, "Unable to restore the secure session."));
       });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
@@ -415,7 +416,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setIsPasswordRecovery(isRecoveryFlow);
         return isRecoveryFlow ? "/login/reset-password" : "/workspaces/select";
       } catch (error) {
-        setAuthError(error instanceof Error ? error.message : "The auth callback could not be processed.");
+        setAuthError(getUserFacingErrorMessage(error, "The auth callback could not be processed."));
         throw error;
       }
     },

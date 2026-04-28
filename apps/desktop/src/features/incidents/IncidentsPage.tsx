@@ -16,6 +16,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { IncidentReportPanel } from "./IncidentReportPanel";
 import { IncidentDetailPanel } from "./IncidentDetailPanel";
@@ -240,7 +241,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       setRmaEditorError(null);
       setRmaEditorMode(null);
     } catch (nextError) {
-      setRmaEditorError(nextError instanceof Error ? nextError.message : "Unable to save repair case.");
+      setRmaEditorError(getUserFacingErrorMessage(nextError, "Unable to save repair case."));
     } finally {
       setIsSubmittingRma(false);
     }
@@ -276,7 +277,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       setRmaFeedback(result.summary);
       setRmaEditorError(null);
     } catch (nextError) {
-      setRmaEditorError(nextError instanceof Error ? nextError.message : "Unable to update repair status.");
+      setRmaEditorError(getUserFacingErrorMessage(nextError, "Unable to update repair status."));
     } finally {
       setIsSubmittingRma(false);
     }
@@ -361,7 +362,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
               setReportFeedback(result.summary);
               setIncidentDetailFeedback(null);
             } catch (nextError) {
-              setReportError(nextError instanceof Error ? nextError.message : "Unable to create incident.");
+              setReportError(getUserFacingErrorMessage(nextError, "Unable to create incident."));
             } finally {
               setIsSubmittingIncident(false);
             }
@@ -475,7 +476,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
             setIncidentDetailError(null);
             setIncidentDetailFeedback(result.summary);
           } catch (nextError) {
-            setIncidentDetailError(nextError instanceof Error ? nextError.message : "Unable to resolve incident.");
+            setIncidentDetailError(getUserFacingErrorMessage(nextError, "Unable to resolve incident."));
           } finally {
             setIsSubmittingIncidentDetail(false);
           }
@@ -507,7 +508,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
             setIncidentDetailError(null);
             setIncidentDetailFeedback(result.summary);
           } catch (nextError) {
-            setIncidentDetailError(nextError instanceof Error ? nextError.message : "Unable to update incident.");
+            setIncidentDetailError(getUserFacingErrorMessage(nextError, "Unable to update incident."));
           } finally {
             setIsSubmittingIncidentDetail(false);
           }

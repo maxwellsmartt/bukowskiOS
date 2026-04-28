@@ -8,6 +8,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { getSyncOutboxStatusLabel } from "@shared/labels/statusLabels";
 
 const emptyDiagnostics: AppDiagnosticsSnapshot = {
@@ -126,7 +127,7 @@ export const SyncOutboxPage = () => {
       setRows(nextRows);
       setError(null);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "The app could not load sync activity.");
+      setError(getUserFacingErrorMessage(nextError, "The app could not load sync activity."));
     }
   };
 
@@ -194,7 +195,7 @@ export const SyncOutboxPage = () => {
       const nextRows = await window.bukowskiApp!.getSyncOutboxRows();
       setRows(nextRows);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "The app could not complete that local sync action.");
+      setError(getUserFacingErrorMessage(nextError, "The app could not complete that local sync action."));
     } finally {
       setPending(false);
     }
@@ -214,7 +215,7 @@ export const SyncOutboxPage = () => {
       const nextRows = await window.bukowskiApp.getSyncOutboxRows();
       setRows(nextRows);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "The app could not retry that local sync row.");
+      setError(getUserFacingErrorMessage(nextError, "The app could not retry that local sync row."));
     } finally {
       setRetryingRowId(null);
     }
@@ -241,7 +242,7 @@ export const SyncOutboxPage = () => {
       const nextRows = await window.bukowskiApp.getSyncOutboxRows();
       setRows(nextRows);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "The app could not retry the visible local sync rows.");
+      setError(getUserFacingErrorMessage(nextError, "The app could not retry the visible local sync rows."));
     } finally {
       setIsRetryingVisible(false);
     }

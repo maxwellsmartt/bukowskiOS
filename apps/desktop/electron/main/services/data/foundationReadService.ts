@@ -316,6 +316,20 @@ const formatShortDate = (value: string | null) => {
   return dateFormatter.format(new Date(value));
 };
 
+const shortDateWithYearFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "2-digit",
+  year: "numeric",
+});
+
+const formatShortDateWithYear = (value: string | null) => {
+  if (!value) {
+    return "—";
+  }
+
+  return shortDateWithYearFormatter.format(new Date(value));
+};
+
 const formatCompactDate = (value: string | null) => {
   if (!value) {
     return "undated";
@@ -1704,9 +1718,9 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         department: slip.department,
         responsible: slip.responsible,
         preparedBy: slip.prepared_by,
-        issueDate: formatShortDate(slip.issue_date),
+        issueDate: formatShortDateWithYear(slip.issue_date),
         issueDateCompact: formatCompactDate(slip.issue_date),
-        dueDate: formatShortDate(slip.return_due_date),
+        dueDate: formatShortDateWithYear(slip.return_due_date),
         status: resolvePackingStatus(slip.status, slip.return_due_date, slip.item_count, returnedCount),
         notes: slip.notes,
         itemCount: slip.item_count,

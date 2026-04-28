@@ -22,6 +22,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { exportFinanceReportPdf, useFinanceOverview } from "./useFinanceData";
 
@@ -118,7 +119,7 @@ export const FinanceOverviewPage = () => {
       setExportFeedback(result.summary);
     } catch (nextError) {
       setExportFeedback(null);
-      setExportError(nextError instanceof Error ? nextError.message : "Unable to export finance report PDF.");
+      setExportError(getUserFacingErrorMessage(nextError, "Unable to export finance report PDF."));
     } finally {
       setIsExportingPdf(false);
     }

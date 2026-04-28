@@ -167,6 +167,7 @@ export type AssetFileRow = {
   status: "available" | "missing" | "deleted";
   createdAt: string;
   isPreviewable: boolean;
+  previewDataUrl?: string | null;
 };
 
 export type AssetDetailSnapshot = {

@@ -5,6 +5,27 @@ import { assertTrustedIpcSender, sanitizeIpcError } from "../security/securityCo
 
 type AsyncResult<TResult> = TResult | Promise<TResult>;
 
+const humanizeFieldPath = (path: PropertyKey[]) =>
+  path
+    .map((segment) => String(segment).replace(/([a-z])([A-Z])/g, "$1 $2"))
+    .join(" ")
+    .trim()
+    .toLowerCase();
+
+const formatValidationError = (error: z.ZodError) => {
+  const issue = error.issues[0];
+  const field = issue?.path.length ? humanizeFieldPath(issue.path) : "one field";
+  const rawIssue = issue as z.ZodIssue & { input?: unknown };
+  const detail =
+    issue?.code === "invalid_type" && rawIssue.input === undefined
+      ? `${field} is required.`
+      : issue?.message
+        ? `${field}: ${issue.message}`
+        : "Some information is missing or has the wrong format.";
+
+  return `Some information is missing or invalid. ${detail} Review the form and try again.`;
+};
+
 export const safeHandle = <TSchema extends ZodTypeAny, TResult>(
   channel: string,
   schema: TSchema,
@@ -16,7 +37,7 @@ export const safeHandle = <TSchema extends ZodTypeAny, TResult>(
 
     const parsedInput = schema.safeParse(input);
     if (!parsedInput.success) {
-      throw sanitizeIpcError(parsedInput.error.issues[0]?.message ?? "Invalid request payload.", "Invalid request payload.");
+      throw sanitizeIpcError(formatValidationError(parsedInput.error), "Some information is missing or invalid.");
     }
 
     try {
@@ -54,7 +75,7 @@ export const safeHandleReadWithSchema = <TArgs extends unknown[], TResult>(
 
     const parsedArgs = schema.safeParse(args);
     if (!parsedArgs.success) {
-      throw sanitizeIpcError(parsedArgs.error.issues[0]?.message ?? "Invalid request payload.", "Invalid request payload.");
+      throw sanitizeIpcError(formatValidationError(parsedArgs.error), "Some information is missing or invalid.");
     }
 
     try {

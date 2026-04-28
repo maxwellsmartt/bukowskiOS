@@ -484,7 +484,7 @@ export const createProjectSchema = z
   })
   .strict();
 
-export const updateProjectSchema = createProjectSchema.extend({
+export const updateProjectSchema = createProjectSchema.omit({ workspaceId: true }).extend({
   projectId: nonEmptyString,
 });
 

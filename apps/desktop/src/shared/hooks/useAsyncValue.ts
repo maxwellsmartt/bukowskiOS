@@ -1,5 +1,7 @@
 import { DependencyList, useEffect, useState } from "react";
 
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
+
 type AsyncValueState<T> = {
   data: T;
   error: string | null;
@@ -44,7 +46,7 @@ export const useAsyncValue = <T>(
         if (!isCancelled) {
           setState({
             data: initialValue,
-            error: error instanceof Error ? error.message : "Unknown loading error",
+            error: getUserFacingErrorMessage(error, "Unknown loading error"),
             isLoading: false,
             reload: () => setReloadToken((current) => current + 1),
           });

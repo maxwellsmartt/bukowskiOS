@@ -397,13 +397,17 @@ export const createDocumentGenerationService = () => ({
           item.serialLabel,
           item.location,
         ];
-        const contentHeights = rowValues.map((value, valueIndex) =>
-          document.heightOfString(value, {
+        const contentHeights = rowValues.map((value, valueIndex) => {
+          const isPrimaryCell = valueIndex === 1;
+          document.font(isPrimaryCell ? "Helvetica-Bold" : "Helvetica").fontSize(isPrimaryCell ? 8.4 : 7.8);
+          return document.heightOfString(value, {
             width: columns[valueIndex]!.width - 14,
             align: columns[valueIndex]!.align,
-          }),
-        );
-        const rowHeight = Math.max(26, Math.ceil(Math.max(...contentHeights)) + 10);
+            lineBreak: isPrimaryCell,
+          });
+        });
+        document.font("Helvetica");
+        const rowHeight = Math.max(30, Math.ceil(Math.max(...contentHeights)) + 16);
 
         if (cursorY + rowHeight > document.page.height - document.page.margins.bottom - footerReserve) {
           document.addPage();
@@ -422,7 +426,7 @@ export const createDocumentGenerationService = () => ({
           document.fillColor(isPrimaryCell ? "#18202a" : surfaceText).fontSize(isPrimaryCell ? 8.4 : 7.8).text(value, x, cursorY + 5, {
             width: columns[valueIndex]!.width - 14,
             align: columns[valueIndex]!.align,
-            ellipsis: valueIndex !== 0,
+            ellipsis: valueIndex !== 0 && !isPrimaryCell,
             lineBreak: valueIndex === 1,
             height: rowHeight - 8,
           });

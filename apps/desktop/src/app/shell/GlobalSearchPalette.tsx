@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { pushRecentEntityKey, readRecentEntityKeys } from "@shared/lib/recentEntities";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 
@@ -92,7 +93,7 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
         }
 
         setGroups(emptyGroups);
-        setError(nextError instanceof Error ? nextError.message : "Unable to search right now.");
+        setError(getUserFacingErrorMessage(nextError, "Unable to search right now."));
         setIsLoading(false);
         setActiveIndex(0);
       });

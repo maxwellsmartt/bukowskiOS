@@ -258,6 +258,8 @@ const bukowskiAssets = {
     ipcRenderer.invoke(ipcChannels.assets.getDetail, assetId) as Promise<AssetDetailSnapshot>,
   uploadFiles: (assetId: string) =>
     ipcRenderer.invoke(ipcChannels.assets.uploadFiles, assetId) as Promise<FileUploadMutationResult>,
+  uploadImages: (assetId: string) =>
+    ipcRenderer.invoke(ipcChannels.assets.uploadImages, assetId) as Promise<FileUploadMutationResult>,
   openFile: (fileId: string) => ipcRenderer.invoke(ipcChannels.assets.openFile, fileId) as Promise<void>,
   assignMove: (input: AssignMoveAssetsInput) =>
     ipcRenderer.invoke(ipcChannels.assets.assignMove, input) as Promise<AssignMoveAssetsResult>,

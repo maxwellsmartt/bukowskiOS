@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 const slugifyWorkspaceName = (value: string) =>
   value
@@ -54,7 +55,7 @@ export const WorkspaceCreateScreen = () => {
               iconColor,
             })
               .then(() => navigate("/workspaces/select", { replace: true }))
-              .catch((error: unknown) => setStatus(error instanceof Error ? error.message : "Workspace creation failed."));
+              .catch((error: unknown) => setStatus(getUserFacingErrorMessage(error, "Workspace creation failed.")));
           }}
         >
           <label className="auth-field">

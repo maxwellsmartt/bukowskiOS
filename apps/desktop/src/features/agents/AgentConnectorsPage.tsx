@@ -7,6 +7,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { titleCaseEnum } from "@shared/labels/statusLabels";
 import { getConnectorBrand } from "@shared/lib/connectorBranding";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { useCatalogData } from "@features/projects/useProjectsData";
 
@@ -329,7 +330,7 @@ export const AgentConnectorsPage = () => {
         botToken: "",
       }));
     } catch (saveError) {
-      setErrorMessage(saveError instanceof Error ? saveError.message : "Unable to save channel settings.");
+      setErrorMessage(getUserFacingErrorMessage(saveError, "Unable to save channel settings."));
     } finally {
       setIsSaving(false);
     }
@@ -353,7 +354,7 @@ export const AgentConnectorsPage = () => {
       });
       setFeedback(result.summary);
     } catch (saveError) {
-      setErrorMessage(saveError instanceof Error ? saveError.message : "Unable to disable this channel.");
+      setErrorMessage(getUserFacingErrorMessage(saveError, "Unable to disable this channel."));
     } finally {
       setIsSaving(false);
     }
@@ -379,7 +380,7 @@ export const AgentConnectorsPage = () => {
       setFeedback(result.summary);
       setGeneratedLinkToken(null);
     } catch (saveError) {
-      setErrorMessage(saveError instanceof Error ? saveError.message : "Unable to clear the stored token.");
+      setErrorMessage(getUserFacingErrorMessage(saveError, "Unable to clear the stored token."));
     } finally {
       setIsSaving(false);
     }
@@ -401,7 +402,7 @@ export const AgentConnectorsPage = () => {
       });
       setFeedback(result.summary);
     } catch (testError) {
-      setErrorMessage(testError instanceof Error ? testError.message : "Unable to test this channel.");
+      setErrorMessage(getUserFacingErrorMessage(testError, "Unable to test this channel."));
     } finally {
       setIsTesting(false);
     }
@@ -428,7 +429,7 @@ export const AgentConnectorsPage = () => {
       setCopiedLinkCommand(false);
       setFeedback(result.summary);
     } catch (tokenError) {
-      setErrorMessage(tokenError instanceof Error ? tokenError.message : "Unable to generate a link code.");
+      setErrorMessage(getUserFacingErrorMessage(tokenError, "Unable to generate a link code."));
     } finally {
       setIsGeneratingToken(false);
     }
@@ -450,7 +451,7 @@ export const AgentConnectorsPage = () => {
         copiedLinkCommandTimeoutRef.current = null;
       }, 2200);
     } catch (copyError) {
-      setErrorMessage(copyError instanceof Error ? copyError.message : "Unable to copy the Telegram command.");
+      setErrorMessage(getUserFacingErrorMessage(copyError, "Unable to copy the Telegram command."));
     }
   };
 

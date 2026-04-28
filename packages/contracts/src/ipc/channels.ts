@@ -70,6 +70,7 @@ export const ipcChannels = {
     getOverview: "bukowskiAssets:getOverview",
     getDetail: "bukowskiAssets:getDetail",
     uploadFiles: "bukowskiAssets:uploadFiles",
+    uploadImages: "bukowskiAssets:uploadImages",
     openFile: "bukowskiAssets:openFile",
     assignMove: "bukowskiAssets:assignMove",
     create: "bukowskiAssets:create",

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Sparkles, X } from "lucide-react";
 
 import type { AgentApprovalMode, AgentRosterRow, AgentStatus } from "@contracts";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { createAgent, updateAgent } from "./useAgentsData";
 
@@ -223,7 +224,7 @@ export const AgentWizardPanel = ({
       onSaved?.();
       onClose();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to save agent.");
+      setError(getUserFacingErrorMessage(nextError, "Unable to save agent."));
     } finally {
       setIsSaving(false);
     }

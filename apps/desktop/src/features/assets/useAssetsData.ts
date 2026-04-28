@@ -162,6 +162,14 @@ export const uploadAssetFiles = async (assetId: string) => {
   return window.bukowskiAssets.uploadFiles(assetId);
 };
 
+export const uploadAssetImages = async (assetId: string) => {
+  if (!window.bukowskiAssets) {
+    throw new Error("Assets bridge unavailable");
+  }
+
+  return window.bukowskiAssets.uploadImages(assetId);
+};
+
 export const openAssetFile = async (fileId: string) => {
   if (!window.bukowskiAssets) {
     throw new Error("Assets bridge unavailable");

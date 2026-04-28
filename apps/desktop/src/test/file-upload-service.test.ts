@@ -36,6 +36,34 @@ describe("file upload service", () => {
     fs.rmSync(tempRoot, { force: true, recursive: true });
   });
 
+  it("exposes inline previews for attached asset images", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-file-upload-asset-images");
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-asset-images-"));
+    const sourceFilePath = path.join(tempRoot, "fixture-asset.png");
+    fs.writeFileSync(
+      sourceFilePath,
+      Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lwA6YQAAAABJRU5ErkJggg==", "base64"),
+    );
+
+    const service = createFileUploadService(database, {
+      userDataPath: tempRoot,
+      shellApi: {
+        openPath: vi.fn().mockResolvedValue(""),
+      },
+    });
+
+    service.importAssetFiles("asset-legacy-rentman-1", [sourceFilePath]);
+    const reads = createFoundationReadService(database);
+    const detail = reads.getAssetDetail("asset-legacy-rentman-1");
+
+    expect(detail.files).toHaveLength(1);
+    expect(detail.files[0]?.mimeType).toBe("image/png");
+    expect(detail.files[0]?.previewDataUrl).toContain("data:image/png;base64,");
+
+    cleanup();
+    fs.rmSync(tempRoot, { force: true, recursive: true });
+  });
+
   it("marks missing incident evidence when the stored file disappears", () => {
     const { cleanup, database } = createTestDatabase("bukowski-file-upload-incident");
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-incident-files-"));

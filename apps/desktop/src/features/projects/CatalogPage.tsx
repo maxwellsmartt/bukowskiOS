@@ -26,6 +26,7 @@ import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { CatalogEditorPanel } from "./CatalogEditorPanel";
 import {
@@ -765,7 +766,7 @@ export const CatalogPage = () => {
       setEditorMode(null);
       setEditorError(null);
     } catch (nextError) {
-      setEditorError(nextError instanceof Error ? nextError.message : "Could not save this catalog record.");
+      setEditorError(getUserFacingErrorMessage(nextError, "Could not save this catalog record."));
     } finally {
       setIsSubmittingEditor(false);
     }
@@ -781,7 +782,7 @@ export const CatalogPage = () => {
       });
       setCatalogActionMessage(result.summary);
     } catch (nextError) {
-      setCatalogActionMessage(nextError instanceof Error ? nextError.message : "Could not export this CSV.");
+      setCatalogActionMessage(getUserFacingErrorMessage(nextError, "Could not export this CSV."));
     } finally {
       setExportMenuOpen(false);
     }
@@ -803,7 +804,7 @@ export const CatalogPage = () => {
         csvText,
         strategy,
         preview: null,
-        error: nextError instanceof Error ? nextError.message : "Could not preview this CSV.",
+        error: getUserFacingErrorMessage(nextError, "Could not preview this CSV."),
       });
     }
   };
@@ -815,7 +816,7 @@ export const CatalogPage = () => {
       setCatalogActionMessage(result.summary);
       await reload();
     } catch (nextError) {
-      setEditorError(nextError instanceof Error ? nextError.message : "Crew document upload failed.");
+      setEditorError(getUserFacingErrorMessage(nextError, "Crew document upload failed."));
     } finally {
       setIsUploadingCrewDocuments(false);
     }
@@ -827,7 +828,7 @@ export const CatalogPage = () => {
       setCatalogActionMessage(result.summary);
       await reload();
     } catch (nextError) {
-      setEditorError(nextError instanceof Error ? nextError.message : "Crew document removal failed.");
+      setEditorError(getUserFacingErrorMessage(nextError, "Crew document removal failed."));
     }
   };
 
@@ -857,7 +858,7 @@ export const CatalogPage = () => {
       await Promise.all([reload(), loadUsersSnapshot()]);
       notifyCatalogChanged();
     } catch (nextError) {
-      setEditorError(nextError instanceof Error ? nextError.message : "Could not create the user from this crew record.");
+      setEditorError(getUserFacingErrorMessage(nextError, "Could not create the user from this crew record."));
     } finally {
       setIsCreatingCrewUser(false);
     }
@@ -898,7 +899,7 @@ export const CatalogPage = () => {
         current
           ? {
               ...current,
-              error: nextError instanceof Error ? nextError.message : "Could not import this CSV.",
+              error: getUserFacingErrorMessage(nextError, "Could not import this CSV."),
             }
           : current,
       );
@@ -942,7 +943,7 @@ export const CatalogPage = () => {
       setKitAssignOpen(false);
       setCatalogActionMessage(result.summary);
     } catch (nextError) {
-      setKitAssignError(nextError instanceof Error ? nextError.message : "Kit assignment failed.");
+      setKitAssignError(getUserFacingErrorMessage(nextError, "Kit assignment failed."));
     } finally {
       setIsSubmittingKitAssign(false);
     }
@@ -1019,7 +1020,7 @@ export const CatalogPage = () => {
                 onClick={() => importInputRef.current?.click()}
                 type="button"
               >
-                <Upload size={14} />
+                <Download size={14} />
                 <span>Import CSV</span>
               </button>
               <button
@@ -1030,7 +1031,7 @@ export const CatalogPage = () => {
                 ref={exportTriggerRef}
                 type="button"
               >
-                <Download size={14} />
+                <Upload size={14} />
                 <span>{selectedCount ? `Export selected (${selectedCount})` : "Export CSV"}</span>
                 <ChevronDown size={14} />
               </button>
@@ -1161,13 +1162,13 @@ export const CatalogPage = () => {
                   <span className="list-toolbar-menu-label">Export</span>
                   <button className="list-toolbar-menu-item" onClick={() => void runExport("template")} role="menuitem" type="button">
                     <span className="list-toolbar-menu-item-copy">
-                      <Download size={14} />
+                      <Upload size={14} />
                       <span>Blank template</span>
                     </span>
                   </button>
                   <button className="list-toolbar-menu-item" onClick={() => void runExport("data")} role="menuitem" type="button">
                     <span className="list-toolbar-menu-item-copy">
-                      <Download size={14} />
+                      <Upload size={14} />
                       <span>{selectedCount ? `Selected rows (${selectedCount})` : "All rows"}</span>
                     </span>
                   </button>

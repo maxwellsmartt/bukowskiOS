@@ -16,6 +16,7 @@ import type { AssistantApprovalPreference, AssistantGatewayAttachment } from "@c
 import { useAssistantChat } from "@app/providers/AssistantChatContext";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { reviewAgentRun } from "@features/agents/useAgentsData";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { readJsonPreference, uiPreferenceKeys, writeJsonPreference } from "@shared/lib/preferences";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
@@ -607,9 +608,7 @@ export const GlobalAssistantChat = () => {
         },
       });
     } catch (error) {
-      setAttachmentError(
-        error instanceof Error ? error.message : "Mission Control could not prepare this draft run.",
-      );
+      setAttachmentError(getUserFacingErrorMessage(error, "Mission Control could not prepare this draft run."));
     } finally {
       setOptimisticTurn(null);
       setIsSending(false);
@@ -658,7 +657,7 @@ export const GlobalAssistantChat = () => {
       });
       await refresh();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "I could not record that decision yet.");
+      setActionError(getUserFacingErrorMessage(error, "I could not record that decision yet."));
     } finally {
       setOptimisticAssistantMessage(null);
       setReviewingRunId(null);
@@ -703,7 +702,7 @@ export const GlobalAssistantChat = () => {
         files.length > nextFiles.length ? `Only ${availableSlots} images were attached to keep this message lightweight.` : null,
       );
     } catch (error) {
-      setAttachmentError(error instanceof Error ? error.message : "I could not attach that image.");
+      setAttachmentError(getUserFacingErrorMessage(error, "I could not attach that image."));
     } finally {
       if (attachmentInputRef.current) {
         attachmentInputRef.current.value = "";

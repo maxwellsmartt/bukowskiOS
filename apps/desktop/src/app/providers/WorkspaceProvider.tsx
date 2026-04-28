@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 import { useSession } from "./SessionProvider";
@@ -172,7 +173,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       const localWorkspaces = (await window.bukowskiApp?.getLocalWorkspaces?.().catch(() => [])) ?? [];
       const cachedMemberships = localWorkspaces.length > 0 ? localWorkspaces.map(toCachedMembership) : [localMembership];
-      const message = error instanceof Error ? error.message : "Unable to load remote workspaces.";
+      const message = getUserFacingErrorMessage(error, "Unable to load remote workspaces.");
 
       setWorkspaceError(`Supabase no responde ahora mismo. Se cargó el cache local de workspaces. ${message}`);
       setMemberships(cachedMemberships);
@@ -257,7 +258,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         setActiveWorkspaceId(workspaceId);
         return workspaceId;
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Workspace creation failed.";
+        const message = getUserFacingErrorMessage(error, "Workspace creation failed.");
         setWorkspaceError(message);
         throw error;
       } finally {

@@ -13,6 +13,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { formatProjectAssignmentInline } from "@shared/lib/assetQuantityPresentation";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 type ProjectDetailPanelProps = {
   data: ProjectDetailSnapshot;
@@ -174,7 +175,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               setReportError(null);
               setReportFeedback(result.summary);
             } catch (nextError) {
-              setReportError(nextError instanceof Error ? nextError.message : "Unable to create incident.");
+              setReportError(getUserFacingErrorMessage(nextError, "Unable to create incident."));
             } finally {
               setIsSubmitting(false);
             }

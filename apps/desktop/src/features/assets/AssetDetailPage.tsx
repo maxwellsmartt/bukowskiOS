@@ -9,10 +9,11 @@ import { ScannableCodePanel } from "@shared/components/ScannableCodePanel";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
-import { archiveAsset, openAssetFile, updateAsset, uploadAssetFiles, useAssetDetail } from "./useAssetsData";
+import { archiveAsset, openAssetFile, updateAsset, uploadAssetFiles, uploadAssetImages, useAssetDetail } from "./useAssetsData";
 
 const fileDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -48,6 +49,8 @@ const resolveFileTone = (status: "available" | "missing" | "deleted") => {
   return "critical" as const;
 };
 
+const isAssetImageFile = (file: { mimeType: string }) => file.mimeType.startsWith("image/");
+
 export const AssetDetailPage = () => {
   const { assetId } = useParams();
   const { activeWorkspaceId } = useWorkspace();
@@ -70,6 +73,7 @@ export const AssetDetailPage = () => {
   const [filesError, setFilesError] = useState<string | null>(null);
   const [filesFeedback, setFilesFeedback] = useState<string | null>(null);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [openingFileId, setOpeningFileId] = useState<string | null>(null);
   const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
   const [isArchivingAsset, setIsArchivingAsset] = useState(false);
@@ -80,6 +84,9 @@ export const AssetDetailPage = () => {
 
   const stockSummary = `${data.asset.quantity} available · ${data.asset.assignedQuantity} reserved · ${data.asset.checkedOutQuantity} checked out`;
   const secondaryCodes = data.scannableCodes.filter((code) => !code.isPrimary);
+  const assetImages = data.files.filter((file) => file.status === "available" && isAssetImageFile(file)).slice(0, 2);
+  const documentFiles = data.files.filter((file) => !isAssetImageFile(file));
+  const remainingImageSlots = Math.max(0, 2 - assetImages.length);
 
   return (
     <div className="page-stack">
@@ -151,6 +158,75 @@ export const AssetDetailPage = () => {
         </div>
       ) : null}
 
+      <SurfaceCard
+        title="Asset images"
+        aside={
+          <button
+            className="surface-card-action-text"
+            disabled={isUploadingImages || remainingImageSlots <= 0}
+            onClick={() => {
+              setFilesError(null);
+              setFilesFeedback(null);
+              void (async () => {
+                try {
+                  setIsUploadingImages(true);
+                  const result = await uploadAssetImages(data.asset!.id);
+                  if (result.uploadedCount > 0) {
+                    await reload();
+                  }
+                  setFilesFeedback(result.summary);
+                } catch (nextError) {
+                  setFilesError(getUserFacingErrorMessage(nextError, "Unable to add images to this asset."));
+                } finally {
+                  setIsUploadingImages(false);
+                }
+              })();
+            }}
+            type="button"
+          >
+            {isUploadingImages ? "Adding..." : remainingImageSlots <= 0 ? "2 images max" : "Add images"}
+          </button>
+        }
+      >
+        {assetImages.length ? (
+          <div className="asset-image-gallery">
+            {assetImages.map((file) => (
+              <button
+                key={file.id}
+                className="asset-image-card"
+                disabled={openingFileId === file.id}
+                onClick={() => {
+                  setFilesError(null);
+                  void (async () => {
+                    try {
+                      setOpeningFileId(file.id);
+                      await openAssetFile(file.id);
+                    } catch (nextError) {
+                      setFilesError(getUserFacingErrorMessage(nextError, "Unable to open that asset image."));
+                      await reload();
+                    } finally {
+                      setOpeningFileId(null);
+                    }
+                  })();
+                }}
+                type="button"
+              >
+                {file.previewDataUrl ? (
+                  <img alt={file.originalName} className="asset-image-preview" src={file.previewDataUrl} />
+                ) : (
+                  <span className="asset-image-preview asset-image-preview-placeholder">Preview unavailable</span>
+                )}
+                <span className="asset-image-caption">{file.originalName}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="asset-image-empty">
+            Add up to 2 JPEG or PNG images to make this asset easier to identify.
+          </div>
+        )}
+      </SurfaceCard>
+
       {editorOpen && data.editor ? (
         <AssetEditorPanel
           categories={catalog.categories}
@@ -176,7 +252,7 @@ export const AssetDetailPage = () => {
               setEditorError(null);
               setEditorFeedback(result.summary);
             } catch (nextError) {
-              setEditorError(nextError instanceof Error ? nextError.message : "Unable to archive asset.");
+              setEditorError(getUserFacingErrorMessage(nextError, "Unable to archive asset."));
             } finally {
               setIsArchivingAsset(false);
             }
@@ -203,7 +279,7 @@ export const AssetDetailPage = () => {
               setEditorError(null);
               setEditorFeedback(result.summary);
             } catch (nextError) {
-              setEditorError(nextError instanceof Error ? nextError.message : "Unable to save asset changes.");
+              setEditorError(getUserFacingErrorMessage(nextError, "Unable to save asset changes."));
             } finally {
               setIsSubmittingEditor(false);
             }
@@ -258,7 +334,7 @@ export const AssetDetailPage = () => {
               setReportError(null);
               setReportFeedback(result.summary);
             } catch (nextError) {
-              setReportError(nextError instanceof Error ? nextError.message : "Unable to create incident.");
+              setReportError(getUserFacingErrorMessage(nextError, "Unable to create incident."));
             } finally {
               setIsSubmitting(false);
             }
@@ -416,7 +492,7 @@ export const AssetDetailPage = () => {
                       }
                       setFilesFeedback(result.summary);
                     } catch (nextError) {
-                      setFilesError(nextError instanceof Error ? nextError.message : "Unable to attach files to this asset.");
+                      setFilesError(getUserFacingErrorMessage(nextError, "Unable to attach files to this asset."));
                     } finally {
                       setIsUploadingFiles(false);
                     }
@@ -424,7 +500,7 @@ export const AssetDetailPage = () => {
                 }}
                 type="button"
               >
-                {isUploadingFiles ? "Uploading..." : "Attach files"}
+                {isUploadingFiles ? "Uploading..." : "Attach PDF"}
               </button>
             }
           >
@@ -458,11 +534,11 @@ export const AssetDetailPage = () => {
               <section className="entity-detail-section">
                 <header className="entity-detail-section-header">
                   <h3>Files</h3>
-                  <span>{data.files.length || "None"}</span>
+                  <span>{documentFiles.length || "None"}</span>
                 </header>
-                {data.files.length ? (
+                {documentFiles.length ? (
                   <div className="entity-file-list entity-detail-compact-list">
-                    {data.files.map((file) => (
+                    {documentFiles.map((file) => (
                       <div key={file.id} className="entity-file-row">
                         <div className="entity-file-main">
                           <div className="entity-file-head">
@@ -486,7 +562,7 @@ export const AssetDetailPage = () => {
                                   setOpeningFileId(file.id);
                                   await openAssetFile(file.id);
                                 } catch (nextError) {
-                                  setFilesError(nextError instanceof Error ? nextError.message : "Unable to open that asset file.");
+                                  setFilesError(getUserFacingErrorMessage(nextError, "Unable to open that asset file."));
                                   await reload();
                                 } finally {
                                   setOpeningFileId(null);

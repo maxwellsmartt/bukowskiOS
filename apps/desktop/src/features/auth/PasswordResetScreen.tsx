@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 export const PasswordResetScreen = () => {
   const { requestPasswordReset } = useSession();
@@ -23,7 +24,7 @@ export const PasswordResetScreen = () => {
             setStatus(null);
             void requestPasswordReset(email)
               .then(() => setStatus("Recovery email sent. Open the link in your email to set a new password."))
-              .catch((error: unknown) => setStatus(error instanceof Error ? error.message : "Could not send recovery link."))
+              .catch((error: unknown) => setStatus(getUserFacingErrorMessage(error, "Could not send recovery link.")))
               .finally(() => setIsSubmitting(false));
           }}
         >

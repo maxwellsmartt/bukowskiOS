@@ -14,6 +14,7 @@ import type {
 } from "@contracts";
 import type { ProjectRouteSection, ScopeMode } from "@app/routing/route-meta";
 import { resolveActiveRoute, resolveRememberedGlobalPath } from "@app/routing/route-meta";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { readJsonPreference, readStringPreference, uiPreferenceKeys, writeJsonPreference, writePreference } from "@shared/lib/preferences";
 import { useWorkspace } from "./WorkspaceProvider";
 
@@ -147,7 +148,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
       });
     } catch (error) {
       setProjects([]);
-      setProjectsError(error instanceof Error ? error.message : "Project shell unavailable");
+      setProjectsError(getUserFacingErrorMessage(error, "Project shell unavailable"));
       setProjectsHydrated(true);
     }
   }, [activeWorkspaceId, isWorkspaceReady, showArchivedProjects]);

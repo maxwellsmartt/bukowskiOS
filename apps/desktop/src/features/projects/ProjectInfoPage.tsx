@@ -7,6 +7,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { ProjectUnitsManager } from "./ProjectUnitsManager";
 import { useProjectMode } from "./useProjectMode";
@@ -98,7 +99,7 @@ export const ProjectInfoPage = () => {
       setSaveError(null);
       setSaveFeedback("Project details updated.");
     } catch (nextError) {
-      setSaveError(nextError instanceof Error ? nextError.message : "Unable to update project details.");
+      setSaveError(getUserFacingErrorMessage(nextError, "Unable to update project details."));
       setSaveFeedback(null);
     } finally {
       setIsSubmitting(false);

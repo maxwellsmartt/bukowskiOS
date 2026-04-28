@@ -27,7 +27,7 @@ export type NavItem = {
 };
 
 export const primaryNav: NavItem[] = [
-  { label: "Projects", path: "/projects", icon: FolderOpenDot },
+  { label: "Projects", path: "/projects/schedule", icon: FolderOpenDot },
   { label: "Assets", path: "/assets", icon: Boxes },
   { label: "Finance", path: "/finance", icon: BriefcaseBusiness },
   { label: "Automation", path: "/agents/mission-control", icon: Bot },

@@ -9,6 +9,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
@@ -208,7 +209,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               setReturnError(null);
               setReturnFeedback(result.summary);
             } catch (nextError) {
-              setReturnError(nextError instanceof Error ? nextError.message : "Unable to export insurance list PDF.");
+              setReturnError(getUserFacingErrorMessage(nextError, "Unable to export insurance list PDF."));
             } finally {
               setIsExportingInsurancePdf(false);
             }
@@ -224,7 +225,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               setReturnError(null);
               setReturnFeedback(result.summary);
             } catch (nextError) {
-              setReturnError(nextError instanceof Error ? nextError.message : "Unable to export packing slip PDF.");
+              setReturnError(getUserFacingErrorMessage(nextError, "Unable to export packing slip PDF."));
             } finally {
               setIsExportingPdf(false);
             }
@@ -251,7 +252,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               setReturnError(null);
               setReturnFeedback(result.summary);
             } catch (nextError) {
-              setReturnError(nextError instanceof Error ? nextError.message : "Unable to register packing return.");
+              setReturnError(getUserFacingErrorMessage(nextError, "Unable to register packing return."));
             } finally {
               setIsSubmittingReturn(false);
             }

@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { getRenderFidelityAuditSummary, renderFidelityAudit } from "@shared/lib/renderFidelityAudit";
 import { useCatalogData } from "@features/projects/useProjectsData";
 
@@ -199,7 +200,7 @@ export const SettingsPage = () => {
       setUsersSnapshot(nextUsersSnapshot);
       setError(null);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Settings are unavailable right now.");
+      setError(getUserFacingErrorMessage(nextError, "Settings are unavailable right now."));
     }
   };
 
@@ -233,7 +234,7 @@ export const SettingsPage = () => {
         await loadDiagnostics();
       }
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "The app could not complete that settings action.");
+      setError(getUserFacingErrorMessage(nextError, "The app could not complete that settings action."));
     } finally {
       stateSetter(false);
     }
@@ -417,7 +418,7 @@ export const SettingsPage = () => {
       setError(null);
       setSelectedUserId(result.userId ?? "new");
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "The app could not update users.");
+      setError(getUserFacingErrorMessage(nextError, "The app could not update users."));
     }
   };
 
@@ -1075,7 +1076,7 @@ export const SettingsPage = () => {
                     setFeedback("Copied the diagnostics summary.");
                     setError(null);
                   } catch (copyError) {
-                    setError(copyError instanceof Error ? copyError.message : "The app could not copy the diagnostics summary.");
+                    setError(getUserFacingErrorMessage(copyError, "The app could not copy the diagnostics summary."));
                   }
                 }}
                 type="button"

@@ -115,6 +115,7 @@ import type {
   FinanceEntryListQuery,
   FinanceOverviewQuery,
   FinanceEntryMutationResult,
+  FileUploadMutationResult,
   GlobalSearchQuery,
   IncidentListQuery,
   PackingSlipListQuery,
@@ -188,7 +189,7 @@ type RegisterFoundationIpcOptions = {
   };
   workspaceAccess: WorkspaceAccessGuard;
   fileUploads: {
-    importAssetFiles: (assetId: string, sourceFilePaths: string[]) => unknown;
+    importAssetFiles: (assetId: string, sourceFilePaths: string[]) => FileUploadMutationResult;
     importIncidentFiles: (incidentId: string, sourceFilePaths: string[]) => unknown;
     importFinanceDocuments: (entryId: string, sourceFilePaths: string[]) => unknown;
     importCrewDocuments: (crewMemberId: string, sourceFilePaths: string[]) => unknown;
@@ -613,8 +614,6 @@ export const registerFoundationIpc = ({
         buttonLabel: "Attach files",
         properties: ["openFile", "multiSelections"],
         filters: [
-          { name: "Supported files", extensions: ["png", "jpg", "jpeg", "webp", "gif", "heic", "pdf"] },
-          { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "heic"] },
           { name: "PDF", extensions: ["pdf"] },
         ],
       });
@@ -629,6 +628,57 @@ export const registerFoundationIpc = ({
       return fileUploads.importAssetFiles(assetId, filePaths);
     },
     "The app could not attach files to that asset.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.assets.uploadImages,
+    idReadArgsSchema,
+    async (_event, assetId: string) => {
+      await workspaceAccess.assertAssetAccess(assetId, "attach images to that asset", "write", "assets.manage");
+      const detail = foundationReads.getAssetDetail(assetId);
+
+      if (!detail.asset) {
+        throw new Error("Asset was not found.");
+      }
+
+      const currentImageCount = detail.files.filter(
+        (file) => file.status === "available" && file.mimeType.startsWith("image/"),
+      ).length;
+      const remainingSlots = Math.max(0, 2 - currentImageCount);
+
+      if (remainingSlots <= 0) {
+        return {
+          uploadedCount: 0,
+          summary: "This asset already has the maximum of 2 images.",
+        };
+      }
+
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: `Add images to ${detail.asset.name}`,
+        buttonLabel: remainingSlots === 1 ? "Add image" : "Add images",
+        properties: ["openFile", "multiSelections"],
+        filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg"] }],
+      });
+
+      if (canceled || !filePaths.length) {
+        return {
+          uploadedCount: 0,
+          summary: "No asset images were selected.",
+        };
+      }
+
+      const selectedFilePaths = filePaths.slice(0, remainingSlots);
+      const result = fileUploads.importAssetFiles(assetId, selectedFilePaths);
+
+      if (filePaths.length > selectedFilePaths.length) {
+        return {
+          ...result,
+          summary: `${result.summary} Only ${remainingSlots} image${remainingSlots === 1 ? "" : "s"} can be attached to this asset.`,
+        };
+      }
+
+      return result;
+    },
+    "The app could not attach images to that asset.",
   );
   safeHandleReadWithSchema(
     ipcChannels.assets.openFile,

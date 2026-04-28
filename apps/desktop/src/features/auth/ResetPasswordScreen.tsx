@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 export const ResetPasswordScreen = () => {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ export const ResetPasswordScreen = () => {
                 navigate("/workspaces/select", { replace: true });
               })
               .catch((error: unknown) => {
-                setStatus(error instanceof Error ? error.message : "Could not update the password.");
+                setStatus(getUserFacingErrorMessage(error, "Could not update the password."));
               })
               .finally(() => setIsSubmitting(false));
           }}

@@ -47,6 +47,8 @@ type AssetKitMembershipRow = {
   kit_name: string;
 };
 
+const maxInlinePreviewBytes = 5 * 1024 * 1024;
+
 const loadActiveKitMemberships = (db: DatabaseSync, assetIds: string[]) => {
   if (!assetIds.length) {
     return new Map<string, AssetKitMembershipRow[]>();
@@ -677,6 +679,16 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
         files: files.map((row) => {
           const isMissing = row.status !== "deleted" && row.storage_path ? !fs.existsSync(row.storage_path) : row.status === "missing";
           const mimeType = row.mime_type?.trim() || "application/octet-stream";
+          const status = (isMissing ? "missing" : row.status?.trim() || "available") as "available" | "missing" | "deleted";
+          const canInlinePreview =
+            status === "available" &&
+            row.storage_path &&
+            fs.existsSync(row.storage_path) &&
+            mimeType.startsWith("image/") &&
+            (row.byte_size ?? 0) <= maxInlinePreviewBytes;
+          const previewDataUrl = canInlinePreview
+            ? `data:${mimeType};base64,${fs.readFileSync(row.storage_path!).toString("base64")}`
+            : null;
 
           return {
             id: row.id,
@@ -684,9 +696,10 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
             originalName: row.original_name?.trim() || "Attached file",
             mimeType,
             byteSize: row.byte_size ?? 0,
-            status: (isMissing ? "missing" : row.status?.trim() || "available") as "available" | "missing" | "deleted",
+            status,
             createdAt: row.created_at,
             isPreviewable: mimeType.startsWith("image/") || mimeType === "application/pdf",
+            previewDataUrl,
           };
         }),
       };

@@ -23,6 +23,7 @@ import { ListToolbar } from "@shared/components/ListToolbar";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 const projectStatusOptions = ["Prep", "Active", "Wrapped", "On hold"] as const;
 const additionalUnitPresets = ["Second Unit", "Third Unit", "Splinter Unit", "Insert Unit"] as const;
@@ -480,7 +481,7 @@ export const ProjectSetupWizard = ({
       })
       .catch((error) => {
         setStagingSlips([]);
-        setStagingError(error instanceof Error ? error.message : "Unable to load staging packing slips.");
+        setStagingError(getUserFacingErrorMessage(error, "Unable to load staging packing slips."));
       })
       .finally(() => setIsLoadingStaging(false));
   }, [open]);
@@ -509,7 +510,7 @@ export const ProjectSetupWizard = ({
         })
         .catch((error) => {
           setConflicts(null);
-          setConflictsError(error instanceof Error ? error.message : "Unable to check conflicts.");
+          setConflictsError(getUserFacingErrorMessage(error, "Unable to check conflicts."));
         })
         .finally(() => setIsCheckingConflicts(false));
     }, 200);
@@ -1060,7 +1061,7 @@ export const ProjectSetupWizard = ({
         openProject(createdProject.id, "info");
       }
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Unable to create project setup.");
+      setSubmitError(getUserFacingErrorMessage(error, "Unable to create project setup."));
     } finally {
       setIsSubmitting(false);
     }
@@ -1072,7 +1073,7 @@ export const ProjectSetupWizard = ({
       const result = await exportProjectBlueprintPdf({ ...normalizeDraftForSubmit(draft), workspaceId: activeWorkspaceId });
       setSubmitFeedback(result.summary);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Unable to export project setup summary.");
+      setSubmitError(getUserFacingErrorMessage(error, "Unable to export project setup summary."));
     }
   };
 

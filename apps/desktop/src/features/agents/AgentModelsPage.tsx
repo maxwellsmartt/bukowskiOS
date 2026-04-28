@@ -5,6 +5,7 @@ import type { AgentModelAssignmentRow, AgentModelRow } from "@contracts";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import {
   assignAgentModel,
@@ -185,7 +186,7 @@ export const AgentModelsPage = () => {
         apiKey: "",
       }));
     } catch (saveError) {
-      setErrorMessage(saveError instanceof Error ? saveError.message : "Unable to save provider configuration.");
+      setErrorMessage(getUserFacingErrorMessage(saveError, "Unable to save provider configuration."));
     } finally {
       setIsSavingProvider(false);
     }
@@ -215,7 +216,7 @@ export const AgentModelsPage = () => {
 
       setFeedback(result.summary);
     } catch (saveError) {
-      setErrorMessage(saveError instanceof Error ? saveError.message : "Unable to clear the stored API key.");
+      setErrorMessage(getUserFacingErrorMessage(saveError, "Unable to clear the stored API key."));
     } finally {
       setIsSavingProvider(false);
     }
@@ -237,7 +238,7 @@ export const AgentModelsPage = () => {
       });
       setFeedback(result.summary);
     } catch (testError) {
-      setErrorMessage(testError instanceof Error ? testError.message : "Unable to test the provider connection.");
+      setErrorMessage(getUserFacingErrorMessage(testError, "Unable to test the provider connection."));
     } finally {
       setIsTestingProvider(false);
     }
@@ -295,7 +296,7 @@ export const AgentModelsPage = () => {
 
       setFeedback(result.summary);
     } catch (assignmentError) {
-      setErrorMessage(assignmentError instanceof Error ? assignmentError.message : "Unable to update the agent assignment.");
+      setErrorMessage(getUserFacingErrorMessage(assignmentError, "Unable to update the agent assignment."));
     } finally {
       setAssignmentBusyAgentId(null);
     }

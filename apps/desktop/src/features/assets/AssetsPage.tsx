@@ -18,12 +18,23 @@ import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { formatAssetStockDetailRows, formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { AssetAssignMovePanel, type AssetAssignMoveFormValue } from "./AssetAssignMovePanel";
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
-import { archiveAsset, assignMoveAssets, createAsset, updateAsset, useAssetDetail, useAssetsList, useAssetsOverview } from "./useAssetsData";
+import {
+  archiveAsset,
+  assignMoveAssets,
+  createAsset,
+  openAssetFile,
+  updateAsset,
+  uploadAssetImages,
+  useAssetDetail,
+  useAssetsList,
+  useAssetsOverview,
+} from "./useAssetsData";
 
 type AssetsPageProps = {
   projectId?: string | null;
@@ -160,7 +171,7 @@ const parseCsvMoney = (value: string, rowNumber: number, label: string) => {
 
 const joinCsvNotes = (parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join("\n");
 const getErrorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
+  getUserFacingErrorMessage(error, typeof error === "string" ? error : String(error));
 const isDuplicateRegistryCodeError = (error: unknown) =>
   /(?:registry|asset) code .* already in use/i.test(getErrorMessage(error));
 
@@ -594,6 +605,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [editorError, setEditorError] = useState<string | null>(null);
   const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
   const [isArchivingAsset, setIsArchivingAsset] = useState(false);
+  const [isUploadingPreviewImages, setIsUploadingPreviewImages] = useState(false);
+  const [openingPreviewImageId, setOpeningPreviewImageId] = useState<string | null>(null);
   const [isImportingAssets, setIsImportingAssets] = useState(false);
   const [csvImportPreview, setCsvImportPreview] = useState<AssetCsvPreview | null>(null);
   const [csvReportCopied, setCsvReportCopied] = useState(false);
@@ -601,11 +614,20 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
   const editorAssetId = editorMode === "edit" ? selectedAssetId ?? undefined : undefined;
   const { data: editorDetail, reload: reloadEditorDetail } = useAssetDetail(editorAssetId);
+  const { data: selectedAssetDetail, reload: reloadSelectedAssetDetail } = useAssetDetail(selectedAssetId ?? undefined);
 
   const activeAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) ?? null,
     [assets, selectedAssetId],
   );
+  const activeAssetImages = useMemo(
+    () =>
+      selectedAssetDetail.files
+        .filter((file) => file.status === "available" && file.mimeType.startsWith("image/"))
+        .slice(0, 2),
+    [selectedAssetDetail.files],
+  );
+  const activeAssetImageSlots = Math.max(0, 2 - activeAssetImages.length);
   const selectedAssets = useMemo(() => {
     const assetMap = new Map(assets.map((asset) => [asset.id, asset] as const));
     return selectedRowIds
@@ -653,7 +675,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setActionPanelOpen(false);
       setSelectedRowIds([]);
     } catch (nextError) {
-      setActionError(nextError instanceof Error ? nextError.message : "Unable to apply assign or move.");
+      setActionError(getUserFacingErrorMessage(nextError, "Unable to apply assign or move."));
     } finally {
       setIsSubmittingAction(false);
     }
@@ -686,7 +708,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setSelectedRowIds([]);
       navigate("/packing-slips");
     } catch (nextError) {
-      setPackingError(nextError instanceof Error ? nextError.message : "Unable to issue packing slip.");
+      setPackingError(getUserFacingErrorMessage(nextError, "Unable to issue packing slip."));
     } finally {
       setIsSubmittingPacking(false);
     }
@@ -729,7 +751,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setEditorError(null);
       setEditorMode(null);
     } catch (nextError) {
-      setEditorError(nextError instanceof Error ? nextError.message : "Unable to save asset changes.");
+      setEditorError(getUserFacingErrorMessage(nextError, "Unable to save asset changes."));
     } finally {
       setIsSubmittingEditor(false);
     }
@@ -757,7 +779,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setActionFeedback(result.summary);
       setActionWarning(null);
     } catch (nextError) {
-      setEditorError(nextError instanceof Error ? nextError.message : "Unable to archive asset.");
+      setEditorError(getUserFacingErrorMessage(nextError, "Unable to archive asset."));
     } finally {
       setIsArchivingAsset(false);
     }
@@ -776,7 +798,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setCsvImportPreview(buildAssetCsvPreview({ assets, catalog, csvText, fileName: file.name }));
     } catch (error) {
       setCsvImportPreview(null);
-      setEditorError(error instanceof Error ? error.message : "Asset CSV import failed.");
+      setEditorError(getUserFacingErrorMessage(error, "Asset CSV import failed."));
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -847,7 +869,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         }`,
       );
     } catch (error) {
-      setEditorError(error instanceof Error ? error.message : "Asset CSV import failed.");
+      setEditorError(getUserFacingErrorMessage(error, "Asset CSV import failed."));
     } finally {
       setIsImportingAssets(false);
     }
@@ -1347,7 +1369,66 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 </div>
               </div>
 
+              <div className="asset-preview-image-strip">
+                {activeAssetImages.length ? (
+                  activeAssetImages.map((file) => (
+                    <button
+                      key={file.id}
+                      className="asset-preview-image-card"
+                      disabled={openingPreviewImageId === file.id}
+                      onClick={() => {
+                        setActionError(null);
+                        void (async () => {
+                          try {
+                            setOpeningPreviewImageId(file.id);
+                            await openAssetFile(file.id);
+                          } catch (nextError) {
+                            setActionError(getUserFacingErrorMessage(nextError, "Unable to open that asset image."));
+                            await reloadSelectedAssetDetail();
+                          } finally {
+                            setOpeningPreviewImageId(null);
+                          }
+                        })();
+                      }}
+                      type="button"
+                    >
+                      {file.previewDataUrl ? (
+                        <img alt={file.originalName} src={file.previewDataUrl} />
+                      ) : (
+                        <span>Preview unavailable</span>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <div className="asset-preview-image-empty">No images yet.</div>
+                )}
+              </div>
+
               <div className="action-panel-actions action-panel-actions-start">
+                <button
+                  className="ghost-control"
+                  disabled={isUploadingPreviewImages || activeAssetImageSlots <= 0}
+                  onClick={() => {
+                    setActionError(null);
+                    setActionFeedback(null);
+                    void (async () => {
+                      try {
+                        setIsUploadingPreviewImages(true);
+                        const result = await uploadAssetImages(activeAsset.id);
+                        await Promise.all([reloadSelectedAssetDetail(), reload()]);
+                        setActionFeedback(result.summary);
+                      } catch (nextError) {
+                        setActionError(getUserFacingErrorMessage(nextError, "Unable to add images to this asset."));
+                      } finally {
+                        setIsUploadingPreviewImages(false);
+                      }
+                    })();
+                  }}
+                  type="button"
+                >
+                  <FileUp size={14} />
+                  <span>{isUploadingPreviewImages ? "Adding..." : activeAssetImageSlots <= 0 ? "2 images max" : "Add images"}</span>
+                </button>
                 <button
                   className="ghost-control"
                   onClick={() => {

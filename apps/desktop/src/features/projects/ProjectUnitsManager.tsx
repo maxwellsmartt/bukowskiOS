@@ -6,6 +6,7 @@ import { projectColorPalette } from "@contracts";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import {
   assignCrewToProjectUnit,
@@ -171,7 +172,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       resetEditor();
       setFeedback(nextFeedback);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to save project unit.");
+      setError(getUserFacingErrorMessage(nextError, "Unable to save project unit."));
     } finally {
       setIsSubmitting(false);
     }
@@ -211,7 +212,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       setFeedback(action === "delete" ? "Unit deleted." : "Unit updated.");
       setWarning(null);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to update unit.");
+      setError(getUserFacingErrorMessage(nextError, "Unable to update unit."));
     } finally {
       setIsSubmitting(false);
     }
@@ -237,7 +238,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       setFeedback("Crew linked to unit.");
       setWarning(nextSnapshot.units.find((unit) => unit.id === unitId)?.conflictSummary ?? null);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to assign crew member to unit.");
+      setError(getUserFacingErrorMessage(nextError, "Unable to assign crew member to unit."));
     } finally {
       setIsSubmitting(false);
     }
@@ -256,7 +257,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       setFeedback("Crew assignment removed.");
       setWarning(null);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to remove crew assignment.");
+      setError(getUserFacingErrorMessage(nextError, "Unable to remove crew assignment."));
     } finally {
       setIsSubmitting(false);
     }

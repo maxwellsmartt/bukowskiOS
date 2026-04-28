@@ -14,6 +14,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { FinanceEntryEditorPanel, type FinanceEntryEditorDraft } from "./FinanceEntryEditorPanel";
 import { createFinanceEntry, openFinanceDocument, updateFinanceEntry, uploadFinanceDocuments, useFinanceEntries, useFinanceEntryDocuments } from "./useFinanceData";
@@ -104,7 +105,7 @@ export const FinanceEntriesPage = () => {
       setEditingEntryId(null);
       reload();
     } catch (nextError) {
-      setSubmitError(nextError instanceof Error ? nextError.message : "The app could not save that finance entry.");
+      setSubmitError(getUserFacingErrorMessage(nextError, "The app could not save that finance entry."));
     } finally {
       setIsSubmitting(false);
     }
@@ -193,7 +194,7 @@ export const FinanceEntriesPage = () => {
               setSubmitError(null);
               await reloadDocuments();
             } catch (nextError) {
-              setSubmitError(nextError instanceof Error ? nextError.message : "The app could not attach finance documents.");
+              setSubmitError(getUserFacingErrorMessage(nextError, "The app could not attach finance documents."));
             } finally {
               setIsUploadingDocuments(false);
             }
@@ -208,7 +209,7 @@ export const FinanceEntriesPage = () => {
               await openFinanceDocument(fileId);
               setSubmitError(null);
             } catch (nextError) {
-              setSubmitError(nextError instanceof Error ? nextError.message : "The app could not open that finance document.");
+              setSubmitError(getUserFacingErrorMessage(nextError, "The app could not open that finance document."));
             }
           }}
           onSubmit={handleSubmit}

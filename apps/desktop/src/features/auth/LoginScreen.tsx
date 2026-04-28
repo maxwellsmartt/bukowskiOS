@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 export const LoginScreen = () => {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ export const LoginScreen = () => {
         navigate(from, { replace: true });
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Authentication failed.");
+      setStatus(getUserFacingErrorMessage(error, "Authentication failed."));
     } finally {
       setIsSubmitting(false);
     }

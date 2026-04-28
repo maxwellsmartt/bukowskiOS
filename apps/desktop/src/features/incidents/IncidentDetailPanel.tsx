@@ -5,6 +5,7 @@ import type { CatalogSnapshot, IncidentDetailSnapshot } from "@contracts";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { openIncidentFile, uploadIncidentFiles } from "./useIncidentsData";
 
 type IncidentDetailPanelProps = {
@@ -288,7 +289,7 @@ export const IncidentDetailPanel = ({
                     setFilesFeedback(result.summary);
                     await onRefresh();
                   } catch (nextError) {
-                    setFilesError(nextError instanceof Error ? nextError.message : "Unable to attach files to this incident.");
+                    setFilesError(getUserFacingErrorMessage(nextError, "Unable to attach files to this incident."));
                   } finally {
                     setIsUploadingFiles(false);
                   }
@@ -326,7 +327,7 @@ export const IncidentDetailPanel = ({
                             setOpeningFileId(file.id);
                             await openIncidentFile(file.id);
                           } catch (nextError) {
-                            setFilesError(nextError instanceof Error ? nextError.message : "Unable to open that incident file.");
+                            setFilesError(getUserFacingErrorMessage(nextError, "Unable to open that incident file."));
                             await onRefresh();
                           } finally {
                             setOpeningFileId(null);

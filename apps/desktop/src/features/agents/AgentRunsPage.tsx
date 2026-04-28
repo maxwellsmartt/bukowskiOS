@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { getAgentApprovalDecisionLabel, getAgentRunStatusLabel } from "@shared/labels/statusLabels";
 
 import { reviewAgentRun, useAgentRuns } from "./useAgentsData";
@@ -40,7 +41,7 @@ export const AgentRunsPage = () => {
       });
       setFeedback(result.summary);
     } catch (nextError) {
-      setFeedback(nextError instanceof Error ? nextError.message : "I could not record that decision.");
+      setFeedback(getUserFacingErrorMessage(nextError, "I could not record that decision."));
     } finally {
       setProcessingRunId(null);
     }

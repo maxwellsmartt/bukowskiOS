@@ -8,6 +8,7 @@ import {
   type WizardTab,
 } from "@features/projects/ProjectSetupWizard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import type { ProjectCardRow, ProjectDeletePreview } from "@contracts";
 
 const LayersPlus = createLucideIcon("layers-plus", [
@@ -97,7 +98,7 @@ export const ShellProjectsPanel = () => {
 
       await deleteProject(project.id);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Could not delete this project.");
+      setActionError(getUserFacingErrorMessage(error, "Could not delete this project."));
     } finally {
       setDeletingProjectId(null);
     }
