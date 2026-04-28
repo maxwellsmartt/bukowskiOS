@@ -505,6 +505,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
               JOIN kits ON kits.id = kit_assets.kit_id
               WHERE kit_assets.asset_id = assets.id
                 AND kits.is_active = 1
+                AND kits.workspace_id = assets.workspace_id
             ) AS linked_kit_count,
             COALESCE((
               SELECT group_concat(kits.code, ',')
@@ -512,6 +513,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
               JOIN kits ON kits.id = kit_assets.kit_id
               WHERE kit_assets.asset_id = assets.id
                 AND kits.is_active = 1
+                AND kits.workspace_id = assets.workspace_id
             ), '') AS linked_kit_codes,
             COALESCE((
               SELECT group_concat(kits.name, ',')
@@ -519,6 +521,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
               JOIN kits ON kits.id = kit_assets.kit_id
               WHERE kit_assets.asset_id = assets.id
                 AND kits.is_active = 1
+                AND kits.workspace_id = assets.workspace_id
             ), '') AS linked_kit_names
           FROM assets
           JOIN asset_categories ON asset_categories.id = assets.category_id

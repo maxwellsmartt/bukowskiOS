@@ -132,7 +132,7 @@ export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery
         return emptyCatalog;
       }
 
-      return window.bukowskiCatalog ? window.bukowskiCatalog.getSnapshot(query) : window.bukowskiProjects.getCatalog();
+      return window.bukowskiCatalog ? window.bukowskiCatalog.getSnapshot(query) : window.bukowskiProjects.getCatalog({ workspaceId: query.workspaceId });
     },
     emptyCatalog,
     [query.entityType, query.search, query.sortBy, query.sortDirection, query.workspaceId, refreshVersion],

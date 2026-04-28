@@ -34,9 +34,9 @@ Este sub-roadmap se considera listo cuando:
 ### Blockers
 
 - No hay todavía una checklist manual completa para el flujo vertical de inventario end-to-end.
-- RMA todavía no está en el mismo nivel de hardening workspace/permissions que Assets, Packing, Incidents y Projects.
-- Catalog/CSV import todavía tiene deuda de mapeo pro: categorías, ubicaciones, duplicados, preview por fila y errores recuperables.
-- Global Search y algunas lecturas globales todavía pueden necesitar scope por workspace para no enseñar resultados cruzados.
+- RMA ya tiene guard/read scope en tests, pero falta smoke manual dentro del flujo Incidents -> RMA.
+- Catalog/CSV import todavía tiene deuda de mapeo pro: creación guiada de categorías/ubicaciones, preview por fila y errores recuperables.
+- Global Search quedó auditado y probado para assets/projects/packing/incidents; falta decidir si debe incluir finance entries antes de reactivar Finance como slice.
 
 ### Crítico
 
@@ -80,6 +80,7 @@ Hallazgos de baseline:
 - Packing/Incidents/RMA no tienen datos reales en `Metadata Cine2` todavía.
 - RMA estaba redirigido a Incidents en UI y el data layer todavía usaba `DEFAULT_WORKSPACE_ID`.
 - Catalog read/mutation todavía depende de `DEFAULT_WORKSPACE_ID`; se considera parte de IC-1.
+- 2026-04-28: la auditoría posterior al trabajo vertical encontró que Global Search ya estaba scoped por workspace y con test de aislamiento, pero quedaban fallbacks viejos de Catalog en project catalog/blueprint export.
 
 Pruebas:
 
@@ -97,10 +98,13 @@ Cerrar cualquier lectura o mutación del vertical operativo que todavía pueda m
 
 Incluye:
 
-- Auditar Global Search para scope por workspace.
-- Auditar Catalog usado por Assets/Projects/Packing/Incidents/RMA.
+- Done — Auditar Global Search para scope por workspace.
+- Done — Auditar Catalog usado por Assets/Projects/Packing/Incidents/RMA.
 - Done — Extender workspace guard/read scope a RMA snapshot/detail/create/update.
-- Doing — Extender workspace scope a Catalog reads como dependencia de RMA y Assets/Projects.
+- Done — Extender workspace scope a Catalog reads como dependencia de RMA y Assets/Projects.
+- Done — Cerrar fallback legacy `bukowskiProjects.getCatalog()` para exigir `workspaceId` y validar acceso antes de cargar catálogo.
+- Done — Scopear catalog/assets usados por `exportProjectBlueprintPdf` al `workspaceId` del blueprint.
+- Done — Reforzar metadata de kits en `assetOptions` para no mostrar kits de otro workspace aunque existan filas inconsistentes en `kit_assets`.
 - Confirmar que Project sidebar, Projects table, Schedule Overview y Project detail comparten el mismo criterio de visible projects.
 - Verificar que Packing/Incidents/RMA detail resuelven workspace desde su entidad antes de leer o mutar.
 
@@ -110,9 +114,18 @@ Pruebas:
 - Done — Test de RMA snapshot con dos workspaces.
 - Done — Verificación: `npm run typecheck`.
 - Done — Verificación: `npm run test -- foundation-read-service workspace-access-guard`.
-- Tests de workspace access para Catalog.
+- Done — Test de Catalog/Global Search con dos workspaces.
+- Done — Test de no-leak de linked kit metadata entre workspaces.
 - Tests de timeline/list/detail con dos workspaces.
 - Smoke con `Metadata Cine2` y `workspace-metadata` coexistiendo.
+
+Findings 2026-04-28:
+
+- Crítico mitigado — `GlobalSearch` ya filtra por `workspaceId` y tiene test de aislamiento para proyecto/catálogo de otro workspace.
+- Crítico mitigado — `projects.getCatalog` seguía expuesto sin argumentos y cargaba el catálogo default; ahora requiere workspace explícito y valida `projects.read`.
+- Medio mitigado — `exportProjectBlueprintPdf` leía catálogo/assets default; ahora usa el workspace del blueprint.
+- Medio mitigado — `assetOptions` podía derivar linked kit metadata desde kits de otro workspace si existían referencias inconsistentes; ahora el read model exige `kits.workspace_id = assets.workspace_id`.
+- Bajo — `foundationReads.getCatalogSnapshot()` aún conserva fallback default para tests/local seed. No usarlo desde IPC sin workspace.
 
 ### Slice IC-2 — Assets table + detail a nivel producto
 
@@ -289,9 +302,8 @@ Volvemos al roadmap principal cuando:
 
 ## Próximo paso inmediato
 
-Empezar por **IC-0**:
+Seguir con **IC-3 — Assign / move como flujo operacional central** después de una mini-verificación visual de Project sidebar / Projects table / Schedule Overview / Project detail.
 
-- Crear checklist manual de smoke vertical.
-- Correr la auditoría en app dev con datos actuales.
-- Abrir issues/tareas internas por blocker.
-- Después empezar IC-1 con RMA/Catalog/Global Search workspace scope.
+- Razón: IC-1 ya cerró los riesgos principales de Catalog/Search/RMA en código y tests.
+- Antes de tocar UX, confirmar manualmente que `Metadata Cine2` y `workspace-metadata` no mezclan proyectos visibles.
+- Luego implementar IC-3 con foco en auditoría, mensajes claros, permisos y cantidades.

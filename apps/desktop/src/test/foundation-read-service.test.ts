@@ -240,6 +240,53 @@ describe("foundation read service", () => {
     cleanup();
   });
 
+  it("does not leak linked kit metadata from another workspace into catalog asset options", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-foundation-catalog-kit-workspace");
+    const reads = createFoundationReadService(database);
+    const now = "2026-04-15T12:00:00.000Z";
+
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, name, slug, base_currency, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run("workspace-kit-other", "Kit Other", "kit-other", "USD", now, now);
+    database
+      .prepare(
+        `
+          INSERT INTO kits (id, workspace_id, code, name, description, notes, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+        `,
+      )
+      .run("kit-other-workspace", "workspace-kit-other", "OTHERKIT", "Other Workspace Kit", null, null, now, now);
+    database
+      .prepare("INSERT INTO kit_assets (kit_id, asset_id, quantity, added_at) VALUES (?, ?, ?, ?)")
+      .run("kit-other-workspace", "asset-smallhd-cine7", 1, now);
+
+    const defaultCatalog = reads.getCatalogSnapshot({
+      workspaceId: "workspace-metadata",
+      entityType: "kit",
+      search: "",
+      sortBy: "name",
+      sortDirection: "asc",
+    });
+    const defaultAssetOption = defaultCatalog.assetOptions.find((asset) => asset.id === "asset-smallhd-cine7");
+    const otherCatalog = reads.getCatalogSnapshot({
+      workspaceId: "workspace-kit-other",
+      entityType: "kit",
+      search: "",
+      sortBy: "name",
+      sortDirection: "asc",
+    });
+
+    expect(defaultAssetOption?.linkedKitCodes).not.toContain("OTHERKIT");
+    expect(otherCatalog.kits.map((kit) => kit.code)).toEqual(["OTHERKIT"]);
+
+    cleanup();
+  });
+
   it("hides archived projects from default lists and timeline until explicitly included", () => {
     const { cleanup, database } = createTestDatabase("bukowski-foundation-archived-projects");
     const reads = createFoundationReadService(database);

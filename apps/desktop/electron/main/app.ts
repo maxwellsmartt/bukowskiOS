@@ -342,8 +342,9 @@ app.whenReady().then(() => {
       };
     },
     exportProjectBlueprintPdf: async (input: CreateProjectBlueprintInput, targetFilePath: string) => {
-      const catalog = localDatabase.foundationReads.getCatalogSnapshot();
+      const catalog = localDatabase.foundationReads.getCatalogSnapshot({ workspaceId: input.workspaceId });
       const assets = localDatabase.foundationReads.getAssets({
+        workspaceId: input.workspaceId,
         search: "",
         sortBy: "name",
         sortDirection: "asc",

@@ -240,7 +240,7 @@ declare global {
       getList: (query?: ProjectListQuery) => Promise<ProjectCardRow[]>;
       getDetail: (projectId: string) => Promise<ProjectDetailSnapshot>;
       getDeletePreview: (projectId: string) => Promise<ProjectDeletePreview>;
-      getCatalog: () => Promise<CatalogSnapshot>;
+      getCatalog: (query?: AssetWorkspaceQuery) => Promise<CatalogSnapshot>;
       getStagingPackingSlips: () => Promise<StagingPackingSlipRow[]>;
       getCreationConflicts: (input: CreateProjectBlueprintInput) => Promise<ProjectCreationConflictsSnapshot>;
       create: (input: CreateProjectInput) => Promise<ProjectCardRow[]>;

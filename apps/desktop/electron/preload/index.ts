@@ -307,7 +307,7 @@ const bukowskiProjects = {
   getDetail: (projectId: string) => ipcRenderer.invoke(ipcChannels.projects.getDetail, projectId) as Promise<ProjectDetailSnapshot>,
   getDeletePreview: (projectId: string) =>
     ipcRenderer.invoke(ipcChannels.projects.getDeletePreview, projectId) as Promise<ProjectDeletePreview>,
-  getCatalog: () => ipcRenderer.invoke(ipcChannels.projects.getCatalog) as Promise<CatalogSnapshot>,
+  getCatalog: (query?: AssetWorkspaceQuery) => ipcRenderer.invoke(ipcChannels.projects.getCatalog, query) as Promise<CatalogSnapshot>,
   getStagingPackingSlips: () =>
     ipcRenderer.invoke(ipcChannels.projects.getStagingPackingSlips) as Promise<StagingPackingSlipRow[]>,
   getCreationConflicts: (input: CreateProjectBlueprintInput) =>

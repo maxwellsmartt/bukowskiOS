@@ -136,6 +136,7 @@ Decisiones bloqueadas:
 | 2026-04-24 | Working tree casa | Se extiende `workspaceAccess` a Packing e Incidents; sus query contracts/read services ahora aceptan y filtran `workspaceId`, las páginas usan active workspace y el IPC valida permisos (`packing-slips.read/create`, `incidents.read/create`) antes de leer, mutar, exportar o abrir archivos. Se agrega migración Supabase `20260424190000_operational_permissions.sql` y bootstrap admin para permisos remotos. Verificación: `npm run test -- workspace-access-guard packing-mutation-service incident-mutation-service` y `npm run typecheck` pasan. | Cerrar los dominios operativos con mayor riesgo de writes cruzados después de Assets. |
 | 2026-04-25 | Working tree casa | Usuario aplica en Supabase la migración `20260424190000_operational_permissions.sql`. Se ajusta `WorkspaceProvider` para no mostrar el workspace local como placeholder durante rehidratación remota, y se centra/suaviza el overlay de búsqueda global para reducir banding visual. Verificación: `npm run typecheck` y tests focalizados de workspace/Packing/Incidents pasan. | Evitar confusión en el picker y pulir la UX de comandos globales antes de seguir extendiendo guards. |
 | 2026-04-25 | Working tree casa | Se extiende `workspaceAccess` a Projects: la lista filtra por `workspaceId`, detail/delete preview/mutaciones resuelven workspace desde `projectId`, create/project blueprint escriben en el workspace activo, el wizard/conflict preview usa el workspace activo y se agrega permiso remoto `projects.read/manage` vía migración `20260425113000_project_permissions.sql`. Verificación: `npm run typecheck` y `npm run test -- workspace-access-guard project-mutation-service foundation-read-service` pasan. | Cerrar navegación y acciones de proyectos antes de seguir con Finance/Catalog, reduciendo riesgo de mezcla entre workspaces. |
+| 2026-04-28 | Working tree | Auditoría IC-1: Global Search ya estaba scoped y probado; se cerró fallback legacy de `projects.getCatalog` sin workspace, se scopeó `exportProjectBlueprintPdf` al workspace del blueprint y se reforzó metadata de kits en Catalog para no cruzar workspaces. Verificación: `corepack pnpm --filter @bukowski/desktop typecheck` y `corepack pnpm --filter @bukowski/desktop test -- foundation-read-service.test.ts ipc-safe-handler.test.ts` pasan con 27 archivos/116 tests. | Mantener el foco en el vertical Inventory Core y reducir riesgo de datos cruzados antes de Assign/Move. |
 
 ## Decisiones tomadas
 
@@ -156,7 +157,7 @@ Decisiones bloqueadas:
 | Impacto | Riesgo | Mitigación | Estado |
 | --- | --- | --- | --- |
 | crítico | Exponer service role en Electron compromete toda la base. | Solo anon/JWT en app; admin por Edge Functions/RPC. | Abierto, mitigación aplicada en diseño. |
-| crítico | Confiar en `workspaceId` del renderer permite acceso cruzado. | Validar sesión, membership y permisos en main/RLS. | Mitigado en Assets, Packing e Incidents; abierto para el resto de dominios. |
+| crítico | Confiar en `workspaceId` del renderer permite acceso cruzado. | Validar sesión, membership y permisos en main/RLS. | Mitigado en Assets, Packing, Incidents, Projects, RMA read/mutations y Catalog IPC; abierto para Finance/Agents y smoke manual final. |
 | medio | `DEFAULT_WORKSPACE_ID` está distribuido y puede romper flujos. | Migración por dominio + grep final limitado a seeds/tests. | Abierto. |
 | medio | Roadmap desactualizado pierde valor. | Actualizarlo como parte obligatoria del Definition of Done. | Abierto. |
 | medio | Online-first puede confundir con mala conexión. | Estados visibles de sync, outbox auditable y retries claros. | Abierto. |
@@ -174,14 +175,14 @@ Decisiones bloqueadas:
 
 - El schema remoto foundation, las Edge Functions y el flujo autenticado login -> create workspace ya fueron validados contra Supabase dev.
 - Guards de sesión/workspace ya existen, pero falta endurecer comportamiento prod sin fallback.
-- Validación workspace-scoped ya existe en main para Assets, Packing, Incidents y Projects; falta extenderla a Finance, Catalog, RMA y Agents.
+- Validación workspace-scoped ya existe en main para Assets, Packing, Incidents, Projects, RMA read/mutations y Catalog IPC; falta extenderla a Finance y Agents.
 - Aún no se ha iniciado reemplazo de `DEFAULT_WORKSPACE_ID`.
 - El worker ya escribe remoto en `public.sync_outbox` y, para filas `asset_event`, ahora proyecta snapshots en `public.assets`, `public.asset_current_state` y `public.asset_events`.
 - MFA TOTP está como pantalla placeholder; falta wiring real Supabase MFA.
 - El transport Supabase está opt-in; `Metadata Cine2` confirmó 675 filas remotas en `public.sync_outbox`.
 - La migración `20260416003000_asset_sync_snapshots.sql` ya fue aplicada y validada con una asignación real; el backfill histórico dejó remotas `public.assets`, `public.asset_current_state` y `public.asset_events` en paridad con SQLite para `Metadata Cine2`.
 - Falta validar visualmente en app que el cambio de workspace aísla assets creados en cada workspace.
-- Deuda técnica: los catálogos base por workspace todavía no se clonan/filtran; para el MVP se desbloquea workspace FK, pero Slice 2/3 debe separar catálogos por workspace con más rigor.
+- Deuda técnica: los catálogos ya filtran por workspace en los reads/IPC revisados, pero los catálogos base por workspace todavía no tienen flujo formal de clonado/plantillas; Slice IC-6/Slice 3 debe cubrir creación guiada y bootstrap más claro.
 - Import CSV de assets ya existe como MVP probado con CSV real Rentman y ahora muestra preview/resumen antes de escribir; falta agregar template descargable, errores por fila más detallados y creación guiada de categorías/ubicaciones faltantes.
 - Documento de handoff creado en `docs/handoff/2026-04-15-auth-workspaces-assets-handoff.md`.
 

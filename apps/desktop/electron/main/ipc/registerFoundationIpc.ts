@@ -958,7 +958,25 @@ export const registerFoundationIpc = ({
     },
     "The app could not load that project lifecycle preview.",
   );
-  safeHandleRead(ipcChannels.projects.getCatalog, () => foundationReads.getCatalogSnapshot(), "The app could not load the catalog.");
+  safeHandleReadWithSchema(
+    ipcChannels.projects.getCatalog,
+    assetWorkspaceReadArgsSchema,
+    async (_event, query: AssetWorkspaceQuery | undefined) => {
+      if (!query?.workspaceId) {
+        throw new Error("Workspace scope is required to load the project catalog.");
+      }
+
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load the project catalog",
+        accessLevel: "read",
+        requiredPermission: "projects.read",
+      });
+
+      return foundationReads.getCatalogSnapshot({ workspaceId: query.workspaceId });
+    },
+    "The app could not load the catalog.",
+  );
   safeHandle(ipcChannels.projects.create, createProjectSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({
       workspaceId: input.workspaceId,

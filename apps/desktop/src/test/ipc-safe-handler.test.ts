@@ -64,7 +64,9 @@ describe("ipc safe read handler", () => {
     const registered = registeredHandlers.get("test:invalid-read");
     expect(registered).toBeTypeOf("function");
 
-    await expect(registered!({ senderFrame: {} }, { query: "this-query-is-way-too-long" })).rejects.toThrow("Invalid request payload.");
+    await expect(registered!({ senderFrame: {} }, { query: "this-query-is-way-too-long" })).rejects.toThrow(
+      "Some information is missing or invalid.",
+    );
     expect(handler).not.toHaveBeenCalled();
   });
 });
