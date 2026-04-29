@@ -283,6 +283,10 @@ const resolveAssignableQuantity = (
   nextResponsibleUserId: string | null | undefined,
   nextLocationId: string | null | undefined,
 ) => {
+  if (row.operational_status === "retired") {
+    return 0;
+  }
+
   const sameContext =
     row.current_project_id === (nextProjectId ?? null) &&
     row.project_unit_id === (nextProjectUnitId ?? null) &&
@@ -534,6 +538,14 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
       fail(
         `${kitProtectedAsset.asset_name} is already part of the active kit${memberships.length === 1 ? "" : "s"} ${membershipLabel}. Remove it from the kit before assigning or moving it individually.`,
       );
+    }
+
+    if (input.mode === "assign") {
+      const retiredAsset = assetStateRows.find((row) => row.operational_status === "retired");
+
+      if (retiredAsset) {
+        fail(`${retiredAsset.asset_name} is retired and can no longer be assigned.`);
+      }
     }
 
     const invalidQuantityAsset =

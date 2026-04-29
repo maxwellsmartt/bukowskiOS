@@ -508,6 +508,12 @@ export const createPackingMutationService = (db: DatabaseSync) => ({
       );
     }
 
+    const retiredAsset = assetRows.find((row) => row.operational_status === "retired");
+
+    if (retiredAsset) {
+      fail(`${retiredAsset.asset_name} is retired and cannot be issued on a packing slip.`);
+    }
+
     const invalidQuantityAsset = assetRows.find((row) => {
       const sourceQuantity =
         row.current_project_id === input.projectId && row.assigned_quantity > 0 ? row.assigned_quantity : row.available_quantity;

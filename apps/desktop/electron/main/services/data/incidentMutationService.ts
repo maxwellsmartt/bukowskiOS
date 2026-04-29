@@ -176,6 +176,11 @@ const loadIncidentRecord = (db: DatabaseSync, workspaceId: string, incidentId: s
       `
         SELECT
           id,
+          asset_id,
+          project_id,
+          project_unit_id,
+          department_id,
+          assignment_id,
           responsible_user_id,
           status,
           title,
@@ -193,6 +198,11 @@ const loadIncidentRecord = (db: DatabaseSync, workspaceId: string, incidentId: s
     .get(workspaceId, incidentId) as
     | {
         id: string;
+        asset_id: string | null;
+        project_id: string | null;
+        project_unit_id: string | null;
+        department_id: string | null;
+        assignment_id: string | null;
         responsible_user_id: string | null;
         status: string;
         title: string;
@@ -202,6 +212,45 @@ const loadIncidentRecord = (db: DatabaseSync, workspaceId: string, incidentId: s
         cost_estimate: number | null;
         financial_status: string | null;
       }
+    | undefined;
+
+const loadIncidentAssetState = (db: DatabaseSync, workspaceId: string, assetId: string) =>
+  db
+    .prepare(
+      `
+        SELECT
+          asset_current_state.asset_id,
+          assets.name AS asset_name,
+          asset_current_state.current_location_id,
+          asset_current_state.current_project_id,
+          asset_current_state.project_unit_id,
+          asset_current_state.current_department_id,
+          asset_current_state.current_responsible_user_id,
+          asset_current_state.active_assignment_id,
+          asset_current_state.operational_status,
+          asset_current_state.custody_status,
+          asset_current_state.total_quantity,
+          asset_current_state.available_quantity,
+          asset_current_state.assigned_quantity,
+          asset_current_state.checked_out_quantity,
+          asset_current_state.version
+        FROM asset_current_state
+        JOIN assets ON assets.id = asset_current_state.asset_id
+        WHERE asset_current_state.workspace_id = ?
+          AND asset_current_state.asset_id = ?
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, assetId) as
+    | (AssetIncidentContextRow & {
+        operational_status: string;
+        custody_status: string;
+        total_quantity: number;
+        available_quantity: number;
+        assigned_quantity: number;
+        checked_out_quantity: number;
+        version: number;
+      })
     | undefined;
 
 export const createIncidentMutationService = (db: DatabaseSync) => ({
@@ -646,25 +695,202 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
       requiredPermission: "incidents.create",
       actionLabel: "resolve incidents",
     });
+    const receiptHelpers = createCommandReceiptHelpers(db);
+    const existingReceipt = receiptHelpers.getExistingReceipt(input.commandId);
+
+    if (existingReceipt?.outcome_status === "success") {
+      return {
+        commandId: input.commandId,
+        incidentId: input.incidentId,
+        repeated: true,
+        summary: "This incident resolution was already applied.",
+      };
+    }
+
+    if (existingReceipt?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage("incident resolution", existingReceipt.error_message));
+    }
+
     const incident = loadIncidentRecord(db, input.workspaceId, input.incidentId);
     if (!incident) {
       throw new Error("Incident not found.");
     }
 
     const mergedNotes = [incident.notes?.trim(), input.resolutionNotes?.trim()].filter(Boolean).join("\n\n");
+    const nextResponsibleUserId = input.resolvedByUserId ?? incident.responsible_user_id;
+    const userMap = loadUserMap(db, uniqueValues([nextResponsibleUserId, actor.actorUserId]));
+    ensureEntityExists(nextResponsibleUserId ?? undefined, "Responsible user", userMap);
+    ensureEntityExists(actor.actorUserId, "Actor user", userMap);
 
-    return this.updateIncident({
+    const assetState = input.retireAsset && incident.asset_id ? loadIncidentAssetState(db, input.workspaceId, incident.asset_id) : undefined;
+
+    if (input.retireAsset && !incident.asset_id) {
+      throw new Error("Only asset incidents can retire equipment.");
+    }
+
+    if (input.retireAsset && incident.asset_id && !assetState) {
+      throw new Error("Selected asset is no longer available in the local registry.");
+    }
+
+    const now = new Date().toISOString();
+    const nextCostEstimate = input.costEstimate ?? incident.cost_estimate;
+    const nextFinancialStatus = input.financialStatus ?? incident.financial_status ?? "Resolved";
+    const nextNotes = mergedNotes || incident.notes;
+    const retireEventId = assetState ? `event-${input.commandId}-retired` : null;
+    const retireMetadataJson = assetState
+      ? JSON.stringify({
+          incidentId: input.incidentId,
+          resolution: "no_repair",
+          previousOperationalStatus: assetState.operational_status,
+          previousCustodyStatus: assetState.custody_status,
+          previousAvailableQuantity: assetState.available_quantity,
+          assignedQuantity: assetState.assigned_quantity,
+          checkedOutQuantity: assetState.checked_out_quantity,
+        })
+      : null;
+
+    db.exec("BEGIN");
+
+    try {
+      db.prepare(
+        `
+          UPDATE incidents
+          SET
+            responsible_user_id = ?,
+            status = 'Resolved',
+            notes = ?,
+            cost_estimate = ?,
+            financial_status = ?,
+            resolved_at = COALESCE(resolved_at, ?),
+            updated_at = ?
+          WHERE workspace_id = ?
+            AND id = ?
+        `,
+      ).run(
+        nextResponsibleUserId ?? null,
+        nextNotes ?? null,
+        nextCostEstimate,
+        nextFinancialStatus,
+        now,
+        now,
+        input.workspaceId,
+        input.incidentId,
+      );
+
+      if (assetState && retireEventId && retireMetadataJson) {
+        db.prepare(
+          `
+            INSERT INTO asset_events (
+              id,
+              workspace_id,
+              asset_id,
+              assignment_id,
+              project_id,
+              department_id,
+              performed_by_user_id,
+              event_type,
+              location_id,
+              from_location_id,
+              to_location_id,
+              event_timestamp,
+              command_id,
+              actor_type,
+              source_channel,
+              notes,
+              metadata_json,
+              created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'asset_retired', ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
+          `,
+        ).run(
+          retireEventId,
+          input.workspaceId,
+          assetState.asset_id,
+          assetState.active_assignment_id ?? incident.assignment_id ?? null,
+          assetState.current_project_id ?? incident.project_id ?? null,
+          assetState.current_department_id ?? incident.department_id ?? null,
+          actor.actorUserId,
+          assetState.current_location_id ?? null,
+          now,
+          input.commandId,
+          input.actorType,
+          input.sourceChannel,
+          input.resolutionNotes?.trim() || "Marked as no repair. Removed from available inventory.",
+          retireMetadataJson,
+          now,
+        );
+
+        db.prepare(
+          `
+            UPDATE asset_current_state
+            SET
+              condition_status = 'No repair',
+              operational_status = 'retired',
+              available_quantity = 0,
+              last_event_id = ?,
+              version = version + 1,
+              updated_at = ?
+            WHERE workspace_id = ?
+              AND asset_id = ?
+          `,
+        ).run(retireEventId, now, input.workspaceId, assetState.asset_id);
+
+        db.prepare(
+          `
+            INSERT INTO sync_outbox (
+              id,
+              workspace_id,
+              entity_type,
+              entity_id,
+              event_id,
+              operation_type,
+              payload_json,
+              status,
+              attempt_count,
+              last_error,
+              next_retry_at,
+              created_at,
+              updated_at
+            )
+            VALUES (?, ?, 'asset_event', ?, ?, 'upsert', ?, 'pending', 0, NULL, NULL, ?, ?)
+          `,
+        ).run(`outbox-${retireEventId}`, input.workspaceId, assetState.asset_id, retireEventId, retireMetadataJson, now, now);
+      }
+
+      receiptHelpers.insertReceipt.run(
+        input.commandId,
+        input.workspaceId,
+        actor.actorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        "success",
+        null,
+      );
+
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      receiptHelpers.insertReceipt.run(
+        input.commandId,
+        input.workspaceId,
+        actor.actorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        "failed",
+        error instanceof Error ? error.message : "Unknown incident resolution error",
+      );
+      throw error;
+    }
+
+    return {
       commandId: input.commandId,
-      workspaceId: input.workspaceId,
-      actorUserId: actor.actorUserId,
       incidentId: input.incidentId,
-      status: "Resolved",
-      responsibleUserId: input.resolvedByUserId ?? incident.responsible_user_id,
-      costEstimate: input.costEstimate ?? incident.cost_estimate,
-      financialStatus: input.financialStatus ?? incident.financial_status ?? "Resolved",
-      notes: mergedNotes || incident.notes,
-      actorType: input.actorType,
-      sourceChannel: input.sourceChannel,
-    });
+      repeated: false,
+      summary: assetState
+        ? "Incident resolved. Asset retired from available inventory."
+        : "Incident resolved successfully.",
+    };
   },
 });

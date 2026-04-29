@@ -469,6 +469,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
               costEstimate: value.costEstimate,
               financialStatus: value.financialStatus,
               resolvedByUserId: value.resolvedByUserId,
+              retireAsset: value.retireAsset,
               actorType: "user",
               sourceChannel: "desktop",
             });

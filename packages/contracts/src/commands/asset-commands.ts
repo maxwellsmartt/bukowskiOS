@@ -72,6 +72,7 @@ export type ResolveIncidentCommand = {
   costEstimate?: number;
   financialStatus?: string;
   resolvedByUserId?: string;
+  retireAsset?: boolean;
   actorType: CommandActorType;
   sourceChannel: CommandSourceChannel;
 };

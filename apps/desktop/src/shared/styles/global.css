@@ -6646,6 +6646,29 @@ button.timeline-signal-chip:focus-visible {
   gap: 10px;
 }
 
+.incident-retire-option {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(235, 120, 120, 0.28);
+  border-radius: 16px;
+  background: rgba(235, 120, 120, 0.08);
+  color: var(--text-primary);
+}
+
+.incident-retire-option-copy {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.incident-retire-option-copy span {
+  color: var(--text-muted);
+}
+
 .agents-health-grid,
 .agents-support-grid {
   display: grid;

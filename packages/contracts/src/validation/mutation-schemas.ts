@@ -406,6 +406,7 @@ export const resolveIncidentSchema = z
     costEstimate: z.number().finite().nonnegative().optional(),
     financialStatus: optionalTrimmedString,
     resolvedByUserId: optionalTrimmedString,
+    retireAsset: z.boolean().optional(),
     actorType: commandActorTypeSchema,
     sourceChannel: commandSourceChannelSchema,
   })

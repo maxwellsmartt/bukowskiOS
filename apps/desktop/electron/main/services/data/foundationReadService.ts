@@ -550,6 +550,10 @@ const mapAssetStatus = (
   assignedQuantity: number,
   checkedOutQuantity: number,
 ) => {
+  if (operationalStatus === "retired") {
+    return "Retired";
+  }
+
   if (operationalStatus === "maintenance") {
     return "Maintenance";
   }
@@ -602,6 +606,8 @@ const mapEventTitle = (eventType: string) => {
       return "Moved";
     case "incident_reported":
       return "Incident reported";
+    case "asset_retired":
+      return "Retired from inventory";
     case "maintenance_started":
       return "Maintenance started";
     case "maintenance_completed":

@@ -15,6 +15,10 @@ const mapAssetStatus = (
   assignedQuantity: number,
   checkedOutQuantity: number,
 ) => {
+  if (operationalStatus === "retired") {
+    return "Retired";
+  }
+
   if (operationalStatus === "maintenance") {
     return "Maintenance";
   }

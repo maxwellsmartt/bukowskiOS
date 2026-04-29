@@ -16,7 +16,13 @@ type IncidentDetailPanelProps = {
   users: CatalogSnapshot["users"];
   onClose: () => void;
   onRefresh: () => void | Promise<void>;
-  onResolve: (value: { resolutionNotes?: string; costEstimate?: number; financialStatus?: string; resolvedByUserId?: string }) => Promise<void>;
+  onResolve: (value: {
+    resolutionNotes?: string;
+    costEstimate?: number;
+    financialStatus?: string;
+    resolvedByUserId?: string;
+    retireAsset?: boolean;
+  }) => Promise<void>;
   onUpdate: (value: {
     title: string;
     description: string;
@@ -104,6 +110,7 @@ export const IncidentDetailPanel = ({
   const [financialStatus, setFinancialStatus] = useState("");
   const [notes, setNotes] = useState("");
   const [resolutionNotes, setResolutionNotes] = useState("");
+  const [retireAsset, setRetireAsset] = useState(false);
   const [filesFeedback, setFilesFeedback] = useState<string | null>(null);
   const [filesError, setFilesError] = useState<string | null>(null);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
@@ -123,6 +130,7 @@ export const IncidentDetailPanel = ({
     setFinancialStatus(incident.financialStatus === "Estimate missing" ? "" : incident.financialStatus);
     setNotes(incident.notes ?? "");
     setResolutionNotes("");
+    setRetireAsset(false);
   }, [incident]);
 
   if (!incident) {
@@ -233,6 +241,21 @@ export const IncidentDetailPanel = ({
               value={resolutionNotes}
             />
           </label>
+
+          {incident.assetId && incident.status !== "Resolved" ? (
+            <label className="incident-retire-option">
+              <input
+                checked={retireAsset}
+                className="table-checkbox"
+                onChange={(event) => setRetireAsset(event.target.checked)}
+                type="checkbox"
+              />
+              <span className="incident-retire-option-copy">
+                <strong>No repair possible</strong>
+                <span>Keep the asset in history, but remove it from assignment and packing availability.</span>
+              </span>
+            </label>
+          ) : null}
         </div>
 
         <details className="detail-disclosure">
@@ -382,6 +405,7 @@ export const IncidentDetailPanel = ({
                 costEstimate: normalizeOptionalText(costEstimate) ? Number(costEstimate) : undefined,
                 financialStatus: normalizeOptionalText(financialStatus) ?? undefined,
                 resolvedByUserId: normalizeOptionalText(responsibleUserId) ?? undefined,
+                retireAsset,
               })
             }
             type="button"
