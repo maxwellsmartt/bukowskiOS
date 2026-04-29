@@ -49,6 +49,7 @@ import type {
   ScheduleTimelineSnapshot,
   ShellBootstrap,
   RmaCaseDetailSnapshot,
+  RmaCaseStatus,
   RmaSnapshotQuery,
   RmaSnapshot,
 } from "@contracts";
@@ -1283,6 +1284,19 @@ export const createFoundationReadService = (db: DatabaseSync) => {
 
   getRmaSnapshot(query: RmaSnapshotQuery = {}): RmaSnapshot {
     const workspaceId = query.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    const normalizeRmaStatus = (status: string) => {
+      switch (status) {
+        case "Draft":
+        case "Ready":
+          return "Needs review";
+        case "Sent":
+          return "Sent to repair";
+        case "Closed":
+          return "Returned to inventory";
+        default:
+          return status;
+      }
+    };
     const maintenanceAssets = db
       .prepare(
         `
@@ -1346,7 +1360,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       title: string;
       manufacturer_name: string;
       support_email: string;
-      status: "Draft" | "Ready" | "Sent" | "Closed";
+      status: string;
       updated_at: string;
       asset_count: number;
     }>;
@@ -1357,7 +1371,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         title: row.title,
         manufacturerName: row.manufacturer_name,
         supportEmail: row.support_email,
-        status: row.status,
+        status: normalizeRmaStatus(row.status) as RmaCaseStatus,
         assetCount: row.asset_count,
         updatedAtLabel: formatTimelineTimestamp(row.updated_at),
       })),
@@ -1375,6 +1389,19 @@ export const createFoundationReadService = (db: DatabaseSync) => {
   },
 
   getRmaCaseDetail(rmaCaseId: string): RmaCaseDetailSnapshot {
+    const normalizeRmaStatus = (status: string) => {
+      switch (status) {
+        case "Draft":
+        case "Ready":
+          return "Needs review";
+        case "Sent":
+          return "Sent to repair";
+        case "Closed":
+          return "Returned to inventory";
+        default:
+          return status;
+      }
+    };
     const caseRecord = db
       .prepare(
         `
@@ -1407,7 +1434,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       phone: string;
       problem_summary: string;
       notes: string;
-      status: "Draft" | "Ready" | "Sent" | "Closed";
+      status: string;
       created_at: string;
       updated_at: string;
     } | undefined;
@@ -1457,7 +1484,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         phone: caseRecord.phone,
         problemSummary: caseRecord.problem_summary,
         notes: caseRecord.notes,
-        status: caseRecord.status,
+        status: normalizeRmaStatus(caseRecord.status) as RmaCaseStatus,
         createdAtLabel: formatTimelineTimestamp(caseRecord.created_at),
         updatedAtLabel: formatTimelineTimestamp(caseRecord.updated_at),
       },

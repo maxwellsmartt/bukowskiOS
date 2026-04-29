@@ -52,20 +52,28 @@ const resolveIncidentStatusTone = (status: string) => {
 };
 
 const resolveRmaStatusTone = (status: RmaCaseStatus) => {
-  if (status === "Closed") {
+  if (status === "Repaired" || status === "Returned to inventory") {
     return "success" as const;
   }
 
-  if (status === "Sent") {
+  if (status === "Sent to repair" || status === "Waiting parts") {
     return "info" as const;
   }
 
-  if (status === "Ready") {
-    return "warning" as const;
+  if (status === "No repair / retired") {
+    return "critical" as const;
   }
 
-  return "neutral" as const;
+  return "warning" as const;
 };
+
+const rmaStatusActions: Array<{ status: RmaCaseStatus; label: string }> = [
+  { status: "Sent to repair", label: "Send to repair" },
+  { status: "Waiting parts", label: "Waiting parts" },
+  { status: "Repaired", label: "Mark repaired" },
+  { status: "No repair / retired", label: "No repair" },
+  { status: "Returned to inventory", label: "Return to inventory" },
+];
 
 const buildRmaMailtoUrl = (detail: RmaCaseDetailSnapshot) => {
   if (!detail.caseRecord) {
@@ -676,21 +684,19 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
 
                     <div className="chip-row">
                       <StatusBadge tone={resolveRmaStatusTone(rmaDetail.caseRecord.status)}>{rmaDetail.caseRecord.status}</StatusBadge>
-                      {rmaDetail.caseRecord.status !== "Ready" ? (
-                        <button className="ghost-control" disabled={isSubmittingRma} onClick={() => void handleUpdateRmaStatus("Ready")} type="button">
-                          Mark ready
-                        </button>
-                      ) : null}
-                      {rmaDetail.caseRecord.status !== "Sent" ? (
-                        <button className="ghost-control" disabled={isSubmittingRma} onClick={() => void handleUpdateRmaStatus("Sent")} type="button">
-                          Mark sent
-                        </button>
-                      ) : null}
-                      {rmaDetail.caseRecord.status !== "Closed" ? (
-                        <button className="ghost-control" disabled={isSubmittingRma} onClick={() => void handleUpdateRmaStatus("Closed")} type="button">
-                          Close case
-                        </button>
-                      ) : null}
+                      {rmaStatusActions
+                        .filter((action) => action.status !== rmaDetail.caseRecord?.status)
+                        .map((action) => (
+                          <button
+                            key={action.status}
+                            className={action.status === "No repair / retired" ? "ghost-control is-danger" : "ghost-control"}
+                            disabled={isSubmittingRma}
+                            onClick={() => void handleUpdateRmaStatus(action.status)}
+                            type="button"
+                          >
+                            {action.label}
+                          </button>
+                        ))}
                     </div>
 
                     <div className="summary-row">

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import type { CreateRmaCaseCommand, RmaCaseAssetInput, RmaCaseMutationResult, UpdateRmaCaseCommand } from "@contracts";
+import type { CreateRmaCaseCommand, RmaCaseAssetInput, RmaCaseMutationResult, RmaCaseStatus, UpdateRmaCaseCommand } from "@contracts";
 
 import { resolveAuthorizedActor } from "./mutationAuthorization";
 
@@ -125,6 +125,182 @@ const replaceCaseAssets = (db: DatabaseSync, rmaCaseId: string, assetItems: Retu
   });
 };
 
+const normalizeRmaStatus = (status: string): RmaCaseStatus => {
+  switch (status) {
+    case "Draft":
+    case "Ready":
+      return "Needs review";
+    case "Sent":
+      return "Sent to repair";
+    case "Closed":
+      return "Returned to inventory";
+    default:
+      return status as RmaCaseStatus;
+  }
+};
+
+const resolveAssetStateForRmaStatus = (status: RmaCaseStatus) => {
+  if (status === "No repair / retired") {
+    return {
+      conditionStatus: "No repair",
+      operationalStatus: "retired",
+      custodyStatus: "retired",
+      eventType: "asset_retired",
+      eventNote: "Marked as no repair from repair case. Removed from available inventory.",
+    };
+  }
+
+  if (status === "Repaired" || status === "Returned to inventory") {
+    return {
+      conditionStatus: "Good",
+      operationalStatus: "ready",
+      custodyStatus: "available",
+      eventType: "maintenance_completed",
+      eventNote: "Repair completed. Asset returned to available inventory.",
+    };
+  }
+
+  return {
+    conditionStatus: status === "Waiting parts" ? "Waiting parts" : "Needs review",
+    operationalStatus: "maintenance",
+    custodyStatus: "maintenance",
+    eventType: "maintenance_started",
+    eventNote: "Repair case keeps this asset out of available inventory.",
+  };
+};
+
+const applyRmaStatusToAssets = (
+  db: DatabaseSync,
+  input: UpdateRmaCaseCommand,
+  assetItems: ReturnType<typeof uniqueAssetItems>,
+  status: RmaCaseStatus,
+  actorUserId: string,
+  now: string,
+) => {
+  const state = resolveAssetStateForRmaStatus(status);
+  const updateAssetState = db.prepare(
+    `
+      UPDATE asset_current_state
+      SET
+        condition_status = ?,
+        operational_status = ?,
+        custody_status = ?,
+        available_quantity = CASE
+          WHEN ? = 'ready' THEN MAX(0, total_quantity - assigned_quantity - checked_out_quantity)
+          ELSE 0
+        END,
+        last_event_id = ?,
+        version = version + 1,
+        updated_at = ?
+      WHERE workspace_id = ?
+        AND asset_id = ?
+    `,
+  );
+  const insertEvent = db.prepare(
+    `
+      INSERT INTO asset_events (
+        id,
+        workspace_id,
+        asset_id,
+        assignment_id,
+        project_id,
+        department_id,
+        performed_by_user_id,
+        event_type,
+        location_id,
+        from_location_id,
+        to_location_id,
+        event_timestamp,
+        command_id,
+        actor_type,
+        source_channel,
+        notes,
+        metadata_json,
+        created_at
+      )
+      SELECT
+        ?,
+        asset_current_state.workspace_id,
+        asset_current_state.asset_id,
+        asset_current_state.active_assignment_id,
+        asset_current_state.current_project_id,
+        asset_current_state.current_department_id,
+        ?,
+        ?,
+        asset_current_state.current_location_id,
+        NULL,
+        NULL,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+      FROM asset_current_state
+      WHERE asset_current_state.workspace_id = ?
+        AND asset_current_state.asset_id = ?
+    `,
+  );
+  const insertOutbox = db.prepare(
+    `
+      INSERT INTO sync_outbox (
+        id,
+        workspace_id,
+        entity_type,
+        entity_id,
+        event_id,
+        operation_type,
+        payload_json,
+        status,
+        attempt_count,
+        last_error,
+        next_retry_at,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, 'asset_event', ?, ?, 'upsert', ?, 'pending', 0, NULL, NULL, ?, ?)
+    `,
+  );
+
+  assetItems.forEach((item, index) => {
+    const eventId = `event-${input.commandId}-rma-${index + 1}`;
+    const metadataJson = JSON.stringify({
+      rmaCaseId: input.rmaCaseId,
+      rmaStatus: status,
+      issueSummary: item.issueSummary,
+    });
+
+    insertEvent.run(
+      eventId,
+      actorUserId,
+      state.eventType,
+      now,
+      input.commandId,
+      input.actorType,
+      input.sourceChannel,
+      state.eventNote,
+      metadataJson,
+      now,
+      input.workspaceId,
+      item.assetId,
+    );
+
+    updateAssetState.run(
+      state.conditionStatus,
+      state.operationalStatus,
+      state.custodyStatus,
+      state.operationalStatus,
+      eventId,
+      now,
+      input.workspaceId,
+      item.assetId,
+    );
+
+    insertOutbox.run(`outbox-${eventId}`, input.workspaceId, item.assetId, eventId, metadataJson, now, now);
+  });
+};
+
 export const createRmaMutationService = (db: DatabaseSync) => ({
   createRmaCase(input: CreateRmaCaseCommand): RmaCaseMutationResult {
     const actor = resolveAuthorizedActor(db, {
@@ -169,7 +345,7 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
             sent_at,
             closed_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'Draft', ?, ?, ?, NULL, NULL)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'Needs review', ?, ?, ?, NULL, NULL)
         `,
       ).run(rmaCaseId, workspaceId, manufacturer.id, title, supportEmail, problemSummary, optionalValue(input.notes), actor.actorUserId, now, now);
 
@@ -187,7 +363,7 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
   },
 
   updateRmaCase(input: UpdateRmaCaseCommand): RmaCaseMutationResult {
-    resolveAuthorizedActor(db, {
+    const actor = resolveAuthorizedActor(db, {
       workspaceId: input.workspaceId,
       actorUserId: input.actorUserId,
       requiredPermission: "rma.create",
@@ -200,7 +376,7 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
     const supportEmail = optionalValue(input.supportEmail) ?? optionalValue(manufacturer.support_email) ?? "";
     const title = ensureValue(input.title, "RMA title");
     const problemSummary = ensureValue(input.problemSummary, "Problem summary");
-    const status = ensureValue(input.status, "RMA status");
+    const status = normalizeRmaStatus(ensureValue(input.status, "RMA status"));
 
     assertAssetsEligibleForUpdate(
       db,
@@ -210,15 +386,17 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
     );
 
     const previous = db
-      .prepare("SELECT sent_at, closed_at FROM rma_cases WHERE id = ? AND workspace_id = ? LIMIT 1")
-      .get(input.rmaCaseId, workspaceId) as { sent_at: string | null; closed_at: string | null } | undefined;
+      .prepare("SELECT status, sent_at, closed_at FROM rma_cases WHERE id = ? AND workspace_id = ? LIMIT 1")
+      .get(input.rmaCaseId, workspaceId) as { status: string; sent_at: string | null; closed_at: string | null } | undefined;
 
     if (!previous) {
       throw new Error("RMA case not found.");
     }
 
-    const nextSentAt = status === "Sent" ? previous.sent_at ?? now : previous.sent_at;
-    const nextClosedAt = status === "Closed" ? previous.closed_at ?? now : null;
+    const previousStatus = normalizeRmaStatus(previous.status);
+    const nextSentAt = status === "Sent to repair" || status === "Waiting parts" ? previous.sent_at ?? now : previous.sent_at;
+    const isTerminalStatus = status === "Repaired" || status === "No repair / retired" || status === "Returned to inventory";
+    const nextClosedAt = isTerminalStatus ? previous.closed_at ?? now : null;
 
     db.exec("BEGIN");
 
@@ -257,6 +435,10 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
       }
 
       replaceCaseAssets(db, input.rmaCaseId, assetItems, now);
+
+      if (status !== previousStatus) {
+        applyRmaStatusToAssets(db, input, assetItems, status, actor.actorUserId, now);
+      }
 
       db.exec("COMMIT");
       return {

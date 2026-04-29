@@ -8,7 +8,14 @@ const commandSourceChannelSchema = z.enum(["desktop", "mobile", "api", "whatsapp
 const agentStatusSchema = z.enum(["active", "paused"]);
 const agentApprovalModeSchema = z.enum(["auto", "supervised", "needs_approval"]);
 const assistantApprovalPreferenceSchema = z.enum(["supervised", "needs_approval", "unsupervised"]);
-const rmaStatusSchema = z.enum(["Draft", "Ready", "Sent", "Closed"]);
+const rmaStatusSchema = z.enum([
+  "Needs review",
+  "Sent to repair",
+  "Waiting parts",
+  "Repaired",
+  "No repair / retired",
+  "Returned to inventory",
+]);
 const financeEntrySchema = z
   .object({
     entryType: nonEmptyString,

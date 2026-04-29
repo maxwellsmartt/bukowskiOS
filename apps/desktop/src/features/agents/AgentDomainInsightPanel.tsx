@@ -118,12 +118,12 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
 
   if (domain === "incidents") {
     const openIncidents = incidents.filter((incident) => incident.status.toLowerCase() !== "closed").length;
-    const readyRmas = rmaSnapshot.cases.filter((row) => row.status === "Ready").length;
+    const readyRmas = rmaSnapshot.cases.filter((row) => row.status === "Needs review").length;
     title = "Incidents";
     insights = [
       `${openIncidents} open incident records across the app`,
       `${rmaSnapshot.maintenanceAssets.length} maintenance assets currently eligible for RMA follow-up`,
-      `${readyRmas} RMA cases already prepared and waiting on next action`,
+      `${readyRmas} repair cases waiting on next action`,
     ];
     focusItems = [
       ...incidents

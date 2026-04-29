@@ -48,7 +48,14 @@ const normalizeOptional = (value: string) => {
   return nextValue ? nextValue : undefined;
 };
 
-const statusOptions: RmaCaseStatus[] = ["Draft", "Ready", "Sent", "Closed"];
+const statusOptions: RmaCaseStatus[] = [
+  "Needs review",
+  "Sent to repair",
+  "Waiting parts",
+  "Repaired",
+  "No repair / retired",
+  "Returned to inventory",
+];
 
 const resolveInitialAssetState = (snapshot?: RmaCaseDetailSnapshot | null) =>
   Object.fromEntries(
@@ -77,7 +84,7 @@ export const RmaCaseEditorPanel = ({
   const [title, setTitle] = useState(initialValue?.caseRecord?.title ?? "");
   const [problemSummary, setProblemSummary] = useState(initialValue?.caseRecord?.problemSummary ?? "");
   const [notes, setNotes] = useState(initialValue?.caseRecord?.notes ?? "");
-  const [status, setStatus] = useState<RmaCaseStatus>(initialValue?.caseRecord?.status ?? "Draft");
+  const [status, setStatus] = useState<RmaCaseStatus>(initialValue?.caseRecord?.status ?? "Needs review");
   const [selectedAssets, setSelectedAssets] = useState<Record<string, SelectedAssetState>>(() => resolveInitialAssetState(initialValue));
 
   const manufacturerEmail = useMemo(

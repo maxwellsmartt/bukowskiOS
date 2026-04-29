@@ -1,4 +1,10 @@
-export type RmaCaseStatus = "Draft" | "Ready" | "Sent" | "Closed";
+export type RmaCaseStatus =
+  | "Needs review"
+  | "Sent to repair"
+  | "Waiting parts"
+  | "Repaired"
+  | "No repair / retired"
+  | "Returned to inventory";
 
 export type RmaManufacturerRow = {
   id: string;
