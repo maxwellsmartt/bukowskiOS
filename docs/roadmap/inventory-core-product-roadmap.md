@@ -151,7 +151,7 @@ Pruebas:
 
 ### Slice IC-3 — Assign / move como flujo operacional central
 
-**Estado:** Doing
+**Estado:** Ready for smoke
 
 Objetivo:
 
@@ -168,11 +168,14 @@ Incluye:
 - Done — Ajuste visual fino: quantity inputs más compactos, zafacones en rojo y rail con scroll usable en pantallas de menor altura.
 - Done — Sidebar principal actualizado a panel dark glass con bordes redondeados, manteniendo navegación y resize existentes.
 - Done — Patrón reusable de rail derecho redimensionable para Assets, Packing, Asset Detail, RMA, Finance Overview y Sync Outbox; el mínimo conserva el tamaño operativo actual.
-- Doing — Reducir copy técnico del panel.
-- Orden progresivo: selección -> modo -> proyecto/unidad/responsable -> cantidad/fechas -> ubicación/notas.
+- Done — Project Assets ahora reutiliza acciones operativas del cart y abre Packing/Returns desde el contexto del proyecto.
+- Done — Assign conserva la selección después de reservar assets y muestra CTA explícito para emitir packing slip sin crear drafts invisibles.
+- Done — Disponibilidad unificada de assets compartida por Assets, Assign/Move, Packing y Catalog.
+- Done — Reducir copy técnico crítico del panel y reemplazar bloqueos ambiguos por razones accionables.
+- Done — Orden progresivo: selección -> modo -> proyecto/unidad/responsable -> cantidad/fechas -> ubicación/notas.
 - Done — Mostrar warnings de stock/kit lock y bloquear acciones que perderían cantidad o emitirían assets de kit individualmente.
-- Confirmar auditoría en `asset_events` y outbox.
-- Hacer que success/error explique qué cambió.
+- Done — Confirmar auditoría en `asset_events` y outbox con tests de assign/packing existentes.
+- Done — Hacer que success/error explique qué cambió en operaciones principales.
 - Deferred — Multi-incident y multi-RMA desde la bandeja; en este slice quedan acciones single-asset que llevan al contexto correspondiente.
 
 Pruebas:
@@ -185,6 +188,8 @@ Pruebas:
 - Done — Verificación: `corepack pnpm --filter @bukowski/desktop typecheck`.
 - Done — Verificación: `corepack pnpm --filter @bukowski/desktop test -- asset-mutation-service.test.ts packing-mutation-service.test.ts foundation-read-service.test.ts` pasa con 27 archivos/116 tests.
 - Done — Verificación: `corepack pnpm --filter @bukowski/desktop build`.
+- Done — Verificación 2026-04-29: `corepack pnpm --filter @bukowski/desktop test -- asset-availability.test.ts rma-mutation-service.test.ts incident-mutation-service.test.ts packing-mutation-service.test.ts` pasa con 29 archivos/125 tests.
+- Done — Verificación 2026-04-29: `corepack pnpm --filter @bukowski/desktop typecheck` y `corepack pnpm --filter @bukowski/desktop build`.
 
 Findings 2026-04-28:
 
@@ -193,12 +198,14 @@ Findings 2026-04-28:
 - Medio mitigado — Assets con stock > 1 ya no toman todo disponible por defecto; la bandeja arranca en 1 unidad para reducir sobre-asignación.
 - Medio mitigado — La primera versión de la bandeja crecía arriba de la tabla y hacía difícil seguir buscando/seleccionando. Ahora vive en un rail derecho con scroll propio y el quick preview queda debajo.
 - Bajo mitigado — Inputs de cantidad, iconos destructivos y sidebar no estaban visualmente alineados con la densidad/pulido esperado; se ajustaron antes de pasar a Packing.
-- Medio abierto — Falta smoke manual recreando un packing slip real completo con búsqueda multi-paso, cantidades y export.
+- Medio mitigado — La disponibilidad se resolvía con reglas dispersas por pantalla. Ahora `assetAvailability.ts` centraliza `Available`, `In kit`, `In repair`, `Retired`, `Checked out`, `Assigned` y `No stock`.
+- Medio mitigado — Assign y Packing parecían flujos desconectados. Ahora Assign queda como reserva/staging y el CTA empuja a emitir packing sólo cuando corresponde.
+- Medio abierto — Falta smoke manual recreando un packing slip real completo con búsqueda multi-paso, cantidades, export, return, incident y RMA.
 - Bajo abierto — Falta revisión visual completa de Packing/Incidents/RMA para aplicar el mismo patrón de rail compacto donde corresponda.
 
 ### Slice IC-4 — Packing Slips end-to-end
 
-**Estado:** Todo
+**Estado:** Doing
 
 Objetivo:
 
@@ -207,23 +214,35 @@ Packing debe sentirse como documento operacional real, no como tabla técnica.
 Incluye:
 
 - Builder más corto y progresivo.
-- Selección desde Assets y creación directa desde Packing.
-- Cantidades consistentes con asignaciones y returns.
-- PDF/print smoke.
-- Return flow claro: parcial, completo, overdue.
-- Estados y colores consistentes.
+- Done — Selección desde Assets alimenta Packing con cantidades acumuladas en el cart.
+- Done — Cantidades consistentes con asignaciones, stock disponible y returns.
+- Done — Packing bloquea emisión de assets no disponibles usando disponibilidad unificada.
+- Done — Insurance workflow pulido: avisos de valores faltantes y export dedicado de insurance list.
+- Done — Builder de Packing compactado: ya no repite la lista grande del cart; sólo confirma contexto, warnings y campos del documento.
+- Done — Packing detail mueve Export packing slip, Return all pending/selected y Export insurance list al header del card.
+- Done — Assets asignados a proyecto pueden alimentar packing desde Project Assets sin volver a buscarlos globalmente.
+- Done — Catalog usa rail derecho redimensionable para preview/editor, preservando el menú portal de import/export.
+- Doing — PDF/print smoke manual.
+- Doing — Return flow claro: parcial, completo, overdue.
+- Doing — Estados y colores consistentes.
 
 Pruebas:
 
 - Crear slip desde selección.
-- Export PDF.
-- Return parcial.
-- Return completo.
-- Validar cambios en asset current state.
+- Done — Tests de packing mutation cubren emisión, returns, cantidades parciales, permisos, workspace y kit members.
+- Done — Verificación 2026-04-29 incluida en suite de 29 archivos/125 tests.
+- Done — Verificación 2026-04-29: `corepack pnpm --filter @bukowski/desktop typecheck`.
+- Done — Verificación 2026-04-29: `corepack pnpm --filter @bukowski/desktop build`.
+- Done — Verificación 2026-04-29: `corepack pnpm --filter @bukowski/desktop test -- packing-mutation-service.test.ts asset-mutation-service.test.ts asset-availability.test.ts foundation-read-service.test.ts` pasa con 29 archivos/125 tests.
+- Todo — Export PDF manual.
+- Todo — Export insurance PDF manual.
+- Todo — Return parcial manual.
+- Todo — Return completo manual.
+- Todo — Validar cambios en asset current state en smoke manual.
 
 ### Slice IC-5 — Incidents + RMA conectados
 
-**Estado:** Todo
+**Estado:** Doing
 
 Objetivo:
 
@@ -232,18 +251,27 @@ Que reportar un problema lleve naturalmente a seguimiento, evidencia, costo/RMA 
 Incluye:
 
 - Incident report más corto y menos técnico.
-- Incident detail con contexto de asset/proyecto y evidencia clara.
-- RMA desde incident o asset cuando el daño/reparación lo amerite.
-- RMA list/detail con workspace guard, estados claros y archivos.
+- Done — Incident detail expone acciones de repair/RMA y retiro cuando aplica.
+- Done — Resolución de incident puede retirar assets sin perder historial.
+- Done — RMA desde incident/asset mueve assets a maintenance y los saca de disponibilidad.
+- Done — RMA puede devolver assets reparados a inventario disponible.
+- Done — RMA puede marcar `No repair / retired` y retirar assets.
+- Done — RMA list/detail con workspace guard, estados claros y archivos base.
+- Done — Asset availability refleja repair/retired en Assets, Assign/Move, Packing y Catalog.
 - Evitar duplicar info entre Incident Detail, Asset Detail y RMA Detail.
 
 Pruebas:
 
 - Reportar incident desde project y desde asset.
 - Adjuntar evidencia.
-- Crear RMA desde un asset/incidente.
-- Cambiar estado de RMA.
-- Resolver incident.
+- Done — Tests de incident mutation cubren resolución y retiro de asset.
+- Done — Tests de RMA mutation cubren crear repair case, repaired y no repair/retired.
+- Done — Verificación 2026-04-29 incluida en suite de 29 archivos/125 tests.
+- Todo — Smoke manual: reportar incident desde project y desde asset.
+- Todo — Smoke manual: adjuntar evidencia.
+- Todo — Smoke manual: crear RMA desde asset/incidente.
+- Todo — Smoke manual: cambiar estado de RMA.
+- Todo — Smoke manual: resolver incident y confirmar disponibilidad.
 
 ### Slice IC-6 — CSV import pro
 
@@ -325,8 +353,11 @@ Volvemos al roadmap principal cuando:
 
 ## Próximo paso inmediato
 
-Seguir con **IC-3 — Assign / move como flujo operacional central** después de una mini-verificación visual de Project sidebar / Projects table / Schedule Overview / Project detail.
+Ejecutar un **smoke manual vertical end-to-end** antes de abrir más superficie nueva.
 
-- Razón: IC-1 ya cerró los riesgos principales de Catalog/Search/RMA en código y tests.
-- Antes de tocar UX, confirmar manualmente que `Metadata Cine2` y `workspace-metadata` no mezclan proyectos visibles.
-- Luego implementar IC-3 con foco en auditoría, mensajes claros, permisos y cantidades.
+- Razón: IC-3 está listo para smoke y desde casa ya se avanzó IC-4/IC-5; ahora toca validar el flujo real completo, no seguir agregando piezas.
+- Flujo recomendado: importar/listar asset -> seleccionar varios assets con cart -> crear packing slip con cantidades -> export packing + insurance -> return parcial/completo -> reportar incident -> crear RMA/repair -> marcar repaired o retired -> confirmar disponibilidad en Assets/Catalog/Packing.
+- Precondición si aparece Sync `Pull required`: hacer Pull updates/Refresh antes del smoke para no mezclar cola local vieja con datos cloud más recientes.
+- Si el smoke falla en Packing, cerrar IC-4 primero.
+- Si el smoke falla en Incident/RMA/repair availability, cerrar IC-5 primero.
+- Si ambos pasan sin blockers, pasar a IC-6 CSV import pro o cerrar IC-2 polish fino.

@@ -351,6 +351,7 @@ type AssetOperationCartProps = {
   onCreateRma: () => void;
   onOpenAssignMove: () => void;
   onOpenAssetDetail: (assetId: string) => void;
+  onOpenProjectReturns?: () => void;
   onQuantityChange: (assetId: string, quantity: number) => void;
   onRemove: (assetId: string) => void;
 };
@@ -363,6 +364,7 @@ const AssetOperationCart = ({
   onCreateRma,
   onOpenAssignMove,
   onOpenAssetDetail,
+  onOpenProjectReturns,
   onQuantityChange,
   onRemove,
 }: AssetOperationCartProps) => {
@@ -375,6 +377,7 @@ const AssetOperationCart = ({
   const totalUnits = items.reduce((total, asset) => total + asset.requestedQuantity, 0);
   const issueActionsDisabled = lockedItems.length > 0 || unavailableItems.length > 0;
   const singleAsset = items.length === 1 ? items[0] : null;
+  const checkedOutUnits = items.reduce((total, asset) => total + asset.checkedOutQuantity, 0);
 
   return (
     <div className="asset-operation-cart">
@@ -426,6 +429,17 @@ const AssetOperationCart = ({
         >
           Assign / move
         </button>
+        {onOpenProjectReturns ? (
+          <button
+            className="ghost-control action-row-button"
+            data-tooltip={checkedOutUnits ? "Open project packing slips to process returns" : "No selected units are checked out yet"}
+            disabled={!checkedOutUnits}
+            onClick={onOpenProjectReturns}
+            type="button"
+          >
+            Return
+          </button>
+        ) : null}
       </div>
 
       {lockedItems.length || unavailableItems.length ? (
@@ -877,6 +891,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [packingError, setPackingError] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [actionWarning, setActionWarning] = useState<string | null>(null);
+  const [assignNextStep, setAssignNextStep] = useState<{ projectId: string; projectName: string } | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const [isSubmittingPacking, setIsSubmittingPacking] = useState(false);
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
@@ -1022,7 +1037,10 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     });
   };
 
-  const clearOperationCart = () => setCartItemsById({});
+  const clearOperationCart = () => {
+    setCartItemsById({});
+    setAssignNextStep(null);
+  };
 
   const handleAssignMove = async (formValue: AssetAssignMoveFormValue) => {
     try {
@@ -1049,7 +1067,15 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setActionFeedback(result.summary);
       setActionWarning(result.warningSummary ?? null);
       setActionPanelOpen(false);
-      clearOperationCart();
+      if (formValue.mode === "assign" && formValue.projectId) {
+        const assignedProject = projects.find((project) => project.id === formValue.projectId);
+        setAssignNextStep({
+          projectId: formValue.projectId,
+          projectName: assignedProject?.name ?? "this project",
+        });
+      } else {
+        clearOperationCart();
+      }
     } catch (nextError) {
       setActionError(getUserFacingErrorMessage(nextError, "Unable to apply assign or move."));
     } finally {
@@ -1080,6 +1106,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setPackingError(null);
       setActionFeedback(result.summary);
       setActionWarning(null);
+      setAssignNextStep(null);
       setPackingPanelOpen(false);
       clearOperationCart();
       navigate("/packing-slips");
@@ -1456,6 +1483,37 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
       {actionFeedback ? <div className="action-feedback action-feedback-success">{actionFeedback}</div> : null}
+      {assignNextStep && selectedRowIds.length ? (
+        <div className="selection-action-bar asset-next-step-bar">
+          <div className="selection-action-copy">
+            <span className="selection-action-title">Ready for checkout</span>
+            <span className="selection-action-subtitle">
+              These assets are reserved for {assignNextStep.projectName}. Create the packing slip when the gear is physically leaving.
+            </span>
+          </div>
+          <div className="selection-action-buttons">
+            <button
+              className="action-primary-button action-row-button"
+              onClick={() => {
+                setPackingPanelOpen(true);
+                setActionPanelOpen(false);
+                setPackingError(null);
+              }}
+              type="button"
+            >
+              <ClipboardList size={14} />
+              <span>Create packing slip for this project</span>
+            </button>
+            <button
+              className="ghost-control action-row-button"
+              onClick={() => navigate(`/projects/${assignNextStep.projectId}/assets`)}
+              type="button"
+            >
+              Open Project Assets
+            </button>
+          </div>
+        </div>
+      ) : null}
       {actionWarning ? <div className="action-feedback action-feedback-warning">{actionWarning}</div> : null}
       {editorError && !editorMode ? <div className="action-feedback action-feedback-error">{editorError}</div> : null}
       {selectedKitLockSummary ? (
@@ -1515,7 +1573,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       {packingPanelOpen && selectedRowIds.length ? (
         <PackingSlipBuilderPanel
-          defaultProjectId={isProjectMode ? projectId ?? null : null}
+          defaultProjectId={assignNextStep?.projectId ?? (isProjectMode ? projectId ?? null : null)}
           departments={catalog.departments}
           error={packingError}
           initialAssetSelections={selectedAssetSelections}
@@ -1965,8 +2023,10 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 setActionPanelOpen(true);
                 setPackingPanelOpen(false);
                 setActionFeedback(null);
+                setAssignNextStep(null);
               }}
               onOpenAssetDetail={(assetId) => navigate(`/assets/${assetId}?report=incident`)}
+              onOpenProjectReturns={isProjectMode && projectId ? () => navigate(`/projects/${projectId}/packing`) : undefined}
               onQuantityChange={updateCartQuantity}
               onRemove={removeFromCart}
             />

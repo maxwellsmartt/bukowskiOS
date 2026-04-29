@@ -43,7 +43,6 @@ export const PackingSlipBuilderPanel = ({
   error,
   initialAssetSelections,
   isSubmitting,
-  onAssetSelectionsChange,
   onClose,
   onSubmit,
   projects,
@@ -101,25 +100,11 @@ export const PackingSlipBuilderPanel = ({
   const kitLockedAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount > 0);
   const unavailableAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount <= 0 && !resolveAssetAvailability(asset).isAvailable);
   const kitLockSummary = kitLockedAssets.map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`).join(", ");
-  const previewRows = selectedAssetDetails.slice(0, 5);
-  const hiddenPreviewCount = Math.max(0, selectedAssetDetails.length - previewRows.length);
-
-  const handleQuantityChange = (assetId: string, availableQuantity: number, rawValue: string) => {
-    const parsedValue = Number.parseInt(rawValue, 10);
-    const nextValue = Number.isFinite(parsedValue) ? parsedValue : 1;
-    const nextQuantity = Math.min(Math.max(nextValue, 1), Math.max(1, availableQuantity));
-
-    setQuantityByAssetId((current) => ({
-      ...current,
-      [assetId]: nextQuantity,
-    }));
-    onAssetSelectionsChange?.(
-      selectedAssetDetails.map((asset) => ({
-        assetId: asset.id,
-        quantity: asset.id === assetId ? nextQuantity : asset.requestedQuantity,
-      })),
-    );
-  };
+  const availableSummaryLabel = unavailableAssets.length
+    ? `${unavailableAssets.length} blocked`
+    : kitLockedAssets.length
+      ? `${kitLockedAssets.length} kit locked`
+      : "Ready to issue";
 
   return (
     <SurfaceCard
@@ -141,47 +126,22 @@ export const PackingSlipBuilderPanel = ({
         </div>
         <div className="summary-row">
           <span className="summary-label">Variable qty</span>
-          <span className="summary-value">{hasVariableQuantityAssets ? "Review quantities" : "Fixed"}</span>
+          <span className="summary-value">{hasVariableQuantityAssets ? "From cart" : "Fixed"}</span>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Availability</span>
+          <span className="summary-value">{availableSummaryLabel}</span>
         </div>
       </div>
 
-      <div className="packing-builder-selection-list">
-        {previewRows.map((asset) => (
-          <div className="packing-builder-selection-row" key={asset.id}>
-            <div className="packing-builder-selection-copy">
-              <span className="packing-builder-selection-title">{asset.name}</span>
-              <span className="packing-builder-selection-meta">
-                {asset.code} · {resolveAssetAvailability(asset).label} · {resolveAssetAvailability(asset).reason}
-                {asset.serialNumber && asset.serialNumber !== "—" ? ` · ${asset.serialNumber}` : ""}
-              </span>
-            </div>
-            {asset.quantity > 1 ? (
-              <label className="packing-builder-selection-quantity">
-                <span className="action-field-label">Qty</span>
-                <input
-                  className="action-field-control"
-                  max={asset.quantity}
-                  min={1}
-                  onChange={(event) => handleQuantityChange(asset.id, asset.quantity, event.target.value)}
-                  type="number"
-                  value={asset.requestedQuantity}
-                />
-              </label>
-            ) : (
-              <span className="packing-builder-selection-fixed">Qty 1</span>
-            )}
-          </div>
-        ))}
-        {hiddenPreviewCount ? (
-          <div className="packing-builder-selection-more">
-            {hiddenPreviewCount} more asset{hiddenPreviewCount === 1 ? "" : "s"} included in this slip.
-          </div>
-        ) : null}
+      <div className="packing-builder-context-summary">
+        <strong>Items come from the operation cart.</strong>
+        <span>Adjust asset quantities in the cart before issuing. This step only confirms project, unit, responsible and document details.</span>
       </div>
 
       {hasVariableQuantityAssets ? (
         <div className="action-feedback action-feedback-warning">
-          Adjust quantity for bulk assets before creating the slip.
+          Bulk quantities are locked to the current cart selection for this slip.
         </div>
       ) : null}
 

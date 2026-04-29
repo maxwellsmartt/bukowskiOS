@@ -19,6 +19,7 @@ import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -27,6 +28,7 @@ import { type ListSortOption, useListControls } from "@shared/hooks/useListContr
 import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { uiPreferenceKeys } from "@shared/lib/preferences";
 
 import { CatalogEditorPanel } from "./CatalogEditorPanel";
 import {
@@ -1013,7 +1015,13 @@ export const CatalogPage = () => {
         })}
       </div>
 
-      <div className={showContextColumn ? "split-layout" : "list-layout"}>
+      <ResizableSideRailLayout
+        className={showContextColumn ? "split-layout" : "list-layout"}
+        defaultWidth={360}
+        maxWidth={640}
+        minWidth={320}
+        storageKey={uiPreferenceKeys.catalogSideRailWidth}
+      >
         <SurfaceCard
           className="catalog-surface-card"
           title={activeTabConfig.title}
@@ -1154,36 +1162,10 @@ export const CatalogPage = () => {
           />
         </SurfaceCard>
 
-        {exportMenuOpen && exportMenuStyle
-          ? createPortal(
-              <div
-                className={`list-toolbar-menu list-toolbar-menu-${exportMenuStyle.placement}`}
-                ref={exportMenuRef}
-                role="menu"
-                style={{ top: exportMenuStyle.top, left: exportMenuStyle.left }}
-              >
-                <div className="list-toolbar-menu-section">
-                  <span className="list-toolbar-menu-label">Export</span>
-                  <button className="list-toolbar-menu-item" onClick={() => void runExport("template")} role="menuitem" type="button">
-                    <span className="list-toolbar-menu-item-copy">
-                      <Upload size={14} />
-                      <span>Blank template</span>
-                    </span>
-                  </button>
-                  <button className="list-toolbar-menu-item" onClick={() => void runExport("data")} role="menuitem" type="button">
-                    <span className="list-toolbar-menu-item-copy">
-                      <Upload size={14} />
-                      <span>{selectedCount ? `Selected rows (${selectedCount})` : "All rows"}</span>
-                    </span>
-                  </button>
-                </div>
-              </div>,
-              document.body,
-            )
-          : null}
-
-        {editorMode ? (
-          <CatalogEditorPanel
+        {showContextColumn || kitAssignOpen ? (
+          <div className="catalog-side-rail">
+            {editorMode ? (
+              <CatalogEditorPanel
             assetOptions={data.assetOptions}
             crewDocuments={activeTab === "crew" && editTargetRow ? ((editTargetRow.documents as CatalogSnapshot["crewMembers"][number]["documents"]) ?? []) : []}
             departmentOptions={data.departments}
@@ -1219,9 +1201,9 @@ export const CatalogPage = () => {
                 ? async (filePaths) => handleUploadCrewDocuments(editTargetRow.id as string, filePaths)
                 : undefined
             }
-          />
-        ) : showPreview && previewRow ? (
-          <SurfaceCard
+              />
+            ) : showPreview && previewRow ? (
+              <SurfaceCard
             title={resolveCatalogPreviewTitle(activeTab, previewRow)}
             aside={
               <button
@@ -1517,11 +1499,11 @@ export const CatalogPage = () => {
                 </div>
               </>
             ) : null}
-          </SurfaceCard>
-        ) : null}
+              </SurfaceCard>
+            ) : null}
 
-        {kitAssignOpen && activeKitRow ? (
-          <AssetAssignMovePanel
+            {kitAssignOpen && activeKitRow ? (
+              <AssetAssignMovePanel
             allowedModes={["assign"]}
             defaultProjectId={null}
             departments={data.departments}
@@ -1539,9 +1521,39 @@ export const CatalogPage = () => {
             selectedCount={activeKitAssignmentAssets.length}
             title={`Assign kit · ${activeKitRow.code}`}
             users={data.users}
-          />
+              />
+            ) : null}
+          </div>
         ) : null}
-      </div>
+      </ResizableSideRailLayout>
+
+      {exportMenuOpen && exportMenuStyle
+        ? createPortal(
+            <div
+              className={`list-toolbar-menu list-toolbar-menu-${exportMenuStyle.placement}`}
+              ref={exportMenuRef}
+              role="menu"
+              style={{ top: exportMenuStyle.top, left: exportMenuStyle.left }}
+            >
+              <div className="list-toolbar-menu-section">
+                <span className="list-toolbar-menu-label">Export</span>
+                <button className="list-toolbar-menu-item" onClick={() => void runExport("template")} role="menuitem" type="button">
+                  <span className="list-toolbar-menu-item-copy">
+                    <Upload size={14} />
+                    <span>Blank template</span>
+                  </span>
+                </button>
+                <button className="list-toolbar-menu-item" onClick={() => void runExport("data")} role="menuitem" type="button">
+                  <span className="list-toolbar-menu-item-copy">
+                    <Upload size={14} />
+                    <span>{selectedCount ? `Selected rows (${selectedCount})` : "All rows"}</span>
+                  </span>
+                </button>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {importDialogState ? (
         <CatalogCsvImportDialog

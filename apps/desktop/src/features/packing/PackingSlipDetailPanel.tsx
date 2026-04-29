@@ -74,11 +74,43 @@ export const PackingSlipDetailPanel = ({
   const returnLabel = selectedPendingAssetIds.length
     ? `Return ${selectedPendingAssetIds.length} selected`
     : `Return all pending (${pendingAssetIds.length})`;
+  const headerActions = (
+    <div className="packing-detail-header-actions">
+      <StatusBadge tone={data.slip.status === "Overdue" ? "critical" : data.slip.status === "Closed" ? "success" : "info"}>{data.slip.status}</StatusBadge>
+      <button
+        className="ghost-control action-row-button"
+        disabled={isExportingPdf}
+        onClick={() => void onExportPdf()}
+        type="button"
+      >
+        <Download size={14} />
+        <span>{isExportingPdf ? "Exporting..." : "Export slip"}</span>
+      </button>
+      <button
+        className="action-primary-button action-row-button"
+        disabled={isSubmittingReturn || !pendingAssetIds.length}
+        onClick={() => void onReturnItems(selectedPendingAssetIds.length ? selectedPendingAssetIds : pendingAssetIds, conditionIn, notes)}
+        type="button"
+      >
+        <RotateCcw size={14} />
+        <span>{isSubmittingReturn ? "Returning..." : returnLabel}</span>
+      </button>
+      <button
+        className="ghost-control action-row-button"
+        disabled={isExportingInsurancePdf}
+        onClick={() => void onExportInsurancePdf()}
+        type="button"
+      >
+        <FileText size={14} />
+        <span>{isExportingInsurancePdf ? "Exporting..." : "Export insurance"}</span>
+      </button>
+    </div>
+  );
 
   return (
     <SurfaceCard
       title={data.slip.number}
-      aside={<StatusBadge tone={data.slip.status === "Overdue" ? "critical" : data.slip.status === "Closed" ? "success" : "info"}>{data.slip.status}</StatusBadge>}
+      aside={headerActions}
     >
       <div className="summary-grid">
         <div className="summary-row">
@@ -189,46 +221,6 @@ export const PackingSlipDetailPanel = ({
             value={notes}
           />
         </label>
-      </div>
-
-      <div className="packing-detail-action-grid">
-        <div className="packing-detail-action-group">
-          <span className="packing-detail-action-label">Operational</span>
-          <div className="action-panel-actions action-panel-actions-inline">
-            <button
-              className="ghost-control"
-              disabled={isExportingPdf}
-              onClick={() => void onExportPdf()}
-              type="button"
-            >
-              <Download size={14} />
-              <span>{isExportingPdf ? "Exporting slip..." : "Export packing slip"}</span>
-            </button>
-            <button
-              className="action-primary-button"
-              disabled={isSubmittingReturn || !pendingAssetIds.length}
-              onClick={() => void onReturnItems(selectedPendingAssetIds.length ? selectedPendingAssetIds : pendingAssetIds, conditionIn, notes)}
-              type="button"
-            >
-              <RotateCcw size={14} />
-              <span>{isSubmittingReturn ? "Returning..." : returnLabel}</span>
-            </button>
-          </div>
-        </div>
-        <div className="packing-detail-action-group">
-          <span className="packing-detail-action-label">Production / insurance</span>
-          <div className="action-panel-actions action-panel-actions-inline">
-            <button
-              className="ghost-control"
-              disabled={isExportingInsurancePdf}
-              onClick={() => void onExportInsurancePdf()}
-              type="button"
-            >
-              <FileText size={14} />
-              <span>{isExportingInsurancePdf ? "Exporting insurance..." : "Export insurance list"}</span>
-            </button>
-          </div>
-        </div>
       </div>
 
       <DataTable
