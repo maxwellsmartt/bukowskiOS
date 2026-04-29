@@ -100,6 +100,8 @@ export const PackingSlipBuilderPanel = ({
   const kitLockedAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount > 0);
   const unavailableAssets = selectedAssetDetails.filter((asset) => asset.quantity <= 0);
   const kitLockSummary = kitLockedAssets.map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`).join(", ");
+  const previewRows = selectedAssetDetails.slice(0, 5);
+  const hiddenPreviewCount = Math.max(0, selectedAssetDetails.length - previewRows.length);
 
   const handleQuantityChange = (assetId: string, availableQuantity: number, rawValue: string) => {
     const parsedValue = Number.parseInt(rawValue, 10);
@@ -127,13 +129,23 @@ export const PackingSlipBuilderPanel = ({
       }
       title="Create packing slip"
     >
-      <div className="action-panel-summary">
-        <span>{selectedLabel}</span>
-        <span>{issueQuantityLabel} to issue</span>
+      <div className="packing-builder-summary-grid">
+        <div className="summary-row">
+          <span className="summary-label">Selection</span>
+          <span className="summary-value">{selectedLabel}</span>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Operational qty</span>
+          <span className="summary-value">{issueQuantityLabel}</span>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Variable qty</span>
+          <span className="summary-value">{hasVariableQuantityAssets ? "Review quantities" : "Fixed"}</span>
+        </div>
       </div>
 
       <div className="packing-builder-selection-list">
-        {selectedAssetDetails.map((asset) => (
+        {previewRows.map((asset) => (
           <div className="packing-builder-selection-row" key={asset.id}>
             <div className="packing-builder-selection-copy">
               <span className="packing-builder-selection-title">{asset.name}</span>
@@ -159,6 +171,11 @@ export const PackingSlipBuilderPanel = ({
             )}
           </div>
         ))}
+        {hiddenPreviewCount ? (
+          <div className="packing-builder-selection-more">
+            {hiddenPreviewCount} more asset{hiddenPreviewCount === 1 ? "" : "s"} included in this slip.
+          </div>
+        ) : null}
       </div>
 
       {hasVariableQuantityAssets ? (

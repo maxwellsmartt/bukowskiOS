@@ -1,4 +1,4 @@
-import { Download, FileText, RotateCcw } from "lucide-react";
+import { Download, FileText, RotateCcw, ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { PackingSlipDetailSnapshot } from "@contracts";
@@ -68,6 +68,9 @@ export const PackingSlipDetailPanel = ({
 
   const selectedPendingAssetIds = pendingAssetIds.filter((assetId) => selectedItemIds.includes(assetId));
   const missingInsuranceValueCount = data.items.filter((item) => item.unitInsuredValueAmount === null).length;
+  const insuredItemsCount = data.items.length - missingInsuranceValueCount;
+  const operationalQuantity = data.items.reduce((total, item) => total + item.quantity, 0);
+  const missingInsuranceItems = data.items.filter((item) => item.unitInsuredValueAmount === null).slice(0, 4);
   const returnLabel = selectedPendingAssetIds.length
     ? `Return ${selectedPendingAssetIds.length} selected`
     : `Return all pending (${pendingAssetIds.length})`;
@@ -116,6 +119,27 @@ export const PackingSlipDetailPanel = ({
         </div>
       </div>
 
+      <div className="packing-detail-summary-grid">
+        <div className="summary-row">
+          <span className="summary-label">Items</span>
+          <span className="summary-value">{data.items.length}</span>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Operational qty</span>
+          <span className="summary-value">{operationalQuantity}</span>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Insured total</span>
+          <span className="summary-value">{data.slip.insuredTotal}</span>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Insurance values</span>
+          <span className="summary-value">
+            {insuredItemsCount} ready · {missingInsuranceValueCount} pending
+          </span>
+        </div>
+      </div>
+
       {data.slip.primaryCodeValue ? (
         <ScannableCodePanel
           codeValue={data.slip.primaryCodeValue}
@@ -127,8 +151,20 @@ export const PackingSlipDetailPanel = ({
       ) : null}
 
       {missingInsuranceValueCount ? (
-        <div className="action-feedback action-feedback-warning">
-          {missingInsuranceValueCount} item{missingInsuranceValueCount === 1 ? "" : "s"} missing insured value. Insurance PDF will mark them as pending.
+        <div className="packing-insurance-warning">
+          <ShieldAlert size={16} />
+          <div>
+            <strong>{missingInsuranceValueCount} item{missingInsuranceValueCount === 1 ? "" : "s"} need insurance values</strong>
+            <span>
+              Add current value, replacement value, or purchase price plus additional costs before exporting the insurance list.
+            </span>
+            {missingInsuranceItems.length ? (
+              <span>
+                Pending: {missingInsuranceItems.map((item) => `${item.code} ${item.asset}`).join(", ")}
+                {missingInsuranceValueCount > missingInsuranceItems.length ? `, +${missingInsuranceValueCount - missingInsuranceItems.length} more` : ""}.
+              </span>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -155,34 +191,44 @@ export const PackingSlipDetailPanel = ({
         </label>
       </div>
 
-      <div className="action-panel-actions action-panel-actions-inline">
-        <button
-          className="ghost-control"
-          disabled={isExportingPdf}
-          onClick={() => void onExportPdf()}
-          type="button"
-        >
-          <Download size={14} />
-          <span>{isExportingPdf ? "Exporting slip..." : "Export packing slip"}</span>
-        </button>
-        <button
-          className="ghost-control"
-          disabled={isExportingInsurancePdf}
-          onClick={() => void onExportInsurancePdf()}
-          type="button"
-        >
-          <FileText size={14} />
-          <span>{isExportingInsurancePdf ? "Exporting insurance..." : "Export insurance list"}</span>
-        </button>
-        <button
-          className="action-primary-button"
-          disabled={isSubmittingReturn || !pendingAssetIds.length}
-          onClick={() => void onReturnItems(selectedPendingAssetIds.length ? selectedPendingAssetIds : pendingAssetIds, conditionIn, notes)}
-          type="button"
-        >
-          <RotateCcw size={14} />
-          <span>{isSubmittingReturn ? "Returning..." : returnLabel}</span>
-        </button>
+      <div className="packing-detail-action-grid">
+        <div className="packing-detail-action-group">
+          <span className="packing-detail-action-label">Operational</span>
+          <div className="action-panel-actions action-panel-actions-inline">
+            <button
+              className="ghost-control"
+              disabled={isExportingPdf}
+              onClick={() => void onExportPdf()}
+              type="button"
+            >
+              <Download size={14} />
+              <span>{isExportingPdf ? "Exporting slip..." : "Export packing slip"}</span>
+            </button>
+            <button
+              className="action-primary-button"
+              disabled={isSubmittingReturn || !pendingAssetIds.length}
+              onClick={() => void onReturnItems(selectedPendingAssetIds.length ? selectedPendingAssetIds : pendingAssetIds, conditionIn, notes)}
+              type="button"
+            >
+              <RotateCcw size={14} />
+              <span>{isSubmittingReturn ? "Returning..." : returnLabel}</span>
+            </button>
+          </div>
+        </div>
+        <div className="packing-detail-action-group">
+          <span className="packing-detail-action-label">Production / insurance</span>
+          <div className="action-panel-actions action-panel-actions-inline">
+            <button
+              className="ghost-control"
+              disabled={isExportingInsurancePdf}
+              onClick={() => void onExportInsurancePdf()}
+              type="button"
+            >
+              <FileText size={14} />
+              <span>{isExportingInsurancePdf ? "Exporting insurance..." : "Export insurance list"}</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <DataTable
