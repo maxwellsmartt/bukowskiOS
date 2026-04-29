@@ -78,6 +78,6 @@ describe("asset availability", () => {
         { ...baseAsset, quantity: 0 },
         { ...baseAsset, quantity: 0, assignedQuantity: 1 },
       ]),
-    ).toBe("1 in repair, 1 retired, 1 no stock, 1 assigned");
+    ).toBe("1 in repair, 1 retired, 1 out of stock, 1 assigned");
   });
 });

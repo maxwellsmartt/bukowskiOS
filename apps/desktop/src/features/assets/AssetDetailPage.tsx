@@ -159,11 +159,11 @@ export const AssetDetailPage = () => {
       >
         <div className="summary-grid compact-summary-grid">
           <div className="summary-row">
-            <span className="summary-label">Status</span>
+            <span className="summary-label">Current state</span>
             <span className="summary-value">{availability.reason}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Next action</span>
+            <span className="summary-label">To use</span>
             <span className="summary-value">{availability.nextAction}</span>
           </div>
           <div className="summary-row">
@@ -178,12 +178,6 @@ export const AssetDetailPage = () => {
       {editorFeedback ? <div className="action-feedback action-feedback-success">{editorFeedback}</div> : null}
       {filesFeedback ? <div className="action-feedback action-feedback-success">{filesFeedback}</div> : null}
       {filesError ? <div className="action-feedback action-feedback-error">{filesError}</div> : null}
-      {data.asset.linkedKitCount ? (
-        <div className="action-feedback action-feedback-warning">
-          This asset is currently part of the active kit{data.asset.linkedKitCount === 1 ? "" : "s"} {data.asset.linkedKitCodes.join(", ")}. Remove it from the kit first before assigning or moving it individually.
-        </div>
-      ) : null}
-
       <SurfaceCard
         title="Asset images"
         aside={

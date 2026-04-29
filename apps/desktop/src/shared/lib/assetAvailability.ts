@@ -25,8 +25,8 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
     return {
       isAvailable: false,
       label: "In kit",
-      reason: linkedKitCodes.length ? `Part of active kit ${linkedKitCodes.join(", ")}.` : "Part of an active kit.",
-      nextAction: "Remove it from the kit before assigning or issuing it individually.",
+      reason: linkedKitCodes.length ? `In kit ${linkedKitCodes.join(", ")}.` : "Part of an active kit.",
+      nextAction: "Remove from kit to use separately.",
       tone: "warning",
     };
   }
@@ -35,8 +35,8 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
     return {
       isAvailable: false,
       label: "Retired",
-      reason: "Retired assets stay in history but cannot be assigned or issued.",
-      nextAction: "Use replacement equipment or review the linked incident/repair record.",
+      reason: "Unavailable; kept for history.",
+      nextAction: "Use replacement equipment.",
       tone: "critical",
     };
   }
@@ -45,8 +45,8 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
     return {
       isAvailable: false,
       label: "In repair",
-      reason: "This asset is in maintenance and out of available inventory.",
-      nextAction: "Open the repair case or mark it repaired before assigning it again.",
+      reason: "Out for repair.",
+      nextAction: "Close repair case to return it to stock.",
       tone: "warning",
     };
   }
@@ -56,7 +56,7 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
       isAvailable: false,
       label: "Checked out",
       reason: `${asset.checkedOutQuantity} checked out${hasMeaningfulProject(asset.project) ? ` on ${asset.project}` : ""}.`,
-      nextAction: "Return the asset before assigning or issuing it again.",
+      nextAction: "Process return before reusing.",
       tone: "warning",
     };
   }
@@ -66,7 +66,7 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
       isAvailable: false,
       label: "Assigned",
       reason: `${asset.assignedQuantity} reserved${hasMeaningfulProject(asset.project) ? ` for ${asset.project}` : ""}.`,
-      nextAction: "Use the existing project context or release/reassign the reservation first.",
+      nextAction: "Release or move the reservation first.",
       tone: "info",
     };
   }
@@ -75,8 +75,8 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
     return {
       isAvailable: false,
       label: "No stock",
-      reason: "There are no available units right now.",
-      nextAction: "Wait for a return or add available stock before using this asset.",
+      reason: "No units available.",
+      nextAction: "Wait for return or add stock.",
       tone: "neutral",
     };
   }
@@ -85,9 +85,18 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
     isAvailable: true,
     label: "Available",
     reason: asset.quantity === 1 ? "1 unit available." : `${asset.quantity} units available.`,
-    nextAction: "Ready for assignment or packing.",
+    nextAction: "Ready to use.",
     tone: "success",
   };
+};
+
+const unavailableSummaryLabel: Record<string, string> = {
+  Assigned: "assigned",
+  "Checked out": "checked out",
+  "In kit": "in kit",
+  "In repair": "in repair",
+  "No stock": "out of stock",
+  Retired: "retired",
 };
 
 export const summarizeUnavailableAssets = (assets: AvailabilityAsset[]) => {
@@ -98,6 +107,6 @@ export const summarizeUnavailableAssets = (assets: AvailabilityAsset[]) => {
   }, {});
 
   return Object.entries(counts)
-    .map(([label, count]) => `${count} ${label.toLowerCase()}`)
+    .map(([label, count]) => `${count} ${unavailableSummaryLabel[label] ?? label.toLowerCase()}`)
     .join(", ");
 };
