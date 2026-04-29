@@ -5,7 +5,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import type { AssetListQuery, IncidentListQuery, IncidentSortField, RmaCaseDetailSnapshot, RmaCaseStatus } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAssetsList } from "@features/assets/useAssetsData";
-import { buildAvailableRmaAssets, RmaCaseEditorPanel, type RmaCaseEditorDraft } from "@features/rma/RmaCaseEditorPanel";
+import {
+  buildAvailableRmaAssets,
+  RmaCaseEditorPanel,
+  type AvailableRmaAsset,
+  type RmaCaseEditorDraft,
+  type RmaCaseEditorInitialDraft,
+} from "@features/rma/RmaCaseEditorPanel";
 import { createRmaCase, updateRmaCase, useRmaCaseDetail, useRmaSnapshot } from "@features/rma/useRmaData";
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
@@ -156,6 +162,8 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
   const [activeRmaCaseId, setActiveRmaCaseId] = useState<string | null>(null);
   const [pendingRmaCaseId, setPendingRmaCaseId] = useState<string | null>(null);
   const [rmaEditorMode, setRmaEditorMode] = useState<"create" | "edit" | null>(null);
+  const [rmaInitialDraft, setRmaInitialDraft] = useState<RmaCaseEditorInitialDraft | null>(null);
+  const [rmaInitialAsset, setRmaInitialAsset] = useState<AvailableRmaAsset | null>(null);
   const [rmaEditorError, setRmaEditorError] = useState<string | null>(null);
   const [rmaFeedback, setRmaFeedback] = useState<string | null>(null);
   const [isSubmittingRma, setIsSubmittingRma] = useState(false);
@@ -201,9 +209,74 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
   }, [pendingRmaCaseId, rmaSnapshot.cases]);
 
   const availableRmaAssets = useMemo(
-    () => buildAvailableRmaAssets(rmaSnapshot.maintenanceAssets, rmaEditorMode === "edit" ? rmaDetail : null),
-    [rmaDetail, rmaEditorMode, rmaSnapshot.maintenanceAssets],
+    () => {
+      const rows = buildAvailableRmaAssets(rmaSnapshot.maintenanceAssets, rmaEditorMode === "edit" ? rmaDetail : null);
+
+      if (!rmaInitialAsset || rows.some((asset) => asset.id === rmaInitialAsset.id)) {
+        return rows;
+      }
+
+      return [rmaInitialAsset, ...rows];
+    },
+    [rmaDetail, rmaEditorMode, rmaInitialAsset, rmaSnapshot.maintenanceAssets],
   );
+  const activeIncident = activeIncidentDetail.incident;
+  const activeIncidentRepairCase =
+    activeIncident?.assetId
+      ? rmaSnapshot.cases.find(
+          (row) =>
+            row.assetIds.includes(activeIncident.assetId!) &&
+            row.status !== "No repair / retired" &&
+            row.status !== "Returned to inventory",
+        ) ?? null
+      : null;
+
+  const handleCreateRepairCaseFromIncident = () => {
+    if (!activeIncident?.assetId) {
+      return;
+    }
+
+    const asset = assets.find((row) => row.id === activeIncident.assetId);
+    const manufacturer = rmaSnapshot.manufacturers.find((row) =>
+      [asset?.name, activeIncident.asset, activeIncident.title].some((value) =>
+        value?.toLowerCase().includes(row.name.toLowerCase()),
+      ),
+    );
+
+    setRmaInitialAsset({
+      id: activeIncident.assetId,
+      name: asset?.name ?? activeIncident.asset,
+      brand: "",
+      model: "",
+      serialNumber: asset?.serialNumber === "—" ? "" : asset?.serialNumber ?? "",
+      location: asset?.location ?? "Current asset",
+      latestIssue: activeIncident.title,
+    });
+    setRmaInitialDraft({
+      manufacturerId: manufacturer?.id,
+      supportEmail: manufacturer?.supportEmail,
+      title: `Repair · ${activeIncident.title}`,
+      problemSummary: activeIncident.description,
+      notes: `Created from incident ${activeIncident.id}.`,
+      status: "Needs review",
+      assetItems: [
+        {
+          assetId: activeIncident.assetId,
+          issueSummary: activeIncident.description,
+        },
+      ],
+    });
+    setActiveRmaCaseId(null);
+    setRmaEditorMode("create");
+    setRmaEditorError(null);
+    setRmaFeedback(null);
+  };
+
+  const handleOpenRepairCaseFromIncident = (repairCaseId: string) => {
+    setActiveRmaCaseId(repairCaseId);
+    setRmaEditorMode(null);
+    setRmaEditorError(null);
+  };
 
   const handleSubmitRma = async (draft: RmaCaseEditorDraft) => {
     try {
@@ -248,6 +321,8 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       }
 
       setRmaEditorError(null);
+      setRmaInitialDraft(null);
+      setRmaInitialAsset(null);
       setRmaEditorMode(null);
     } catch (nextError) {
       setRmaEditorError(getUserFacingErrorMessage(nextError, "Unable to save repair case."));
@@ -456,11 +531,22 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
         error={incidentDetailError ?? activeIncidentDetailLoadError}
         feedback={incidentDetailFeedback}
         isSubmitting={isSubmittingIncidentDetail}
+        repairCase={
+          activeIncidentRepairCase
+            ? {
+                id: activeIncidentRepairCase.id,
+                title: activeIncidentRepairCase.title,
+                status: activeIncidentRepairCase.status,
+              }
+            : null
+        }
         onClose={() => {
           setActiveIncidentId(null);
           setIncidentDetailError(null);
           setIncidentDetailFeedback(null);
         }}
+        onCreateRepairCase={!isProjectMode ? handleCreateRepairCaseFromIncident : undefined}
+        onOpenRepairCase={!isProjectMode ? handleOpenRepairCaseFromIncident : undefined}
         onRefresh={reloadIncidentDetail}
         onResolve={async (value) => {
           if (!activeIncidentId) {
@@ -561,6 +647,8 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
                   className="action-primary-button"
                   onClick={() => {
                     setRmaEditorMode("create");
+                    setRmaInitialDraft(null);
+                    setRmaInitialAsset(null);
                     setRmaEditorError(null);
                   }}
                   type="button"
@@ -611,12 +699,15 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
                 key={`${rmaEditorMode}-${rmaDetail.caseRecord?.id ?? "new"}`}
                 availableAssets={availableRmaAssets}
                 error={rmaEditorError}
+                initialDraft={rmaEditorMode === "create" ? rmaInitialDraft : null}
                 initialValue={rmaEditorMode === "edit" ? rmaDetail : null}
                 isSubmitting={isSubmittingRma}
                 manufacturers={rmaSnapshot.manufacturers}
                 mode={rmaEditorMode}
                 onClose={() => {
                   setRmaEditorMode(null);
+                  setRmaInitialDraft(null);
+                  setRmaInitialAsset(null);
                   setRmaEditorError(null);
                 }}
                 onOpenCatalog={() => navigate("/catalog")}

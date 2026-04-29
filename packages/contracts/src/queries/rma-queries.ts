@@ -33,6 +33,7 @@ export type RmaCaseListRow = {
   supportEmail: string;
   status: RmaCaseStatus;
   assetCount: number;
+  assetIds: string[];
   updatedAtLabel: string;
 };
 

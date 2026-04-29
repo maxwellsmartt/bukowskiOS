@@ -69,17 +69,22 @@ const assertAssetsEligibleForCreate = (db: DatabaseSync, workspaceId: string, as
   const rows = db
     .prepare(
       `
-        SELECT asset_current_state.asset_id
+        SELECT asset_current_state.asset_id, asset_current_state.operational_status
         FROM asset_current_state
         WHERE asset_current_state.workspace_id = ?
-          AND asset_current_state.operational_status = 'maintenance'
           AND asset_current_state.asset_id IN (${placeholders})
       `,
     )
-    .all(workspaceId, ...assetIds) as Array<{ asset_id: string }>;
+    .all(workspaceId, ...assetIds) as Array<{ asset_id: string; operational_status: string }>;
 
   if (rows.length !== assetIds.length) {
-    throw new Error("RMA cases can only be created from assets currently in maintenance.");
+    throw new Error("One or more selected assets are no longer available for repair.");
+  }
+
+  const retiredRow = rows.find((row) => row.operational_status === "retired");
+
+  if (retiredRow) {
+    throw new Error("Retired assets cannot be sent to repair.");
   }
 };
 
@@ -169,9 +174,17 @@ const resolveAssetStateForRmaStatus = (status: RmaCaseStatus) => {
   };
 };
 
+type RmaStatusMutationContext = {
+  commandId: string;
+  workspaceId: string;
+  rmaCaseId: string;
+  actorType: string;
+  sourceChannel: string;
+};
+
 const applyRmaStatusToAssets = (
   db: DatabaseSync,
-  input: UpdateRmaCaseCommand,
+  input: RmaStatusMutationContext,
   assetItems: ReturnType<typeof uniqueAssetItems>,
   status: RmaCaseStatus,
   actorUserId: string,
@@ -350,6 +363,20 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
       ).run(rmaCaseId, workspaceId, manufacturer.id, title, supportEmail, problemSummary, optionalValue(input.notes), actor.actorUserId, now, now);
 
       replaceCaseAssets(db, rmaCaseId, assetItems, now);
+      applyRmaStatusToAssets(
+        db,
+        {
+          commandId: input.commandId,
+          workspaceId,
+          rmaCaseId,
+          actorType: input.actorType,
+          sourceChannel: input.sourceChannel,
+        },
+        assetItems,
+        "Needs review",
+        actor.actorUserId,
+        now,
+      );
 
       db.exec("COMMIT");
       return {

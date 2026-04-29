@@ -13,8 +13,11 @@ type IncidentDetailPanelProps = {
   error: string | null;
   feedback: string | null;
   isSubmitting: boolean;
+  repairCase?: { id: string; title: string; status: string } | null;
   users: CatalogSnapshot["users"];
   onClose: () => void;
+  onCreateRepairCase?: () => void;
+  onOpenRepairCase?: (repairCaseId: string) => void;
   onRefresh: () => void | Promise<void>;
   onResolve: (value: {
     resolutionNotes?: string;
@@ -94,8 +97,11 @@ export const IncidentDetailPanel = ({
   error,
   feedback,
   isSubmitting,
+  repairCase,
   users,
   onClose,
+  onCreateRepairCase,
+  onOpenRepairCase,
   onRefresh,
   onResolve,
   onUpdate,
@@ -157,6 +163,28 @@ export const IncidentDetailPanel = ({
             {incident.severity}
           </StatusBadge>
         </div>
+
+        {incident.assetId ? (
+          <div className="incident-repair-handoff">
+            <div className="incident-repair-handoff-copy">
+              <strong>{repairCase ? "Repair case linked" : "Repair follow-up"}</strong>
+              <span>
+                {repairCase
+                  ? `${repairCase.title} · ${repairCase.status}`
+                  : "Create a repair case from this incident and remove the asset from availability while it is reviewed."}
+              </span>
+            </div>
+            {repairCase && onOpenRepairCase ? (
+              <button className="ghost-control" onClick={() => onOpenRepairCase?.(repairCase.id)} type="button">
+                Open repair case
+              </button>
+            ) : incident.status !== "Resolved" && onCreateRepairCase ? (
+              <button className="ghost-control" onClick={onCreateRepairCase} type="button">
+                Create repair case
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="summary-grid compact-summary-grid">
           <div className="summary-row">

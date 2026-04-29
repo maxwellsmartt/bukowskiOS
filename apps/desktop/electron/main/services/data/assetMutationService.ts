@@ -546,6 +546,12 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
       if (retiredAsset) {
         fail(`${retiredAsset.asset_name} is retired and can no longer be assigned.`);
       }
+
+      const maintenanceAsset = assetStateRows.find((row) => row.operational_status === "maintenance");
+
+      if (maintenanceAsset) {
+        fail(`${maintenanceAsset.asset_name} is in maintenance and cannot be assigned right now.`);
+      }
     }
 
     const invalidQuantityAsset =
@@ -632,12 +638,6 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
     }
 
     if (input.mode === "assign") {
-      const maintenanceAsset = processedRows.find((row) => row.operational_status === "maintenance");
-
-      if (maintenanceAsset) {
-        fail(`${maintenanceAsset.asset_name} is in maintenance and cannot be assigned right now.`);
-      }
-
       const checkedOutAsset = processedRows.find((row) => row.checked_out_quantity > 0);
 
       if (checkedOutAsset) {

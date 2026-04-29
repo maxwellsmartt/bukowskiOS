@@ -6,7 +6,7 @@ import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 
-type AvailableRmaAsset = {
+export type AvailableRmaAsset = {
   id: string;
   name: string;
   brand: string;
@@ -26,9 +26,14 @@ export type RmaCaseEditorDraft = {
   assetItems: RmaCaseAssetInput[];
 };
 
+export type RmaCaseEditorInitialDraft = Partial<Omit<RmaCaseEditorDraft, "assetItems">> & {
+  assetItems?: RmaCaseAssetInput[];
+};
+
 type RmaCaseEditorPanelProps = {
   availableAssets: AvailableRmaAsset[];
   error: string | null;
+  initialDraft?: RmaCaseEditorInitialDraft | null;
   initialValue?: RmaCaseDetailSnapshot | null;
   isSubmitting: boolean;
   manufacturers: RmaManufacturerRow[];
@@ -68,9 +73,21 @@ const resolveInitialAssetState = (snapshot?: RmaCaseDetailSnapshot | null) =>
     ]),
   ) as Record<string, SelectedAssetState>;
 
+const resolveDraftAssetState = (draft?: RmaCaseEditorInitialDraft | null) =>
+  Object.fromEntries(
+    (draft?.assetItems ?? []).map((asset) => [
+      asset.assetId,
+      {
+        equipmentYear: asset.equipmentYear ?? "",
+        issueSummary: asset.issueSummary,
+      } satisfies SelectedAssetState,
+    ]),
+  ) as Record<string, SelectedAssetState>;
+
 export const RmaCaseEditorPanel = ({
   availableAssets,
   error,
+  initialDraft,
   initialValue,
   isSubmitting,
   manufacturers,
@@ -79,13 +96,16 @@ export const RmaCaseEditorPanel = ({
   onOpenCatalog,
   onSubmit,
 }: RmaCaseEditorPanelProps) => {
-  const [manufacturerId, setManufacturerId] = useState(initialValue?.caseRecord?.manufacturerId ?? manufacturers[0]?.id ?? "");
-  const [supportEmail, setSupportEmail] = useState(initialValue?.caseRecord?.supportEmail ?? "");
-  const [title, setTitle] = useState(initialValue?.caseRecord?.title ?? "");
-  const [problemSummary, setProblemSummary] = useState(initialValue?.caseRecord?.problemSummary ?? "");
-  const [notes, setNotes] = useState(initialValue?.caseRecord?.notes ?? "");
-  const [status, setStatus] = useState<RmaCaseStatus>(initialValue?.caseRecord?.status ?? "Needs review");
-  const [selectedAssets, setSelectedAssets] = useState<Record<string, SelectedAssetState>>(() => resolveInitialAssetState(initialValue));
+  const [manufacturerId, setManufacturerId] = useState(initialValue?.caseRecord?.manufacturerId ?? initialDraft?.manufacturerId ?? manufacturers[0]?.id ?? "");
+  const [supportEmail, setSupportEmail] = useState(initialValue?.caseRecord?.supportEmail ?? initialDraft?.supportEmail ?? "");
+  const [title, setTitle] = useState(initialValue?.caseRecord?.title ?? initialDraft?.title ?? "");
+  const [problemSummary, setProblemSummary] = useState(initialValue?.caseRecord?.problemSummary ?? initialDraft?.problemSummary ?? "");
+  const [notes, setNotes] = useState(initialValue?.caseRecord?.notes ?? initialDraft?.notes ?? "");
+  const [status, setStatus] = useState<RmaCaseStatus>(initialValue?.caseRecord?.status ?? initialDraft?.status ?? "Needs review");
+  const [selectedAssets, setSelectedAssets] = useState<Record<string, SelectedAssetState>>(() => ({
+    ...resolveDraftAssetState(initialDraft),
+    ...resolveInitialAssetState(initialValue),
+  }));
 
   const manufacturerEmail = useMemo(
     () => manufacturers.find((manufacturer) => manufacturer.id === manufacturerId)?.supportEmail ?? "",

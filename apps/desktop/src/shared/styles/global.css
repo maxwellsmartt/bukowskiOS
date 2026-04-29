@@ -6669,6 +6669,34 @@ button.timeline-signal-chip:focus-visible {
   color: var(--text-muted);
 }
 
+.incident-repair-handoff {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.incident-repair-handoff-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.incident-repair-handoff-copy strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.incident-repair-handoff-copy span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .agents-health-grid,
 .agents-support-grid {
   display: grid;

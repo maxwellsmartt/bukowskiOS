@@ -1364,6 +1364,22 @@ export const createFoundationReadService = (db: DatabaseSync) => {
       updated_at: string;
       asset_count: number;
     }>;
+    const rmaAssetRows = db
+      .prepare(
+        `
+          SELECT rma_case_id, asset_id
+          FROM rma_case_assets
+          WHERE rma_case_id IN (${rmaCases.length ? rmaCases.map(() => "?").join(", ") : "NULL"})
+          ORDER BY asset_id
+        `,
+      )
+      .all(...rmaCases.map((row) => row.id)) as Array<{ rma_case_id: string; asset_id: string }>;
+    const assetIdsByRmaCaseId = rmaAssetRows.reduce((map, row) => {
+      const current = map.get(row.rma_case_id) ?? [];
+      current.push(row.asset_id);
+      map.set(row.rma_case_id, current);
+      return map;
+    }, new Map<string, string[]>());
 
     return {
       cases: rmaCases.map((row) => ({
@@ -1373,6 +1389,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
         supportEmail: row.support_email,
         status: normalizeRmaStatus(row.status) as RmaCaseStatus,
         assetCount: row.asset_count,
+        assetIds: assetIdsByRmaCaseId.get(row.id) ?? [],
         updatedAtLabel: formatTimelineTimestamp(row.updated_at),
       })),
       maintenanceAssets: maintenanceAssets.map((row) => ({
