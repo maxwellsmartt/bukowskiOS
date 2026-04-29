@@ -5,6 +5,7 @@ import type { AssetListRow, CatalogSnapshot, PackingSlipAssetSelection, ProjectC
 import { useProjectDetail } from "@features/projects/useProjectsData";
 import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { resolveAssetAvailability, summarizeUnavailableAssets } from "@shared/lib/assetAvailability";
 
 export type PackingSlipBuilderDraft = {
   assetSelections: PackingSlipAssetSelection[];
@@ -98,7 +99,7 @@ export const PackingSlipBuilderPanel = ({
   const issueQuantityLabel = totalIssueQuantity === 1 ? "1 item" : `${totalIssueQuantity} items`;
   const hasVariableQuantityAssets = selectedAssetDetails.some((asset) => asset.quantity > 1);
   const kitLockedAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount > 0);
-  const unavailableAssets = selectedAssetDetails.filter((asset) => asset.quantity <= 0);
+  const unavailableAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount <= 0 && !resolveAssetAvailability(asset).isAvailable);
   const kitLockSummary = kitLockedAssets.map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`).join(", ");
   const previewRows = selectedAssetDetails.slice(0, 5);
   const hiddenPreviewCount = Math.max(0, selectedAssetDetails.length - previewRows.length);
@@ -150,7 +151,7 @@ export const PackingSlipBuilderPanel = ({
             <div className="packing-builder-selection-copy">
               <span className="packing-builder-selection-title">{asset.name}</span>
               <span className="packing-builder-selection-meta">
-                {asset.code} · Available {asset.quantity}
+                {asset.code} · {resolveAssetAvailability(asset).label} · {resolveAssetAvailability(asset).reason}
                 {asset.serialNumber && asset.serialNumber !== "—" ? ` · ${asset.serialNumber}` : ""}
               </span>
             </div>
@@ -192,7 +193,7 @@ export const PackingSlipBuilderPanel = ({
 
       {unavailableAssets.length ? (
         <div className="action-feedback action-feedback-warning">
-          {unavailableAssets.length} selected asset{unavailableAssets.length === 1 ? "" : "s"} have no available units to issue.
+          Cannot issue: {summarizeUnavailableAssets(unavailableAssets)}.
         </div>
       ) : null}
 

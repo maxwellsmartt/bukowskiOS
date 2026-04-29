@@ -11,6 +11,7 @@ import { ScannableCodePanel } from "@shared/components/ScannableCodePanel";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { resolveAssetAvailability } from "@shared/lib/assetAvailability";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
@@ -87,6 +88,7 @@ export const AssetDetailPage = () => {
   }
 
   const stockSummary = `${data.asset.quantity} available · ${data.asset.assignedQuantity} reserved · ${data.asset.checkedOutQuantity} checked out`;
+  const availability = resolveAssetAvailability(data.asset);
   const secondaryCodes = data.scannableCodes.filter((code) => !code.isPrimary);
   const assetImages = data.files.filter((file) => file.status === "available" && isAssetImageFile(file)).slice(0, 2);
   const documentFiles = data.files.filter((file) => !isAssetImageFile(file));
@@ -147,6 +149,26 @@ export const AssetDetailPage = () => {
           <div className="summary-row">
             <span className="summary-label">Condition</span>
             <span className="summary-value">{data.asset.condition}</span>
+          </div>
+        </div>
+      </SurfaceCard>
+
+      <SurfaceCard
+        title="Availability"
+        aside={<StatusBadge tone={availability.tone}>{availability.label}</StatusBadge>}
+      >
+        <div className="summary-grid compact-summary-grid">
+          <div className="summary-row">
+            <span className="summary-label">Status</span>
+            <span className="summary-value">{availability.reason}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Next action</span>
+            <span className="summary-value">{availability.nextAction}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Stock</span>
+            <span className="summary-value">{stockSummary}</span>
           </div>
         </div>
       </SurfaceCard>

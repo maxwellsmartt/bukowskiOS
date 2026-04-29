@@ -624,7 +624,7 @@ export const CatalogPage = () => {
   const activeKitAssignmentAssets = useMemo<AssetAssignSelectionRow[]>(
     () =>
       activeKitSelections
-        .map((selection) => {
+        .map<AssetAssignSelectionRow | null>((selection) => {
           const asset = assetOptionsById.get(selection.assetId);
           if (!asset) {
             return null;
@@ -637,6 +637,10 @@ export const CatalogPage = () => {
             quantity: asset.quantity,
             assignedQuantity: asset.assignedQuantity,
             checkedOutQuantity: asset.checkedOutQuantity,
+            status: asset.status,
+            project: asset.currentProject ?? undefined,
+            linkedKitCount: asset.linkedKitCount,
+            linkedKitCodes: asset.linkedKitCodes,
           } satisfies AssetAssignSelectionRow;
         })
         .filter((asset): asset is AssetAssignSelectionRow => Boolean(asset)),

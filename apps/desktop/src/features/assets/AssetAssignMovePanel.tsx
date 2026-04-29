@@ -5,6 +5,7 @@ import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
 import { useProjectDetail } from "@features/projects/useProjectsData";
 import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { resolveAssetAvailability, summarizeUnavailableAssets } from "@shared/lib/assetAvailability";
 
 export type AssetAssignMoveFormValue = {
   assetSelections?: Array<{ assetId: string; quantity: number }>;
@@ -25,6 +26,10 @@ export type AssetAssignSelectionRow = {
   quantity: number;
   assignedQuantity: number;
   checkedOutQuantity: number;
+  status: string;
+  project?: string;
+  linkedKitCount?: number;
+  linkedKitCodes?: string[];
   serialNumber?: string;
 };
 
@@ -133,7 +138,7 @@ export const AssetAssignMovePanel = ({
   );
   const totalAssignQuantity = selectedAssetDetails.reduce((sum, asset) => sum + asset.requestedQuantity, 0);
   const hasVariableQuantityAssets = !lockedAssetSelections?.length && selectedAssetDetails.some((asset) => asset.sourceQuantity > 1);
-  const unavailableAssignAssets = selectedAssetDetails.filter((asset) => asset.sourceQuantity <= 0);
+  const unavailableAssignAssets = selectedAssetDetails.filter((asset) => !asset.linkedKitCount && !resolveAssetAvailability(asset).isAvailable);
 
   const handleQuantityChange = (assetId: string, availableQuantity: number, rawValue: string) => {
     const parsedValue = Number.parseInt(rawValue, 10);
@@ -200,7 +205,7 @@ export const AssetAssignMovePanel = ({
                 <div className="packing-builder-selection-copy">
                   <span className="packing-builder-selection-title">{asset.name}</span>
                   <span className="packing-builder-selection-meta">
-                    {asset.code} · Assignable {asset.sourceQuantity}
+                    {asset.code} · {resolveAssetAvailability(asset).label} · {resolveAssetAvailability(asset).reason}
                     {asset.assignedQuantity > 0 ? ` · Reserved ${asset.assignedQuantity}` : ""}
                     {asset.serialNumber && asset.serialNumber !== "—" ? ` · ${asset.serialNumber}` : ""}
                   </span>
@@ -233,7 +238,7 @@ export const AssetAssignMovePanel = ({
           ) : null}
           {unavailableAssignAssets.length ? (
             <div className="action-feedback action-feedback-warning">
-              {unavailableAssignAssets.length} selected asset{unavailableAssignAssets.length === 1 ? "" : "s"} have no available units for assignment.
+              Cannot assign: {summarizeUnavailableAssets(unavailableAssignAssets)}.
             </div>
           ) : null}
         </>

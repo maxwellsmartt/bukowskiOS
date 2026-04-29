@@ -18,6 +18,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
+import { resolveAssetAvailability, summarizeUnavailableAssets } from "@shared/lib/assetAvailability";
 import { formatAssetStockDetailRows, formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
@@ -370,7 +371,7 @@ const AssetOperationCart = ({
   }
 
   const lockedItems = items.filter((asset) => asset.linkedKitCount > 0);
-  const unavailableItems = items.filter((asset) => resolveAssignableQuantity(asset) <= 0);
+  const unavailableItems = items.filter((asset) => asset.linkedKitCount <= 0 && !resolveAssetAvailability(asset).isAvailable);
   const totalUnits = items.reduce((total, asset) => total + asset.requestedQuantity, 0);
   const issueActionsDisabled = lockedItems.length > 0 || unavailableItems.length > 0;
   const singleAsset = items.length === 1 ? items[0] : null;
@@ -431,7 +432,7 @@ const AssetOperationCart = ({
         <div className="asset-operation-cart-warning">
           {lockedItems.length ? `${lockedItems.length} asset${lockedItems.length === 1 ? "" : "s"} locked by active kit.` : null}
           {lockedItems.length && unavailableItems.length ? " " : ""}
-          {unavailableItems.length ? `${unavailableItems.length} asset${unavailableItems.length === 1 ? "" : "s"} with no available units.` : null}
+          {unavailableItems.length ? summarizeUnavailableAssets(unavailableItems) : null}
         </div>
       ) : null}
 
@@ -439,15 +440,15 @@ const AssetOperationCart = ({
         {items.map((asset) => {
           const maxQuantity = resolveAssignableQuantity(asset);
           const isLocked = asset.linkedKitCount > 0;
-          const isUnavailable = maxQuantity <= 0;
+          const availability = resolveAssetAvailability(asset);
+          const isUnavailable = !availability.isAvailable;
 
           return (
             <div className={`asset-operation-cart-row${isLocked || isUnavailable ? " is-warning" : ""}`} key={asset.id}>
               <div className="asset-operation-cart-row-copy">
                 <span className="asset-operation-cart-title">{asset.name}</span>
                 <span className="asset-operation-cart-meta">
-                  {asset.code} · Available {maxQuantity} · {asset.project}
-                  {isLocked ? ` · In kit ${asset.linkedKitCodes.join(", ")}` : ""}
+                  {asset.code} · {availability.label} · {availability.reason}
                 </span>
               </div>
               <label className="asset-operation-cart-quantity">
