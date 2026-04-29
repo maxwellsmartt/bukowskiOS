@@ -15,6 +15,7 @@ export const uiPreferenceKeys = {
   recentEntityKeys: "recent-entity-keys",
   shellSidebarWidth: "shell-sidebar-width",
   assetOperationSideRailWidth: "asset-operation-side-rail-width",
+  projectsSideRailWidth: "projects-side-rail-width",
   splitSideRailWidth: "split-side-rail-width",
   shellProjectsShowArchived: "shell-projects-show-archived",
   activeWorkspaceId: "active-workspace-id",

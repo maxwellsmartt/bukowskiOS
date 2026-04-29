@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ClipboardList, FileUp, Plus, SquarePen, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -170,6 +170,32 @@ const parseCsvMoney = (value: string, rowNumber: number, label: string) => {
   return parsed;
 };
 
+const parseEditableCsvQuantity = (value: string, rowIssues: string[]) => {
+  if (!value) {
+    return 1;
+  }
+
+  try {
+    return parseCsvQuantity(value, 0);
+  } catch {
+    rowIssues.push("Quantity could not be read. Set a whole number before importing.");
+    return 0;
+  }
+};
+
+const parseEditableCsvMoney = (value: string, label: string, rowIssues: string[]) => {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    return parseCsvMoney(value, 0, label);
+  } catch {
+    rowIssues.push(`${label} could not be read and was left blank.`);
+    return undefined;
+  }
+};
+
 const joinCsvNotes = (parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join("\n");
 const getErrorMessage = (error: unknown) =>
   getUserFacingErrorMessage(error, typeof error === "string" ? error : String(error));
@@ -195,6 +221,7 @@ type AssetCsvDraft = {
   ownershipType: string;
   qrCodeValue: string;
   totalQuantity: number;
+  importWarnings?: string[];
 };
 
 type AssetCsvCatalogOption = {
@@ -228,6 +255,68 @@ type AssetCsvPreview = {
     allRowsExist: boolean;
     stockSource: "declaredQuantity" | "mergedRows";
     warnings: string[];
+  };
+};
+
+type AssetCsvValidationIssue = {
+  rowNumber: number;
+  message: string;
+};
+
+const buildAssetCsvDerivedSummary = (preview: AssetCsvPreview, assets: AssetListRow[]) => {
+  const existingCodes = new Set(assets.map((asset) => asset.code.trim().toUpperCase()).filter(Boolean));
+  const importableDrafts = preview.drafts.filter((draft) => !existingCodes.has(draft.internalCode.trim().toUpperCase()));
+  const importableCodeCounts = importableDrafts.reduce<Record<string, number>>((counts, draft) => {
+    const normalizedCode = draft.internalCode.trim().toUpperCase();
+    if (normalizedCode) {
+      counts[normalizedCode] = (counts[normalizedCode] ?? 0) + 1;
+    }
+
+    return counts;
+  }, {});
+  const validationIssues = importableDrafts.reduce<AssetCsvValidationIssue[]>((issues, draft) => {
+    const rowNumber = draft.importRowNumber;
+    const normalizedCode = draft.internalCode.trim().toUpperCase();
+
+    if (!draft.name.trim()) {
+      issues.push({ rowNumber, message: "Asset name is required." });
+    }
+
+    if (!normalizedCode) {
+      issues.push({ rowNumber, message: "Asset code is required." });
+    }
+
+    if (normalizedCode && importableCodeCounts[normalizedCode] > 1) {
+      issues.push({ rowNumber, message: "Asset code is repeated in the editable import rows." });
+    }
+
+    if (!draft.categoryId) {
+      issues.push({ rowNumber, message: "Choose a category." });
+    }
+
+    if (!Number.isInteger(draft.totalQuantity) || draft.totalQuantity < 0) {
+      issues.push({ rowNumber, message: "Quantity must be a whole number." });
+    }
+
+    return issues;
+  }, []);
+  const issueCountByRow = validationIssues.reduce<Record<number, number>>((counts, issue) => {
+    counts[issue.rowNumber] = (counts[issue.rowNumber] ?? 0) + 1;
+    return counts;
+  }, {});
+  const readyDrafts = importableDrafts.filter((draft) => !issueCountByRow[draft.importRowNumber]);
+  const needsReviewDrafts = importableDrafts.filter((draft) => Boolean(issueCountByRow[draft.importRowNumber]));
+
+  return {
+    importableDrafts,
+    readyDrafts,
+    needsReviewDrafts,
+    validationIssues,
+    issueCountByRow,
+    importableCount: importableDrafts.length,
+    existingCount: preview.drafts.length - importableDrafts.length,
+    importableStock: importableDrafts.reduce((total, draft) => total + draft.totalQuantity, 0),
+    canImport: importableDrafts.length > 0 && preview.errors.length === 0 && validationIssues.length === 0,
   };
 };
 
@@ -398,10 +487,11 @@ const aggregateAssetCsvDrafts = (drafts: AssetCsvDraft[]) => {
 
   for (const draft of drafts) {
     const normalizedCode = draft.internalCode.trim().toUpperCase();
-    const existingDraft = draftsByCode.get(normalizedCode);
+    const aggregateKey = normalizedCode || `__row_${draft.importRowNumber}`;
+    const existingDraft = draftsByCode.get(aggregateKey);
 
     if (!existingDraft) {
-      draftsByCode.set(normalizedCode, {
+      draftsByCode.set(aggregateKey, {
         ...draft,
         importRowNumbers: [draft.importRowNumber],
         serialNumbers: draft.serialNumber ? [draft.serialNumber] : [],
@@ -422,6 +512,10 @@ const aggregateAssetCsvDrafts = (drafts: AssetCsvDraft[]) => {
     if (draft.serialNumber && !existingDraft.serialNumbers.includes(draft.serialNumber)) {
       existingDraft.serialNumbers.push(draft.serialNumber);
     }
+
+    if (draft.importWarnings?.length) {
+      existingDraft.importWarnings = Array.from(new Set([...(existingDraft.importWarnings ?? []), ...draft.importWarnings]));
+    }
   }
 
   return {
@@ -433,6 +527,7 @@ const aggregateAssetCsvDrafts = (drafts: AssetCsvDraft[]) => {
         serialNumbers.length > 1 && `Source serials: ${serialNumbers.join(", ")}`,
         importRowNumbers.length > 1 && `Merged CSV rows: ${importRowNumbers.join(", ")}`,
       ]),
+      importWarnings: draft.importWarnings,
     })),
     mergedDuplicateRows,
     duplicateGroups,
@@ -494,6 +589,7 @@ const buildAssetCsvPreview = ({
     const rowNumber = index + 2;
 
     try {
+      const rowIssues: string[] = [];
       const name = resolveCsvValue(row, [
         "name",
         "asset",
@@ -511,6 +607,15 @@ const buildAssetCsvPreview = ({
         "ID (Número de serie)",
         "Códigos QR",
       ]);
+
+      if (!name) {
+        rowIssues.push("Asset name is missing.");
+      }
+
+      if (!internalCode) {
+        rowIssues.push("Asset code is missing.");
+      }
+
       const categoryValue = resolveCsvValue(row, ["categoryId", "categoryCode", "category"]);
       const explicitLocationValue = resolveCsvValue(row, ["defaultLocationId", "locationCode", "location", "defaultLocation"]);
       const warehouseSlot = resolveCsvValue(row, ["Ubicado en almacén", "warehouseSlot", "warehouse"]);
@@ -520,29 +625,26 @@ const buildAssetCsvPreview = ({
         : warehouseSlot
           ? locationByCodeOrName.get(normalizeCsvLookup(warehouseSlot))
           : undefined;
-      const purchasePrice = parseCsvMoney(resolveCsvValue(row, ["purchasePrice", "purchase price", "precio compra", "precio de compra"]), rowNumber, "purchase price");
-      const shippingCost = parseCsvMoney(resolveCsvValue(row, ["shipping", "freight", "envio", "flete"]), rowNumber, "shipping");
-      const customsCost = parseCsvMoney(resolveCsvValue(row, ["customs", "customsTax", "taxes", "impuestos", "aduana"]), rowNumber, "customs/taxes");
-      const explicitAdditionalCosts = parseCsvMoney(resolveCsvValue(row, ["additionalCosts", "additional costs", "gastos adicionales"]), rowNumber, "additional costs");
+      const purchasePrice = parseEditableCsvMoney(resolveCsvValue(row, ["purchasePrice", "purchase price", "precio compra", "precio de compra"]), "Purchase price", rowIssues);
+      const shippingCost = parseEditableCsvMoney(resolveCsvValue(row, ["shipping", "freight", "envio", "flete"]), "Shipping", rowIssues);
+      const customsCost = parseEditableCsvMoney(resolveCsvValue(row, ["customs", "customsTax", "taxes", "impuestos", "aduana"]), "Customs/taxes", rowIssues);
+      const explicitAdditionalCosts = parseEditableCsvMoney(resolveCsvValue(row, ["additionalCosts", "additional costs", "gastos adicionales"]), "Additional costs", rowIssues);
       const additionalCosts =
         typeof explicitAdditionalCosts === "number"
           ? explicitAdditionalCosts
           : [shippingCost, customsCost].some((value) => typeof value === "number")
             ? (shippingCost ?? 0) + (customsCost ?? 0)
             : undefined;
-      const replacementValue = parseCsvMoney(resolveCsvValue(row, ["replacementValue", "replacement", "replacement value", "value", "valor reposicion", "valor de reposicion"]), rowNumber, "replacement value");
-      const currentBookValue = parseCsvMoney(resolveCsvValue(row, ["currentBookValue", "current book value", "current value", "insured value", "valor asegurado", "valor actual"]), rowNumber, "current value");
+      const replacementValue = parseEditableCsvMoney(resolveCsvValue(row, ["replacementValue", "replacement", "replacement value", "value", "valor reposicion", "valor de reposicion"]), "Replacement value", rowIssues);
+      const currentBookValue = parseEditableCsvMoney(resolveCsvValue(row, ["currentBookValue", "current book value", "current value", "insured value", "valor asegurado", "valor actual"]), "Current value", rowIssues);
       const conditionStatus = resolveCsvValue(row, ["condition", "conditionStatus"]) || "Good";
-      const totalQuantity = parseCsvQuantity(resolveCsvValue(row, ["quantity", "Cantidad actual", "currentQuantity"]), rowNumber);
+      const safeConditionStatus = allowedCsvConditions.has(conditionStatus) ? conditionStatus : "Review";
+      const totalQuantity = parseEditableCsvQuantity(resolveCsvValue(row, ["quantity", "Cantidad actual", "currentQuantity"]), rowIssues);
       const folderPath = resolveCsvValue(row, ["Estructura de la carpeta (Carpeta)", "folderPath"]);
       const folderType = resolveCsvValue(row, ["Tipo de articulo (Carpeta)", "folderType"]);
       const positionType = resolveCsvValue(row, ["Tipo (posición/case/set)", "positionType"]);
       const externalNote = resolveCsvValue(row, ["Nota externa", "externalNote", "notes"]);
       const serialNumber = resolveCsvValue(row, ["serialNumber", "serial", "Número de Serie (Número de serie)"]);
-
-      if (!name || !internalCode) {
-        throw new Error("name and code are required.");
-      }
 
       if (categoryValue && !categoryId) {
         warnings.add(`Unknown category "${categoryValue}" will use ${defaultCategory.name}.`);
@@ -557,7 +659,7 @@ const buildAssetCsvPreview = ({
       }
 
       if (!allowedCsvConditions.has(conditionStatus)) {
-        throw new Error("condition must be Good, Review, or Damaged.");
+        rowIssues.push("Condition was not recognized and was set to Review.");
       }
 
       if (totalQuantity === 0) {
@@ -574,7 +676,7 @@ const buildAssetCsvPreview = ({
         model: resolveCsvValue(row, ["model"]),
         serialNumber,
         description: resolveCsvValue(row, ["description"]),
-        conditionStatus,
+        conditionStatus: safeConditionStatus,
         notes: joinCsvNotes([
           externalNote,
           warehouseSlot && `Warehouse slot: ${warehouseSlot}`,
@@ -589,6 +691,7 @@ const buildAssetCsvPreview = ({
         ownershipType: resolveCsvValue(row, ["ownership", "ownershipType"]) || "owned",
         qrCodeValue: resolveCsvValue(row, ["qr", "qrCode", "qrCodeValue", "barcode", "Códigos QR"]),
         totalQuantity,
+        importWarnings: rowIssues,
       });
     } catch (error) {
       errors.push({
@@ -647,6 +750,11 @@ const buildAssetCsvPreview = ({
     );
   }
 
+  const editableIssueRows = drafts.filter((draft) => draft.importWarnings?.length).length;
+  if (editableIssueRows) {
+    warnings.add(`${editableIssueRows} row${editableIssueRows === 1 ? "" : "s"} need review in the editable import table.`);
+  }
+
   return {
     fileName,
     drafts,
@@ -696,6 +804,15 @@ const buildAssetCsvIssueReport = (preview: AssetCsvPreview) => {
     lines.push("Errors");
     preview.errors.forEach((error) => {
       lines.push(`- Row ${error.rowNumber}: ${error.message}`);
+    });
+    lines.push("");
+  }
+
+  const editableRows = preview.drafts.filter((draft) => draft.importWarnings?.length);
+  if (editableRows.length) {
+    lines.push("Rows reviewed in app");
+    editableRows.forEach((draft) => {
+      lines.push(`- Row ${draft.importRowNumber} (${draft.internalCode || "No code"}): ${draft.importWarnings?.join(" ")}`);
     });
     lines.push("");
   }
@@ -769,6 +886,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [openingPreviewImageId, setOpeningPreviewImageId] = useState<string | null>(null);
   const [isImportingAssets, setIsImportingAssets] = useState(false);
   const [csvImportPreview, setCsvImportPreview] = useState<AssetCsvPreview | null>(null);
+  const [csvShowAllRows, setCsvShowAllRows] = useState(false);
   const [csvReportCopied, setCsvReportCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -798,6 +916,14 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       })),
     [selectedAssets],
   );
+  const csvDerivedSummary = useMemo(
+    () => (csvImportPreview ? buildAssetCsvDerivedSummary(csvImportPreview, assets) : null),
+    [assets, csvImportPreview],
+  );
+  const csvReviewDrafts = csvShowAllRows
+    ? csvDerivedSummary?.importableDrafts ?? []
+    : csvDerivedSummary?.importableDrafts.slice(0, 8) ?? [];
+  const csvHiddenReviewCount = Math.max(0, (csvDerivedSummary?.importableDrafts.length ?? 0) - csvReviewDrafts.length);
   const selectedKitLockedAssets = useMemo(
     () => selectedAssets.filter((asset) => asset.linkedKitCount > 0),
     [selectedAssets],
@@ -1045,6 +1171,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setActionWarning(null);
       const csvText = await file.text();
       setCsvImportPreview(buildAssetCsvPreview({ assets, catalog, csvText, fileName: file.name }));
+      setCsvShowAllRows(false);
     } catch (error) {
       setCsvImportPreview(null);
       setEditorError(getUserFacingErrorMessage(error, "Asset CSV import failed."));
@@ -1055,7 +1182,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     }
   };
 
-  const handleConfirmCsvImport = async () => {
+  const handleConfirmCsvImport = async (mode: "all" | "ready" = "all") => {
     if (!csvImportPreview) {
       return;
     }
@@ -1066,12 +1193,22 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setActionFeedback(null);
       setActionWarning(null);
       const existingCodes = new Set(assets.map((asset) => asset.code.trim().toUpperCase()).filter(Boolean));
+      const readyRowNumbers =
+        mode === "ready"
+          ? new Set((csvDerivedSummary?.readyDrafts ?? []).map((draft) => draft.importRowNumber))
+          : null;
       let importedCount = 0;
       let skippedDuplicateCount = 0;
+      let skippedReviewCount = 0;
 
       for (const draft of csvImportPreview.drafts) {
-        const { importRowNumber, ...assetDraft } = draft;
+        const { importRowNumber, importWarnings: _importWarnings, ...assetDraft } = draft;
         const normalizedCode = assetDraft.internalCode.trim().toUpperCase();
+
+        if (readyRowNumbers && !readyRowNumbers.has(importRowNumber)) {
+          skippedReviewCount += 1;
+          continue;
+        }
 
         if (existingCodes.has(normalizedCode)) {
           skippedDuplicateCount += 1;
@@ -1105,7 +1242,20 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       }
 
       await Promise.all([reload(), refreshProjects()]);
-      setCsvImportPreview(null);
+      if (readyRowNumbers && skippedReviewCount) {
+        setCsvImportPreview((current) =>
+          current
+            ? {
+                ...current,
+                drafts: current.drafts.filter((draft) => !readyRowNumbers.has(draft.importRowNumber)),
+              }
+            : current,
+        );
+        setCsvShowAllRows(false);
+      } else {
+        setCsvImportPreview(null);
+        setCsvShowAllRows(false);
+      }
       setActionFeedback(
         `Imported ${importedCount} asset${importedCount === 1 ? "" : "s"} from ${csvImportPreview.fileName}.${
           csvImportPreview.summary.duplicateRows
@@ -1115,6 +1265,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             : ""
         }${
           skippedDuplicateCount ? ` Skipped ${skippedDuplicateCount} existing code${skippedDuplicateCount === 1 ? "" : "s"}.` : ""
+        }${
+          skippedReviewCount ? ` Left ${skippedReviewCount} row${skippedReviewCount === 1 ? "" : "s"} for review.` : ""
         }`,
       );
     } catch (error) {
@@ -1132,6 +1284,94 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     await navigator.clipboard.writeText(buildAssetCsvIssueReport(csvImportPreview));
     setCsvReportCopied(true);
     window.setTimeout(() => setCsvReportCopied(false), 1800);
+  };
+
+  const updateCsvDraft = (importRowNumber: number, patch: Partial<AssetCsvDraft>) => {
+    setCsvImportPreview((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        drafts: current.drafts.map((draft) => {
+          if (draft.importRowNumber !== importRowNumber) {
+            return draft;
+          }
+
+          const importWarnings = (draft.importWarnings ?? []).filter((warning) => {
+            if ("name" in patch && warning === "Asset name is missing.") {
+              return false;
+            }
+
+            if ("internalCode" in patch && warning === "Asset code is missing.") {
+              return false;
+            }
+
+            if ("totalQuantity" in patch && warning.startsWith("Quantity could not be read.")) {
+              return false;
+            }
+
+            if ("purchasePrice" in patch && warning.startsWith("Purchase price could not be read")) {
+              return false;
+            }
+
+            if ("additionalCosts" in patch && warning.startsWith("Additional costs could not be read")) {
+              return false;
+            }
+
+            if ("currentBookValue" in patch && warning.startsWith("Current value could not be read")) {
+              return false;
+            }
+
+            return true;
+          });
+
+          return {
+            ...draft,
+            ...patch,
+            importWarnings,
+          };
+        }),
+      };
+    });
+  };
+
+  const handleCsvTextEdit =
+    (importRowNumber: number, field: keyof Pick<AssetCsvDraft, "name" | "internalCode" | "serialNumber">) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const value = field === "internalCode" ? event.target.value.toUpperCase() : event.target.value;
+      updateCsvDraft(importRowNumber, { [field]: value } as Partial<AssetCsvDraft>);
+    };
+
+  const handleCsvSelectEdit =
+    (importRowNumber: number, field: keyof Pick<AssetCsvDraft, "categoryId" | "defaultLocationId">) =>
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      updateCsvDraft(importRowNumber, { [field]: event.target.value || undefined } as Partial<AssetCsvDraft>);
+    };
+
+  const handleCsvQuantityEdit = (importRowNumber: number) => (event: ChangeEvent<HTMLInputElement>) => {
+    const parsedQuantity = Number.parseInt(event.target.value, 10);
+    updateCsvDraft(importRowNumber, {
+      totalQuantity: Number.isInteger(parsedQuantity) ? parsedQuantity : 0,
+    });
+  };
+
+  const handleCsvOptionalMoneyEdit =
+    (
+      importRowNumber: number,
+      field: keyof Pick<AssetCsvDraft, "purchasePrice" | "additionalCosts" | "currentBookValue">,
+    ) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const rawValue = event.target.value.trim();
+      const parsedValue = Number(rawValue);
+      updateCsvDraft(importRowNumber, {
+        [field]: rawValue && Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : undefined,
+      } as Partial<AssetCsvDraft>);
+    };
+
+  const handleCsvNotesEdit = (importRowNumber: number) => (event: ChangeEvent<HTMLTextAreaElement>) => {
+    updateCsvDraft(importRowNumber, { notes: event.target.value });
   };
 
   const assetColumns = useMemo(
@@ -1392,15 +1632,28 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   <button
                     className="ghost-control cancel-control action-row-button"
                     disabled={isImportingAssets}
-                    onClick={() => setCsvImportPreview(null)}
+                    onClick={() => {
+                      setCsvImportPreview(null);
+                      setCsvShowAllRows(false);
+                    }}
                     type="button"
                   >
                     Cancel
                   </button>
+                  {csvDerivedSummary?.validationIssues.length && csvDerivedSummary.readyDrafts.length ? (
+                    <button
+                      className="ghost-control action-row-button"
+                      disabled={isImportingAssets}
+                      onClick={() => void handleConfirmCsvImport("ready")}
+                      type="button"
+                    >
+                      Import ready rows
+                    </button>
+                  ) : null}
                   <button
                     className="asset-create-button action-row-button"
-                    disabled={isImportingAssets || csvImportPreview.errors.length > 0 || csvImportPreview.summary.importableCount === 0}
-                    onClick={() => void handleConfirmCsvImport()}
+                    disabled={isImportingAssets || !csvDerivedSummary?.canImport}
+                    onClick={() => void handleConfirmCsvImport("all")}
                     type="button"
                   >
                     {isImportingAssets ? "Importing..." : "Import assets"}
@@ -1412,9 +1665,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 {[
                   ["Rows", csvImportPreview.summary.totalRows],
                   ["Unique assets", csvImportPreview.summary.uniqueCodes],
-                  ["To import", csvImportPreview.summary.importableCount],
-                  ["Total units", csvImportPreview.summary.importableStock],
-                  ["Existing", csvImportPreview.summary.existingCodes],
+                  ["To import", csvDerivedSummary?.importableCount ?? csvImportPreview.summary.importableCount],
+                  ["Ready", csvDerivedSummary?.readyDrafts.length ?? 0],
+                  ["Needs review", csvDerivedSummary?.needsReviewDrafts.length ?? 0],
+                  ["Total units", csvDerivedSummary?.importableStock ?? csvImportPreview.summary.importableStock],
+                  ["Existing", csvDerivedSummary?.existingCount ?? csvImportPreview.summary.existingCodes],
                   ["Merged rows", csvImportPreview.summary.duplicateRows],
                 ].map(([label, value]) => (
                   <span key={label}>
@@ -1432,7 +1687,155 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 </span>
               </div>
 
-              {csvImportPreview.summary.allRowsExist || csvImportPreview.summary.warnings.length || csvImportPreview.errors.length ? (
+              {csvReviewDrafts.length ? (
+                <div className="asset-import-review">
+                  <div className="asset-import-review-header">
+                    <div>
+                      <strong>Review rows before importing</strong>
+                      <span>Edit operational and insurance fields here instead of going back to the CSV.</span>
+                    </div>
+                    <div className="asset-import-review-header-actions">
+                      {csvHiddenReviewCount ? <span>{csvHiddenReviewCount} more row(s) hidden.</span> : null}
+                      {(csvDerivedSummary?.importableDrafts.length ?? 0) > 8 ? (
+                        <button
+                          className="ghost-control action-row-button"
+                          onClick={() => setCsvShowAllRows((current) => !current)}
+                          type="button"
+                        >
+                          {csvShowAllRows ? "Show less" : "Show all"}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="asset-import-review-table">
+                    <div className="asset-import-review-row is-header">
+                      <span>Row</span>
+                      <span>Status</span>
+                      <span>Asset</span>
+                      <span>Code</span>
+                      <span>Category</span>
+                      <span>Location</span>
+                      <span>Qty</span>
+                      <span>Serial</span>
+                      <span>Purchase</span>
+                      <span>Add. costs</span>
+                      <span>Current</span>
+                    </div>
+                    {csvReviewDrafts.map((draft) => (
+                      <Fragment key={draft.importRowNumber}>
+                        <div className="asset-import-review-row">
+                          <span className="asset-import-review-row-number">{draft.importRowNumber}</span>
+                          <span
+                            className={`asset-import-row-status${
+                              csvDerivedSummary?.issueCountByRow[draft.importRowNumber]
+                                ? " needs-review"
+                                : draft.importWarnings?.length
+                                  ? " has-warning"
+                                  : ""
+                            }`}
+                          >
+                            {csvDerivedSummary?.issueCountByRow[draft.importRowNumber]
+                              ? "Needs review"
+                              : draft.importWarnings?.length
+                                ? "Review"
+                                : "Ready"}
+                          </span>
+                          <input
+                            aria-label={`Asset name for CSV row ${draft.importRowNumber}`}
+                            className="asset-import-review-input"
+                            onChange={handleCsvTextEdit(draft.importRowNumber, "name")}
+                            value={draft.name}
+                          />
+                          <input
+                            aria-label={`Asset code for CSV row ${draft.importRowNumber}`}
+                            className="asset-import-review-input asset-import-review-code"
+                            onChange={handleCsvTextEdit(draft.importRowNumber, "internalCode")}
+                            value={draft.internalCode}
+                          />
+                          <select
+                            aria-label={`Category for CSV row ${draft.importRowNumber}`}
+                            className="asset-import-review-input"
+                            onChange={handleCsvSelectEdit(draft.importRowNumber, "categoryId")}
+                            value={draft.categoryId}
+                          >
+                            {catalog.categories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.code} · {category.name}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            aria-label={`Location for CSV row ${draft.importRowNumber}`}
+                            className="asset-import-review-input"
+                            onChange={handleCsvSelectEdit(draft.importRowNumber, "defaultLocationId")}
+                            value={draft.defaultLocationId ?? ""}
+                          >
+                            <option value="">No location</option>
+                            {catalog.locations.map((location) => (
+                              <option key={location.id} value={location.id}>
+                                {location.code} · {location.name}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            aria-label={`Quantity for CSV row ${draft.importRowNumber}`}
+                            className="asset-import-review-input asset-import-review-quantity"
+                            min={0}
+                            onChange={handleCsvQuantityEdit(draft.importRowNumber)}
+                            type="number"
+                            value={draft.totalQuantity}
+                          />
+                          <input
+                            aria-label={`Serial number for CSV row ${draft.importRowNumber}`}
+                            className="asset-import-review-input"
+                            onChange={handleCsvTextEdit(draft.importRowNumber, "serialNumber")}
+                            value={draft.serialNumber}
+                          />
+                          <input
+                            aria-label={`Purchase price for CSV row ${draft.importRowNumber}`}
+                            className="asset-import-review-input asset-import-review-quantity"
+                            min={0}
+                            onChange={handleCsvOptionalMoneyEdit(draft.importRowNumber, "purchasePrice")}
+                            type="number"
+                            value={draft.purchasePrice ?? ""}
+                          />
+                          <input
+                            aria-label={`Additional costs for CSV row ${draft.importRowNumber}`}
+                            className="asset-import-review-input asset-import-review-quantity"
+                            min={0}
+                            onChange={handleCsvOptionalMoneyEdit(draft.importRowNumber, "additionalCosts")}
+                            type="number"
+                            value={draft.additionalCosts ?? ""}
+                          />
+                          <input
+                            aria-label={`Current value for CSV row ${draft.importRowNumber}`}
+                            className="asset-import-review-input asset-import-review-quantity"
+                            min={0}
+                            onChange={handleCsvOptionalMoneyEdit(draft.importRowNumber, "currentBookValue")}
+                            type="number"
+                            value={draft.currentBookValue ?? ""}
+                          />
+                        </div>
+                        <textarea
+                          aria-label={`Notes for CSV row ${draft.importRowNumber}`}
+                          className="asset-import-review-notes"
+                          onChange={handleCsvNotesEdit(draft.importRowNumber)}
+                          placeholder="Notes"
+                          rows={2}
+                          value={draft.notes}
+                        />
+                        {draft.importWarnings?.length ? (
+                          <div className="asset-import-review-row-note">
+                            Row {draft.importRowNumber}: {draft.importWarnings.join(" ")}
+                          </div>
+                        ) : null}
+                      </Fragment>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {csvImportPreview.summary.allRowsExist || csvImportPreview.summary.warnings.length || csvImportPreview.errors.length || csvDerivedSummary?.validationIssues.length ? (
                 <div className="asset-import-preview-issues">
                   {csvImportPreview.summary.allRowsExist ? (
                     <div className="asset-import-preview-issue-card info">
@@ -1480,6 +1883,20 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       ))}
                       {csvImportPreview.errors.length > 6 ? (
                         <span>{csvImportPreview.errors.length - 6} more row error(s).</span>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {csvDerivedSummary?.validationIssues.length ? (
+                    <div className="asset-import-preview-issue-card error">
+                      <strong>Review row edits</strong>
+                      {csvDerivedSummary.validationIssues.slice(0, 6).map((issue) => (
+                        <span key={`${issue.rowNumber}-${issue.message}`}>
+                          Row {issue.rowNumber}: {issue.message}
+                        </span>
+                      ))}
+                      {csvDerivedSummary.validationIssues.length > 6 ? (
+                        <span>{csvDerivedSummary.validationIssues.length - 6} more row issue(s).</span>
                       ) : null}
                     </div>
                   ) : null}

@@ -6,11 +6,13 @@ import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { uiPreferenceKeys } from "@shared/lib/preferences";
 
 import { ProjectDetailPanel } from "./ProjectDetailPanel";
 import { useProjectDetail, useProjectsRegistry } from "./useProjectsData";
@@ -107,7 +109,13 @@ export const ProjectsPage = () => {
         </div>
       ) : null}
 
-      <div className="projects-layout">
+      <ResizableSideRailLayout
+        className="projects-layout"
+        defaultWidth={520}
+        maxWidth={760}
+        minWidth={360}
+        storageKey={uiPreferenceKeys.projectsSideRailWidth}
+      >
         <SurfaceCard className="projects-registry-card" title="Projects">
           <ListToolbar
             activeSortLabel={projectControls.activeSortOption?.label}
@@ -233,7 +241,7 @@ export const ProjectsPage = () => {
         </SurfaceCard>
 
         <ProjectDetailPanel data={detail} error={detailError} isLoading={detailLoading} onIncidentCreated={reloadDetail} />
-      </div>
+      </ResizableSideRailLayout>
     </div>
   );
 };
