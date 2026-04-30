@@ -11,7 +11,6 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
-import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 import { PackingSlipDetailPanel } from "./PackingSlipDetailPanel";
@@ -43,7 +42,6 @@ const packingSortOptions: Array<ListSortOption<PackingSlipSortField>> = [
 export const PackingPage = ({ projectId = null, projectName = null }: PackingPageProps) => {
   const { activeWorkspaceId } = useWorkspace();
   const isProjectMode = Boolean(projectId);
-  const sectionScopeLabel = useSectionScopeLabel();
   const [searchParams] = useSearchParams();
   const packingControls = useListControls<PackingSlipSortField, PackingSlipListQuery>({
     viewKey: isProjectMode ? "project-packing-list" : "packing-list",
@@ -105,10 +103,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        title={isProjectMode ? "Project Packing" : "Packing Slips"}
-        contextLabel={isProjectMode ? sectionScopeLabel ?? undefined : undefined}
-      />
+      <SectionHeader title={isProjectMode ? "Project Packing" : "Packing Slips"} />
 
       {error ? <div className="empty-state">Packing slips unavailable: {error}</div> : null}
       {returnFeedback ? <div className="action-feedback action-feedback-success">{returnFeedback}</div> : null}

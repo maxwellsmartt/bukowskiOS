@@ -84,17 +84,20 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
         <WorkspaceSwitcher />
       </div>
 
+      {scopeChipLabel ? (
+        <div className="top-context-group top-context-group-center">
+          <div className="context-chip context-chip-project">
+            <span>{scopeChipLabel}</span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="top-context-group top-context-group-end">
         <button className="ghost-control search-control" onClick={onOpenSearch} type="button">
           <Search size={13} />
           <span>Search</span>
           <kbd>⌘K</kbd>
         </button>
-        {scopeChipLabel ? (
-          <div className="context-chip">
-            <span>{scopeChipLabel}</span>
-          </div>
-        ) : null}
         <button
           aria-label={syncState.label}
           className={`icon-ghost-control sync-control ${syncState.className}`}

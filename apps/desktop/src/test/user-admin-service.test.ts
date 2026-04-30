@@ -85,6 +85,53 @@ describe("user admin service", () => {
     cleanup();
   });
 
+  it("creates users linked to crew in the selected non-default workspace", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-user-admin-workspace-crew-link");
+
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, slug, name, base_currency, is_active, created_at, updated_at)
+          VALUES ('workspace-casa', 'casa', 'Casa', 'USD', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `,
+      )
+      .run();
+
+    database
+      .prepare(
+        `
+          INSERT INTO crew_members (
+            id, workspace_id, full_name, role_label, email, phone, is_active, created_at, updated_at
+          ) VALUES ('crew-casa-daniel', 'workspace-casa', 'Daniel Casa', 'DIT', 'daniel@casa.test', '+1 809 555 1212', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `,
+      )
+      .run();
+
+    bootstrapAdminFoundation(database);
+    const service = createUserAdminService(database);
+    const crewRole = service.getSnapshot({ workspaceId: "workspace-casa" }).roles.find((role) => role.key === "crew");
+
+    const created = service.createUser({
+      workspaceId: "workspace-casa",
+      fullName: "Daniel Casa",
+      email: "daniel.user@casa.test",
+      phone: "+1 809 555 3434",
+      roleId: crewRole?.id ?? "",
+      linkedCrewMemberId: "crew-casa-daniel",
+    });
+
+    const createdUser = created.snapshot.users.find((user) => user.id === created.userId);
+    expect(createdUser?.linkedCrewId).toBe("crew-casa-daniel");
+    expect(createdUser?.linkedCrewLabel).toBe("Daniel Casa");
+
+    const crew = database.prepare("SELECT linked_user_id FROM crew_members WHERE id = ?").get("crew-casa-daniel") as {
+      linked_user_id: string | null;
+    };
+    expect(crew.linked_user_id).toBe(created.userId);
+
+    cleanup();
+  });
+
   it("deactivates users and revokes linked Telegram identities", () => {
     const { cleanup, database } = createTestDatabase("bukowski-user-admin-revoke");
     const service = createUserAdminService(database);

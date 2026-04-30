@@ -149,7 +149,13 @@ const buildUserDraft = (user: AppUserAdminRow | null, roles: AppUsersSnapshot["r
 export const SettingsPage = () => {
   const { appInfo } = useShellContext();
   const { activeWorkspaceId, activeWorkspaceName } = useWorkspace();
-  const { data: catalog } = useCatalogData();
+  const { data: catalog } = useCatalogData({
+    workspaceId: activeWorkspaceId,
+    entityType: "crew",
+    search: "",
+    sortBy: "fullName",
+    sortDirection: "asc",
+  });
   const navigate = useNavigate();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
   const [supportSnapshot, setSupportSnapshot] = useState<AppSupportSnapshot>(emptySupportSnapshot);
@@ -198,6 +204,19 @@ export const SettingsPage = () => {
   useEffect(() => {
     void loadDiagnostics();
   }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    if (!error && !feedback) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setError(null);
+      setFeedback(null);
+    }, 6500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [error, feedback]);
 
   const runAction = async (
     action: () => Promise<AppActionResult | AppExportResult>,
@@ -753,7 +772,7 @@ export const SettingsPage = () => {
                   onClick={() => void handleSaveUser()}
                   type="button"
                 >
-                  {isSavingUser ? "Saving..." : selectedUser ? "Save changes" : "Create user"}
+                  {isSavingUser ? "Saving..." : selectedUser ? "Save user" : "Add User"}
                 </button>
                 {selectedUser ? (
                   <button className="ghost-control" disabled={isTogglingUser} onClick={() => void handleToggleUser()} type="button">
@@ -809,7 +828,7 @@ export const SettingsPage = () => {
       ) : null}
 
       {activeSection === "operations" ? (
-        <>
+        <div className="settings-data-stack">
           <SurfaceCard title="Data health" subtitle="Use these actions before exports, handoffs or troubleshooting.">
             <div className="summary-grid">
               {dataHealthRows.map((row) => (
@@ -882,7 +901,7 @@ export const SettingsPage = () => {
               </button>
             </div>
           </SurfaceCard>
-        </>
+        </div>
       ) : null}
 
       {activeSection === "advanced" ? (

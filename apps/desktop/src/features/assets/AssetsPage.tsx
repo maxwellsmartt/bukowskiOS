@@ -22,7 +22,6 @@ import { resolveAssetAvailability, summarizeUnavailableAssets } from "@shared/li
 import { formatAssetStockDetailRows, formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
-import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 
 import { AssetAssignMovePanel, type AssetAssignMoveFormValue } from "./AssetAssignMovePanel";
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
@@ -848,11 +847,9 @@ export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageP
 
 const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const { activeWorkspaceId } = useWorkspace();
-  const { activeProject, projects, refreshProjects } = useShellContext();
+  const { projects, refreshProjects } = useShellContext();
   const { addItems } = useCompareTray();
   const isProjectMode = Boolean(projectId);
-  const effectiveProjectName = projectName ?? (isProjectMode ? activeProject?.name ?? null : null);
-  const sectionScopeLabel = useSectionScopeLabel();
   const assetControls = useListControls<AssetSortField, AssetListQuery>({
     viewKey: isProjectMode ? "project-assets-list" : "assets-list",
     defaults: {
@@ -1464,7 +1461,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     <div className="page-stack assets-page-stack">
       <SectionHeader
         title={isProjectMode ? "Project Assets" : "Assets"}
-        contextLabel={isProjectMode ? sectionScopeLabel ?? undefined : undefined}
       />
 
       {error ? <div className="empty-state">Assets unavailable: {error}</div> : null}
@@ -1476,10 +1472,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           />
         </SurfaceCard>
       ) : null}
-
-      <div className="chip-row">
-        {isProjectMode ? <StatusBadge>{effectiveProjectName ?? "Project scope"}</StatusBadge> : null}
-      </div>
 
       {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
       {actionFeedback ? <div className="action-feedback action-feedback-success">{actionFeedback}</div> : null}

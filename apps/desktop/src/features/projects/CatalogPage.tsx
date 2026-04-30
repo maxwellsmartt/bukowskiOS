@@ -25,7 +25,6 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
-import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { uiPreferenceKeys } from "@shared/lib/preferences";
@@ -409,7 +408,6 @@ export const CatalogPage = () => {
     }),
   });
   const { data, error, isLoading, reload } = useCatalogData(catalogControls.query);
-  const sectionScopeLabel = useSectionScopeLabel();
   const [selectedIds, setSelectedIds] = useState<Record<CatalogEntityType, string[]>>(emptySelectedState);
   const [activePreviewIds, setActivePreviewIds] = useState<Record<CatalogEntityType, string | null>>({
     location: null,
@@ -957,10 +955,7 @@ export const CatalogPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        title="Catalog"
-        contextLabel={sectionScopeLabel}
-      />
+      <SectionHeader title="Catalog" />
 
       {error ? <div className="empty-state">Catalog unavailable: {error}</div> : null}
       {!error && isLoading ? (

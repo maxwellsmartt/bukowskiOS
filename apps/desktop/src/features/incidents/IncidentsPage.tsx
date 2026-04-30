@@ -22,7 +22,6 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useShellContext } from "@shared/hooks/useShellContext";
-import { useSectionScopeLabel } from "@shared/hooks/useSectionScopeLabel";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { IncidentReportPanel } from "./IncidentReportPanel";
@@ -111,7 +110,6 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
   const { activeProject, projects, refreshProjects } = useShellContext();
   const isProjectMode = Boolean(projectId);
   const effectiveProjectName = projectName ?? (isProjectMode ? activeProject?.name ?? null : null);
-  const sectionScopeLabel = useSectionScopeLabel();
   const [searchParams] = useSearchParams();
   const incidentControls = useListControls<IncidentSortField, IncidentListQuery>({
     viewKey: isProjectMode ? "project-incidents-list" : "incidents-list",
@@ -369,10 +367,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        title="Incidents"
-        contextLabel={isProjectMode ? sectionScopeLabel ?? undefined : undefined}
-      />
+      <SectionHeader title="Incidents" />
 
       {error ? <div className="empty-state">Incidents unavailable: {error}</div> : null}
       {catalogError ? <div className="empty-state">Incident catalog unavailable: {catalogError}</div> : null}
