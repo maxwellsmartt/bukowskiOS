@@ -5,7 +5,9 @@ import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 
 import {
+  appUsersSnapshotReadArgsSchema,
   createAppUserSchema,
+  deleteAppUserSchema,
   emptyReadArgsSchema,
   revokeTelegramLinkSchema,
   setAppUserActiveSchema,
@@ -19,11 +21,12 @@ type RegisterAppIpcOptions = {
   database: DatabaseSync;
   getDiagnosticsSnapshot: () => import("@contracts").AppDiagnosticsSnapshot;
   getSupportSnapshot: () => import("@contracts").AppSupportSnapshot;
-  getUsersSnapshot: () => import("@contracts").AppUsersSnapshot;
+  getUsersSnapshot: (query?: import("@contracts").AppUsersSnapshotQuery) => import("@contracts").AppUsersSnapshot;
   createUser: (input: import("@contracts").CreateAppUserCommand) => import("@contracts").AppUserMutationResult;
   updateUser: (input: import("@contracts").UpdateAppUserCommand) => import("@contracts").AppUserMutationResult;
   setUserActive: (input: import("@contracts").SetAppUserActiveCommand) => import("@contracts").AppUserMutationResult;
   revokeTelegramLink: (input: import("@contracts").RevokeTelegramLinkCommand) => import("@contracts").AppUserMutationResult;
+  deleteUser: (input: import("@contracts").DeleteAppUserCommand) => import("@contracts").AppUserMutationResult;
   createBackupNow: () => import("@contracts").AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => import("@contracts").AppDiagnosticsSnapshot;
   ensureLocalWorkspaces: (workspaces: import("@contracts").EnsureLocalWorkspaceInput[]) => import("@contracts").AppDiagnosticsSnapshot;
@@ -110,6 +113,7 @@ export const registerAppIpc = ({
   updateUser,
   setUserActive,
   revokeTelegramLink,
+  deleteUser,
   createBackupNow,
   runIntegrityCheckNow,
   ensureLocalWorkspaces,
@@ -130,7 +134,9 @@ export const registerAppIpc = ({
   }));
   safeHandleReadWithSchema(ipcChannels.app.getDiagnostics, emptyReadArgsSchema, () => getDiagnosticsSnapshot());
   safeHandleReadWithSchema(ipcChannels.app.getSupportSnapshot, emptyReadArgsSchema, () => getSupportSnapshot());
-  safeHandleReadWithSchema(ipcChannels.app.getUsersSnapshot, emptyReadArgsSchema, () => getUsersSnapshot());
+  safeHandleReadWithSchema(ipcChannels.app.getUsersSnapshot, appUsersSnapshotReadArgsSchema, (_event, query) =>
+    getUsersSnapshot(query as import("@contracts").AppUsersSnapshotQuery | undefined),
+  );
   safeHandleReadWithSchema(
     ipcChannels.app.getLocalWorkspaces,
     emptyReadArgsSchema,
@@ -171,6 +177,15 @@ export const registerAppIpc = ({
       return revokeTelegramLink(parsed);
     } catch (error) {
       throw sanitizeIpcError(error, "The app could not revoke Telegram access for that user.");
+    }
+  });
+  ipcMain.handle(ipcChannels.app.deleteUser, (event, input) => {
+    try {
+      assertTrustedIpcSender(event);
+      const parsed = deleteAppUserSchema.parse(input);
+      return deleteUser(parsed);
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not remove that user.");
     }
   });
   ipcMain.handle(ipcChannels.app.ensureLocalWorkspaces, (event, input) => {

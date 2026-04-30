@@ -240,3 +240,8 @@ export type RevokeTelegramLinkCommand = {
   workspaceId: string;
   userId: string;
 };
+
+export type DeleteAppUserCommand = {
+  workspaceId: string;
+  userId: string;
+};

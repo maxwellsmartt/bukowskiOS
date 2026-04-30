@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useCatalogData } from "@features/projects/useProjectsData";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
@@ -168,6 +169,8 @@ export const SettingsPage = () => {
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [isTogglingUser, setIsTogglingUser] = useState(false);
   const [isRevokingTelegram, setIsRevokingTelegram] = useState(false);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [isDeleteUserConfirmOpen, setIsDeleteUserConfirmOpen] = useState(false);
   const [syncRows, setSyncRows] = useState<AppSyncOutboxRow[]>([]);
 
   const loadDiagnostics = async () => {
@@ -180,7 +183,7 @@ export const SettingsPage = () => {
         window.bukowskiApp.getDiagnostics(),
         window.bukowskiApp.getSupportSnapshot(),
         window.bukowskiApp.getSyncOutboxRows(),
-        window.bukowskiApp.getUsersSnapshot(),
+        window.bukowskiApp.getUsersSnapshot({ workspaceId: activeWorkspaceId }),
       ]);
       setDiagnostics(nextDiagnostics);
       setSupportSnapshot(nextSupportSnapshot);
@@ -194,7 +197,7 @@ export const SettingsPage = () => {
 
   useEffect(() => {
     void loadDiagnostics();
-  }, []);
+  }, [activeWorkspaceId]);
 
   const runAction = async (
     action: () => Promise<AppActionResult | AppExportResult>,
@@ -212,7 +215,7 @@ export const SettingsPage = () => {
           const [nextSyncRows, nextSupportSnapshot, nextUsersSnapshot] = await Promise.all([
             window.bukowskiApp.getSyncOutboxRows(),
             window.bukowskiApp.getSupportSnapshot(),
-            window.bukowskiApp.getUsersSnapshot(),
+            window.bukowskiApp.getUsersSnapshot({ workspaceId: activeWorkspaceId }),
           ]);
           setSyncRows(nextSyncRows);
           setSupportSnapshot(nextSupportSnapshot);
@@ -521,6 +524,33 @@ export const SettingsPage = () => {
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!window.bukowskiApp || !selectedUser) {
+      return;
+    }
+
+    setIsDeletingUser(true);
+
+    try {
+      await applyUserMutation(() =>
+        window.bukowskiApp!.deleteUser({
+          workspaceId: activeWorkspaceId,
+          userId: selectedUser.id,
+        }),
+      );
+      setIsDeleteUserConfirmOpen(false);
+    } finally {
+      setIsDeletingUser(false);
+    }
+  };
+
+  const canRequestUserDelete =
+    Boolean(selectedUser) &&
+    !selectedUser?.isActive &&
+    selectedUser?.membershipStatus !== "active" &&
+    selectedUser?.telegramLinkStatus !== "linked" &&
+    selectedUser?.telegramLinkStatus !== "pending";
+
   return (
     <div className="page-stack settings-page">
       <SectionHeader title="Settings" />
@@ -733,6 +763,16 @@ export const SettingsPage = () => {
                 {selectedUser?.telegramLinkStatus === "linked" ? (
                   <button className="ghost-control" disabled={isRevokingTelegram} onClick={() => void handleRevokeTelegram()} type="button">
                     {isRevokingTelegram ? "Revoking..." : "Revoke Telegram"}
+                  </button>
+                ) : null}
+                {selectedUser && canRequestUserDelete ? (
+                  <button
+                    className="ghost-control is-danger"
+                    disabled={isDeletingUser}
+                    onClick={() => setIsDeleteUserConfirmOpen(true)}
+                    type="button"
+                  >
+                    Remove user
                   </button>
                 ) : null}
                 <button className="ghost-control" onClick={() => navigate("/agents/connectors")} type="button">
@@ -977,6 +1017,20 @@ export const SettingsPage = () => {
       ) : null}
         </div>
       </div>
+      <ConfirmDialog
+        body={
+          selectedUser
+            ? `${selectedUser.fullName} will be removed from this workspace. If they still own active assets, open packing slips, open incidents or Telegram access, the app will stop the removal and explain what to fix first.`
+            : "This user will be removed from this workspace."
+        }
+        confirmLabel="Remove user"
+        isOpen={isDeleteUserConfirmOpen}
+        isSubmitting={isDeletingUser}
+        onCancel={() => setIsDeleteUserConfirmOpen(false)}
+        onConfirm={handleDeleteUser}
+        title="Remove this user?"
+        tone="danger"
+      />
     </div>
   );
 };

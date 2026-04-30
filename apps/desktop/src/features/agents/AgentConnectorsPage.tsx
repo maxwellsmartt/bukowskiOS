@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, KeyRound, Link2, RadioTower, RotateCcw, ShieldCheck } from "lucide-react";
 
-import { DEFAULT_WORKSPACE_ID, type AgentConnectorRow, type AppUsersSnapshot } from "@contracts";
+import type { AgentConnectorRow, AppUsersSnapshot } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -17,8 +18,6 @@ import {
   testConnectorConnection,
   useAgentConnectors,
 } from "./useAgentsData";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const emptyUsersSnapshot: AppUsersSnapshot = {
   users: [],
@@ -104,6 +103,7 @@ const getIdentityTone = (state: LinkableIdentityOption["linkState"]) => {
 };
 
 export const AgentConnectorsPage = () => {
+  const { activeWorkspaceId } = useWorkspace();
   const { data, error } = useAgentConnectors();
   const { data: catalog } = useCatalogData();
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
@@ -162,10 +162,10 @@ export const AgentConnectorsPage = () => {
       return;
     }
 
-    void window.bukowskiApp.getUsersSnapshot().then(setUsersSnapshot).catch(() => {
+    void window.bukowskiApp.getUsersSnapshot({ workspaceId: activeWorkspaceId }).then(setUsersSnapshot).catch(() => {
       setUsersSnapshot(emptyUsersSnapshot);
     });
-  }, []);
+  }, [activeWorkspaceId]);
 
   const linkableIdentities = useMemo(() => {
     const readyUsers = usersSnapshot.users.map<LinkableIdentityOption>((user) => ({
@@ -319,7 +319,7 @@ export const AgentConnectorsPage = () => {
     try {
       const result = await saveConnectorConfig({
         commandId: `cmd-connector-save-${Date.now().toString(36)}`,
-        workspaceId,
+        workspaceId: activeWorkspaceId,
         connectorKey: selectedConnector.connectorKey,
         enabled: draft.enabled,
         botToken: draft.botToken,
@@ -348,7 +348,7 @@ export const AgentConnectorsPage = () => {
     try {
       const result = await saveConnectorConfig({
         commandId: `cmd-connector-disable-${Date.now().toString(36)}`,
-        workspaceId,
+        workspaceId: activeWorkspaceId,
         connectorKey: selectedConnector.connectorKey,
         enabled: false,
       });
@@ -372,7 +372,7 @@ export const AgentConnectorsPage = () => {
     try {
       const result = await saveConnectorConfig({
         commandId: `cmd-connector-clear-${Date.now().toString(36)}`,
-        workspaceId,
+        workspaceId: activeWorkspaceId,
         connectorKey: selectedConnector.connectorKey,
         enabled: false,
         clearStoredSecret: true,
@@ -397,7 +397,7 @@ export const AgentConnectorsPage = () => {
 
     try {
       const result = await testConnectorConnection({
-        workspaceId,
+        workspaceId: activeWorkspaceId,
         connectorKey: selectedConnector.connectorKey,
       });
       setFeedback(result.summary);
@@ -420,7 +420,7 @@ export const AgentConnectorsPage = () => {
     try {
       const result = await createConnectorLinkToken({
         commandId: `cmd-connector-link-${Date.now().toString(36)}`,
-        workspaceId,
+        workspaceId: activeWorkspaceId,
         connectorKey: selectedConnector.connectorKey,
         userId: selectedIdentity.userId,
         expiresInMinutes: 30,

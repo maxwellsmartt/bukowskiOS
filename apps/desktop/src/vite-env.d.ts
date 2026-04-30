@@ -31,9 +31,11 @@ import type {
   EnsureLocalWorkspaceInput,
   AppUserMutationResult,
   AppUsersSnapshot,
+  AppUsersSnapshotQuery,
   AssetsOverviewSnapshot,
   CreateAgentCommand,
   CreateAppUserCommand,
+  DeleteAppUserCommand,
   CreateAssistantThreadCommand,
   CreateConnectorLinkTokenCommand,
   AssetDetailSnapshot,
@@ -137,12 +139,13 @@ declare global {
       getAppInfo: () => Promise<AppInfo>;
       getDiagnostics: () => Promise<AppDiagnosticsSnapshot>;
       getSupportSnapshot: () => Promise<AppSupportSnapshot>;
-      getUsersSnapshot: () => Promise<AppUsersSnapshot>;
+      getUsersSnapshot: (query?: AppUsersSnapshotQuery) => Promise<AppUsersSnapshot>;
       createBackup: () => Promise<AppActionResult>;
       createUser: (input: CreateAppUserCommand) => Promise<AppUserMutationResult>;
       updateUser: (input: UpdateAppUserCommand) => Promise<AppUserMutationResult>;
       setUserActive: (input: SetAppUserActiveCommand) => Promise<AppUserMutationResult>;
       revokeTelegramLink: (input: RevokeTelegramLinkCommand) => Promise<AppUserMutationResult>;
+      deleteUser: (input: DeleteAppUserCommand) => Promise<AppUserMutationResult>;
       ensureLocalWorkspaces: (workspaces: EnsureLocalWorkspaceInput[]) => Promise<AppActionResult>;
       getLocalWorkspaces: () => Promise<AppLocalWorkspaceRow[]>;
       runIntegrityCheck: () => Promise<AppActionResult>;

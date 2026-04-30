@@ -44,6 +44,10 @@ export type AppUsersSnapshot = {
   roles: AppUserRoleRow[];
 };
 
+export type AppUsersSnapshotQuery = {
+  workspaceId?: string;
+};
+
 export type AppUserMutationResult = {
   summary: string;
   snapshot: AppUsersSnapshot;

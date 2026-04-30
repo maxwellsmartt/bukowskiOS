@@ -4,8 +4,6 @@ import { createCodeGenerationService } from "./codeGenerationService";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
-
 const operationalPermissions = [
   ["perm-projects-read", "projects.read", "Read projects", "View project registry, details and schedule"],
   ["perm-projects-manage", "projects.manage", "Manage projects", "Create, edit and archive projects"],
@@ -87,6 +85,9 @@ const slugify = (value: string) =>
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
 
+export const getWorkspaceRoleId = (workspaceId: string, baseRoleId: string) =>
+  workspaceId === DEFAULT_WORKSPACE_ID ? baseRoleId : `${baseRoleId}-${slugify(workspaceId).slice(0, 48)}`;
+
 const ensureDefaultCommandActorAccess = (db: DatabaseSync, now: string) => {
   db.prepare(
     `
@@ -108,15 +109,22 @@ const ensureDefaultCommandActorAccess = (db: DatabaseSync, now: string) => {
   const upsertMembership = db.prepare(
     `
       INSERT INTO workspace_memberships (id, workspace_id, user_id, role_id, status, joined_at, created_at)
-      VALUES (?, ?, ?, 'role-admin', 'active', ?, ?)
+      VALUES (?, ?, ?, ?, 'active', ?, ?)
       ON CONFLICT(workspace_id, user_id) DO UPDATE SET
-        role_id = 'role-admin',
+        role_id = excluded.role_id,
         status = 'active'
     `,
   );
 
   workspaces.forEach((workspace) => {
-    upsertMembership.run(`membership-${workspace.id}-ops`, workspace.id, defaultCommandActor[0], now, now);
+    upsertMembership.run(
+      `membership-${workspace.id}-ops`,
+      workspace.id,
+      defaultCommandActor[0],
+      getWorkspaceRoleId(workspace.id, "role-admin"),
+      now,
+      now,
+    );
   });
 };
 
@@ -195,38 +203,67 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
       ).run(id, key, label, description);
     });
 
-    operationalRoles.forEach(([id, key, name, description, isSystemRole]) => {
-      db.prepare(
-        `
-          INSERT INTO roles (id, workspace_id, key, name, description, is_system_role, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET
-            key = excluded.key,
-            name = excluded.name,
-            description = excluded.description,
-            is_system_role = excluded.is_system_role
-        `,
-      ).run(id, workspaceId, key, name, description, isSystemRole, now);
+    const workspaces = db.prepare("SELECT id FROM workspaces").all() as Array<{ id: string }>;
+    const upsertRole = db.prepare(
+      `
+        INSERT INTO roles (id, workspace_id, key, name, description, is_system_role, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          workspace_id = excluded.workspace_id,
+          key = excluded.key,
+          name = excluded.name,
+          description = excluded.description,
+          is_system_role = excluded.is_system_role
+      `,
+    );
+
+    workspaces.forEach((workspace) => {
+      operationalRoles.forEach(([baseRoleId, key, name, description, isSystemRole]) => {
+        upsertRole.run(getWorkspaceRoleId(workspace.id, baseRoleId), workspace.id, key, name, description, isSystemRole, now);
+      });
     });
 
     migrateLegacyRoles(db);
+
+    const remapMemberships = db.prepare(
+      `
+        UPDATE workspace_memberships
+        SET role_id = ?
+        WHERE workspace_id = ?
+          AND role_id IN (
+            SELECT id
+            FROM roles
+            WHERE key = ?
+          )
+      `,
+    );
+
+    workspaces.forEach((workspace) => {
+      operationalRoles.forEach(([baseRoleId, key]) => {
+        remapMemberships.run(getWorkspaceRoleId(workspace.id, baseRoleId), workspace.id, key);
+      });
+    });
 
     if (options.cleanupDemoPlaceholders) {
       cleanupDemoTeamPlaceholders(db, now);
     }
 
-    operationalRoles.forEach(([roleId]) => {
-      db.prepare("DELETE FROM role_permissions WHERE role_id = ?").run(roleId);
+    workspaces.forEach((workspace) => {
+      operationalRoles.forEach(([baseRoleId]) => {
+        db.prepare("DELETE FROM role_permissions WHERE role_id = ?").run(getWorkspaceRoleId(workspace.id, baseRoleId));
+      });
     });
 
-    operationalRolePermissions.forEach(([roleId, permissionId]) => {
-      db.prepare(
-        `
-          INSERT INTO role_permissions (role_id, permission_id, created_at)
-          VALUES (?, ?, ?)
-          ON CONFLICT(role_id, permission_id) DO NOTHING
-        `,
-      ).run(roleId, permissionId, now);
+    workspaces.forEach((workspace) => {
+      operationalRolePermissions.forEach(([baseRoleId, permissionId]) => {
+        db.prepare(
+          `
+            INSERT INTO role_permissions (role_id, permission_id, created_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(role_id, permission_id) DO NOTHING
+          `,
+        ).run(getWorkspaceRoleId(workspace.id, baseRoleId), permissionId, now);
+      });
     });
 
     ensureDefaultCommandActorAccess(db, now);
@@ -241,7 +278,7 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
             AND trim(client_name) != ''
         `,
       )
-      .all(workspaceId) as Array<{ id: string; client_name: string }>;
+      .all(DEFAULT_WORKSPACE_ID) as Array<{ id: string; client_name: string }>;
 
     projectsWithClients.forEach((project) => {
       const clientName = project.client_name.trim();
@@ -263,7 +300,7 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
           )
           VALUES (?, ?, ?, NULL, NULL, NULL, 'Backfilled from project registry.', 1, ?, ?)
         `,
-      ).run(clientId, workspaceId, clientName, now, now);
+      ).run(clientId, DEFAULT_WORKSPACE_ID, clientName, now, now);
 
       db.prepare(
         `
@@ -302,7 +339,7 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
           )
           VALUES (?, ?, ?, 'Core crew', ?, ?, 'Backfilled from users registry.', 1, ?, ?)
         `,
-      ).run(`crew-${user.id}`, workspaceId, user.full_name, user.email, user.phone, now, now);
+      ).run(`crew-${user.id}`, DEFAULT_WORKSPACE_ID, user.full_name, user.email, user.phone, now, now);
     });
 
     const assets = db
@@ -313,11 +350,11 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
           WHERE workspace_id = ?
         `,
       )
-      .all(workspaceId) as Array<{ id: string; internal_code: string; qr_code_value: string | null }>;
+      .all(DEFAULT_WORKSPACE_ID) as Array<{ id: string; internal_code: string; qr_code_value: string | null }>;
 
     assets.forEach((asset) => {
       codeService.ensurePrimaryCode({
-        workspaceId,
+        workspaceId: DEFAULT_WORKSPACE_ID,
         entityType: "asset",
         entityId: asset.id,
         preferredCodeValue: asset.qr_code_value?.trim() || `AST-${asset.internal_code}`,
@@ -326,11 +363,11 @@ export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundat
 
     const packingSlips = db
       .prepare("SELECT id FROM packing_slips WHERE workspace_id = ?")
-      .all(workspaceId) as Array<{ id: string }>;
+      .all(DEFAULT_WORKSPACE_ID) as Array<{ id: string }>;
 
     packingSlips.forEach((slip) => {
       codeService.ensurePrimaryCode({
-        workspaceId,
+        workspaceId: DEFAULT_WORKSPACE_ID,
         entityType: "packing_slip",
         entityId: slip.id,
         preferredCodeValue: slip.id.replace("packing-", "PS-"),

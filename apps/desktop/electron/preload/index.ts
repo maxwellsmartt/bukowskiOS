@@ -31,9 +31,11 @@ import type {
   EnsureLocalWorkspaceInput,
   AppUserMutationResult,
   AppUsersSnapshot,
+  AppUsersSnapshotQuery,
   AssetsOverviewSnapshot,
   CreateAgentCommand,
   CreateAppUserCommand,
+  DeleteAppUserCommand,
   CreateAssistantThreadCommand,
   CreateConnectorLinkTokenCommand,
   AssetDetailSnapshot,
@@ -150,7 +152,8 @@ const bukowskiApp = {
   getAppInfo: () => ipcRenderer.invoke(ipcChannels.app.getInfo) as Promise<AppInfo>,
   getDiagnostics: () => ipcRenderer.invoke(ipcChannels.app.getDiagnostics) as Promise<AppDiagnosticsSnapshot>,
   getSupportSnapshot: () => ipcRenderer.invoke(ipcChannels.app.getSupportSnapshot) as Promise<AppSupportSnapshot>,
-  getUsersSnapshot: () => ipcRenderer.invoke(ipcChannels.app.getUsersSnapshot) as Promise<AppUsersSnapshot>,
+  getUsersSnapshot: (query?: AppUsersSnapshotQuery) =>
+    ipcRenderer.invoke(ipcChannels.app.getUsersSnapshot, query) as Promise<AppUsersSnapshot>,
   createBackup: () => ipcRenderer.invoke(ipcChannels.app.createBackup) as Promise<AppActionResult>,
   createUser: (input: CreateAppUserCommand) => ipcRenderer.invoke(ipcChannels.app.createUser, input) as Promise<AppUserMutationResult>,
   updateUser: (input: UpdateAppUserCommand) => ipcRenderer.invoke(ipcChannels.app.updateUser, input) as Promise<AppUserMutationResult>,
@@ -158,6 +161,7 @@ const bukowskiApp = {
     ipcRenderer.invoke(ipcChannels.app.setUserActive, input) as Promise<AppUserMutationResult>,
   revokeTelegramLink: (input: RevokeTelegramLinkCommand) =>
     ipcRenderer.invoke(ipcChannels.app.revokeTelegramLink, input) as Promise<AppUserMutationResult>,
+  deleteUser: (input: DeleteAppUserCommand) => ipcRenderer.invoke(ipcChannels.app.deleteUser, input) as Promise<AppUserMutationResult>,
   ensureLocalWorkspaces: (workspaces: EnsureLocalWorkspaceInput[]) =>
     ipcRenderer.invoke(ipcChannels.app.ensureLocalWorkspaces, workspaces) as Promise<AppActionResult>,
   getLocalWorkspaces: () => ipcRenderer.invoke(ipcChannels.app.getLocalWorkspaces) as Promise<AppLocalWorkspaceRow[]>,

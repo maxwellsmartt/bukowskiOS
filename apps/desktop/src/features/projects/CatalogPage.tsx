@@ -443,14 +443,14 @@ export const CatalogPage = () => {
       return;
     }
 
-    const nextUsersSnapshot = await window.bukowskiApp.getUsersSnapshot();
+    const nextUsersSnapshot = await window.bukowskiApp.getUsersSnapshot({ workspaceId: activeWorkspaceId });
     setUsersSnapshot(nextUsersSnapshot);
     setCreateCrewUserRoleId((current) => current || nextUsersSnapshot.roles[0]?.id || "");
   };
 
   useEffect(() => {
     void loadUsersSnapshot();
-  }, []);
+  }, [activeWorkspaceId]);
 
   const tabs = useMemo<CatalogTabConfig[]>(
     () => [

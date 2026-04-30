@@ -5,14 +5,14 @@ import type {
   AppUserMutationResult,
   AppUserRoleRow,
   AppUsersSnapshot,
+  AppUsersSnapshotQuery,
   CreateAppUserCommand,
+  DeleteAppUserCommand,
   RevokeTelegramLinkCommand,
   SetAppUserActiveCommand,
   UpdateAppUserCommand,
 } from "@contracts";
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const slugify = (value: string) =>
   value
@@ -31,7 +31,9 @@ const optionalValue = (value?: string | null) => {
   return nextValue ? nextValue : null;
 };
 
-const loadRoles = (db: DatabaseSync): AppUserRoleRow[] =>
+const resolveWorkspaceId = (workspaceId?: string | null) => optionalValue(workspaceId) ?? DEFAULT_WORKSPACE_ID;
+
+const loadRoles = (db: DatabaseSync, workspaceId: string): AppUserRoleRow[] =>
   db
     .prepare(
       `
@@ -89,7 +91,7 @@ const loadRoles = (db: DatabaseSync): AppUserRoleRow[] =>
       };
     });
 
-const loadUsers = (db: DatabaseSync): AppUserAdminRow[] =>
+const loadUsers = (db: DatabaseSync, workspaceId: string): AppUserAdminRow[] =>
   db
     .prepare(
       `
@@ -252,12 +254,12 @@ const loadUsers = (db: DatabaseSync): AppUserAdminRow[] =>
       };
     });
 
-const loadSnapshot = (db: DatabaseSync): AppUsersSnapshot => ({
-  users: loadUsers(db),
-  roles: loadRoles(db),
+const loadSnapshot = (db: DatabaseSync, workspaceId: string): AppUsersSnapshot => ({
+  users: loadUsers(db, workspaceId),
+  roles: loadRoles(db, workspaceId),
 });
 
-const resolveRole = (db: DatabaseSync, roleId: string) => {
+const resolveRole = (db: DatabaseSync, workspaceId: string, roleId: string) => {
   const role = db
     .prepare(
       `
@@ -277,7 +279,7 @@ const resolveRole = (db: DatabaseSync, roleId: string) => {
   return role;
 };
 
-const ensureWorkspaceMembership = (db: DatabaseSync, userId: string, roleId: string, isActive: boolean) => {
+const ensureWorkspaceMembership = (db: DatabaseSync, workspaceId: string, userId: string, roleId: string, isActive: boolean) => {
   const now = nowIso();
   const existingMembership = db
     .prepare(
@@ -321,7 +323,7 @@ const ensureWorkspaceMembership = (db: DatabaseSync, userId: string, roleId: str
   return membershipId;
 };
 
-const syncCrewLink = (db: DatabaseSync, userId: string, linkedCrewMemberId?: string) => {
+const syncCrewLink = (db: DatabaseSync, workspaceId: string, userId: string, linkedCrewMemberId?: string) => {
   db.prepare(
     `
       UPDATE crew_members
@@ -388,13 +390,133 @@ const ensureUniqueEmail = (db: DatabaseSync, email: string | null, userId?: stri
   }
 };
 
+const countUserDeleteBlockers = (db: DatabaseSync, workspaceId: string, userId: string) => {
+  const userState = db
+    .prepare(
+      `
+        SELECT
+          users.id,
+          users.full_name,
+          users.is_active,
+          COALESCE(workspace_memberships.status, 'missing') AS membership_status
+        FROM users
+        LEFT JOIN workspace_memberships
+          ON workspace_memberships.user_id = users.id
+          AND workspace_memberships.workspace_id = ?
+        WHERE users.id = ?
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, userId) as
+    | {
+        id: string;
+        full_name: string;
+        is_active: number;
+        membership_status: string;
+      }
+    | undefined;
+
+  if (!userState || userState.membership_status === "missing") {
+    throw new Error("That user is not part of this workspace.");
+  }
+
+  const telegramLinks = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM connector_accounts
+        WHERE workspace_id = ?
+          AND linked_user_id = ?
+          AND link_status IN ('linked', 'pending')
+      `,
+    )
+    .get(workspaceId, userId) as { count: number };
+
+  const activeAssetState = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM asset_current_state
+        WHERE workspace_id = ?
+          AND current_responsible_user_id = ?
+          AND (
+            active_assignment_id IS NOT NULL
+            OR assigned_quantity > 0
+            OR checked_out_quantity > 0
+            OR custody_status IN ('assigned', 'partial_assigned', 'checked_out', 'partial_checked_out')
+          )
+      `,
+    )
+    .get(workspaceId, userId) as { count: number };
+
+  const activeAssignments = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM asset_assignments
+        WHERE workspace_id = ?
+          AND assigned_to_user_id = ?
+          AND assignment_status NOT IN ('returned', 'cancelled', 'canceled', 'void')
+      `,
+    )
+    .get(workspaceId, userId) as { count: number };
+
+  const openPackingSlips = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM packing_slips
+        WHERE workspace_id = ?
+          AND responsible_user_id = ?
+          AND status NOT IN ('Closed', 'Returned', 'Cancelled', 'Canceled', 'Void')
+      `,
+    )
+    .get(workspaceId, userId) as { count: number };
+
+  const openIncidents = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM incidents
+        WHERE workspace_id = ?
+          AND responsible_user_id = ?
+          AND status NOT IN ('Resolved', 'Closed', 'Cancelled', 'Canceled')
+      `,
+    )
+    .get(workspaceId, userId) as { count: number };
+
+  return {
+    userName: userState.full_name,
+    isActive: userState.is_active === 1,
+    membershipStatus: userState.membership_status,
+    telegramLinks: telegramLinks.count,
+    activeAssetState: activeAssetState.count,
+    activeAssignments: activeAssignments.count,
+    openPackingSlips: openPackingSlips.count,
+    openIncidents: openIncidents.count,
+  };
+};
+
+const buildUserDeleteBlockerMessage = (blockers: ReturnType<typeof countUserDeleteBlockers>) => {
+  const messages = [
+    blockers.isActive || blockers.membershipStatus === "active" ? "deactivate the user first" : null,
+    blockers.telegramLinks ? "revoke Telegram access first" : null,
+    blockers.activeAssetState || blockers.activeAssignments ? "return or reassign active assets first" : null,
+    blockers.openPackingSlips ? "close or reassign open packing slips first" : null,
+    blockers.openIncidents ? "resolve or reassign open incidents first" : null,
+  ].filter(Boolean);
+
+  return `This user cannot be removed yet. Please ${messages.join(", ")}.`;
+};
+
 export const createUserAdminService = (db: DatabaseSync) => ({
-  getSnapshot(): AppUsersSnapshot {
-    return loadSnapshot(db);
+  getSnapshot(query?: AppUsersSnapshotQuery): AppUsersSnapshot {
+    return loadSnapshot(db, resolveWorkspaceId(query?.workspaceId));
   },
 
   createUser(input: CreateAppUserCommand): AppUserMutationResult {
-    resolveRole(db, input.roleId);
+    const workspaceId = resolveWorkspaceId(input.workspaceId);
+    resolveRole(db, workspaceId, input.roleId);
     ensureUniqueEmail(db, optionalValue(input.email));
 
     const now = nowIso();
@@ -409,8 +531,8 @@ export const createUserAdminService = (db: DatabaseSync) => ({
         `,
       ).run(userId, input.fullName.trim(), optionalValue(input.email), optionalValue(input.phone), now, now);
 
-      ensureWorkspaceMembership(db, userId, input.roleId, true);
-      syncCrewLink(db, userId, optionalValue(input.linkedCrewMemberId) ?? undefined);
+      ensureWorkspaceMembership(db, workspaceId, userId, input.roleId, true);
+      syncCrewLink(db, workspaceId, userId, optionalValue(input.linkedCrewMemberId) ?? undefined);
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");
@@ -419,12 +541,13 @@ export const createUserAdminService = (db: DatabaseSync) => ({
 
     return {
       summary: `${input.fullName.trim()} is now an internal user and ready for role-based access.`,
-      snapshot: loadSnapshot(db),
+      snapshot: loadSnapshot(db, workspaceId),
       userId,
     };
   },
 
   updateUser(input: UpdateAppUserCommand): AppUserMutationResult {
+    const workspaceId = resolveWorkspaceId(input.workspaceId);
     const existing = db
       .prepare(
         `
@@ -440,7 +563,7 @@ export const createUserAdminService = (db: DatabaseSync) => ({
       throw new Error("User not found.");
     }
 
-    resolveRole(db, input.roleId);
+    resolveRole(db, workspaceId, input.roleId);
     ensureUniqueEmail(db, optionalValue(input.email), input.userId);
 
     db.exec("BEGIN");
@@ -458,8 +581,8 @@ export const createUserAdminService = (db: DatabaseSync) => ({
       ).run(input.fullName.trim(), optionalValue(input.email), optionalValue(input.phone), nowIso(), input.userId);
 
       const currentActive = db.prepare("SELECT is_active FROM users WHERE id = ?").get(input.userId) as { is_active: number };
-      ensureWorkspaceMembership(db, input.userId, input.roleId, currentActive.is_active === 1);
-      syncCrewLink(db, input.userId, optionalValue(input.linkedCrewMemberId) ?? undefined);
+      ensureWorkspaceMembership(db, workspaceId, input.userId, input.roleId, currentActive.is_active === 1);
+      syncCrewLink(db, workspaceId, input.userId, optionalValue(input.linkedCrewMemberId) ?? undefined);
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");
@@ -468,12 +591,13 @@ export const createUserAdminService = (db: DatabaseSync) => ({
 
     return {
       summary: `${input.fullName.trim()} was updated.`,
-      snapshot: loadSnapshot(db),
+      snapshot: loadSnapshot(db, workspaceId),
       userId: input.userId,
     };
   },
 
   setUserActive(input: SetAppUserActiveCommand): AppUserMutationResult {
+    const workspaceId = resolveWorkspaceId(input.workspaceId);
     const existingMembership = db
       .prepare(
         `
@@ -502,7 +626,7 @@ export const createUserAdminService = (db: DatabaseSync) => ({
         `,
       ).run(input.isActive ? 1 : 0, nowIso(), input.userId);
 
-      ensureWorkspaceMembership(db, input.userId, existingMembership.role_id, input.isActive);
+      ensureWorkspaceMembership(db, workspaceId, input.userId, existingMembership.role_id, input.isActive);
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");
@@ -511,12 +635,13 @@ export const createUserAdminService = (db: DatabaseSync) => ({
 
     return {
       summary: input.isActive ? "User activated for workspace operations." : "User deactivated and blocked from connector access.",
-      snapshot: loadSnapshot(db),
+      snapshot: loadSnapshot(db, workspaceId),
       userId: input.userId,
     };
   },
 
   revokeTelegramLink(input: RevokeTelegramLinkCommand): AppUserMutationResult {
+    const workspaceId = resolveWorkspaceId(input.workspaceId);
     const now = nowIso();
     db.exec("BEGIN");
 
@@ -552,8 +677,68 @@ export const createUserAdminService = (db: DatabaseSync) => ({
 
     return {
       summary: "Telegram access was revoked for this user.",
-      snapshot: loadSnapshot(db),
+      snapshot: loadSnapshot(db, workspaceId),
       userId: input.userId,
+    };
+  },
+
+  deleteUser(input: DeleteAppUserCommand): AppUserMutationResult {
+    const workspaceId = resolveWorkspaceId(input.workspaceId);
+    const blockers = countUserDeleteBlockers(db, workspaceId, input.userId);
+
+    if (
+      blockers.isActive ||
+      blockers.membershipStatus === "active" ||
+      blockers.telegramLinks ||
+      blockers.activeAssetState ||
+      blockers.activeAssignments ||
+      blockers.openPackingSlips ||
+      blockers.openIncidents
+    ) {
+      throw new Error(buildUserDeleteBlockerMessage(blockers));
+    }
+
+    const now = nowIso();
+    db.exec("BEGIN");
+
+    try {
+      db.prepare(
+        `
+          UPDATE crew_members
+          SET linked_user_id = NULL,
+              updated_at = ?
+          WHERE workspace_id = ?
+            AND linked_user_id = ?
+        `,
+      ).run(now, workspaceId, input.userId);
+
+      db.prepare(
+        `
+          DELETE FROM workspace_memberships
+          WHERE workspace_id = ?
+            AND user_id = ?
+        `,
+      ).run(workspaceId, input.userId);
+
+      db.prepare(
+        `
+          UPDATE users
+          SET is_active = 0,
+              updated_at = ?
+          WHERE id = ?
+        `,
+      ).run(now, input.userId);
+
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+
+    return {
+      summary: `${blockers.userName} was removed from this workspace.`,
+      snapshot: loadSnapshot(db, workspaceId),
+      userId: null,
     };
   },
 });

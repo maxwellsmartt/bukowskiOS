@@ -163,6 +163,13 @@ export const revokeTelegramLinkSchema = z
   })
   .strict();
 
+export const deleteAppUserSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    userId: nonEmptyString,
+  })
+  .strict();
+
 export const assignAgentModelSchema = z
   .object({
     commandId: nonEmptyString,

@@ -604,6 +604,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
         seededProjectCount += seedProjectShellForWorkspace(database, workspace.id, timestamp);
       });
       database.exec("COMMIT");
+      bootstrapAdminFoundation(database);
       if (seededProjectCount > 0) {
         logger.info("Seeded project shell rows for remote workspaces.", { count: seededProjectCount });
       }

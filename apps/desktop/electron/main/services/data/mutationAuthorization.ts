@@ -1,5 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { getWorkspaceRoleId } from "./adminFoundationBootstrap";
+
 const defaultActorUserId = "user-ops";
 
 type AuthorizationRow = {
@@ -56,12 +58,12 @@ const ensureDefaultActorWorkspaceAccess = (db: DatabaseSync, workspaceId: string
   db.prepare(
     `
       INSERT INTO workspace_memberships (id, workspace_id, user_id, role_id, status, joined_at, created_at)
-      VALUES (?, ?, ?, 'role-admin', 'active', ?, ?)
+      VALUES (?, ?, ?, ?, 'active', ?, ?)
       ON CONFLICT(workspace_id, user_id) DO UPDATE SET
-        role_id = 'role-admin',
+        role_id = excluded.role_id,
         status = 'active'
     `,
-  ).run(`membership-${workspaceId}-ops`, workspaceId, defaultActorUserId, now, now);
+  ).run(`membership-${workspaceId}-ops`, workspaceId, defaultActorUserId, getWorkspaceRoleId(workspaceId, "role-admin"), now, now);
 };
 
 export const resolveAuthorizedActor = (

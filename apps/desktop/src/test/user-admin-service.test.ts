@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { bootstrapAdminFoundation } from "../../electron/main/services/data/adminFoundationBootstrap";
 import { createUserAdminService } from "../../electron/main/services/data/userAdminService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
@@ -11,6 +12,28 @@ describe("user admin service", () => {
     const roleKeys = service.getSnapshot().roles.map((role) => role.key);
 
     expect(roleKeys).toEqual(["admin", "crew", "supervisor", "finance_viewer", "maintenance"]);
+
+    cleanup();
+  });
+
+  it("bootstraps the same product roles for additional workspaces", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-user-admin-workspace-roles");
+
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, slug, name, base_currency, is_active, created_at, updated_at)
+          VALUES ('workspace-casa', 'casa', 'Casa', 'USD', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `,
+      )
+      .run();
+
+    bootstrapAdminFoundation(database);
+    const service = createUserAdminService(database);
+    const snapshot = service.getSnapshot({ workspaceId: "workspace-casa" });
+
+    expect(snapshot.roles.map((role) => role.key)).toEqual(["admin", "crew", "supervisor", "finance_viewer", "maintenance"]);
+    expect(snapshot.users.find((user) => user.id === "user-ops")?.roleKey).toBe("admin");
 
     cleanup();
   });
@@ -170,6 +193,99 @@ describe("user admin service", () => {
     });
     const revokedUser = revoked.snapshot.users.find((user) => user.id === "user-ops");
     expect(revokedUser?.telegramLinkStatus).toBe("revoked");
+
+    cleanup();
+  });
+
+  it("removes inactive users from the workspace and clears crew links", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-user-admin-delete");
+    const service = createUserAdminService(database);
+
+    database
+      .prepare(
+        `
+          INSERT INTO crew_members (
+            id, workspace_id, full_name, role_label, is_active, created_at, updated_at
+          ) VALUES ('crew-remove-user', 'workspace-metadata', 'Remove User', 'Crew', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `,
+      )
+      .run();
+
+    const created = service.createUser({
+      workspaceId: "workspace-metadata",
+      fullName: "Remove User",
+      email: "remove.user@metadata.cine",
+      roleId: "role-crew",
+      linkedCrewMemberId: "crew-remove-user",
+    });
+
+    service.setUserActive({
+      workspaceId: "workspace-metadata",
+      userId: created.userId ?? "",
+      isActive: false,
+    });
+
+    const removed = service.deleteUser({
+      workspaceId: "workspace-metadata",
+      userId: created.userId ?? "",
+    });
+
+    expect(removed.snapshot.users.some((user) => user.id === created.userId)).toBe(false);
+
+    const membership = database
+      .prepare("SELECT id FROM workspace_memberships WHERE workspace_id = ? AND user_id = ?")
+      .get("workspace-metadata", created.userId) as { id: string } | undefined;
+    expect(membership).toBeUndefined();
+
+    const crew = database.prepare("SELECT linked_user_id FROM crew_members WHERE id = ?").get("crew-remove-user") as {
+      linked_user_id: string | null;
+    };
+    expect(crew.linked_user_id).toBeNull();
+
+    cleanup();
+  });
+
+  it("blocks removal while users still have active access or active operational links", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-user-admin-delete-blockers");
+    const service = createUserAdminService(database);
+
+    expect(() =>
+      service.deleteUser({
+        workspaceId: "workspace-metadata",
+        userId: "user-ops",
+      }),
+    ).toThrow(/deactivate the user first/u);
+
+    service.setUserActive({
+      workspaceId: "workspace-metadata",
+      userId: "user-ops",
+      isActive: false,
+    });
+
+    database
+      .prepare(
+        `
+          UPDATE asset_current_state
+          SET current_responsible_user_id = ?,
+              assigned_quantity = 1,
+              custody_status = 'assigned'
+          WHERE workspace_id = ?
+            AND asset_id = (
+              SELECT asset_id
+              FROM asset_current_state
+              WHERE workspace_id = ?
+              LIMIT 1
+            )
+        `,
+      )
+      .run("user-ops", "workspace-metadata", "workspace-metadata");
+
+    expect(() =>
+      service.deleteUser({
+        workspaceId: "workspace-metadata",
+        userId: "user-ops",
+      }),
+    ).toThrow(/return or reassign active assets first/u);
 
     cleanup();
   });
