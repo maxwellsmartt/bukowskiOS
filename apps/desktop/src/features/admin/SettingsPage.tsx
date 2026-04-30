@@ -8,16 +8,16 @@ import type {
   AppSupportSnapshot,
   AppSyncOutboxRow,
 } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { useCatalogData } from "@features/projects/useProjectsData";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { getRenderFidelityAuditSummary, renderFidelityAudit } from "@shared/lib/renderFidelityAudit";
-import { useCatalogData } from "@features/projects/useProjectsData";
 
 const emptyDiagnostics: AppDiagnosticsSnapshot = {
   databaseSizeBytes: 0,
@@ -72,10 +72,10 @@ type UserEditorDraft = {
 type SettingsSectionKey = "overview" | "users" | "operations" | "advanced";
 
 const settingsSections: Array<{ key: SettingsSectionKey; label: string; description: string }> = [
-  { key: "overview", label: "General", description: "Quick health and access status." },
-  { key: "users", label: "Team", description: "People, roles and channel readiness." },
-  { key: "operations", label: "Data & Sync", description: "Database, backups and sync." },
-  { key: "advanced", label: "Advanced", description: "Diagnostics, exports and internal tools." },
+  { key: "overview", label: "General", description: "Workspace status" },
+  { key: "users", label: "Team", description: "Users and roles" },
+  { key: "operations", label: "Data", description: "Backups and sync" },
+  { key: "advanced", label: "Advanced", description: "Support tools" },
 ];
 
 const permissionLabelMap: Record<string, string> = {
@@ -159,6 +159,7 @@ const buildUserDraft = (user: AppUserAdminRow | null, roles: AppUsersSnapshot["r
 
 export const SettingsPage = () => {
   const { appInfo } = useShellContext();
+  const { activeWorkspaceId, activeWorkspaceName } = useWorkspace();
   const { data: catalog } = useCatalogData();
   const navigate = useNavigate();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
@@ -240,7 +241,7 @@ export const SettingsPage = () => {
     }
   };
 
-  const summaryRows = useMemo(
+  const dataHealthRows = useMemo(
     () => [
       {
         label: "Database file",
@@ -263,45 +264,51 @@ export const SettingsPage = () => {
         value: formatDateLabel(diagnostics.lastIntegrityCheckAt),
       },
       {
-        label: "Last retention pass",
+        label: "Secure storage",
+        value: diagnostics.encryptionAvailable ? "Available" : "Unavailable on this device",
+      },
+    ],
+    [diagnostics],
+  );
+
+  const syncHealthRows = useMemo(
+    () => [
+      {
+        label: "Last cleanup",
         value: formatDateLabel(diagnostics.lastRetentionRunAt),
       },
       {
-        label: "Retention result",
-        value: diagnostics.lastRetentionSummary ?? "No retention pass has run yet",
+        label: "Cleanup result",
+        value: diagnostics.lastRetentionSummary ?? "Not run yet",
       },
       {
-        label: "Last local sync pass",
+        label: "Last sync",
         value: formatDateLabel(diagnostics.lastSyncRunAt),
       },
       {
-        label: "Local sync status",
+        label: "Sync status",
         value:
           diagnostics.lastSyncStatus === "healthy"
             ? "Healthy"
             : diagnostics.lastSyncStatus === "failed"
               ? "Failed"
-              : "Not run yet",
+              : "Idle",
       },
       {
-        label: "Local sync result",
-        value: diagnostics.lastSyncSummary ?? "No local sync pass has run yet",
+        label: "Sync result",
+        value: diagnostics.lastSyncSummary ?? "No sync run yet",
       },
       {
-        label: "Outbox pending",
+        label: "Pending",
         value: String(diagnostics.syncOutboxPendingCount),
       },
       {
-        label: "Outbox processing",
+        label: "Processing",
         value: String(diagnostics.syncOutboxProcessingCount),
       },
       {
-        label: "Outbox failed",
+        label: "Failed",
         value: String(diagnostics.syncOutboxFailedCount),
-      },
-      {
-        label: "Secure local encryption",
-        value: diagnostics.encryptionAvailable ? "Available" : "Unavailable on this device",
       },
     ],
     [diagnostics],
@@ -374,14 +381,55 @@ export const SettingsPage = () => {
 
   const overviewRows = useMemo(
     () => [
+      { label: "Workspace", value: activeWorkspaceName },
       { label: "App", value: `${appInfo?.appName ?? "bukowskiOS"} ${appInfo?.version ?? "Unknown"}` },
-      { label: "Platform", value: appInfo?.platform ?? "Unknown" },
       { label: "Active users", value: usersSnapshot.users.filter((user) => user.isActive).length },
       { label: "Telegram ready", value: usersSnapshot.users.filter((user) => user.readyForTelegram).length },
       { label: "Integrity", value: resolveIntegrityLabel(diagnostics.lastIntegrityCheckStatus) },
       { label: "Failed sync rows", value: diagnostics.syncOutboxFailedCount },
     ],
-    [appInfo?.appName, appInfo?.platform, appInfo?.version, diagnostics.lastIntegrityCheckStatus, diagnostics.syncOutboxFailedCount, usersSnapshot.users],
+    [activeWorkspaceName, appInfo?.appName, appInfo?.version, diagnostics.lastIntegrityCheckStatus, diagnostics.syncOutboxFailedCount, usersSnapshot.users],
+  );
+
+  const settingsHealthCards = useMemo(
+    () => [
+      {
+        label: "Data health",
+        value: resolveIntegrityLabel(diagnostics.lastIntegrityCheckStatus),
+        detail:
+          diagnostics.lastIntegrityCheckStatus === "healthy"
+            ? `Last checked ${formatDateLabel(diagnostics.lastIntegrityCheckAt)}`
+            : "Run an integrity check before export or handoff.",
+        tone: diagnostics.lastIntegrityCheckStatus === "healthy" ? "success" : diagnostics.lastIntegrityCheckStatus === "failed" ? "critical" : "warning",
+      },
+      {
+        label: "Sync queue",
+        value: diagnostics.syncOutboxFailedCount ? `${diagnostics.syncOutboxFailedCount} failed` : diagnostics.syncOutboxPendingCount ? `${diagnostics.syncOutboxPendingCount} pending` : "Clear",
+        detail: diagnostics.syncOutboxFailedCount ? "Review failed rows before continuing sync." : "No blocking sync errors.",
+        tone: diagnostics.syncOutboxFailedCount ? "critical" : diagnostics.syncOutboxPendingCount ? "warning" : "success",
+      },
+      {
+        label: "Team setup",
+        value: `${usersSnapshot.users.filter((user) => user.isActive).length} active`,
+        detail: `${usersSnapshot.users.filter((user) => user.readyForTelegram).length} ready for Telegram.`,
+        tone: usersSnapshot.users.some((user) => user.isActive) ? "success" : "warning",
+      },
+      {
+        label: "Support",
+        value: supportSnapshot.lastCrash || supportSnapshot.lastError ? "Review" : "Stable",
+        detail: supportSnapshot.lastCrash || supportSnapshot.lastError ? "Recent runtime events are available." : "No recent crash or strong error captured.",
+        tone: supportSnapshot.lastCrash || supportSnapshot.lastError ? "warning" : "success",
+      },
+    ],
+    [
+      diagnostics.lastIntegrityCheckAt,
+      diagnostics.lastIntegrityCheckStatus,
+      diagnostics.syncOutboxFailedCount,
+      diagnostics.syncOutboxPendingCount,
+      supportSnapshot.lastCrash,
+      supportSnapshot.lastError,
+      usersSnapshot.users,
+    ],
   );
 
   useEffect(() => {
@@ -433,7 +481,7 @@ export const SettingsPage = () => {
       if (selectedUser) {
         await applyUserMutation(() =>
           window.bukowskiApp!.updateUser({
-            workspaceId: DEFAULT_WORKSPACE_ID,
+            workspaceId: activeWorkspaceId,
             userId: selectedUser.id,
             fullName: userDraft.fullName,
             email: userDraft.email,
@@ -445,7 +493,7 @@ export const SettingsPage = () => {
       } else {
         await applyUserMutation(() =>
           window.bukowskiApp!.createUser({
-            workspaceId: DEFAULT_WORKSPACE_ID,
+            workspaceId: activeWorkspaceId,
             fullName: userDraft.fullName,
             email: userDraft.email,
             phone: userDraft.phone,
@@ -469,7 +517,7 @@ export const SettingsPage = () => {
     try {
       await applyUserMutation(() =>
         window.bukowskiApp!.setUserActive({
-          workspaceId: DEFAULT_WORKSPACE_ID,
+          workspaceId: activeWorkspaceId,
           userId: selectedUser.id,
           isActive: !selectedUser.isActive,
         }),
@@ -489,7 +537,7 @@ export const SettingsPage = () => {
     try {
       await applyUserMutation(() =>
         window.bukowskiApp!.revokeTelegramLink({
-          workspaceId: DEFAULT_WORKSPACE_ID,
+          workspaceId: activeWorkspaceId,
           userId: selectedUser.id,
         }),
       );
@@ -499,31 +547,39 @@ export const SettingsPage = () => {
   };
 
   return (
-    <div className="page-stack">
-      <SectionHeader title="Settings" />
+    <div className="page-stack settings-page">
+      <SectionHeader title="Settings" contextLabel={activeWorkspaceName} />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
       {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
-      <SurfaceCard title="Sections">
-        <div className="settings-subnav-grid">
-          {settingsSections.map((section) => (
-            <button
-              key={section.key}
-              className={`settings-subnav-button${activeSection === section.key ? " is-active" : ""}`}
-              onClick={() => setActiveSection(section.key)}
-              type="button"
-            >
-              <strong>{section.label}</strong>
-              <span>{section.description}</span>
-            </button>
-          ))}
-        </div>
-      </SurfaceCard>
+      <nav aria-label="Settings sections" className="settings-section-nav">
+        {settingsSections.map((section) => (
+          <button
+            key={section.key}
+            className={`settings-section-tab${activeSection === section.key ? " is-active" : ""}`}
+            onClick={() => setActiveSection(section.key)}
+            type="button"
+          >
+            <span>{section.label}</span>
+            <small>{section.description}</small>
+          </button>
+        ))}
+      </nav>
 
       {activeSection === "overview" ? (
         <>
-          <SurfaceCard title="General">
+          <div className="settings-health-grid">
+            {settingsHealthCards.map((card) => (
+              <div key={card.label} className={`settings-health-card settings-health-card-${card.tone}`}>
+                <span className="summary-label">{card.label}</span>
+                <strong>{card.value}</strong>
+                <span>{card.detail}</span>
+              </div>
+            ))}
+          </div>
+
+          <SurfaceCard title="General" subtitle="The normal workspace controls live here. Technical tools stay under Advanced.">
             <div className="summary-grid">
               {overviewRows.map((row) => (
                 <div key={row.label} className="summary-row">
@@ -535,13 +591,13 @@ export const SettingsPage = () => {
 
             <div className="action-panel-actions action-panel-actions-start">
               <button className="action-primary-button" onClick={() => setActiveSection("users")} type="button">
-                Open team
+                Team
               </button>
               <button className="ghost-control" onClick={() => setActiveSection("operations")} type="button">
-                Open data & sync
+                Data
               </button>
               <button className="ghost-control" onClick={() => setActiveSection("advanced")} type="button">
-                Open advanced
+                Advanced
               </button>
             </div>
           </SurfaceCard>
@@ -862,9 +918,9 @@ export const SettingsPage = () => {
 
       {activeSection === "operations" ? (
         <>
-          <SurfaceCard title="Database">
+          <SurfaceCard title="Data health" subtitle="Use these actions before exports, handoffs or troubleshooting.">
             <div className="summary-grid">
-              {summaryRows.map((row) => (
+              {dataHealthRows.map((row) => (
                 <div key={row.label} className="summary-row">
                   <span className="summary-label">{row.label}</span>
                   <span className="summary-value">{row.value}</span>
@@ -900,23 +956,17 @@ export const SettingsPage = () => {
             </div>
           </SurfaceCard>
 
-          <SurfaceCard title="Sync">
+          <SurfaceCard title="Sync activity" subtitle="Queue status for local changes waiting to be processed.">
             <div className="summary-grid">
+              {syncHealthRows.map((row) => (
+                <div key={row.label} className="summary-row">
+                  <span className="summary-label">{row.label}</span>
+                  <span className="summary-value">{row.value}</span>
+                </div>
+              ))}
               <div className="summary-row">
-                <span className="summary-label">Visible rows</span>
+                <span className="summary-label">Visible queue rows</span>
                 <span className="summary-value">{syncRows.length}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Failed rows</span>
-                <span className="summary-value">{diagnostics.syncOutboxFailedCount}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Pending rows</span>
-                <span className="summary-value">{diagnostics.syncOutboxPendingCount}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Processing rows</span>
-                <span className="summary-value">{diagnostics.syncOutboxProcessingCount}</span>
               </div>
             </div>
 

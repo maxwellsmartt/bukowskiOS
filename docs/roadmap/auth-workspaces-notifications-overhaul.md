@@ -23,7 +23,7 @@ Decisiones bloqueadas:
 | --- | --- | --- | --- | --- | --- |
 | 0 — Foundation Supabase + Seguridad | In progress | 2026-04-15 |  | Codex | Dependencias instaladas; roadmap, paquete Supabase, Keychain IPC, deep links, migración y Edge Functions desplegadas. Migración validada con REST `workspaces` 200; functions responden `authentication_required`/`forbidden` sin sesión. Typecheck/build/tests pasan. |
 | 1 — Auth + Workspace Vertical MVP | In progress | 2026-04-15 |  | Codex | Login real Supabase y creación real de workspace remoto validados en app. Providers/rutas/guardas/switcher creados. Assets/Packing/Incidents consumen active workspace y validan workspace access en main. Outbox async con transport Supabase opt-in. Workspaces remotos se cachean en SQLite local. Import CSV Rentman probado con CSV real, reconciliado localmente y con preview antes de escribir. Outbox de Metadata Cine2 drenó localmente a `sent=674` y Supabase confirmó `0-673/674`. Snapshots remotos de Assets quedaron en paridad con SQLite. Typecheck/build/tests pasan; typecheck volvió a pasar en casa. |
-| 2 — Roles, Permissions e Invites | Todo |  |  | Codex | Pendiente. |
+| 2 — Roles, Permissions e Invites | In progress | 2026-04-29 |  | Codex | Primer corte de Settings: navegación compacta, health cards, Data/Advanced más separados y Team usando workspace activo. |
 | 3 — Workspaces CRUD + Sharing | Todo |  |  | Codex | Pendiente. |
 | 4 — Archiving Wrapped-Gate | Todo |  |  | Codex | Pendiente. |
 | 5 — Notifications, Todos y Reminders | Todo |  |  | Codex | Pendiente. |
@@ -75,7 +75,7 @@ Decisiones bloqueadas:
 ### Slice 2 — Roles, Permissions e Invites
 
 - Todo — Roles de sistema inmutables y clonables.
-- Todo — Refactor Settings en Members/Roles/Crew/Invitations.
+- Doing — Refactor Settings en Members/Roles/Crew/Invitations.
 - Todo — Implementar invite crew -> user.
 - Todo — Enforcement UI + IPC + RLS.
 
@@ -138,6 +138,7 @@ Decisiones bloqueadas:
 | 2026-04-25 | Working tree casa | Se extiende `workspaceAccess` a Projects: la lista filtra por `workspaceId`, detail/delete preview/mutaciones resuelven workspace desde `projectId`, create/project blueprint escriben en el workspace activo, el wizard/conflict preview usa el workspace activo y se agrega permiso remoto `projects.read/manage` vía migración `20260425113000_project_permissions.sql`. Verificación: `npm run typecheck` y `npm run test -- workspace-access-guard project-mutation-service foundation-read-service` pasan. | Cerrar navegación y acciones de proyectos antes de seguir con Finance/Catalog, reduciendo riesgo de mezcla entre workspaces. |
 | 2026-04-28 | Working tree | Auditoría IC-1: Global Search ya estaba scoped y probado; se cerró fallback legacy de `projects.getCatalog` sin workspace, se scopeó `exportProjectBlueprintPdf` al workspace del blueprint y se reforzó metadata de kits en Catalog para no cruzar workspaces. Verificación: `corepack pnpm --filter @bukowski/desktop typecheck` y `corepack pnpm --filter @bukowski/desktop test -- foundation-read-service.test.ts ipc-safe-handler.test.ts` pasan con 27 archivos/116 tests. | Mantener el foco en el vertical Inventory Core y reducir riesgo de datos cruzados antes de Assign/Move. |
 | 2026-04-28 | Working tree | IC-3 Assign/Move: se agrega bandeja operacional persistente en Assets, selección cross-search, cantidades default 1 editables antes de assign/packing, y `DataTable.pruneSelectionOnRowsChange=false` para este flujo. Verificación: `typecheck`, tests focalizados y `build` pasan. | Reducir fricción real detectada al recrear un packing slip manual y preparar el flujo para técnicos no técnicos. |
+| 2026-04-29 | Working tree | Se retoma roadmap principal con Slice 2/UX1: primer polish de Settings, separación visual de General/Team/Data/Advanced, overview con health cards y mutaciones de Team contra workspace activo. Verificación: `npm run typecheck` pasa. | Convertir Settings en una superficie de producto usable y sacar herramientas técnicas del camino normal. |
 
 ## Decisiones tomadas
 

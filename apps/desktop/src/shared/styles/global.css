@@ -7897,50 +7897,106 @@ button.timeline-signal-chip:focus-visible {
   min-width: 0;
 }
 
-.settings-subnav-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+.settings-page {
+  max-width: 1440px;
 }
 
-.settings-subnav-button {
-  display: grid;
-  gap: 6px;
-  padding: 14px 16px;
+.settings-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px;
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--text-primary);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.settings-section-tab {
+  display: grid;
+  min-width: 118px;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--text-secondary);
   text-align: left;
   transition:
-    border-color 180ms ease,
     background 180ms ease,
+    color 180ms ease,
     transform 180ms ease;
 }
 
-.settings-subnav-button strong {
+.settings-section-tab span {
+  color: inherit;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 650;
 }
 
-.settings-subnav-button span {
+.settings-section-tab small {
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.settings-section-tab:hover {
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.settings-section-tab.is-active {
+  background:
+    linear-gradient(180deg, rgba(230, 151, 147, 0.16), rgba(230, 151, 147, 0.07)),
+    rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px rgba(230, 151, 147, 0.16);
+}
+
+.settings-health-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-health-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 124px;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 46%),
+    rgba(255, 255, 255, 0.025);
+}
+
+.settings-health-card strong {
+  color: var(--text-primary);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.settings-health-card > span:last-child {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.4;
 }
 
-.settings-subnav-button:hover {
-  border-color: rgba(230, 151, 147, 0.32);
-  background: rgba(230, 151, 147, 0.06);
-  transform: translateY(-1px);
+.settings-health-card-success {
+  border-color: rgba(111, 201, 156, 0.22);
 }
 
-.settings-subnav-button.is-active {
-  border-color: rgba(230, 151, 147, 0.4);
-  background:
-    linear-gradient(180deg, rgba(230, 151, 147, 0.12), rgba(230, 151, 147, 0.05)),
-    rgba(255, 255, 255, 0.02);
-  box-shadow: inset 0 0 0 1px rgba(230, 151, 147, 0.12);
+.settings-health-card-warning {
+  border-color: rgba(245, 197, 107, 0.28);
+}
+
+.settings-health-card-critical {
+  border-color: rgba(242, 120, 120, 0.32);
 }
 
 .roles-directory {
@@ -9568,6 +9624,10 @@ button.timeline-signal-chip:focus-visible {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .settings-health-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .resizable-side-layout.has-side-rail {
     grid-template-columns: minmax(0, 1fr) 14px minmax(var(--side-rail-min-width, 300px), var(--side-rail-width, 360px));
   }
@@ -9631,6 +9691,10 @@ button.timeline-signal-chip:focus-visible {
 
   .overview-operational-grid-assets {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-health-grid {
+    grid-template-columns: 1fr;
   }
 
   .catalog-import-strategy {

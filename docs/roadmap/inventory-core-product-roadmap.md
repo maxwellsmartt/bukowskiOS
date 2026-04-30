@@ -2,11 +2,16 @@
 
 ## Estado general
 
-**In progress**
+**Ready to return to main roadmap**
 
 Este sub-roadmap pausa temporalmente el roadmap horizontal de auth/workspaces para cerrar el motor operativo del producto: Projects, Assets, asignaciones, Packing Slips, Incidents, RMA, usuarios operativos e import CSV pro.
 
 La meta no es agregar features por ansiedad. La meta es que el flujo diario de inventario se pueda usar con confianza: encontrar assets, importarlos, asignarlos, moverlos, reportar problemas, emitir packing slips, preparar RMA y entender el estado de un proyecto sin leer pantallas técnicas.
+
+Actualización 2026-04-29:
+- El vertical operativo ya tiene suficiente base para volver al roadmap principal.
+- Quedan smoke manuales y polish fino, pero no hay blocker conocido que impida avanzar a `Settings / Advanced`.
+- Los pendientes de IC-4/IC-5 se mantienen como verificación manual, no como razón para seguir abriendo features en inventario.
 
 ## Decisión de foco
 
@@ -353,10 +358,10 @@ Volvemos al roadmap principal cuando:
 
 ## Próximo paso inmediato
 
-Ejecutar un **smoke manual vertical end-to-end** antes de abrir más superficie nueva.
+Volver al **main roadmap** con `Settings / Advanced` como siguiente slice activo.
 
-- Razón: IC-3 está listo para smoke y desde casa ya se avanzó IC-4/IC-5; ahora toca validar el flujo real completo, no seguir agregando piezas.
-- Flujo recomendado: importar/listar asset -> seleccionar varios assets con cart -> crear packing slip con cantidades -> export packing + insurance -> return parcial/completo -> reportar incident -> crear RMA/repair -> marcar repaired o retired -> confirmar disponibilidad en Assets/Catalog/Packing.
+- Razón: IC-3/IC-4/IC-5 ya tienen lógica, pruebas focalizadas y polish suficiente para no bloquear producto.
+- Smoke vertical recomendado queda como checklist antes de demo/release: importar/listar asset -> seleccionar varios assets con cart -> crear packing slip con cantidades -> export packing + insurance -> return parcial/completo -> reportar incident -> crear RMA/repair -> marcar repaired o retired -> confirmar disponibilidad en Assets/Catalog/Packing.
 - Precondición si aparece Sync `Pull required`: hacer Pull updates/Refresh antes del smoke para no mezclar cola local vieja con datos cloud más recientes.
 - Si el smoke falla en Packing, cerrar IC-4 primero.
 - Si el smoke falla en Incident/RMA/repair availability, cerrar IC-5 primero.

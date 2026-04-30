@@ -397,7 +397,22 @@
 ## Fase 3 — UX estructural
 
 ### Slice UX1 — Settings expandido
-- Estado: `planned`
+- Estado: `in_progress`
+- Objetivo:
+  - convertir `Settings` en una superficie de producto clara para operación normal, separando herramientas técnicas bajo `Advanced`
+- Área:
+  - frontend / UX / hardening
+- Qué cambió:
+  - primer polish visual de Settings con navegación compacta por secciones
+  - overview con health cards para data, sync, team y support
+  - `Team` dejó de mutar usuarios contra `DEFAULT_WORKSPACE_ID` y ahora usa el workspace activo
+  - `Data` separa salud de base local y actividad de sync para reducir ruido técnico
+- Qué se probó:
+  - `npm run typecheck`
+- Siguientes cortes:
+  - reorganizar `Advanced` en soporte, export técnico y developer tools
+  - revisar labels técnicos restantes en Support/Sync
+  - smoke visual de Settings en desktop y ancho reducido
 
 ### Slice UX2 — Reorganización de navegación
 - Estado: `planned`
