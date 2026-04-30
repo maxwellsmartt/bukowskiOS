@@ -407,12 +407,17 @@
   - overview con health cards para data, sync, team y support
   - `Team` dejó de mutar usuarios contra `DEFAULT_WORKSPACE_ID` y ahora usa el workspace activo
   - `Data` separa salud de base local y actividad de sync para reducir ruido técnico
+  - `Advanced` quedó reorganizado en soporte, export técnico y sistema; se retiró `Visual Audit` de la UI final
+  - Settings movió su subnav a un rail vertical interno para quitar peso del header
+  - `Team` se simplificó con métricas de decisión, lista compacta de usuarios, editor esencial y roles como tarjetas de acceso
+  - roles de producto consolidados a `Admin`, `Crew`, `Supervisor`, `Finance Viewer` y `Maintenance`; los roles legacy se migran al rol equivalente
+  - placeholders de usuarios/crew demo se limpian del runtime local para poder crear usuarios reales sin duplicados visuales
 - Qué se probó:
   - `npm run typecheck`
+  - `npm run build`
 - Siguientes cortes:
-  - reorganizar `Advanced` en soporte, export técnico y developer tools
-  - revisar labels técnicos restantes en Support/Sync
   - smoke visual de Settings en desktop y ancho reducido
+  - revisar labels técnicos restantes en Support/Sync
 
 ### Slice UX2 — Reorganización de navegación
 - Estado: `planned`

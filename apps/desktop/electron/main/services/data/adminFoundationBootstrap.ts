@@ -21,16 +21,16 @@ const operationalPermissions = [
 ] as const;
 
 const operationalRoles = [
-  ["role-admin", "admin", "Admin", "Full operational access", 1],
-  ["role-supervisor", "supervisor", "Supervisor", "Supervise operations and incidents", 0],
-  ["role-operations-supervisor", "operations_supervisor", "Operations Supervisor", "Coordinate incidents, RMAs and packing flows", 0],
-  ["role-vtr-operator", "vtr_operator", "VTR Operator", "Report set issues and work with VTR equipment context", 0],
-  ["role-logistics-operator", "logistics_operator", "Logistics Operator", "Handle packing flows and asset dispatch", 0],
-  ["role-maintenance-operator", "maintenance_operator", "Maintenance Operator", "Handle incidents, repairs and RMAs", 0],
-  ["role-finance-viewer", "finance_viewer", "Finance Viewer", "Review finance status without edit privileges", 0],
+  ["role-admin", "admin", "Admin", "Full access to settings, team, assets, projects and finance.", 1],
+  ["role-crew", "crew", "Crew", "Report incidents and follow assigned equipment work.", 0],
+  ["role-supervisor", "supervisor", "Supervisor", "Coordinate projects, assets, incidents, RMAs and packing slips.", 0],
+  ["role-finance-viewer", "finance_viewer", "Finance Viewer", "Review finance status without edit access.", 0],
+  ["role-maintenance", "maintenance", "Maintenance", "Handle incidents, repairs and RMA follow-up.", 0],
 ] as const;
 
 const operationalRolePermissions = [
+  ["role-admin", "perm-projects-read"],
+  ["role-admin", "perm-projects-manage"],
   ["role-admin", "perm-assets-read"],
   ["role-admin", "perm-assets-manage"],
   ["role-admin", "perm-incidents-read"],
@@ -40,40 +40,39 @@ const operationalRolePermissions = [
   ["role-admin", "perm-packing-read"],
   ["role-admin", "perm-packing-create"],
   ["role-admin", "perm-finance-read"],
+  ["role-crew", "perm-projects-read"],
+  ["role-crew", "perm-assets-read"],
+  ["role-crew", "perm-incidents-read"],
+  ["role-crew", "perm-incidents-create"],
+  ["role-crew", "perm-packing-read"],
+  ["role-supervisor", "perm-projects-read"],
+  ["role-supervisor", "perm-projects-manage"],
   ["role-supervisor", "perm-assets-read"],
+  ["role-supervisor", "perm-assets-manage"],
   ["role-supervisor", "perm-incidents-read"],
   ["role-supervisor", "perm-incidents-create"],
   ["role-supervisor", "perm-rma-read"],
   ["role-supervisor", "perm-rma-create"],
   ["role-supervisor", "perm-packing-read"],
   ["role-supervisor", "perm-packing-create"],
-  ["role-supervisor", "perm-finance-read"],
-  ["role-operations-supervisor", "perm-assets-read"],
-  ["role-operations-supervisor", "perm-assets-manage"],
-  ["role-operations-supervisor", "perm-incidents-read"],
-  ["role-operations-supervisor", "perm-incidents-create"],
-  ["role-operations-supervisor", "perm-rma-read"],
-  ["role-operations-supervisor", "perm-rma-create"],
-  ["role-operations-supervisor", "perm-packing-read"],
-  ["role-operations-supervisor", "perm-packing-create"],
-  ["role-vtr-operator", "perm-assets-read"],
-  ["role-vtr-operator", "perm-incidents-read"],
-  ["role-vtr-operator", "perm-incidents-create"],
-  ["role-vtr-operator", "perm-rma-read"],
-  ["role-vtr-operator", "perm-rma-create"],
-  ["role-logistics-operator", "perm-assets-read"],
-  ["role-logistics-operator", "perm-assets-manage"],
-  ["role-logistics-operator", "perm-packing-read"],
-  ["role-logistics-operator", "perm-packing-create"],
-  ["role-maintenance-operator", "perm-assets-read"],
-  ["role-maintenance-operator", "perm-incidents-read"],
-  ["role-maintenance-operator", "perm-incidents-create"],
-  ["role-maintenance-operator", "perm-rma-read"],
-  ["role-maintenance-operator", "perm-rma-create"],
   ["role-finance-viewer", "perm-finance-read"],
+  ["role-maintenance", "perm-assets-read"],
+  ["role-maintenance", "perm-incidents-read"],
+  ["role-maintenance", "perm-incidents-create"],
+  ["role-maintenance", "perm-rma-read"],
+  ["role-maintenance", "perm-rma-create"],
+] as const;
+
+const legacyRoleMappings = [
+  ["role-operations-supervisor", "role-supervisor"],
+  ["role-logistics-operator", "role-supervisor"],
+  ["role-vtr-operator", "role-crew"],
+  ["role-maintenance-operator", "role-maintenance"],
 ] as const;
 
 const defaultCommandActor = ["user-ops", "Ops Repair", "ops@metadata.cine", "+1 809 555 0199"] as const;
+const demoPlaceholderUserIds = ["user-paola", "user-luis", "user-miguel"] as const;
+const demoPlaceholderCrewIds = ["crew-user-paola", "crew-user-luis", "crew-user-miguel", "crew-user-ops"] as const;
 
 const hasColumn = (db: DatabaseSync, tableName: string, columnName: string) => {
   const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
@@ -121,6 +120,49 @@ const ensureDefaultCommandActorAccess = (db: DatabaseSync, now: string) => {
   });
 };
 
+const migrateLegacyRoles = (db: DatabaseSync) => {
+  legacyRoleMappings.forEach(([legacyRoleId, nextRoleId]) => {
+    db.prepare(
+      `
+        UPDATE workspace_memberships
+        SET role_id = ?
+        WHERE role_id = ?
+      `,
+    ).run(nextRoleId, legacyRoleId);
+  });
+
+  legacyRoleMappings.forEach(([legacyRoleId]) => {
+    db.prepare("DELETE FROM role_permissions WHERE role_id = ?").run(legacyRoleId);
+    db.prepare("DELETE FROM roles WHERE id = ?").run(legacyRoleId);
+  });
+};
+
+const cleanupDemoTeamPlaceholders = (db: DatabaseSync, now: string) => {
+  const userPlaceholders = demoPlaceholderUserIds.map(() => "?").join(", ");
+  const crewPlaceholders = demoPlaceholderCrewIds.map(() => "?").join(", ");
+
+  db.prepare(`DELETE FROM workspace_memberships WHERE user_id IN (${userPlaceholders})`).run(...demoPlaceholderUserIds);
+
+  db.prepare(
+    `
+      UPDATE users
+      SET is_active = 0,
+          updated_at = ?
+      WHERE id IN (${userPlaceholders})
+    `,
+  ).run(now, ...demoPlaceholderUserIds);
+
+  db.prepare(
+    `
+      UPDATE crew_members
+      SET linked_user_id = NULL,
+          is_active = 0,
+          updated_at = ?
+      WHERE id IN (${crewPlaceholders})
+    `,
+  ).run(now, ...demoPlaceholderCrewIds);
+};
+
 export const applyAdminFoundationMigration = (db: DatabaseSync) => {
   if (!hasColumn(db, "projects", "client_id")) {
     db.exec("ALTER TABLE projects ADD COLUMN client_id TEXT REFERENCES clients(id);");
@@ -131,7 +173,11 @@ export const applyAdminFoundationMigration = (db: DatabaseSync) => {
   }
 };
 
-export const bootstrapAdminFoundation = (db: DatabaseSync) => {
+type AdminFoundationBootstrapOptions = {
+  cleanupDemoPlaceholders?: boolean;
+};
+
+export const bootstrapAdminFoundation = (db: DatabaseSync, options: AdminFoundationBootstrapOptions = {}) => {
   applyAdminFoundationMigration(db);
 
   const codeService = createCodeGenerationService(db);
@@ -152,17 +198,33 @@ export const bootstrapAdminFoundation = (db: DatabaseSync) => {
     operationalRoles.forEach(([id, key, name, description, isSystemRole]) => {
       db.prepare(
         `
-          INSERT OR IGNORE INTO roles (id, workspace_id, key, name, description, is_system_role, created_at)
+          INSERT INTO roles (id, workspace_id, key, name, description, is_system_role, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            key = excluded.key,
+            name = excluded.name,
+            description = excluded.description,
+            is_system_role = excluded.is_system_role
         `,
       ).run(id, workspaceId, key, name, description, isSystemRole, now);
+    });
+
+    migrateLegacyRoles(db);
+
+    if (options.cleanupDemoPlaceholders) {
+      cleanupDemoTeamPlaceholders(db, now);
+    }
+
+    operationalRoles.forEach(([roleId]) => {
+      db.prepare("DELETE FROM role_permissions WHERE role_id = ?").run(roleId);
     });
 
     operationalRolePermissions.forEach(([roleId, permissionId]) => {
       db.prepare(
         `
-          INSERT OR IGNORE INTO role_permissions (role_id, permission_id, created_at)
+          INSERT INTO role_permissions (role_id, permission_id, created_at)
           VALUES (?, ?, ?)
+          ON CONFLICT(role_id, permission_id) DO NOTHING
         `,
       ).run(roleId, permissionId, now);
     });

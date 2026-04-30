@@ -4,6 +4,17 @@ import { createUserAdminService } from "../../electron/main/services/data/userAd
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 describe("user admin service", () => {
+  it("exposes the simplified product role set", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-user-admin-roles");
+    const service = createUserAdminService(database);
+
+    const roleKeys = service.getSnapshot().roles.map((role) => role.key);
+
+    expect(roleKeys).toEqual(["admin", "crew", "supervisor", "finance_viewer", "maintenance"]);
+
+    cleanup();
+  });
+
   it("creates workspace users, links crew, updates roles, and tracks Telegram readiness", () => {
     const { cleanup, database } = createTestDatabase("bukowski-user-admin-create");
     const service = createUserAdminService(database);
@@ -13,12 +24,12 @@ describe("user admin service", () => {
       fullName: "Daniel VTR",
       email: "daniel@metadata.cine",
       phone: "+1 809 555 9999",
-      roleId: "role-vtr-operator",
+      roleId: "role-crew",
     });
 
     const createdUser = created.snapshot.users.find((user) => user.id === created.userId);
     expect(createdUser?.fullName).toBe("Daniel VTR");
-    expect(createdUser?.roleKey).toBe("vtr_operator");
+    expect(createdUser?.roleKey).toBe("crew");
     expect(createdUser?.readyForTelegram).toBe(true);
 
     const crewId = database
@@ -39,12 +50,12 @@ describe("user admin service", () => {
       fullName: "Daniel VTR",
       email: "daniel.vtr@metadata.cine",
       phone: "+1 809 555 8888",
-      roleId: "role-maintenance-operator",
+      roleId: "role-maintenance",
       linkedCrewMemberId: "crew-daniel-vtr",
     });
 
     const updatedUser = updated.snapshot.users.find((user) => user.id === created.userId);
-    expect(updatedUser?.roleKey).toBe("maintenance_operator");
+    expect(updatedUser?.roleKey).toBe("maintenance");
     expect(updatedUser?.linkedCrewId).toBe("crew-daniel-vtr");
     expect(updatedUser?.permissionKeys).toContain("rma.create");
 

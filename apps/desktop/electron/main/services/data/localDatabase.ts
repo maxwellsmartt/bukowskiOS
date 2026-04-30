@@ -465,7 +465,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   bootstrapLegacyRentmanDemo(database);
   applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database));
   applyTrackedStep(database, "runtime_asset_valuation_foundation_v1", () => applyAssetValuationFoundationMigration(database));
-  bootstrapAdminFoundation(database);
+  bootstrapAdminFoundation(database, { cleanupDemoPlaceholders: true });
   bootstrapSchedulingFoundation(database);
   if (process.env.BUKOWSKI_PROFILE_DATASET === "1") {
     seedPerformanceFoundationData(database);

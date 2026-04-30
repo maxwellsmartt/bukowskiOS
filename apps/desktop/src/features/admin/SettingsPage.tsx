@@ -17,7 +17,6 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
-import { getRenderFidelityAuditSummary, renderFidelityAudit } from "@shared/lib/renderFidelityAudit";
 
 const emptyDiagnostics: AppDiagnosticsSnapshot = {
   databaseSizeBytes: 0,
@@ -78,18 +77,6 @@ const settingsSections: Array<{ key: SettingsSectionKey; label: string; descript
   { key: "advanced", label: "Advanced", description: "Support tools" },
 ];
 
-const permissionLabelMap: Record<string, string> = {
-  "assets.read": "Read assets",
-  "assets.manage": "Manage assets",
-  "incidents.read": "Read incidents",
-  "incidents.create": "Create incidents",
-  "rma.read": "Read RMAs",
-  "rma.create": "Create RMAs",
-  "packing-slips.read": "Read packing slips",
-  "packing-slips.create": "Create packing slips",
-  "finance.read": "Read finance",
-};
-
 const roleCoverageGroups = [
   { label: "Assets", keys: ["assets.read", "assets.manage"] },
   { label: "Incidents", keys: ["incidents.read", "incidents.create"] },
@@ -99,14 +86,15 @@ const roleCoverageGroups = [
 ] as const;
 
 const roleUseCaseMap: Record<string, string> = {
-  admin: "Best for workspace admins who need full operational control across teams.",
-  supervisor: "Best for people coordinating the floor, supervising incidents and keeping approvals moving.",
-  operations_supervisor: "Best for operations leads handling incidents, RMAs and packing without finance access.",
-  vtr_operator: "Best for set operators who report equipment issues and need RMA-related follow-up.",
-  logistics_operator: "Best for dispatch and returns flows, packing slips and asset movement.",
-  maintenance_operator: "Best for repair workflows, incident follow-up and manufacturer cases.",
-  finance_viewer: "Best for people who only need visibility into finance status and exposure.",
+  admin: "Full control for workspace owners and trusted operators.",
+  crew: "Daily crew access for assigned equipment, packing context and incident reports.",
+  supervisor: "Operational lead access for projects, assets, incidents, RMAs and packing slips.",
+  finance_viewer: "Finance visibility without edit access.",
+  maintenance: "Repair and RMA access for damaged equipment follow-up.",
 };
+
+const getRoleCoverageLabels = (permissionKeys: string[]) =>
+  roleCoverageGroups.filter((group) => group.keys.some((key) => permissionKeys.includes(key))).map((group) => group.label);
 
 const formatBytes = (value: number) => {
   if (!value) {
@@ -153,7 +141,7 @@ const buildUserDraft = (user: AppUserAdminRow | null, roles: AppUsersSnapshot["r
   fullName: user?.fullName ?? "",
   email: user?.email ?? "",
   phone: user?.phone ?? "",
-  roleId: user?.roleId ?? roles[0]?.id ?? "",
+  roleId: user?.roleId ?? roles.find((role) => role.key === "crew")?.id ?? roles[0]?.id ?? "",
   linkedCrewMemberId: user?.linkedCrewId ?? "",
 });
 
@@ -181,7 +169,6 @@ export const SettingsPage = () => {
   const [isTogglingUser, setIsTogglingUser] = useState(false);
   const [isRevokingTelegram, setIsRevokingTelegram] = useState(false);
   const [syncRows, setSyncRows] = useState<AppSyncOutboxRow[]>([]);
-  const fidelityAuditSummary = useMemo(() => getRenderFidelityAuditSummary(), []);
 
   const loadDiagnostics = async () => {
     if (!window.bukowskiApp) {
@@ -342,53 +329,41 @@ export const SettingsPage = () => {
   );
 
   const selectedRoleCoverage = useMemo(
-    () =>
-      selectedRole
-        ? roleCoverageGroups
-            .filter((group) => group.keys.some((key) => selectedRole.permissionKeys.includes(key)))
-            .map((group) => group.label)
-        : [],
+    () => (selectedRole ? getRoleCoverageLabels(selectedRole.permissionKeys) : []),
     [selectedRole],
   );
 
-  const focusedRole = useMemo(
-    () => usersSnapshot.roles.find((role) => role.id === roleDirectoryId) ?? selectedRole ?? usersSnapshot.roles[0] ?? null,
-    [roleDirectoryId, selectedRole, usersSnapshot.roles],
-  );
+  const handleCrewMemberChange = (crewMemberId: string) => {
+    const crewMember = catalog.crewMembers.find((row) => row.id === crewMemberId) ?? null;
 
-  const focusedRoleCoverage = useMemo(
-    () =>
-      focusedRole
-        ? roleCoverageGroups
-            .map((group) => ({
-              label: group.label,
-              permissions: group.keys.filter((key) => focusedRole.permissionKeys.includes(key)).map((key) => permissionLabelMap[key] ?? key),
-            }))
-            .filter((group) => group.permissions.length > 0)
-        : [],
-    [focusedRole],
-  );
+    setUserDraft((current) => ({
+      ...current,
+      linkedCrewMemberId: crewMemberId,
+      fullName: crewMember?.fullName ?? current.fullName,
+      email: crewMember?.email || current.email,
+      phone: crewMember?.phone || current.phone,
+    }));
+  };
 
-  const userSummaryRows = useMemo(
+  const teamSummaryRows = useMemo(
     () => [
-      { label: "Users", value: usersSnapshot.users.length },
-      { label: "Active", value: usersSnapshot.users.filter((user) => user.isActive).length },
-      { label: "Ready for Telegram", value: usersSnapshot.users.filter((user) => user.readyForTelegram).length },
-      { label: "Linked on Telegram", value: usersSnapshot.users.filter((user) => user.telegramLinkStatus === "linked").length },
+      {
+        label: "Active users",
+        value: usersSnapshot.users.filter((user) => user.isActive).length,
+        detail: `${usersSnapshot.users.length} total`,
+      },
+      {
+        label: "Telegram linked",
+        value: usersSnapshot.users.filter((user) => user.telegramLinkStatus === "linked").length,
+        detail: `${usersSnapshot.users.filter((user) => user.readyForTelegram).length} ready`,
+      },
+      {
+        label: "Roles",
+        value: usersSnapshot.roles.length,
+        detail: "Inherited access",
+      },
     ],
-    [usersSnapshot.users],
-  );
-
-  const overviewRows = useMemo(
-    () => [
-      { label: "Workspace", value: activeWorkspaceName },
-      { label: "App", value: `${appInfo?.appName ?? "bukowskiOS"} ${appInfo?.version ?? "Unknown"}` },
-      { label: "Active users", value: usersSnapshot.users.filter((user) => user.isActive).length },
-      { label: "Telegram ready", value: usersSnapshot.users.filter((user) => user.readyForTelegram).length },
-      { label: "Integrity", value: resolveIntegrityLabel(diagnostics.lastIntegrityCheckStatus) },
-      { label: "Failed sync rows", value: diagnostics.syncOutboxFailedCount },
-    ],
-    [activeWorkspaceName, appInfo?.appName, appInfo?.version, diagnostics.lastIntegrityCheckStatus, diagnostics.syncOutboxFailedCount, usersSnapshot.users],
+    [usersSnapshot.roles.length, usersSnapshot.users],
   );
 
   const settingsHealthCards = useMemo(
@@ -548,27 +523,30 @@ export const SettingsPage = () => {
 
   return (
     <div className="page-stack settings-page">
-      <SectionHeader title="Settings" contextLabel={activeWorkspaceName} />
+      <SectionHeader title="Settings" />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
       {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
-      <nav aria-label="Settings sections" className="settings-section-nav">
-        {settingsSections.map((section) => (
-          <button
-            key={section.key}
-            className={`settings-section-tab${activeSection === section.key ? " is-active" : ""}`}
-            onClick={() => setActiveSection(section.key)}
-            type="button"
-          >
-            <span>{section.label}</span>
-            <small>{section.description}</small>
-          </button>
-        ))}
-      </nav>
+      <div className="settings-shell-layout">
+        <nav aria-label="Settings sections" className="settings-section-nav">
+          {settingsSections.map((section) => (
+            <button
+              key={section.key}
+              className={`settings-section-tab${activeSection === section.key ? " is-active" : ""}`}
+              onClick={() => setActiveSection(section.key)}
+              type="button"
+            >
+              <span>{section.label}</span>
+              <small>{section.description}</small>
+            </button>
+          ))}
+        </nav>
+
+        <div className="settings-content-panel">
 
       {activeSection === "overview" ? (
-        <>
+        <div className="page-stack">
           <div className="settings-health-grid">
             {settingsHealthCards.map((card) => (
               <div key={card.label} className={`settings-health-card settings-health-card-${card.tone}`}>
@@ -578,105 +556,70 @@ export const SettingsPage = () => {
               </div>
             ))}
           </div>
-
-          <SurfaceCard title="General" subtitle="The normal workspace controls live here. Technical tools stay under Advanced.">
-            <div className="summary-grid">
-              {overviewRows.map((row) => (
-                <div key={row.label} className="summary-row">
-                  <span className="summary-label">{row.label}</span>
-                  <span className="summary-value">{row.value}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="action-panel-actions action-panel-actions-start">
-              <button className="action-primary-button" onClick={() => setActiveSection("users")} type="button">
-                Team
-              </button>
-              <button className="ghost-control" onClick={() => setActiveSection("operations")} type="button">
-                Data
-              </button>
-              <button className="ghost-control" onClick={() => setActiveSection("advanced")} type="button">
-                Advanced
-              </button>
-            </div>
-          </SurfaceCard>
-        </>
+        </div>
       ) : null}
 
       {activeSection === "users" ? (
-        <SurfaceCard title="Team">
-          <div className="summary-grid">
-            {userSummaryRows.map((row) => (
-              <div key={row.label} className="summary-row">
+        <div className="page-stack">
+          <div className="settings-team-metrics">
+            {teamSummaryRows.map((row) => (
+              <div key={row.label} className="settings-team-metric">
                 <span className="summary-label">{row.label}</span>
-                <span className="summary-value">{row.value}</span>
+                <strong>{row.value}</strong>
+                <span>{row.detail}</span>
               </div>
             ))}
           </div>
 
-          <div className="users-admin-layout">
-            <div className="users-admin-list">
-              <button
-                className={`models-provider-row${selectedUserId === "new" ? " is-selected" : ""}`}
-                onClick={() => setSelectedUserId("new")}
-                type="button"
-              >
-                <div className="models-provider-row-copy">
-                  <div className="models-provider-row-topline">
-                    <strong className="provider-heading">
-                      <span>New user</span>
-                    </strong>
-                    <span className="subtle-pill">Create</span>
-                  </div>
-                  <div className="agent-detail-row">
-                    <span>Add a new internal user</span>
-                    <span>Users & roles</span>
-                  </div>
-                </div>
+          <div className="settings-team-layout">
+            <SurfaceCard title="Users">
+              <button className={`settings-user-row${selectedUserId === "new" ? " is-selected" : ""}`} onClick={() => setSelectedUserId("new")} type="button">
+                <span className="settings-user-create-mark">+</span>
+                <span className="settings-user-row-copy">
+                  <span className="settings-user-row-topline">
+                    <strong>Create user</strong>
+                    <span>Add access</span>
+                  </span>
+                  <span className="settings-user-row-meta">Internal profile, role and optional Telegram link.</span>
+                </span>
               </button>
 
-              <div className="models-provider-list">
+              <div className="settings-user-list">
                 {usersSnapshot.users.map((user) => (
                   <button
                     key={user.id}
-                    className={`models-provider-row${selectedUserId === user.id ? " is-selected" : ""}${
-                      user.isActive ? " is-active-provider" : " is-inactive-provider"
-                    }`}
+                    className={`settings-user-row${selectedUserId === user.id ? " is-selected" : ""}`}
                     onClick={() => setSelectedUserId(user.id)}
                     type="button"
                   >
                     <span
                       aria-label={user.isActive ? "active" : "inactive"}
-                      className={`agent-live-dot agent-live-dot-${user.isActive ? "green" : "red"}`}
+                      className={`settings-user-status-dot settings-user-status-dot-${user.isActive ? "active" : "inactive"}`}
                     />
-                    <div className="models-provider-row-copy">
-                      <div className="models-provider-row-topline">
-                        <strong className="provider-heading">
-                          <span>{user.fullName}</span>
-                        </strong>
-                        <span className="subtle-pill">{user.roleName ?? "No role"}</span>
-                      </div>
-                      <div className="agent-detail-row">
-                        <span>{user.membershipStatus === "active" ? "Workspace active" : "Workspace blocked"}</span>
-                        <span>{user.telegramLinkStatus === "linked" ? "Telegram linked" : user.telegramLinkStatus === "pending" ? "Telegram pending" : "No Telegram"}</span>
-                      </div>
-                    </div>
+                    <span className="settings-user-row-copy">
+                      <span className="settings-user-row-topline">
+                        <strong>{user.fullName}</strong>
+                        <span>{user.roleName ?? "No role"}</span>
+                      </span>
+                      <span className="settings-user-row-meta">
+                        {user.isActive ? "Active" : "Inactive"} ·{" "}
+                        {user.telegramLinkStatus === "linked" ? "Telegram linked" : user.telegramLinkStatus === "pending" ? "Telegram pending" : "No Telegram"}
+                        {user.linkedCrewLabel ? ` · ${user.linkedCrewLabel}` : ""}
+                      </span>
+                    </span>
                   </button>
                 ))}
               </div>
-            </div>
+            </SurfaceCard>
 
-            <div className="users-admin-editor">
-              <div className="agent-detail-row">
+            <SurfaceCard
+              title={selectedUser ? selectedUser.fullName : "Create user"}
+              aside={
                 <span className={`run-status-pill run-status-pill-${selectedUser?.isActive ? "configured" : "disabled"}`}>
-                  {selectedUser ? (selectedUser.isActive ? "active" : "inactive") : "create"}
+                  {selectedUser ? (selectedUser.isActive ? "Active" : "Inactive") : "New"}
                 </span>
-                <span className="subtle-pill">
-                  {selectedUser ? `Membership: ${selectedUser.membershipStatus}` : "A new user gets an active membership"}
-                </span>
-              </div>
-
+              }
+            >
               <div className="agent-form-grid">
                 <label className="field-block">
                   <span className="field-label">Full name</span>
@@ -701,7 +644,7 @@ export const SettingsPage = () => {
                     <option value="">Select a role</option>
                     {usersSnapshot.roles.map((role) => (
                       <option key={role.id} value={role.id}>
-                        {role.name} · {role.description}
+                        {role.name}
                       </option>
                     ))}
                   </select>
@@ -725,10 +668,10 @@ export const SettingsPage = () => {
                   />
                 </label>
                 <label className="field-block field-block-span-2">
-                  <span className="field-label">Linked crew member</span>
+                  <span className="field-label">Crew member</span>
                   <select
                     className="field-input"
-                    onChange={(event) => setUserDraft((current) => ({ ...current, linkedCrewMemberId: event.target.value }))}
+                    onChange={(event) => handleCrewMemberChange(event.target.value)}
                     value={userDraft.linkedCrewMemberId}
                   >
                     <option value="">No linked crew</option>
@@ -742,56 +685,32 @@ export const SettingsPage = () => {
                 </label>
               </div>
 
-              <div className="models-provider-diagnostic">
-                <span className="agent-detail-kicker">Selected role</span>
-                <p>
-                  {selectedRole ? `${selectedRole.name} · ${selectedRole.description}` : "Choose the main role for this user."}
-                </p>
-              </div>
-
-              <div className="summary-grid">
+              <div className="settings-user-context-grid">
                 <div className="summary-row">
-                  <span className="summary-label">Role permissions</span>
-                  <span className="summary-value">
-                    {selectedRole?.permissionKeys.length
-                      ? selectedRole.permissionKeys.map((permission) => permissionLabelMap[permission] ?? permission).join(", ")
-                      : "No permissions on this role"}
-                  </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Role coverage</span>
-                  <span className="summary-value">{selectedRoleCoverage.length ? selectedRoleCoverage.join(", ") : "No access areas yet"}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Crew link</span>
-                  <span className="summary-value">{selectedUser?.linkedCrewLabel ?? "No linked crew yet"}</span>
+                  <span className="summary-label">Access</span>
+                  <span className="summary-value">{selectedRoleCoverage.length ? selectedRoleCoverage.join(", ") : "Choose a role"}</span>
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">Telegram</span>
                   <span className="summary-value">
                     {selectedUser
                       ? selectedUser.telegramLinkStatus === "linked"
-                        ? `${selectedUser.telegramDisplayName ?? selectedUser.fullName} linked`
+                        ? `${selectedUser.telegramDisplayName ?? selectedUser.fullName}`
                         : selectedUser.telegramLinkStatus === "pending"
                           ? "Pending link"
                           : selectedUser.telegramLinkStatus === "revoked"
                             ? "Revoked"
                             : "Not linked"
-                      : "Create the user first"}
+                      : "Create user first"}
                   </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Ready for Telegram</span>
-                  <span className="summary-value">{selectedUser ? (selectedUser.readyForTelegram ? "Yes" : "No") : "Will be checked after save"}</span>
                 </div>
               </div>
 
               {selectedUser?.telegramExternalUserId ? (
                 <div className="models-provider-diagnostic">
-                  <span className="agent-detail-kicker">Telegram identity</span>
+                  <span className="agent-detail-kicker">Telegram</span>
                   <p>
-                    {selectedUser.telegramDisplayName ?? selectedUser.fullName}
-                    {selectedUser.telegramUsername ? ` · @${selectedUser.telegramUsername}` : ""}
+                    {selectedUser.telegramUsername ? `@${selectedUser.telegramUsername}` : selectedUser.telegramDisplayName ?? selectedUser.fullName}
                     {selectedUser.telegramLastSeenAt ? ` · last seen ${new Date(selectedUser.telegramLastSeenAt).toLocaleString()}` : ""}
                   </p>
                 </div>
@@ -804,11 +723,11 @@ export const SettingsPage = () => {
                   onClick={() => void handleSaveUser()}
                   type="button"
                 >
-                  {isSavingUser ? "Saving user..." : selectedUser ? "Save user" : "Create user"}
+                  {isSavingUser ? "Saving..." : selectedUser ? "Save changes" : "Create user"}
                 </button>
                 {selectedUser ? (
                   <button className="ghost-control" disabled={isTogglingUser} onClick={() => void handleToggleUser()} type="button">
-                    {isTogglingUser ? "Updating state..." : selectedUser.isActive ? "Deactivate user" : "Activate user"}
+                    {isTogglingUser ? "Updating..." : selectedUser.isActive ? "Deactivate" : "Activate"}
                   </button>
                 ) : null}
                 {selectedUser?.telegramLinkStatus === "linked" ? (
@@ -817,103 +736,36 @@ export const SettingsPage = () => {
                   </button>
                 ) : null}
                 <button className="ghost-control" onClick={() => navigate("/agents/connectors")} type="button">
-                  Open channels
+                  Channels
                 </button>
               </div>
-            </div>
+            </SurfaceCard>
           </div>
 
-          <div className="roles-directory">
-            <div className="surface-card-header">
-              <div>
-                <h3 className="surface-card-title">Role directory</h3>
-                <p className="surface-card-subtitle">
-                  Roles stay simple in v1: one main role per user, with permissions inherited from the role instead of custom per-user overrides.
-                </p>
-              </div>
-            </div>
+          <SurfaceCard title="Roles">
+            <div className="settings-role-grid">
+              {usersSnapshot.roles.map((role) => {
+                const coverageLabels = getRoleCoverageLabels(role.permissionKeys);
 
-            <div className="roles-directory-layout">
-              <div className="roles-directory-list">
-                {usersSnapshot.roles.map((role) => (
+                return (
                   <button
                     key={role.id}
-                    className={`role-directory-row${focusedRole?.id === role.id ? " is-selected" : ""}`}
+                    className={`settings-role-card${roleDirectoryId === role.id ? " is-selected" : ""}`}
                     onClick={() => setRoleDirectoryId(role.id)}
                     type="button"
                   >
-                    <div className="role-directory-row-topline">
+                    <span className="settings-role-card-head">
                       <strong>{role.name}</strong>
-                      <span className="subtle-pill">{role.assignedUserCount} assigned</span>
-                    </div>
-                    <span>{role.description}</span>
+                      <span>{role.assignedUserCount} user{role.assignedUserCount === 1 ? "" : "s"}</span>
+                    </span>
+                    <span className="settings-role-card-copy">{roleUseCaseMap[role.key] ?? role.description}</span>
+                    <span className="settings-role-access">{coverageLabels.length ? coverageLabels.join(" · ") : "No access"}</span>
                   </button>
-                ))}
-              </div>
-
-              <div className="role-detail-card">
-                {focusedRole ? (
-                  <>
-                    <div className="role-card-header">
-                      <strong>{focusedRole.name}</strong>
-                      <span className="subtle-pill">{focusedRole.assignedUserCount} assigned</span>
-                    </div>
-
-                    <p className="role-card-description">{roleUseCaseMap[focusedRole.key] ?? focusedRole.description}</p>
-
-                    <div className="summary-grid">
-                      <div className="summary-row">
-                        <span className="summary-label">Role purpose</span>
-                        <span className="summary-value">{focusedRole.description}</span>
-                      </div>
-                      <div className="summary-row">
-                        <span className="summary-label">Access areas</span>
-                        <span className="summary-value">
-                          {focusedRoleCoverage.length ? focusedRoleCoverage.map((group) => group.label).join(", ") : "No access yet"}
-                        </span>
-                      </div>
-                      <div className="summary-row">
-                        <span className="summary-label">Permission count</span>
-                        <span className="summary-value">{focusedRole.permissionKeys.length}</span>
-                      </div>
-                      <div className="summary-row">
-                        <span className="summary-label">System role</span>
-                        <span className="summary-value">{focusedRole.isSystemRole ? "Yes" : "No"}</span>
-                      </div>
-                    </div>
-
-                    <div className="role-detail-sections">
-                      <div className="role-detail-block">
-                        <span className="agent-detail-kicker">Can do</span>
-                        <div className="role-card-permissions">
-                          {focusedRole.permissionKeys.map((permission) => (
-                            <span key={`${focusedRole.id}-${permission}`} className="role-permission-chip">
-                              {permissionLabelMap[permission] ?? permission}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="role-detail-block">
-                        <span className="agent-detail-kicker">Coverage by area</span>
-                        <div className="role-coverage-list">
-                          {focusedRoleCoverage.map((group) => (
-                            <div key={`${focusedRole.id}-${group.label}`} className="role-coverage-row">
-                              <strong>{group.label}</strong>
-                              <span>{group.permissions.join(", ")}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="catalog-crew-support-empty">No roles available yet.</div>
-                )}
-              </div>
+                );
+              })}
             </div>
-          </div>
-        </SurfaceCard>
+          </SurfaceCard>
+        </div>
       ) : null}
 
       {activeSection === "operations" ? (
@@ -994,95 +846,25 @@ export const SettingsPage = () => {
       ) : null}
 
       {activeSection === "advanced" ? (
-        <>
-          <SurfaceCard title="App Info">
-            <div className="summary-grid">
-              <div className="summary-row">
-                <span className="summary-label">App</span>
-                <span className="summary-value">{appInfo?.appName ?? "bukowskiOS"}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Version</span>
-                <span className="summary-value">{appInfo?.version ?? "Unknown"}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Desktop build</span>
-                <span className="summary-value">{appInfo?.shellVersion ?? "Unknown"}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Platform</span>
-                <span className="summary-value">{appInfo?.platform ?? "Unknown"}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Build type</span>
-                <span className="summary-value">{appInfo?.isPackaged ? "Packaged" : "Development"}</span>
-              </div>
-            </div>
-          </SurfaceCard>
-
-          <SurfaceCard title="Visual Audit">
-            <div className="summary-grid">
-              <div className="summary-row">
-                <span className="summary-label">Total audited</span>
-                <span className="summary-value">{fidelityAuditSummary.total}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Vector candidates</span>
-                <span className="summary-value">{fidelityAuditSummary.vectorCandidates}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">Raster keepers</span>
-                <span className="summary-value">{fidelityAuditSummary.rasterItems}</span>
-              </div>
-              {renderFidelityAudit.map((item) => (
-                <div key={item.id} className="summary-row">
-                  <span className="summary-label">{item.label}</span>
-                  <span className="summary-value">{`${item.currentKind} to ${item.recommendedKind}`}</span>
-                </div>
-              ))}
-            </div>
-          </SurfaceCard>
-
-          <SurfaceCard title="Data Export">
-            <div className="summary-grid">
-              <div className="summary-row">
-                <span className="summary-label">Build artifacts</span>
-                <span className="summary-value">
-                  {diagnostics.internalBuildArtifacts.length ? diagnostics.internalBuildArtifacts.join(", ") : "Not packaged yet"}
-                </span>
-              </div>
-            </div>
-
-            <div className="action-panel-actions action-panel-actions-start">
-              <button
-                className="action-primary-button"
-                disabled={isExporting}
-                onClick={() => void runAction(() => window.bukowskiApp!.exportWorkspaceData(), setIsExporting)}
-                type="button"
-              >
-                {isExporting ? "Exporting..." : "Export all data as JSON"}
-              </button>
-            </div>
-          </SurfaceCard>
-
-          <SurfaceCard title="Support">
+        <div className="settings-advanced-layout">
+          <SurfaceCard className="settings-advanced-card settings-advanced-card-wide" title="Support" subtitle="Use this when something fails or you need a clean handoff for debugging.">
             <div className="summary-grid">
               <div className="summary-row">
                 <span className="summary-label">Last crash</span>
                 <span className="summary-value">{formatSupportEvent(supportSnapshot.lastCrash, "None captured yet")}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Last strong error</span>
+                <span className="summary-label">Last error</span>
                 <span className="summary-value">{formatSupportEvent(supportSnapshot.lastError, "None captured yet")}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Last load failure</span>
+                <span className="summary-label">Last load issue</span>
                 <span className="summary-value">
-                  {formatSupportEvent(supportSnapshot.lastLoadFailure, "No did-fail-load or render-process-gone yet")}
+                  {formatSupportEvent(supportSnapshot.lastLoadFailure, "No load issues captured")}
                 </span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Logs</span>
+                <span className="summary-label">Log location</span>
                 <span className="summary-value">{supportSnapshot.logStorageLabel}</span>
               </div>
               <div className="summary-row">
@@ -1135,8 +917,66 @@ export const SettingsPage = () => {
               </button>
             </div>
           </SurfaceCard>
-        </>
+
+          <SurfaceCard className="settings-advanced-card" title="Workspace export" subtitle="Technical export for backups, handoff or inspection.">
+            <div className="summary-grid">
+              <div className="summary-row">
+                <span className="summary-label">Format</span>
+                <span className="summary-value">JSON</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Scope</span>
+                <span className="summary-value">{activeWorkspaceName}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Build files</span>
+                <span className="summary-value">
+                  {diagnostics.internalBuildArtifacts.length ? diagnostics.internalBuildArtifacts.join(", ") : "Not packaged yet"}
+                </span>
+              </div>
+            </div>
+
+            <div className="action-panel-actions action-panel-actions-start">
+              <button
+                className="action-primary-button"
+                disabled={isExporting}
+                onClick={() => void runAction(() => window.bukowskiApp!.exportWorkspaceData(), setIsExporting)}
+                type="button"
+              >
+                {isExporting ? "Exporting..." : "Export workspace JSON"}
+              </button>
+            </div>
+          </SurfaceCard>
+
+          <SurfaceCard className="settings-advanced-card" title="System" subtitle="Build and runtime details for support.">
+            <div className="summary-grid">
+              <div className="summary-row">
+                <span className="summary-label">App</span>
+                <span className="summary-value">{appInfo?.appName ?? "bukowskiOS"}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Version</span>
+                <span className="summary-value">{appInfo?.version ?? "Unknown"}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Build</span>
+                <span className="summary-value">{appInfo?.shellVersion ?? "Unknown"}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Platform</span>
+                <span className="summary-value">{appInfo?.platform ?? "Unknown"}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Mode</span>
+                <span className="summary-value">{appInfo?.isPackaged ? "Packaged" : "Development"}</span>
+              </div>
+            </div>
+          </SurfaceCard>
+
+        </div>
       ) : null}
+        </div>
+      </div>
     </div>
   );
 };

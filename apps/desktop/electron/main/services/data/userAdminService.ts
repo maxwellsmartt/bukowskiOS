@@ -51,7 +51,15 @@ const loadRoles = (db: DatabaseSync): AppUserRoleRow[] =>
           AND workspace_memberships.workspace_id = ?
         WHERE roles.workspace_id = ?
         GROUP BY roles.id, roles.key, roles.name, roles.description, roles.is_system_role
-        ORDER BY roles.is_system_role DESC, roles.name COLLATE NOCASE ASC
+        ORDER BY CASE roles.key
+          WHEN 'admin' THEN 0
+          WHEN 'crew' THEN 1
+          WHEN 'supervisor' THEN 2
+          WHEN 'finance_viewer' THEN 3
+          WHEN 'maintenance' THEN 4
+          ELSE 5
+        END,
+        roles.name COLLATE NOCASE ASC
       `,
     )
     .all(workspaceId, workspaceId)
@@ -159,10 +167,8 @@ const loadUsers = (db: DatabaseSync): AppUserAdminRow[] =>
               AND connector_channel_memberships.connector_key = 'telegram'
               AND connector_channel_memberships.linked_user_id = users.id
           ) AS telegram_last_seen_at
-        FROM users
-        LEFT JOIN workspace_memberships
-          ON workspace_memberships.user_id = users.id
-          AND workspace_memberships.workspace_id = ?
+        FROM workspace_memberships
+        JOIN users ON users.id = workspace_memberships.user_id
         LEFT JOIN roles ON roles.id = workspace_memberships.role_id
         LEFT JOIN role_permissions ON role_permissions.role_id = roles.id
         LEFT JOIN permissions ON permissions.id = role_permissions.permission_id
@@ -170,6 +176,7 @@ const loadUsers = (db: DatabaseSync): AppUserAdminRow[] =>
           ON crew_members.linked_user_id = users.id
           AND crew_members.workspace_id = ?
           AND crew_members.is_active = 1
+        WHERE workspace_memberships.workspace_id = ?
         GROUP BY
           users.id,
           users.full_name,
