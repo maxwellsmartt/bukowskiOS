@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, KeyRound, RadioTower, RotateCcw, ServerCog } from "lucide-react";
 
 import type { AgentModelAssignmentRow, AgentModelRow } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
@@ -13,10 +14,6 @@ import {
   testAIProviderConnection,
   useAgentModels,
 } from "./useAgentsData";
-
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const providerStatusLabelMap: Record<AgentModelRow["status"], string> = {
   not_configured: "Not configured",
@@ -83,6 +80,7 @@ const buildAssignmentDraftMap = (assignments: AgentModelAssignmentRow[]) =>
   }, {});
 
 export const AgentModelsPage = () => {
+  const { activeWorkspaceId: workspaceId } = useWorkspace();
   const { data, error } = useAgentModels();
   const [selectedProviderKey, setSelectedProviderKey] = useState<string | null>(null);
   const [providerDraft, setProviderDraft] = useState<ProviderDraft>(buildProviderDraft(null));

@@ -1,4 +1,4 @@
-import { Archive, Pencil, Trash2, createLucideIcon } from "lucide-react";
+import { Archive, ArchiveRestore, Pencil, Trash2, createLucideIcon } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -7,6 +7,7 @@ import {
   type ProjectSetupDraft,
   type WizardTab,
 } from "@features/projects/ProjectSetupWizard";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import type { ProjectCardRow, ProjectDeletePreview } from "@contracts";
@@ -30,28 +31,24 @@ const LayersPlus = createLucideIcon("layers-plus", [
   ["path", { d: "M21 6v4", key: "layers-plus-vertical" }],
 ]);
 
-const buildProjectDeleteMessage = (preview: ProjectDeletePreview) => {
-  const relationSummary = preview.operationalRelationSummary;
-  const linkedItems = [
-    relationSummary.currentAssetCount ? `${relationSummary.currentAssetCount} current assets` : null,
-    relationSummary.assignmentCount ? `${relationSummary.assignmentCount} assignments` : null,
-    relationSummary.incidentCount ? `${relationSummary.incidentCount} incidents` : null,
-    relationSummary.packingCount ? `${relationSummary.packingCount} packing slips` : null,
-    relationSummary.financeCount ? `${relationSummary.financeCount} finance records` : null,
-    relationSummary.collaboratorFeeCount ? `${relationSummary.collaboratorFeeCount} collaborator fees` : null,
-  ].filter(Boolean);
+type LinkedItem = { label: string; count: number };
 
+const buildLinkedItems = (preview: ProjectDeletePreview): LinkedItem[] => {
+  const relationSummary = preview.operationalRelationSummary;
   return [
-    `Delete "${preview.name}"?`,
-    preview.backupWillRun ? "A backup will be created before deletion." : "No backup is scheduled for this deletion.",
-    linkedItems.length ? `Linked data: ${linkedItems.join(", ")}.` : "No linked operational data was found.",
-    "This cannot be undone.",
-  ].join("\n\n");
+    { label: "current assets", count: relationSummary.currentAssetCount },
+    { label: "assignments", count: relationSummary.assignmentCount },
+    { label: "incidents", count: relationSummary.incidentCount },
+    { label: "packing slips", count: relationSummary.packingCount },
+    { label: "finance records", count: relationSummary.financeCount },
+    { label: "collaborator fees", count: relationSummary.collaboratorFeeCount },
+  ].filter((item) => item.count > 0);
 };
 
 export const ShellProjectsPanel = () => {
   const {
     activeProjectId,
+    archiveProject,
     deleteProject,
     getProjectDeletePreview,
     openProject,
@@ -60,19 +57,41 @@ export const ShellProjectsPanel = () => {
     scopeMode,
     showArchivedProjects,
     setShowArchivedProjects,
+    unarchiveProject,
   } = useShellContext();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardTab, setWizardTab] = useState<WizardTab>("general");
   const [wizardDraft, setWizardDraft] = useState<ProjectSetupDraft>(createEmptyProjectSetupDraft());
   const [actionError, setActionError] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [deletePreview, setDeletePreview] = useState<{ project: ProjectCardRow; preview: ProjectDeletePreview } | null>(null);
+  const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
 
   const handleEditProject = (projectId: string) => {
     setActionError(null);
     openProject(projectId, "info");
   };
 
-  const handleDeleteProject = async (project: ProjectCardRow) => {
+  const handleToggleArchive = async (project: ProjectCardRow) => {
+    setActionError(null);
+
+    try {
+      if (project.isArchived) {
+        await unarchiveProject({ projectId: project.id });
+      } else {
+        await archiveProject({ projectId: project.id });
+      }
+    } catch (error) {
+      setActionError(
+        getUserFacingErrorMessage(
+          error,
+          project.isArchived ? "Could not restore this project." : "Could not archive this project.",
+        ),
+      );
+    }
+  };
+
+  const handleRequestDelete = async (project: ProjectCardRow) => {
     if (deletingProjectId) {
       return;
     }
@@ -89,19 +108,38 @@ export const ShellProjectsPanel = () => {
             ? preview.hardDeleteBlockedReasons.join(" ")
             : "This project cannot be deleted yet.",
         );
+        setDeletingProjectId(null);
         return;
       }
 
-      if (!window.confirm(buildProjectDeleteMessage(preview))) {
-        return;
-      }
+      setDeletePreview({ project, preview });
+    } catch (error) {
+      setActionError(getUserFacingErrorMessage(error, "Could not prepare this deletion."));
+      setDeletingProjectId(null);
+    }
+  };
 
-      await deleteProject(project.id);
+  const handleConfirmDelete = async () => {
+    if (!deletePreview) {
+      return;
+    }
+
+    setIsDeleteSubmitting(true);
+
+    try {
+      await deleteProject(deletePreview.project.id);
+      setDeletePreview(null);
     } catch (error) {
       setActionError(getUserFacingErrorMessage(error, "Could not delete this project."));
     } finally {
+      setIsDeleteSubmitting(false);
       setDeletingProjectId(null);
     }
+  };
+
+  const handleCancelDelete = () => {
+    setDeletePreview(null);
+    setDeletingProjectId(null);
   };
 
   return (
@@ -167,10 +205,22 @@ export const ShellProjectsPanel = () => {
                   event.stopPropagation();
                   handleEditProject(project.id);
                 }}
-                title="Edit project"
+                title="Edit details"
                 type="button"
               >
                 <Pencil size={13} />
+              </button>
+              <button
+                aria-label={project.isArchived ? `Restore ${project.name}` : `Archive ${project.name}`}
+                className="shell-project-action"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleToggleArchive(project);
+                }}
+                title={project.isArchived ? "Restore project (reversible)" : "Archive project (reversible)"}
+                type="button"
+              >
+                {project.isArchived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
               </button>
               <button
                 aria-label={`Delete ${project.name}`}
@@ -178,9 +228,9 @@ export const ShellProjectsPanel = () => {
                 disabled={deletingProjectId === project.id}
                 onClick={(event) => {
                   event.stopPropagation();
-                  void handleDeleteProject(project);
+                  void handleRequestDelete(project);
                 }}
-                title="Delete project"
+                title="Delete permanently (with backup)"
                 type="button"
               >
                 <Trash2 size={13} />
@@ -202,6 +252,47 @@ export const ShellProjectsPanel = () => {
         }}
         open={wizardOpen}
       />
+
+      {deletePreview ? (
+        <ConfirmDialog
+          isOpen
+          tone="danger"
+          confirmLabel="Delete project"
+          cancelLabel="Keep project"
+          isSubmitting={isDeleteSubmitting}
+          title={`Delete "${deletePreview.preview.name}"?`}
+          body={
+            <>
+              <p>
+                {deletePreview.preview.backupWillRun
+                  ? "A backup will be created before deletion."
+                  : "No backup is scheduled for this deletion."}
+              </p>
+              <p className="confirm-dialog-warning">This action cannot be undone.</p>
+            </>
+          }
+          details={(() => {
+            const linkedItems = buildLinkedItems(deletePreview.preview);
+            if (!linkedItems.length) {
+              return <p className="confirm-dialog-empty">No linked operational data was found.</p>;
+            }
+            return (
+              <>
+                <span className="confirm-dialog-details-label">Linked data that will be removed</span>
+                <ul className="confirm-dialog-list">
+                  {linkedItems.map((item) => (
+                    <li key={item.label}>
+                      <strong>{item.count}</strong> {item.label}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            );
+          })()}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+        />
+      ) : null}
     </section>
   );
 };

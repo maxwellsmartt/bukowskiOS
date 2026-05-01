@@ -79,7 +79,7 @@ export const WorkspaceSwitcher = () => {
             <button
               onClick={() => {
                 setOpen(false);
-                navigate("/settings");
+                navigate("/settings/workspace");
               }}
               type="button"
             >

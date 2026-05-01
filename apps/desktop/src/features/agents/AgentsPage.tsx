@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { CopyPlus, PauseCircle, PlayCircle, Plus, X } from "lucide-react";
 
 import type { AgentRosterRow } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { getAgentApprovalModeLabel, titleCaseEnum } from "@shared/labels/statusLabels";
@@ -11,9 +12,6 @@ import { AgentDomainInsightPanel } from "./AgentDomainInsightPanel";
 import { AgentWizardPanel } from "./AgentWizardPanel";
 import { setAgentStatus, useAgentDetail, useAgentsList, useMissionControlSnapshot } from "./useAgentsData";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
 const operationalStateLabelMap = {
   idle: "Idle",
   working: "Working",
@@ -45,6 +43,7 @@ const getAgentIndicatorLabel = (status: AgentRosterRow["status"], operationalSta
 };
 
 export const AgentsPage = () => {
+  const { activeWorkspaceId: workspaceId } = useWorkspace();
   const { data, error } = useAgentsList();
   const { data: missionControl } = useMissionControlSnapshot();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);

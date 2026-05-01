@@ -15,6 +15,8 @@ import { resolveAssetAvailability } from "@shared/lib/assetAvailability";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
+
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
 import { archiveAsset, deleteAssetFile, openAssetFile, updateAsset, uploadAssetFiles, uploadAssetImages, useAssetDetail } from "./useAssetsData";
 
@@ -80,8 +82,31 @@ export const AssetDetailPage = () => {
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [openingFileId, setOpeningFileId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [pendingImageDelete, setPendingImageDelete] = useState<{ id: string; name: string } | null>(null);
   const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
   const [isArchivingAsset, setIsArchivingAsset] = useState(false);
+
+  const handleConfirmImageDelete = async () => {
+    if (!pendingImageDelete) {
+      return;
+    }
+
+    const target = pendingImageDelete;
+    setFilesError(null);
+    setFilesFeedback(null);
+
+    try {
+      setDeletingFileId(target.id);
+      const result = await deleteAssetFile(target.id);
+      await reload();
+      setFilesFeedback(result.summary);
+    } catch (nextError) {
+      setFilesError(getUserFacingErrorMessage(nextError, "Unable to remove that asset image."));
+    } finally {
+      setDeletingFileId(null);
+      setPendingImageDelete(null);
+    }
+  };
 
   if (!data.asset) {
     return <div className="empty-state">This asset does not exist anymore or was removed from the workspace.</div>;
@@ -247,27 +272,7 @@ export const AssetDetailPage = () => {
                     className="asset-image-remove"
                     data-tooltip="Remove image"
                     disabled={deletingFileId === file.id}
-                    onClick={() => {
-                      const confirmed = window.confirm("Remove this asset image?");
-                      if (!confirmed) {
-                        return;
-                      }
-
-                      setFilesError(null);
-                      setFilesFeedback(null);
-                      void (async () => {
-                        try {
-                          setDeletingFileId(file.id);
-                          const result = await deleteAssetFile(file.id);
-                          await reload();
-                          setFilesFeedback(result.summary);
-                        } catch (nextError) {
-                          setFilesError(getUserFacingErrorMessage(nextError, "Unable to remove that asset image."));
-                        } finally {
-                          setDeletingFileId(null);
-                        }
-                      })();
-                    }}
+                    onClick={() => setPendingImageDelete({ id: file.id, name: file.originalName })}
                     type="button"
                   >
                     <Trash2 size={13} />
@@ -641,6 +646,20 @@ export const AssetDetailPage = () => {
           </SurfaceCard>
         </div>
       </ResizableSideRailLayout>
+
+      {pendingImageDelete ? (
+        <ConfirmDialog
+          isOpen
+          tone="danger"
+          title={`Remove "${pendingImageDelete.name}"?`}
+          body="This image will be removed from the asset. Action cannot be undone."
+          confirmLabel="Remove image"
+          cancelLabel="Keep image"
+          isSubmitting={deletingFileId === pendingImageDelete.id}
+          onConfirm={handleConfirmImageDelete}
+          onCancel={() => setPendingImageDelete(null)}
+        />
+      ) : null}
     </div>
   );
 };

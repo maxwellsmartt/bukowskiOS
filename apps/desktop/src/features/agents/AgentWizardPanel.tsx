@@ -2,13 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Sparkles, X } from "lucide-react";
 
 import type { AgentApprovalMode, AgentRosterRow, AgentStatus } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { createAgent, updateAgent } from "./useAgentsData";
-
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const slugify = (value: string) =>
   value
@@ -138,6 +135,7 @@ export const AgentWizardPanel = ({
   onClose,
   onSaved,
 }: AgentWizardPanelProps) => {
+  const { activeWorkspaceId: workspaceId } = useWorkspace();
   const [step, setStep] = useState(mode === "edit" ? 2 : 1);
   const [mission, setMission] = useState(initialAgent?.role ?? "");
   const [draft, setDraft] = useState<AgentDraft | null>(initialAgent ? buildDraftFromAgent(initialAgent) : null);

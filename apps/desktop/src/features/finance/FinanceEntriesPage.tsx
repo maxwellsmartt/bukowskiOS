@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import type { FinanceEntryListQuery, FinanceEntrySortField } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAssetsList } from "@features/assets/useAssetsData";
 import { useIncidentsData } from "@features/incidents/useIncidentsData";
 import { useProjectsRegistry } from "@features/projects/useProjectsData";
@@ -29,9 +29,8 @@ const financeEntrySortOptions: Array<ListSortOption<FinanceEntrySortField>> = [
   { value: "status", label: "Status", columnKey: "status" },
 ];
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
-
 export const FinanceEntriesPage = () => {
+  const { activeWorkspaceId: workspaceId } = useWorkspace();
   const [searchParams] = useSearchParams();
   const financeControls = useListControls<FinanceEntrySortField, FinanceEntryListQuery>({
     viewKey: "finance-entries-list",

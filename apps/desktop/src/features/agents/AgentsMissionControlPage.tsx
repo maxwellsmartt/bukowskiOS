@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Bot, ChevronDown, CircleAlert, PauseCircle, PlayCircle, ShieldCheck, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
@@ -11,10 +12,6 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { AgentWizardPanel } from "./AgentWizardPanel";
 import { reviewAgentRun, setAgentApprovalMode, setAgentStatus, useAgentDetail, useMissionControlSnapshot } from "./useAgentsData";
-
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
 
 const statusLabelMap = {
   active: "Active",
@@ -58,6 +55,7 @@ const getAgentIndicatorLabel = (
 };
 
 export const AgentsMissionControlPage = () => {
+  const { activeWorkspaceId: workspaceId } = useWorkspace();
   const { data, error, reload } = useMissionControlSnapshot();
   const [searchParams] = useSearchParams();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);

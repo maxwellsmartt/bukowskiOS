@@ -19,9 +19,6 @@ import { reviewAgentRun } from "@features/agents/useAgentsData";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { readJsonPreference, uiPreferenceKeys, writeJsonPreference } from "@shared/lib/preferences";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
 const modelOptions = ["GPT-5.4", "Claude Sonnet", "OpenClaw Balanced"];
 const reasoningOptions = ["Low", "Medium", "High"];
 const approvalOptions: Array<{ label: string; value: AssistantApprovalPreference }> = [
@@ -358,6 +355,7 @@ export const GlobalAssistantChat = () => {
     close,
     deleteSession,
     isOpen,
+    isWorkspaceReady,
     open,
     sendTurn,
     refresh,
@@ -366,6 +364,7 @@ export const GlobalAssistantChat = () => {
     setCompareTrayVisible,
     updateSessionApprovalMode,
     toggle,
+    workspaceId,
   } = useAssistantChat();
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -552,7 +551,7 @@ export const GlobalAssistantChat = () => {
   const handleSend = async () => {
     const nextMessage = message.trim();
 
-    if ((!nextMessage && !attachments.length) || isSending) {
+    if ((!nextMessage && !attachments.length) || isSending || !isWorkspaceReady) {
       return;
     }
 
@@ -616,6 +615,10 @@ export const GlobalAssistantChat = () => {
   };
 
   const handleReviewRun = async (runId: string, decision: "approve" | "deny" | "approve_for_session") => {
+    if (!isWorkspaceReady) {
+      return;
+    }
+
     setReviewingRunId(runId);
     setActionError(null);
     if (decision !== "deny") {
@@ -1059,8 +1062,14 @@ export const GlobalAssistantChat = () => {
                 <button
                   aria-label={isSending ? "Routing message" : "Send message"}
                   className="assistant-chat-send-button"
-                  data-tooltip={isSending ? "Routing message" : "Send message"}
-                  disabled={isSending || (!message.trim() && !attachments.length)}
+                  data-tooltip={
+                    !isWorkspaceReady
+                      ? "Select a workspace to start chatting"
+                      : isSending
+                        ? "Routing message"
+                        : "Send message"
+                  }
+                  disabled={isSending || !isWorkspaceReady || (!message.trim() && !attachments.length)}
                   onClick={handleSend}
                   type="button"
                 >

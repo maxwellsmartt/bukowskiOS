@@ -25,6 +25,7 @@ const adminPermissions = [
   { key: "finance.read", label: "Read finance", description: "View finance exposure and entries" },
   { key: "rma.read", label: "Read RMAs", description: "Review RMA queues and manufacturer cases" },
   { key: "rma.create", label: "Create RMAs", description: "Open or prepare new RMA cases" },
+  { key: "users.invite", label: "Invite users", description: "Invite a teammate to join a workspace by email." },
 ];
 
 const corsHeaders = (request: Request) => {

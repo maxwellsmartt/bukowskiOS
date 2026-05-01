@@ -9596,6 +9596,134 @@ select.field-input {
   gap: 10px;
 }
 
+.confirm-dialog-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.confirm-dialog-details-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.confirm-dialog-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.confirm-dialog-list strong {
+  color: var(--text-primary);
+  margin-right: 4px;
+}
+
+.confirm-dialog-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.confirm-dialog-warning {
+  color: var(--accent-critical);
+  font-weight: 500;
+}
+
+.permission-matrix-wrapper {
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.permission-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.permission-matrix thead th {
+  position: sticky;
+  top: 0;
+  background: rgba(20, 24, 28, 0.96);
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 11px;
+}
+
+.permission-matrix-corner {
+  min-width: 220px;
+}
+
+.permission-matrix-role {
+  text-align: center !important;
+  min-width: 96px;
+}
+
+.permission-matrix tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.permission-matrix tbody tr:last-child {
+  border-bottom: none;
+}
+
+.permission-matrix-permission {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.permission-matrix-group {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, var(--text-secondary));
+  margin-bottom: 2px;
+}
+
+.permission-matrix-permission-label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.permission-matrix-permission-key {
+  color: var(--text-secondary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.permission-matrix-cell {
+  text-align: center;
+  padding: 10px 14px;
+  font-weight: 600;
+}
+
+.permission-matrix-cell.is-allowed {
+  color: var(--accent-positive, #6fb98c);
+}
+
+.permission-matrix-cell.is-denied {
+  color: rgba(255, 255, 255, 0.18);
+}
+
 .loading-line {
   display: block;
   width: 100%;

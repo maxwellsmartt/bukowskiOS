@@ -1,5 +1,4 @@
 import type { AppActionResult, AppDiagnosticsSnapshot, AppSyncOutboxRow } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { CatalogSnapshot, ProjectDetailSnapshot } from "@contracts";
 import { projectColorPalette } from "@contracts";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -92,6 +93,10 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
   const [feedback, setFeedback] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingUnitAction, setPendingUnitAction] = useState<{
+    unit: ProjectDetailSnapshot["units"][number];
+    action: "mark_wrapped" | "delete";
+  } | null>(null);
 
   const editingUnit = useMemo(
     () => units.find((unit) => unit.id === editingUnitId) ?? null,
@@ -264,6 +269,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
   };
 
   return (
+    <>
     <SurfaceCard
       title="Units"
       aside={
@@ -319,12 +325,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                     aria-label={`Wrap ${unit.name}`}
                     className="shell-project-action"
                     data-tooltip="Mark wrapped"
-                    onClick={() => {
-                      const confirmed = window.confirm("Mark this unit as wrapped and set its end date to today?");
-                      if (confirmed) {
-                        void runUnitAction(unit, "mark_wrapped");
-                      }
-                    }}
+                    onClick={() => setPendingUnitAction({ unit, action: "mark_wrapped" })}
                     type="button"
                   >
                     <WrapText size={12} />
@@ -342,15 +343,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                     aria-label={`Delete ${unit.name}`}
                     className="shell-project-action is-danger"
                     data-tooltip="Delete unit"
-                    onClick={() => {
-                      const confirmed = window.confirm(
-                        `Delete unit "${unit.name}"? This only works if it has no linked operational records.`,
-                      );
-
-                      if (confirmed) {
-                        void runUnitAction(unit, "delete");
-                      }
-                    }}
+                    onClick={() => setPendingUnitAction({ unit, action: "delete" })}
                     type="button"
                   >
                     <Trash2 size={12} />
@@ -592,5 +585,32 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
         </div>
       ) : null}
     </SurfaceCard>
+
+    {pendingUnitAction ? (
+      <ConfirmDialog
+        isOpen
+        tone={pendingUnitAction.action === "delete" ? "danger" : "default"}
+        title={
+          pendingUnitAction.action === "delete"
+            ? `Delete unit "${pendingUnitAction.unit.name}"?`
+            : `Mark "${pendingUnitAction.unit.name}" as wrapped?`
+        }
+        body={
+          pendingUnitAction.action === "delete"
+            ? "This only works if the unit has no linked operational records. Action cannot be undone."
+            : "The unit's end date will be set to today."
+        }
+        confirmLabel={pendingUnitAction.action === "delete" ? "Delete unit" : "Mark wrapped"}
+        cancelLabel="Cancel"
+        isSubmitting={isSubmitting}
+        onConfirm={async () => {
+          const next = pendingUnitAction;
+          setPendingUnitAction(null);
+          await runUnitAction(next.unit, next.action);
+        }}
+        onCancel={() => setPendingUnitAction(null)}
+      />
+    ) : null}
+    </>
   );
 };

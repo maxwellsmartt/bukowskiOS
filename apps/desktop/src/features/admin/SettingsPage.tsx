@@ -146,6 +146,112 @@ const buildUserDraft = (user: AppUserAdminRow | null, roles: AppUsersSnapshot["r
   linkedCrewMemberId: user?.linkedCrewId ?? "",
 });
 
+const permissionLabelOverrides: Record<string, string> = {
+  "projects.read": "View projects",
+  "projects.manage": "Manage projects",
+  "assets.read": "View assets",
+  "assets.manage": "Manage assets",
+  "incidents.read": "View incidents",
+  "incidents.create": "Report incidents",
+  "packing-slips.read": "View packing slips",
+  "packing-slips.create": "Issue packing slips",
+  "finance.read": "View finance",
+  "rma.read": "View RMAs",
+  "rma.create": "Create RMAs",
+  "users.invite": "Invite users",
+};
+
+const permissionGroupForKey = (key: string) => {
+  if (key.startsWith("projects.")) return "Projects";
+  if (key.startsWith("assets.")) return "Assets";
+  if (key.startsWith("incidents.")) return "Incidents";
+  if (key.startsWith("packing-slips.")) return "Packing";
+  if (key.startsWith("finance.")) return "Finance";
+  if (key.startsWith("rma.")) return "RMA";
+  if (key.startsWith("users.")) return "Team";
+  return "Other";
+};
+
+type RolesPermissionMatrixProps = {
+  roles: AppUsersSnapshot["roles"];
+};
+
+const RolesPermissionMatrix = ({ roles }: RolesPermissionMatrixProps) => {
+  const allPermissionKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const role of roles) {
+      for (const key of role.permissionKeys) {
+        set.add(key);
+      }
+    }
+    return Array.from(set).sort((a, b) => {
+      const groupA = permissionGroupForKey(a);
+      const groupB = permissionGroupForKey(b);
+      if (groupA !== groupB) {
+        return groupA.localeCompare(groupB);
+      }
+      return a.localeCompare(b);
+    });
+  }, [roles]);
+
+  if (!roles.length) {
+    return <p className="surface-card-subtitle">No roles defined for this workspace.</p>;
+  }
+
+  if (!allPermissionKeys.length) {
+    return <p className="surface-card-subtitle">No permissions are assigned to any role yet.</p>;
+  }
+
+  let lastGroup = "";
+
+  return (
+    <div className="permission-matrix-wrapper">
+      <table className="permission-matrix">
+        <thead>
+          <tr>
+            <th className="permission-matrix-corner">Permission</th>
+            {roles.map((role) => (
+              <th key={role.id} className="permission-matrix-role">
+                {role.name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {allPermissionKeys.map((key) => {
+            const group = permissionGroupForKey(key);
+            const showGroup = group !== lastGroup;
+            lastGroup = group;
+            return (
+              <tr key={key}>
+                <td className="permission-matrix-permission">
+                  {showGroup ? <span className="permission-matrix-group">{group}</span> : null}
+                  <span className="permission-matrix-permission-label">
+                    {permissionLabelOverrides[key] ?? key}
+                  </span>
+                  <span className="permission-matrix-permission-key">{key}</span>
+                </td>
+                {roles.map((role) => {
+                  const has = role.permissionKeys.includes(key);
+                  return (
+                    <td
+                      key={role.id}
+                      className={`permission-matrix-cell${has ? " is-allowed" : " is-denied"}`}
+                      aria-label={has ? `${role.name} has ${key}` : `${role.name} does not have ${key}`}
+                    >
+                      {has ? "✓" : "—"}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 export const SettingsPage = () => {
   const { appInfo } = useShellContext();
   const { activeWorkspaceId, activeWorkspaceName } = useWorkspace();
@@ -823,6 +929,13 @@ export const SettingsPage = () => {
                 );
               })}
             </div>
+          </SurfaceCard>
+
+          <SurfaceCard
+            title="Permission matrix"
+            subtitle="Read-only view. Custom roles and editable matrix ship in the next release."
+          >
+            <RolesPermissionMatrix roles={usersSnapshot.roles} />
           </SurfaceCard>
         </div>
       ) : null}

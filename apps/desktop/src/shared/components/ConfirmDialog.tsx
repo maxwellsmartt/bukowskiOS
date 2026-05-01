@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 
 type ConfirmDialogProps = {
   title: string;
-  body: string;
+  body: ReactNode;
+  details?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: "default" | "danger";
@@ -15,6 +17,7 @@ type ConfirmDialogProps = {
 export const ConfirmDialog = ({
   title,
   body,
+  details,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   tone = "default",
@@ -36,9 +39,11 @@ export const ConfirmDialog = ({
           </span>
           <div className="confirm-dialog-copy">
             <strong>{title}</strong>
-            <p>{body}</p>
+            {typeof body === "string" ? <p>{body}</p> : body}
           </div>
         </div>
+
+        {details ? <div className="confirm-dialog-details">{details}</div> : null}
 
         <div className="confirm-dialog-actions">
           <button className="ghost-control cancel-control" disabled={isSubmitting} onClick={onCancel} type="button">

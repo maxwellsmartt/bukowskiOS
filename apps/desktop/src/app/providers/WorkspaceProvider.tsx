@@ -9,6 +9,7 @@ import { useSession } from "./SessionProvider";
 export type WorkspaceMembership = {
   workspaceId: string;
   workspaceName: string;
+  roleKey: string | null;
   roleName: string;
   status: "active" | "invited" | "inactive";
   permissions: string[];
@@ -57,6 +58,7 @@ export type CreateWorkspaceInput = {
 const localMembership: WorkspaceMembership = {
   workspaceId: DEFAULT_WORKSPACE_ID,
   workspaceName: "Metadata Cine",
+  roleKey: "admin",
   roleName: "Local admin",
   status: "active",
   permissions: ["*"],
@@ -68,6 +70,7 @@ const toCachedMembership = (workspace: {
 }): WorkspaceMembership => ({
   workspaceId: workspace.id,
   workspaceName: workspace.name,
+  roleKey: "admin",
   roleName: "Cached access",
   status: "active",
   permissions: ["*"],
@@ -115,7 +118,9 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from("workspace_memberships")
-        .select("workspace_id,status,workspaces(name,slug,base_currency,icon_color),roles(name)")
+        .select(
+          "workspace_id,status,workspaces(name,slug,base_currency,icon_color),roles(key,name,role_permissions(permissions(key)))",
+        )
         .eq("user_id", userId)
         .eq("status", "active");
 
@@ -128,15 +133,28 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
           workspace_id: string;
           status: "active" | "invited" | "inactive";
           workspaces?: { name?: string | null; slug?: string | null; base_currency?: string | null; icon_color?: string | null } | null;
-          roles?: { name?: string | null } | null;
+          roles?: {
+            key?: string | null;
+            name?: string | null;
+            role_permissions?: Array<{ permissions?: { key?: string | null } | null }> | null;
+          } | null;
         };
+
+        const permissionKeys = Array.from(
+          new Set(
+            (typedRow.roles?.role_permissions ?? [])
+              .map((entry) => entry?.permissions?.key)
+              .filter((key): key is string => typeof key === "string" && key.length > 0),
+          ),
+        );
 
         return {
           workspaceId: typedRow.workspace_id,
           workspaceName: typedRow.workspaces?.name ?? "Workspace",
+          roleKey: typedRow.roles?.key ?? null,
           roleName: typedRow.roles?.name ?? "Member",
           status: typedRow.status,
-          permissions: [],
+          permissions: permissionKeys,
         };
       });
 

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
@@ -7,11 +8,8 @@ import { getAgentApprovalDecisionLabel, getAgentRunStatusLabel } from "@shared/l
 
 import { reviewAgentRun, useAgentRuns } from "./useAgentsData";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
-
-const workspaceId = DEFAULT_WORKSPACE_ID;
-
 export const AgentRunsPage = () => {
+  const { activeWorkspaceId: workspaceId, isWorkspaceReady } = useWorkspace();
   const { data, error } = useAgentRuns();
   const [processingRunId, setProcessingRunId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -29,6 +27,10 @@ export const AgentRunsPage = () => {
   );
 
   const handleReview = async (runId: string, decision: "approve" | "deny" | "approve_for_session") => {
+    if (!isWorkspaceReady) {
+      return;
+    }
+
     setProcessingRunId(runId);
     setFeedback(null);
 

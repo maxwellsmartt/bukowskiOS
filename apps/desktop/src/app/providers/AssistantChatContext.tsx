@@ -12,7 +12,6 @@ import type {
   AssistantChatThreadState,
   SendAssistantChatTurnCommand,
 } from "@contracts";
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import {
   createAssistantThread,
   deleteAssistantThread,
@@ -22,6 +21,8 @@ import {
   updateAssistantThreadPreferences,
 } from "@features/agents/useAgentsData";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
+
+import { useWorkspace } from "./WorkspaceProvider";
 
 export type AssistantChatSessionState = AssistantChatMessageMeta;
 
@@ -59,6 +60,8 @@ type AssistantChatContextValue = {
   activeSession: AssistantChatSession;
   sessions: AssistantChatSession[];
   compareTrayVisible: boolean;
+  workspaceId: string;
+  isWorkspaceReady: boolean;
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -73,7 +76,6 @@ type AssistantChatContextValue = {
 
 const AssistantChatContext = createContext<AssistantChatContextValue | null>(null);
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
 const fallbackWelcomeBody =
   "Supervisor ready. Ask for context, routing, or a draft run. Nothing touches the command layer from chat without review.";
 
@@ -200,12 +202,17 @@ const normalizeThread = (thread: AssistantChatThreadRow): AssistantChatSession =
 
 export const AssistantChatProvider = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
+  const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const [isOpen, setIsOpen] = useState(false);
   const [compareTrayVisible, setCompareTrayVisible] = useState(false);
   const [snapshot, setSnapshot] = useState<AssistantChatSnapshot | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
   const ensureInitialThread = useCallback(async () => {
+    if (!isWorkspaceReady) {
+      return null;
+    }
+
     const currentSnapshot = await getAssistantChatSnapshot();
 
     if (currentSnapshot.threads.length) {
@@ -215,19 +222,29 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
 
     const created = await createAssistantThread({
       commandId: `cmd-thread-${Date.now().toString(36)}`,
-      workspaceId,
+      workspaceId: activeWorkspaceId,
       contextKey: location.pathname,
       contextLabel: resolveContextLabel(location.pathname),
     });
     setSnapshot(created);
     return created;
-  }, [location.pathname]);
+  }, [activeWorkspaceId, isWorkspaceReady, location.pathname]);
 
   const refresh = useCallback(async () => {
     const nextSnapshot = await ensureInitialThread();
+
+    if (!nextSnapshot) {
+      return;
+    }
+
     setSnapshot(nextSnapshot);
     setIsHydrated(true);
   }, [ensureInitialThread]);
+
+  useEffect(() => {
+    setSnapshot(null);
+    setIsHydrated(false);
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     void refresh();
@@ -259,14 +276,20 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
       activeSession,
       sessions,
       compareTrayVisible,
+      workspaceId: activeWorkspaceId,
+      isWorkspaceReady,
       open: () => setIsOpen(true),
       close: () => setIsOpen(false),
       toggle: () => setIsOpen((current) => !current),
       refresh,
       createSession: async () => {
+        if (!isWorkspaceReady) {
+          return;
+        }
+
         const nextSnapshot = await createAssistantThread({
           commandId: `cmd-thread-${Date.now().toString(36)}`,
-          workspaceId,
+          workspaceId: activeWorkspaceId,
           contextKey: location.pathname,
           contextLabel: resolveContextLabel(location.pathname),
         });
@@ -275,9 +298,13 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
         setIsOpen(true);
       },
       selectSession: async (sessionId: string) => {
+        if (!isWorkspaceReady) {
+          return;
+        }
+
         const nextSnapshot = await setActiveAssistantThread({
           commandId: `cmd-thread-active-${Date.now().toString(36)}`,
-          workspaceId,
+          workspaceId: activeWorkspaceId,
           threadId: sessionId,
         });
         setSnapshot(nextSnapshot);
@@ -285,18 +312,26 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
         setIsOpen(true);
       },
       deleteSession: async (sessionId: string) => {
+        if (!isWorkspaceReady) {
+          return;
+        }
+
         const nextSnapshot = await deleteAssistantThread({
           commandId: `cmd-thread-delete-${Date.now().toString(36)}`,
-          workspaceId,
+          workspaceId: activeWorkspaceId,
           threadId: sessionId,
         });
         setSnapshot(nextSnapshot);
         setIsHydrated(true);
       },
       updateSessionApprovalMode: async (sessionId: string, preferredApprovalMode: AssistantApprovalPreference) => {
+        if (!isWorkspaceReady) {
+          return;
+        }
+
         const nextSnapshot = await updateAssistantThreadPreferences({
           commandId: `cmd-thread-preferences-${Date.now().toString(36)}`,
-          workspaceId,
+          workspaceId: activeWorkspaceId,
           threadId: sessionId,
           preferredApprovalMode,
         });
@@ -310,7 +345,17 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
       },
       setCompareTrayVisible,
     }),
-    [activeSession, compareTrayVisible, isHydrated, isOpen, location.pathname, refresh, sessions],
+    [
+      activeSession,
+      activeWorkspaceId,
+      compareTrayVisible,
+      isHydrated,
+      isOpen,
+      isWorkspaceReady,
+      location.pathname,
+      refresh,
+      sessions,
+    ],
   );
 
   return <AssistantChatContext.Provider value={value}>{children}</AssistantChatContext.Provider>;
