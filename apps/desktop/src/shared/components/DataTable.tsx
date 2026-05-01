@@ -37,6 +37,7 @@ type DataTableProps<T = unknown> = {
   onRowDoubleClick?: (row: T) => void;
   maxHeight?: number | string;
   emptyMessage?: string;
+  emptyContent?: ReactNode;
   persistKey?: string;
   defaultVisibleColumnKeys?: string[];
   shellClassName?: string;
@@ -68,6 +69,7 @@ export const DataTable = <T = unknown,>({
   onRowDoubleClick,
   maxHeight,
   emptyMessage = "No rows available.",
+  emptyContent,
   persistKey,
   defaultVisibleColumnKeys,
   shellClassName,
@@ -616,7 +618,7 @@ export const DataTable = <T = unknown,>({
           ) : (
             <tr>
               <td className="data-table-empty" colSpan={visibleColumns.length + (selectable ? 1 : 0)}>
-                {emptyMessage}
+                {emptyContent ?? emptyMessage}
               </td>
             </tr>
           )}

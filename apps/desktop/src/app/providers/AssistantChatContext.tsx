@@ -250,6 +250,14 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    const handler = () => setIsOpen(true);
+    window.addEventListener("bukowski:open-assistant-chat", handler);
+    return () => {
+      window.removeEventListener("bukowski:open-assistant-chat", handler);
+    };
+  }, []);
+
   const hasLiveWork = snapshot?.threads.some((thread) => thread.state === "pending" || thread.state === "streaming") ?? false;
 
   useVisiblePolling(

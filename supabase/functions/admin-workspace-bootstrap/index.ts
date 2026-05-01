@@ -191,5 +191,38 @@ Deno.serve(async (request) => {
     return json(request, { error: membershipError.message }, 400);
   }
 
+  const baseCategories = [
+    { code: "CAM", name: "Cameras", description: "Bodies, accessories and rigs." },
+    { code: "LENS", name: "Lenses", description: "Primes, zooms and matte boxes." },
+    { code: "LITE", name: "Lighting", description: "Fixtures, modifiers and stands." },
+    { code: "GRIP", name: "Grip", description: "Stands, clamps, dollies and hardware." },
+    { code: "SOUND", name: "Sound", description: "Mics, recorders, mixers and cables." },
+  ];
+
+  await adminClient.from("asset_categories").upsert(
+    baseCategories.map((category) => ({
+      workspace_id: workspace.id,
+      code: category.code,
+      name: category.name,
+      description: category.description,
+      updated_at: now,
+    })),
+    { onConflict: "workspace_id,code", ignoreDuplicates: true },
+  );
+
+  await adminClient.from("locations").upsert(
+    [
+      {
+        workspace_id: workspace.id,
+        code: "WH-01",
+        name: "Main warehouse",
+        type: "warehouse",
+        description: "Default storage location. Rename or expand from the Catalog screen.",
+        updated_at: now,
+      },
+    ],
+    { onConflict: "workspace_id,code", ignoreDuplicates: true },
+  );
+
   return json(request, { ok: true, workspaceId: workspace.id });
 });

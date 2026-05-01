@@ -9,7 +9,9 @@ import { useAssetsList } from "@features/assets/useAssetsData";
 import { useIncidentsData } from "@features/incidents/useIncidentsData";
 import { useProjectsRegistry } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
+import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -50,7 +52,7 @@ export const FinanceEntriesPage = () => {
       sortDirection,
     }),
   });
-  const { data, error, reload } = useFinanceEntries(financeControls.query);
+  const { data, error, isLoading, reload } = useFinanceEntries(financeControls.query);
   const { data: projects } = useProjectsRegistry();
   const { data: assets } = useAssetsList();
   const { data: incidents } = useIncidentsData();
@@ -230,8 +232,42 @@ export const FinanceEntriesPage = () => {
           sortDirection={financeControls.sortDirection}
           sortOptions={financeEntrySortOptions}
         />
+        {isLoading && data.length === 0 ? (
+          <TableSkeleton body="Loading finance entries…" columns={6} />
+        ) : null}
         <DataTable
           activeRowId={editingEntryId}
+          emptyContent={
+            <GuidedEmptyState
+              title={financeControls.searchValue ? "No matches" : "No finance entries yet"}
+              body={
+                financeControls.searchValue
+                  ? "Try a different search, or clear it to see every entry."
+                  : "Track every cost, refund or invoice tied to your projects. Add the first entry to start a paper trail."
+              }
+              tone="subtle"
+              actionLabel={financeControls.searchValue ? "Clear search" : "Add first entry"}
+              onAction={
+                financeControls.searchValue
+                  ? () => financeControls.setSearchValue("")
+                  : () => {
+                      setEditingEntryId(null);
+                      setSubmitError(null);
+                      setFeedback(null);
+                      setIsEditorOpen(true);
+                    }
+              }
+              tips={
+                financeControls.searchValue
+                  ? undefined
+                  : [
+                      "Entries can be tied to a project, asset or incident.",
+                      "Attach receipts and invoices as PDF for clean audits.",
+                      "Use status to mark drafts vs confirmed entries.",
+                    ]
+              }
+            />
+          }
           getRowId={(row) => row.id}
           maxHeight="min(56vh, 620px)"
           onRowClick={(row) => {

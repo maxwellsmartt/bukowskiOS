@@ -2,6 +2,7 @@ import { RefreshCcw, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { HelpMenu } from "@features/onboarding/HelpMenu";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import type { AppDiagnosticsSnapshot } from "@contracts";
@@ -98,6 +99,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
           <span>Search</span>
           <kbd>⌘K</kbd>
         </button>
+        <HelpMenu />
         <button
           aria-label={syncState.label}
           className={`icon-ghost-control sync-control ${syncState.className}`}

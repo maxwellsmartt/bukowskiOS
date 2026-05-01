@@ -1460,7 +1460,12 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   return (
     <div className="page-stack assets-page-stack">
       <SectionHeader
-        title={isProjectMode ? "Project Assets" : "Assets"}
+        title={isProjectMode ? "Project assets" : "Assets"}
+        body={
+          isProjectMode
+            ? "The gear assigned or available to this project. Click any row to see its history and status."
+            : "Every piece of equipment your team owns. Filter, search or import from CSV to build the catalog."
+        }
       />
 
       {error ? <div className="empty-state">Assets unavailable: {error}</div> : null}
@@ -1960,10 +1965,33 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             autoScrollToActiveRow
             columns={assetColumns}
             defaultVisibleColumnKeys={assetDefaultColumnKeys}
-            emptyMessage={
-              isProjectMode
-                ? "No assets are assigned to this project yet."
-                : "No assets yet. Create the first one after setting up the catalog."
+            emptyContent={
+              <GuidedEmptyState
+                title={
+                  assetControls.searchValue
+                    ? "No matches"
+                    : isProjectMode
+                      ? "No assets on this project yet"
+                      : "No assets yet"
+                }
+                body={
+                  assetControls.searchValue
+                    ? "Try a different search, or clear it to see every asset."
+                    : isProjectMode
+                      ? "Assign gear from the global catalog so this project's crew can pull and return it."
+                      : "Add the first piece of equipment to your catalog. You can also import from a CSV if you already have a list."
+                }
+                tone="subtle"
+                actionLabel={assetControls.searchValue ? "Clear search" : undefined}
+                onAction={assetControls.searchValue ? () => assetControls.setSearchValue("") : undefined}
+                tips={
+                  assetControls.searchValue
+                    ? undefined
+                    : isProjectMode
+                      ? ["Use the assign action from the asset detail page.", "Filter the global catalog by category to find gear faster."]
+                      : ["Categories and locations live in the Catalog section.", "QR labels print straight from the asset detail page."]
+                }
+              />
             }
             getRowId={(row) => row.id}
             maxHeight={isProjectMode ? "min(68vh, 760px)" : "min(56vh, 680px)"}

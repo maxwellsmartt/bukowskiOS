@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { DataTable } from "@shared/components/DataTable";
+import { HelpHint } from "@shared/components/HelpHint";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -13,7 +14,10 @@ export const FinanceCostLinksPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Cost links" />
+      <SectionHeader
+        title="Cost links"
+        body="Each row connects a cost-bearing incident to the asset and project it impacts, so you can trace any peso back to its source."
+      />
 
       {error ? <div className="empty-state">Cost links unavailable: {error}</div> : null}
 

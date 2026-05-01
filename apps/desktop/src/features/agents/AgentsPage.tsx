@@ -67,7 +67,11 @@ export const AgentsPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Automation Team" titleTone="accent" />
+      <SectionHeader
+        title="Automation Team"
+        body="The roster of AI assistants set up for this workspace. Each one has a focus area, a model and an approval mode."
+        titleTone="accent"
+      />
 
       <div className={`agents-directory-layout${selectedAgentId ? "" : " is-directory-expanded"}`}>
         <SurfaceCard

@@ -103,7 +103,14 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
 
   return (
     <div className="page-stack">
-      <SectionHeader title={isProjectMode ? "Project Packing" : "Packing Slips"} />
+      <SectionHeader
+        title={isProjectMode ? "Project packing" : "Packing slips"}
+        body={
+          isProjectMode
+            ? "Packing slips for this project. Use them to hand gear to crew and track returns."
+            : "Generate, send and track packing slips for the gear that leaves the warehouse."
+        }
+      />
 
       {error ? <div className="empty-state">Packing slips unavailable: {error}</div> : null}
       {returnFeedback ? <div className="action-feedback action-feedback-success">{returnFeedback}</div> : null}

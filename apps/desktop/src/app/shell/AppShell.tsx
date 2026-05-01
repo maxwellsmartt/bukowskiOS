@@ -5,8 +5,11 @@ import { resolveActiveRoute } from "@app/routing/route-meta";
 import { AppRoutes } from "@app/routing/routes";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useSession } from "@app/providers/SessionProvider";
+import { Breadcrumb } from "@shared/components/Breadcrumb";
 import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 import { pushRecentEntityKey } from "@shared/lib/recentEntities";
+
+import { OnboardingTour } from "@features/onboarding/OnboardingTour";
 
 import { CompareTrayBar } from "./CompareTrayBar";
 import { FloatingTooltipLayer } from "./FloatingTooltipLayer";
@@ -147,6 +150,21 @@ export const AppShell = () => {
         return;
       }
 
+      if (action.type === "open-onboarding") {
+        window.dispatchEvent(new CustomEvent("bukowski:open-onboarding"));
+        return;
+      }
+
+      if (action.type === "open-assistant-chat") {
+        window.dispatchEvent(new CustomEvent("bukowski:open-assistant-chat"));
+        return;
+      }
+
+      if (action.type === "switch-workspace") {
+        navigate("/workspaces/select");
+        return;
+      }
+
       if (action.type === "auth-deep-link") {
         void handleAuthDeepLink(action.url).then((targetPath) => navigate(targetPath, { replace: true }));
       }
@@ -203,6 +221,7 @@ export const AppShell = () => {
 
         <div className="shell-main">
           <TopContextBar onOpenSearch={() => setSearchOpen(true)} />
+          <Breadcrumb />
           {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
           <main className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}`}>
             {!isScopeReady ? (
@@ -228,6 +247,7 @@ export const AppShell = () => {
       </div>
       <GlobalSearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <GlobalAssistantChat />
+      <OnboardingTour />
       <FloatingTooltipLayer />
     </div>
   );

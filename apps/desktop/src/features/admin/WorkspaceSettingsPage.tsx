@@ -4,6 +4,7 @@ import { ArrowLeft, Send } from "lucide-react";
 
 import type { AppUserAdminRow, AppUsersSnapshot } from "@contracts";
 import { useSession } from "@app/providers/SessionProvider";
+import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -12,12 +13,14 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { InviteMemberDialog } from "./InviteMemberDialog";
+import { revokeWorkspaceInvite, sendWorkspaceInvite } from "./inviteService";
 
 const emptyUsersSnapshot: AppUsersSnapshot = { users: [], roles: [] };
 
 type PendingInviteRow = {
   id: string;
   email: string;
+  roleId: string | null;
   roleName: string;
   invitedAt: string | null;
 };
@@ -48,12 +51,12 @@ const resolveMembershipLabel = (status: AppUserAdminRow["membershipStatus"]) => 
 
 export const WorkspaceSettingsPage = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const { supabase, isLocalFallback } = useSession();
   const { activeWorkspaceId, activeWorkspaceName, activeMembership, memberships } = useWorkspace();
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
   const [pendingInvites, setPendingInvites] = useState<PendingInviteRow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const loadPendingInvites = useCallback(async () => {
@@ -65,7 +68,7 @@ export const WorkspaceSettingsPage = () => {
     try {
       const { data, error: queryError } = await supabase
         .from("workspace_memberships")
-        .select("id,invited_at,roles(name),user_profiles(email)")
+        .select("id,invited_at,role_id,roles(name),user_profiles(email)")
         .eq("workspace_id", activeWorkspaceId)
         .eq("status", "invited");
 
@@ -77,6 +80,7 @@ export const WorkspaceSettingsPage = () => {
         const typed = row as {
           id: string;
           invited_at: string | null;
+          role_id: string | null;
           roles?: { name?: string | null } | null;
           user_profiles?: { email?: string | null } | null;
         };
@@ -84,6 +88,7 @@ export const WorkspaceSettingsPage = () => {
         return {
           id: typed.id,
           email: typed.user_profiles?.email ?? "Pending",
+          roleId: typed.role_id,
           roleName: typed.roles?.name ?? "Member",
           invitedAt: typed.invited_at,
         } satisfies PendingInviteRow;
@@ -120,6 +125,39 @@ export const WorkspaceSettingsPage = () => {
   const teamMembers = usersSnapshot.users.filter((user) => user.membershipStatus !== "missing");
   const inviteRolesForDialog = usersSnapshot.roles;
 
+  const handleResendInvite = async (invite: PendingInviteRow) => {
+    if (!supabase || !invite.roleId) {
+      toast.error("Cannot resend", "This invite is missing role information.");
+      return;
+    }
+
+    try {
+      await sendWorkspaceInvite(supabase, {
+        workspaceId: activeWorkspaceId,
+        email: invite.email,
+        roleId: invite.roleId,
+      });
+      toast.success("Invite resent", `${invite.email} got a fresh magic link.`);
+      await loadPendingInvites();
+    } catch (nextError) {
+      toast.error("Could not resend", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+    }
+  };
+
+  const handleRevokeInvite = async (invite: PendingInviteRow) => {
+    if (!supabase) {
+      return;
+    }
+
+    try {
+      await revokeWorkspaceInvite(supabase, { membershipId: invite.id });
+      toast.success("Invite revoked", `${invite.email} can no longer join with the previous link.`);
+      await loadPendingInvites();
+    } catch (nextError) {
+      toast.error("Could not revoke", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+    }
+  };
+
   return (
     <div className="page-stack">
       <div className="settings-back-row">
@@ -137,7 +175,6 @@ export const WorkspaceSettingsPage = () => {
       />
 
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
-      {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
       <SurfaceCard title="Workspace details">
         <div className="summary-grid compact-summary-grid">
@@ -231,6 +268,30 @@ export const WorkspaceSettingsPage = () => {
                 label: "Invited",
                 render: (row) => (row.invitedAt ? new Date(row.invitedAt).toLocaleDateString() : "Pending"),
               },
+              {
+                key: "actions",
+                label: "Actions",
+                align: "right",
+                render: (row) => (
+                  <div className="surface-card-actions" style={{ justifyContent: "flex-end" }}>
+                    <button
+                      className="ghost-control"
+                      disabled={!row.roleId}
+                      onClick={() => void handleResendInvite(row)}
+                      type="button"
+                    >
+                      Resend
+                    </button>
+                    <button
+                      className="ghost-control is-danger"
+                      onClick={() => void handleRevokeInvite(row)}
+                      type="button"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                ),
+              },
             ]}
             rows={pendingInvites}
             emptyMessage="No pending invites."
@@ -257,7 +318,7 @@ export const WorkspaceSettingsPage = () => {
         roles={inviteRolesForDialog}
         onClose={() => setInviteOpen(false)}
         onSent={async (email) => {
-          setFeedback(`Invite sent to ${email}.`);
+          toast.success("Invite sent", `${email} will receive a magic link to join this workspace.`);
           await Promise.all([loadMembers(), loadPendingInvites()]);
         }}
       />

@@ -12,6 +12,7 @@ import {
   type RmaCaseEditorDraft,
   type RmaCaseEditorInitialDraft,
 } from "@features/rma/RmaCaseEditorPanel";
+import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { buildRmaMailtoUrl, resolveRmaStatusTone, rmaStatusActions } from "@features/rma/rmaHelpers";
 import { createRmaCase, updateRmaCase, useRmaCaseDetail, useRmaSnapshot } from "@features/rma/useRmaData";
 import { useCatalogData } from "@features/projects/useProjectsData";
@@ -85,7 +86,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       sortDirection,
     }),
   });
-  const { data, error, reload } = useIncidentsData(incidentControls.query);
+  const { data, error, isLoading, reload } = useIncidentsData(incidentControls.query);
   const { data: assets } = useAssetsList({
     workspaceId: activeWorkspaceId,
     scopeProjectId: projectId,
@@ -418,6 +419,9 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           sortDirection={incidentControls.sortDirection}
           sortOptions={incidentSortOptions}
         />
+        {isLoading && data.length === 0 ? (
+          <TableSkeleton body="Loading incidents…" columns={6} />
+        ) : null}
         <DataTable
           activeRowId={activeIncidentId}
           autoScrollToActiveRow

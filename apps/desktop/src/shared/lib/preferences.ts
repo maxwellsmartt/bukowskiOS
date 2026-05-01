@@ -20,6 +20,7 @@ export const uiPreferenceKeys = {
   splitSideRailWidth: "split-side-rail-width",
   shellProjectsShowArchived: "shell-projects-show-archived",
   activeWorkspaceId: "active-workspace-id",
+  onboardingTourCompletedWorkspaces: "onboarding-tour-completed-workspaces",
 } as const;
 
 const buildPreferenceKey = (key: string) => `bukowski:${key}`;

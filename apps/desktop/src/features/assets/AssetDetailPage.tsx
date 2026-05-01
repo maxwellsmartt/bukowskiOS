@@ -148,7 +148,15 @@ export const AssetDetailPage = () => {
 
       <SurfaceCard
         title={data.asset.name}
-        aside={<StatusBadge tone={data.asset.status === "Maintenance" ? "warning" : "info"}>{data.asset.status}</StatusBadge>}
+        aside={
+          <span
+            data-tooltip="Lifecycle: Active means in service, Maintenance means under repair, Retired means out of rotation. For day-to-day work look at Availability below."
+          >
+            <StatusBadge tone={data.asset.status === "Maintenance" ? "warning" : data.asset.status === "Retired" ? "critical" : "info"}>
+              {data.asset.status}
+            </StatusBadge>
+          </span>
+        }
       >
         <div className="summary-grid">
           <div className="summary-row">
@@ -180,7 +188,12 @@ export const AssetDetailPage = () => {
 
       <SurfaceCard
         title="Availability"
-        aside={<StatusBadge tone={availability.tone}>{availability.label}</StatusBadge>}
+        subtitle="What you can do with this asset right now."
+        aside={
+          <span data-tooltip="Day-to-day state of the asset: whether it is in stock, checked out, assigned to a project or unavailable.">
+            <StatusBadge tone={availability.tone}>{availability.label}</StatusBadge>
+          </span>
+        }
       >
         <div className="summary-grid compact-summary-grid">
           <div className="summary-row">

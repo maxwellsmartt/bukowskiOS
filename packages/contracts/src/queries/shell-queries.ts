@@ -15,6 +15,15 @@ export type ShellAppAction =
   | {
       type: "auth-deep-link";
       url: string;
+    }
+  | {
+      type: "open-onboarding";
+    }
+  | {
+      type: "open-assistant-chat";
+    }
+  | {
+      type: "switch-workspace";
     };
 
 export type GlobalSearchEntityType = "asset" | "project" | "project_unit" | "packing_slip" | "incident" | "financial_entry";

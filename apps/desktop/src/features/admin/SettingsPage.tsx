@@ -678,13 +678,25 @@ export const SettingsPage = () => {
 
   return (
     <div className="page-stack settings-page">
-      <SectionHeader title="Settings" />
+      <SectionHeader
+        title="Settings"
+        body="Workspace identity, team, data health and advanced tools — everything that shapes how your studio uses bukowskiOS."
+      />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
       {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
       <div className="settings-shell-layout">
         <nav aria-label="Settings sections" className="settings-section-nav">
+          <button
+            className="settings-section-tab settings-section-tab-link"
+            onClick={() => navigate("/settings/workspace")}
+            type="button"
+          >
+            <span>Workspace</span>
+            <small>Members, roles & invites</small>
+          </button>
+
           {settingsSections.map((section) => (
             <button
               key={section.key}
@@ -696,6 +708,15 @@ export const SettingsPage = () => {
               <small>{section.description}</small>
             </button>
           ))}
+
+          <button
+            className="settings-section-tab settings-section-tab-link"
+            onClick={() => navigate("/settings/sync")}
+            type="button"
+          >
+            <span>Sync activity</span>
+            <small>Outbox & remote status</small>
+          </button>
         </nav>
 
         <div className="settings-content-panel">

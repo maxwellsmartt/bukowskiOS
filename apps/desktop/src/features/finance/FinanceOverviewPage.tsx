@@ -18,6 +18,7 @@ import {
 import type { FinanceOverviewPeriodPreset, FinanceOverviewQuery } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
+import { HelpHint } from "@shared/components/HelpHint";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -200,7 +201,14 @@ export const FinanceOverviewPage = () => {
       </div>
 
       <div className="finance-dashboard-grid">
-        <SurfaceCard title="Exposure by Project">
+        <SurfaceCard
+          title="Exposure by project"
+          aside={
+            <HelpHint
+              body="Exposure is the total estimated cost of open incidents and reserves on each project — money you might still owe if everything resolves badly."
+            />
+          }
+        >
           {isLoading ? (
             <TableSkeleton rows={5} />
           ) : exposureChartRows.length ? (
@@ -229,7 +237,14 @@ export const FinanceOverviewPage = () => {
           )}
         </SurfaceCard>
 
-        <SurfaceCard title="Monthly Burn">
+        <SurfaceCard
+          title="Monthly burn"
+          aside={
+            <HelpHint
+              body="Burn is how much money flowed out of the workspace each month, summed across all projects."
+            />
+          }
+        >
           {isLoading ? (
             <TableSkeleton rows={5} />
           ) : (

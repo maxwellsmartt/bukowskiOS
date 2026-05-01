@@ -70,3 +70,22 @@ export const sendWorkspaceInvite = async (
 
   return { userId: payload.userId };
 };
+
+export type RevokeWorkspaceInviteInput = {
+  membershipId: string;
+};
+
+export const revokeWorkspaceInvite = async (
+  supabase: SupabaseClient,
+  input: RevokeWorkspaceInviteInput,
+): Promise<void> => {
+  const { error: deleteError } = await supabase
+    .from("workspace_memberships")
+    .delete()
+    .eq("id", input.membershipId)
+    .eq("status", "invited");
+
+  if (deleteError) {
+    throw new Error(deleteError.message);
+  }
+};

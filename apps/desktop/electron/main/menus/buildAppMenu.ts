@@ -1,4 +1,4 @@
-import { BrowserWindow, Menu, type MenuItemConstructorOptions } from "electron";
+import { BrowserWindow, Menu, shell, type MenuItemConstructorOptions } from "electron";
 
 import { ipcChannels, type ShellAppAction } from "@contracts";
 
@@ -14,10 +14,13 @@ const sendShellAction = (action: ShellAppAction) => {
   targetWindow.webContents.send(ipcChannels.shell.appAction, action);
 };
 
+const navigate = (path: string): MenuItemConstructorOptions["click"] =>
+  () => sendShellAction({ type: "navigate", path });
+
 const buildGoItem = (label: string, path: string, accelerator?: string): MenuItemConstructorOptions => ({
   label,
   accelerator,
-  click: () => sendShellAction({ type: "navigate", path }),
+  click: navigate(path),
 });
 
 export const buildAppMenu = () =>
@@ -26,10 +29,16 @@ export const buildAppMenu = () =>
       label: "bukowskiOS",
       submenu: [
         { role: "about" },
+        { type: "separator" },
         {
           label: "Settings…",
           accelerator: "CmdOrCtrl+,",
-          click: () => sendShellAction({ type: "navigate", path: "/settings" }),
+          click: navigate("/settings"),
+        },
+        {
+          label: "Workspace settings",
+          accelerator: "CmdOrCtrl+Shift+,",
+          click: navigate("/settings/workspace"),
         },
         { type: "separator" },
         { role: "services" },
@@ -45,9 +54,30 @@ export const buildAppMenu = () =>
       label: "File",
       submenu: [
         {
+          label: "New project",
+          accelerator: "CmdOrCtrl+N",
+          click: navigate("/projects"),
+        },
+        {
+          label: "New asset",
+          accelerator: "CmdOrCtrl+Shift+N",
+          click: navigate("/assets"),
+        },
+        {
+          label: "New finance entry",
+          accelerator: "CmdOrCtrl+Alt+N",
+          click: navigate("/finance/entries"),
+        },
+        { type: "separator" },
+        {
+          label: "Import catalog (CSV)",
+          click: navigate("/catalog"),
+        },
+        { type: "separator" },
+        {
           label: "Settings…",
           accelerator: "CmdOrCtrl+,",
-          click: () => sendShellAction({ type: "navigate", path: "/settings" }),
+          click: navigate("/settings"),
         },
         { type: "separator" },
         { role: "close" },
@@ -89,38 +119,95 @@ export const buildAppMenu = () =>
       label: "Go",
       submenu: [
         {
-          label: "Search",
+          label: "Search…",
           accelerator: "CmdOrCtrl+K",
           click: () => sendShellAction({ type: "open-search" }),
         },
         { type: "separator" },
-        buildGoItem("Overview", "/assets/overview"),
-        buildGoItem("Assets", "/assets"),
-        buildGoItem("Finance", "/finance"),
-        buildGoItem("Mission Control", "/agents/mission-control"),
-        buildGoItem("Agents", "/agents"),
-        buildGoItem("Runs", "/agents/runs"),
-        buildGoItem("Models", "/agents/models"),
-        buildGoItem("Connectors", "/agents/connectors"),
-        buildGoItem("Packing Slips", "/packing-slips"),
-        buildGoItem("Projects", "/projects"),
-        buildGoItem("Incidents", "/incidents"),
+        buildGoItem("Projects", "/projects", "CmdOrCtrl+1"),
+        buildGoItem("Assets", "/assets", "CmdOrCtrl+2"),
+        buildGoItem("Packing slips", "/packing-slips", "CmdOrCtrl+3"),
+        buildGoItem("Incidents", "/incidents", "CmdOrCtrl+4"),
+        buildGoItem("Repair cases", "/rma", "CmdOrCtrl+5"),
+        buildGoItem("Finance", "/finance", "CmdOrCtrl+6"),
+        buildGoItem("Agents", "/agents", "CmdOrCtrl+7"),
+        { type: "separator" },
         buildGoItem("Catalog", "/catalog"),
+        buildGoItem("Compare", "/compare"),
         { type: "separator" },
         buildGoItem("Settings", "/settings"),
+        buildGoItem("Sync activity", "/settings/sync"),
+      ],
+    },
+    {
+      label: "Workspace",
+      submenu: [
+        {
+          label: "Workspace settings",
+          click: navigate("/settings/workspace"),
+        },
+        {
+          label: "Switch workspace…",
+          accelerator: "CmdOrCtrl+Shift+W",
+          click: () => sendShellAction({ type: "switch-workspace" }),
+        },
+        {
+          label: "Create new workspace…",
+          click: navigate("/workspaces/create"),
+        },
+        { type: "separator" },
+        {
+          label: "Invite a teammate",
+          click: navigate("/settings/workspace"),
+        },
+        {
+          label: "Manage members",
+          click: navigate("/settings/workspace"),
+        },
       ],
     },
     {
       label: "Window",
-      submenu: [{ role: "minimize" }, { role: "zoom" }, { type: "separator" }, { role: "front" }, { role: "close" }],
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        {
+          label: "Open assistant chat",
+          accelerator: "CmdOrCtrl+/",
+          click: () => sendShellAction({ type: "open-assistant-chat" }),
+        },
+        { type: "separator" },
+        { role: "front" },
+        { role: "close" },
+      ],
     },
     {
       label: "Help",
       submenu: [
         {
-          label: "Search anything",
+          label: "Replay onboarding tour",
+          click: () => sendShellAction({ type: "open-onboarding" }),
+        },
+        {
+          label: "Search anything…",
           accelerator: "CmdOrCtrl+K",
           click: () => sendShellAction({ type: "open-search" }),
+        },
+        { type: "separator" },
+        {
+          label: "Workspace settings",
+          click: navigate("/settings/workspace"),
+        },
+        {
+          label: "Sync activity",
+          click: navigate("/settings/sync"),
+        },
+        { type: "separator" },
+        {
+          label: "Report an issue",
+          click: () => {
+            void shell.openExternal("https://github.com/anthropics/bukowskios/issues/new");
+          },
         },
       ],
     },

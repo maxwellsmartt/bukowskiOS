@@ -5,7 +5,9 @@ import type { ProjectListQuery, ProjectSortField } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
+import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -61,7 +63,7 @@ export const ProjectsPage = () => {
       includeArchived: showArchived,
     }),
   });
-  const { data, error } = useProjectsRegistry(projectControls.query);
+  const { data, error, isLoading } = useProjectsRegistry(projectControls.query);
   const { activeProjectId, openProject, setActiveProjectId, setShowArchivedProjects } = useShellContext();
   const { addItems, hasItem } = useCompareTray();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
@@ -69,7 +71,7 @@ export const ProjectsPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Projects" />
+      <SectionHeader title="Projects" body="Every shoot or production lives here. Open one to see its assets, crew, incidents and finance." />
 
       {error ? <div className="empty-state">Projects unavailable: {error}</div> : null}
 
@@ -130,6 +132,9 @@ export const ProjectsPage = () => {
             sortDirection={projectControls.sortDirection}
             sortOptions={projectSortOptions}
           />
+          {isLoading && data.length === 0 ? (
+            <TableSkeleton body="Loading projects…" columns={6} />
+          ) : null}
           <DataTable
             activeRowId={activeProjectId}
             autoScrollToActiveRow
@@ -202,6 +207,28 @@ export const ProjectsPage = () => {
               { key: "exposure", label: "Exposure", align: "right", width: 110, minWidth: 96, render: (row) => row.exposure },
               { key: "description", label: "Description", width: 260, minWidth: 220, render: (row) => row.description },
             ]}
+            emptyContent={
+              <GuidedEmptyState
+                title={projectControls.searchValue ? "No matches" : "No projects yet"}
+                body={
+                  projectControls.searchValue
+                    ? "Try a different search term, or clear it to see every project in this workspace."
+                    : "A project groups your shoot, its units, crew and gear. Create the first one to start tracking assets and incidents against it."
+                }
+                tone="subtle"
+                actionLabel={projectControls.searchValue ? "Clear search" : undefined}
+                onAction={projectControls.searchValue ? () => projectControls.setSearchValue("") : undefined}
+                tips={
+                  projectControls.searchValue
+                    ? undefined
+                    : [
+                        "You can create new projects from the sidebar.",
+                        "Use units to split a long shoot into blocks.",
+                        "Archive a project when it wraps — you can always restore it.",
+                      ]
+                }
+              />
+            }
             getRowId={(row) => row.id}
             maxHeight="min(72vh, 760px)"
             onRowClick={(row) => setActiveProjectId(row.id)}
