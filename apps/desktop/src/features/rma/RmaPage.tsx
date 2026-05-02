@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { RmaCaseStatus } from "@contracts";
+import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
@@ -33,8 +34,8 @@ export const RmaPage = () => {
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [initialDraft, setInitialDraft] = useState<RmaCaseEditorInitialDraft | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useToast();
 
   const {
     data: detail,
@@ -96,7 +97,7 @@ export const RmaPage = () => {
         });
 
         await Promise.all([reloadSnapshot(), reloadDetail()]);
-        setFeedback(result.summary);
+        toast.success("Updated", result.summary);
       } else {
         const result = await createRmaCase({
           commandId: crypto.randomUUID(),
@@ -114,7 +115,7 @@ export const RmaPage = () => {
         await reloadSnapshot();
         setPendingRmaCaseId(result.rmaCaseId);
         setActiveRmaCaseId(result.rmaCaseId);
-        setFeedback(result.summary);
+        toast.success("Updated", result.summary);
       }
 
       setEditorError(null);
@@ -154,7 +155,7 @@ export const RmaPage = () => {
       });
 
       await Promise.all([reloadSnapshot(), reloadDetail()]);
-      setFeedback(result.summary);
+      toast.success("Updated", result.summary);
       setEditorError(null);
     } catch (nextError) {
       setEditorError(getUserFacingErrorMessage(nextError, "Unable to update repair status."));
@@ -167,7 +168,7 @@ export const RmaPage = () => {
     setEditorMode("create");
     setInitialDraft(null);
     setEditorError(null);
-    setFeedback(null);
+
   };
 
   const isEmpty = !snapshotError && snapshot.cases.length === 0 && !editorMode;
@@ -181,7 +182,6 @@ export const RmaPage = () => {
       />
 
       {snapshotError ? <div className="action-feedback action-feedback-error">{snapshotError}</div> : null}
-      {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
       {isEmpty ? (
         <GuidedEmptyState

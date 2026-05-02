@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { CatalogSnapshot, ProjectDetailSnapshot } from "@contracts";
 import { projectColorPalette } from "@contracts";
+import { useToast } from "@app/providers/ToastProvider";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -90,9 +91,9 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
   const [unitDraft, setUnitDraft] = useState<UnitDraft>(emptyUnitDraft);
   const [crewDrafts, setCrewDrafts] = useState<Record<string, CrewAssignmentDraft>>({});
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useToast();
   const [pendingUnitAction, setPendingUnitAction] = useState<{
     unit: ProjectDetailSnapshot["units"][number];
     action: "mark_wrapped" | "delete";
@@ -120,7 +121,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       sortOrder: String(units.length + 1),
     });
     setError(null);
-    setFeedback(null);
+
     setWarning(null);
   };
 
@@ -129,7 +130,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
     setEditingUnitId(unit.id);
     setUnitDraft(toDraft(unit));
     setError(null);
-    setFeedback(null);
+
     setWarning(null);
   };
 
@@ -138,7 +139,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
     setEditingUnitId(null);
     setUnitDraft(emptyUnitDraft);
     setError(null);
-    setFeedback(null);
+
     setWarning(null);
   };
 
@@ -175,7 +176,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       await Promise.resolve(onChanged());
       const nextFeedback = editorMode === "create" ? "Unit created." : "Unit updated.";
       resetEditor();
-      setFeedback(nextFeedback);
+      toast.success("Done", nextFeedback);
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, "Unable to save project unit."));
     } finally {
@@ -214,7 +215,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       }
 
       setError(null);
-      setFeedback(action === "delete" ? "Unit deleted." : "Unit updated.");
+      toast.success(action === "delete" ? "Unit deleted" : "Unit updated", action === "delete" ? "The unit and its assignments are gone." : "Changes are now live for the project crew.");
       setWarning(null);
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, "Unable to update unit."));
@@ -240,7 +241,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       await Promise.resolve(onChanged());
       setCrewDrafts((current) => ({ ...current, [unitId]: emptyCrewDraft }));
       setError(null);
-      setFeedback("Crew linked to unit.");
+      toast.success("Crew linked", "Member is now assigned to this unit.");
       setWarning(nextSnapshot.units.find((unit) => unit.id === unitId)?.conflictSummary ?? null);
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, "Unable to assign crew member to unit."));
@@ -259,7 +260,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       });
       await Promise.resolve(onChanged());
       setError(null);
-      setFeedback("Crew assignment removed.");
+      toast.success("Crew removed", "Member is no longer assigned to this unit.");
       setWarning(null);
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, "Unable to remove crew assignment."));
@@ -279,7 +280,6 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
         </button>
       }
     >
-      {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
       {warning ? <div className="action-feedback action-feedback-warning">{warning}</div> : null}
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 

@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Folder } from "lucide-react";
 import { useMemo } from "react";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
 
@@ -129,6 +129,7 @@ export const Breadcrumb = () => {
 
   return (
     <nav aria-label="Breadcrumb" className="breadcrumb-bar">
+      <Folder aria-hidden="true" className="breadcrumb-leading-icon" size={12} />
       {crumbs.map((crumb, index) => {
         const isLast = index === crumbs.length - 1;
         return (

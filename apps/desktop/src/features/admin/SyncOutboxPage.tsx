@@ -11,6 +11,8 @@ import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { getSyncOutboxStatusLabel } from "@shared/labels/statusLabels";
 
+import { SettingsLayout } from "./SettingsLayout";
+
 const emptyDiagnostics: AppDiagnosticsSnapshot = {
   databaseSizeBytes: 0,
   backupSizeBytes: 0,
@@ -249,12 +251,18 @@ export const SyncOutboxPage = () => {
   };
 
   return (
-    <div className="page-stack">
-      <SectionHeader title="Sync Activity" />
+    <div className="page-stack settings-page">
+      <SectionHeader
+        eyebrow="Settings"
+        title="Sync activity"
+        body="Track local changes still on their way to the cloud, retry failed rows and inspect outbox state."
+        titleTone="accent"
+      />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
       {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
+      <SettingsLayout>
       <div className="chip-row">
         <StatusBadge tone={diagnostics.syncOutboxFailedCount ? "critical" : "success"}>
           {diagnostics.syncOutboxFailedCount ? `${diagnostics.syncOutboxFailedCount} failed` : "Up to date"}
@@ -289,9 +297,6 @@ export const SyncOutboxPage = () => {
           type="button"
         >
           {isRetryingVisible ? "Retrying visible rows..." : `Retry visible (${visibleRetryableRows.length})`}
-        </button>
-        <button className="ghost-control" onClick={() => navigate("/settings")} type="button">
-          Back to settings
         </button>
       </div>
 
@@ -418,6 +423,7 @@ export const SyncOutboxPage = () => {
           )}
         </SurfaceCard>
       </ResizableSideRailLayout>
+      </SettingsLayout>
     </div>
   );
 };

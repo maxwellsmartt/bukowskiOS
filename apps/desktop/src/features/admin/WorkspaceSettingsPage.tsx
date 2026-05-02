@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Send } from "lucide-react";
+import { Pencil, Save, Send, X } from "lucide-react";
 
 import type { AppUserAdminRow, AppUsersSnapshot } from "@contracts";
 import { useSession } from "@app/providers/SessionProvider";
@@ -12,7 +11,9 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
+import { CustomRolesEditor } from "./CustomRolesEditor";
 import { InviteMemberDialog } from "./InviteMemberDialog";
+import { SettingsLayout } from "./SettingsLayout";
 import { revokeWorkspaceInvite, sendWorkspaceInvite } from "./inviteService";
 
 const emptyUsersSnapshot: AppUsersSnapshot = { users: [], roles: [] };
@@ -50,14 +51,22 @@ const resolveMembershipLabel = (status: AppUserAdminRow["membershipStatus"]) => 
 };
 
 export const WorkspaceSettingsPage = () => {
-  const navigate = useNavigate();
   const toast = useToast();
   const { supabase, isLocalFallback } = useSession();
-  const { activeWorkspaceId, activeWorkspaceName, activeMembership, memberships } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspaceName, activeMembership, memberships, refreshWorkspaces } = useWorkspace();
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
   const [pendingInvites, setPendingInvites] = useState<PendingInviteRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [workspaceProfile, setWorkspaceProfile] = useState<{
+    name: string;
+    slug: string;
+    baseCurrency: string;
+    iconColor: string | null;
+  } | null>(null);
+  const [isEditingWorkspace, setIsEditingWorkspace] = useState(false);
+  const [workspaceDraft, setWorkspaceDraft] = useState({ name: "", baseCurrency: "USD", iconColor: "" });
+  const [isSavingWorkspace, setIsSavingWorkspace] = useState(false);
 
   const loadPendingInvites = useCallback(async () => {
     if (!supabase || isLocalFallback) {
@@ -117,10 +126,91 @@ export const WorkspaceSettingsPage = () => {
     }
   }, [activeWorkspaceId]);
 
+  const loadWorkspaceProfile = useCallback(async () => {
+    if (!supabase || isLocalFallback || !activeWorkspaceId) {
+      setWorkspaceProfile(null);
+      return;
+    }
+
+    try {
+      const { data, error: queryError } = await supabase
+        .from("workspaces")
+        .select("name,slug,base_currency,icon_color")
+        .eq("id", activeWorkspaceId)
+        .maybeSingle();
+
+      if (queryError || !data) {
+        setWorkspaceProfile(null);
+        return;
+      }
+
+      const profile = {
+        name: (data as { name?: string }).name ?? "",
+        slug: (data as { slug?: string }).slug ?? "",
+        baseCurrency: (data as { base_currency?: string }).base_currency ?? "USD",
+        iconColor: (data as { icon_color?: string | null }).icon_color ?? null,
+      };
+
+      setWorkspaceProfile(profile);
+      setWorkspaceDraft({
+        name: profile.name,
+        baseCurrency: profile.baseCurrency,
+        iconColor: profile.iconColor ?? "",
+      });
+    } catch {
+      setWorkspaceProfile(null);
+    }
+  }, [activeWorkspaceId, isLocalFallback, supabase]);
+
   useEffect(() => {
     void loadMembers();
     void loadPendingInvites();
-  }, [loadMembers, loadPendingInvites]);
+    void loadWorkspaceProfile();
+  }, [loadMembers, loadPendingInvites, loadWorkspaceProfile]);
+
+  const handleSaveWorkspace = async () => {
+    if (!supabase || !workspaceProfile) {
+      return;
+    }
+
+    const nextName = workspaceDraft.name.trim();
+    const nextBaseCurrency = workspaceDraft.baseCurrency.trim().toUpperCase();
+    const nextIconColor = workspaceDraft.iconColor.trim() || null;
+
+    if (!nextName || !nextBaseCurrency) {
+      toast.error("Cannot save", "Name and currency are required.");
+      return;
+    }
+
+    setIsSavingWorkspace(true);
+
+    try {
+      const updatePayload = {
+        name: nextName,
+        base_currency: nextBaseCurrency,
+        icon_color: nextIconColor,
+        updated_at: new Date().toISOString(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const looseSupabase = supabase as any;
+      const { error: updateError } = await looseSupabase
+        .from("workspaces")
+        .update(updatePayload)
+        .eq("id", activeWorkspaceId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      toast.success("Workspace updated", "Identity changes apply right away across the app.");
+      setIsEditingWorkspace(false);
+      await Promise.all([loadWorkspaceProfile(), refreshWorkspaces()]);
+    } catch (nextError) {
+      toast.error("Could not save", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+    } finally {
+      setIsSavingWorkspace(false);
+    }
+  };
 
   const teamMembers = usersSnapshot.users.filter((user) => user.membershipStatus !== "missing");
   const inviteRolesForDialog = usersSnapshot.roles;
@@ -159,46 +249,126 @@ export const WorkspaceSettingsPage = () => {
   };
 
   return (
-    <div className="page-stack">
-      <div className="settings-back-row">
-        <button className="ghost-control" onClick={() => navigate("/settings")} type="button">
-          <ArrowLeft size={14} />
-          <span>All settings</span>
-        </button>
-      </div>
-
+    <div className="page-stack settings-page">
       <SectionHeader
         eyebrow="Workspace"
         title={activeWorkspaceName}
-        body="Workspace identity, currency, color and members. Editing the name, currency or icon will be enabled in the next release."
+        body="Workspace identity, members, invites and roles."
         titleTone="accent"
       />
 
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
-      <SurfaceCard title="Workspace details">
-        <div className="summary-grid compact-summary-grid">
-          <div className="summary-row">
-            <span className="summary-label">Name</span>
-            <span className="summary-value">{activeWorkspaceName}</span>
+      <SettingsLayout>
+
+      <SurfaceCard
+        title="Workspace details"
+        aside={
+          workspaceProfile && !isEditingWorkspace && !isLocalFallback ? (
+            <button className="ghost-control" onClick={() => setIsEditingWorkspace(true)} type="button">
+              <Pencil size={13} />
+              <span>Edit</span>
+            </button>
+          ) : null
+        }
+      >
+        {isEditingWorkspace && workspaceProfile ? (
+          <div className="agent-form-grid">
+            <label className="field-block">
+              <span className="field-label">Workspace name</span>
+              <input
+                className="field-input"
+                onChange={(event) => setWorkspaceDraft((current) => ({ ...current, name: event.target.value }))}
+                value={workspaceDraft.name}
+              />
+            </label>
+            <label className="field-block">
+              <span className="field-label">Base currency (ISO)</span>
+              <input
+                className="field-input"
+                maxLength={3}
+                onChange={(event) =>
+                  setWorkspaceDraft((current) => ({ ...current, baseCurrency: event.target.value.toUpperCase() }))
+                }
+                placeholder="USD"
+                value={workspaceDraft.baseCurrency}
+              />
+            </label>
+            <label className="field-block">
+              <span className="field-label">Icon color (hex, optional)</span>
+              <input
+                className="field-input"
+                onChange={(event) => setWorkspaceDraft((current) => ({ ...current, iconColor: event.target.value }))}
+                placeholder="#d6b37a"
+                value={workspaceDraft.iconColor}
+              />
+            </label>
+            <div className="surface-card-actions" style={{ gridColumn: "1 / -1", justifyContent: "flex-end" }}>
+              <button
+                className="ghost-control"
+                disabled={isSavingWorkspace}
+                onClick={() => {
+                  setIsEditingWorkspace(false);
+                  if (workspaceProfile) {
+                    setWorkspaceDraft({
+                      name: workspaceProfile.name,
+                      baseCurrency: workspaceProfile.baseCurrency,
+                      iconColor: workspaceProfile.iconColor ?? "",
+                    });
+                  }
+                }}
+                type="button"
+              >
+                <X size={13} />
+                <span>Cancel</span>
+              </button>
+              <button
+                className="action-primary-button"
+                disabled={isSavingWorkspace}
+                onClick={() => void handleSaveWorkspace()}
+                type="button"
+              >
+                <Save size={13} />
+                <span>{isSavingWorkspace ? "Saving…" : "Save changes"}</span>
+              </button>
+            </div>
           </div>
-          <div className="summary-row">
-            <span className="summary-label">Workspace ID</span>
-            <span className="summary-value">{activeWorkspaceId}</span>
+        ) : (
+          <div className="summary-grid compact-summary-grid">
+            <div className="summary-row">
+              <span className="summary-label">Name</span>
+              <span className="summary-value">{workspaceProfile?.name ?? activeWorkspaceName}</span>
+            </div>
+            <div className="summary-row">
+              <span className="summary-label">Slug</span>
+              <span className="summary-value">{workspaceProfile?.slug ?? "—"}</span>
+            </div>
+            <div className="summary-row">
+              <span className="summary-label">Base currency</span>
+              <span className="summary-value">{workspaceProfile?.baseCurrency ?? "USD"}</span>
+            </div>
+            <div className="summary-row">
+              <span className="summary-label">Icon color</span>
+              <span className="summary-value">{workspaceProfile?.iconColor ?? "Default"}</span>
+            </div>
+            <div className="summary-row">
+              <span className="summary-label">Workspace ID</span>
+              <span className="summary-value">{activeWorkspaceId}</span>
+            </div>
+            <div className="summary-row">
+              <span className="summary-label">Your role</span>
+              <span className="summary-value">{activeMembership?.roleName ?? "Member"}</span>
+            </div>
+            <div className="summary-row">
+              <span className="summary-label">Your access</span>
+              <span className="summary-value">
+                {activeMembership?.permissions.length
+                  ? `${activeMembership.permissions.length} permissions`
+                  : "Pending — refresh the workspace if this stays empty"}
+              </span>
+            </div>
           </div>
-          <div className="summary-row">
-            <span className="summary-label">Your role</span>
-            <span className="summary-value">{activeMembership?.roleName ?? "Member"}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label">Your access</span>
-            <span className="summary-value">
-              {activeMembership?.permissions.length
-                ? `${activeMembership.permissions.length} permissions`
-                : "Pending — refresh the workspace if this stays empty"}
-            </span>
-          </div>
-        </div>
+        )}
       </SurfaceCard>
 
       <SurfaceCard
@@ -299,6 +469,10 @@ export const WorkspaceSettingsPage = () => {
         )}
       </SurfaceCard>
 
+      {supabase && !isLocalFallback ? (
+        <CustomRolesEditor supabase={supabase} workspaceId={activeWorkspaceId} />
+      ) : null}
+
       {memberships.length > 1 ? (
         <SurfaceCard title="Switch workspace">
           <p className="surface-card-subtitle">You belong to {memberships.length} workspaces.</p>
@@ -312,6 +486,8 @@ export const WorkspaceSettingsPage = () => {
           </ul>
         </SurfaceCard>
       ) : null}
+
+      </SettingsLayout>
 
       <InviteMemberDialog
         isOpen={inviteOpen}

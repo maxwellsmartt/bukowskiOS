@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import type { ProjectDetailSnapshot } from "@contracts";
+import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
@@ -45,8 +46,8 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   const [selectedIncidentIds, setSelectedIncidentIds] = useState<string[]>([]);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
-  const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useToast();
 
   if (error) {
     return <div className="empty-state">Project detail unavailable: {error}</div>;
@@ -94,7 +95,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               onClick={() => {
                 setReportOpen(true);
                 setReportError(null);
-                setReportFeedback(null);
+
               }}
               type="button"
             >
@@ -129,7 +130,6 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
       </SurfaceCard>
 
       {catalogError ? <div className="empty-state">Incident catalog unavailable: {catalogError}</div> : null}
-      {reportFeedback ? <div className="action-feedback action-feedback-success">{reportFeedback}</div> : null}
 
       {reportOpen ? (
         <IncidentReportPanel
@@ -173,7 +173,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               await Promise.all([Promise.resolve(onIncidentCreated()), refreshProjects()]);
               setReportOpen(false);
               setReportError(null);
-              setReportFeedback(result.summary);
+              toast.success("Incident reported", result.summary);
             } catch (nextError) {
               setReportError(getUserFacingErrorMessage(nextError, "Unable to create incident."));
             } finally {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, HelpCircle, Keyboard, RefreshCcw, Settings as SettingsIcon, X } from "lucide-react";
+import { HelpCircle, Keyboard, RefreshCcw, Settings as SettingsIcon, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { triggerOnboardingTour } from "./OnboardingTour";
@@ -81,14 +81,12 @@ export const HelpMenu = () => {
       <button
         aria-expanded={open}
         aria-label={open ? "Close help" : "Open help"}
-        className={`ghost-control help-menu-trigger${open ? " is-open" : ""}`}
+        className={`icon-ghost-control help-menu-trigger${open ? " is-open" : ""}`}
         data-tooltip="Help & tour"
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
-        <HelpCircle size={13} />
-        <span>Help</span>
-        <ChevronDown size={11} />
+        <HelpCircle size={14} />
       </button>
 
       {open ? (

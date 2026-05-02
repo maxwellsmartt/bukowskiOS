@@ -32,16 +32,14 @@ export const WorkspaceSwitcher = () => {
     <div className="workspace-switcher" ref={switcherRef}>
       <button
         aria-expanded={open}
+        aria-label={`Switch workspace · current: ${activeWorkspaceName}`}
         className="workspace-switcher-trigger"
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
         <span className="workspace-avatar">{activeWorkspaceName.slice(0, 1).toUpperCase()}</span>
-        <span className="context-meta-stack">
-          <span className="context-meta-label">Workspace</span>
-          <span className="context-meta-value">{activeWorkspaceName}</span>
-        </span>
-        <ChevronDown size={13} />
+        <span className="workspace-switcher-name">{activeWorkspaceName}</span>
+        <ChevronDown className="workspace-switcher-chevron" size={13} />
       </button>
 
       {open ? (

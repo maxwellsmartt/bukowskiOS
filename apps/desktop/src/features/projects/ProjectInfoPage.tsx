@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { projectColorPalette } from "@contracts";
+import { useToast } from "@app/providers/ToastProvider";
 import { SelectField } from "@shared/components/SelectField";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -23,6 +24,7 @@ const normalizeOptional = (value: string) => {
 export const ProjectInfoPage = () => {
   const { project, projectId } = useProjectMode();
   const [searchParams] = useSearchParams();
+  const toast = useToast();
   const { data, error, isLoading, reload } = useProjectDetail(projectId);
   const { data: catalog } = useCatalogData();
   const { refreshProjects, updateProject } = useShellContext();
@@ -40,7 +42,6 @@ export const ProjectInfoPage = () => {
   const [preproductionEndDate, setPreproductionEndDate] = useState("");
   const [colorKey, setColorKey] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const focusedUnitId = searchParams.get("unit");
 
@@ -97,10 +98,9 @@ export const ProjectInfoPage = () => {
       });
       await Promise.all([reload(), refreshProjects()]);
       setSaveError(null);
-      setSaveFeedback("Project details updated.");
+      toast.success("Project saved", "Project details updated.");
     } catch (nextError) {
       setSaveError(getUserFacingErrorMessage(nextError, "Unable to update project details."));
-      setSaveFeedback(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -111,7 +111,6 @@ export const ProjectInfoPage = () => {
       <SectionHeader title="Details" />
 
       <div className="project-workspace-scroll">
-        {saveFeedback ? <div className="action-feedback action-feedback-success">{saveFeedback}</div> : null}
         {saveError ? <div className="action-feedback action-feedback-error">{saveError}</div> : null}
 
         <div className="project-detail-support-grid">

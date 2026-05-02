@@ -16,6 +16,7 @@ import {
 } from "recharts";
 
 import type { FinanceOverviewPeriodPreset, FinanceOverviewQuery } from "@contracts";
+import { useToast } from "@app/providers/ToastProvider";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { HelpHint } from "@shared/components/HelpHint";
@@ -76,11 +77,11 @@ const ChartTooltip = ({
 };
 
 export const FinanceOverviewPage = () => {
+  const toast = useToast();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [period, setPeriod] = useState<FinanceOverviewPeriodPreset>("month");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
-  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const isCustomRangeReady = period !== "custom" || (Boolean(customStartDate) && Boolean(customEndDate));
@@ -118,9 +119,8 @@ export const FinanceOverviewPage = () => {
       setIsExportingPdf(true);
       const result = await exportFinanceReportPdf(overviewQuery);
       setExportError(null);
-      setExportFeedback(result.summary);
+      toast.success("Report exported", result.summary);
     } catch (nextError) {
-      setExportFeedback(null);
       setExportError(getUserFacingErrorMessage(nextError, "Unable to export finance report PDF."));
     } finally {
       setIsExportingPdf(false);
@@ -132,7 +132,6 @@ export const FinanceOverviewPage = () => {
       <SectionHeader title="Finance" />
 
       {error ? <div className="empty-state">Finance overview unavailable: {error}</div> : null}
-      {exportFeedback ? <div className="action-feedback action-feedback-success">{exportFeedback}</div> : null}
       {exportError ? <div className="action-feedback action-feedback-error">{exportError}</div> : null}
 
       <SurfaceCard

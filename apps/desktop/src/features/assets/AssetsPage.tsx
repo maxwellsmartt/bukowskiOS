@@ -3,6 +3,7 @@ import { ClipboardList, FileUp, Plus, SquarePen, Trash2, X } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 
 import type { AssetListQuery, AssetListRow, AssetSortField } from "@contracts";
+import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { PackingSlipBuilderPanel, type PackingSlipBuilderDraft } from "@features/packing/PackingSlipBuilderPanel";
@@ -886,8 +887,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [packingPanelOpen, setPackingPanelOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [packingError, setPackingError] = useState<string | null>(null);
-  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [actionWarning, setActionWarning] = useState<string | null>(null);
+  const toast = useToast();
   const [assignNextStep, setAssignNextStep] = useState<{ projectId: string; projectName: string } | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const [isSubmittingPacking, setIsSubmittingPacking] = useState(false);
@@ -1061,7 +1062,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       await Promise.all([reload(), refreshProjects()]);
       setActionError(null);
-      setActionFeedback(result.summary);
+      toast.success("Done", result.summary);
       setActionWarning(result.warningSummary ?? null);
       setActionPanelOpen(false);
       if (formValue.mode === "assign" && formValue.projectId) {
@@ -1101,7 +1102,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       await Promise.all([reload(), refreshProjects()]);
       writePreference(uiPreferenceKeys.activePackingSlipId, result.packingSlipId);
       setPackingError(null);
-      setActionFeedback(result.summary);
+      toast.success("Done", result.summary);
       setActionWarning(null);
       setAssignNextStep(null);
       setPackingPanelOpen(false);
@@ -1130,7 +1131,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         });
 
         await Promise.all([reload(), refreshProjects(), reloadEditorDetail()]);
-        setActionFeedback(result.summary);
+        toast.success("Done", result.summary);
         setActionWarning(null);
       } else {
         const result = await createAsset({
@@ -1144,7 +1145,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
         await Promise.all([reload(), refreshProjects()]);
         setSelectedAssetId(result.assetId);
-        setActionFeedback(result.summary);
+        toast.success("Done", result.summary);
         setActionWarning(null);
       }
 
@@ -1176,7 +1177,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setEditorMode(null);
       setSelectedAssetId(null);
       setEditorError(null);
-      setActionFeedback(result.summary);
+      toast.success("Done", result.summary);
       setActionWarning(null);
     } catch (nextError) {
       setEditorError(getUserFacingErrorMessage(nextError, "Unable to archive asset."));
@@ -1192,7 +1193,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
     try {
       setEditorError(null);
-      setActionFeedback(null);
+
       setActionWarning(null);
       const csvText = await file.text();
       setCsvImportPreview(buildAssetCsvPreview({ assets, catalog, csvText, fileName: file.name }));
@@ -1215,7 +1216,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     try {
       setIsImportingAssets(true);
       setEditorError(null);
-      setActionFeedback(null);
+
       setActionWarning(null);
       const existingCodes = new Set(assets.map((asset) => asset.code.trim().toUpperCase()).filter(Boolean));
       const readyRowNumbers =
@@ -1281,7 +1282,8 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         setCsvImportPreview(null);
         setCsvShowAllRows(false);
       }
-      setActionFeedback(
+      toast.success(
+        "CSV imported",
         `Imported ${importedCount} asset${importedCount === 1 ? "" : "s"} from ${csvImportPreview.fileName}.${
           csvImportPreview.summary.duplicateRows
             ? ` Merged ${csvImportPreview.summary.duplicateRows} duplicate CSV row${
@@ -1479,7 +1481,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       ) : null}
 
       {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
-      {actionFeedback ? <div className="action-feedback action-feedback-success">{actionFeedback}</div> : null}
       {assignNextStep && selectedRowIds.length ? (
         <div className="selection-action-bar asset-next-step-bar">
           <div className="selection-action-copy">
@@ -2036,13 +2037,13 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 setPackingPanelOpen(true);
                 setActionPanelOpen(false);
                 setPackingError(null);
-                setActionFeedback(null);
+
               }}
               onCreateRma={() => navigate("/incidents")}
               onOpenAssignMove={() => {
                 setActionPanelOpen(true);
                 setPackingPanelOpen(false);
-                setActionFeedback(null);
+
                 setAssignNextStep(null);
               }}
               onOpenAssetDetail={(assetId) => navigate(`/assets/${assetId}?report=incident`)}
@@ -2154,13 +2155,13 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       disabled={isUploadingPreviewImages || activeAssetImageSlots <= 0}
                       onClick={() => {
                         setActionError(null);
-                        setActionFeedback(null);
+
                         void (async () => {
                           try {
                             setIsUploadingPreviewImages(true);
                             const result = await uploadAssetImages(activeAsset.id);
                             await Promise.all([reloadSelectedAssetDetail(), reload()]);
-                            setActionFeedback(result.summary);
+                            toast.success("Done", result.summary);
                           } catch (nextError) {
                             setActionError(getUserFacingErrorMessage(nextError, "Unable to add images to this asset."));
                           } finally {

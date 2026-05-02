@@ -2,6 +2,7 @@ import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
+import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
@@ -59,6 +60,7 @@ const isAssetImageFile = (file: { mimeType: string }) => file.mimeType.startsWit
 export const AssetDetailPage = () => {
   const { assetId } = useParams();
   const [searchParams] = useSearchParams();
+  const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const { data, reload } = useAssetDetail(assetId);
   const { projects, refreshProjects } = useShellContext();
@@ -71,13 +73,10 @@ export const AssetDetailPage = () => {
   });
   const [reportOpen, setReportOpen] = useState(() => searchParams.get("report") === "incident");
   const [reportError, setReportError] = useState<string | null>(null);
-  const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorError, setEditorError] = useState<string | null>(null);
-  const [editorFeedback, setEditorFeedback] = useState<string | null>(null);
   const [filesError, setFilesError] = useState<string | null>(null);
-  const [filesFeedback, setFilesFeedback] = useState<string | null>(null);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [openingFileId, setOpeningFileId] = useState<string | null>(null);
@@ -93,13 +92,13 @@ export const AssetDetailPage = () => {
 
     const target = pendingImageDelete;
     setFilesError(null);
-    setFilesFeedback(null);
+    
 
     try {
       setDeletingFileId(target.id);
       const result = await deleteAssetFile(target.id);
       await reload();
-      setFilesFeedback(result.summary);
+      toast.success("Files updated", result.summary);
     } catch (nextError) {
       setFilesError(getUserFacingErrorMessage(nextError, "Unable to remove that asset image."));
     } finally {
@@ -127,7 +126,7 @@ export const AssetDetailPage = () => {
           onClick={() => {
             setEditorOpen(true);
             setEditorError(null);
-            setEditorFeedback(null);
+
           }}
           type="button"
         >
@@ -138,7 +137,7 @@ export const AssetDetailPage = () => {
           onClick={() => {
             setReportOpen(true);
             setReportError(null);
-            setReportFeedback(null);
+
           }}
           type="button"
         >
@@ -212,9 +211,6 @@ export const AssetDetailPage = () => {
       </SurfaceCard>
 
       {catalogError ? <div className="empty-state">Incident catalog unavailable: {catalogError}</div> : null}
-      {reportFeedback ? <div className="action-feedback action-feedback-success">{reportFeedback}</div> : null}
-      {editorFeedback ? <div className="action-feedback action-feedback-success">{editorFeedback}</div> : null}
-      {filesFeedback ? <div className="action-feedback action-feedback-success">{filesFeedback}</div> : null}
       {filesError ? <div className="action-feedback action-feedback-error">{filesError}</div> : null}
       <SurfaceCard
         title="Asset images"
@@ -224,7 +220,7 @@ export const AssetDetailPage = () => {
             disabled={isUploadingImages || remainingImageSlots <= 0}
             onClick={() => {
               setFilesError(null);
-              setFilesFeedback(null);
+              
               void (async () => {
                 try {
                   setIsUploadingImages(true);
@@ -232,7 +228,7 @@ export const AssetDetailPage = () => {
                   if (result.uploadedCount > 0) {
                     await reload();
                   }
-                  setFilesFeedback(result.summary);
+                  toast.success("Files updated", result.summary);
                 } catch (nextError) {
                   setFilesError(getUserFacingErrorMessage(nextError, "Unable to add images to this asset."));
                 } finally {
@@ -324,7 +320,7 @@ export const AssetDetailPage = () => {
               await Promise.all([reload(), refreshProjects()]);
               setEditorOpen(false);
               setEditorError(null);
-              setEditorFeedback(result.summary);
+              toast.success("Asset saved", result.summary);
             } catch (nextError) {
               setEditorError(getUserFacingErrorMessage(nextError, "Unable to archive asset."));
             } finally {
@@ -351,7 +347,7 @@ export const AssetDetailPage = () => {
               await Promise.all([reload(), refreshProjects()]);
               setEditorOpen(false);
               setEditorError(null);
-              setEditorFeedback(result.summary);
+              toast.success("Asset saved", result.summary);
             } catch (nextError) {
               setEditorError(getUserFacingErrorMessage(nextError, "Unable to save asset changes."));
             } finally {
@@ -406,7 +402,7 @@ export const AssetDetailPage = () => {
               await Promise.all([reload(), refreshProjects()]);
               setReportOpen(false);
               setReportError(null);
-              setReportFeedback(result.summary);
+              toast.success("Incident reported", result.summary);
             } catch (nextError) {
               setReportError(getUserFacingErrorMessage(nextError, "Unable to create incident."));
             } finally {
@@ -556,7 +552,7 @@ export const AssetDetailPage = () => {
                 disabled={isUploadingFiles}
                 onClick={() => {
                   setFilesError(null);
-                  setFilesFeedback(null);
+                  
                   void (async () => {
                     try {
                       setIsUploadingFiles(true);
@@ -564,7 +560,7 @@ export const AssetDetailPage = () => {
                       if (result.uploadedCount > 0) {
                         await reload();
                       }
-                      setFilesFeedback(result.summary);
+                      toast.success("Files updated", result.summary);
                     } catch (nextError) {
                       setFilesError(getUserFacingErrorMessage(nextError, "Unable to attach files to this asset."));
                     } finally {

@@ -69,14 +69,7 @@ type UserEditorDraft = {
   linkedCrewMemberId: string;
 };
 
-type SettingsSectionKey = "overview" | "users" | "operations" | "advanced";
-
-const settingsSections: Array<{ key: SettingsSectionKey; label: string; description: string }> = [
-  { key: "overview", label: "General", description: "Workspace status" },
-  { key: "users", label: "Team", description: "Users and roles" },
-  { key: "operations", label: "Data", description: "Backups and sync" },
-  { key: "advanced", label: "Advanced", description: "Support tools" },
-];
+import { SettingsLayout, useActiveSettingsSection } from "./SettingsLayout";
 
 const roleCoverageGroups = [
   { label: "Assets", keys: ["assets.read", "assets.manage"] },
@@ -266,7 +259,7 @@ export const SettingsPage = () => {
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
   const [supportSnapshot, setSupportSnapshot] = useState<AppSupportSnapshot>(emptySupportSnapshot);
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
-  const [activeSection, setActiveSection] = useState<SettingsSectionKey>("overview");
+  const activeSection = useActiveSettingsSection();
   const [roleDirectoryId, setRoleDirectoryId] = useState<string>("");
   const [selectedUserId, setSelectedUserId] = useState<string>("new");
   const [userDraft, setUserDraft] = useState<UserEditorDraft>(buildUserDraft(null, []));
@@ -686,42 +679,9 @@ export const SettingsPage = () => {
       {error ? <div className="form-inline-error">{error}</div> : null}
       {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
-      <div className="settings-shell-layout">
-        <nav aria-label="Settings sections" className="settings-section-nav">
-          <button
-            className="settings-section-tab settings-section-tab-link"
-            onClick={() => navigate("/settings/workspace")}
-            type="button"
-          >
-            <span>Workspace</span>
-            <small>Members, roles & invites</small>
-          </button>
+      <SettingsLayout>
 
-          {settingsSections.map((section) => (
-            <button
-              key={section.key}
-              className={`settings-section-tab${activeSection === section.key ? " is-active" : ""}`}
-              onClick={() => setActiveSection(section.key)}
-              type="button"
-            >
-              <span>{section.label}</span>
-              <small>{section.description}</small>
-            </button>
-          ))}
-
-          <button
-            className="settings-section-tab settings-section-tab-link"
-            onClick={() => navigate("/settings/sync")}
-            type="button"
-          >
-            <span>Sync activity</span>
-            <small>Outbox & remote status</small>
-          </button>
-        </nav>
-
-        <div className="settings-content-panel">
-
-      {activeSection === "overview" ? (
+      {activeSection === "general" ? (
         <div className="page-stack">
           <div className="settings-health-grid">
             {settingsHealthCards.map((card) => (
@@ -735,7 +695,7 @@ export const SettingsPage = () => {
         </div>
       ) : null}
 
-      {activeSection === "users" ? (
+      {activeSection === "team" ? (
         <div className="page-stack">
           <div className="settings-team-metrics">
             {teamSummaryRows.map((row) => (
@@ -961,7 +921,7 @@ export const SettingsPage = () => {
         </div>
       ) : null}
 
-      {activeSection === "operations" ? (
+      {activeSection === "data" ? (
         <div className="settings-data-stack">
           <SurfaceCard title="Data health" subtitle="Use these actions before exports, handoffs or troubleshooting.">
             <div className="summary-grid">
@@ -1168,8 +1128,7 @@ export const SettingsPage = () => {
 
         </div>
       ) : null}
-        </div>
-      </div>
+      </SettingsLayout>
       <ConfirmDialog
         body={
           selectedUser

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import type { PackingSlipListQuery, PackingSlipSortField } from "@contracts";
+import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
 import { ListToolbar } from "@shared/components/ListToolbar";
@@ -71,8 +72,8 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
     readStringPreference(uiPreferenceKeys.activePackingSlipId),
   );
   const [returnError, setReturnError] = useState<string | null>(null);
-  const [returnFeedback, setReturnFeedback] = useState<string | null>(null);
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+  const toast = useToast();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingInsurancePdf, setIsExportingInsurancePdf] = useState(false);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = usePackingDetail(activePackingSlipId);
@@ -113,7 +114,6 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
       />
 
       {error ? <div className="empty-state">Packing slips unavailable: {error}</div> : null}
-      {returnFeedback ? <div className="action-feedback action-feedback-success">{returnFeedback}</div> : null}
       {returnError ? <div className="action-feedback action-feedback-error">{returnError}</div> : null}
 
       <ResizableSideRailLayout
@@ -216,7 +216,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               setIsExportingInsurancePdf(true);
               const result = await exportPackingSlipInsurancePdf(activePackingSlipId);
               setReturnError(null);
-              setReturnFeedback(result.summary);
+              toast.success("Done", result.summary);
             } catch (nextError) {
               setReturnError(getUserFacingErrorMessage(nextError, "Unable to export insurance list PDF."));
             } finally {
@@ -232,7 +232,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               setIsExportingPdf(true);
               const result = await exportPackingSlipPdf(activePackingSlipId);
               setReturnError(null);
-              setReturnFeedback(result.summary);
+              toast.success("Done", result.summary);
             } catch (nextError) {
               setReturnError(getUserFacingErrorMessage(nextError, "Unable to export packing slip PDF."));
             } finally {
@@ -259,7 +259,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
 
               await Promise.all([reload(), reloadDetail()]);
               setReturnError(null);
-              setReturnFeedback(result.summary);
+              toast.success("Done", result.summary);
             } catch (nextError) {
               setReturnError(getUserFacingErrorMessage(nextError, "Unable to register packing return."));
             } finally {
