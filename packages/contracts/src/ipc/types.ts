@@ -116,6 +116,21 @@ export type AppActionResult = {
   diagnostics: AppDiagnosticsSnapshot;
 };
 
+export type AppOperationalBackfillCommand = {
+  workspaceId: string;
+};
+
+export type AppOperationalBackfillResult = AppActionResult & {
+  enqueuedCount: number;
+  skippedCount: number;
+  byEntityType: Array<{
+    entityType: OperationalSnapshotEntityType;
+    scannedCount: number;
+    enqueuedCount: number;
+    skippedCount: number;
+  }>;
+};
+
 export type CatalogPullEntityType = "asset_categories" | "locations" | "clients" | "manufacturers" | "production_companies";
 
 export type AppRemoteCatalogRow = {
@@ -204,6 +219,33 @@ export type AppApplyRemoteAssetSnapshotsResult = {
   skippedDueToOutboxCount: number;
   skippedDueToOlderCount: number;
   missingAssetCount: number;
+  errors: string[];
+  cursorAfter: string | null;
+};
+
+export type OperationalSnapshotEntityType = "project" | "packing_slip" | "incident" | "rma_case";
+
+export type AppRemoteOperationalSnapshotRow = {
+  workspace_id: string;
+  entity_type: OperationalSnapshotEntityType;
+  entity_id: string;
+  snapshot_json: Record<string, unknown>;
+  updated_at: string;
+  deleted_at?: string | null;
+};
+
+export type AppApplyRemoteOperationalSnapshotsCommand = {
+  workspaceId: string;
+  entityType: OperationalSnapshotEntityType;
+  rows: AppRemoteOperationalSnapshotRow[];
+};
+
+export type AppApplyRemoteOperationalSnapshotsResult = {
+  workspaceId: string;
+  entityType: OperationalSnapshotEntityType;
+  appliedCount: number;
+  skippedDueToOutboxCount: number;
+  skippedDueToOlderCount: number;
   errors: string[];
   cursorAfter: string | null;
 };

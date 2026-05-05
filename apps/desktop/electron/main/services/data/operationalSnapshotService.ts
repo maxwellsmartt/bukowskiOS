@@ -1,0 +1,581 @@
+import type { DatabaseSync, SQLInputValue } from "node:sqlite";
+
+import { getDesktopLogger } from "../logger";
+
+const logger = getDesktopLogger("operational-snapshot-service");
+
+export type OperationalSnapshotEntityType = "project" | "packing_slip" | "incident" | "rma_case";
+
+export type RemoteOperationalSnapshotRow = {
+  workspace_id: string;
+  entity_type: OperationalSnapshotEntityType;
+  entity_id: string;
+  snapshot_json: Record<string, unknown>;
+  updated_at: string;
+  deleted_at?: string | null;
+};
+
+export type OperationalSnapshotRecord = {
+  workspace_id: string;
+  entity_type: OperationalSnapshotEntityType;
+  entity_id: string;
+  snapshot_json: Record<string, unknown>;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
+export const enqueueOperationalSnapshotOutbox = (
+  db: DatabaseSync,
+  {
+    workspaceId,
+    entityType,
+    entityId,
+    operationType = "upsert",
+    outboxId,
+    payload = {},
+    updatedAt,
+  }: {
+    workspaceId: string;
+    entityType: OperationalSnapshotEntityType;
+    entityId: string;
+    operationType?: string;
+    outboxId?: string;
+    payload?: Record<string, unknown>;
+    updatedAt: string;
+  },
+) => {
+  db
+    .prepare(
+      `
+        INSERT INTO sync_outbox (
+          id,
+          workspace_id,
+          entity_type,
+          entity_id,
+          event_id,
+          operation_type,
+          payload_json,
+          status,
+          attempt_count,
+          last_error,
+          next_retry_at,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, NULL, ?, ?, 'pending', 0, NULL, NULL, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          payload_json = excluded.payload_json,
+          status = 'pending',
+          last_error = NULL,
+          next_retry_at = NULL,
+          updated_at = excluded.updated_at
+      `,
+    )
+    .run(
+      outboxId ?? `outbox-${entityType}-${entityId}-${updatedAt}`,
+      workspaceId,
+      entityType,
+      entityId,
+      operationType,
+      JSON.stringify(payload),
+      updatedAt,
+      updatedAt,
+    );
+};
+
+type OperationalBackfillEntityResult = {
+  entityType: OperationalSnapshotEntityType;
+  scannedCount: number;
+  enqueuedCount: number;
+  skippedCount: number;
+};
+
+export type OperationalBackfillResult = {
+  workspaceId: string;
+  enqueuedCount: number;
+  skippedCount: number;
+  byEntityType: OperationalBackfillEntityResult[];
+};
+
+export type OperationalSnapshotPullResult = {
+  workspaceId: string;
+  entityType: OperationalSnapshotEntityType;
+  appliedCount: number;
+  skippedDueToOutboxCount: number;
+  skippedDueToOlderCount: number;
+  errors: string[];
+  cursorAfter: string | null;
+};
+
+const entityTables: Record<OperationalSnapshotEntityType, string> = {
+  project: "projects",
+  packing_slip: "packing_slips",
+  incident: "incidents",
+  rma_case: "rma_cases",
+};
+
+const toJsonObject = (value: string | null) => {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+
+const toSqlInputValue = (value: unknown): SQLInputValue => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "number" || typeof value === "string" || typeof value === "bigint") return value;
+  return JSON.stringify(value);
+};
+
+const selectOne = <T extends Record<string, unknown>>(db: DatabaseSync, sql: string, ...params: SQLInputValue[]) =>
+  (db.prepare(sql).get(...params) as T | undefined) ?? null;
+
+const selectMany = <T extends Record<string, unknown>>(db: DatabaseSync, sql: string, ...params: SQLInputValue[]) =>
+  db.prepare(sql).all(...params) as T[];
+
+const filterRowToTable = (db: DatabaseSync, table: string, row: Record<string, unknown>) => {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  const columnNames = new Set(columns.map((column) => column.name));
+  return Object.fromEntries(Object.entries(row).filter(([key]) => columnNames.has(key)));
+};
+
+const upsertRow = (db: DatabaseSync, table: string, row: Record<string, unknown>, conflictColumn = "id") => {
+  const filtered = filterRowToTable(db, table, row);
+  const entries = Object.entries(filtered);
+  if (!entries.length) return;
+
+  const columns = entries.map(([key]) => key);
+  const placeholders = columns.map(() => "?").join(", ");
+  const updates = columns
+    .filter((column) => column !== conflictColumn)
+    .map((column) => `${column} = excluded.${column}`)
+    .join(", ");
+
+  db
+    .prepare(
+      `
+        INSERT INTO ${table} (${columns.join(", ")})
+        VALUES (${placeholders})
+        ON CONFLICT(${conflictColumn}) DO UPDATE SET ${updates || `${conflictColumn} = excluded.${conflictColumn}`}
+      `,
+    )
+    .run(...entries.map(([, value]) => toSqlInputValue(value)));
+};
+
+const hasPendingOutbox = (db: DatabaseSync, workspaceId: string, entityType: OperationalSnapshotEntityType, entityId: string) => {
+  const row = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM sync_outbox
+        WHERE workspace_id = ?
+          AND entity_type = ?
+          AND entity_id = ?
+          AND status IN ('pending', 'processing', 'failed')
+      `,
+    )
+    .get(workspaceId, entityType, entityId) as { count: number };
+  return row.count > 0;
+};
+
+const readLocalUpdatedAt = (
+  db: DatabaseSync,
+  entityType: OperationalSnapshotEntityType,
+  entityId: string,
+) => {
+  if (entityType === "project") {
+    const row = db
+      .prepare(
+        `
+          SELECT MAX(updated_at) AS updated_at
+          FROM (
+            SELECT updated_at FROM projects WHERE id = ?
+            UNION ALL
+            SELECT updated_at FROM project_units WHERE project_id = ?
+            UNION ALL
+            SELECT project_unit_windows.updated_at
+            FROM project_unit_windows
+            JOIN project_units ON project_units.id = project_unit_windows.project_unit_id
+            WHERE project_units.project_id = ?
+            UNION ALL
+            SELECT project_unit_crew_assignments.updated_at
+            FROM project_unit_crew_assignments
+            JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
+            WHERE project_units.project_id = ?
+          )
+        `,
+      )
+      .get(entityId, entityId, entityId, entityId) as { updated_at?: string | null } | undefined;
+    return row?.updated_at ?? null;
+  }
+
+  const table = entityTables[entityType];
+  const row = db.prepare(`SELECT updated_at FROM ${table} WHERE id = ? LIMIT 1`).get(entityId) as
+    | { updated_at?: string | null }
+    | undefined;
+  return row?.updated_at ?? null;
+};
+
+const updateCursor = (
+  db: DatabaseSync,
+  workspaceId: string,
+  entityType: OperationalSnapshotEntityType,
+  cursorAfter: string | null,
+  appliedCount: number,
+  errorMessage: string | null,
+) => {
+  db
+    .prepare(
+      `
+        INSERT INTO sync_pull_cursors (workspace_id, entity_type, last_synced_at, last_pulled_count, last_error, updated_at)
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(workspace_id, entity_type) DO UPDATE SET
+          last_synced_at = excluded.last_synced_at,
+          last_pulled_count = excluded.last_pulled_count,
+          last_error = excluded.last_error,
+          updated_at = CURRENT_TIMESTAMP
+      `,
+    )
+    .run(workspaceId, `${entityType}s`, cursorAfter, appliedCount, errorMessage);
+};
+
+const shouldSkipBackfillOutbox = (
+  db: DatabaseSync,
+  workspaceId: string,
+  entityType: OperationalSnapshotEntityType,
+  entityId: string,
+  updatedAt: string,
+) => {
+  const row = db
+    .prepare(
+      `
+        SELECT status
+        FROM sync_outbox
+        WHERE workspace_id = ?
+          AND entity_type = ?
+          AND entity_id = ?
+          AND operation_type = 'snapshot_backfill'
+          AND updated_at >= ?
+          AND status IN ('pending', 'processing', 'sent')
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, entityType, entityId, updatedAt) as { status: string } | undefined;
+
+  return Boolean(row);
+};
+
+const getBackfillCandidates = (
+  db: DatabaseSync,
+  workspaceId: string,
+  entityType: OperationalSnapshotEntityType,
+) => {
+  if (entityType === "project") {
+    return selectMany<{ id: string; updated_at: string }>(
+      db,
+      `
+        SELECT
+          projects.id,
+          COALESCE(MAX(updated_rows.updated_at), projects.updated_at) AS updated_at
+        FROM projects
+        LEFT JOIN (
+          SELECT project_id, updated_at FROM project_units
+          UNION ALL
+          SELECT project_units.project_id, project_unit_windows.updated_at
+          FROM project_unit_windows
+          JOIN project_units ON project_units.id = project_unit_windows.project_unit_id
+          UNION ALL
+          SELECT project_units.project_id, project_unit_crew_assignments.updated_at
+          FROM project_unit_crew_assignments
+          JOIN project_units ON project_units.id = project_unit_crew_assignments.project_unit_id
+        ) AS updated_rows ON updated_rows.project_id = projects.id
+        WHERE projects.workspace_id = ?
+        GROUP BY projects.id
+        ORDER BY updated_at DESC, projects.id
+      `,
+      workspaceId,
+    );
+  }
+
+  const table = entityTables[entityType];
+  return selectMany<{ id: string; updated_at: string }>(
+    db,
+    `SELECT id, updated_at FROM ${table} WHERE workspace_id = ? ORDER BY updated_at DESC, id`,
+    workspaceId,
+  );
+};
+
+const resolveProjectSnapshot = (db: DatabaseSync, workspaceId: string, projectId: string) => {
+  const project = selectOne(db, "SELECT * FROM projects WHERE id = ? AND workspace_id = ? LIMIT 1", projectId, workspaceId);
+  if (!project) return null;
+  const units = selectMany(db, "SELECT * FROM project_units WHERE project_id = ? ORDER BY sort_order, name", projectId);
+  const unitIds = units.map((unit) => String(unit.id));
+  const placeholders = unitIds.map(() => "?").join(", ");
+
+  return {
+    project,
+    units,
+    unitWindows: unitIds.length
+      ? selectMany(db, `SELECT * FROM project_unit_windows WHERE project_unit_id IN (${placeholders})`, ...unitIds)
+      : [],
+    projectDepartments: selectMany(db, "SELECT * FROM project_departments WHERE project_id = ?", projectId),
+    unitDepartments: unitIds.length
+      ? selectMany(db, `SELECT * FROM project_unit_departments WHERE project_unit_id IN (${placeholders})`, ...unitIds)
+      : [],
+    crewAssignments: unitIds.length
+      ? selectMany(db, `SELECT * FROM project_unit_crew_assignments WHERE project_unit_id IN (${placeholders})`, ...unitIds)
+      : [],
+  };
+};
+
+const resolvePackingSnapshot = (db: DatabaseSync, workspaceId: string, packingSlipId: string) => {
+  const slip = selectOne(db, "SELECT * FROM packing_slips WHERE id = ? AND workspace_id = ? LIMIT 1", packingSlipId, workspaceId);
+  if (!slip) return null;
+  return {
+    packingSlip: slip,
+    items: selectMany(db, "SELECT * FROM packing_slip_items WHERE packing_slip_id = ? ORDER BY id", packingSlipId),
+  };
+};
+
+const resolveIncidentSnapshot = (db: DatabaseSync, workspaceId: string, incidentId: string) => {
+  const incident = selectOne(db, "SELECT * FROM incidents WHERE id = ? AND workspace_id = ? LIMIT 1", incidentId, workspaceId);
+  if (!incident) return null;
+  return {
+    incident,
+    files: selectMany(db, "SELECT * FROM incident_files WHERE incident_id = ? ORDER BY created_at, id", incidentId),
+  };
+};
+
+const resolveRmaSnapshot = (db: DatabaseSync, workspaceId: string, rmaCaseId: string) => {
+  const rmaCase = selectOne(db, "SELECT * FROM rma_cases WHERE id = ? AND workspace_id = ? LIMIT 1", rmaCaseId, workspaceId);
+  if (!rmaCase) return null;
+  return {
+    rmaCase,
+    assets: selectMany(db, "SELECT * FROM rma_case_assets WHERE rma_case_id = ? ORDER BY created_at, id", rmaCaseId),
+  };
+};
+
+export const resolveOperationalSnapshot = (
+  db: DatabaseSync,
+  row: { workspace_id: string; entity_type: string; entity_id: string; updated_at: string },
+): OperationalSnapshotRecord | null => {
+  if (!["project", "packing_slip", "incident", "rma_case"].includes(row.entity_type)) {
+    return null;
+  }
+
+  const entityType = row.entity_type as OperationalSnapshotEntityType;
+  const snapshot =
+    entityType === "project"
+      ? resolveProjectSnapshot(db, row.workspace_id, row.entity_id)
+      : entityType === "packing_slip"
+        ? resolvePackingSnapshot(db, row.workspace_id, row.entity_id)
+        : entityType === "incident"
+          ? resolveIncidentSnapshot(db, row.workspace_id, row.entity_id)
+          : resolveRmaSnapshot(db, row.workspace_id, row.entity_id);
+
+  if (!snapshot) return null;
+
+  return {
+    workspace_id: row.workspace_id,
+    entity_type: entityType,
+    entity_id: row.entity_id,
+    snapshot_json: snapshot,
+    updated_at: row.updated_at,
+    deleted_at: null,
+  };
+};
+
+const applyProjectSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown>) => {
+  const project = snapshot.project as Record<string, unknown> | undefined;
+  if (!project) throw new Error("Project snapshot is missing project.");
+  upsertRow(db, "projects", project);
+  for (const row of (snapshot.units as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "project_units", row);
+  for (const row of (snapshot.unitWindows as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "project_unit_windows", row);
+  for (const row of (snapshot.projectDepartments as Record<string, unknown>[] | undefined) ?? []) {
+    db
+      .prepare(
+        `
+          INSERT OR IGNORE INTO project_departments (project_id, department_id, created_at)
+          VALUES (?, ?, ?)
+        `,
+      )
+      .run(toSqlInputValue(row.project_id), toSqlInputValue(row.department_id), toSqlInputValue(row.created_at));
+  }
+  for (const row of (snapshot.unitDepartments as Record<string, unknown>[] | undefined) ?? []) {
+    db
+      .prepare(
+        `
+          INSERT OR IGNORE INTO project_unit_departments (project_unit_id, department_id, created_at)
+          VALUES (?, ?, ?)
+        `,
+      )
+      .run(toSqlInputValue(row.project_unit_id), toSqlInputValue(row.department_id), toSqlInputValue(row.created_at));
+  }
+  for (const row of (snapshot.crewAssignments as Record<string, unknown>[] | undefined) ?? []) {
+    try {
+      upsertRow(db, "project_unit_crew_assignments", row);
+    } catch {
+      logger.warn("Skipped remote project crew assignment because related crew is unavailable.", { id: row.id });
+    }
+  }
+};
+
+const applyPackingSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown>) => {
+  const slip = snapshot.packingSlip as Record<string, unknown> | undefined;
+  if (!slip) throw new Error("Packing snapshot is missing packingSlip.");
+  upsertRow(db, "packing_slips", slip);
+  for (const row of (snapshot.items as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "packing_slip_items", row);
+};
+
+const applyIncidentSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown>) => {
+  const incident = snapshot.incident as Record<string, unknown> | undefined;
+  if (!incident) throw new Error("Incident snapshot is missing incident.");
+  upsertRow(db, "incidents", incident);
+  for (const row of (snapshot.files as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "incident_files", row);
+};
+
+const applyRmaSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown>) => {
+  const rmaCase = snapshot.rmaCase as Record<string, unknown> | undefined;
+  if (!rmaCase) throw new Error("RMA snapshot is missing rmaCase.");
+  upsertRow(db, "rma_cases", rmaCase);
+  for (const row of (snapshot.assets as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "rma_case_assets", row);
+};
+
+export const createOperationalSnapshotService = (db: DatabaseSync) => ({
+  enqueueBackfill(workspaceId: string): OperationalBackfillResult {
+    const entityTypes: OperationalSnapshotEntityType[] = ["project", "packing_slip", "incident", "rma_case"];
+    const result: OperationalBackfillResult = {
+      workspaceId,
+      enqueuedCount: 0,
+      skippedCount: 0,
+      byEntityType: [],
+    };
+
+    db.exec("BEGIN");
+    try {
+      for (const entityType of entityTypes) {
+        const candidates = getBackfillCandidates(db, workspaceId, entityType);
+        const entityResult: OperationalBackfillEntityResult = {
+          entityType,
+          scannedCount: candidates.length,
+          enqueuedCount: 0,
+          skippedCount: 0,
+        };
+
+        for (const candidate of candidates) {
+          const updatedAt = candidate.updated_at || new Date().toISOString();
+          if (shouldSkipBackfillOutbox(db, workspaceId, entityType, candidate.id, updatedAt)) {
+            entityResult.skippedCount += 1;
+            continue;
+          }
+
+          enqueueOperationalSnapshotOutbox(db, {
+            workspaceId,
+            entityType,
+            entityId: candidate.id,
+            operationType: "snapshot_backfill",
+            outboxId: `outbox-snapshot-backfill-${entityType}-${candidate.id}-${updatedAt}`,
+            payload: { source: "operational_snapshot_backfill" },
+            updatedAt,
+          });
+          entityResult.enqueuedCount += 1;
+        }
+
+        result.enqueuedCount += entityResult.enqueuedCount;
+        result.skippedCount += entityResult.skippedCount;
+        result.byEntityType.push(entityResult);
+      }
+
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      const message = error instanceof Error ? error.message : "Unknown operational snapshot backfill error.";
+      logger.error("Operational snapshot backfill transaction rolled back.", { workspaceId, error: message });
+      throw new Error(message);
+    }
+
+    logger.info("Operational snapshot backfill queued.", result);
+    return result;
+  },
+  applyRemoteSnapshots(
+    workspaceId: string,
+    entityType: OperationalSnapshotEntityType,
+    rows: RemoteOperationalSnapshotRow[],
+  ): OperationalSnapshotPullResult {
+    const result: OperationalSnapshotPullResult = {
+      workspaceId,
+      entityType,
+      appliedCount: 0,
+      skippedDueToOutboxCount: 0,
+      skippedDueToOlderCount: 0,
+      errors: [],
+      cursorAfter: null,
+    };
+
+    db.exec("BEGIN");
+    try {
+      for (const row of rows) {
+        if (row.workspace_id !== workspaceId || row.entity_type !== entityType) continue;
+
+        if (!result.cursorAfter || row.updated_at > result.cursorAfter) {
+          result.cursorAfter = row.updated_at;
+        }
+
+        if (hasPendingOutbox(db, workspaceId, entityType, row.entity_id)) {
+          result.skippedDueToOutboxCount += 1;
+          continue;
+        }
+
+        const localUpdatedAt = readLocalUpdatedAt(db, entityType, row.entity_id);
+        if (localUpdatedAt && localUpdatedAt >= row.updated_at) {
+          result.skippedDueToOlderCount += 1;
+          continue;
+        }
+
+        try {
+          if (row.deleted_at) {
+            continue;
+          }
+
+          if (entityType === "project") applyProjectSnapshot(db, row.snapshot_json);
+          if (entityType === "packing_slip") applyPackingSnapshot(db, row.snapshot_json);
+          if (entityType === "incident") applyIncidentSnapshot(db, row.snapshot_json);
+          if (entityType === "rma_case") applyRmaSnapshot(db, row.snapshot_json);
+          result.appliedCount += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unknown operational snapshot error.";
+          result.errors.push(`${row.entity_id}: ${message}`);
+          logger.warn("Operational snapshot row failed.", { entityType, id: row.entity_id, error: message });
+        }
+      }
+
+      updateCursor(db, workspaceId, entityType, result.cursorAfter, result.appliedCount, result.errors[0] ?? null);
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      const message = error instanceof Error ? error.message : "Unknown operational snapshot pull error.";
+      result.errors.push(message);
+      logger.error("Operational snapshot pull transaction rolled back.", { entityType, error: message });
+    }
+
+    return result;
+  },
+  resolveSnapshot(row: { workspace_id: string; entity_type: string; entity_id: string; updated_at: string }) {
+    return resolveOperationalSnapshot(db, row);
+  },
+  readLocalUpdatedAt(entityType: OperationalSnapshotEntityType, entityId: string) {
+    return readLocalUpdatedAt(db, entityType, entityId);
+  },
+});
+
+export const maybeParseOperationalSnapshot = (row: RemoteOperationalSnapshotRow) => ({
+  ...row,
+  snapshot_json:
+    typeof row.snapshot_json === "string"
+      ? (toJsonObject(row.snapshot_json) ?? {})
+      : row.snapshot_json,
+});

@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, CloudDownload, CloudUpload, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CloudDownload, CloudUpload, RefreshCw, Search } from "lucide-react";
 import type { AppActionResult, AppDiagnosticsSnapshot, AppSyncOutboxRow, AppSyncPullCursorRow } from "@contracts";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +8,7 @@ import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLay
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { getSyncOutboxStatusLabel } from "@shared/labels/statusLabels";
@@ -52,10 +53,10 @@ const inboundCoverage = [
   { entityType: "clients", label: "Clients", detail: "Client catalog", status: "active" },
   { entityType: "manufacturers", label: "Manufacturers", detail: "Manufacturer catalog", status: "active" },
   { entityType: "production_companies", label: "Production companies", detail: "Production company catalog", status: "active" },
-  { entityType: "projects", label: "Projects", detail: "Needs remote snapshot tables", status: "planned" },
-  { entityType: "packing_slips", label: "Packing slips", detail: "Needs remote snapshot tables", status: "planned" },
-  { entityType: "incidents", label: "Incidents", detail: "Needs remote snapshot tables", status: "planned" },
-  { entityType: "rma_cases", label: "RMAs", detail: "Needs remote snapshot tables", status: "planned" },
+  { entityType: "projects", label: "Projects", detail: "Project shells, units and crew assignments", status: "active" },
+  { entityType: "packing_slips", label: "Packing slips", detail: "Issued slips, items and returns", status: "active" },
+  { entityType: "incidents", label: "Incidents", detail: "Incident reports and evidence metadata", status: "active" },
+  { entityType: "rma_cases", label: "RMAs", detail: "Manufacturer repair cases and linked assets", status: "active" },
 ] as const;
 
 const formatDateLabel = (value: string | null) => {
@@ -184,6 +185,7 @@ const summarizeSelection = (row: AppSyncOutboxRow | null) => {
 
 export const SyncOutboxPage = () => {
   const navigate = useNavigate();
+  const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
   const [rows, setRows] = useState<AppSyncOutboxRow[]>([]);
   const [pullCursors, setPullCursors] = useState<AppSyncPullCursorRow[]>([]);
@@ -197,6 +199,7 @@ export const SyncOutboxPage = () => {
   const [isRetryingAllFailed, setIsRetryingAllFailed] = useState(false);
   const [isRetryingVisible, setIsRetryingVisible] = useState(false);
   const [isRunningLocalSync, setIsRunningLocalSync] = useState(false);
+  const [isBackfillingOperational, setIsBackfillingOperational] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   const load = async () => {
@@ -342,6 +345,32 @@ export const SyncOutboxPage = () => {
     }
   };
 
+  const backfillOperationalSnapshots = async () => {
+    if (!window.bukowskiApp || !isWorkspaceReady || !activeWorkspaceId) {
+      return;
+    }
+
+    try {
+      setIsBackfillingOperational(true);
+      const result = await window.bukowskiApp.backfillOperationalSnapshots({
+        workspaceId: activeWorkspaceId,
+      });
+      setFeedback(result.summary);
+      setDiagnostics(result.diagnostics);
+      setError(null);
+      const [nextRows, nextPullCursors] = await Promise.all([
+        window.bukowskiApp.getSyncOutboxRows(),
+        window.bukowskiApp.getSyncPullCursors().catch(() => pullCursors),
+      ]);
+      setRows(nextRows);
+      setPullCursors(nextPullCursors);
+    } catch (nextError) {
+      setError(getUserFacingErrorMessage(nextError, "The app could not backfill operational sync snapshots."));
+    } finally {
+      setIsBackfillingOperational(false);
+    }
+  };
+
   return (
     <div className="page-stack settings-page">
       <SectionHeader
@@ -417,6 +446,14 @@ export const SyncOutboxPage = () => {
         >
           {isRetryingVisible ? "Retrying visible..." : `Retry visible (${visibleRetryableRows.length})`}
         </button>
+        <button
+          className="ghost-control"
+          disabled={!isWorkspaceReady || !activeWorkspaceId || isBackfillingOperational || isRunningLocalSync}
+          onClick={() => void backfillOperationalSnapshots()}
+          type="button"
+        >
+          {isBackfillingOperational ? "Backfilling operational..." : "Backfill operational data"}
+        </button>
       </div>
 
       <SurfaceCard title="Download coverage">
@@ -446,37 +483,46 @@ export const SyncOutboxPage = () => {
       <ResizableSideRailLayout className="split-layout" defaultWidth={420} maxWidth={680} minWidth={320} storageKey="sync-outbox-side-rail-width">
         <SurfaceCard title="Upload queue">
           <div className="sync-outbox-toolbar">
-            <div className="sync-outbox-filter-row">
-              {syncFilters.map((item) => (
-                <button
-                  key={item.value}
-                  className={`filter-chip${filter === item.value ? " active" : ""}`}
-                  onClick={() => setFilter(item.value)}
-                  type="button"
+            <div className="sync-outbox-filter-grid">
+              <label className="compact-filter-field">
+                <span>Status</span>
+                <select
+                  className="compact-filter-select"
+                  onChange={(event) => setFilter(event.target.value as SyncFilter)}
+                  value={filter}
                 >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <div className="sync-outbox-filter-row">
-              {entityFilters.map((item) => (
-                <button
-                  key={item}
-                  className={`filter-chip${entityFilter === item ? " active" : ""}`}
-                  onClick={() => setEntityFilter(item)}
-                  type="button"
+                  {syncFilters.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="compact-filter-field">
+                <span>Entity</span>
+                <select
+                  className="compact-filter-select"
+                  onChange={(event) => setEntityFilter(event.target.value)}
+                  value={entityFilter}
                 >
-                  {item === "all" ? "All entities" : formatEntityLabel(item)}
-                </button>
-              ))}
+                  {entityFilters.map((item) => (
+                    <option key={item} value={item}>
+                      {item === "all" ? "All entities" : formatEntityLabel(item)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
-            <input
-              className="text-input sync-outbox-search"
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search upload, operation, payload or error"
-              type="search"
-              value={search}
-            />
+            <label className="list-toolbar-search sync-outbox-search" aria-label="Search upload queue">
+              <Search aria-hidden size={14} />
+              <input
+                className="list-toolbar-search-input"
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search upload, operation, payload or error"
+                type="search"
+                value={search}
+              />
+            </label>
           </div>
 
           <DataTable

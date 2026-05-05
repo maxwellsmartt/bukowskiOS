@@ -22,6 +22,7 @@ import {
 } from "./projectScheduling";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { enqueueOperationalSnapshotOutbox } from "./operationalSnapshotService";
 
 const fallbackWorkspaceId = DEFAULT_WORKSPACE_ID;
 const placeholderTimestamp = "2026-04-09T18:45:00.000Z";
@@ -1796,6 +1797,14 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
         syncPackingSlipItems(nextPackingIdentifiers.packingSlipId, bucket.assetIds);
       });
 
+      enqueueOperationalSnapshotOutbox(db, {
+        workspaceId,
+        entityType: "project",
+        entityId: projectId,
+        updatedAt: now,
+        payload: { projectId, operation: "create" },
+      });
+
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");
@@ -1875,6 +1884,14 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
     if (!result.changes) {
       throw new Error("Project not found.");
     }
+
+    enqueueOperationalSnapshotOutbox(db, {
+      workspaceId,
+      entityType: "project",
+      entityId: input.projectId,
+      updatedAt: now,
+      payload: { projectId: input.projectId, operation: "update" },
+    });
   },
 
   archiveProject(input: ArchiveProjectInput) {
@@ -1884,11 +1901,15 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       return;
     }
 
-    db.prepare("UPDATE projects SET archived_at = ?, updated_at = ? WHERE id = ?").run(
-      new Date().toISOString(),
-      new Date().toISOString(),
-      input.projectId,
-    );
+    const now = new Date().toISOString();
+    db.prepare("UPDATE projects SET archived_at = ?, updated_at = ? WHERE id = ?").run(now, now, input.projectId);
+    enqueueOperationalSnapshotOutbox(db, {
+      workspaceId: project.workspace_id,
+      entityType: "project",
+      entityId: input.projectId,
+      updatedAt: now,
+      payload: { projectId: input.projectId, operation: "archive" },
+    });
   },
 
   unarchiveProject(input: UnarchiveProjectInput) {
@@ -1898,10 +1919,15 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       return;
     }
 
-    db.prepare("UPDATE projects SET archived_at = NULL, updated_at = ? WHERE id = ?").run(
-      new Date().toISOString(),
-      input.projectId,
-    );
+    const now = new Date().toISOString();
+    db.prepare("UPDATE projects SET archived_at = NULL, updated_at = ? WHERE id = ?").run(now, input.projectId);
+    enqueueOperationalSnapshotOutbox(db, {
+      workspaceId: project.workspace_id,
+      entityType: "project",
+      entityId: input.projectId,
+      updatedAt: now,
+      payload: { projectId: input.projectId, operation: "unarchive" },
+    });
   },
 
   deleteProject(input: DeleteProjectInput) {
@@ -2037,6 +2063,14 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
         `,
       ).run(`unit-window-${unitId}-primary`, unitId, startDate, endDate, now, now);
     }
+
+    enqueueOperationalSnapshotOutbox(db, {
+      workspaceId,
+      entityType: "project",
+      entityId: input.projectId,
+      updatedAt: now,
+      payload: { projectId: input.projectId, unitId, operation: "create_unit" },
+    });
   },
 
   updateProjectUnit(input: UpdateProjectUnitInput) {
@@ -2127,11 +2161,21 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
         `,
       ).run(`unit-window-${input.unitId}-primary`, input.unitId, startDate, endDate, now, now);
     }
+
+    enqueueOperationalSnapshotOutbox(db, {
+      workspaceId: project.workspace_id,
+      entityType: "project",
+      entityId: input.projectId,
+      updatedAt: now,
+      payload: { projectId: input.projectId, unitId: input.unitId, operation: "update_unit" },
+    });
   },
 
   deleteProjectUnit(input: DeleteProjectUnitInput) {
+    const project = ensureProjectExists(db, input.projectId);
     ensureProjectUnitExists(db, input.projectId, input.unitId);
     const relationCount = getProjectUnitRelationCount(db, input.unitId);
+    const now = new Date().toISOString();
 
     if (relationCount > 0) {
       throw new Error("This unit already has linked operational records and cannot be deleted yet.");
@@ -2146,6 +2190,14 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       if (!result.changes) {
         throw new Error("Project unit not found.");
       }
+
+      enqueueOperationalSnapshotOutbox(db, {
+        workspaceId: project.workspace_id,
+        entityType: "project",
+        entityId: input.projectId,
+        updatedAt: now,
+        payload: { projectId: input.projectId, unitId: input.unitId, operation: "delete_unit" },
+      });
 
       db.exec("COMMIT");
     } catch (error) {
@@ -2210,10 +2262,20 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
       now,
       now,
     );
+
+    enqueueOperationalSnapshotOutbox(db, {
+      workspaceId,
+      entityType: "project",
+      entityId: input.projectId,
+      updatedAt: now,
+      payload: { projectId: input.projectId, unitId: input.unitId, crewMemberId: input.crewMemberId, operation: "assign_crew" },
+    });
   },
 
   unassignCrewFromProjectUnit(input: UnassignCrewFromProjectUnitInput) {
+    const project = ensureProjectExists(db, input.projectId);
     ensureProjectUnitExists(db, input.projectId, input.unitId);
+    const now = new Date().toISOString();
     const result = db
       .prepare(
         `
@@ -2227,5 +2289,13 @@ export const createProjectMutationService = (db: DatabaseSync, options: ProjectM
     if (!result.changes) {
       throw new Error("Crew assignment not found.");
     }
+
+    enqueueOperationalSnapshotOutbox(db, {
+      workspaceId: project.workspace_id,
+      entityType: "project",
+      entityId: input.projectId,
+      updatedAt: now,
+      payload: { projectId: input.projectId, unitId: input.unitId, assignmentId: input.assignmentId, operation: "unassign_crew" },
+    });
   },
 });

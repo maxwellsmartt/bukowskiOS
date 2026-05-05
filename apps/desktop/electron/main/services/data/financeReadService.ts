@@ -1,16 +1,17 @@
 import fs from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 
-import type {
-  FinancialDocumentRow,
-  FinanceCostLinkRow,
-  FinanceEntryListQuery,
-  FinanceEntryRow,
-  FinanceEntrySortField,
-  FinanceOverviewQuery,
-  FinanceOverviewSnapshot,
-  ListSortDirection,
-  ProjectExposureRow,
+import {
+  DEFAULT_WORKSPACE_ID,
+  type FinancialDocumentRow,
+  type FinanceCostLinkRow,
+  type FinanceEntryListQuery,
+  type FinanceEntryRow,
+  type FinanceEntrySortField,
+  type FinanceOverviewQuery,
+  type FinanceOverviewSnapshot,
+  type ListSortDirection,
+  type ProjectExposureRow,
 } from "@contracts";
 import { endOfMonth, endOfQuarter, endOfYear, format, startOfMonth, startOfQuarter, startOfYear, subMonths } from "date-fns";
 
@@ -82,9 +83,11 @@ const buildMonthlyWindows = (months: number) =>
   });
 
 const maxInlinePreviewBytes = 5 * 1024 * 1024;
+const resolveWorkspaceId = (workspaceId?: string | null) => workspaceId?.trim() || DEFAULT_WORKSPACE_ID;
 
 export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps) => ({
   getFinanceOverview(query?: FinanceOverviewQuery): FinanceOverviewSnapshot {
+    const workspaceId = resolveWorkspaceId(query?.workspaceId);
     const window = resolveFinanceOverviewWindow(query);
     const incidentExposure = db
       .prepare(
@@ -92,11 +95,12 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
           SELECT COALESCE(SUM(cost_estimate), 0) AS amount
           FROM incidents
           WHERE status IN ('Open', 'In review')
+            AND workspace_id = ?
             AND reported_at >= ?
             AND reported_at <= ?
         `,
       )
-      .get(window.startDate, `${window.endDate}T23:59:59.999Z`) as AmountRow;
+      .get(workspaceId, window.startDate, `${window.endDate}T23:59:59.999Z`) as AmountRow;
     const replacementAtRisk = db
       .prepare(
         `
@@ -104,56 +108,61 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
           FROM asset_current_state
           JOIN assets ON assets.id = asset_current_state.asset_id
           WHERE asset_current_state.custody_status IN ('checked_out', 'assigned')
+            AND assets.workspace_id = ?
         `,
       )
-      .get() as AmountRow;
+      .get(workspaceId) as AmountRow;
     const maintenanceQueue = db
-      .prepare("SELECT COUNT(*) AS count FROM asset_current_state WHERE operational_status = 'maintenance'")
-      .get() as CountRow;
+      .prepare("SELECT COUNT(*) AS count FROM asset_current_state WHERE operational_status = 'maintenance' AND workspace_id = ?")
+      .get(workspaceId) as CountRow;
     const missingEstimates = db
       .prepare(
         `
           SELECT COUNT(*) AS count
           FROM incidents
           WHERE status IN ('Open', 'In review')
+            AND workspace_id = ?
             AND reported_at >= ?
             AND reported_at <= ?
             AND cost_estimate IS NULL
         `,
       )
-      .get(window.startDate, `${window.endDate}T23:59:59.999Z`) as CountRow;
+      .get(workspaceId, window.startDate, `${window.endDate}T23:59:59.999Z`) as CountRow;
     const trackedSpend = db
       .prepare(
         `
           SELECT COALESCE(SUM(amount), 0) AS amount
           FROM financial_entries
-          WHERE entry_date >= ?
+          WHERE workspace_id = ?
+            AND entry_date >= ?
             AND entry_date <= ?
         `,
       )
-      .get(window.startDate, window.endDate) as AmountRow;
+      .get(workspaceId, window.startDate, window.endDate) as AmountRow;
     const reserveAmount = db
       .prepare(
         `
           SELECT COALESCE(SUM(amount), 0) AS amount
           FROM financial_entries
-          WHERE entry_type = 'reserve'
+          WHERE workspace_id = ?
+            AND entry_type = 'reserve'
             AND entry_date >= ?
             AND entry_date <= ?
         `,
       )
-      .get(window.startDate, window.endDate) as AmountRow;
+      .get(workspaceId, window.startDate, window.endDate) as AmountRow;
     const monthlyBurn = buildMonthlyWindows(6).map((entry) => {
       const amount = (db
         .prepare(
           `
             SELECT COALESCE(SUM(amount), 0) AS amount
             FROM financial_entries
-            WHERE entry_date >= ?
+            WHERE workspace_id = ?
+              AND entry_date >= ?
               AND entry_date <= ?
           `,
         )
-        .get(entry.startDate, entry.endDate) as AmountRow).amount ?? 0;
+        .get(workspaceId, entry.startDate, entry.endDate) as AmountRow).amount ?? 0;
 
       return {
         amount: deps.formatCurrency(amount),
@@ -168,13 +177,14 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
         `
           SELECT category, COALESCE(SUM(amount), 0) AS amount
           FROM financial_entries
-          WHERE entry_date >= ?
+          WHERE workspace_id = ?
+            AND entry_date >= ?
             AND entry_date <= ?
           GROUP BY category
           ORDER BY amount DESC, category
         `,
       )
-      .all(window.startDate, window.endDate) as Array<{ category: string; amount: number }>;
+      .all(workspaceId, window.startDate, window.endDate) as Array<{ category: string; amount: number }>;
     const totalCategoryAmount = categoryBreakdownRows.reduce((sum, row) => sum + row.amount, 0);
 
     return {
@@ -196,8 +206,8 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
         burnRateAverage: deps.formatCurrency(burnRateAverageValue),
         burnRateAverageValue,
       },
-      exposureByProject: this.getFinanceProjectExposure(window.startDate, window.endDate),
-      costLinks: this.getFinanceCostLinks(),
+      exposureByProject: this.getFinanceProjectExposure(workspaceId, window.startDate, window.endDate),
+      costLinks: this.getFinanceCostLinks(workspaceId),
       monthlyBurn,
       categoryBreakdown: categoryBreakdownRows.map((row) => ({
         amount: deps.formatCurrency(row.amount),
@@ -208,7 +218,8 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
     };
   },
 
-  getFinanceProjectExposure(startDate?: string, endDate?: string): ProjectExposureRow[] {
+  getFinanceProjectExposure(workspaceId?: string, startDate?: string, endDate?: string): ProjectExposureRow[] {
+    const resolvedWorkspaceId = resolveWorkspaceId(workspaceId);
     const rows = db
       .prepare(
         `
@@ -235,6 +246,7 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
               WHERE asset_current_state.current_project_id = projects.id
             ), 0) AS assets_out
           FROM projects
+          WHERE projects.workspace_id = ?
           ORDER BY exposure DESC, projects.name
         `,
       )
@@ -247,6 +259,7 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
         startDate ?? null,
         endDate ? `${endDate}T23:59:59.999Z` : null,
         endDate ? `${endDate}T23:59:59.999Z` : null,
+        resolvedWorkspaceId,
       ) as Array<{
       project: string;
       exposure: number;
@@ -264,7 +277,8 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
     }));
   },
 
-  getFinanceCostLinks(): FinanceCostLinkRow[] {
+  getFinanceCostLinks(workspaceId?: string): FinanceCostLinkRow[] {
+    const resolvedWorkspaceId = resolveWorkspaceId(workspaceId);
     const rows = db
       .prepare(
         `
@@ -281,10 +295,11 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
           LEFT JOIN assets ON assets.id = incidents.asset_id
           LEFT JOIN projects ON projects.id = incidents.project_id
           LEFT JOIN users ON users.id = incidents.responsible_user_id
+          WHERE incidents.workspace_id = ?
           ORDER BY incidents.reported_at DESC
         `,
       )
-      .all() as Array<{
+      .all(resolvedWorkspaceId) as Array<{
       incident: string;
       asset: string;
       project: string;
@@ -308,6 +323,7 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
   },
 
   getFinanceEntries(query: FinanceEntryListQuery = deps.defaultFinanceEntryListQuery): FinanceEntryRow[] {
+    const workspaceId = resolveWorkspaceId(query.workspaceId);
     const rows = db
       .prepare(
         `
@@ -330,9 +346,10 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
           LEFT JOIN projects ON projects.id = financial_entries.project_id
           LEFT JOIN incidents ON incidents.id = financial_entries.incident_id
           LEFT JOIN assets ON assets.id = financial_entries.asset_id
+          WHERE financial_entries.workspace_id = ?
         `,
       )
-      .all() as Array<{
+      .all(workspaceId) as Array<{
       id: string;
       entry_date: string;
       entry_type: string;

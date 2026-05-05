@@ -17,6 +17,7 @@ import {
 
 import type { FinanceOverviewPeriodPreset, FinanceOverviewQuery } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { HelpHint } from "@shared/components/HelpHint";
@@ -77,6 +78,7 @@ const ChartTooltip = ({
 };
 
 export const FinanceOverviewPage = () => {
+  const { activeWorkspaceId } = useWorkspace();
   const toast = useToast();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [period, setPeriod] = useState<FinanceOverviewPeriodPreset>("month");
@@ -117,7 +119,7 @@ export const FinanceOverviewPage = () => {
   const handleExportPdf = async () => {
     try {
       setIsExportingPdf(true);
-      const result = await exportFinanceReportPdf(overviewQuery);
+      const result = await exportFinanceReportPdf({ ...overviewQuery, workspaceId: activeWorkspaceId });
       setExportError(null);
       toast.success("Report exported", result.summary);
     } catch (nextError) {
@@ -147,16 +149,20 @@ export const FinanceOverviewPage = () => {
         }
       >
         <div className="finance-period-toolbar">
-          {periodOptions.map((option) => (
-            <button
-              key={option.value}
-              className={`ghost-control finance-period-chip${period === option.value ? " is-active" : ""}`}
-              onClick={() => setPeriod(option.value)}
-              type="button"
+          <label className="compact-filter-field finance-period-select">
+            <span>Window</span>
+            <select
+              className="compact-filter-select"
+              onChange={(event) => setPeriod(event.target.value as FinanceOverviewPeriodPreset)}
+              value={period}
             >
-              {option.label}
-            </button>
-          ))}
+              {periodOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         {period === "custom" ? (

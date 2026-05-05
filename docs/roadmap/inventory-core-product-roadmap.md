@@ -13,6 +13,14 @@ Actualización 2026-04-29:
 - Quedan smoke manuales y polish fino, pero no hay blocker conocido que impida avanzar a `Settings / Advanced`.
 - Los pendientes de IC-4/IC-5 se mantienen como verificación manual, no como razón para seguir abriendo features en inventario.
 
+Actualización 2026-05-05:
+- El foco pasa de inventario aislado a **pilot readiness**: login/auth, multiusuario, sync completo y smoke operacional para que Iván y Carlos puedan operar sin workarounds.
+- Sync Activity queda como preflight obligatorio del piloto: si hay `failed`, `pull required`, cola pendiente inesperada o cobertura de download incompleta, se corrige antes del smoke.
+- Se inicia polish visual transversal de controles: filtros con muchas opciones migran a dropdowns y los pills quedan reservados para estados, toggles pequeños o quick actions.
+- Queda pendiente smoke manual explícito de Projects -> Packing Slips -> Incidents -> RMA con dos usuarios.
+- Se implementa primer corte de sync para Projects, Packing Slips, Incidents y RMA vía snapshots operativos en Supabase. La migración remota fue aplicada y ahora existe backfill idempotente desde Sync Activity; queda pendiente ejecutarlo en data real y validar pull/push con dos dispositivos/usuarios.
+- Se extiende `workspaceAccess` fuera de inventario a Finance, Currency y Quotes. Agents queda como deuda separada porque todavía usa `DEFAULT_WORKSPACE_ID` internamente y requiere refactor de runtime, no sólo guard de IPC.
+
 ## Decisión de foco
 
 - Pausamos momentaneamente Finance/Agents como siguiente slice principal.
@@ -358,11 +366,12 @@ Volvemos al roadmap principal cuando:
 
 ## Próximo paso inmediato
 
-Volver al **main roadmap** con `Settings / Advanced` como siguiente slice activo.
+Volver al **main roadmap** con `Pilot Readiness Hardening` como slice activo.
 
-- Razón: IC-3/IC-4/IC-5 ya tienen lógica, pruebas focalizadas y polish suficiente para no bloquear producto.
+- Razón: IC-3/IC-4/IC-5 ya tienen lógica, pruebas focalizadas y polish suficiente para no bloquear producto, pero el piloto necesita validar sync, usuarios y permisos con condiciones reales.
 - Smoke vertical recomendado queda como checklist antes de demo/release: importar/listar asset -> seleccionar varios assets con cart -> crear packing slip con cantidades -> export packing + insurance -> return parcial/completo -> reportar incident -> crear RMA/repair -> marcar repaired o retired -> confirmar disponibilidad en Assets/Catalog/Packing.
 - Precondición si aparece Sync `Pull required`: hacer Pull updates/Refresh antes del smoke para no mezclar cola local vieja con datos cloud más recientes.
+- Precondición nueva: `supabase/migrations/20260505130000_operational_snapshots.sql` ya fue aplicada y existe `Backfill operational data` en Sync Activity. Ejecutarlo en el workspace real y confirmar que Sync Activity tiene cobertura reciente para `projects`, `packing_slips`, `incidents` y `rma_cases`.
 - Si el smoke falla en Packing, cerrar IC-4 primero.
 - Si el smoke falla en Incident/RMA/repair availability, cerrar IC-5 primero.
-- Si ambos pasan sin blockers, pasar a IC-6 CSV import pro o cerrar IC-2 polish fino.
+- Si ambos pasan sin blockers, terminar usuarios operativos mínimos y refactorizar Agents hacia workspace activo antes de Notifications.

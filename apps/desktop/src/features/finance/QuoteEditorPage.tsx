@@ -134,6 +134,10 @@ export const QuoteEditorPage = () => {
   const mutations = useQuoteMutations();
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [rateSuggestion, setRateSuggestion] = useState<{ rate: number; effectiveDate: string } | null>(null);
+  const [activeItemSuggestion, setActiveItemSuggestion] = useState<{
+    field: "title" | "description";
+    index: number;
+  } | null>(null);
 
   // Per-workspace recall of previously used values for fast re-entry.
   const recentClients = useRecentValues(`${activeWorkspaceId}:quote-client`);
@@ -282,6 +286,27 @@ export const QuoteEditorPage = () => {
       items[index] = { ...items[index]!, ...patch };
       return { ...prev, items };
     });
+  };
+
+  const getItemSuggestions = (field: "title" | "description", value: string) => {
+    const source = field === "title" ? recentItemTitles.values : recentItemDescriptions.values;
+    const query = value.trim().toLowerCase();
+    return source
+      .filter((candidate) => {
+        const normalized = candidate.trim().toLowerCase();
+        if (!normalized || normalized === query) return false;
+        return query.length === 0 || normalized.includes(query);
+      })
+      .slice(0, 6);
+  };
+
+  const applyItemSuggestion = (
+    index: number,
+    field: "title" | "description",
+    value: string,
+  ) => {
+    updateItem(index, field === "title" ? { title: value } : { description: value });
+    setActiveItemSuggestion(null);
   };
 
   const addItem = () => {
@@ -859,18 +884,17 @@ export const QuoteEditorPage = () => {
           </label>
           <label className="field-block field-block-span-2">
             <span className="field-label">Tax profile</span>
-            <div className="filter-pill-row">
+            <select
+              className="field-input"
+              onChange={(event) => updateDraft("taxProfile", event.target.value as typeof draft.taxProfile)}
+              value={draft.taxProfile}
+            >
               {taxProfileOptions.map((profile) => (
-                <button
-                  key={profile}
-                  className={`filter-pill${draft.taxProfile === profile ? " is-active" : ""}`}
-                  onClick={() => updateDraft("taxProfile", profile)}
-                  type="button"
-                >
+                <option key={profile} value={profile}>
                   {taxProfileLabel(profile)}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           </label>
           <label className="field-block">
             <span className="field-label">ITBIS rate</span>
@@ -945,22 +969,64 @@ export const QuoteEditorPage = () => {
                   <GripVertical size={14} />
                 </button>
                 <div className="quote-items-description">
-                  <input
-                    className="field-input quote-items-description-title"
-                    list="quote-recent-item-titles"
-                    onChange={(e) => updateItem(index, { title: e.target.value })}
-                    placeholder="DIT operator"
-                    value={item.title}
-                  />
-                  <input
-                    className="field-input quote-items-description-detail"
-                    list="quote-recent-item-descriptions"
-                    onChange={(e) =>
-                      updateItem(index, { description: e.target.value || null })
-                    }
-                    placeholder="Optional detail (Mac Studio M1, Davinci Resolve…)"
-                    value={item.description ?? ""}
-                  />
+                  <div className="quote-item-autocomplete">
+                    <input
+                      className="field-input quote-items-description-title"
+                      onBlur={() => window.setTimeout(() => setActiveItemSuggestion(null), 120)}
+                      onChange={(e) => {
+                        setActiveItemSuggestion({ field: "title", index });
+                        updateItem(index, { title: e.target.value });
+                      }}
+                      onFocus={() => setActiveItemSuggestion({ field: "title", index })}
+                      placeholder="DIT operator"
+                      value={item.title}
+                    />
+                    {activeItemSuggestion?.index === index &&
+                    activeItemSuggestion.field === "title" ? (
+                      <div className="quote-item-suggestions" role="listbox">
+                        {getItemSuggestions("title", item.title).map((suggestion) => (
+                          <button
+                            key={`title-${suggestion}`}
+                            onClick={() => applyItemSuggestion(index, "title", suggestion)}
+                            onMouseDown={(event) => event.preventDefault()}
+                            role="option"
+                            type="button"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="quote-item-autocomplete">
+                    <input
+                      className="field-input quote-items-description-detail"
+                      onBlur={() => window.setTimeout(() => setActiveItemSuggestion(null), 120)}
+                      onChange={(e) => {
+                        setActiveItemSuggestion({ field: "description", index });
+                        updateItem(index, { description: e.target.value || null });
+                      }}
+                      onFocus={() => setActiveItemSuggestion({ field: "description", index })}
+                      placeholder="Optional detail (Mac Studio M1, Davinci Resolve…)"
+                      value={item.description ?? ""}
+                    />
+                    {activeItemSuggestion?.index === index &&
+                    activeItemSuggestion.field === "description" ? (
+                      <div className="quote-item-suggestions" role="listbox">
+                        {getItemSuggestions("description", item.description ?? "").map((suggestion) => (
+                          <button
+                            key={`description-${suggestion}`}
+                            onClick={() => applyItemSuggestion(index, "description", suggestion)}
+                            onMouseDown={(event) => event.preventDefault()}
+                            role="option"
+                            type="button"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 <NumberStepper
                   ariaLabel={`Quantity for line ${index + 1}`}
@@ -1016,17 +1082,6 @@ export const QuoteEditorPage = () => {
             <span>Add line</span>
           </button>
         </div>
-
-        <datalist id="quote-recent-item-titles">
-          {recentItemTitles.values.map((v) => (
-            <option key={v} value={v} />
-          ))}
-        </datalist>
-        <datalist id="quote-recent-item-descriptions">
-          {recentItemDescriptions.values.map((v) => (
-            <option key={v} value={v} />
-          ))}
-        </datalist>
       </SurfaceCard>
 
       <SurfaceCard

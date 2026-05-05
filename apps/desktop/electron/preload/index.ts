@@ -30,6 +30,8 @@ import type {
   AppExportResult,
   AppInfo,
   AppLocalWorkspaceRow,
+  AppOperationalBackfillCommand,
+  AppOperationalBackfillResult,
   AppSupportSnapshot,
   AppSyncPullCursorRow,
   AppSyncOutboxRow,
@@ -180,6 +182,8 @@ const bukowskiApp = {
     ipcRenderer.invoke(ipcChannels.app.retrySyncOutboxRow, id) as Promise<AppActionResult>,
   retryAllFailedSyncOutboxRows: () =>
     ipcRenderer.invoke(ipcChannels.app.retryAllFailedSyncOutboxRows) as Promise<AppActionResult>,
+  backfillOperationalSnapshots: (input: AppOperationalBackfillCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.backfillOperationalSnapshots, input) as Promise<AppOperationalBackfillResult>,
   exportWorkspaceData: () => ipcRenderer.invoke(ipcChannels.app.exportWorkspaceData) as Promise<AppExportResult>,
   exportSupportBundle: () => ipcRenderer.invoke(ipcChannels.app.exportSupportBundle) as Promise<AppExportResult>,
   exportRecentLogs: () => ipcRenderer.invoke(ipcChannels.app.exportRecentLogs) as Promise<AppExportResult>,
@@ -192,6 +196,10 @@ const bukowskiApp = {
     >,
   applyRemoteAssetSnapshots: (input: AppApplyRemoteAssetSnapshotsCommand) =>
     ipcRenderer.invoke(ipcChannels.app.applyRemoteAssetSnapshots, input) as Promise<AppApplyRemoteAssetSnapshotsResult>,
+  applyRemoteOperationalSnapshots: (input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.applyRemoteOperationalSnapshots, input) as Promise<
+      import("@contracts").AppApplyRemoteOperationalSnapshotsResult
+    >,
 };
 
 const bukowskiAuth = {
@@ -361,7 +369,8 @@ const bukowskiFinance = {
     ipcRenderer.invoke(ipcChannels.finance.getOverview, query) as Promise<FinanceOverviewSnapshot>,
   exportReportPdf: (query?: FinanceOverviewQuery) =>
     ipcRenderer.invoke(ipcChannels.finance.exportReportPdf, query) as Promise<AppExportResult>,
-  getCostLinks: () => ipcRenderer.invoke(ipcChannels.finance.getCostLinks) as Promise<FinanceCostLinkRow[]>,
+  getCostLinks: (workspaceId: string) =>
+    ipcRenderer.invoke(ipcChannels.finance.getCostLinks, { workspaceId }) as Promise<FinanceCostLinkRow[]>,
   getEntries: (query?: FinanceEntryListQuery) => ipcRenderer.invoke(ipcChannels.finance.getEntries, query) as Promise<FinanceEntryRow[]>,
   getDocuments: (entryId: string) =>
     ipcRenderer.invoke(ipcChannels.finance.getDocuments, entryId) as Promise<FinancialDocumentRow[]>,

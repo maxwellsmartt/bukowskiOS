@@ -35,6 +35,7 @@ import { applyAssetQuantityFoundationMigration } from "./assetQuantityFoundation
 import { applyAssetValuationFoundationMigration } from "./assetValuationFoundationBootstrap";
 import { createAssetMutationService } from "./assetMutationService";
 import { createAssetSnapshotPullService } from "./assetSnapshotPullService";
+import { createOperationalSnapshotService } from "./operationalSnapshotService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
 import { createCatalogPullService } from "./catalogPullService";
@@ -126,6 +127,9 @@ type LocalDatabaseRuntime = {
   getSyncPullCursors: () => AppSyncPullCursorRow[];
   retrySyncOutboxRow: (id: string) => Promise<AppDiagnosticsSnapshot>;
   retryAllFailedSyncOutboxRows: () => Promise<AppDiagnosticsSnapshot>;
+  backfillOperationalSnapshots: (
+    input: import("@contracts").AppOperationalBackfillCommand,
+  ) => Promise<import("@contracts").AppOperationalBackfillResult>;
   exportRecentLogs: (filePath: string) => AppExportResult;
   exportSupportBundle: (directoryPath: string) => AppExportResult;
   applyRemoteCatalogRows: (
@@ -137,6 +141,9 @@ type LocalDatabaseRuntime = {
   applyRemoteAssetSnapshots: (
     input: import("@contracts").AppApplyRemoteAssetSnapshotsCommand,
   ) => import("@contracts").AppApplyRemoteAssetSnapshotsResult;
+  applyRemoteOperationalSnapshots: (
+    input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand,
+  ) => import("@contracts").AppApplyRemoteOperationalSnapshotsResult;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -855,6 +862,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   };
 
   const supabaseTokenStore = createSupabaseTokenStore();
+  const operationalSnapshots = createOperationalSnapshotService(database);
   const workspaceAccess = createWorkspaceAccessGuard({
     database,
     supabaseUrl: process.env.VITE_SUPABASE_URL,
@@ -868,6 +876,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
           anonKey: process.env.VITE_SUPABASE_ANON_KEY ?? "",
           getAccessToken: async () => (await supabaseTokenStore.getTokens()).accessToken,
           resolveAssetSnapshot: resolveSupabaseAssetSnapshot,
+          resolveOperationalSnapshot: (row) => operationalSnapshots.resolveSnapshot(row),
         })
       : undefined,
   });
@@ -932,6 +941,25 @@ const createRuntime = (): LocalDatabaseRuntime => {
     const retriedCount = syncOutboxWorker.retryAllFailedRows();
     logger.info("Queued failed sync outbox rows for retry.", { retriedCount });
     return await runLocalSyncNow();
+  };
+
+  const backfillOperationalSnapshots = async (input: import("@contracts").AppOperationalBackfillCommand) => {
+    const backfill = operationalSnapshots.enqueueBackfill(input.workspaceId);
+    const diagnostics = await runLocalSyncNow();
+    const entitySummary = backfill.byEntityType
+      .map((row) => `${row.entityType}: ${row.enqueuedCount}/${row.scannedCount}`)
+      .join(", ");
+
+    return {
+      summary:
+        backfill.enqueuedCount > 0
+          ? `Queued ${backfill.enqueuedCount} operational snapshot${backfill.enqueuedCount === 1 ? "" : "s"} for cloud sync (${entitySummary}).`
+          : `Operational snapshots were already queued or synced (${entitySummary}).`,
+      diagnostics,
+      enqueuedCount: backfill.enqueuedCount,
+      skippedCount: backfill.skippedCount,
+      byEntityType: backfill.byEntityType,
+    };
   };
 
   const secretStore = createAISecretStore();
@@ -1129,6 +1157,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
     },
     applyRemoteAssetSnapshots: (input: import("@contracts").AppApplyRemoteAssetSnapshotsCommand) =>
       createAssetSnapshotPullService(database).applyRemoteSnapshots(input.workspaceId, input.assets, input.states),
+    applyRemoteOperationalSnapshots: (input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand) =>
+      operationalSnapshots.applyRemoteSnapshots(input.workspaceId, input.entityType, input.rows),
     runtimeDiagnostics,
     supportDiagnostics,
     userAdmin,
@@ -1144,6 +1174,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     getSyncPullCursors,
     retrySyncOutboxRow,
     retryAllFailedSyncOutboxRows,
+    backfillOperationalSnapshots,
     exportRecentLogs: (filePath: string) => supportDiagnostics.exportRecentLogs(filePath),
     exportSupportBundle: (directoryPath: string) => supportDiagnostics.exportSupportBundle(directoryPath),
     agentMutations: createAgentMutationService(database, {

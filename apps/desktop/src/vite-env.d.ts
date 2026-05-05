@@ -30,6 +30,8 @@ import type {
   AppExportResult,
   AppInfo,
   AppLocalWorkspaceRow,
+  AppOperationalBackfillCommand,
+  AppOperationalBackfillResult,
   AppSupportSnapshot,
   AppSyncPullCursorRow,
   AppSyncOutboxRow,
@@ -160,6 +162,9 @@ declare global {
       getSyncPullCursors: () => Promise<AppSyncPullCursorRow[]>;
       retrySyncOutboxRow: (id: string) => Promise<AppActionResult>;
       retryAllFailedSyncOutboxRows: () => Promise<AppActionResult>;
+      backfillOperationalSnapshots: (
+        input: AppOperationalBackfillCommand,
+      ) => Promise<AppOperationalBackfillResult>;
       exportWorkspaceData: () => Promise<AppExportResult>;
       exportSupportBundle: () => Promise<AppExportResult>;
       exportRecentLogs: () => Promise<AppExportResult>;
@@ -173,6 +178,9 @@ declare global {
       applyRemoteAssetSnapshots: (
         input: AppApplyRemoteAssetSnapshotsCommand,
       ) => Promise<AppApplyRemoteAssetSnapshotsResult>;
+      applyRemoteOperationalSnapshots: (
+        input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand,
+      ) => Promise<import("@contracts").AppApplyRemoteOperationalSnapshotsResult>;
     };
     bukowskiAuth?: {
       getStoredTokens: () => Promise<{
@@ -279,7 +287,7 @@ declare global {
     bukowskiFinance?: {
       getOverview: (query?: FinanceOverviewQuery) => Promise<FinanceOverviewSnapshot>;
       exportReportPdf: (query?: FinanceOverviewQuery) => Promise<AppExportResult>;
-      getCostLinks: () => Promise<FinanceCostLinkRow[]>;
+      getCostLinks: (workspaceId: string) => Promise<FinanceCostLinkRow[]>;
       getEntries: (query?: FinanceEntryListQuery) => Promise<FinanceEntryRow[]>;
       getDocuments: (entryId: string) => Promise<FinancialDocumentRow[]>;
       uploadDocuments: (entryId: string) => Promise<FileUploadMutationResult>;

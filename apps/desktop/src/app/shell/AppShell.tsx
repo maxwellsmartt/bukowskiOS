@@ -6,6 +6,7 @@ import { AppRoutes } from "@app/routing/routes";
 import { useAutoLogout } from "@shared/hooks/useAutoLogout";
 import { useAssetSnapshotPull } from "@shared/hooks/useAssetSnapshotPull";
 import { useCatalogPull } from "@shared/hooks/useCatalogPull";
+import { useOperationalSnapshotPull } from "@shared/hooks/useOperationalSnapshotPull";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
@@ -41,6 +42,7 @@ export const AppShell = () => {
   useAutoLogout();
   useCatalogPull();
   useAssetSnapshotPull();
+  useOperationalSnapshotPull();
   const [workspaceTransitionActive, setWorkspaceTransitionActive] = useState(false);
   const prevWorkspaceIdRef = useRef(activeWorkspaceId);
 

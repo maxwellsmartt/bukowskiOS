@@ -25,11 +25,23 @@ export type SupabaseOutboxAssetSnapshot = {
   event?: SupabaseAssetEventSnapshotRecord | null;
 };
 
+export type SupabaseOperationalSnapshotRecord = {
+  workspace_id: string;
+  entity_type: string;
+  entity_id: string;
+  snapshot_json: Record<string, unknown>;
+  updated_at: string;
+  deleted_at?: string | null;
+};
+
 export type SupabaseOutboxTransportOptions = {
   supabaseUrl: string;
   anonKey: string;
   getAccessToken: () => Promise<string | null>;
   resolveAssetSnapshot?: (row: SupabaseOutboxTransportRow) => Promise<SupabaseOutboxAssetSnapshot | null> | SupabaseOutboxAssetSnapshot | null;
+  resolveOperationalSnapshot?: (
+    row: SupabaseOutboxTransportRow,
+  ) => Promise<SupabaseOperationalSnapshotRecord | null> | SupabaseOperationalSnapshotRecord | null;
   fetchImpl?: typeof fetch;
 };
 
@@ -79,6 +91,7 @@ export const createSupabaseOutboxTransport = ({
   anonKey,
   getAccessToken,
   resolveAssetSnapshot,
+  resolveOperationalSnapshot,
   fetchImpl = fetch,
 }: SupabaseOutboxTransportOptions) => {
   const normalizedUrl = normalizeUrl(supabaseUrl);
@@ -131,6 +144,22 @@ export const createSupabaseOutboxTransport = ({
           fetchImpl,
         });
       }
+    }
+
+    if (["project", "packing_slip", "incident", "rma_case"].includes(row.entity_type) && resolveOperationalSnapshot) {
+      const snapshot = await resolveOperationalSnapshot(row);
+
+      if (!snapshot) {
+        throw new Error(`Supabase operational snapshot unavailable for outbox row ${row.id}.`);
+      }
+
+      await upsertSupabaseRow({
+        accessToken,
+        anonKey,
+        endpoint: `${normalizedUrl}/rest/v1/operational_snapshots?on_conflict=workspace_id,entity_type,entity_id`,
+        payload: snapshot,
+        fetchImpl,
+      });
     }
 
     await upsertSupabaseRow({

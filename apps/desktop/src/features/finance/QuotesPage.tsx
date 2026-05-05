@@ -320,18 +320,20 @@ export const QuotesPage = () => {
 
       <SurfaceCard>
         <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap" }}>
-          <div className="filter-pill-row">
-            {allStatuses.map((s) => (
-              <button
-                key={s}
-                className={`filter-pill${statusFilter === s ? " is-active" : ""}`}
-                onClick={() => setStatusFilter(s)}
-                type="button"
-              >
-                {s === "all" ? "All" : statusLabel(s)}
-              </button>
-            ))}
-          </div>
+          <label className="compact-filter-field quotes-status-filter">
+            <span>Status</span>
+            <select
+              className="compact-filter-select"
+              onChange={(event) => setStatusFilter(event.target.value as QuoteStatus | "all")}
+              value={statusFilter}
+            >
+              {allStatuses.map((s) => (
+                <option key={s} value={s}>
+                  {s === "all" ? "All" : statusLabel(s)}
+                </option>
+              ))}
+            </select>
+          </label>
           <input
             className="field-input"
             onChange={(event) => setSearch(event.target.value)}

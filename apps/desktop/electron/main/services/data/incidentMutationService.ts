@@ -7,6 +7,7 @@ import type {
   ResolveIncidentCommand,
   UpdateIncidentCommand,
 } from "@contracts";
+import { enqueueOperationalSnapshotOutbox } from "./operationalSnapshotService";
 import { resolveAuthorizedActor } from "./mutationAuthorization";
 
 type AssetIncidentContextRow = {
@@ -653,6 +654,17 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
         input.incidentId,
       );
 
+      enqueueOperationalSnapshotOutbox(db, {
+        workspaceId: input.workspaceId,
+        entityType: "incident",
+        entityId: input.incidentId,
+        updatedAt: now,
+        payload: {
+          incidentId: input.incidentId,
+          status: nextStatus,
+        },
+      });
+
       receiptHelpers.insertReceipt.run(
         input.commandId,
         input.workspaceId,
@@ -856,6 +868,18 @@ export const createIncidentMutationService = (db: DatabaseSync) => ({
           `,
         ).run(`outbox-${retireEventId}`, input.workspaceId, assetState.asset_id, retireEventId, retireMetadataJson, now, now);
       }
+
+      enqueueOperationalSnapshotOutbox(db, {
+        workspaceId: input.workspaceId,
+        entityType: "incident",
+        entityId: input.incidentId,
+        updatedAt: now,
+        payload: {
+          incidentId: input.incidentId,
+          status: "Resolved",
+          retireAsset: Boolean(input.retireAsset),
+        },
+      });
 
       receiptHelpers.insertReceipt.run(
         input.commandId,

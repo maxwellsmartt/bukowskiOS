@@ -11,6 +11,7 @@ import type {
   FinanceOverviewSnapshot,
   UpdateFinancialEntryCommand,
 } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 
 const emptyOverview: FinanceOverviewSnapshot = {
@@ -43,43 +44,57 @@ const defaultFinanceEntryListQuery: FinanceEntryListQuery = {
 };
 
 export const useFinanceOverview = (query?: FinanceOverviewQuery) =>
-  useAsyncValue(
-    async () => {
-      if (!window.bukowskiFinance) {
-        return emptyOverview;
-      }
+  {
+    const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+    return useAsyncValue(
+      async () => {
+        if (!window.bukowskiFinance || !isWorkspaceReady) {
+          return emptyOverview;
+        }
 
-      return window.bukowskiFinance.getOverview(query);
-    },
-    emptyOverview,
-    [query?.period, query?.customStartDate, query?.customEndDate],
-  );
+        return window.bukowskiFinance.getOverview({
+          period: query?.period ?? "month",
+          customStartDate: query?.customStartDate ?? null,
+          customEndDate: query?.customEndDate ?? null,
+          workspaceId: activeWorkspaceId,
+        });
+      },
+      emptyOverview,
+      [activeWorkspaceId, isWorkspaceReady, query?.period, query?.customStartDate, query?.customEndDate],
+    );
+  };
 
 export const useFinanceCostLinks = () =>
-  useAsyncValue(
-    async () => {
-      if (!window.bukowskiFinance) {
-        return emptyCostLinks;
-      }
+  {
+    const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+    return useAsyncValue(
+      async () => {
+        if (!window.bukowskiFinance || !isWorkspaceReady) {
+          return emptyCostLinks;
+        }
 
-      return window.bukowskiFinance.getCostLinks();
-    },
-    emptyCostLinks,
-    [],
-  );
+        return window.bukowskiFinance.getCostLinks(activeWorkspaceId);
+      },
+      emptyCostLinks,
+      [activeWorkspaceId, isWorkspaceReady],
+    );
+  };
 
 export const useFinanceEntries = (query: FinanceEntryListQuery = defaultFinanceEntryListQuery) =>
-  useAsyncValue(
-    async () => {
-      if (!window.bukowskiFinance) {
-        return emptyEntries;
-      }
+  {
+    const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+    return useAsyncValue(
+      async () => {
+        if (!window.bukowskiFinance || !isWorkspaceReady) {
+          return emptyEntries;
+        }
 
-      return window.bukowskiFinance.getEntries(query);
-    },
-    emptyEntries,
-    [query.search, query.sortBy, query.sortDirection],
-  );
+        return window.bukowskiFinance.getEntries({ ...query, workspaceId: activeWorkspaceId });
+      },
+      emptyEntries,
+      [activeWorkspaceId, isWorkspaceReady, query.search, query.sortBy, query.sortDirection],
+    );
+  };
 
 export const useFinanceEntryDocuments = (entryId: string | null) =>
   useAsyncValue(

@@ -4,6 +4,7 @@ import type { ListSortDirection } from "./list-controls-queries";
 export type FinanceOverviewPeriodPreset = "month" | "quarter" | "year" | "custom";
 
 export type FinanceOverviewQuery = {
+  workspaceId?: string;
   period: FinanceOverviewPeriodPreset;
   customStartDate?: string | null;
   customEndDate?: string | null;
@@ -62,6 +63,7 @@ export type FinancialDocumentRow = {
 export type FinanceEntrySortField = "date" | "type" | "category" | "reference" | "project" | "amount" | "status";
 
 export type FinanceEntryListQuery = {
+  workspaceId?: string;
   search?: string;
   sortBy: FinanceEntrySortField;
   sortDirection: ListSortDirection;

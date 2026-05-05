@@ -18,6 +18,7 @@ export const ipcChannels = {
     getSyncPullCursors: "bukowskiApp:getSyncPullCursors",
     retrySyncOutboxRow: "bukowskiApp:retrySyncOutboxRow",
     retryAllFailedSyncOutboxRows: "bukowskiApp:retryAllFailedSyncOutboxRows",
+    backfillOperationalSnapshots: "bukowskiApp:backfillOperationalSnapshots",
     exportWorkspaceData: "bukowskiApp:exportWorkspaceData",
     exportSupportBundle: "bukowskiApp:exportSupportBundle",
     exportRecentLogs: "bukowskiApp:exportRecentLogs",
@@ -26,6 +27,7 @@ export const ipcChannels = {
     applyRemoteCatalogRows: "bukowskiApp:applyRemoteCatalogRows",
     applyRemoteExchangeRates: "bukowskiApp:applyRemoteExchangeRates",
     applyRemoteAssetSnapshots: "bukowskiApp:applyRemoteAssetSnapshots",
+    applyRemoteOperationalSnapshots: "bukowskiApp:applyRemoteOperationalSnapshots",
   },
   auth: {
     getStoredTokens: "bukowskiAuth:getStoredTokens",

@@ -34,20 +34,20 @@ export const AutoLogoutSetting = () => {
 
   return (
     <div className="auto-logout-setting">
-      <div className="auto-logout-presets" role="radiogroup" aria-label="Auto sign-out timeout">
-        {presetMinutes.map((preset) => (
-          <button
-            key={preset.value}
-            aria-checked={selected === preset.value}
-            className={`auto-logout-preset${selected === preset.value ? " is-active" : ""}`}
-            onClick={() => handleChange(preset.value)}
-            role="radio"
-            type="button"
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
+      <label className="compact-filter-field auto-logout-select">
+        <span>Timeout</span>
+        <select
+          className="compact-filter-select"
+          onChange={(event) => handleChange(Number(event.target.value))}
+          value={selected}
+        >
+          {presetMinutes.map((preset) => (
+            <option key={preset.value} value={preset.value}>
+              {preset.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <p className="auto-logout-helper">{helper}</p>
       <p className="surface-card-subtitle" style={{ fontSize: "var(--font-2xs)", color: "var(--text-muted)" }}>
         Saved on this device. Activity = mouse, keyboard, scroll or touch inside the app window.

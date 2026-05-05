@@ -150,6 +150,28 @@ export const createWorkspaceAccessGuard = ({
     return row?.workspace_id ?? null;
   };
 
+  const getFinanceEntryWorkspaceId = (entryId: string) => {
+    const row = database.prepare("SELECT workspace_id FROM financial_entries WHERE id = ? LIMIT 1").get(entryId) as
+      | { workspace_id: string }
+      | undefined;
+    return row?.workspace_id ?? null;
+  };
+
+  const getFinanceDocumentWorkspaceId = (fileId: string) => {
+    const row = database
+      .prepare(
+        `
+          SELECT financial_entries.workspace_id
+          FROM financial_documents
+          JOIN financial_entries ON financial_entries.id = financial_documents.financial_entry_id
+          WHERE financial_documents.id = ?
+          LIMIT 1
+        `,
+      )
+      .get(fileId) as { workspace_id: string } | undefined;
+    return row?.workspace_id ?? null;
+  };
+
   const getIncidentFileWorkspaceId = (fileId: string) => {
     const row = database
       .prepare(
@@ -348,6 +370,38 @@ export const createWorkspaceAccessGuard = ({
 
       if (!workspaceId) {
         throw new Error("RMA case was not found.");
+      }
+
+      await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });
+      return workspaceId;
+    },
+
+    async assertFinanceEntryAccess(
+      entryId: string,
+      action: string,
+      accessLevel: WorkspaceAccessLevel = "read",
+      requiredPermission?: string,
+    ) {
+      const workspaceId = getFinanceEntryWorkspaceId(entryId);
+
+      if (!workspaceId) {
+        throw new Error("Finance entry was not found.");
+      }
+
+      await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });
+      return workspaceId;
+    },
+
+    async assertFinanceDocumentAccess(
+      fileId: string,
+      action: string,
+      accessLevel: WorkspaceAccessLevel = "read",
+      requiredPermission?: string,
+    ) {
+      const workspaceId = getFinanceDocumentWorkspaceId(fileId);
+
+      if (!workspaceId) {
+        throw new Error("Finance document was not found.");
       }
 
       await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });

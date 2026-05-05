@@ -36,6 +36,9 @@ type RegisterAppIpcOptions = {
   getSyncPullCursors: () => import("@contracts").AppSyncPullCursorRow[];
   retrySyncOutboxRow: (id: string) => Promise<import("@contracts").AppDiagnosticsSnapshot>;
   retryAllFailedSyncOutboxRows: () => Promise<import("@contracts").AppDiagnosticsSnapshot>;
+  backfillOperationalSnapshots: (
+    input: import("@contracts").AppOperationalBackfillCommand,
+  ) => Promise<import("@contracts").AppOperationalBackfillResult>;
   exportRecentLogs: (filePath: string) => import("@contracts").AppExportResult;
   exportSupportBundle: (directoryPath: string) => import("@contracts").AppExportResult;
   applyRemoteCatalogRows: (
@@ -47,6 +50,9 @@ type RegisterAppIpcOptions = {
   applyRemoteAssetSnapshots: (
     input: import("@contracts").AppApplyRemoteAssetSnapshotsCommand,
   ) => import("@contracts").AppApplyRemoteAssetSnapshotsResult;
+  applyRemoteOperationalSnapshots: (
+    input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand,
+  ) => import("@contracts").AppApplyRemoteOperationalSnapshotsResult;
 };
 
 const applyRemoteCatalogRowsSchema = z.object({
@@ -141,6 +147,25 @@ const applyRemoteAssetSnapshotsSchema = z.object({
   ),
 });
 
+const applyRemoteOperationalSnapshotsSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  entityType: z.enum(["project", "packing_slip", "incident", "rma_case"]),
+  rows: z.array(
+    z.object({
+      workspace_id: z.string().trim().min(1),
+      entity_type: z.enum(["project", "packing_slip", "incident", "rma_case"]),
+      entity_id: z.string().trim().min(1),
+      snapshot_json: z.record(z.string(), z.unknown()),
+      updated_at: z.string().min(1),
+      deleted_at: z.string().nullable().optional(),
+    }),
+  ),
+});
+
+const backfillOperationalSnapshotsSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+});
+
 const ensureLocalWorkspacesSchema = z.array(
   z.object({
     id: z.string().trim().min(1),
@@ -225,11 +250,13 @@ export const registerAppIpc = ({
   getSyncPullCursors,
   retrySyncOutboxRow,
   retryAllFailedSyncOutboxRows,
+  backfillOperationalSnapshots,
   exportRecentLogs,
   exportSupportBundle,
   applyRemoteCatalogRows,
   applyRemoteExchangeRates,
   applyRemoteAssetSnapshots,
+  applyRemoteOperationalSnapshots,
 }: RegisterAppIpcOptions) => {
   safeHandleReadWithSchema(ipcChannels.app.getInfo, emptyReadArgsSchema, () => ({
     appName: "bukowskiOS",
@@ -373,6 +400,13 @@ export const registerAppIpc = ({
       throw sanitizeIpcError(error, "The app could not retry the failed local sync rows.");
     }
   });
+  safeHandle(
+    ipcChannels.app.backfillOperationalSnapshots,
+    backfillOperationalSnapshotsSchema,
+    (_event, input) =>
+      backfillOperationalSnapshots(input as import("@contracts").AppOperationalBackfillCommand),
+    "The app could not backfill operational sync snapshots.",
+  );
   ipcMain.handle(ipcChannels.app.exportWorkspaceData, async (event) => {
     try {
       assertTrustedIpcSender(event);
@@ -461,5 +495,12 @@ export const registerAppIpc = ({
     (_event, input) =>
       applyRemoteAssetSnapshots(input as import("@contracts").AppApplyRemoteAssetSnapshotsCommand),
     "The app could not apply remote asset snapshots.",
+  );
+  safeHandle(
+    ipcChannels.app.applyRemoteOperationalSnapshots,
+    applyRemoteOperationalSnapshotsSchema,
+    (_event, input) =>
+      applyRemoteOperationalSnapshots(input as import("@contracts").AppApplyRemoteOperationalSnapshotsCommand),
+    "The app could not apply remote operational snapshots.",
   );
 };

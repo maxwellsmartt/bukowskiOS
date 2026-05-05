@@ -1,6 +1,7 @@
 import { app, dialog } from "electron";
 import fs from "node:fs";
 import path from "node:path";
+import { z } from "zod";
 
 import {
   archiveProjectSchema,
@@ -373,6 +374,18 @@ const buildPackingSlipPdfFileName = (
   const issuedDate = sanitizePdfFileNamePart(slip.issueDateCompact, "undated");
 
   return `${slipLabel}_${projectCode}_${projectName}_${departmentCode}_Packing_${issuedDate}.pdf`;
+};
+
+const workspaceQueryReadArgsSchema = z.tuple([
+  z.object({ workspaceId: z.string().trim().min(1) }).strict(),
+]);
+
+const requireWorkspaceId = (query: { workspaceId?: string | null } | undefined, action: string) => {
+  const workspaceId = query?.workspaceId?.trim();
+  if (!workspaceId) {
+    throw new Error(`Select a workspace before you ${action}.`);
+  }
+  return workspaceId;
 };
 
 export const registerFoundationIpc = ({
@@ -1401,20 +1414,39 @@ export const registerFoundationIpc = ({
   safeHandleReadWithSchema(
     ipcChannels.finance.getOverview,
     financeOverviewReadArgsSchema,
-    (_event, query: FinanceOverviewQuery | undefined) => foundationReads.getFinanceOverview(query),
+    async (_event, query: FinanceOverviewQuery | undefined) => {
+      const workspaceId = requireWorkspaceId(query, "load finance overview");
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId,
+        action: "load finance overview",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return foundationReads.getFinanceOverview(query);
+    },
     "The app could not load finance overview.",
   );
   safeHandleReadWithSchema(
     ipcChannels.finance.getDocuments,
     idReadArgsSchema,
-    (_event, entryId: string) => foundationReads.getFinanceEntryDocuments(entryId),
+    async (_event, entryId: string) => {
+      await workspaceAccess.assertFinanceEntryAccess(entryId, "load finance documents", "read", "finance.read");
+      return foundationReads.getFinanceEntryDocuments(entryId);
+    },
     "The app could not load finance documents.",
   );
   safeHandleReadWithSchema(
     ipcChannels.finance.uploadDocuments,
     idReadArgsSchema,
     async (_event, entryId: string) => {
+      const workspaceId = await workspaceAccess.assertFinanceEntryAccess(
+        entryId,
+        "attach finance documents",
+        "write",
+        "finance.read",
+      );
       const entry = foundationReads.getFinanceEntries({
+        workspaceId,
         search: "",
         sortBy: "date",
         sortDirection: "desc",
@@ -1450,6 +1482,7 @@ export const registerFoundationIpc = ({
     ipcChannels.finance.openDocument,
     idReadArgsSchema,
     async (_event, fileId: string) => {
+      await workspaceAccess.assertFinanceDocumentAccess(fileId, "open that finance document", "read", "finance.read");
       await fileUploads.openFinanceDocument(fileId);
       return null;
     },
@@ -1459,6 +1492,13 @@ export const registerFoundationIpc = ({
     ipcChannels.finance.exportReportPdf,
     financeOverviewReadArgsSchema,
     async (_event, query: FinanceOverviewQuery | undefined) => {
+      const workspaceId = requireWorkspaceId(query, "export finance report");
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId,
+        action: "export finance report",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
       const dateStamp = new Date().toISOString().slice(0, 10);
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: "Export finance report PDF",
@@ -1487,29 +1527,76 @@ export const registerFoundationIpc = ({
     },
     "The app could not export the finance report PDF.",
   );
-  safeHandleRead(ipcChannels.finance.getCostLinks, () => foundationReads.getFinanceCostLinks(), "The app could not load finance cost links.");
+  safeHandleReadWithSchema(
+    ipcChannels.finance.getCostLinks,
+    workspaceQueryReadArgsSchema,
+    async (_event, query: { workspaceId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load finance cost links",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return foundationReads.getFinanceCostLinks(query.workspaceId);
+    },
+    "The app could not load finance cost links.",
+  );
   safeHandleReadWithSchema(
     ipcChannels.finance.getEntries,
     financeEntryListReadArgsSchema,
-    (_event, query: FinanceEntryListQuery | undefined) => foundationReads.getFinanceEntries(query),
+    async (_event, query: FinanceEntryListQuery | undefined) => {
+      const workspaceId = requireWorkspaceId(query, "load finance entries");
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId,
+        action: "load finance entries",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return foundationReads.getFinanceEntries(query);
+    },
     "The app could not load finance entries.",
   );
-  safeHandle(ipcChannels.finance.create, createFinancialEntrySchema, (_event, input) => financeMutations.createEntry(input));
-  safeHandle(ipcChannels.finance.update, updateFinancialEntrySchema, (_event, input) => financeMutations.updateEntry(input));
+  safeHandle(ipcChannels.finance.create, createFinancialEntrySchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "create finance entries",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return financeMutations.createEntry(input);
+  });
+  safeHandle(ipcChannels.finance.update, updateFinancialEntrySchema, async (_event, input) => {
+    await workspaceAccess.assertFinanceEntryAccess(input.entryId, "update finance entries", "write", "finance.read");
+    return financeMutations.updateEntry(input);
+  });
 
   safeHandleReadWithSchema(
     ipcChannels.currency.getSettings,
     currencySettingsReadArgsSchema,
-    (_event, query: { workspaceId: string }) => currencyReads.getSettings(query.workspaceId),
+    async (_event, query: { workspaceId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load currency settings",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return currencyReads.getSettings(query.workspaceId);
+    },
     "The app could not load currency settings.",
   );
   safeHandleReadWithSchema(
     ipcChannels.currency.listRates,
     exchangeRateListReadArgsSchema,
-    (
+    async (
       _event,
       query: { workspaceId: string; baseCurrency?: string; quoteCurrency?: string; limit?: number },
     ) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load exchange rates",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
       const { workspaceId, ...filter } = query;
       return currencyReads.listRates(workspaceId, filter);
     },
@@ -1518,7 +1605,7 @@ export const registerFoundationIpc = ({
   safeHandleReadWithSchema(
     ipcChannels.currency.getLatestRate,
     latestExchangeRateReadArgsSchema,
-    (
+    async (
       _event,
       query: {
         workspaceId: string;
@@ -1526,59 +1613,142 @@ export const registerFoundationIpc = ({
         quoteCurrency: string;
         rateType?: import("@contracts").CurrencyRateType;
       },
-    ) =>
-      currencyReads.getLatestRate(query.workspaceId, query.baseCurrency, query.quoteCurrency, query.rateType),
+    ) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load exchange rates",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return currencyReads.getLatestRate(query.workspaceId, query.baseCurrency, query.quoteCurrency, query.rateType);
+    },
     "The app could not load the latest exchange rate.",
   );
-  safeHandle(ipcChannels.currency.upsertSettings, upsertCurrencySettingsSchema, (_event, input) =>
-    currencyMutations.upsertSettings(input),
-  );
-  safeHandle(ipcChannels.currency.createRate, createExchangeRateSchema, (_event, input) =>
-    currencyMutations.createRate(input),
-  );
-  safeHandle(ipcChannels.currency.deleteRate, deleteExchangeRateSchema, (_event, input) =>
-    currencyMutations.deleteRate(input),
-  );
+  safeHandle(ipcChannels.currency.upsertSettings, upsertCurrencySettingsSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update currency settings",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return currencyMutations.upsertSettings(input);
+  });
+  safeHandle(ipcChannels.currency.createRate, createExchangeRateSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "create exchange rates",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return currencyMutations.createRate(input);
+  });
+  safeHandle(ipcChannels.currency.deleteRate, deleteExchangeRateSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "delete exchange rates",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return currencyMutations.deleteRate(input);
+  });
 
   safeHandleReadWithSchema(
     ipcChannels.quotes.list,
     quoteListReadArgsSchema,
-    (_event, filter: import("@contracts").QuoteListFilter) => quoteReads.listQuotes(filter),
+    async (_event, filter: import("@contracts").QuoteListFilter) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: filter.workspaceId,
+        action: "load quotes",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return quoteReads.listQuotes(filter);
+    },
     "The app could not load quotes.",
   );
   safeHandleReadWithSchema(
     ipcChannels.quotes.detail,
     quoteDetailReadArgsSchema,
-    (_event, query: { workspaceId: string; quoteId: string }) =>
-      quoteReads.getQuoteDetail(query.workspaceId, query.quoteId),
+    async (_event, query: { workspaceId: string; quoteId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load quote detail",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return quoteReads.getQuoteDetail(query.workspaceId, query.quoteId);
+    },
     "The app could not load the quote detail.",
   );
-  safeHandle(ipcChannels.quotes.create, createQuoteSchema, (_event, input) =>
-    quoteMutations.createQuote(input),
-  );
-  safeHandle(ipcChannels.quotes.update, updateQuoteSchema, (_event, input) =>
-    quoteMutations.updateQuote(input),
-  );
-  safeHandle(ipcChannels.quotes.setStatus, setQuoteStatusSchema, (_event, input) =>
-    quoteMutations.setStatus(input),
-  );
-  safeHandle(ipcChannels.quotes.duplicate, duplicateQuoteSchema, (_event, input) =>
-    quoteMutations.duplicateQuote(input),
-  );
-  safeHandle(ipcChannels.quotes.delete, duplicateQuoteSchema, (_event, input) =>
-    quoteMutations.deleteQuote(input),
-  );
+  safeHandle(ipcChannels.quotes.create, createQuoteSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "create quotes",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return quoteMutations.createQuote(input);
+  });
+  safeHandle(ipcChannels.quotes.update, updateQuoteSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update quotes",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return quoteMutations.updateQuote(input);
+  });
+  safeHandle(ipcChannels.quotes.setStatus, setQuoteStatusSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update quote status",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return quoteMutations.setStatus(input);
+  });
+  safeHandle(ipcChannels.quotes.duplicate, duplicateQuoteSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "duplicate quotes",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return quoteMutations.duplicateQuote(input);
+  });
+  safeHandle(ipcChannels.quotes.delete, duplicateQuoteSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "delete quotes",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return quoteMutations.deleteQuote(input);
+  });
   safeHandleReadWithSchema(
     ipcChannels.quotes.listVersions,
     quoteVersionsReadArgsSchema,
-    (_event, query: { workspaceId: string; quoteId: string }) =>
-      quoteReads.listQuoteVersions(query.workspaceId, query.quoteId),
+    async (_event, query: { workspaceId: string; quoteId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load quote versions",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return quoteReads.listQuoteVersions(query.workspaceId, query.quoteId);
+    },
     "The app could not load quote versions.",
   );
   safeHandleReadWithSchema(
     ipcChannels.quotes.exportPdf,
     quoteExportPdfReadArgsSchema,
     async (_event, query: { workspaceId: string; quoteId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "export quote PDF",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
       const dateStamp = new Date().toISOString().slice(0, 10);
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: "Export quote PDF",

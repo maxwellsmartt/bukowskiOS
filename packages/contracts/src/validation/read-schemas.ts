@@ -161,6 +161,7 @@ export const projectListQuerySchema = z.object({
 export const projectListReadArgsSchema = z.tuple([projectListQuerySchema.optional()]);
 
 export const financeEntryListQuerySchema = z.object({
+  workspaceId: nonEmptyId.optional(),
   search: boundedSearch.optional(),
   sortBy: financeEntrySortFieldSchema,
   sortDirection: sortDirectionSchema,
@@ -170,6 +171,7 @@ export const financeEntryListReadArgsSchema = z.tuple([financeEntryListQuerySche
 
 export const financeOverviewQuerySchema = z
   .object({
+    workspaceId: nonEmptyId.optional(),
     period: financeOverviewPeriodSchema,
     customStartDate: isoDateSchema.nullable().optional(),
     customEndDate: isoDateSchema.nullable().optional(),

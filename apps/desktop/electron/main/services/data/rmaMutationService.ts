@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import type { CreateRmaCaseCommand, RmaCaseAssetInput, RmaCaseMutationResult, RmaCaseStatus, UpdateRmaCaseCommand } from "@contracts";
 
+import { enqueueOperationalSnapshotOutbox } from "./operationalSnapshotService";
 import { resolveAuthorizedActor } from "./mutationAuthorization";
 
 const ensureValue = (value: string | undefined, label: string) => {
@@ -378,6 +379,18 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
         now,
       );
 
+      enqueueOperationalSnapshotOutbox(db, {
+        workspaceId,
+        entityType: "rma_case",
+        entityId: rmaCaseId,
+        updatedAt: now,
+        payload: {
+          rmaCaseId,
+          status: "Needs review",
+          assetIds: assetItems.map((item) => item.assetId),
+        },
+      });
+
       db.exec("COMMIT");
       return {
         rmaCaseId,
@@ -466,6 +479,18 @@ export const createRmaMutationService = (db: DatabaseSync) => ({
       if (status !== previousStatus) {
         applyRmaStatusToAssets(db, input, assetItems, status, actor.actorUserId, now);
       }
+
+      enqueueOperationalSnapshotOutbox(db, {
+        workspaceId,
+        entityType: "rma_case",
+        entityId: input.rmaCaseId,
+        updatedAt: now,
+        payload: {
+          rmaCaseId: input.rmaCaseId,
+          status,
+          assetIds: assetItems.map((item) => item.assetId),
+        },
+      });
 
       db.exec("COMMIT");
       return {

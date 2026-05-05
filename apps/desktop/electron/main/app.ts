@@ -204,11 +204,13 @@ app.whenReady().then(() => {
     getSyncPullCursors: localDatabase.getSyncPullCursors,
     retrySyncOutboxRow: localDatabase.retrySyncOutboxRow,
     retryAllFailedSyncOutboxRows: localDatabase.retryAllFailedSyncOutboxRows,
+    backfillOperationalSnapshots: localDatabase.backfillOperationalSnapshots,
     exportRecentLogs: localDatabase.exportRecentLogs,
     exportSupportBundle: localDatabase.exportSupportBundle,
     applyRemoteCatalogRows: localDatabase.applyRemoteCatalogRows,
     applyRemoteExchangeRates: localDatabase.applyRemoteExchangeRates,
     applyRemoteAssetSnapshots: localDatabase.applyRemoteAssetSnapshots,
+    applyRemoteOperationalSnapshots: localDatabase.applyRemoteOperationalSnapshots,
   });
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,
