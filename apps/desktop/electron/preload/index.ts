@@ -22,6 +22,8 @@ import type {
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppActionResult,
+  AppApplyRemoteAssetSnapshotsCommand,
+  AppApplyRemoteAssetSnapshotsResult,
   AppApplyRemoteCatalogRowsCommand,
   AppApplyRemoteCatalogRowsResult,
   AppDiagnosticsSnapshot,
@@ -29,6 +31,7 @@ import type {
   AppInfo,
   AppLocalWorkspaceRow,
   AppSupportSnapshot,
+  AppSyncPullCursorRow,
   AppSyncOutboxRow,
   EnsureLocalWorkspaceInput,
   AppUserMutationResult,
@@ -171,6 +174,8 @@ const bukowskiApp = {
   runIntegrityCheck: () => ipcRenderer.invoke(ipcChannels.app.runIntegrityCheck) as Promise<AppActionResult>,
   runLocalSync: () => ipcRenderer.invoke(ipcChannels.app.runLocalSync) as Promise<AppActionResult>,
   getSyncOutboxRows: () => ipcRenderer.invoke(ipcChannels.app.getSyncOutboxRows) as Promise<AppSyncOutboxRow[]>,
+  getSyncPullCursors: () =>
+    ipcRenderer.invoke(ipcChannels.app.getSyncPullCursors) as Promise<AppSyncPullCursorRow[]>,
   retrySyncOutboxRow: (id: string) =>
     ipcRenderer.invoke(ipcChannels.app.retrySyncOutboxRow, id) as Promise<AppActionResult>,
   retryAllFailedSyncOutboxRows: () =>
@@ -185,6 +190,8 @@ const bukowskiApp = {
     ipcRenderer.invoke(ipcChannels.app.applyRemoteExchangeRates, input) as Promise<
       import("@contracts").AppApplyRemoteExchangeRatesResult
     >,
+  applyRemoteAssetSnapshots: (input: AppApplyRemoteAssetSnapshotsCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.applyRemoteAssetSnapshots, input) as Promise<AppApplyRemoteAssetSnapshotsResult>,
 };
 
 const bukowskiAuth = {

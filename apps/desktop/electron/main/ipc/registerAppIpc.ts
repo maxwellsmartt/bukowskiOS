@@ -33,6 +33,7 @@ type RegisterAppIpcOptions = {
   getLocalWorkspaces: () => import("@contracts").AppLocalWorkspaceRow[];
   runLocalSyncNow: () => Promise<import("@contracts").AppDiagnosticsSnapshot>;
   getSyncOutboxRows: () => import("@contracts").AppSyncOutboxRow[];
+  getSyncPullCursors: () => import("@contracts").AppSyncPullCursorRow[];
   retrySyncOutboxRow: (id: string) => Promise<import("@contracts").AppDiagnosticsSnapshot>;
   retryAllFailedSyncOutboxRows: () => Promise<import("@contracts").AppDiagnosticsSnapshot>;
   exportRecentLogs: (filePath: string) => import("@contracts").AppExportResult;
@@ -43,6 +44,9 @@ type RegisterAppIpcOptions = {
   applyRemoteExchangeRates: (
     input: import("@contracts").AppApplyRemoteExchangeRatesCommand,
   ) => import("@contracts").AppApplyRemoteExchangeRatesResult;
+  applyRemoteAssetSnapshots: (
+    input: import("@contracts").AppApplyRemoteAssetSnapshotsCommand,
+  ) => import("@contracts").AppApplyRemoteAssetSnapshotsResult;
 };
 
 const applyRemoteCatalogRowsSchema = z.object({
@@ -81,6 +85,58 @@ const applyRemoteExchangeRatesSchema = z.object({
       notes: z.string().nullable().optional(),
       created_at: z.string().trim().min(1),
       updated_at: z.string().trim().min(1).optional(),
+    }),
+  ),
+});
+
+const applyRemoteAssetSnapshotsSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  assets: z.array(
+    z.object({
+      id: z.string().trim().min(1),
+      workspace_id: z.string().trim().min(1),
+      category_id: z.string().trim().min(1),
+      name: z.string().trim().min(1),
+      brand: z.string().nullable().optional(),
+      model: z.string().nullable().optional(),
+      serial_number: z.string().nullable().optional(),
+      internal_code: z.string().trim().min(1),
+      description: z.string().nullable().optional(),
+      purchase_date: z.string().nullable().optional(),
+      purchase_price: z.number().nullable().optional(),
+      additional_costs: z.number().nullable().optional(),
+      currency: z.string().nullable().optional(),
+      replacement_value: z.number().nullable().optional(),
+      current_book_value: z.number().nullable().optional(),
+      ownership_type: z.string().nullable().optional(),
+      default_location_id: z.string().nullable().optional(),
+      qr_code_value: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+      is_active: z.boolean().nullable().optional(),
+      created_at: z.string().min(1),
+      updated_at: z.string().min(1),
+    }),
+  ),
+  states: z.array(
+    z.object({
+      asset_id: z.string().trim().min(1),
+      workspace_id: z.string().trim().min(1),
+      current_location_id: z.string().nullable().optional(),
+      current_project_id: z.string().nullable().optional(),
+      current_department_id: z.string().nullable().optional(),
+      current_responsible_user_id: z.string().nullable().optional(),
+      active_assignment_id: z.string().nullable().optional(),
+      condition_status: z.string().trim().min(1),
+      operational_status: z.string().trim().min(1),
+      custody_status: z.string().trim().min(1),
+      last_event_id: z.string().trim().min(1),
+      version: z.number().int().nullable().optional(),
+      updated_at: z.string().min(1),
+      project_unit_id: z.string().nullable().optional(),
+      total_quantity: z.number().int().nullable().optional(),
+      available_quantity: z.number().int().nullable().optional(),
+      assigned_quantity: z.number().int().nullable().optional(),
+      checked_out_quantity: z.number().int().nullable().optional(),
     }),
   ),
 });
@@ -166,12 +222,14 @@ export const registerAppIpc = ({
   getLocalWorkspaces,
   runLocalSyncNow,
   getSyncOutboxRows,
+  getSyncPullCursors,
   retrySyncOutboxRow,
   retryAllFailedSyncOutboxRows,
   exportRecentLogs,
   exportSupportBundle,
   applyRemoteCatalogRows,
   applyRemoteExchangeRates,
+  applyRemoteAssetSnapshots,
 }: RegisterAppIpcOptions) => {
   safeHandleReadWithSchema(ipcChannels.app.getInfo, emptyReadArgsSchema, () => ({
     appName: "bukowskiOS",
@@ -287,6 +345,12 @@ export const registerAppIpc = ({
     () => getSyncOutboxRows(),
     "The app could not load the local sync queue.",
   );
+  safeHandleReadWithSchema(
+    ipcChannels.app.getSyncPullCursors,
+    emptyReadArgsSchema,
+    () => getSyncPullCursors(),
+    "The app could not load inbound sync status.",
+  );
   ipcMain.handle(ipcChannels.app.retrySyncOutboxRow, async (event, id: string) => {
     try {
       assertTrustedIpcSender(event);
@@ -390,5 +454,12 @@ export const registerAppIpc = ({
     (_event, input) =>
       applyRemoteExchangeRates(input as import("@contracts").AppApplyRemoteExchangeRatesCommand),
     "The app could not apply remote exchange rates.",
+  );
+  safeHandle(
+    ipcChannels.app.applyRemoteAssetSnapshots,
+    applyRemoteAssetSnapshotsSchema,
+    (_event, input) =>
+      applyRemoteAssetSnapshots(input as import("@contracts").AppApplyRemoteAssetSnapshotsCommand),
+    "The app could not apply remote asset snapshots.",
   );
 };

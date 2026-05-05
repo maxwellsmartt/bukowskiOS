@@ -22,6 +22,8 @@ import type {
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppActionResult,
+  AppApplyRemoteAssetSnapshotsCommand,
+  AppApplyRemoteAssetSnapshotsResult,
   AppApplyRemoteCatalogRowsCommand,
   AppApplyRemoteCatalogRowsResult,
   AppDiagnosticsSnapshot,
@@ -29,6 +31,7 @@ import type {
   AppInfo,
   AppLocalWorkspaceRow,
   AppSupportSnapshot,
+  AppSyncPullCursorRow,
   AppSyncOutboxRow,
   EnsureLocalWorkspaceInput,
   AppUserMutationResult,
@@ -154,6 +157,7 @@ declare global {
       runIntegrityCheck: () => Promise<AppActionResult>;
       runLocalSync: () => Promise<AppActionResult>;
       getSyncOutboxRows: () => Promise<AppSyncOutboxRow[]>;
+      getSyncPullCursors: () => Promise<AppSyncPullCursorRow[]>;
       retrySyncOutboxRow: (id: string) => Promise<AppActionResult>;
       retryAllFailedSyncOutboxRows: () => Promise<AppActionResult>;
       exportWorkspaceData: () => Promise<AppExportResult>;
@@ -166,6 +170,9 @@ declare global {
       applyRemoteExchangeRates: (
         input: import("@contracts").AppApplyRemoteExchangeRatesCommand,
       ) => Promise<import("@contracts").AppApplyRemoteExchangeRatesResult>;
+      applyRemoteAssetSnapshots: (
+        input: AppApplyRemoteAssetSnapshotsCommand,
+      ) => Promise<AppApplyRemoteAssetSnapshotsResult>;
     };
     bukowskiAuth?: {
       getStoredTokens: () => Promise<{

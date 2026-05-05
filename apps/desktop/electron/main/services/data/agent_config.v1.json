@@ -65,7 +65,8 @@
         "get_delivery_status",
         "draft_message",
         "get_runs_snapshot",
-        "delegate_to_agent"
+        "delegate_to_agent",
+        "ask_user_choice"
       ],
       "allowed_domains_json": [
         "assets",
@@ -121,7 +122,8 @@
         "get_schedule_conflicts",
         "get_overdue_returns",
         "create_packing_slip",
-        "return_packing_items"
+        "return_packing_items",
+        "ask_user_choice"
       ],
       "allowed_domains_json": [
         "assets",
@@ -171,9 +173,12 @@
         "get_incidents_missing_cost_estimate",
         "get_asset_detail",
         "get_financial_exposure_summary",
+        "search_assets",
+        "search_projects",
         "create_incident",
         "update_incident",
-        "create_rma"
+        "create_rma",
+        "ask_user_choice"
       ],
       "allowed_domains_json": [
         "incidents",

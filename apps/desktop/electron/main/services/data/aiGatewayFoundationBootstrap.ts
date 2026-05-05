@@ -182,6 +182,45 @@ export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
     /* table may not exist yet on a brand-new install — ignore */
   }
 
+  // Sprint B: ensure every operational agent has the `ask_user_choice` tool
+  // available so it can ask multi-choice clarifications instead of free-text
+  // questions. We patch the tools list in place for agents whose JSON does not
+  // already include the tool — non-destructive to anything else they have.
+  try {
+    const askToolKey = "ask_user_choice";
+    const targetAgents = db
+      .prepare(
+        `SELECT id, agent_key, allowed_tools_json
+           FROM agents
+          WHERE agent_key IN ('supervisor-agent', 'assets-agent', 'incidents-maintenance-agent')`,
+      )
+      .all() as Array<{ id: string; agent_key: string; allowed_tools_json: string | null }>;
+    const updateTools = db.prepare("UPDATE agents SET allowed_tools_json = ?, updated_at = ? WHERE id = ?");
+    const now = new Date().toISOString();
+    for (const agentRow of targetAgents) {
+      let tools: string[] = [];
+      try {
+        const parsed = JSON.parse(agentRow.allowed_tools_json ?? "[]");
+        if (Array.isArray(parsed)) tools = parsed.filter((value): value is string => typeof value === "string");
+      } catch {
+        tools = [];
+      }
+      if (!tools.includes(askToolKey)) {
+        tools.push(askToolKey);
+        // Also ensure Incidents has search_assets / search_projects so it can
+        // resolve names → IDs without asking the user.
+        if (agentRow.agent_key === "incidents-maintenance-agent") {
+          for (const helper of ["search_assets", "search_projects"]) {
+            if (!tools.includes(helper)) tools.push(helper);
+          }
+        }
+        updateTools.run(JSON.stringify(tools), now, agentRow.id);
+      }
+    }
+  } catch {
+    /* tolerate brand-new installs where the agents table does not exist yet */
+  }
+
   const agentsMissingProvider = db
     .prepare(
       `

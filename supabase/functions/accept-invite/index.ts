@@ -1,14 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.103.2";
 
-type SendInvitePayload = {
-  workspaceId: string;
-  email: string;
-  roleId: string;
-  message?: string;
-};
-
 type SupabaseAuthUser = {
   id: string;
+};
+
+type AcceptInvitePayload = {
+  workspaceId?: string | null;
+};
+
+type WorkspaceMembershipRow = {
+  workspace_id: string;
 };
 
 const allowedOrigins = [/^https?:\/\/localhost(?::\d+)?$/, /^https?:\/\/127\.0\.0\.1(?::\d+)?$/];
@@ -58,6 +59,23 @@ const getAuthenticatedUser = async (supabaseUrl: string, anonKey: string, bearer
   return user.id ? { user, error: null } : { user: null, error: "auth_user_missing_id" };
 };
 
+const normalizeWorkspaceId = (workspaceId: unknown) => {
+  if (typeof workspaceId !== "string") {
+    return null;
+  }
+
+  const trimmed = workspaceId.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const readPayload = async (request: Request): Promise<AcceptInvitePayload> => {
+  try {
+    return (await request.json()) as AcceptInvitePayload;
+  } catch {
+    return {};
+  }
+};
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response(null, {
@@ -79,47 +97,70 @@ Deno.serve(async (request) => {
   }
 
   const bearerToken = readBearerToken(request);
-  const userClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: bearerToken ? `Bearer ${bearerToken}` : "" } },
-  });
-  const adminClient = createClient(supabaseUrl, serviceRoleKey);
-  const payload = (await request.json()) as SendInvitePayload;
-
-  const { data: allowed, error: permissionError } = await userClient.rpc("has_permission", {
-    target_workspace_id: payload.workspaceId,
-    permission_key: "users.invite",
-  });
-
-  if (permissionError || allowed !== true) {
-    return json(request, { error: "forbidden" }, 403);
-  }
-
   const caller = await getAuthenticatedUser(supabaseUrl, anonKey, bearerToken);
-  const { data: invite, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(payload.email, {
-    redirectTo: `bukowskios://auth/accept-invite?flow=invite&workspace_id=${encodeURIComponent(payload.workspaceId)}`,
-    data: {
-      workspace_id: payload.workspaceId,
-      role_id: payload.roleId,
-      message: payload.message ?? null,
-    },
-  });
 
-  if (inviteError || !invite.user) {
-    return json(request, { error: inviteError?.message ?? "invite_failed" }, 400);
+  if (!caller.user) {
+    return json(request, { error: caller.error ?? "unauthenticated" }, 401);
   }
 
-  const { error: membershipError } = await adminClient.from("workspace_memberships").upsert({
-    workspace_id: payload.workspaceId,
-    user_id: invite.user.id,
-    role_id: payload.roleId,
-    status: "invited",
-    invited_by: caller.user?.id ?? null,
-    invited_at: new Date().toISOString(),
-  });
+  const payload = await readPayload(request);
+  const workspaceId = normalizeWorkspaceId(payload.workspaceId);
+  const adminClient = createClient(supabaseUrl, serviceRoleKey);
+  const now = new Date().toISOString();
 
-  if (membershipError) {
-    return json(request, { error: membershipError.message }, 400);
+  let inviteQuery = adminClient
+    .from("workspace_memberships")
+    .update({
+      status: "active",
+      accepted_at: now,
+      updated_at: now,
+    })
+    .eq("user_id", caller.user.id)
+    .eq("status", "invited")
+    .select("workspace_id");
+
+  if (workspaceId) {
+    inviteQuery = inviteQuery.eq("workspace_id", workspaceId);
   }
 
-  return json(request, { ok: true, userId: invite.user.id });
+  const { data: acceptedRows, error: acceptError } = await inviteQuery;
+
+  if (acceptError) {
+    return json(request, { error: acceptError.message }, 400);
+  }
+
+  const acceptedWorkspaceIds = ((acceptedRows ?? []) as WorkspaceMembershipRow[])
+    .map((row) => row.workspace_id)
+    .filter(Boolean);
+
+  if (acceptedWorkspaceIds.length > 0) {
+    return json(request, {
+      ok: true,
+      accepted: true,
+      workspaceIds: acceptedWorkspaceIds,
+    });
+  }
+
+  let activeQuery = adminClient
+    .from("workspace_memberships")
+    .select("workspace_id")
+    .eq("user_id", caller.user.id)
+    .eq("status", "active");
+
+  if (workspaceId) {
+    activeQuery = activeQuery.eq("workspace_id", workspaceId);
+  }
+
+  const { data: activeRows, error: activeError } = await activeQuery;
+
+  if (activeError) {
+    return json(request, { error: activeError.message }, 400);
+  }
+
+  return json(request, {
+    ok: true,
+    accepted: false,
+    alreadyActive: ((activeRows ?? []) as WorkspaceMembershipRow[]).length > 0,
+    workspaceIds: ((activeRows ?? []) as WorkspaceMembershipRow[]).map((row) => row.workspace_id).filter(Boolean),
+  });
 });

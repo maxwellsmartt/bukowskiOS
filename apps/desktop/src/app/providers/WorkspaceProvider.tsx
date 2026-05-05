@@ -209,6 +209,15 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     void refreshWorkspaces();
   }, [refreshWorkspaces]);
 
+  useEffect(() => {
+    const handleWorkspaceMembershipChange = () => {
+      void refreshWorkspaces();
+    };
+
+    window.addEventListener("bukowski:workspace-memberships-changed", handleWorkspaceMembershipChange);
+    return () => window.removeEventListener("bukowski:workspace-memberships-changed", handleWorkspaceMembershipChange);
+  }, [refreshWorkspaces]);
+
   const createWorkspace = useCallback(
     async (input: CreateWorkspaceInput) => {
       if (isLocalFallback || !supabase) {

@@ -8,6 +8,7 @@ import {
   type AppDiagnosticsSnapshot,
   type AppExportResult,
   type AppInfo,
+  type AppSyncPullCursorRow,
   type AppSupportSnapshot,
   type AppSyncOutboxRow,
   type EnsureLocalWorkspaceInput,
@@ -33,6 +34,7 @@ import { createFoundationReadService, type FoundationReadService } from "./found
 import { applyAssetQuantityFoundationMigration } from "./assetQuantityFoundationBootstrap";
 import { applyAssetValuationFoundationMigration } from "./assetValuationFoundationBootstrap";
 import { createAssetMutationService } from "./assetMutationService";
+import { createAssetSnapshotPullService } from "./assetSnapshotPullService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
 import { createCatalogPullService } from "./catalogPullService";
@@ -121,6 +123,7 @@ type LocalDatabaseRuntime = {
   getLocalWorkspaces: () => import("@contracts").AppLocalWorkspaceRow[];
   runLocalSyncNow: () => Promise<AppDiagnosticsSnapshot>;
   getSyncOutboxRows: () => AppSyncOutboxRow[];
+  getSyncPullCursors: () => AppSyncPullCursorRow[];
   retrySyncOutboxRow: (id: string) => Promise<AppDiagnosticsSnapshot>;
   retryAllFailedSyncOutboxRows: () => Promise<AppDiagnosticsSnapshot>;
   exportRecentLogs: (filePath: string) => AppExportResult;
@@ -131,6 +134,9 @@ type LocalDatabaseRuntime = {
   applyRemoteExchangeRates: (
     input: import("@contracts").AppApplyRemoteExchangeRatesCommand,
   ) => import("@contracts").AppApplyRemoteExchangeRatesResult;
+  applyRemoteAssetSnapshots: (
+    input: import("@contracts").AppApplyRemoteAssetSnapshotsCommand,
+  ) => import("@contracts").AppApplyRemoteAssetSnapshotsResult;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -878,6 +884,39 @@ const createRuntime = (): LocalDatabaseRuntime => {
 
   const getSyncOutboxRows = () => syncOutboxWorker.listRows();
 
+  const getSyncPullCursors = (): AppSyncPullCursorRow[] =>
+    (
+      database
+        .prepare(
+          `
+            SELECT
+              workspace_id,
+              entity_type,
+              last_synced_at,
+              last_pulled_count,
+              last_error,
+              updated_at
+            FROM sync_pull_cursors
+            ORDER BY updated_at DESC, entity_type ASC
+          `,
+        )
+        .all() as Array<{
+        workspace_id: string;
+        entity_type: string;
+        last_synced_at: string | null;
+        last_pulled_count: number;
+        last_error: string | null;
+        updated_at: string;
+      }>
+    ).map((row) => ({
+      workspaceId: row.workspace_id,
+      entityType: row.entity_type,
+      lastSyncedAt: row.last_synced_at,
+      lastPulledCount: row.last_pulled_count,
+      lastError: row.last_error,
+      updatedAt: row.updated_at,
+    }));
+
   const retrySyncOutboxRow = async (id: string) => {
     const retried = syncOutboxWorker.retryRow(id);
 
@@ -1088,6 +1127,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
       const result = createCatalogPullService(database).applyRemoteExchangeRates(input.workspaceId, input.rows);
       return { workspaceId: input.workspaceId, ...result };
     },
+    applyRemoteAssetSnapshots: (input: import("@contracts").AppApplyRemoteAssetSnapshotsCommand) =>
+      createAssetSnapshotPullService(database).applyRemoteSnapshots(input.workspaceId, input.assets, input.states),
     runtimeDiagnostics,
     supportDiagnostics,
     userAdmin,
@@ -1100,6 +1141,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     getLocalWorkspaces,
     runLocalSyncNow,
     getSyncOutboxRows,
+    getSyncPullCursors,
     retrySyncOutboxRow,
     retryAllFailedSyncOutboxRows,
     exportRecentLogs: (filePath: string) => supportDiagnostics.exportRecentLogs(filePath),

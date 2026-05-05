@@ -4,6 +4,7 @@ import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import { resolveActiveRoute } from "@app/routing/route-meta";
 import { AppRoutes } from "@app/routing/routes";
 import { useAutoLogout } from "@shared/hooks/useAutoLogout";
+import { useAssetSnapshotPull } from "@shared/hooks/useAssetSnapshotPull";
 import { useCatalogPull } from "@shared/hooks/useCatalogPull";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useSession } from "@app/providers/SessionProvider";
@@ -39,6 +40,7 @@ export const AppShell = () => {
   const { activeWorkspaceId } = useWorkspace();
   useAutoLogout();
   useCatalogPull();
+  useAssetSnapshotPull();
   const [workspaceTransitionActive, setWorkspaceTransitionActive] = useState(false);
   const prevWorkspaceIdRef = useRef(activeWorkspaceId);
 

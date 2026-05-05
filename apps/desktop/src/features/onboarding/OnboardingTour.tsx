@@ -55,11 +55,15 @@ export const OnboardingTour = () => {
   const { activeWorkspaceId, activeWorkspaceName, isWorkspaceReady } = useWorkspace();
   const [stepIndex, setStepIndex] = useState(0);
   const [forceOpen, setForceOpen] = useState(false);
+  const [completedWorkspaces, setCompletedWorkspaces] = useState(() => readCompletedWorkspaces());
 
-  const completed = useMemo(() => readCompletedWorkspaces(), [activeWorkspaceId]);
-  const isCompleted = completed.includes(activeWorkspaceId);
+  const isCompleted = useMemo(
+    () => completedWorkspaces.includes(activeWorkspaceId),
+    [activeWorkspaceId, completedWorkspaces],
+  );
 
   useEffect(() => {
+    setCompletedWorkspaces(readCompletedWorkspaces());
     setStepIndex(0);
     setForceOpen(false);
   }, [activeWorkspaceId]);
@@ -112,6 +116,7 @@ export const OnboardingTour = () => {
 
   const handleClose = () => {
     markTourCompleted(activeWorkspaceId);
+    setCompletedWorkspaces(readCompletedWorkspaces());
     setForceOpen(false);
   };
 

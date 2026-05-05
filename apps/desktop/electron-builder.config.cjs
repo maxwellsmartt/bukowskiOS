@@ -23,6 +23,7 @@ module.exports = {
   asar: true,
   npmRebuild: false,
   mac: {
+    icon: "build/icon.icns",
     target: ["dmg", "zip"],
     category: "public.app-category.business",
     artifactName: "${productName}-${version}-${arch}.${ext}",

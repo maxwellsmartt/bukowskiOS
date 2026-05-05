@@ -1,4 +1,5 @@
-import type { AppActionResult, AppDiagnosticsSnapshot, AppSyncOutboxRow } from "@contracts";
+import { AlertTriangle, CheckCircle2, CloudDownload, CloudUpload, RefreshCw } from "lucide-react";
+import type { AppActionResult, AppDiagnosticsSnapshot, AppSyncOutboxRow, AppSyncPullCursorRow } from "@contracts";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -44,6 +45,19 @@ const syncFilters: Array<{ value: SyncFilter; label: string }> = [
   { value: "sent", label: "Sent" },
 ];
 
+const inboundCoverage = [
+  { entityType: "asset_snapshots", label: "Assets", detail: "Inventory and current stock state", status: "active" },
+  { entityType: "asset_categories", label: "Categories", detail: "Asset categories", status: "active" },
+  { entityType: "locations", label: "Locations", detail: "Warehouses and operational locations", status: "active" },
+  { entityType: "clients", label: "Clients", detail: "Client catalog", status: "active" },
+  { entityType: "manufacturers", label: "Manufacturers", detail: "Manufacturer catalog", status: "active" },
+  { entityType: "production_companies", label: "Production companies", detail: "Production company catalog", status: "active" },
+  { entityType: "projects", label: "Projects", detail: "Needs remote snapshot tables", status: "planned" },
+  { entityType: "packing_slips", label: "Packing slips", detail: "Needs remote snapshot tables", status: "planned" },
+  { entityType: "incidents", label: "Incidents", detail: "Needs remote snapshot tables", status: "planned" },
+  { entityType: "rma_cases", label: "RMAs", detail: "Needs remote snapshot tables", status: "planned" },
+] as const;
+
 const formatDateLabel = (value: string | null) => {
   if (!value) {
     return "Never";
@@ -51,6 +65,75 @@ const formatDateLabel = (value: string | null) => {
 
   const parsedDate = new Date(value);
   return Number.isNaN(parsedDate.getTime()) ? value : parsedDate.toLocaleString();
+};
+
+const formatEntityLabel = (value: string) =>
+  value
+    .split("_")
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(" ");
+
+const resolveOutboundStatus = (diagnostics: AppDiagnosticsSnapshot) => {
+  if (diagnostics.syncOutboxFailedCount > 0) {
+    return {
+      tone: "critical" as const,
+      label: "Needs attention",
+      detail: `${diagnostics.syncOutboxFailedCount} upload${diagnostics.syncOutboxFailedCount === 1 ? "" : "s"} failed.`,
+    };
+  }
+
+  if (diagnostics.syncOutboxProcessingCount > 0) {
+    return {
+      tone: "info" as const,
+      label: "Uploading",
+      detail: `${diagnostics.syncOutboxProcessingCount} change${diagnostics.syncOutboxProcessingCount === 1 ? "" : "s"} in progress.`,
+    };
+  }
+
+  if (diagnostics.syncOutboxPendingCount > 0) {
+    return {
+      tone: "warning" as const,
+      label: "Waiting to upload",
+      detail: `${diagnostics.syncOutboxPendingCount} change${diagnostics.syncOutboxPendingCount === 1 ? "" : "s"} queued.`,
+    };
+  }
+
+  return {
+    tone: "success" as const,
+    label: "Up to date",
+    detail: "No local changes waiting for cloud upload.",
+  };
+};
+
+const resolveInboundStatus = (pullCursors: AppSyncPullCursorRow[]) => {
+  const failed = pullCursors.filter((row) => row.lastError);
+  const activeCursors = pullCursors.filter((row) => !row.lastError);
+  const latest = activeCursors[0]?.updatedAt ?? pullCursors[0]?.updatedAt ?? null;
+
+  if (failed.length > 0) {
+    return {
+      tone: "critical" as const,
+      label: "Download needs attention",
+      detail: `${failed.length} inbound source${failed.length === 1 ? "" : "s"} reported an error.`,
+      latest,
+    };
+  }
+
+  if (pullCursors.length > 0) {
+    return {
+      tone: "success" as const,
+      label: "Downloads active",
+      detail: `${pullCursors.length} inbound source${pullCursors.length === 1 ? "" : "s"} checked.`,
+      latest,
+    };
+  }
+
+  return {
+    tone: "warning" as const,
+    label: "Waiting for first download",
+    detail: "Open a remote workspace and the app will start pulling supported data.",
+    latest: null,
+  };
 };
 
 const formatSyncStatusTone = (status: AppSyncOutboxRow["status"]) => {
@@ -103,6 +186,7 @@ export const SyncOutboxPage = () => {
   const navigate = useNavigate();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
   const [rows, setRows] = useState<AppSyncOutboxRow[]>([]);
+  const [pullCursors, setPullCursors] = useState<AppSyncPullCursorRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [filter, setFilter] = useState<SyncFilter>("all");
@@ -125,8 +209,10 @@ export const SyncOutboxPage = () => {
         window.bukowskiApp.getDiagnostics(),
         window.bukowskiApp.getSyncOutboxRows(),
       ]);
+      const nextPullCursors = await window.bukowskiApp.getSyncPullCursors().catch(() => []);
       setDiagnostics(nextDiagnostics);
       setRows(nextRows);
+      setPullCursors(nextPullCursors);
       setError(null);
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, "The app could not load sync activity."));
@@ -182,6 +268,12 @@ export const SyncOutboxPage = () => {
   }, [deferredSearch, entityFilter, filter, rows]);
 
   const activeRow = useMemo(() => visibleRows.find((row) => row.id === activeRowId) ?? null, [activeRowId, visibleRows]);
+  const outboundStatus = useMemo(() => resolveOutboundStatus(diagnostics), [diagnostics]);
+  const inboundStatus = useMemo(() => resolveInboundStatus(pullCursors), [pullCursors]);
+  const pullCursorByEntity = useMemo(
+    () => new Map(pullCursors.map((cursor) => [cursor.entityType, cursor])),
+    [pullCursors],
+  );
   const visibleRetryableRows = useMemo(
     () => visibleRows.filter((row) => row.status === "failed" || row.status === "processing"),
     [visibleRows],
@@ -255,32 +347,59 @@ export const SyncOutboxPage = () => {
       <SectionHeader
         eyebrow="Settings"
         title="Sync activity"
-        body="Track local changes still on their way to the cloud, retry failed rows and inspect outbox state."
-        titleTone="accent"
       />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
       {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
       <SettingsLayout>
-      <div className="chip-row">
-        <StatusBadge tone={diagnostics.syncOutboxFailedCount ? "critical" : "success"}>
-          {diagnostics.syncOutboxFailedCount ? `${diagnostics.syncOutboxFailedCount} failed` : "Up to date"}
-        </StatusBadge>
-        <StatusBadge tone="warning">{`${diagnostics.syncOutboxPendingCount} pending`}</StatusBadge>
-        <StatusBadge tone="info">{`${diagnostics.syncOutboxProcessingCount} processing`}</StatusBadge>
-        <StatusBadge>{`${visibleRows.length} visible`}</StatusBadge>
-        <StatusBadge>{formatDateLabel(diagnostics.lastSyncRunAt)}</StatusBadge>
+      <div className="sync-overview-grid">
+        <SurfaceCard className="sync-direction-card" title="Upload to cloud">
+          <div className="sync-direction-head">
+            <span className={`sync-direction-icon sync-direction-icon-${outboundStatus.tone}`}>
+              <CloudUpload size={18} />
+            </span>
+            <div>
+              <StatusBadge tone={outboundStatus.tone}>{outboundStatus.label}</StatusBadge>
+              <p>{outboundStatus.detail}</p>
+            </div>
+          </div>
+          <div className="sync-metric-row">
+            <span><strong>{diagnostics.syncOutboxPendingCount}</strong> pending</span>
+            <span><strong>{diagnostics.syncOutboxProcessingCount}</strong> uploading</span>
+            <span><strong>{diagnostics.syncOutboxFailedCount}</strong> failed</span>
+          </div>
+          <small>Last upload pass: {formatDateLabel(diagnostics.lastSyncRunAt)}</small>
+        </SurfaceCard>
+
+        <SurfaceCard className="sync-direction-card" title="Download from cloud">
+          <div className="sync-direction-head">
+            <span className={`sync-direction-icon sync-direction-icon-${inboundStatus.tone}`}>
+              <CloudDownload size={18} />
+            </span>
+            <div>
+              <StatusBadge tone={inboundStatus.tone}>{inboundStatus.label}</StatusBadge>
+              <p>{inboundStatus.detail}</p>
+            </div>
+          </div>
+          <div className="sync-metric-row">
+            <span><strong>{pullCursors.length}</strong> sources</span>
+            <span><strong>{pullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0)}</strong> latest rows</span>
+            <span><strong>{pullCursors.filter((row) => row.lastError).length}</strong> errors</span>
+          </div>
+          <small>Last download check: {formatDateLabel(inboundStatus.latest)}</small>
+        </SurfaceCard>
       </div>
 
-      <div className="action-panel-actions action-panel-actions-start">
+      <div className="sync-action-row">
         <button
           className="action-primary-button"
           disabled={isRunningLocalSync}
           onClick={() => void runAction(() => window.bukowskiApp!.runLocalSync(), setIsRunningLocalSync)}
           type="button"
         >
-          {isRunningLocalSync ? "Syncing..." : "Run sync now"}
+          <RefreshCw size={14} />
+          <span>{isRunningLocalSync ? "Syncing..." : "Run upload sync"}</span>
         </button>
         <button
           className="ghost-control"
@@ -288,7 +407,7 @@ export const SyncOutboxPage = () => {
           onClick={() => void runAction(() => window.bukowskiApp!.retryAllFailedSyncOutboxRows(), setIsRetryingAllFailed)}
           type="button"
         >
-          {isRetryingAllFailed ? "Retrying failed rows..." : "Retry all failed"}
+          {isRetryingAllFailed ? "Retrying failed..." : "Retry failed uploads"}
         </button>
         <button
           className="ghost-control"
@@ -296,12 +415,36 @@ export const SyncOutboxPage = () => {
           onClick={() => void retryVisibleRows()}
           type="button"
         >
-          {isRetryingVisible ? "Retrying visible rows..." : `Retry visible (${visibleRetryableRows.length})`}
+          {isRetryingVisible ? "Retrying visible..." : `Retry visible (${visibleRetryableRows.length})`}
         </button>
       </div>
 
+      <SurfaceCard title="Download coverage">
+        <div className="sync-coverage-grid">
+          {inboundCoverage.map((item) => {
+            const cursor = pullCursorByEntity.get(item.entityType);
+            const isActive = item.status === "active";
+            const hasError = Boolean(cursor?.lastError);
+            return (
+              <div className={`sync-coverage-item${isActive ? "" : " is-planned"}`} key={item.entityType}>
+                <span className={`sync-coverage-icon${hasError ? " is-error" : isActive ? " is-active" : ""}`}>
+                  {hasError ? <AlertTriangle size={14} /> : isActive ? <CheckCircle2 size={14} /> : <CloudDownload size={14} />}
+                </span>
+                <div>
+                  <strong>{item.label}</strong>
+                  <small>{hasError ? cursor?.lastError : cursor ? `${cursor.lastPulledCount} rows in latest pull` : item.detail}</small>
+                </div>
+                <StatusBadge tone={hasError ? "critical" : isActive ? "success" : "neutral"}>
+                  {hasError ? "Error" : isActive ? "Active" : "Planned"}
+                </StatusBadge>
+              </div>
+            );
+          })}
+        </div>
+      </SurfaceCard>
+
       <ResizableSideRailLayout className="split-layout" defaultWidth={420} maxWidth={680} minWidth={320} storageKey="sync-outbox-side-rail-width">
-        <SurfaceCard title="Rows">
+        <SurfaceCard title="Upload queue">
           <div className="sync-outbox-toolbar">
             <div className="sync-outbox-filter-row">
               {syncFilters.map((item) => (
@@ -323,14 +466,14 @@ export const SyncOutboxPage = () => {
                   onClick={() => setEntityFilter(item)}
                   type="button"
                 >
-                  {item === "all" ? "All entities" : item}
+                  {item === "all" ? "All entities" : formatEntityLabel(item)}
                 </button>
               ))}
             </div>
             <input
               className="text-input sync-outbox-search"
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search entity, operation, payload or error"
+              placeholder="Search upload, operation, payload or error"
               type="search"
               value={search}
             />
@@ -354,14 +497,14 @@ export const SyncOutboxPage = () => {
               { key: "attemptCount", label: "Attempts", align: "right", render: (row) => row.attemptCount },
               { key: "updatedAt", label: "Updated", render: (row) => formatDateLabel(row.updatedAt) },
             ]}
-            emptyMessage="No outbox rows match the current filter."
+            emptyMessage="No upload rows match the current filter."
             rows={visibleRows}
           />
         </SurfaceCard>
 
-        <SurfaceCard title="Row Detail" subtitle={summarizeSelection(activeRow)}>
+        <SurfaceCard title="Upload detail" subtitle={summarizeSelection(activeRow)}>
           {!activeRow ? (
-            <div className="empty-state">Select any outbox row to inspect it.</div>
+            <div className="empty-state">Select an upload row to inspect it.</div>
           ) : (
             <div className="sync-outbox-detail-stack">
               <div className="summary-grid">

@@ -124,6 +124,31 @@ const persistStoredTokens = (tokens: { accessToken: string | null; refreshToken:
   });
 };
 
+const acceptWorkspaceInvite = async (supabase: BukowskiSupabaseClient, workspaceId: string | null) => {
+  const env = resolveBukowskiSupabaseEnv(import.meta.env);
+  const { data, error } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+
+  if (error || !accessToken) {
+    throw new Error("We could not verify your invite session. Open the invite link again or sign in first.");
+  }
+
+  const response = await fetch(`${env.url.replace(/\/+$/, "")}/functions/v1/accept-invite`, {
+    method: "POST",
+    headers: {
+      apikey: env.anonKey,
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ workspaceId }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error ?? "We could not activate this workspace invite.");
+  }
+};
+
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [supabase] = useState(() => createSupabaseClientFromEnv());
   const [status, setStatus] = useState<SessionStatus>(() => (supabase ? "loading" : "authenticated"));
@@ -427,15 +452,31 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         const flow = parsedUrl.searchParams.get("flow");
         const type = parsedUrl.searchParams.get("type");
         const isRecoveryFlow = flow === "password-recovery" || type === "recovery";
+        const isInviteFlow = flow === "invite" || parsedUrl.pathname === "/accept-invite";
+        const workspaceId = parsedUrl.searchParams.get("workspace_id") ?? parsedUrl.searchParams.get("workspaceId");
 
         if (!code) {
           return isRecoveryFlow ? "/login/reset-password" : "/workspaces/select";
         }
 
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
           setAuthError(error.message);
           throw error;
+        }
+
+        if (data.session) {
+          setUser(toSessionUser(data.session.user));
+          setStatus("authenticated");
+          persistStoredTokens({
+            accessToken: data.session.access_token,
+            refreshToken: data.session.refresh_token,
+          });
+        }
+
+        if (isInviteFlow) {
+          await acceptWorkspaceInvite(supabase, workspaceId);
+          window.dispatchEvent(new CustomEvent("bukowski:workspace-memberships-changed"));
         }
 
         setIsPasswordRecovery(isRecoveryFlow);

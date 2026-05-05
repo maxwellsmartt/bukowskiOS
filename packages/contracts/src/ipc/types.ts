@@ -87,6 +87,15 @@ export type AppSyncOutboxRow = {
   payloadJson: string;
 };
 
+export type AppSyncPullCursorRow = {
+  workspaceId: string;
+  entityType: string;
+  lastSyncedAt: string | null;
+  lastPulledCount: number;
+  lastError: string | null;
+  updatedAt: string;
+};
+
 export type EnsureLocalWorkspaceInput = {
   id: string;
   name: string;
@@ -133,6 +142,68 @@ export type AppApplyRemoteCatalogRowsResult = {
   appliedCount: number;
   skippedDueToOutboxCount: number;
   skippedDueToOlderCount: number;
+  errors: string[];
+  cursorAfter: string | null;
+};
+
+export type AppRemoteAssetSnapshotRow = {
+  id: string;
+  workspace_id: string;
+  category_id: string;
+  name: string;
+  brand?: string | null;
+  model?: string | null;
+  serial_number?: string | null;
+  internal_code: string;
+  description?: string | null;
+  purchase_date?: string | null;
+  purchase_price?: number | null;
+  additional_costs?: number | null;
+  currency?: string | null;
+  replacement_value?: number | null;
+  current_book_value?: number | null;
+  ownership_type?: string | null;
+  default_location_id?: string | null;
+  qr_code_value?: string | null;
+  notes?: string | null;
+  is_active?: boolean | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AppRemoteAssetCurrentStateRow = {
+  asset_id: string;
+  workspace_id: string;
+  current_location_id?: string | null;
+  current_project_id?: string | null;
+  current_department_id?: string | null;
+  current_responsible_user_id?: string | null;
+  active_assignment_id?: string | null;
+  condition_status: string;
+  operational_status: string;
+  custody_status: string;
+  last_event_id: string;
+  version?: number | null;
+  updated_at: string;
+  project_unit_id?: string | null;
+  total_quantity?: number | null;
+  available_quantity?: number | null;
+  assigned_quantity?: number | null;
+  checked_out_quantity?: number | null;
+};
+
+export type AppApplyRemoteAssetSnapshotsCommand = {
+  workspaceId: string;
+  assets: AppRemoteAssetSnapshotRow[];
+  states: AppRemoteAssetCurrentStateRow[];
+};
+
+export type AppApplyRemoteAssetSnapshotsResult = {
+  workspaceId: string;
+  appliedCount: number;
+  skippedDueToOutboxCount: number;
+  skippedDueToOlderCount: number;
+  missingAssetCount: number;
   errors: string[];
   cursorAfter: string | null;
 };

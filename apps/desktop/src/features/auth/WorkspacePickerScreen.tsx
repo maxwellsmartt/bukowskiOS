@@ -1,11 +1,13 @@
-import { Check, Plus } from "lucide-react";
+import { Check, Plus, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 
 export const WorkspacePickerScreen = () => {
   const navigate = useNavigate();
-  const { activeWorkspaceId, isLoadingWorkspaces, memberships, switchWorkspace, workspaceError } = useWorkspace();
+  const { activeWorkspaceId, isLoadingWorkspaces, memberships, refreshWorkspaces, switchWorkspace, workspaceError } =
+    useWorkspace();
+  const hasNoWorkspaceAccess = !isLoadingWorkspaces && memberships.length === 0;
 
   return (
     <div className="auth-screen">
@@ -46,6 +48,16 @@ export const WorkspacePickerScreen = () => {
               {membership.workspaceId === activeWorkspaceId ? <Check size={16} /> : null}
             </button>
           ))}
+          {hasNoWorkspaceAccess ? (
+            <div className="workspace-picker-empty">
+              <strong>No workspace access yet</strong>
+              <p>Ask an admin to invite this email, then refresh once you accept the invite.</p>
+              <button className="auth-secondary-button" onClick={() => void refreshWorkspaces()} type="button">
+                <RefreshCw size={14} />
+                <span>Refresh access</span>
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <button className="auth-secondary-button" onClick={() => navigate("/workspaces/create")} type="button">
