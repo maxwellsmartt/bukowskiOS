@@ -82,7 +82,7 @@ export const WorkspaceSwitcher = () => {
               type="button"
             >
               <Settings size={14} />
-              <span>Workspace settings</span>
+              <span>Settings</span>
             </button>
           </div>
         </div>

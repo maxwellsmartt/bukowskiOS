@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Pencil, Save, Send, X } from "lucide-react";
 
 import type { AppUserAdminRow, AppUsersSnapshot } from "@contracts";
@@ -11,10 +12,17 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
+import { CurrencySettingsCard } from "./CurrencySettingsCard";
 import { CustomRolesEditor } from "./CustomRolesEditor";
 import { InviteMemberDialog } from "./InviteMemberDialog";
 import { SettingsLayout } from "./SettingsLayout";
-import { revokeWorkspaceInvite, sendWorkspaceInvite } from "./inviteService";
+import { WorkspaceBrandingCard } from "./WorkspaceBrandingCard";
+import {
+  revokeWorkspaceInvite,
+  sendWorkspaceInvite,
+  setMemberStatus,
+  updateMemberRole,
+} from "./inviteService";
 
 const emptyUsersSnapshot: AppUsersSnapshot = { users: [], roles: [] };
 
@@ -52,7 +60,8 @@ const resolveMembershipLabel = (status: AppUserAdminRow["membershipStatus"]) => 
 
 export const WorkspaceSettingsPage = () => {
   const toast = useToast();
-  const { supabase, isLocalFallback } = useSession();
+  const navigate = useNavigate();
+  const { supabase, isLocalFallback, user: sessionUser } = useSession();
   const { activeWorkspaceId, activeWorkspaceName, activeMembership, memberships, refreshWorkspaces } = useWorkspace();
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
   const [pendingInvites, setPendingInvites] = useState<PendingInviteRow[]>([]);
@@ -215,6 +224,42 @@ export const WorkspaceSettingsPage = () => {
   const teamMembers = usersSnapshot.users.filter((user) => user.membershipStatus !== "missing");
   const inviteRolesForDialog = usersSnapshot.roles;
 
+  const handleChangeMemberRole = async (member: AppUserAdminRow, nextRoleId: string) => {
+    if (!supabase || !nextRoleId || nextRoleId === member.roleId) {
+      return;
+    }
+    try {
+      await updateMemberRole(supabase, {
+        workspaceId: activeWorkspaceId,
+        userId: member.id,
+        roleId: nextRoleId,
+      });
+      toast.success("Role updated", `${member.fullName || member.email} has a new role.`);
+      await loadMembers();
+    } catch (nextError) {
+      toast.error("Could not change role", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+    }
+  };
+
+  const handleToggleMemberStatus = async (member: AppUserAdminRow) => {
+    if (!supabase) return;
+    const nextStatus: "active" | "inactive" = member.membershipStatus === "active" ? "inactive" : "active";
+    try {
+      await setMemberStatus(supabase, {
+        workspaceId: activeWorkspaceId,
+        userId: member.id,
+        status: nextStatus,
+      });
+      toast.success(
+        nextStatus === "inactive" ? "Member suspended" : "Member reactivated",
+        `${member.fullName || member.email} is now ${nextStatus === "inactive" ? "suspended" : "active"}.`,
+      );
+      await loadMembers();
+    } catch (nextError) {
+      toast.error("Could not change status", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+    }
+  };
+
   const handleResendInvite = async (invite: PendingInviteRow) => {
     if (!supabase || !invite.roleId) {
       toast.error("Cannot resend", "This invite is missing role information.");
@@ -253,7 +298,7 @@ export const WorkspaceSettingsPage = () => {
       <SectionHeader
         eyebrow="Workspace"
         title={activeWorkspaceName}
-        body="Workspace identity, members, invites and roles."
+        body="Identity, currency, branding, members and roles for this workspace."
         titleTone="accent"
       />
 
@@ -262,7 +307,8 @@ export const WorkspaceSettingsPage = () => {
       <SettingsLayout>
 
       <SurfaceCard
-        title="Workspace details"
+        title="Identity"
+        subtitle="The workspace's name, slug and accent. Currency lives below."
         aside={
           workspaceProfile && !isEditingWorkspace && !isLocalFallback ? (
             <button className="ghost-control" onClick={() => setIsEditingWorkspace(true)} type="button">
@@ -280,18 +326,6 @@ export const WorkspaceSettingsPage = () => {
                 className="field-input"
                 onChange={(event) => setWorkspaceDraft((current) => ({ ...current, name: event.target.value }))}
                 value={workspaceDraft.name}
-              />
-            </label>
-            <label className="field-block">
-              <span className="field-label">Base currency (ISO)</span>
-              <input
-                className="field-input"
-                maxLength={3}
-                onChange={(event) =>
-                  setWorkspaceDraft((current) => ({ ...current, baseCurrency: event.target.value.toUpperCase() }))
-                }
-                placeholder="USD"
-                value={workspaceDraft.baseCurrency}
               />
             </label>
             <label className="field-block">
@@ -334,42 +368,61 @@ export const WorkspaceSettingsPage = () => {
             </div>
           </div>
         ) : (
-          <div className="summary-grid compact-summary-grid">
-            <div className="summary-row">
-              <span className="summary-label">Name</span>
-              <span className="summary-value">{workspaceProfile?.name ?? activeWorkspaceName}</span>
+          <div className="workspace-details-groups">
+            <div className="workspace-details-group">
+              <span className="workspace-details-group-label">Workspace</span>
+              <div className="summary-grid compact-summary-grid">
+                <div className="summary-row">
+                  <span className="summary-label">Name</span>
+                  <span className="summary-value">{workspaceProfile?.name ?? activeWorkspaceName}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Slug</span>
+                  <span className="summary-value">{workspaceProfile?.slug ?? "—"}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Icon color</span>
+                  <span className="summary-value">
+                    {workspaceProfile?.iconColor ? (
+                      <span className="workspace-color-chip">
+                        <span style={{ background: workspaceProfile.iconColor }} />
+                        <code>{workspaceProfile.iconColor}</code>
+                      </span>
+                    ) : (
+                      "Default"
+                    )}
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Workspace ID</span>
+                  <span className="summary-value workspace-details-id">{activeWorkspaceId}</span>
+                </div>
+              </div>
             </div>
-            <div className="summary-row">
-              <span className="summary-label">Slug</span>
-              <span className="summary-value">{workspaceProfile?.slug ?? "—"}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Base currency</span>
-              <span className="summary-value">{workspaceProfile?.baseCurrency ?? "USD"}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Icon color</span>
-              <span className="summary-value">{workspaceProfile?.iconColor ?? "Default"}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Workspace ID</span>
-              <span className="summary-value">{activeWorkspaceId}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Your role</span>
-              <span className="summary-value">{activeMembership?.roleName ?? "Member"}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-label">Your access</span>
-              <span className="summary-value">
-                {activeMembership?.permissions.length
-                  ? `${activeMembership.permissions.length} permissions`
-                  : "Pending — refresh the workspace if this stays empty"}
-              </span>
+
+            <div className="workspace-details-group">
+              <span className="workspace-details-group-label">Your access</span>
+              <div className="summary-grid compact-summary-grid">
+                <div className="summary-row">
+                  <span className="summary-label">Role</span>
+                  <span className="summary-value">{activeMembership?.roleName ?? "Member"}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Permissions</span>
+                  <span className="summary-value">
+                    {activeMembership?.permissions.length
+                      ? `${activeMembership.permissions.length} permissions granted`
+                      : "Pending — refresh the workspace if this stays empty"}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         )}
       </SurfaceCard>
+
+      <CurrencySettingsCard />
+      <WorkspaceBrandingCard />
 
       <SurfaceCard
         title="Members"
@@ -401,7 +454,31 @@ export const WorkspaceSettingsPage = () => {
                 </div>
               ),
             },
-            { key: "role", label: "Role", render: (row) => row.roleName ?? "Member" },
+            {
+              key: "role",
+              label: "Role",
+              render: (row) => {
+                const isSelf = row.id === sessionUser?.id;
+                const canEdit = !isLocalFallback && Boolean(supabase) && !isSelf;
+                if (!canEdit) {
+                  return <span>{row.roleName ?? "Member"}</span>;
+                }
+                return (
+                  <select
+                    className="field-input field-input-inline"
+                    onChange={(event) => void handleChangeMemberRole(row, event.target.value)}
+                    onClick={(event) => event.stopPropagation()}
+                    value={row.roleId ?? ""}
+                  >
+                    {usersSnapshot.roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
+                );
+              },
+            },
             {
               key: "status",
               label: "Membership",
@@ -417,6 +494,30 @@ export const WorkspaceSettingsPage = () => {
               align: "right",
               render: (row) => row.permissionKeys.length,
             },
+            {
+              key: "actions",
+              label: "Actions",
+              align: "right",
+              render: (row) => {
+                const isSelf = row.id === sessionUser?.id;
+                if (isSelf || isLocalFallback || !supabase) {
+                  return null;
+                }
+                const isActive = row.membershipStatus === "active";
+                return (
+                  <button
+                    className={`ghost-control${isActive ? " is-danger" : ""}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handleToggleMemberStatus(row);
+                    }}
+                    type="button"
+                  >
+                    {isActive ? "Suspend" : "Reactivate"}
+                  </button>
+                );
+              },
+            },
           ]}
           rows={teamMembers}
           emptyMessage="No members yet."
@@ -425,7 +526,9 @@ export const WorkspaceSettingsPage = () => {
 
       <SurfaceCard title="Pending invites">
         {pendingInvites.length === 0 ? (
-          <p className="surface-card-subtitle">No invitations pending. Use the Invite button above to add a teammate.</p>
+          <p className="surface-card-subtitle">
+            No invitations waiting. When you send one, your teammate gets a magic link in their inbox — no password required.
+          </p>
         ) : (
           <DataTable
             getRowId={(row) => row.id}
@@ -473,6 +576,22 @@ export const WorkspaceSettingsPage = () => {
         <CustomRolesEditor supabase={supabase} workspaceId={activeWorkspaceId} />
       ) : null}
 
+      <SurfaceCard
+        title="Channel access"
+        subtitle="Link members to the messaging channels they should reach the assistant from."
+        aside={
+          <button className="action-primary-button" onClick={() => navigate("/agents/connectors")} type="button">
+            <Send size={13} />
+            <span>Manage channels</span>
+          </button>
+        }
+      >
+        <p className="surface-card-subtitle">
+          Today only Telegram is wired with a delivery provider — find each member there and pair them with their
+          internal account. WhatsApp, Email and Webhook are staged but ship in a future release.
+        </p>
+      </SurfaceCard>
+
       {memberships.length > 1 ? (
         <SurfaceCard title="Switch workspace">
           <p className="surface-card-subtitle">You belong to {memberships.length} workspaces.</p>
@@ -492,6 +611,8 @@ export const WorkspaceSettingsPage = () => {
       <InviteMemberDialog
         isOpen={inviteOpen}
         roles={inviteRolesForDialog}
+        existingEmails={teamMembers.map((member) => member.email).filter(Boolean)}
+        pendingInviteEmails={pendingInvites.map((invite) => invite.email).filter((value) => value !== "Pending")}
         onClose={() => setInviteOpen(false)}
         onSent={async (email) => {
           toast.success("Invite sent", `${email} will receive a magic link to join this workspace.`);

@@ -433,6 +433,7 @@ describe("assistant gateway service", () => {
             parameters: { type: "object", additionalProperties: true },
           },
         ],
+        requiresApproval: () => false,
         execute: (name: string) => ({
           trace: {
             toolName: name,

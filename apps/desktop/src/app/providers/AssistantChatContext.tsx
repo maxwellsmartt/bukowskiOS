@@ -16,6 +16,7 @@ import {
   createAssistantThread,
   deleteAssistantThread,
   getAssistantChatSnapshot,
+  renameAssistantThread,
   sendAssistantChatTurn,
   setActiveAssistantThread,
   updateAssistantThreadPreferences,
@@ -70,6 +71,7 @@ type AssistantChatContextValue = {
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   updateSessionApprovalMode: (sessionId: string, preferredApprovalMode: AssistantApprovalPreference) => Promise<void>;
+  renameSession: (sessionId: string, title: string) => Promise<void>;
   sendTurn: (input: SendAssistantChatTurnCommand) => Promise<void>;
   setCompareTrayVisible: (visible: boolean) => void;
 };
@@ -103,7 +105,7 @@ const buildFallbackSession = (pathname: string): AssistantChatSession => ({
   createdAt: Date.now(),
   updatedAt: Date.now(),
   summaryText: "",
-  preferredApprovalMode: "supervised",
+  preferredApprovalMode: "unsupervised",
   threadState: "idle",
   lastErrorSummary: null,
   lastIntent: null,
@@ -342,6 +344,20 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
           workspaceId: activeWorkspaceId,
           threadId: sessionId,
           preferredApprovalMode,
+        });
+        setSnapshot(nextSnapshot);
+        setIsHydrated(true);
+      },
+      renameSession: async (sessionId: string, title: string) => {
+        if (!isWorkspaceReady) {
+          return;
+        }
+
+        const nextSnapshot = await renameAssistantThread({
+          commandId: `cmd-thread-rename-${Date.now().toString(36)}`,
+          workspaceId: activeWorkspaceId,
+          threadId: sessionId,
+          title,
         });
         setSnapshot(nextSnapshot);
         setIsHydrated(true);

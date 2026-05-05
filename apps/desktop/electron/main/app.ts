@@ -205,6 +205,8 @@ app.whenReady().then(() => {
     retryAllFailedSyncOutboxRows: localDatabase.retryAllFailedSyncOutboxRows,
     exportRecentLogs: localDatabase.exportRecentLogs,
     exportSupportBundle: localDatabase.exportSupportBundle,
+    applyRemoteCatalogRows: localDatabase.applyRemoteCatalogRows,
+    applyRemoteExchangeRates: localDatabase.applyRemoteExchangeRates,
   });
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,
@@ -216,6 +218,47 @@ app.whenReady().then(() => {
     fileUploads: localDatabase.fileUploads,
     incidentMutations: localDatabase.incidentMutations,
     financeMutations: localDatabase.financeMutations,
+    currencyMutations: localDatabase.currencyMutations,
+    currencyReads: localDatabase.currencyReads,
+    quoteMutations: localDatabase.quoteMutations,
+    quoteReads: localDatabase.quoteReads,
+    exportQuotePdf: async (workspaceId: string, quoteId: string) => {
+      const detail = localDatabase.quoteReads.getQuoteDetail(workspaceId, quoteId);
+      if (!detail) {
+        throw new Error("Quote not found.");
+      }
+      const settings = localDatabase.currencyReads.getSettings(workspaceId);
+      const { buildQuotePdfPayload } = await import("./services/data/quotePdfPayloadBuilder");
+
+      // Best-effort fetch of branding assets. Failures fall back to the text
+      // logo / blank seal/firma — the PDF is still valid and printable.
+      const fetchOptional = async (url: string | null): Promise<Buffer | null> => {
+        if (!url) return null;
+        try {
+          const response = await fetch(url);
+          if (!response.ok) return null;
+          const arrayBuffer = await response.arrayBuffer();
+          return Buffer.from(arrayBuffer);
+        } catch {
+          return null;
+        }
+      };
+
+      const [logoBuffer, sealBuffer, signatureBuffer] = await Promise.all([
+        fetchOptional(settings.workspaceLogoUrl),
+        fetchOptional(settings.workspaceSealUrl),
+        fetchOptional(settings.workspaceSignatureUrl),
+      ]);
+
+      const payload = buildQuotePdfPayload({
+        quote: detail,
+        currencySettings: settings,
+        logoBuffer,
+        sealBuffer,
+        signatureBuffer,
+      });
+      return documentGeneration.createQuotePdf(payload);
+    },
     packingMutations: localDatabase.packingMutations,
     exportFinanceReportPdf: async (query, targetFilePath) => {
       const overview = localDatabase.foundationReads.getFinanceOverview(query);

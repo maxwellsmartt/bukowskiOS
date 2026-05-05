@@ -35,9 +35,14 @@ import { applyAssetValuationFoundationMigration } from "./assetValuationFoundati
 import { createAssetMutationService } from "./assetMutationService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
+import { createCatalogPullService } from "./catalogPullService";
 import { applyConnectorFoundationMigration, bootstrapConnectorFoundation } from "./connectorFoundationBootstrap";
 import { applyCrewCatalogFoundationMigration } from "./crewCatalogFoundationBootstrap";
 import { createDataRetentionService, summarizeDataRetention } from "./dataRetentionService";
+import { createCurrencyMutationService } from "./currencyMutationService";
+import { createCurrencyReadService } from "./currencyReadService";
+import { createQuoteMutationService } from "./quoteMutationService";
+import { createQuoteReadService } from "./quoteReadService";
 import { createFinanceMutationService } from "./financeMutationService";
 import { applyOperationalFilesMigration, createFileUploadService, type FileUploadService } from "./fileUploadService";
 import { createIncidentMutationService } from "./incidentMutationService";
@@ -76,6 +81,10 @@ type CatalogMutationService = ReturnType<typeof createCatalogMutationService>;
 type AssetMutationService = ReturnType<typeof createAssetMutationService>;
 type IncidentMutationService = ReturnType<typeof createIncidentMutationService>;
 type FinanceMutationService = ReturnType<typeof createFinanceMutationService>;
+type CurrencyMutationService = ReturnType<typeof createCurrencyMutationService>;
+type CurrencyReadService = ReturnType<typeof createCurrencyReadService>;
+type QuoteMutationServiceType = ReturnType<typeof createQuoteMutationService>;
+type QuoteReadServiceType = ReturnType<typeof createQuoteReadService>;
 type PackingMutationService = ReturnType<typeof createPackingMutationService>;
 type RmaMutationService = ReturnType<typeof createRmaMutationService>;
 type AgentMutationService = ReturnType<typeof createAgentMutationService>;
@@ -92,6 +101,10 @@ type LocalDatabaseRuntime = {
   assetMutations: AssetMutationService;
   incidentMutations: IncidentMutationService;
   financeMutations: FinanceMutationService;
+  currencyMutations: CurrencyMutationService;
+  currencyReads: CurrencyReadService;
+  quoteMutations: QuoteMutationServiceType;
+  quoteReads: QuoteReadServiceType;
   packingMutations: PackingMutationService;
   rmaMutations: RmaMutationService;
   agentMutations: AgentMutationService;
@@ -112,6 +125,12 @@ type LocalDatabaseRuntime = {
   retryAllFailedSyncOutboxRows: () => Promise<AppDiagnosticsSnapshot>;
   exportRecentLogs: (filePath: string) => AppExportResult;
   exportSupportBundle: (directoryPath: string) => AppExportResult;
+  applyRemoteCatalogRows: (
+    input: import("@contracts").AppApplyRemoteCatalogRowsCommand,
+  ) => import("@contracts").AppApplyRemoteCatalogRowsResult;
+  applyRemoteExchangeRates: (
+    input: import("@contracts").AppApplyRemoteExchangeRatesCommand,
+  ) => import("@contracts").AppApplyRemoteExchangeRatesResult;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -883,8 +902,32 @@ const createRuntime = (): LocalDatabaseRuntime => {
   const userAdmin = createUserAdminService(database);
   const agentReads = createAgentReadService(database, secretStore);
   const sessionStore = createAssistantGatewaySessionStore(database);
+  const projectMutations = createProjectMutationService(database, {
+    createBackupBeforeDelete: () => {
+      createDatabaseBackup(database, backupPath);
+    },
+  });
+  const catalogMutations = createCatalogMutationService(database);
+  const assetMutations = createAssetMutationService(database);
+  const incidentMutations = createIncidentMutationService(database);
+  const financeMutations = createFinanceMutationService(database);
+  const currencyMutations = createCurrencyMutationService(database);
+  const currencyReads = createCurrencyReadService(database);
+  const quoteMutations = createQuoteMutationService(database);
+  const quoteReads = createQuoteReadService(database);
+  const packingMutations = createPackingMutationService(database);
+  const rmaMutations = createRmaMutationService(database);
   const toolRegistry = createAgentToolRegistry(foundationReads, {
     getRunsList: () => agentReads.getRunsList(),
+    quoteReads,
+    writeServices: {
+      packing: packingMutations,
+      projects: projectMutations,
+      incidents: incidentMutations,
+      rma: rmaMutations,
+      assets: assetMutations,
+      finance: financeMutations,
+    },
   });
   const memoryService = createAssistantMemoryService(database);
   memoryService.pruneStaleEntries();
@@ -960,8 +1003,42 @@ const createRuntime = (): LocalDatabaseRuntime => {
       // Best effort maintenance only.
       logger.warn("Scheduled retention pass failed.");
     }
+
+    // Quote expiration sweep (Plan L FQ7). Marks any draft/sent quote whose
+    // valid_until has passed as `expired` for every workspace this device
+    // knows about. Same 12h cadence as the retention worker.
+    try {
+      const workspaces = database
+        .prepare("SELECT id FROM workspaces WHERE is_active = 1")
+        .all() as Array<{ id: string }>;
+      let expired = 0;
+      for (const ws of workspaces) {
+        const out = quoteMutations.expireOverdueQuotes(ws.id);
+        expired += out.expiredCount;
+      }
+      if (expired > 0) {
+        logger.info("Expired overdue quotes in scheduled pass.", { expiredCount: expired });
+      }
+    } catch (error) {
+      logger.warn("Scheduled quote expiration pass failed.", {
+        error: error instanceof Error ? error.message : "unknown",
+      });
+    }
   }, 12 * 60 * 60 * 1000);
   retentionTimer.unref();
+
+  // Run the expiration sweep once at startup so quotes that became overdue
+  // while the app was closed get marked immediately.
+  try {
+    const workspaces = database
+      .prepare("SELECT id FROM workspaces WHERE is_active = 1")
+      .all() as Array<{ id: string }>;
+    for (const ws of workspaces) {
+      quoteMutations.expireOverdueQuotes(ws.id);
+    }
+  } catch {
+    /* startup is best-effort */
+  }
   syncOutboxTimer?.unref();
   syncOutboxTimer = setInterval(() => {
     void runLocalSyncNow().catch(() => {
@@ -980,18 +1057,37 @@ const createRuntime = (): LocalDatabaseRuntime => {
     foundationReads,
     agentReads,
     assistantChatService,
-    projectMutations: createProjectMutationService(database, {
-      createBackupBeforeDelete: () => {
-        createDatabaseBackup(database, backupPath);
-      },
-    }),
-    catalogMutations: createCatalogMutationService(database),
-    assetMutations: createAssetMutationService(database),
+    projectMutations,
+    catalogMutations,
+    assetMutations,
     workspaceAccess,
-    incidentMutations: createIncidentMutationService(database),
-    financeMutations: createFinanceMutationService(database),
-    packingMutations: createPackingMutationService(database),
-    rmaMutations: createRmaMutationService(database),
+    incidentMutations,
+    financeMutations,
+    currencyMutations,
+    currencyReads,
+    quoteMutations,
+    quoteReads,
+    packingMutations,
+    rmaMutations,
+    applyRemoteCatalogRows: (input: {
+      workspaceId: string;
+      entityType: "asset_categories" | "locations" | "clients" | "manufacturers" | "production_companies";
+      rows: Array<{
+        id: string;
+        workspace_id: string;
+        code: string;
+        name: string;
+        description?: string | null;
+        parent_category_id?: string | null;
+        type?: string | null;
+        is_active?: boolean | null;
+        updated_at: string;
+      }>;
+    }) => createCatalogPullService(database).applyRemoteRows(input.workspaceId, input.entityType, input.rows),
+    applyRemoteExchangeRates: (input: import("@contracts").AppApplyRemoteExchangeRatesCommand) => {
+      const result = createCatalogPullService(database).applyRemoteExchangeRates(input.workspaceId, input.rows);
+      return { workspaceId: input.workspaceId, ...result };
+    },
     runtimeDiagnostics,
     supportDiagnostics,
     userAdmin,

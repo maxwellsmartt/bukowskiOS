@@ -14,7 +14,10 @@ type ToastRow = ToastInput & {
   id: string;
   tone: ToastTone;
   createdAt: number;
+  isLeaving?: boolean;
 };
+
+const TOAST_LEAVE_DURATION_MS = 220;
 
 type ToastContextValue = {
   toasts: ToastRow[];
@@ -53,12 +56,18 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const dismiss = useCallback((id: string) => {
-    setToasts((current) => current.filter((toast) => toast.id !== id));
     const timer = timersRef.current.get(id);
     if (timer) {
       clearTimeout(timer);
       timersRef.current.delete(id);
     }
+    // Mark leaving first so the CSS keyframe runs, then remove after the animation finishes.
+    setToasts((current) => current.map((toast) => (toast.id === id ? { ...toast, isLeaving: true } : toast)));
+    const removeTimer = setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+      timersRef.current.delete(`${id}:leave`);
+    }, TOAST_LEAVE_DURATION_MS);
+    timersRef.current.set(`${id}:leave`, removeTimer);
   }, []);
 
   const show = useCallback(
@@ -125,7 +134,11 @@ const ToastContainer = ({ toasts, onDismiss }: { toasts: ToastRow[]; onDismiss: 
   return (
     <div aria-live="polite" className="toast-stack" role="status">
       {toasts.map((toast) => (
-        <div key={toast.id} className={`toast toast-${toast.tone}`} role="alert">
+        <div
+          key={toast.id}
+          className={`toast toast-${toast.tone}${toast.isLeaving ? " is-leaving" : ""}`}
+          role="alert"
+        >
           <span className={`toast-icon toast-icon-${toast.tone}`}>{toneIcon[toast.tone]}</span>
           <div className="toast-copy">
             <strong className="toast-title">{toast.title}</strong>

@@ -3,6 +3,7 @@ import {
   BarChart3,
   Boxes,
   BriefcaseBusiness,
+  FileText,
   Building2,
   CalendarDays,
   ClipboardList,
@@ -46,6 +47,7 @@ export const assetsSubnav: NavItem[] = [
 
 export const financeSubnav: NavItem[] = [
   { label: "Overview", path: "/finance", icon: BarChart3 },
+  { label: "Quotes", path: "/finance/quotes", icon: FileText },
   { label: "Entries", path: "/finance/entries", icon: ScrollText },
   { label: "Review Queue", path: "/finance/cost-links", icon: ClipboardList },
 ];

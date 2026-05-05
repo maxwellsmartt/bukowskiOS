@@ -69,7 +69,9 @@ type UserEditorDraft = {
   linkedCrewMemberId: string;
 };
 
+import { AutoLogoutSetting } from "./AutoLogoutSetting";
 import { SettingsLayout, useActiveSettingsSection } from "./SettingsLayout";
+import { UserChannelDots } from "./UserChannelDots";
 
 const roleCoverageGroups = [
   { label: "Assets", keys: ["assets.read", "assets.manage"] },
@@ -672,8 +674,10 @@ export const SettingsPage = () => {
   return (
     <div className="page-stack settings-page">
       <SectionHeader
+        eyebrow="Settings"
         title="Settings"
         body="Workspace identity, team, data health and advanced tools — everything that shapes how your studio uses bukowskiOS."
+        titleTone="accent"
       />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
@@ -738,10 +742,10 @@ export const SettingsPage = () => {
                         <span>{user.roleName ?? "No role"}</span>
                       </span>
                       <span className="settings-user-row-meta">
-                        {user.isActive ? "Active" : "Inactive"} ·{" "}
-                        {user.telegramLinkStatus === "linked" ? "Telegram linked" : user.telegramLinkStatus === "pending" ? "Telegram pending" : "No Telegram"}
+                        {user.isActive ? "Active" : "Inactive"}
                         {user.linkedCrewLabel ? ` · ${user.linkedCrewLabel}` : ""}
                       </span>
+                      <UserChannelDots user={user} />
                     </span>
                   </button>
                 ))}
@@ -1099,6 +1103,14 @@ export const SettingsPage = () => {
                 {isExporting ? "Exporting..." : "Export workspace JSON"}
               </button>
             </div>
+          </SurfaceCard>
+
+          <SurfaceCard
+            className="settings-advanced-card"
+            title="Sign-in & security"
+            subtitle="Auto sign-out keeps shared machines safe when you walk away."
+          >
+            <AutoLogoutSetting />
           </SurfaceCard>
 
           <SurfaceCard className="settings-advanced-card" title="System" subtitle="Build and runtime details for support.">

@@ -126,6 +126,13 @@ export type UpdateAssistantThreadPreferencesCommand = {
   preferredApprovalMode: AssistantApprovalPreference;
 };
 
+export type RenameAssistantThreadCommand = {
+  commandId: string;
+  workspaceId: string;
+  threadId: string;
+  title: string;
+};
+
 export type RecordRuntimeErrorCommand = {
   sourceKind: "main" | "renderer" | "webcontents";
   processLabel: string;

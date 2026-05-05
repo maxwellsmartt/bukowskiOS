@@ -163,7 +163,24 @@ export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
   ensureColumn(db, "assistant_chat_attachments", "deleted_at", "TEXT");
   ensureColumn(db, "assistant_chat_thread_state", "session_approval_agent_id", "TEXT");
   ensureColumn(db, "assistant_chat_thread_state", "session_approval_granted_at", "TEXT");
-  ensureColumn(db, "assistant_chat_thread_state", "preferred_approval_mode", "TEXT DEFAULT 'supervised'");
+  ensureColumn(db, "assistant_chat_thread_state", "preferred_approval_mode", "TEXT DEFAULT 'unsupervised'");
+
+  // One-time bump: when we shipped Sprint A we relaxed Assets and Incidents
+  // agents from `needs_approval` → `auto` so writes don't gate by default.
+  // `approval_mode` is user-overridable so the seed UPSERT doesn't touch it
+  // for already-installed workspaces; force the change here only when the
+  // current value is still the original `needs_approval`. Anything the user
+  // explicitly customised (supervised / auto / something else) stays put.
+  try {
+    db.prepare(
+      `UPDATE agents
+         SET approval_mode = 'auto', updated_at = ?
+       WHERE agent_key IN ('assets-agent', 'incidents-maintenance-agent')
+         AND approval_mode = 'needs_approval'`,
+    ).run(new Date().toISOString());
+  } catch {
+    /* table may not exist yet on a brand-new install — ignore */
+  }
 
   const agentsMissingProvider = db
     .prepare(

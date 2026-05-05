@@ -17,6 +17,7 @@ import type {
   DeleteAssistantThreadCommand,
   SendAssistantChatTurnCommand,
   SetActiveAssistantThreadCommand,
+  RenameAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
 } from "@contracts";
 
@@ -358,7 +359,7 @@ export const createAssistantChatService = (
       contextKey: thread.context_key,
       contextLabel: thread.context_label,
       summaryText: thread.summary_text,
-      preferredApprovalMode: thread.preferred_approval_mode ?? "supervised",
+      preferredApprovalMode: thread.preferred_approval_mode ?? "unsupervised",
       state: thread.last_state ?? "idle",
       lastErrorCode: thread.last_error_code,
       lastErrorSummary: thread.last_error_summary,
@@ -854,6 +855,31 @@ export const createAssistantChatService = (
           WHERE thread_id = ?
         `,
       ).run(input.preferredApprovalMode, now, input.threadId);
+
+      return loadSnapshot();
+    },
+    renameThread(input: RenameAssistantThreadCommand) {
+      const trimmedTitle = input.title.trim().slice(0, 120);
+      if (!trimmedTitle) {
+        throw new Error("Thread title cannot be empty.");
+      }
+      const now = new Date().toISOString();
+      const result = db
+        .prepare(
+          `
+            UPDATE assistant_chat_threads
+            SET title = ?,
+                updated_at = ?
+            WHERE id = ?
+              AND workspace_id = ?
+              AND deleted_at IS NULL
+          `,
+        )
+        .run(trimmedTitle, now, input.threadId, input.workspaceId);
+
+      if (result.changes === 0) {
+        throw new Error("Thread not found.");
+      }
 
       return loadSnapshot();
     },

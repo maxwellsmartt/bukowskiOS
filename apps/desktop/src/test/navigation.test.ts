@@ -11,7 +11,7 @@ describe("foundation navigation shell", () => {
   });
 
   it("keeps finance shell structurally real", () => {
-    expect(financeSubnav.map((item) => item.label)).toEqual(["Overview", "Entries", "Review Queue"]);
+    expect(financeSubnav.map((item) => item.label)).toEqual(["Overview", "Quotes", "Entries", "Review Queue"]);
     expect(appRoutes.some((route) => route.path === "/finance/entries")).toBe(true);
   });
 

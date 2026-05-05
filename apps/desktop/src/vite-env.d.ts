@@ -22,6 +22,8 @@ import type {
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppActionResult,
+  AppApplyRemoteCatalogRowsCommand,
+  AppApplyRemoteCatalogRowsResult,
   AppDiagnosticsSnapshot,
   AppExportResult,
   AppInfo,
@@ -121,6 +123,7 @@ import type {
   UnassignCrewFromProjectUnitInput,
   UpdateAgentCommand,
   UpdateAssetCommand,
+  RenameAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
   UpdateCatalogEntityInput,
   UpdateFinancialEntryCommand,
@@ -157,6 +160,12 @@ declare global {
       exportSupportBundle: () => Promise<AppExportResult>;
       exportRecentLogs: () => Promise<AppExportResult>;
       openExternal: (url: string) => Promise<void>;
+      applyRemoteCatalogRows: (
+        input: AppApplyRemoteCatalogRowsCommand,
+      ) => Promise<AppApplyRemoteCatalogRowsResult>;
+      applyRemoteExchangeRates: (
+        input: import("@contracts").AppApplyRemoteExchangeRatesCommand,
+      ) => Promise<import("@contracts").AppApplyRemoteExchangeRatesResult>;
     };
     bukowskiAuth?: {
       getStoredTokens: () => Promise<{
@@ -194,6 +203,7 @@ declare global {
       deleteAssistantThread: (input: DeleteAssistantThreadCommand) => Promise<AssistantChatSnapshot>;
       setActiveAssistantThread: (input: SetActiveAssistantThreadCommand) => Promise<AssistantChatSnapshot>;
       updateAssistantThreadPreferences: (input: UpdateAssistantThreadPreferencesCommand) => Promise<AssistantChatSnapshot>;
+      renameAssistantThread: (input: RenameAssistantThreadCommand) => Promise<AssistantChatSnapshot>;
       sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
       reviewRun: (input: ReviewAgentRunCommand) => Promise<AgentRunReviewResult>;
       sendAssistantMessage: (input: AssistantGatewayRequest) => Promise<AssistantGatewayResponse>;
@@ -269,6 +279,66 @@ declare global {
       openDocument: (fileId: string) => Promise<void>;
       create: (input: CreateFinancialEntryCommand) => Promise<FinanceEntryMutationResult>;
       update: (input: UpdateFinancialEntryCommand) => Promise<FinanceEntryMutationResult>;
+    };
+    bukowskiCurrency?: {
+      getSettings: (workspaceId: string) => Promise<import("@contracts").CurrencySettingsRow>;
+      listRates: (input: {
+        workspaceId: string;
+        baseCurrency?: string;
+        quoteCurrency?: string;
+        limit?: number;
+      }) => Promise<import("@contracts").ExchangeRateRow[]>;
+      getLatestRate: (input: {
+        workspaceId: string;
+        baseCurrency: string;
+        quoteCurrency: string;
+        rateType?: import("@contracts").CurrencyRateType;
+      }) => Promise<import("@contracts").ExchangeRateRow | null>;
+      upsertSettings: (
+        input: import("@contracts").UpsertCurrencySettingsCommand,
+      ) => Promise<import("@contracts").CurrencySettingsMutationResult>;
+      createRate: (
+        input: import("@contracts").CreateExchangeRateCommand,
+      ) => Promise<import("@contracts").ExchangeRateMutationResult>;
+      deleteRate: (
+        input: import("@contracts").DeleteExchangeRateCommand,
+      ) => Promise<import("@contracts").ExchangeRateMutationResult>;
+    };
+    bukowskiQuotes?: {
+      list: (filter: import("@contracts").QuoteListFilter) => Promise<import("@contracts").QuoteRow[]>;
+      detail: (
+        workspaceId: string,
+        quoteId: string,
+      ) => Promise<import("@contracts").QuoteDetail | null>;
+      create: (
+        input: import("@contracts").CreateQuoteCommand,
+      ) => Promise<import("@contracts").QuoteMutationResult>;
+      update: (
+        input: import("@contracts").UpdateQuoteCommand,
+      ) => Promise<import("@contracts").QuoteMutationResult>;
+      setStatus: (
+        input: import("@contracts").SetQuoteStatusCommand,
+      ) => Promise<import("@contracts").QuoteMutationResult>;
+      duplicate: (
+        input: import("@contracts").DuplicateQuoteCommand,
+      ) => Promise<import("@contracts").QuoteMutationResult>;
+      delete: (
+        input: import("@contracts").DuplicateQuoteCommand,
+      ) => Promise<import("@contracts").QuoteMutationResult>;
+      exportPdf: (workspaceId: string, quoteId: string) => Promise<AppExportResult>;
+      listVersions: (
+        workspaceId: string,
+        quoteId: string,
+      ) => Promise<
+        Array<{
+          id: string;
+          versionNumber: number;
+          changeSummary: string | null;
+          createdAt: string;
+          createdByUserId: string | null;
+          snapshot: Record<string, unknown>;
+        }>
+      >;
     };
     bukowskiCatalog?: {
       getSnapshot: (query?: CatalogListQuery) => Promise<CatalogSnapshot>;

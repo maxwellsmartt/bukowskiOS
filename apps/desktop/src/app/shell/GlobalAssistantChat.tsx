@@ -8,7 +8,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { ArrowUp, Bot, ChevronDown, Ellipsis, PanelLeftClose, PanelLeftOpen, Paperclip, Plus, Trash2, X } from "lucide-react";
+import { ArrowUp, Bot, ChevronDown, Ellipsis, PanelLeft, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AssistantChatSession, AssistantChatSessionState } from "@app/providers/AssistantChatContext";
 import type { AssistantApprovalPreference, AssistantGatewayAttachment } from "@contracts";
@@ -359,6 +359,7 @@ export const GlobalAssistantChat = () => {
     open,
     sendTurn,
     refresh,
+    renameSession,
     selectSession,
     sessions,
     setCompareTrayVisible,
@@ -379,6 +380,8 @@ export const GlobalAssistantChat = () => {
     readJsonPreference<boolean>(uiPreferenceKeys.assistantChatSidebarCollapsed, false),
   );
   const [threadMenuState, setThreadMenuState] = useState<ThreadMenuState>(null);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState<string>("");
   const [expandedMessageDetails, setExpandedMessageDetails] = useState<Record<string, boolean>>({});
   const [optimisticTurn, setOptimisticTurn] = useState<OptimisticTurn | null>(null);
   const [optimisticAssistantMessage, setOptimisticAssistantMessage] = useState<OptimisticAssistantMessage | null>(null);
@@ -757,9 +760,9 @@ export const GlobalAssistantChat = () => {
               </div>
               <div className="assistant-chat-sidebar-tools">
                 <button
-                  aria-label="Create new chat thread"
+                  aria-label="Create new thread"
                   className="assistant-chat-sidebar-tool"
-                  data-tooltip="New chat"
+                  data-tooltip="New thread"
                   onClick={() => void createSession()}
                   type="button"
                 >
@@ -772,7 +775,7 @@ export const GlobalAssistantChat = () => {
                   onClick={() => setIsSidebarCollapsed(true)}
                   type="button"
                 >
-                  <PanelLeftClose size={16} />
+                  <PanelLeft size={16} />
                 </button>
               </div>
             </div>
@@ -790,11 +793,42 @@ export const GlobalAssistantChat = () => {
                     }`}
                   >
                     <div className="assistant-chat-session-main">
-                      <button className="assistant-chat-session-select" onClick={() => void selectSession(session.id)} type="button">
-                        <div className="assistant-chat-session-copy">
-                          <strong>{session.title}</strong>
+                      {renamingSessionId === session.id ? (
+                        <div className="assistant-chat-session-select assistant-chat-session-rename">
+                          <input
+                            autoFocus
+                            className="assistant-chat-session-rename-input"
+                            onBlur={() => {
+                              const nextTitle = renameDraft.trim();
+                              if (nextTitle && nextTitle !== session.title) {
+                                void renameSession(session.id, nextTitle);
+                              }
+                              setRenamingSessionId(null);
+                            }}
+                            onChange={(event) => setRenameDraft(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                const nextTitle = renameDraft.trim();
+                                if (nextTitle && nextTitle !== session.title) {
+                                  void renameSession(session.id, nextTitle);
+                                }
+                                setRenamingSessionId(null);
+                              } else if (event.key === "Escape") {
+                                event.preventDefault();
+                                setRenamingSessionId(null);
+                              }
+                            }}
+                            value={renameDraft}
+                          />
                         </div>
-                      </button>
+                      ) : (
+                        <button className="assistant-chat-session-select" onClick={() => void selectSession(session.id)} type="button">
+                          <div className="assistant-chat-session-copy">
+                            <strong>{session.title}</strong>
+                          </div>
+                        </button>
+                      )}
 
                       <div className="assistant-chat-session-actions">
                         <button
@@ -867,7 +901,7 @@ export const GlobalAssistantChat = () => {
                     onClick={() => setIsSidebarCollapsed(false)}
                     type="button"
                   >
-                    <PanelLeftOpen size={16} />
+                    <PanelLeft size={16} />
                   </button>
                 ) : null}
                 <div className="assistant-chat-context-pill">{resolvedActiveSession.contextLabel}</div>
@@ -954,6 +988,13 @@ export const GlobalAssistantChat = () => {
                           <span className="assistant-chat-approval-eyebrow">Approval required</span>
                           <strong>Choose how you want to handle this supervised draft.</strong>
                           <p>{messageState.approvalReason ?? "No real execution happens here yet. This only records your decision cleanly in the flow."}</p>
+                          {messageState.pendingMutation ? (
+                            <div className="assistant-chat-mutation-preview">
+                              <span className="assistant-chat-mutation-tag">If approved</span>
+                              <strong>{messageState.pendingMutation.summary}</strong>
+                              <code>{messageState.pendingMutation.toolName}</code>
+                            </div>
+                          ) : null}
                         </div>
                         <div className="assistant-chat-approval-actions">
                           <button
@@ -1249,6 +1290,20 @@ export const GlobalAssistantChat = () => {
                   View agent
                 </button>
               ) : null}
+              <button
+                className="assistant-chat-session-menu-item"
+                onClick={() => {
+                  const target = threadMenuSession;
+                  setThreadMenuState(null);
+                  if (!target) return;
+                  setRenamingSessionId(target.id);
+                  setRenameDraft(target.title);
+                }}
+                type="button"
+              >
+                <Pencil size={13} />
+                <span>Rename thread</span>
+              </button>
               <button
                 className="assistant-chat-session-menu-item is-danger"
                 onClick={() => {

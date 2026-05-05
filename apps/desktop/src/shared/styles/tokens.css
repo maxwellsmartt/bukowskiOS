@@ -2,29 +2,96 @@
   color-scheme: dark;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
+  /* ========================================================================
+   * Surfaces
+   * ====================================================================== */
   --bg-app: #0e1012;
   --bg-shell: #111316;
   --bg-sidebar: #121518;
   --bg-panel: #15181c;
   --bg-elevated: #1a1e23;
   --bg-hover: #1d2126;
-  --border-subtle: rgba(255, 255, 255, 0.055);
-  --border-strong: rgba(255, 255, 255, 0.1);
 
+  /* ========================================================================
+   * Hairlines (replace ad-hoc rgba(255,255,255,0.0X) calls).
+   * Use --hairline for everyday borders, --hairline-strong for emphasis,
+   * --hairline-faint for divisor lines inside dense surfaces.
+   * ====================================================================== */
+  --hairline-faint: rgba(255, 255, 255, 0.035);
+  --hairline: rgba(255, 255, 255, 0.06);
+  --hairline-strong: rgba(255, 255, 255, 0.1);
+  --border-subtle: var(--hairline);
+  --border-strong: var(--hairline-strong);
+
+  /* ========================================================================
+   * Text
+   * ====================================================================== */
   --text-primary: #f3f5f7;
   --text-secondary: #afb6c0;
   --text-muted: #79818c;
+  --text-on-accent: #1a1a1a;
 
+  /* ========================================================================
+   * Accents (calm, premium tones — no pinks/red-salmons in UI shell).
+   * ====================================================================== */
   --accent-info: #9fb2c7;
   --accent-selection: #dde4ed;
   --accent-warning: #c89a56;
   --accent-critical: #d27070;
   --accent-success: #6ea987;
+  --accent-positive: var(--accent-success);
 
-  --radius-panel: 14px;
-  --radius-control: 11px;
-  --shadow-soft: 0 16px 32px rgba(0, 0, 0, 0.16);
+  /* ========================================================================
+   * Radius scale.
+   * Aliases keep legacy names working: --radius-panel, --radius-control.
+   * ====================================================================== */
+  --radius-2xs: 6px;
+  --radius-xs: 9px;
+  --radius-sm: 11px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+  --radius-panel: var(--radius-md);
+  --radius-control: var(--radius-sm);
 
+  /* ========================================================================
+   * Shadows. Use tiers, not ad-hoc box-shadows.
+   * Tuned 2026-05 to be softer + less spread for a more refined look.
+   * ====================================================================== */
+  --shadow-subtle: 0 4px 14px rgba(0, 0, 0, 0.12);
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.14);
+  --shadow-elevated: 0 14px 40px rgba(0, 0, 0, 0.28);
+  --shadow-modal: 0 22px 64px rgba(0, 0, 0, 0.38);
+  --shadow-panel: var(--shadow-soft);
+
+  /* ========================================================================
+   * Glass / blur tiers. Use in `backdrop-filter: blur(var(--blur-md))`.
+   * ====================================================================== */
+  --blur-xs: 6px;
+  --blur-sm: 10px;
+  --blur-md: 16px;
+  --blur-lg: 22px;
+
+  /* ========================================================================
+   * Typography scale + weights.
+   * ====================================================================== */
+  --font-2xs: 10px;
+  --font-xs: 11px;
+  --font-sm: 12px;
+  --font-base: 13px;
+  --font-md: 15px;
+  --font-lg: 18px;
+  --font-xl: 22px;
+  --font-2xl: 28px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ========================================================================
+   * Spacing.
+   * ====================================================================== */
   --space-2xs: 4px;
   --space-xs: 7px;
   --space-sm: 10px;
@@ -33,5 +100,29 @@
   --space-xl: 24px;
   --space-2xl: 32px;
 
+  /* ========================================================================
+   * Layout / responsive (advisory; CSS uses clamp directly, JS reads these).
+   * Breakpoints:
+   *   compact   <= 1280px (1080p, small laptops)
+   *   standard  1281px – 2559px (1440p, normal desktop)
+   *   large     >= 2560px (4K / Retina large)
+   * ====================================================================== */
+  --bp-compact: 1280px;
+  --bp-standard: 2559px;
+  --shell-content-max: 1680px;
+  --sidebar-width-min: 220px;
+  --sidebar-width-max: 320px;
+  --row-height: 36px;
+
+  /* ========================================================================
+   * Grain (applied via SVG turbulence on shell sidebar + titlebar only).
+   * ====================================================================== */
+  --grain-opacity-sidebar: 0.04;
+  --grain-opacity-titlebar: 0.025;
+  --grain-blend-mode: overlay;
+
+  /* ========================================================================
+   * Misc
+   * ====================================================================== */
   --window-top-safe: 0px;
 }

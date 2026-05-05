@@ -22,6 +22,8 @@ import type {
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppActionResult,
+  AppApplyRemoteCatalogRowsCommand,
+  AppApplyRemoteCatalogRowsResult,
   AppDiagnosticsSnapshot,
   AppExportResult,
   AppInfo,
@@ -130,6 +132,7 @@ import type {
   AgentRunReviewResult,
   DraftRunFromChatResult,
   SendAssistantChatTurnCommand,
+  RenameAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
   StagingPackingSlipRow,
   UnarchiveProjectInput,
@@ -176,6 +179,12 @@ const bukowskiApp = {
   exportSupportBundle: () => ipcRenderer.invoke(ipcChannels.app.exportSupportBundle) as Promise<AppExportResult>,
   exportRecentLogs: () => ipcRenderer.invoke(ipcChannels.app.exportRecentLogs) as Promise<AppExportResult>,
   openExternal: (url: string) => ipcRenderer.invoke(ipcChannels.app.openExternal, url) as Promise<void>,
+  applyRemoteCatalogRows: (input: AppApplyRemoteCatalogRowsCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.applyRemoteCatalogRows, input) as Promise<AppApplyRemoteCatalogRowsResult>,
+  applyRemoteExchangeRates: (input: import("@contracts").AppApplyRemoteExchangeRatesCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.applyRemoteExchangeRates, input) as Promise<
+      import("@contracts").AppApplyRemoteExchangeRatesResult
+    >,
 };
 
 const bukowskiAuth = {
@@ -244,6 +253,8 @@ const bukowskiAgents = {
     ipcRenderer.invoke(ipcChannels.agents.setActiveAssistantThread, input) as Promise<AssistantChatSnapshot>,
   updateAssistantThreadPreferences: (input: UpdateAssistantThreadPreferencesCommand) =>
     ipcRenderer.invoke(ipcChannels.agents.updateAssistantThreadPreferences, input) as Promise<AssistantChatSnapshot>,
+  renameAssistantThread: (input: RenameAssistantThreadCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.renameAssistantThread, input) as Promise<AssistantChatSnapshot>,
   sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) =>
     ipcRenderer.invoke(ipcChannels.agents.sendAssistantChatTurn, input) as Promise<AssistantChatSnapshot>,
   reviewRun: (input: ReviewAgentRunCommand) =>
@@ -356,6 +367,78 @@ const bukowskiFinance = {
     ipcRenderer.invoke(ipcChannels.finance.update, input) as Promise<FinanceEntryMutationResult>,
 };
 
+const bukowskiCurrency = {
+  getSettings: (workspaceId: string) =>
+    ipcRenderer.invoke(ipcChannels.currency.getSettings, { workspaceId }) as Promise<
+      import("@contracts").CurrencySettingsRow
+    >,
+  listRates: (input: { workspaceId: string; baseCurrency?: string; quoteCurrency?: string; limit?: number }) =>
+    ipcRenderer.invoke(ipcChannels.currency.listRates, input) as Promise<import("@contracts").ExchangeRateRow[]>,
+  getLatestRate: (input: {
+    workspaceId: string;
+    baseCurrency: string;
+    quoteCurrency: string;
+    rateType?: import("@contracts").CurrencyRateType;
+  }) =>
+    ipcRenderer.invoke(ipcChannels.currency.getLatestRate, input) as Promise<
+      import("@contracts").ExchangeRateRow | null
+    >,
+  upsertSettings: (input: import("@contracts").UpsertCurrencySettingsCommand) =>
+    ipcRenderer.invoke(ipcChannels.currency.upsertSettings, input) as Promise<
+      import("@contracts").CurrencySettingsMutationResult
+    >,
+  createRate: (input: import("@contracts").CreateExchangeRateCommand) =>
+    ipcRenderer.invoke(ipcChannels.currency.createRate, input) as Promise<
+      import("@contracts").ExchangeRateMutationResult
+    >,
+  deleteRate: (input: import("@contracts").DeleteExchangeRateCommand) =>
+    ipcRenderer.invoke(ipcChannels.currency.deleteRate, input) as Promise<
+      import("@contracts").ExchangeRateMutationResult
+    >,
+};
+
+const bukowskiQuotes = {
+  list: (filter: import("@contracts").QuoteListFilter) =>
+    ipcRenderer.invoke(ipcChannels.quotes.list, filter) as Promise<import("@contracts").QuoteRow[]>,
+  detail: (workspaceId: string, quoteId: string) =>
+    ipcRenderer.invoke(ipcChannels.quotes.detail, { workspaceId, quoteId }) as Promise<
+      import("@contracts").QuoteDetail | null
+    >,
+  create: (input: import("@contracts").CreateQuoteCommand) =>
+    ipcRenderer.invoke(ipcChannels.quotes.create, input) as Promise<
+      import("@contracts").QuoteMutationResult
+    >,
+  update: (input: import("@contracts").UpdateQuoteCommand) =>
+    ipcRenderer.invoke(ipcChannels.quotes.update, input) as Promise<
+      import("@contracts").QuoteMutationResult
+    >,
+  setStatus: (input: import("@contracts").SetQuoteStatusCommand) =>
+    ipcRenderer.invoke(ipcChannels.quotes.setStatus, input) as Promise<
+      import("@contracts").QuoteMutationResult
+    >,
+  duplicate: (input: import("@contracts").DuplicateQuoteCommand) =>
+    ipcRenderer.invoke(ipcChannels.quotes.duplicate, input) as Promise<
+      import("@contracts").QuoteMutationResult
+    >,
+  delete: (input: import("@contracts").DuplicateQuoteCommand) =>
+    ipcRenderer.invoke(ipcChannels.quotes.delete, input) as Promise<
+      import("@contracts").QuoteMutationResult
+    >,
+  exportPdf: (workspaceId: string, quoteId: string) =>
+    ipcRenderer.invoke(ipcChannels.quotes.exportPdf, { workspaceId, quoteId }) as Promise<AppExportResult>,
+  listVersions: (workspaceId: string, quoteId: string) =>
+    ipcRenderer.invoke(ipcChannels.quotes.listVersions, { workspaceId, quoteId }) as Promise<
+      Array<{
+        id: string;
+        versionNumber: number;
+        changeSummary: string | null;
+        createdAt: string;
+        createdByUserId: string | null;
+        snapshot: Record<string, unknown>;
+      }>
+    >,
+};
+
 const bukowskiCatalog = {
   getSnapshot: (query?: CatalogListQuery) => ipcRenderer.invoke(ipcChannels.catalog.getSnapshot, query) as Promise<CatalogSnapshot>,
   create: (input: CreateCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.create, input) as Promise<CatalogSnapshot>,
@@ -428,5 +511,7 @@ contextBridge.exposeInMainWorld("bukowskiPacking", bukowskiPacking);
 contextBridge.exposeInMainWorld("bukowskiIncidents", bukowskiIncidents);
 contextBridge.exposeInMainWorld("bukowskiProjects", bukowskiProjects);
 contextBridge.exposeInMainWorld("bukowskiFinance", bukowskiFinance);
+contextBridge.exposeInMainWorld("bukowskiCurrency", bukowskiCurrency);
+contextBridge.exposeInMainWorld("bukowskiQuotes", bukowskiQuotes);
 contextBridge.exposeInMainWorld("bukowskiCatalog", bukowskiCatalog);
 contextBridge.exposeInMainWorld("bukowskiRma", bukowskiRma);

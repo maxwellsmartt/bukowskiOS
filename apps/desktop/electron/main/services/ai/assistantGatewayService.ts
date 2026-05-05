@@ -632,12 +632,29 @@ export const createAssistantGatewayService = (
           })()
         : null;
 
+    const supervisorTodayIso = new Date().toISOString().slice(0, 10);
+    const supervisorTodayHuman = new Date().toLocaleDateString("es-DO", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const supervisorRequestingUser = request.context.sourceActorUserId
+      ? `user_id=${request.context.sourceActorUserId}`
+      : "anonymous workspace member";
+
     const supervisorInstructions = [
       supervisor.base_prompt || "You are the BukowskiOS Supervisor Agent.",
-      "Never imply that the command layer executed. Only read-only tools and supervised draft runs are allowed.",
+      "=== SYSTEM CONTEXT ===",
+      `Today: ${supervisorTodayIso} (${supervisorTodayHuman})`,
+      `Workspace: ${workspaceId}`,
+      `Requesting user: ${supervisorRequestingUser}`,
+      "=== END SYSTEM CONTEXT ===",
+      "Specialists EXECUTE write tools directly when the user asks for an action — packing slips, incidents, RMAs, projects, finance entries, quotes. Don't block them.",
       "Choose one target_agent from the allowed list below.",
-      "Only set requires_approval=true when the requested action truly needs an explicit approval boundary or when the target agent is configured as needs_approval.",
-      "Keep user_facing_summary practical and concise.",
+      "Only set requires_approval=true when the action is truly irreversible (delete), externally visible (send message to a client), or above the workspace's risk threshold. Routine creation is NOT a reason for approval.",
+      "When the user asks for an action and the specialist has enough data, route it and let the specialist execute. Do not stall by asking the user to confirm what they already asked for.",
+      "Keep user_facing_summary practical and concise — describe what got done, not what could be done.",
       "Allowed agents:",
       loadAgentsPrompt(db),
       "When tool data is needed, call only the smallest relevant tool.",
@@ -902,12 +919,30 @@ export const createAssistantGatewayService = (
         responseProviderKey = targetProviderKey;
         responseModelKey = targetRuntime.model_key || supervisorModelKey;
 
+        const todayIso = new Date().toISOString().slice(0, 10);
+        const todayHumanEs = new Date().toLocaleDateString("es-DO", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+        const requestingUser = request.context.sourceActorUserId
+          ? `user_id=${request.context.sourceActorUserId}`
+          : "anonymous workspace member";
+        const approvalBypassed = sessionApprovalApplies || approvalBypassApplies;
+
         const specialistInstructions = [
           targetRuntime.base_prompt || `You are the ${targetRuntime.display_name} inside BukowskiOS.`,
+          "=== SYSTEM CONTEXT ===",
+          `Today: ${todayIso} (${todayHumanEs})`,
+          `Workspace: ${workspaceId}`,
+          `Requesting user: ${requestingUser}`,
+          `Approval mode: ${approvalBypassed ? "approved (or unsupervised) — execute writes directly" : "default — execute writes unless explicitly flagged risky"}`,
+          "=== END SYSTEM CONTEXT ===",
           "You are responding after Supervisor routing has already classified the request.",
           "Ground the answer in the provided read-only results and operational context.",
           "Do not invent facts and do not claim that the command layer executed.",
-          "If this is still supervised work, explain the current supervised state clearly and naturally.",
+          "Do NOT mention 'supervised' or 'pending approval' to the user unless the action is genuinely gated. The default is to execute and report results.",
           targetMemoryOverlay.agentEntries.length
             ? `Agent memory:\n${targetMemoryOverlay.agentEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`
             : "Agent memory: none",

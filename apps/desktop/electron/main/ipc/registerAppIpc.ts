@@ -15,7 +15,7 @@ import {
 } from "@contracts";
 import { ipcChannels } from "@contracts/ipc/channels";
 import { assertAllowedExternalUrl, assertTrustedIpcSender, sanitizeIpcError } from "../security/securityConfig";
-import { safeHandleReadWithSchema } from "./ipcSafeHandler";
+import { safeHandle, safeHandleReadWithSchema } from "./ipcSafeHandler";
 
 type RegisterAppIpcOptions = {
   database: DatabaseSync;
@@ -37,7 +37,53 @@ type RegisterAppIpcOptions = {
   retryAllFailedSyncOutboxRows: () => Promise<import("@contracts").AppDiagnosticsSnapshot>;
   exportRecentLogs: (filePath: string) => import("@contracts").AppExportResult;
   exportSupportBundle: (directoryPath: string) => import("@contracts").AppExportResult;
+  applyRemoteCatalogRows: (
+    input: import("@contracts").AppApplyRemoteCatalogRowsCommand,
+  ) => import("@contracts").AppApplyRemoteCatalogRowsResult;
+  applyRemoteExchangeRates: (
+    input: import("@contracts").AppApplyRemoteExchangeRatesCommand,
+  ) => import("@contracts").AppApplyRemoteExchangeRatesResult;
 };
+
+const applyRemoteCatalogRowsSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  entityType: z.enum(["asset_categories", "locations", "clients", "manufacturers", "production_companies"]),
+  rows: z.array(
+    z.object({
+      id: z.string().trim().min(1),
+      workspace_id: z.string().trim().min(1),
+      code: z.string().trim().min(1),
+      name: z.string().trim().min(1),
+      description: z.string().nullable().optional(),
+      parent_category_id: z.string().nullable().optional(),
+      type: z.string().nullable().optional(),
+      is_active: z.boolean().nullable().optional(),
+      updated_at: z.string().min(1),
+    }),
+  ),
+});
+
+const applyRemoteExchangeRatesSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  rows: z.array(
+    z.object({
+      id: z.string().trim().min(1),
+      workspace_id: z.string().trim().min(1),
+      base_currency: z.string().trim().min(2).max(8),
+      quote_currency: z.string().trim().min(2).max(8),
+      rate: z.number().finite().positive(),
+      rate_type: z.string().trim().min(1),
+      source: z.string().trim().min(1),
+      source_label: z.string().nullable().optional(),
+      effective_date: z.string().trim().min(1),
+      fetched_at: z.string().nullable().optional(),
+      created_by_user_id: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+      created_at: z.string().trim().min(1),
+      updated_at: z.string().trim().min(1).optional(),
+    }),
+  ),
+});
 
 const ensureLocalWorkspacesSchema = z.array(
   z.object({
@@ -124,6 +170,8 @@ export const registerAppIpc = ({
   retryAllFailedSyncOutboxRows,
   exportRecentLogs,
   exportSupportBundle,
+  applyRemoteCatalogRows,
+  applyRemoteExchangeRates,
 }: RegisterAppIpcOptions) => {
   safeHandleReadWithSchema(ipcChannels.app.getInfo, emptyReadArgsSchema, () => ({
     appName: "bukowskiOS",
@@ -329,4 +377,18 @@ export const registerAppIpc = ({
       throw sanitizeIpcError(error, "The app could not open that external link.");
     }
   });
+
+  safeHandle(
+    ipcChannels.app.applyRemoteCatalogRows,
+    applyRemoteCatalogRowsSchema,
+    (_event, input) => applyRemoteCatalogRows(input),
+    "The app could not apply remote catalog updates.",
+  );
+  safeHandle(
+    ipcChannels.app.applyRemoteExchangeRates,
+    applyRemoteExchangeRatesSchema,
+    (_event, input) =>
+      applyRemoteExchangeRates(input as import("@contracts").AppApplyRemoteExchangeRatesCommand),
+    "The app could not apply remote exchange rates.",
+  );
 };

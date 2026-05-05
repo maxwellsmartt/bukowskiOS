@@ -13,6 +13,7 @@ export type BukowskiSessionUser = {
   id: string;
   email: string | null;
   displayName: string;
+  avatarUrl: string | null;
 };
 
 type SessionContextValue = {
@@ -30,6 +31,7 @@ type SessionContextValue = {
   signInWithOAuth: (provider: "google" | "github") => Promise<void>;
   signOut: () => Promise<void>;
   handleAuthDeepLink: (url: string) => Promise<string>;
+  refreshUser: () => Promise<void>;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -42,10 +44,16 @@ const toSessionUser = (user: { id: string; email?: string | null; user_metadata?
         ? user.user_metadata.name
         : user.email ?? "BukowskiOS user";
 
+  const avatarUrl =
+    typeof user.user_metadata?.avatar_url === "string" && user.user_metadata.avatar_url.length > 0
+      ? user.user_metadata.avatar_url
+      : null;
+
   return {
     id: user.id,
     email: user.email ?? null,
     displayName,
+    avatarUrl,
   };
 };
 
@@ -126,6 +134,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
           id: "user-ops",
           email: "local@bukowskios.dev",
           displayName: "Local operator",
+          avatarUrl: null,
         },
   );
   const [authError, setAuthError] = useState<string | null>(null);
@@ -371,6 +380,18 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     [supabase],
   );
 
+  const refreshUser = useCallback(async () => {
+    if (!supabase) {
+      return;
+    }
+
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+      return;
+    }
+    setUser(toSessionUser(data.user));
+  }, [supabase]);
+
   const signOut = useCallback(async () => {
     setAuthError(null);
     setIsPasswordRecovery(false);
@@ -384,7 +405,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     }
 
     await window.bukowskiAuth?.clearStoredTokens();
-    setUser(supabase ? null : { id: "user-ops", email: "local@bukowskios.dev", displayName: "Local operator" });
+    setUser(
+      supabase
+        ? null
+        : { id: "user-ops", email: "local@bukowskios.dev", displayName: "Local operator", avatarUrl: null },
+    );
     setStatus(supabase ? "unauthenticated" : "authenticated");
   }, [supabase]);
 
@@ -439,11 +464,13 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       signInWithOAuth,
       signOut,
       handleAuthDeepLink,
+      refreshUser,
     }),
     [
       authError,
       handleAuthDeepLink,
       isPasswordRecovery,
+      refreshUser,
       requestPasswordReset,
       signInWithMagicLink,
       signInWithOAuth,

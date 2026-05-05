@@ -118,6 +118,7 @@ export const OnboardingTour = () => {
   const handleNext = () => {
     if (isLast) {
       handleClose();
+      window.dispatchEvent(new CustomEvent("bukowski:help-pulse"));
       return;
     }
     setStepIndex((current) => Math.min(current + 1, tourSteps.length - 1));
@@ -154,11 +155,22 @@ export const OnboardingTour = () => {
         <strong className="onboarding-title">{step.title}</strong>
         <p className="onboarding-body">{step.body}</p>
 
-        <div className="onboarding-progress" aria-hidden="true">
-          {tourSteps.map((_, index) => (
-            <span
-              key={index}
+        <div className="onboarding-progress-bar" aria-hidden="true">
+          <span
+            className="onboarding-progress-bar-fill"
+            style={{ width: `${((stepIndex + 1) / tourSteps.length) * 100}%` }}
+          />
+        </div>
+
+        <div className="onboarding-progress" role="tablist" aria-label="Tour steps">
+          {tourSteps.map((tourStep, index) => (
+            <button
+              key={tourStep.title}
+              aria-current={index === stepIndex ? "step" : undefined}
+              aria-label={`Step ${index + 1}: ${tourStep.title}`}
               className={`onboarding-progress-dot${index === stepIndex ? " is-active" : index < stepIndex ? " is-done" : ""}`}
+              onClick={() => setStepIndex(index)}
+              type="button"
             />
           ))}
         </div>

@@ -89,3 +89,36 @@ export const revokeWorkspaceInvite = async (
     throw new Error(deleteError.message);
   }
 };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const looseClient = (client: SupabaseClient): any => client as unknown;
+
+export const updateMemberRole = async (
+  supabase: SupabaseClient,
+  input: { workspaceId: string; userId: string; roleId: string },
+): Promise<void> => {
+  const { error } = await looseClient(supabase)
+    .from("workspace_memberships")
+    .update({ role_id: input.roleId, updated_at: new Date().toISOString() })
+    .eq("workspace_id", input.workspaceId)
+    .eq("user_id", input.userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const setMemberStatus = async (
+  supabase: SupabaseClient,
+  input: { workspaceId: string; userId: string; status: "active" | "inactive" },
+): Promise<void> => {
+  const { error } = await looseClient(supabase)
+    .from("workspace_memberships")
+    .update({ status: input.status, updated_at: new Date().toISOString() })
+    .eq("workspace_id", input.workspaceId)
+    .eq("user_id", input.userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};

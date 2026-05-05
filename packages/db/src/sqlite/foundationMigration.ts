@@ -14,6 +14,9 @@ import kitAssetQuantitiesSql from "../migrations/0013_kit_asset_quantities.sql?r
 import assetQuantityStateSql from "../migrations/0014_asset_quantity_state.sql?raw";
 import assetAssignmentQuantitiesSql from "../migrations/0015_asset_assignment_quantities.sql?raw";
 import connectorRuntimeSql from "../migrations/0016_connector_runtime.sql?raw";
+import catalogPullCursorsSql from "../migrations/0017_catalog_pull_cursors.sql?raw";
+import currencyAndQuotesFoundationSql from "../migrations/0018_currency_and_quotes_foundation.sql?raw";
+import quotesSchemaSql from "../migrations/0019_quotes_schema.sql?raw";
 
 const foundationMigrations = [
   { version: "0001_foundation", sql: foundationCoreSql },
@@ -32,6 +35,9 @@ const foundationMigrations = [
   { version: "0014_asset_quantity_state", sql: assetQuantityStateSql },
   { version: "0015_asset_assignment_quantities", sql: assetAssignmentQuantitiesSql },
   { version: "0016_connector_runtime", sql: connectorRuntimeSql },
+  { version: "0017_catalog_pull_cursors", sql: catalogPullCursorsSql },
+  { version: "0018_currency_and_quotes_foundation", sql: currencyAndQuotesFoundationSql },
+  { version: "0019_quotes_schema", sql: quotesSchemaSql },
 ] as const;
 
 const foundationMigrationSql = foundationMigrations.map((migration) => migration.sql).join("\n\n");

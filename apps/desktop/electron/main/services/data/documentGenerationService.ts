@@ -83,6 +83,60 @@ type FinanceReportPdfPayload = {
   }>;
 };
 
+export type QuotePdfPayload = {
+  quoteNumber: string;
+  quoteDate: string; // dd/mm/yyyy
+  validityDays: number;
+  packageTitle: string | null;
+  description: string | null;
+  workspace: {
+    legalName: string;
+    rnc: string;
+    sirecineNumber: string | null;
+    addressLines: string[];
+    phone: string;
+    web: string;
+    email: string;
+    logoBuffer: Buffer | null;
+    sealBuffer: Buffer | null;
+    signatureBuffer: Buffer | null;
+    signatoryName: string;
+  };
+  client: {
+    attentionName: string | null;
+    productionName: string | null;
+    projectName: string | null;
+    descriptionLabel: string | null;
+    phone: string | null;
+    rnc: string | null;
+    pur: string | null;
+  };
+  currency: {
+    code: string; // DOP / USD / EUR
+    symbol: string; // $ / US$ / €
+  };
+  items: Array<{
+    quantity: number;
+    titleLine: string;
+    detailLines: string[];
+    durationValue: string | null;
+    durationUnit: string | null;
+    unitPrice: number;
+    lineTotal: number;
+  }>;
+  totals: {
+    subtotal: number;
+    discountLabel: string | null; // e.g., "DESCUENTO ESPECIAL (PAQUETE)"
+    discountRate: number | null; // 0.20
+    discountAmount: number; // negative or zero
+    taxRate: number; // 0.18
+    taxAmount: number; // computed ITBIS in DOP
+    taxAddedToTotal: boolean;
+    total: number;
+  };
+  observations: string | null;
+};
+
 type ProjectSetupSummaryPdfPayload = {
   projectCode: string;
   projectName: string;
@@ -1262,6 +1316,558 @@ export const createDocumentGenerationService = () => ({
 
     return {
       fileName: `${payload.projectCode.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "project-setup-summary"}.pdf`,
+      mimeType: "application/pdf" as const,
+      buffer: await bufferPromise,
+    };
+  },
+
+  /**
+   * Quote PDF — pixel-faithful recreation of the Metadata Cine quote model
+   * (cotizaciones 2025-8400..8405). A4 portrait, single page.
+   *
+   * Visual hierarchy:
+   *  1. Logo (top-left, ~140x110), "COTIZACIÓN" + number (top-right).
+   *  2. Black header bar with "METADATA CINE S.R.L." + RNC + SIRECINE NO.
+   *  3. Address block left, contact form right (4 lines × 2 cols).
+   *  4. Section title (uppercase bold) + "VALIDITY: N DAYS" right-aligned.
+   *  5. Items table (5 cols: Cant. | Descripción | Duración | Precio | Costo).
+   *     Always renders ~12 row slots (empty rows fill remaining space).
+   *  6. Totals block: SUB-TOTAL, optional discount, ITBIS (with `**` marker if
+   *     not added to total), TOTAL GENERAL.
+   *  7. "Observaciones :" + signature image + sello + signatory name.
+   *  8. "Recibido por:" right.
+   */
+  async createQuotePdf(payload: QuotePdfPayload) {
+    // bufferPages keeps every page in memory so we can drop overflow pages
+    // before flushing to disk. autoFirstPage is on by default; we never want
+    // pdfkit to auto-create a second page from cursor drift.
+    const document = new PDFDocument({ margin: 32, size: "A4", bufferPages: true });
+    const bufferPromise = collectPdfBuffer(document);
+
+    const pageLeft = document.page.margins.left;
+    const pageRight = document.page.width - document.page.margins.right;
+    const pageWidth = pageRight - pageLeft;
+    const pageBottom = document.page.height - document.page.margins.bottom;
+    const top = document.page.margins.top;
+    const ink = "#0d0f12";
+    const muted = "#5b6573";
+    const hairline = "#cdd2da";
+
+    // Helpers --------------------------------------------------------------
+    const formatAmount = (value: number) => {
+      // Metadata format: thousands separator, no decimals.
+      const safe = Number.isFinite(value) ? Math.round(value) : 0;
+      return safe.toLocaleString("en-US");
+    };
+
+    // 1. Logo (top-left) — kept compact (~78pt tall) to match Iván's layout.
+    const logoBoxX = pageLeft;
+    const logoBoxY = top;
+    const logoBoxW = 110;
+    const logoBoxH = 78;
+    if (payload.workspace.logoBuffer) {
+      try {
+        document.image(payload.workspace.logoBuffer, logoBoxX, logoBoxY, {
+          fit: [logoBoxW, logoBoxH],
+        });
+      } catch {
+        drawMetadataLogo(document, logoBoxX + 22, logoBoxY + 8);
+      }
+    } else {
+      // Fallback: stacked META / DATA / CINE text blocks.
+      document.font("Helvetica-Bold").fillColor(ink).fontSize(22);
+      document.text("META", logoBoxX, logoBoxY, { lineBreak: false, characterSpacing: 1.4 });
+      document.text("DATA", logoBoxX, logoBoxY + 21, { lineBreak: false, characterSpacing: 1.4 });
+      document.font("Helvetica").fontSize(9);
+      document.text("C I N E", logoBoxX + 3, logoBoxY + 50, {
+        lineBreak: false,
+        characterSpacing: 6,
+      });
+    }
+
+    // 2. "COTIZACIÓN" + number (top-right) ---------------------------------
+    document.font("Helvetica").fillColor(muted).fontSize(11);
+    document.text("COTIZACIÓN", pageRight - 220, top + 2, {
+      width: 220,
+      align: "right",
+      lineBreak: false,
+    });
+    document.font("Helvetica-Bold").fillColor(ink).fontSize(15);
+    document.text(payload.quoteNumber, pageRight - 220, top + 18, {
+      width: 220,
+      align: "right",
+      lineBreak: false,
+    });
+
+    // 3. Black header bar with workspace identity --------------------------
+    const headerBarY = top + 38;
+    const headerBarH = 42;
+    const headerBarLeft = pageLeft + logoBoxW + 12;
+    const headerBarRight = pageRight;
+    const headerBarW = headerBarRight - headerBarLeft;
+    document.rect(headerBarLeft, headerBarY, headerBarW, headerBarH).fill(ink);
+
+    document.font("Helvetica").fillColor("#ffffff").fontSize(13);
+    document.text(payload.workspace.legalName, headerBarLeft + 14, headerBarY + 8, {
+      width: headerBarW - 28,
+      lineBreak: false,
+    });
+    document.font("Helvetica").fontSize(9.5);
+    document.text(`RNC: ${payload.workspace.rnc}`, headerBarLeft + 14, headerBarY + 26, {
+      width: headerBarW * 0.55,
+      lineBreak: false,
+    });
+    if (payload.workspace.sirecineNumber) {
+      document.text(`SIRECINE NO.: ${payload.workspace.sirecineNumber}`, headerBarLeft + headerBarW * 0.55, headerBarY + 26, {
+        width: headerBarW * 0.45 - 14,
+        align: "right",
+        lineBreak: false,
+      });
+    }
+
+    // 4. Address block (left, under logo) ----------------------------------
+    //
+    // Width is clamped to the logo column so the address never bleeds into
+    // the client form on the right (Iván's PDFs keep the same vertical alley).
+    const addressColumnW = 150;
+    let addressY = top + logoBoxH + 12;
+    document.font("Helvetica").fillColor(ink).fontSize(8);
+    payload.workspace.addressLines.forEach((line) => {
+      document.text(line, pageLeft, addressY, { width: addressColumnW, lineBreak: false, ellipsis: true });
+      addressY += 11;
+    });
+    document.font("Helvetica-Bold").fontSize(8);
+    document.text(`T `, pageLeft, addressY, { width: addressColumnW, continued: true });
+    document.font("Helvetica").text(payload.workspace.phone, { lineBreak: false });
+    addressY += 11;
+    document.font("Helvetica-Bold").text(`W `, pageLeft, addressY, { width: addressColumnW, continued: true });
+    document.font("Helvetica").text(payload.workspace.web, { lineBreak: false });
+    addressY += 11;
+    document.font("Helvetica-Bold").text(`E `, pageLeft, addressY, { width: addressColumnW, continued: true });
+    document.font("Helvetica").text(payload.workspace.email, { lineBreak: false });
+
+    // 5. Client form block (right, under header bar) -----------------------
+    //
+    // The form's left edge is pushed past the address column to keep a clean
+    // alley between the two — `addressColumnW + 16pt` of breathing room.
+    const formY = headerBarY + headerBarH + 14;
+    const formLeft = pageLeft + addressColumnW + 16;
+    const formW = pageRight - formLeft;
+    const formColW = formW / 2;
+    const formLineH = 16;
+
+    const drawFormRow = (
+      leftLabel: string,
+      leftValue: string | null,
+      rightLabel: string,
+      rightValue: string | null,
+      lineIndex: number,
+    ) => {
+      const y = formY + lineIndex * formLineH;
+      document.font("Helvetica").fillColor(ink).fontSize(9.5);
+      document.text(`${leftLabel} : `, formLeft, y, { continued: true, lineBreak: false });
+      document.font(leftValue ? "Helvetica-Bold" : "Helvetica");
+      document.text(leftValue ?? "", { lineBreak: false });
+
+      document.font("Helvetica").fontSize(9.5);
+      document.text(`${rightLabel} : `, formLeft + formColW, y, { continued: true, lineBreak: false });
+      document.font(rightValue ? "Helvetica-Bold" : "Helvetica");
+      document.text(rightValue ?? "", { lineBreak: false });
+      document.font("Helvetica");
+    };
+
+    drawFormRow("ATENCIÓN", payload.client.attentionName, "FECHA", payload.quoteDate, 0);
+    drawFormRow("PRODUCCIÓN", payload.client.productionName, "TEL", payload.client.phone, 1);
+    drawFormRow(
+      "NOMBRE DEL PROJECTO",
+      payload.client.projectName,
+      "RNC",
+      payload.client.rnc,
+      2,
+    );
+    drawFormRow(
+      "DESCRIPCIÓN",
+      payload.client.descriptionLabel,
+      "PUR",
+      payload.client.pur,
+      3,
+    );
+
+    // 6. Section title (package title) + validity --------------------------
+    let cursorY = formY + 4 * formLineH + 14;
+    if (payload.packageTitle) {
+      document.font("Helvetica-Bold").fillColor(ink).fontSize(11);
+      document.text(payload.packageTitle.toUpperCase(), pageLeft, cursorY, {
+        width: pageWidth * 0.65,
+        lineBreak: false,
+      });
+    }
+    document.font("Helvetica").fillColor(muted).fontSize(8.5);
+    document.text(`VALIDITY: ${payload.validityDays} DAYS`, pageLeft, cursorY + 4, {
+      width: pageWidth,
+      align: "right",
+      lineBreak: false,
+    });
+    cursorY += 22;
+
+    // 7. Items table -------------------------------------------------------
+    //
+    // Strategy: compute the vertical area we have left after reserving space
+    // for the totals block, observations, and signature. Real items get their
+    // natural height (varies with description detail lines); empty slots
+    // share whatever height is left, so the table always fills the page
+    // without overflowing onto a second page.
+    const colCantW = 48;
+    const colDurNumW = 34;
+    const colDurUnitW = 42;
+    const colPrecioW = 78;
+    const colCostoW = 86;
+    const colDescW = pageWidth - colCantW - colDurNumW - colDurUnitW - colPrecioW - colCostoW;
+
+    const headerHeight = 20;
+    const minRowHeight = 30;
+    const totalsRowH = 18;
+
+    // Reserve space for everything that comes AFTER the items table.
+    const reservedTotals =
+      totalsRowH * 3 + // SUB-TOTAL + ITBIS + TOTAL GENERAL
+      (payload.totals.discountAmount && payload.totals.discountAmount !== 0 ? totalsRowH : 0);
+    const reservedFooter = 18 + 22 + 76; // observaciones gap + line + signature block
+    const tableTopY = cursorY;
+    const tableBottomLimit = pageBottom - reservedTotals - reservedFooter;
+    const tableAvailable = Math.max(headerHeight + minRowHeight, tableBottomLimit - tableTopY);
+
+    // Table header
+    document.rect(pageLeft, cursorY, pageWidth, headerHeight).strokeColor(hairline).lineWidth(0.7).stroke();
+    document.font("Helvetica-Bold").fillColor(ink).fontSize(8);
+    let tx = pageLeft;
+    const drawHeader = (label: string, w: number) => {
+      document.text(label, tx, cursorY + 6, { width: w, align: "center", lineBreak: false });
+      tx += w;
+    };
+    drawHeader("CANT.", colCantW);
+    drawHeader("DESCRIPCIÓN", colDescW);
+    drawHeader("DURACIÓN", colDurNumW + colDurUnitW);
+    drawHeader("PRECIO", colPrecioW);
+    drawHeader("COSTO", colCostoW);
+
+    // Vertical column dividers in header
+    {
+      let dx = pageLeft + colCantW;
+      [colDescW, colDurNumW + colDurUnitW, colPrecioW].forEach((w) => {
+        document.moveTo(dx, cursorY).lineTo(dx, cursorY + headerHeight).strokeColor(hairline).stroke();
+        dx += w;
+      });
+    }
+
+    cursorY += headerHeight;
+
+    const drawItemRow = (
+      item: QuotePdfPayload["items"][number] | null,
+      rowY: number,
+      rowHeight: number,
+    ) => {
+      // Row outer rect
+      document.rect(pageLeft, rowY, pageWidth, rowHeight).strokeColor(hairline).lineWidth(0.7).stroke();
+      // Vertical dividers
+      let cx = pageLeft + colCantW;
+      [colDescW, colDurNumW, colDurUnitW, colPrecioW].forEach((w) => {
+        document.moveTo(cx, rowY).lineTo(cx, rowY + rowHeight).strokeColor(hairline).stroke();
+        cx += w;
+      });
+
+      if (!item) return;
+
+      // Quantity (vertical center)
+      document.font("Helvetica").fillColor(ink).fontSize(9);
+      document.text(formatAmount(item.quantity), pageLeft, rowY + rowHeight / 2 - 5, {
+        width: colCantW,
+        align: "center",
+        lineBreak: false,
+      });
+      // Description: bold title + smaller details. When the item has no
+      // detail lines, vertically center the title; otherwise top-anchor.
+      const descX = pageLeft + colCantW;
+      const hasDetail = item.detailLines.length > 0;
+      document.font("Helvetica-Bold").fontSize(9);
+      const titleY = hasDetail ? rowY + 5 : rowY + rowHeight / 2 - 5;
+      document.text(item.titleLine, descX + 6, titleY, {
+        width: colDescW - 12,
+        align: "center",
+        lineBreak: false,
+        ellipsis: true,
+      });
+      if (hasDetail) {
+        document.font("Helvetica").fontSize(7.5);
+        document.text(item.detailLines.join("\n"), descX + 6, rowY + 16, {
+          width: colDescW - 12,
+          align: "center",
+        });
+      }
+      const durX = descX + colDescW;
+      document.font("Helvetica").fontSize(9);
+      document.text(item.durationValue ?? "", durX, rowY + rowHeight / 2 - 5, {
+        width: colDurNumW,
+        align: "center",
+        lineBreak: false,
+      });
+      document.text(item.durationUnit ?? "", durX + colDurNumW, rowY + rowHeight / 2 - 5, {
+        width: colDurUnitW,
+        align: "center",
+        lineBreak: false,
+      });
+      const precioX = durX + colDurNumW + colDurUnitW;
+      document.text(formatAmount(item.unitPrice), precioX, rowY + rowHeight / 2 - 5, {
+        width: colPrecioW,
+        align: "center",
+        lineBreak: false,
+      });
+      document.text(formatAmount(item.lineTotal), precioX + colPrecioW, rowY + rowHeight / 2 - 5, {
+        width: colCostoW,
+        align: "center",
+        lineBreak: false,
+      });
+    };
+
+    // Compute heights for each real item based on title + ACTUAL wrapped
+    // detail height (heightOfString takes column width and font into account
+    // so we never have detail text spilling into the next row).
+    const realItems = payload.items;
+    const realHeights = realItems.map((item) => {
+      let detailHeight = 0;
+      if (item.detailLines.length) {
+        const detailText = item.detailLines.join("\n");
+        document.font("Helvetica").fontSize(7.5);
+        detailHeight = document.heightOfString(detailText, {
+          width: colDescW - 12,
+          align: "center",
+        });
+      }
+      // 5pt top padding + ~12pt for bold title + detailHeight + 4pt bottom
+      const naturalHeight = 5 + 12 + detailHeight + 4;
+      return Math.max(minRowHeight, Math.ceil(naturalHeight));
+    });
+    const realHeightTotal = realHeights.reduce((acc, h) => acc + h, 0);
+
+    // Distribute remaining space across empty rows. Cap empty row count so
+    // they don't get absurdly tall when there are very few real items.
+    const remainingForEmpties = Math.max(0, tableAvailable - headerHeight - realHeightTotal);
+    const maxEmptyRows = 8;
+    let emptyCount = Math.min(
+      maxEmptyRows,
+      Math.max(0, Math.floor(remainingForEmpties / minRowHeight)),
+    );
+    // Leave at least one full empty row for visual breathing when we have room.
+    if (remainingForEmpties >= minRowHeight && emptyCount === 0) emptyCount = 1;
+
+    let emptyRowHeight = minRowHeight;
+    if (emptyCount > 0) {
+      emptyRowHeight = Math.max(minRowHeight, Math.floor(remainingForEmpties / emptyCount));
+    }
+
+    realItems.forEach((item, index) => {
+      drawItemRow(item, cursorY, realHeights[index]!);
+      cursorY += realHeights[index]!;
+    });
+    for (let i = 0; i < emptyCount; i += 1) {
+      drawItemRow(null, cursorY, emptyRowHeight);
+      cursorY += emptyRowHeight;
+    }
+
+    // 8. Totals rows -------------------------------------------------------
+    const totalsLabelW = pageWidth - colCostoW - colPrecioW;
+
+    const drawTotalsRow = (label: string, valueText: string, isBold = false) => {
+      document.rect(pageLeft, cursorY, pageWidth, totalsRowH).strokeColor(hairline).lineWidth(0.7).stroke();
+      // Last separator
+      document
+        .moveTo(pageLeft + totalsLabelW + colPrecioW, cursorY)
+        .lineTo(pageLeft + totalsLabelW + colPrecioW, cursorY + totalsRowH)
+        .stroke();
+      document.font(isBold ? "Helvetica-Bold" : "Helvetica").fillColor(ink).fontSize(9.5);
+      document.text(label, pageLeft + 8, cursorY + 5, {
+        width: totalsLabelW + colPrecioW - 16,
+        align: "right",
+        lineBreak: false,
+      });
+      document.font(isBold ? "Helvetica-Bold" : "Helvetica");
+      document.text(valueText, pageLeft + totalsLabelW + colPrecioW, cursorY + 5, {
+        width: colCostoW,
+        align: "center",
+        lineBreak: false,
+      });
+      cursorY += totalsRowH;
+    };
+
+    const ccy = payload.currency.code.toUpperCase();
+    const sym = payload.currency.symbol || "$";
+
+    drawTotalsRow(`( ${ccy} ) ${sym} SUB-TOTAL :`, formatAmount(payload.totals.subtotal));
+
+    if (payload.totals.discountAmount && payload.totals.discountAmount !== 0) {
+      const ratePart =
+        payload.totals.discountRate && payload.totals.discountRate > 0
+          ? `${(payload.totals.discountRate * 100).toFixed(2)}%`
+          : "";
+      const discountLabel = payload.totals.discountLabel ?? "DESCUENTO";
+      // Render label + rate as one line, amount on the right.
+      document.rect(pageLeft, cursorY, pageWidth, totalsRowH).strokeColor(hairline).lineWidth(0.7).stroke();
+      document
+        .moveTo(pageLeft + totalsLabelW, cursorY)
+        .lineTo(pageLeft + totalsLabelW, cursorY + totalsRowH)
+        .stroke();
+      document
+        .moveTo(pageLeft + totalsLabelW + colPrecioW, cursorY)
+        .lineTo(pageLeft + totalsLabelW + colPrecioW, cursorY + totalsRowH)
+        .stroke();
+      document.font("Helvetica").fillColor(ink).fontSize(9.5);
+      document.text(discountLabel, pageLeft + 8, cursorY + 5, {
+        width: totalsLabelW - 16,
+        align: "right",
+        lineBreak: false,
+      });
+      document.text(ratePart, pageLeft + totalsLabelW, cursorY + 5, {
+        width: colPrecioW,
+        align: "center",
+        lineBreak: false,
+      });
+      const signedAmount = -Math.abs(payload.totals.discountAmount);
+      document.text(formatAmount(signedAmount), pageLeft + totalsLabelW + colPrecioW, cursorY + 5, {
+        width: colCostoW,
+        align: "center",
+        lineBreak: false,
+      });
+      cursorY += totalsRowH;
+    }
+
+    // ITBIS row
+    {
+      document.rect(pageLeft, cursorY, pageWidth, totalsRowH).strokeColor(hairline).lineWidth(0.7).stroke();
+      document
+        .moveTo(pageLeft + totalsLabelW, cursorY)
+        .lineTo(pageLeft + totalsLabelW, cursorY + totalsRowH)
+        .stroke();
+      document
+        .moveTo(pageLeft + totalsLabelW + colPrecioW, cursorY)
+        .lineTo(pageLeft + totalsLabelW + colPrecioW, cursorY + totalsRowH)
+        .stroke();
+      const itbisPrefix = payload.totals.taxAddedToTotal ? "" : "** ";
+      document.font("Helvetica").fillColor(ink).fontSize(9.5);
+      document.text(`${itbisPrefix}ITBIS :`, pageLeft + 8, cursorY + 5, {
+        width: totalsLabelW - 16,
+        align: "right",
+        lineBreak: false,
+      });
+      document.text(`${(payload.totals.taxRate * 100).toFixed(2)}%`, pageLeft + totalsLabelW, cursorY + 5, {
+        width: colPrecioW,
+        align: "center",
+        lineBreak: false,
+      });
+      // Show amount only when ITBIS is added to the total. Ley de Cine prints
+      // the rate but leaves the amount column blank.
+      if (payload.totals.taxAddedToTotal) {
+        document.text(formatAmount(payload.totals.taxAmount), pageLeft + totalsLabelW + colPrecioW, cursorY + 5, {
+          width: colCostoW,
+          align: "center",
+          lineBreak: false,
+        });
+      }
+      cursorY += totalsRowH;
+    }
+
+    drawTotalsRow(`( ${ccy} ) ${sym} TOTAL GENERAL :`, formatAmount(payload.totals.total), true);
+
+    // 9. Observaciones + signature/sello -----------------------------------
+    //
+    // Pin everything below to fixed Y coordinates measured from the bottom
+    // margin. This guarantees the signature, signatory name, legal name and
+    // "Recibido por:" all land on page 1 regardless of how tall the items
+    // table ended up.
+    const observacionesY = cursorY + 14;
+    document.font("Helvetica").fillColor(ink).fontSize(9);
+    document.text("Observaciones :", pageLeft, observacionesY, { lineBreak: false });
+    if (payload.observations && payload.observations.trim()) {
+      document.text(payload.observations.trim(), pageLeft + 90, observacionesY, {
+        width: pageWidth - 90,
+      });
+    }
+
+    // Signature block: anchored from page bottom so it never overflows.
+    const signatureBoxW = 230;
+    const signatureBlockY = pageBottom - 76;
+    const signatureLineY = pageBottom - 24;
+
+    if (payload.workspace.signatureBuffer) {
+      try {
+        document.image(payload.workspace.signatureBuffer, pageLeft + 6, signatureBlockY, {
+          fit: [signatureBoxW - 12, 50],
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+    if (payload.workspace.sealBuffer) {
+      try {
+        document.image(payload.workspace.sealBuffer, pageLeft + signatureBoxW - 36, signatureBlockY - 12, {
+          fit: [96, 96],
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // Signature line + names (left side).
+    document
+      .moveTo(pageLeft, signatureLineY)
+      .lineTo(pageLeft + signatureBoxW, signatureLineY)
+      .strokeColor(ink)
+      .lineWidth(0.6)
+      .stroke();
+    document.font("Helvetica").fontSize(9).fillColor(ink);
+    document.text(payload.workspace.signatoryName, pageLeft, signatureLineY + 3, {
+      width: signatureBoxW,
+      align: "center",
+      lineBreak: false,
+    });
+    document.font("Helvetica").fontSize(8.5).fillColor(ink);
+    document.text(payload.workspace.legalName, pageLeft, signatureLineY + 14, {
+      width: signatureBoxW,
+      align: "center",
+      lineBreak: false,
+    });
+
+    // Recibido por (right-side).
+    document.font("Helvetica").fontSize(9).fillColor(ink);
+    document.text("Recibido por:", pageRight - 220, signatureLineY + 3, {
+      width: 220,
+      align: "right",
+      lineBreak: false,
+    });
+
+    // pdfkit may have auto-created extra pages from cursor drift on text()
+    // calls near the page bottom. Force the document down to a single page
+    // by switching back to page 0 and dropping every later page from the
+    // page tree before flush.
+    const range = document.bufferedPageRange();
+    if (range.count > 1) {
+      // PDFKit does not expose a public removePage API. The internal page
+      // list lives on `document._root.data.Pages.data.Kids` and the count
+      // on `Count`. We splice the kids and update the count so only the
+      // first page remains.
+      const root = (document as unknown as {
+        _root: { data: { Pages: { data: { Kids: unknown[]; Count: number } } } };
+      })._root;
+      const kids = root.data.Pages.data.Kids;
+      if (Array.isArray(kids) && kids.length > 1) {
+        kids.length = 1;
+        root.data.Pages.data.Count = 1;
+      }
+    }
+    document.end();
+
+    const safeNumber = payload.quoteNumber.replace(/[^a-z0-9_-]+/gi, "_");
+    return {
+      fileName: `Cotizacion_${safeNumber}.pdf`,
       mimeType: "application/pdf" as const,
       buffer: await bufferPromise,
     };

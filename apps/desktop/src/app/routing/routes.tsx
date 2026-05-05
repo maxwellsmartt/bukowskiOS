@@ -15,6 +15,10 @@ const lazyPage = <TModule extends Record<string, ComponentType<object>>, TKey ex
 
 const SettingsPage = lazyPage(() => import("@features/admin/SettingsPage"), "SettingsPage");
 const SyncOutboxPage = lazyPage(() => import("@features/admin/SyncOutboxPage"), "SyncOutboxPage");
+const UserAccountSettingsPage = lazyPage(
+  () => import("@features/admin/UserAccountSettingsPage"),
+  "UserAccountSettingsPage",
+);
 const WorkspaceSettingsPage = lazyPage(() => import("@features/admin/WorkspaceSettingsPage"), "WorkspaceSettingsPage");
 const AgentConnectorsPage = lazyPage(() => import("@features/agents/AgentConnectorsPage"), "AgentConnectorsPage");
 const AgentModelsPage = lazyPage(() => import("@features/agents/AgentModelsPage"), "AgentModelsPage");
@@ -30,6 +34,8 @@ const CompareView = lazyPage(() => import("@features/compare/CompareView"), "Com
 const FinanceCostLinksPage = lazyPage(() => import("@features/finance/FinanceCostLinksPage"), "FinanceCostLinksPage");
 const FinanceEntriesPage = lazyPage(() => import("@features/finance/FinanceEntriesPage"), "FinanceEntriesPage");
 const FinanceOverviewPage = lazyPage(() => import("@features/finance/FinanceOverviewPage"), "FinanceOverviewPage");
+const QuotesPage = lazyPage(() => import("@features/finance/QuotesPage"), "QuotesPage");
+const QuoteEditorPage = lazyPage(() => import("@features/finance/QuoteEditorPage"), "QuoteEditorPage");
 const IncidentsPage = lazyPage(() => import("@features/incidents/IncidentsPage"), "IncidentsPage");
 const PackingPage = lazyPage(() => import("@features/packing/PackingPage"), "PackingPage");
 const CatalogPage = lazyPage(() => import("@features/projects/CatalogPage"), "CatalogPage");
@@ -61,12 +67,16 @@ const routeElements = {
   "/finance": <FinanceOverviewPage />,
   "/finance/cost-links": <FinanceCostLinksPage />,
   "/finance/entries": <FinanceEntriesPage />,
+  "/finance/quotes": <QuotesPage />,
+  "/finance/quotes/new": <QuoteEditorPage />,
+  "/finance/quotes/:quoteId": <QuoteEditorPage />,
   "/agents/mission-control": <AgentsMissionControlPage />,
   "/agents": <AgentsPage />,
   "/agents/runs": <AgentRunsPage />,
   "/agents/models": <AgentModelsPage />,
   "/agents/connectors": <AgentConnectorsPage />,
   "/settings": <SettingsPage />,
+  "/settings/account": <UserAccountSettingsPage />,
   "/settings/workspace": <WorkspaceSettingsPage />,
   "/settings/sync": <SyncOutboxPage />,
   "/projects/schedule": <ProjectsSchedulePage />,

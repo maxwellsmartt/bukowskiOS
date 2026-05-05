@@ -1,10 +1,13 @@
-import { Suspense, useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
 
 import { resolveActiveRoute } from "@app/routing/route-meta";
 import { AppRoutes } from "@app/routing/routes";
+import { useAutoLogout } from "@shared/hooks/useAutoLogout";
+import { useCatalogPull } from "@shared/hooks/useCatalogPull";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useSession } from "@app/providers/SessionProvider";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { Breadcrumb } from "@shared/components/Breadcrumb";
 import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 import { pushRecentEntityKey } from "@shared/lib/recentEntities";
@@ -33,6 +36,22 @@ export const AppShell = () => {
   const navigate = useNavigate();
   const { activeProjectId, activeProjectRouteSection, isScopeReady } = useShellContext();
   const { handleAuthDeepLink } = useSession();
+  const { activeWorkspaceId } = useWorkspace();
+  useAutoLogout();
+  useCatalogPull();
+  const [workspaceTransitionActive, setWorkspaceTransitionActive] = useState(false);
+  const prevWorkspaceIdRef = useRef(activeWorkspaceId);
+
+  useEffect(() => {
+    if (prevWorkspaceIdRef.current && activeWorkspaceId && prevWorkspaceIdRef.current !== activeWorkspaceId) {
+      setWorkspaceTransitionActive(true);
+      const timer = window.setTimeout(() => setWorkspaceTransitionActive(false), 600);
+      prevWorkspaceIdRef.current = activeWorkspaceId;
+      return () => window.clearTimeout(timer);
+    }
+    prevWorkspaceIdRef.current = activeWorkspaceId;
+    return undefined;
+  }, [activeWorkspaceId]);
   const activeRoute = resolveActiveRoute(location.pathname);
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     clampSidebarWidth(readNumberPreference(uiPreferenceKeys.shellSidebarWidth, sidebarWidthDefault)),
@@ -223,7 +242,10 @@ export const AppShell = () => {
           <TopContextBar onOpenSearch={() => setSearchOpen(true)} />
           <Breadcrumb />
           {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
-          <main className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}`}>
+          <RouteTransitionMain
+            className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}`}
+            transitionKey={location.pathname}
+          >
             {!isScopeReady ? (
               <div className="shell-loading-state">
                 <div className="empty-state">Opening your last view…</div>
@@ -241,7 +263,7 @@ export const AppShell = () => {
                 </Suspense>
               </ShellErrorBoundary>
             )}
-          </main>
+          </RouteTransitionMain>
           <CompareTrayBar />
         </div>
       </div>
@@ -249,6 +271,38 @@ export const AppShell = () => {
       <GlobalAssistantChat />
       <OnboardingTour />
       <FloatingTooltipLayer />
+      {workspaceTransitionActive ? (
+        <div className="workspace-switch-overlay" role="status" aria-live="polite">
+          <div className="auth-blocking-card">
+            <span className="auth-blocking-spinner" aria-hidden="true" />
+            <strong>Switching workspace…</strong>
+          </div>
+        </div>
+      ) : null}
     </div>
+  );
+};
+
+type RouteTransitionMainProps = {
+  className: string;
+  transitionKey: string;
+  children: React.ReactNode;
+};
+
+const RouteTransitionMain = ({ className, transitionKey, children }: RouteTransitionMainProps) => {
+  const ref = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    node.classList.remove("is-entering");
+    void node.offsetWidth;
+    node.classList.add("is-entering");
+  }, [transitionKey]);
+
+  return (
+    <main className={className} ref={ref}>
+      {children}
+    </main>
   );
 };

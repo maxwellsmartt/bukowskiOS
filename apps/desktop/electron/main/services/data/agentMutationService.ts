@@ -23,6 +23,7 @@ import type {
   SaveAIProviderConfigCommand,
   SendAssistantChatTurnCommand,
   SetActiveAssistantThreadCommand,
+  RenameAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
   SetAgentApprovalModeCommand,
   SetAgentStatusCommand,
@@ -941,6 +942,14 @@ export const createAgentMutationService = (
     }
 
     return options.assistantChatService.updateThreadPreferences(input);
+  },
+
+  renameAssistantThread(input: RenameAssistantThreadCommand): AssistantChatSnapshot {
+    if (!options.assistantChatService) {
+      throw new Error("Assistant chat service unavailable.");
+    }
+
+    return options.assistantChatService.renameThread(input);
   },
 
   sendAssistantChatTurn(input: SendAssistantChatTurnCommand): Promise<AssistantChatSnapshot> {

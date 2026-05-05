@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Lock, Plus, Trash2 } from "lucide-react";
+import { Lock, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { useToast } from "@app/providers/ToastProvider";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
@@ -14,6 +14,7 @@ import {
   loadAllPermissions,
   loadRolesWithPermissions,
   revokePermission,
+  updateCustomRole,
   type PermissionDefinition,
   type RolePermissionRow,
 } from "./customRolesService";
@@ -53,6 +54,9 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
   const [isCreating, setIsCreating] = useState(false);
   const [pendingDeleteRole, setPendingDeleteRole] = useState<RolePermissionRow | null>(null);
   const [isDeletingRole, setIsDeletingRole] = useState(false);
+  const [editingRole, setEditingRole] = useState<RolePermissionRow | null>(null);
+  const [editDraft, setEditDraft] = useState({ name: "", description: "" });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
@@ -147,6 +151,37 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
     }
   };
 
+  const handleSaveEdit = async () => {
+    if (!editingRole) return;
+    const name = editDraft.name.trim();
+    if (!name) {
+      toast.error("Name required", "Pick a short, descriptive name for the role.");
+      return;
+    }
+    if (
+      roles.some((role) => role.id !== editingRole.id && role.name.toLowerCase() === name.toLowerCase())
+    ) {
+      toast.error("Already exists", "Another role in this workspace already uses that name.");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      await updateCustomRole(supabase, {
+        roleId: editingRole.id,
+        name,
+        description: editDraft.description.trim(),
+      });
+      toast.success("Role updated", `Renamed to "${name}".`);
+      setEditingRole(null);
+      await refresh();
+    } catch (nextError) {
+      toast.error("Could not update role", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!pendingDeleteRole) return;
     setIsDeletingRole(true);
@@ -201,15 +236,29 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
                       {role.isSystemRole ? (
                         <Lock aria-label="System role" data-tooltip="System role — locked" size={10} />
                       ) : (
-                        <button
-                          aria-label={`Delete ${role.name}`}
-                          className="permission-matrix-role-delete"
-                          data-tooltip={`Delete ${role.name}`}
-                          onClick={() => setPendingDeleteRole(role)}
-                          type="button"
-                        >
-                          <Trash2 size={11} />
-                        </button>
+                        <span className="permission-matrix-role-actions">
+                          <button
+                            aria-label={`Edit ${role.name}`}
+                            className="permission-matrix-role-edit"
+                            data-tooltip={`Edit ${role.name}`}
+                            onClick={() => {
+                              setEditingRole(role);
+                              setEditDraft({ name: role.name, description: role.description ?? "" });
+                            }}
+                            type="button"
+                          >
+                            <Pencil size={11} />
+                          </button>
+                          <button
+                            aria-label={`Delete ${role.name}`}
+                            className="permission-matrix-role-delete"
+                            data-tooltip={`Delete ${role.name}`}
+                            onClick={() => setPendingDeleteRole(role)}
+                            type="button"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </span>
                       )}
                     </div>
                   </th>
@@ -308,6 +357,60 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
               </button>
               <button className="action-primary-button" disabled={isCreating} onClick={() => void handleCreate()} type="button">
                 {isCreating ? "Creating…" : "Create role"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {editingRole ? (
+        <div aria-modal="true" className="confirm-dialog-backdrop" role="dialog">
+          <div className="confirm-dialog">
+            <div className="confirm-dialog-header">
+              <div className="confirm-dialog-copy">
+                <strong>Edit role</strong>
+                <p>Rename the role and refine its description. Permissions stay as they are.</p>
+              </div>
+            </div>
+
+            <div className="agent-form-grid">
+              <label className="field-block">
+                <span className="field-label">Role name</span>
+                <input
+                  autoFocus
+                  className="field-input"
+                  onChange={(event) => setEditDraft((current) => ({ ...current, name: event.target.value }))}
+                  value={editDraft.name}
+                />
+              </label>
+              <label className="field-block">
+                <span className="field-label">Description (optional)</span>
+                <input
+                  className="field-input"
+                  onChange={(event) =>
+                    setEditDraft((current) => ({ ...current, description: event.target.value }))
+                  }
+                  value={editDraft.description}
+                />
+              </label>
+            </div>
+
+            <div className="confirm-dialog-actions">
+              <button
+                className="ghost-control"
+                disabled={isSavingEdit}
+                onClick={() => setEditingRole(null)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="action-primary-button"
+                disabled={isSavingEdit}
+                onClick={() => void handleSaveEdit()}
+                type="button"
+              >
+                {isSavingEdit ? "Saving…" : "Save changes"}
               </button>
             </div>
           </div>

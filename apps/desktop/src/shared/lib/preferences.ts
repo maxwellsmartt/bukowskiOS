@@ -21,6 +21,7 @@ export const uiPreferenceKeys = {
   shellProjectsShowArchived: "shell-projects-show-archived",
   activeWorkspaceId: "active-workspace-id",
   onboardingTourCompletedWorkspaces: "onboarding-tour-completed-workspaces",
+  autoLogoutInactivityMinutes: "auto-logout-inactivity-minutes",
 } as const;
 
 const buildPreferenceKey = (key: string) => `bukowski:${key}`;

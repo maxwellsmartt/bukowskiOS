@@ -108,6 +108,26 @@ export const deleteCustomRole = async (
   }
 };
 
+export const updateCustomRole = async (
+  supabase: SupabaseClient,
+  input: { roleId: string; name: string; description: string },
+): Promise<void> => {
+  const payload = {
+    name: input.name,
+    description: input.description || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await loose(supabase)
+    .from("roles")
+    .update(payload)
+    .eq("id", input.roleId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
 export const grantPermission = async (
   supabase: SupabaseClient,
   roleId: string,

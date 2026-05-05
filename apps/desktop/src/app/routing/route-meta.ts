@@ -33,6 +33,9 @@ export const globalRouteMeta: AppRouteMeta[] = [
   { path: "/finance", label: "Finance Overview", scopeMode: "global", domain: "finance" },
   { path: "/finance/cost-links", label: "Review Queue", scopeMode: "global", domain: "finance" },
   { path: "/finance/entries", label: "Entries", scopeMode: "global", domain: "finance" },
+  { path: "/finance/quotes", label: "Quotes", scopeMode: "global", domain: "finance" },
+  { path: "/finance/quotes/new", label: "New quote", scopeMode: "global", domain: "finance" },
+  { path: "/finance/quotes/:quoteId", label: "Quote detail", scopeMode: "global", domain: "finance" },
   { path: "/agents/mission-control", label: "Automation Overview", scopeMode: "global", domain: "agents" },
   { path: "/agents", label: "Automation Team", scopeMode: "global", domain: "agents" },
   { path: "/agents/runs", label: "Automation Activity", scopeMode: "global", domain: "agents" },
@@ -40,6 +43,7 @@ export const globalRouteMeta: AppRouteMeta[] = [
   { path: "/agents/connectors", label: "Channels", scopeMode: "global", domain: "agents" },
   { path: "/settings", label: "Settings", scopeMode: "global", domain: "utility" },
   { path: "/settings/workspace", label: "Workspace Settings", scopeMode: "global", domain: "utility" },
+  { path: "/settings/account", label: "Account", scopeMode: "global", domain: "utility" },
   { path: "/settings/sync", label: "Sync Activity", scopeMode: "global", domain: "utility" },
 ];
 

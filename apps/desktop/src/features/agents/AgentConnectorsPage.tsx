@@ -625,9 +625,13 @@ export const AgentConnectorsPage = () => {
                 </div>
               ) : null}
 
+              {selectedConnector.connectorKey !== "telegram" ? (
+                <ChannelProviderShellPreview connectorKey={selectedConnector.connectorKey} />
+              ) : null}
+
               {selectedConnector.connectorKey === "telegram" ? (
-                <details className="detail-disclosure">
-                  <summary className="detail-disclosure-summary">People & linking</summary>
+                <details className="detail-disclosure" open>
+                  <summary className="detail-disclosure-summary">Link a user to Telegram</summary>
                   <div className="detail-disclosure-content">
                     <div className="models-provider-health-grid">
                       {identitySummaryCards.map((card) => (
@@ -782,6 +786,108 @@ export const AgentConnectorsPage = () => {
       </div>
 
       {error ? <div className="empty-state">Channels unavailable: {error}</div> : null}
+    </div>
+  );
+};
+
+type ProviderShell = {
+  key: "whatsapp" | "email" | "sms" | "webhook";
+  label: string;
+  shortDescription: string;
+  expectedSecretLabel: string;
+  expectedExtras: Array<{ key: string; label: string; placeholder: string; required: boolean }>;
+  linkInstructions: string;
+  shipStatus: "staged-ui" | "planned";
+};
+
+const channelShells: Record<string, ProviderShell> = {
+  whatsapp: {
+    key: "whatsapp",
+    label: "WhatsApp",
+    shortDescription: "Inbound and outbound messaging through the WhatsApp Business Cloud API.",
+    expectedSecretLabel: "Access token",
+    expectedExtras: [
+      { key: "businessPhoneNumberId", label: "Business phone number ID", placeholder: "123456789", required: true },
+      { key: "verifyToken", label: "Webhook verify token", placeholder: "secret-string", required: true },
+    ],
+    linkInstructions:
+      "Once wired, each teammate scans a QR or sends a single keyword to the business number to claim their seat.",
+    shipStatus: "staged-ui",
+  },
+  email: {
+    key: "email",
+    label: "Email / Notifications",
+    shortDescription: "Drafts, support outreach and internal notices via SMTP or a transactional provider.",
+    expectedSecretLabel: "API key or SMTP password",
+    expectedExtras: [
+      { key: "fromAddress", label: "From address", placeholder: "ops@studio.com", required: true },
+      { key: "smtpHost", label: "SMTP host (optional)", placeholder: "smtp.postmark.app", required: false },
+    ],
+    linkInstructions: "Email works automatically once a teammate has an email on their profile.",
+    shipStatus: "staged-ui",
+  },
+  sms: {
+    key: "sms",
+    label: "SMS",
+    shortDescription: "Operator alerts via Twilio or a compatible SMS gateway.",
+    expectedSecretLabel: "Auth token",
+    expectedExtras: [
+      { key: "accountSid", label: "Account SID", placeholder: "ACxxxxxxxxxxxxxxxxxxxxxxxx", required: true },
+      { key: "fromNumber", label: "From number", placeholder: "+15551234567", required: true },
+    ],
+    linkInstructions: "Each teammate confirms with a one-time code we text to the phone on their profile.",
+    shipStatus: "planned",
+  },
+  webhook: {
+    key: "webhook",
+    label: "Webhook / Future",
+    shortDescription: "Fan-out delivery to custom HTTPS endpoints for future integrations.",
+    expectedSecretLabel: "Signing secret",
+    expectedExtras: [
+      { key: "endpointUrl", label: "Endpoint URL", placeholder: "https://hooks.example.com/bukowski", required: true },
+    ],
+    linkInstructions: "Linking is per-endpoint configuration, not per-user.",
+    shipStatus: "planned",
+  },
+};
+
+const ChannelProviderShellPreview = ({ connectorKey }: { connectorKey: string }) => {
+  const shell = channelShells[connectorKey];
+  if (!shell) {
+    return null;
+  }
+
+  const isStagedUI = shell.shipStatus === "staged-ui";
+  return (
+    <div className="channel-shell-preview" style={{ marginBottom: 12 }}>
+      <div className="channel-shell-eyebrow">
+        <span className={`channel-shell-pill channel-shell-pill-${shell.shipStatus}`}>
+          {isStagedUI ? "Staged · UI ready" : "Planned"}
+        </span>
+        <strong>{shell.label}</strong>
+      </div>
+      <p className="channel-shell-body">{shell.shortDescription}</p>
+
+      <div className="channel-shell-section">
+        <span className="agent-detail-kicker">When wired, you'll provide</span>
+        <ul className="channel-shell-list">
+          <li>
+            <strong>{shell.expectedSecretLabel}</strong>
+            <small>Stored in the secret store, never visible after save.</small>
+          </li>
+          {shell.expectedExtras.map((extra) => (
+            <li key={extra.key}>
+              <strong>{extra.label}{extra.required ? "" : " (optional)"}</strong>
+              <small>{extra.placeholder}</small>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="channel-shell-section">
+        <span className="agent-detail-kicker">User linking flow</span>
+        <p className="channel-shell-body">{shell.linkInstructions}</p>
+      </div>
     </div>
   );
 };

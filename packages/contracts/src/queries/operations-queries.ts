@@ -294,6 +294,7 @@ export type CatalogClientRow = {
   phone: string;
   notes: string;
   isActive: boolean;
+  rnc: string | null;
 };
 
 export type CatalogProductionCompanyRow = {
@@ -304,6 +305,7 @@ export type CatalogProductionCompanyRow = {
   phone: string;
   notes: string;
   isActive: boolean;
+  pur: string | null;
 };
 
 export type CatalogManufacturerRow = {

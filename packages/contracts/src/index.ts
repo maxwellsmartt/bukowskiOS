@@ -11,6 +11,8 @@ export * from "./commands/asset-commands";
 export * from "./commands/agent-commands";
 export * from "./commands/catalog-commands";
 export * from "./commands/finance-commands";
+export * from "./commands/finance-currency-commands";
+export * from "./commands/quote-commands";
 export * from "./commands/rma-commands";
 export * from "./commands/packing-commands";
 export * from "./commands/project-commands";

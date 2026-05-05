@@ -2,6 +2,8 @@ import type { AIGatewayToolContext, AIGatewayToolCallTrace } from "@contracts";
 import type { AgentRunRow } from "@contracts";
 
 import type { FoundationReadService } from "../data/foundationReadService";
+import type { QuoteReadService } from "../data/quoteReadService";
+import { buildWriteToolDefinitions, type AgentWriteServices } from "./agentWriteTools";
 
 type ToolExecutionResult = {
   payload: Record<string, unknown>;
@@ -12,6 +14,7 @@ type ToolDefinition = {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
+  requiresApproval?: boolean;
   execute: (args: Record<string, unknown>, context: AIGatewayToolContext) => ToolExecutionResult;
 };
 
@@ -72,6 +75,8 @@ export const createAgentToolRegistry = (
   foundationReads: FoundationReadService,
   options: {
     getRunsList: () => AgentRunRow[];
+    quoteReads?: QuoteReadService;
+    writeServices?: AgentWriteServices;
   },
 ) => {
   const definitions: ToolDefinition[] = [
@@ -1667,7 +1672,319 @@ export const createAgentToolRegistry = (
         };
       },
     },
+    // Universal clarification tool — every agent can use this to ask the user
+    // a single multiple-choice question when read tools genuinely can't
+    // resolve a critical field. The renderer detects `kind:"choice"` payloads
+    // and renders clickable option buttons in the chat (no free-text reply
+    // needed). Use sparingly; prefer search_assets / search_projects first.
+    {
+      name: "ask_user_choice",
+      description:
+        "Ask the user to pick one option from a small predefined set when a critical field can't be resolved by other tools. Use sparingly: prefer search_assets / search_projects / etc. first. Returns immediately to the chat as a multiple-choice card.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["prompt", "options"],
+        properties: {
+          prompt: {
+            type: "string",
+            description: "Plain-language question to show the user above the options.",
+          },
+          context: {
+            type: "string",
+            description: "Optional one-line note explaining why the question is needed (shown smaller below the prompt).",
+          },
+          options: {
+            type: "array",
+            minItems: 2,
+            maxItems: 6,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["value", "label"],
+              properties: {
+                value: { type: "string", description: "Machine-readable value the user's choice will resolve to." },
+                label: { type: "string", description: "Short human label rendered on the button." },
+                hint: { type: "string", description: "Optional secondary line under the label." },
+              },
+            },
+          },
+        },
+      },
+      execute: (args) => {
+        const prompt = asString(args.prompt);
+        const context = asOptionalString(args.context);
+        const rawOptions = Array.isArray(args.options) ? args.options : [];
+        const options = rawOptions
+          .map((option) => {
+            const o = option as Record<string, unknown>;
+            return {
+              value: asString(o.value),
+              label: asString(o.label),
+              hint: asOptionalString(o.hint),
+            };
+          })
+          .filter((option) => option.value && option.label);
+        return {
+          summary: prompt
+            ? `Asking the user: ${truncate(prompt, 80)}`
+            : "Asking the user a clarification question.",
+          payload: {
+            kind: "choice",
+            prompt,
+            context: context ?? null,
+            options,
+          },
+        };
+      },
+    },
   ];
+
+  // Quote read tools (FinanceOps Quotes v1, FQ6) — read-only. The agent cannot
+  // create or update quotes; it can only inspect, summarise, and prepare a
+  // draft shape that the user explicitly turns into a real quote.
+  if (options.quoteReads) {
+    const quoteReads = options.quoteReads;
+
+    definitions.push({
+      name: "search_quotes",
+      description:
+        "List quotes for a workspace, optionally filtered by status, client, project, currency or free-text search. Returns the most recent matches first.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          workspace_id: { type: "string" },
+          status: { type: "string", enum: ["draft", "sent", "approved", "rejected", "expired", "cancelled"] },
+          client_id: { type: "string" },
+          project_id: { type: "string" },
+          currency: { type: "string" },
+          date_from: { type: "string" },
+          date_to: { type: "string" },
+          search: { type: "string" },
+          limit: { type: "number" },
+        },
+      },
+      execute: (args, context) => {
+        const workspaceId = asString(args.workspace_id) || context.workspaceId;
+        const rows = quoteReads.listQuotes({
+          workspaceId,
+          status: asOptionalString(args.status) as
+            | "draft"
+            | "sent"
+            | "approved"
+            | "rejected"
+            | "expired"
+            | "cancelled"
+            | undefined,
+          clientId: asOptionalString(args.client_id) ?? undefined,
+          projectId: asOptionalString(args.project_id) ?? undefined,
+          currency: asOptionalString(args.currency) ?? undefined,
+          dateFrom: asOptionalString(args.date_from) ?? undefined,
+          dateTo: asOptionalString(args.date_to) ?? undefined,
+          search: asOptionalString(args.search) ?? undefined,
+          limit: asInteger(args.limit, 20),
+        });
+        return {
+          summary: rows.length
+            ? `Found ${rows.length} quote${rows.length === 1 ? "" : "s"}.`
+            : "No quotes match those filters.",
+          payload: {
+            count: rows.length,
+            items: rows.map((row) => ({
+              quoteId: row.id,
+              quoteNumber: row.quoteNumber,
+              status: row.status,
+              quoteDate: row.quoteDate,
+              validUntil: row.validUntil,
+              client: row.clientNameSnapshot,
+              project: row.projectNameSnapshot,
+              packageTitle: row.packageTitle,
+              currency: row.currency,
+              total: row.totalAmount,
+              taxProfile: row.taxProfile,
+              taxAddedToTotal: row.taxAddedToTotal,
+            })),
+          },
+        };
+      },
+    });
+
+    definitions.push({
+      name: "get_quote_detail",
+      description:
+        "Return the full detail of a single quote (header, items, totals and version snapshot data).",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["quote_id"],
+        properties: {
+          workspace_id: { type: "string" },
+          quote_id: { type: "string" },
+        },
+      },
+      execute: (args, context) => {
+        const workspaceId = asString(args.workspace_id) || context.workspaceId;
+        const quoteId = asString(args.quote_id);
+        if (!quoteId) {
+          return { summary: "Missing quote_id.", payload: { found: false } };
+        }
+        const detail = quoteReads.getQuoteDetail(workspaceId, quoteId);
+        if (!detail) {
+          return { summary: "Quote not found.", payload: { found: false } };
+        }
+        return {
+          summary: `Loaded quote ${detail.quoteNumber} (${detail.status}, ${detail.currency} ${detail.totalAmount.toFixed(
+            2,
+          )}).`,
+          payload: {
+            found: true,
+            quote: detail,
+          },
+        };
+      },
+    });
+
+    definitions.push({
+      name: "explain_quote_total",
+      description:
+        "Produce a human-readable breakdown of a quote's totals: subtotal, discounts, ITBIS treatment and final amount.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["quote_id"],
+        properties: {
+          workspace_id: { type: "string" },
+          quote_id: { type: "string" },
+        },
+      },
+      execute: (args, context) => {
+        const workspaceId = asString(args.workspace_id) || context.workspaceId;
+        const quoteId = asString(args.quote_id);
+        if (!quoteId) {
+          return { summary: "Missing quote_id.", payload: { found: false } };
+        }
+        const detail = quoteReads.getQuoteDetail(workspaceId, quoteId);
+        if (!detail) {
+          return { summary: "Quote not found.", payload: { found: false } };
+        }
+        const lines: string[] = [];
+        lines.push(`Subtotal: ${detail.currency} ${detail.subtotalAmount.toFixed(2)}`);
+        if (detail.discountAmount > 0) {
+          const ratePart =
+            detail.discountRate && detail.discountRate > 0 ? ` (${(detail.discountRate * 100).toFixed(2)}%)` : "";
+          lines.push(
+            `Discount${ratePart}: −${detail.currency} ${detail.discountAmount.toFixed(2)}`,
+          );
+        }
+        const itbisLine = `ITBIS at ${(detail.itbisRate * 100).toFixed(2)}%: ${detail.currency} ${detail.taxAmount.toFixed(
+          2,
+        )}${detail.taxAddedToTotal ? " (added to total)" : " (shown but NOT added — Ley de Cine)"}`;
+        lines.push(itbisLine);
+        lines.push(`Total: ${detail.currency} ${detail.totalAmount.toFixed(2)}`);
+        if (detail.currency !== detail.baseCurrency) {
+          lines.push(
+            `Equivalent in ${detail.baseCurrency} (rate ${detail.exchangeRate}): ${detail.baseCurrency} ${detail.baseCurrencyTotalAmount.toFixed(
+              2,
+            )}`,
+          );
+        }
+        return {
+          summary: `Quote ${detail.quoteNumber} totals breakdown ready.`,
+          payload: {
+            quoteId: detail.id,
+            quoteNumber: detail.quoteNumber,
+            taxProfile: detail.taxProfile,
+            currency: detail.currency,
+            breakdownLines: lines,
+            subtotal: detail.subtotalAmount,
+            discount: detail.discountAmount,
+            tax: detail.taxAmount,
+            total: detail.totalAmount,
+            taxAddedToTotal: detail.taxAddedToTotal,
+          },
+        };
+      },
+    });
+
+    definitions.push({
+      name: "prepare_quote_draft",
+      description:
+        "Suggest a draft shape (header + items) for a new quote based on a client/project intent and a list of items the user described. Returns the draft as a structured payload — the user must approve and create it manually from the Quotes UI; this tool never persists.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          client_name: { type: "string" },
+          project_name: { type: "string" },
+          package_title: { type: "string" },
+          currency: { type: "string" },
+          tax_profile: {
+            type: "string",
+            enum: ["film_law_exempt", "standard_itbis", "mixed", "manual"],
+          },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                title: { type: "string" },
+                description: { type: "string" },
+                quantity: { type: "number" },
+                unit_price: { type: "number" },
+                duration_value: { type: "number" },
+                duration_unit: { type: "string", enum: ["day", "week", "month", "unit", "flat"] },
+              },
+            },
+          },
+        },
+      },
+      execute: (args) => {
+        const items = Array.isArray(args.items) ? args.items : [];
+        const draft = {
+          clientNameSnapshot: asOptionalString(args.client_name) ?? "",
+          projectNameSnapshot: asOptionalString(args.project_name) ?? "",
+          packageTitle: asOptionalString(args.package_title) ?? "",
+          currency: asOptionalString(args.currency) ?? "DOP",
+          taxProfile: (asOptionalString(args.tax_profile) ?? "standard_itbis") as
+            | "film_law_exempt"
+            | "standard_itbis"
+            | "mixed"
+            | "manual",
+          items: items.map((raw, index) => {
+            const item = raw as Record<string, unknown>;
+            return {
+              sortOrder: index + 1,
+              title: asString(item.title),
+              description: asOptionalString(item.description),
+              quantity: asNumber(item.quantity) ?? 1,
+              unitPrice: asNumber(item.unit_price) ?? 0,
+              durationValue: asNumber(item.duration_value),
+              durationUnit: asOptionalString(item.duration_unit) as
+                | "day"
+                | "week"
+                | "month"
+                | "unit"
+                | "flat"
+                | null,
+              taxBehavior: "follows_quote" as const,
+            };
+          }),
+        };
+        return {
+          summary: `Prepared a draft with ${draft.items.length} item${draft.items.length === 1 ? "" : "s"}. The user must open the Quotes editor to review and save it.`,
+          payload: { draft, requiresHumanApproval: true },
+        };
+      },
+    });
+  }
+
+  if (options.writeServices) {
+    for (const writeTool of buildWriteToolDefinitions(options.writeServices)) {
+      definitions.push(writeTool as ToolDefinition);
+    }
+  }
 
   const toolMap = new Map(definitions.map((tool) => [tool.name, tool]));
 
@@ -1677,7 +1994,12 @@ export const createAgentToolRegistry = (
       name: tool.name,
       description: tool.description,
       parameters: tool.parameters,
+      ...(tool.requiresApproval ? { requiresApproval: true } : {}),
     })),
+    requiresApproval(name: string): boolean {
+      const tool = toolMap.get(name);
+      return Boolean(tool?.requiresApproval);
+    },
     execute(name: string, rawArguments: string, context: AIGatewayToolContext) {
       const tool = toolMap.get(name);
 

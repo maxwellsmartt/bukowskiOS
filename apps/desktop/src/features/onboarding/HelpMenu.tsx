@@ -15,7 +15,20 @@ type HelpItem = {
 export const HelpMenu = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [isPulsing, setIsPulsing] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handler = () => {
+      setIsPulsing(true);
+      const timer = window.setTimeout(() => setIsPulsing(false), 6000);
+      return () => window.clearTimeout(timer);
+    };
+    window.addEventListener("bukowski:help-pulse", handler);
+    return () => {
+      window.removeEventListener("bukowski:help-pulse", handler);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -81,12 +94,15 @@ export const HelpMenu = () => {
       <button
         aria-expanded={open}
         aria-label={open ? "Close help" : "Open help"}
-        className={`icon-ghost-control help-menu-trigger${open ? " is-open" : ""}`}
+        className={`icon-ghost-control help-menu-trigger${open ? " is-open" : ""}${isPulsing ? " is-pulsing" : ""}`}
         data-tooltip="Help & tour"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setOpen((current) => !current);
+          setIsPulsing(false);
+        }}
         type="button"
       >
-        <HelpCircle size={14} />
+        <HelpCircle size={16} />
       </button>
 
       {open ? (

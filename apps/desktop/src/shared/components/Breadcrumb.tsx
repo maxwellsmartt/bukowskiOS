@@ -2,7 +2,7 @@ import { ChevronRight, Folder } from "lucide-react";
 import { useMemo } from "react";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
 
-import { resolveActiveRoute } from "@app/routing/route-meta";
+import { resolveActiveRoute, type DomainKey } from "@app/routing/route-meta";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useShellContext } from "@shared/hooks/useShellContext";
 
@@ -20,59 +20,55 @@ const projectSectionLabels: Record<string, string> = {
   budget: "Budget",
 };
 
-const domainHomeByDomain: Record<string, { label: string; to: string }> = {
-  assets: { label: "Assets", to: "/assets" },
-  projects: { label: "Projects", to: "/projects" },
-  finance: { label: "Finance", to: "/finance" },
-  agents: { label: "Agents", to: "/agents" },
+// Source of truth for the root-of-domain crumb. Mirrors the primary nav labels
+// so the breadcrumb never lies about where you actually are in the app.
+const domainRoots: Record<string, { label: string; path: string }> = {
+  assets: { label: "Assets", path: "/assets" },
+  projects: { label: "Projects", path: "/projects" },
+  finance: { label: "Finance", path: "/finance" },
+  agents: { label: "Automation", path: "/agents/mission-control" },
 };
 
-type RouteEntry = {
-  label: string;
-  parent?: string;
+// Per-leaf labels. Keep them aligned with the actual subnav copy.
+const leafLabels: Record<string, string> = {
+  "/assets": "Assets",
+  "/packing-slips": "Packing slips",
+  "/incidents": "Incidents",
+  "/rma": "Repair cases",
+  "/projects": "Projects",
+  "/projects/schedule": "Schedule overview",
+  "/finance": "Overview",
+  "/finance/cost-links": "Review queue",
+  "/finance/entries": "Entries",
+  "/finance/quotes": "Quotes",
+  "/finance/quotes/new": "New quote",
+  "/agents/mission-control": "Overview",
+  "/agents": "Team",
+  "/agents/runs": "Activity",
+  "/agents/models": "AI Models",
+  "/agents/connectors": "Channels",
+  "/catalog": "Catalog",
+  "/compare": "Compare",
+  "/settings": "Settings",
+  "/settings/account": "Account",
+  "/settings/workspace": "Workspace",
+  "/settings/sync": "Sync activity",
 };
 
-const globalRouteEntries: Record<string, RouteEntry> = {
-  "/assets": { label: "Assets" },
-  "/packing-slips": { label: "Packing slips", parent: "/assets" },
-  "/incidents": { label: "Incidents", parent: "/assets" },
-  "/rma": { label: "Repair cases", parent: "/assets" },
-  "/projects": { label: "Projects" },
-  "/projects/schedule": { label: "Schedule", parent: "/projects" },
-  "/finance": { label: "Overview" },
-  "/finance/cost-links": { label: "Cost links", parent: "/finance" },
-  "/finance/entries": { label: "Entries", parent: "/finance" },
-  "/agents": { label: "Team" },
-  "/agents/mission-control": { label: "Mission control", parent: "/agents" },
-  "/agents/runs": { label: "Activity", parent: "/agents" },
-  "/agents/models": { label: "Models", parent: "/agents" },
-  "/agents/connectors": { label: "Connectors", parent: "/agents" },
-  "/catalog": { label: "Catalog" },
-  "/compare": { label: "Compare" },
-  "/settings": { label: "Settings" },
-  "/settings/workspace": { label: "Workspace", parent: "/settings" },
-  "/settings/sync": { label: "Sync activity", parent: "/settings" },
+const utilityLeafParents: Record<string, string> = {
+  "/settings/account": "/settings",
+  "/settings/workspace": "/settings",
+  "/settings/sync": "/settings",
 };
 
-const buildGlobalChain = (pathname: string): Crumb[] => {
-  const chain: Crumb[] = [];
-  let cursor: string | undefined = pathname;
-
-  while (cursor) {
-    const entry: RouteEntry | undefined = globalRouteEntries[cursor];
-    if (!entry) {
-      break;
-    }
-    chain.unshift({ label: entry.label, to: cursor });
-    cursor = entry.parent;
+const resolveDomainRoot = (domain: DomainKey, pathname: string): { label: string; path: string } | null => {
+  const direct = domainRoots[domain];
+  if (direct) return direct;
+  // utility domain (settings/catalog/compare) has no domain root crumb above the leaf
+  if (domain === "utility") {
+    if (pathname.startsWith("/settings")) return { label: "Settings", path: "/settings" };
   }
-
-  if (chain.length) {
-    // Last crumb has no link (it is the current page).
-    chain[chain.length - 1] = { label: chain[chain.length - 1].label };
-  }
-
-  return chain;
+  return null;
 };
 
 export const Breadcrumb = () => {
@@ -108,16 +104,35 @@ export const Breadcrumb = () => {
       return list;
     }
 
-    // Global routes with explicit chain (covers nested settings/finance/agents/etc)
-    const chain = buildGlobalChain(location.pathname);
-    if (chain.length) {
-      // If there is a domain home that is not already the chain root, prepend it.
-      const domainHome = domainHomeByDomain[route.domain];
-      if (domainHome && chain[0].to !== domainHome.to && chain[0].label !== domainHome.label) {
-        list.push({ label: domainHome.label, to: domainHome.to });
-      }
-      list.push(...chain);
+    // Settings sub-routes → Workspace › Settings › <leaf>
+    const utilityParent = utilityLeafParents[location.pathname];
+    if (utilityParent && leafLabels[utilityParent] && leafLabels[location.pathname]) {
+      list.push({ label: leafLabels[utilityParent], to: utilityParent });
+      list.push({ label: leafLabels[location.pathname] });
       return list;
+    }
+
+    // Domain-rooted leaves (assets, projects, finance, agents)
+    const domainRoot = resolveDomainRoot(route.domain, location.pathname);
+    const leafLabel = leafLabels[location.pathname];
+
+    if (domainRoot) {
+      // If the current path is the domain root itself, just show one crumb (no link).
+      if (location.pathname === domainRoot.path) {
+        list.push({ label: domainRoot.label });
+        return list;
+      }
+
+      list.push({ label: domainRoot.label, to: domainRoot.path });
+      if (leafLabel) {
+        list.push({ label: leafLabel });
+      }
+      return list;
+    }
+
+    // Standalone utility leaves (catalog, compare, settings root)
+    if (leafLabel) {
+      list.push({ label: leafLabel });
     }
 
     return list;

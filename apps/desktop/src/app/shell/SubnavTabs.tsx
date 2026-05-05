@@ -10,6 +10,14 @@ export const isSubnavItemActive = (pathname: string, path: string) => {
   if (path === "/assets") {
     return pathname === "/assets" || Boolean(matchPath({ path: "/assets/:assetId", end: true }, pathname));
   }
+  if (path === "/finance/quotes") {
+    // Keep "Quotes" highlighted on /new and /:quoteId detail too.
+    return (
+      pathname === "/finance/quotes" ||
+      pathname === "/finance/quotes/new" ||
+      Boolean(matchPath({ path: "/finance/quotes/:quoteId", end: true }, pathname))
+    );
+  }
 
   return Boolean(matchPath({ path, end: true }, pathname));
 };

@@ -13,18 +13,53 @@ export const AgentRunsPage = () => {
   const { data, error } = useAgentRuns();
   const [processingRunId, setProcessingRunId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "needs_approval" | "queued" | "running" | "done">("all");
+  const [agentFilter, setAgentFilter] = useState<string>("all");
+
   const summaryCards = useMemo(
     () => [
-      { label: "Queued", value: data.filter((run) => run.status === "queued").length },
+      { label: "Queued", value: data.filter((run) => run.status === "queued").length, filter: "queued" as const },
       {
         label: "Needs approval",
         value: data.filter((run) => run.status === "needs_approval").length,
+        filter: "needs_approval" as const,
       },
-      { label: "Running", value: data.filter((run) => run.status === "running" || run.status === "routing").length },
-      { label: "Done", value: data.filter((run) => run.status === "done").length },
+      {
+        label: "Running",
+        value: data.filter((run) => run.status === "running" || run.status === "routing").length,
+        filter: "running" as const,
+      },
+      { label: "Done", value: data.filter((run) => run.status === "done").length, filter: "done" as const },
     ],
     [data],
   );
+
+  const agentOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const list: Array<{ id: string; label: string }> = [];
+    for (const run of data) {
+      const id = run.agentId ?? "supervisor";
+      if (seen.has(id)) continue;
+      seen.add(id);
+      list.push({ id, label: run.agentDisplayName || "Supervisor Agent" });
+    }
+    return list.sort((left, right) => left.label.localeCompare(right.label));
+  }, [data]);
+
+  const filteredRuns = useMemo(() => {
+    return data.filter((run) => {
+      if (statusFilter === "running") {
+        if (run.status !== "running" && run.status !== "routing") return false;
+      } else if (statusFilter !== "all" && run.status !== statusFilter) {
+        return false;
+      }
+      if (agentFilter !== "all") {
+        const id = run.agentId ?? "supervisor";
+        if (id !== agentFilter) return false;
+      }
+      return true;
+    });
+  }, [agentFilter, data, statusFilter]);
 
   const handleReview = async (runId: string, decision: "approve" | "deny" | "approve_for_session") => {
     if (!isWorkspaceReady) {
@@ -54,20 +89,71 @@ export const AgentRunsPage = () => {
       <SectionHeader title="Activity" titleTone="accent" />
 
       <div className="agents-health-grid">
-        {summaryCards.map((card) => (
-          <SurfaceCard key={card.label} className="agents-health-card">
-            <span className="agents-health-label">{card.label}</span>
-            <strong className="agents-health-value">{card.value}</strong>
-          </SurfaceCard>
-        ))}
+        {summaryCards.map((card) => {
+          const isActive = statusFilter === card.filter;
+          return (
+            <button
+              key={card.label}
+              aria-pressed={isActive}
+              className={`agents-health-card agents-health-card-button${isActive ? " is-active" : ""}`}
+              onClick={() => setStatusFilter(isActive ? "all" : card.filter)}
+              type="button"
+            >
+              <span className="agents-health-label">{card.label}</span>
+              <strong className="agents-health-value">{card.value}</strong>
+            </button>
+          );
+        })}
       </div>
 
       <SurfaceCard title="Recent Activity">
+        <div className="agent-runs-filter-row">
+          <label className="agent-runs-filter">
+            <span>Status</span>
+            <select
+              onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+              value={statusFilter}
+            >
+              <option value="all">All</option>
+              <option value="needs_approval">Needs approval</option>
+              <option value="queued">Queued</option>
+              <option value="running">Running</option>
+              <option value="done">Done</option>
+            </select>
+          </label>
+          <label className="agent-runs-filter">
+            <span>Agent</span>
+            <select onChange={(event) => setAgentFilter(event.target.value)} value={agentFilter}>
+              <option value="all">All agents</option>
+              {agentOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {statusFilter !== "all" || agentFilter !== "all" ? (
+            <button
+              className="ghost-control"
+              onClick={() => {
+                setStatusFilter("all");
+                setAgentFilter("all");
+              }}
+              type="button"
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </div>
+
         {error ? <div className="empty-state">Runs unavailable: {error}</div> : null}
         {feedback ? <div className="form-inline-error">{feedback}</div> : null}
 
         <div className="agent-support-list">
-          {data.map((run) => (
+          {filteredRuns.length === 0 && !error ? (
+            <div className="empty-state">No runs match these filters yet.</div>
+          ) : null}
+          {filteredRuns.map((run) => (
             <div key={run.id} className="agent-run-row">
               <div className="agent-run-row-copy">
                 <strong>{run.title}</strong>

@@ -70,6 +70,57 @@ describe("agent tool registry", () => {
     cleanup();
   });
 
+  it("registers write tools when writeServices are provided and marks them as approval-required", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-write");
+    const secretStore = { hasProviderSecret: () => false };
+
+    const noopMutation = (label: string) =>
+      new Proxy({}, {
+        get: () => () => {
+          throw new Error(`mutation '${label}' should not be invoked in this test`);
+        },
+      });
+
+    // Cast as any because we only check registration shape, not real execution.
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      writeServices: {
+        packing: noopMutation("packing"),
+        projects: noopMutation("projects"),
+        incidents: noopMutation("incidents"),
+        rma: noopMutation("rma"),
+        assets: noopMutation("assets"),
+        finance: noopMutation("finance"),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    });
+
+    const toolNames = registry.definitions.map((tool) => tool.name);
+
+    expect(toolNames).toEqual(
+      expect.arrayContaining([
+        "create_incident",
+        "update_incident",
+        "create_rma",
+        "create_packing_slip",
+      ]),
+    );
+
+    expect(registry.requiresApproval("create_incident")).toBe(true);
+    expect(registry.requiresApproval("update_incident")).toBe(true);
+    expect(registry.requiresApproval("create_rma")).toBe(true);
+    expect(registry.requiresApproval("create_packing_slip")).toBe(true);
+    expect(registry.requiresApproval("get_asset_availability")).toBe(false);
+
+    const writeDefs = registry.definitions.filter((tool) => tool.name.startsWith("create_") || tool.name === "update_incident");
+    for (const tool of writeDefs) {
+      expect((tool as { requiresApproval?: boolean }).requiresApproval).toBe(true);
+    }
+
+    cleanup();
+  });
+
   it("returns compact operational payloads for the new tools", () => {
     const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-payload");
     const secretStore = {

@@ -111,7 +111,8 @@ type AgentRow = {
   visibility: "public" | "internal";
 };
 
-const shouldShowInternalAgents = () => process.env.BUKOWSKI_SHOW_INTERNAL_AGENTS === "1" || process.env.NODE_ENV !== "production";
+// Internal agents (Bugs, Product) stay hidden from end-users. Dev override only via env flag.
+const shouldShowInternalAgents = () => process.env.BUKOWSKI_SHOW_INTERNAL_AGENTS === "1";
 
 const isVisibleAgent = (row: AgentRow) => shouldShowInternalAgents() || row.visibility !== "internal";
 

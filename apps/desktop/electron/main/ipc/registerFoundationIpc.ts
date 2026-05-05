@@ -15,7 +15,21 @@ import {
   createConnectorLinkTokenSchema,
   deleteCatalogEntitiesSchema,
   createDraftRunFromChatSchema,
+  createExchangeRateSchema,
   createFinancialEntrySchema,
+  createQuoteSchema,
+  currencySettingsReadArgsSchema,
+  deleteExchangeRateSchema,
+  duplicateQuoteSchema,
+  exchangeRateListReadArgsSchema,
+  latestExchangeRateReadArgsSchema,
+  quoteDetailReadArgsSchema,
+  quoteExportPdfReadArgsSchema,
+  quoteListReadArgsSchema,
+  quoteVersionsReadArgsSchema,
+  setQuoteStatusSchema,
+  updateQuoteSchema,
+  upsertCurrencySettingsSchema,
   createPackingSlipSchema,
   createProjectBlueprintReadArgsSchema,
   createProjectBlueprintSchema,
@@ -55,6 +69,7 @@ import {
   testConnectorConnectionSchema,
   testAiProviderConnectionSchema,
   unarchiveProjectSchema,
+  renameAssistantThreadSchema,
   unassignCrewFromProjectUnitSchema,
   updateAgentSchema,
   updateAssetSchema,
@@ -91,6 +106,7 @@ import type {
   AssetListQuery,
   AssetWorkspaceQuery,
   SetActiveAssistantThreadCommand,
+  RenameAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
   SetAgentApprovalModeCommand,
   SetAgentStatusCommand,
@@ -209,6 +225,56 @@ type RegisterFoundationIpcOptions = {
     createEntry: (input: CreateFinancialEntryCommand) => FinanceEntryMutationResult;
     updateEntry: (input: UpdateFinancialEntryCommand) => FinanceEntryMutationResult;
   };
+  currencyMutations: {
+    upsertSettings: (
+      input: import("@contracts").UpsertCurrencySettingsCommand,
+    ) => import("@contracts").CurrencySettingsMutationResult;
+    createRate: (
+      input: import("@contracts").CreateExchangeRateCommand,
+    ) => import("@contracts").ExchangeRateMutationResult;
+    deleteRate: (
+      input: import("@contracts").DeleteExchangeRateCommand,
+    ) => import("@contracts").ExchangeRateMutationResult;
+  };
+  currencyReads: {
+    getSettings: (workspaceId: string) => import("@contracts").CurrencySettingsRow;
+    listRates: (
+      workspaceId: string,
+      filter?: { baseCurrency?: string; quoteCurrency?: string; limit?: number },
+    ) => import("@contracts").ExchangeRateRow[];
+    getLatestRate: (
+      workspaceId: string,
+      baseCurrency: string,
+      quoteCurrency: string,
+      rateType?: import("@contracts").CurrencyRateType,
+    ) => import("@contracts").ExchangeRateRow | null;
+  };
+  quoteMutations: {
+    createQuote: (input: import("@contracts").CreateQuoteCommand) => import("@contracts").QuoteMutationResult;
+    updateQuote: (input: import("@contracts").UpdateQuoteCommand) => import("@contracts").QuoteMutationResult;
+    setStatus: (input: import("@contracts").SetQuoteStatusCommand) => import("@contracts").QuoteMutationResult;
+    duplicateQuote: (input: import("@contracts").DuplicateQuoteCommand) => import("@contracts").QuoteMutationResult;
+    deleteQuote: (input: import("@contracts").DuplicateQuoteCommand) => import("@contracts").QuoteMutationResult;
+  };
+  quoteReads: {
+    listQuotes: (filter: import("@contracts").QuoteListFilter) => import("@contracts").QuoteRow[];
+    getQuoteDetail: (workspaceId: string, quoteId: string) => import("@contracts").QuoteDetail | null;
+    listQuoteVersions: (
+      workspaceId: string,
+      quoteId: string,
+    ) => Array<{
+      id: string;
+      versionNumber: number;
+      changeSummary: string | null;
+      createdAt: string;
+      createdByUserId: string | null;
+      snapshot: Record<string, unknown>;
+    }>;
+  };
+  exportQuotePdf: (
+    workspaceId: string,
+    quoteId: string,
+  ) => Promise<{ fileName: string; mimeType: "application/pdf"; buffer: Buffer }>;
   packingMutations: {
     createPackingSlip: (input: CreatePackingSlipCommand) => unknown;
     returnPackingSlipItems: (input: ReturnPackingSlipItemsCommand) => unknown;
@@ -269,6 +335,7 @@ type RegisterFoundationIpcOptions = {
     deleteAssistantThread: (input: DeleteAssistantThreadCommand) => AssistantChatSnapshot;
     setActiveAssistantThread: (input: SetActiveAssistantThreadCommand) => AssistantChatSnapshot;
     updateAssistantThreadPreferences: (input: UpdateAssistantThreadPreferencesCommand) => AssistantChatSnapshot;
+    renameAssistantThread: (input: RenameAssistantThreadCommand) => AssistantChatSnapshot;
     sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
     reviewRun: (input: ReviewAgentRunCommand) => unknown;
     sendAssistantMessage: (input: AssistantGatewayRequest) => Promise<AssistantGatewayResponse>;
@@ -318,6 +385,11 @@ export const registerFoundationIpc = ({
   fileUploads,
   incidentMutations,
   financeMutations,
+  currencyMutations,
+  currencyReads,
+  quoteMutations,
+  quoteReads,
+  exportQuotePdf,
   packingMutations,
   exportFinanceReportPdf,
   exportPackingSlipPdf,
@@ -448,6 +520,11 @@ export const registerFoundationIpc = ({
     ipcChannels.agents.updateAssistantThreadPreferences,
     updateAssistantThreadPreferencesSchema,
     (_event, input) => agentMutations.updateAssistantThreadPreferences(input),
+  );
+  safeHandle(
+    ipcChannels.agents.renameAssistantThread,
+    renameAssistantThreadSchema,
+    (_event, input) => agentMutations.renameAssistantThread(input),
   );
   safeHandle(
     ipcChannels.agents.sendAssistantChatTurn,
@@ -1419,4 +1496,115 @@ export const registerFoundationIpc = ({
   );
   safeHandle(ipcChannels.finance.create, createFinancialEntrySchema, (_event, input) => financeMutations.createEntry(input));
   safeHandle(ipcChannels.finance.update, updateFinancialEntrySchema, (_event, input) => financeMutations.updateEntry(input));
+
+  safeHandleReadWithSchema(
+    ipcChannels.currency.getSettings,
+    currencySettingsReadArgsSchema,
+    (_event, query: { workspaceId: string }) => currencyReads.getSettings(query.workspaceId),
+    "The app could not load currency settings.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.currency.listRates,
+    exchangeRateListReadArgsSchema,
+    (
+      _event,
+      query: { workspaceId: string; baseCurrency?: string; quoteCurrency?: string; limit?: number },
+    ) => {
+      const { workspaceId, ...filter } = query;
+      return currencyReads.listRates(workspaceId, filter);
+    },
+    "The app could not load exchange rates.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.currency.getLatestRate,
+    latestExchangeRateReadArgsSchema,
+    (
+      _event,
+      query: {
+        workspaceId: string;
+        baseCurrency: string;
+        quoteCurrency: string;
+        rateType?: import("@contracts").CurrencyRateType;
+      },
+    ) =>
+      currencyReads.getLatestRate(query.workspaceId, query.baseCurrency, query.quoteCurrency, query.rateType),
+    "The app could not load the latest exchange rate.",
+  );
+  safeHandle(ipcChannels.currency.upsertSettings, upsertCurrencySettingsSchema, (_event, input) =>
+    currencyMutations.upsertSettings(input),
+  );
+  safeHandle(ipcChannels.currency.createRate, createExchangeRateSchema, (_event, input) =>
+    currencyMutations.createRate(input),
+  );
+  safeHandle(ipcChannels.currency.deleteRate, deleteExchangeRateSchema, (_event, input) =>
+    currencyMutations.deleteRate(input),
+  );
+
+  safeHandleReadWithSchema(
+    ipcChannels.quotes.list,
+    quoteListReadArgsSchema,
+    (_event, filter: import("@contracts").QuoteListFilter) => quoteReads.listQuotes(filter),
+    "The app could not load quotes.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.quotes.detail,
+    quoteDetailReadArgsSchema,
+    (_event, query: { workspaceId: string; quoteId: string }) =>
+      quoteReads.getQuoteDetail(query.workspaceId, query.quoteId),
+    "The app could not load the quote detail.",
+  );
+  safeHandle(ipcChannels.quotes.create, createQuoteSchema, (_event, input) =>
+    quoteMutations.createQuote(input),
+  );
+  safeHandle(ipcChannels.quotes.update, updateQuoteSchema, (_event, input) =>
+    quoteMutations.updateQuote(input),
+  );
+  safeHandle(ipcChannels.quotes.setStatus, setQuoteStatusSchema, (_event, input) =>
+    quoteMutations.setStatus(input),
+  );
+  safeHandle(ipcChannels.quotes.duplicate, duplicateQuoteSchema, (_event, input) =>
+    quoteMutations.duplicateQuote(input),
+  );
+  safeHandle(ipcChannels.quotes.delete, duplicateQuoteSchema, (_event, input) =>
+    quoteMutations.deleteQuote(input),
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.quotes.listVersions,
+    quoteVersionsReadArgsSchema,
+    (_event, query: { workspaceId: string; quoteId: string }) =>
+      quoteReads.listQuoteVersions(query.workspaceId, query.quoteId),
+    "The app could not load quote versions.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.quotes.exportPdf,
+    quoteExportPdfReadArgsSchema,
+    async (_event, query: { workspaceId: string; quoteId: string }) => {
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: "Export quote PDF",
+        defaultPath: path.join(
+          app.getPath("documents"),
+          `Cotizacion_${query.quoteId.replace(/[^a-z0-9_-]+/gi, "_")}_${dateStamp}.pdf`,
+        ),
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+      if (canceled || !filePath) {
+        return {
+          saved: false,
+          fileName: null,
+          savedPath: null,
+          summary: "Quote PDF export cancelled.",
+        };
+      }
+      const pdf = await exportQuotePdf(query.workspaceId, query.quoteId);
+      fs.writeFileSync(filePath, pdf.buffer);
+      return {
+        saved: true,
+        fileName: path.basename(filePath),
+        savedPath: filePath,
+        summary: `Exported ${pdf.fileName} to ${path.basename(filePath)}.`,
+      };
+    },
+    "The app could not export the quote PDF.",
+  );
 };

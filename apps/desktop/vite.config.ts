@@ -40,9 +40,23 @@ const appendConnectSource = (policy: string, source: string | null) => {
   return policy.replace(/connect-src([^;]*)/, (match) => `${match} ${source}`);
 };
 
+const appendImageSource = (policy: string, source: string | null) => {
+  if (!source) return policy;
+  // Find the existing img-src directive and add the source if it isn't there.
+  const imgRegex = /img-src([^;]*)/;
+  const match = policy.match(imgRegex);
+  if (!match) {
+    return `${policy.replace(/;\s*$/, "")}; img-src 'self' data: blob: ${source}`;
+  }
+  if (match[1]?.includes(source)) return policy;
+  return policy.replace(imgRegex, (m) => `${m} ${source}`);
+};
+
 export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, rootDir, "VITE_");
-  const htmlCsp = appendConnectSource(env.VITE_HTML_CSP ?? "", toHttpsOrigin(env.VITE_SUPABASE_URL));
+  const supabaseOrigin = toHttpsOrigin(env.VITE_SUPABASE_URL);
+  let htmlCsp = appendConnectSource(env.VITE_HTML_CSP ?? "", supabaseOrigin);
+  htmlCsp = appendImageSource(htmlCsp, supabaseOrigin);
   const htmlCspPlugin: Plugin = {
     name: "bukowski-html-csp",
     transformIndexHtml: {

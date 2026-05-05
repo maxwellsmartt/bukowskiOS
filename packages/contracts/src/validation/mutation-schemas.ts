@@ -209,6 +209,15 @@ export const updateAssistantThreadPreferencesSchema = z
   })
   .strict();
 
+export const renameAssistantThreadSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    threadId: nonEmptyString,
+    title: z.string().trim().min(1).max(120),
+  })
+  .strict();
+
 export const assistantGatewayAttachmentSchema = z
   .object({
     id: nonEmptyString,
@@ -876,3 +885,227 @@ export const updateRmaCaseSchema = createRmaCaseSchema.extend({
   rmaCaseId: nonEmptyString,
   status: rmaStatusSchema,
 });
+
+const currencyCodeSchema = z.string().trim().min(2).max(8).transform((v) => v.toUpperCase());
+const currencyRateTypeSchema = z.enum(["buy", "sell", "average", "manual"]);
+const currencyRateSourceSchema = z.enum(["manual", "banco_popular", "banco_central", "custom"]);
+
+// Accepts string | null | undefined and normalises null/empty to undefined.
+// Used for optional text fields that the renderer sends as `null` when empty.
+const nullableOrOptionalText = z
+  .union([z.string().trim(), z.null()])
+  .optional()
+  .transform((value) => (value === null ? undefined : value));
+
+export const upsertCurrencySettingsSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    baseCurrency: currencyCodeSchema,
+    defaultQuoteCurrency: currencyCodeSchema,
+    enabledCurrencies: z.array(currencyCodeSchema).min(1),
+    defaultRateSource: currencyRateSourceSchema,
+    defaultRateType: currencyRateTypeSchema,
+    defaultItbisRate: z.number().finite().min(0).max(1),
+    defaultQuoteValidityDays: z.number().int().min(1).max(365),
+    sirecineNumber: nullableOrOptionalText,
+    workspaceLogoUrl: nullableOrOptionalText,
+    workspaceSealUrl: nullableOrOptionalText,
+    workspaceSignatureUrl: nullableOrOptionalText,
+  })
+  .strict();
+
+export const createExchangeRateSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    baseCurrency: currencyCodeSchema,
+    quoteCurrency: currencyCodeSchema,
+    rate: z.number().finite().positive(),
+    rateType: currencyRateTypeSchema,
+    source: currencyRateSourceSchema,
+    sourceLabel: nullableOrOptionalText,
+    effectiveDate: nonEmptyString,
+    fetchedAt: nullableOrOptionalText,
+    notes: nullableOrOptionalText,
+  })
+  .strict();
+
+export const deleteExchangeRateSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    rateId: nonEmptyString,
+  })
+  .strict();
+
+export const currencySettingsQuerySchema = z
+  .object({ workspaceId: nonEmptyString })
+  .strict();
+
+export const exchangeRateListQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    baseCurrency: currencyCodeSchema.optional(),
+    quoteCurrency: currencyCodeSchema.optional(),
+    limit: z.number().int().positive().max(200).optional(),
+  })
+  .strict();
+
+export const latestExchangeRateQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    baseCurrency: currencyCodeSchema,
+    quoteCurrency: currencyCodeSchema,
+    rateType: currencyRateTypeSchema.optional(),
+  })
+  .strict();
+
+const quoteTaxProfileSchema = z.enum(["film_law_exempt", "standard_itbis", "mixed", "manual"]);
+const quoteItemTaxBehaviorSchema = z.enum(["follows_quote", "taxable", "exempt", "show_only", "included"]);
+const quoteItemDurationUnitSchema = z.enum(["day", "week", "month", "unit", "flat"]);
+const quoteStatusSchema = z.enum(["draft", "sent", "approved", "rejected", "expired", "cancelled"]);
+const quoteSettableStatusSchema = z.enum(["sent", "approved", "rejected", "cancelled"]);
+
+const nullableOrOptionalStringField = z
+  .union([z.string().trim(), z.null()])
+  .optional()
+  .transform((value) => (value === null ? undefined : value));
+
+const quoteItemInputSchema = z
+  .object({
+    sortOrder: z.number().int().min(0),
+    quantity: z.number().finite().min(0),
+    title: nonEmptyString,
+    description: nullableOrOptionalStringField,
+    durationValue: z.number().finite().min(0).nullable().optional(),
+    durationUnit: quoteItemDurationUnitSchema.nullable().optional(),
+    unitPrice: z.number().finite().min(0),
+    discountRate: z.number().finite().min(0).max(1).nullable().optional(),
+    discountAmount: z.number().finite().min(0).nullable().optional(),
+    taxBehavior: quoteItemTaxBehaviorSchema,
+    taxRate: z.number().finite().min(0).max(1).nullable().optional(),
+    notes: nullableOrOptionalStringField,
+  })
+  .strict();
+
+const nullableOrOptionalString = z
+  .union([z.string().trim(), z.null()])
+  .optional()
+  .transform((value) => (value === null ? undefined : value));
+
+const quoteHeaderInputSchema = z.object({
+  quoteDate: nonEmptyString,
+  validityDays: z.number().int().min(1).max(365),
+  clientId: nullableOrOptionalString,
+  clientNameSnapshot: nonEmptyString,
+  clientRncSnapshot: nullableOrOptionalString,
+  productionCompanyId: nullableOrOptionalString,
+  productionCompanyNameSnapshot: nullableOrOptionalString,
+  productionPurSnapshot: nullableOrOptionalString,
+  workspaceSirecineSnapshot: nullableOrOptionalString,
+  attentionName: nullableOrOptionalString,
+  attentionPhone: nullableOrOptionalString,
+  projectId: nullableOrOptionalString,
+  projectNameSnapshot: nullableOrOptionalString,
+  productionName: nullableOrOptionalString,
+  description: nullableOrOptionalString,
+  packageTitle: nullableOrOptionalString,
+  currency: z.string().trim().min(2).max(8).transform((v) => v.toUpperCase()),
+  baseCurrency: z.string().trim().min(2).max(8).transform((v) => v.toUpperCase()),
+  exchangeRate: z.number().finite().positive(),
+  exchangeRateSource: z.enum(["manual", "banco_popular", "banco_central", "custom"]),
+  exchangeRateType: z.enum(["buy", "sell", "average", "manual"]),
+  exchangeRateEffectiveDate: nullableOrOptionalString,
+  taxProfile: quoteTaxProfileSchema,
+  itbisRate: z.number().finite().min(0).max(1),
+  taxAddedToTotal: z.boolean(),
+  taxNotes: nullableOrOptionalString,
+  discountRate: z.number().finite().min(0).max(1).nullable().optional(),
+  discountAmount: z.number().finite().min(0).nullable().optional(),
+  observations: nullableOrOptionalString,
+});
+
+export const createQuoteSchema = quoteHeaderInputSchema
+  .extend({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    items: z.array(quoteItemInputSchema).min(1),
+  })
+  .strict();
+
+export const updateQuoteSchema = quoteHeaderInputSchema
+  .extend({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    quoteId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    items: z.array(quoteItemInputSchema).min(1),
+    changeSummary: nullableOrOptionalString,
+  })
+  .strict();
+
+export const setQuoteStatusSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    quoteId: nonEmptyString,
+    status: quoteSettableStatusSchema,
+    reason: optionalTrimmedString,
+  })
+  .strict();
+
+export const duplicateQuoteSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    quoteId: nonEmptyString,
+  })
+  .strict();
+
+export const quoteListQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    status: quoteStatusSchema.optional(),
+    clientId: optionalTrimmedString,
+    projectId: optionalTrimmedString,
+    dateFrom: optionalTrimmedString,
+    dateTo: optionalTrimmedString,
+    currency: optionalTrimmedString,
+    search: optionalTrimmedString,
+    limit: z.number().int().positive().max(500).optional(),
+  })
+  .strict();
+
+export const quoteDetailQuerySchema = z
+  .object({ workspaceId: nonEmptyString, quoteId: nonEmptyString })
+  .strict();
+
+// Read-args wrappers (tuple-shaped) for `safeHandleReadWithSchema` which parses
+// the full `args` array, not a single object.
+export const currencySettingsReadArgsSchema = z.tuple([currencySettingsQuerySchema]);
+export const exchangeRateListReadArgsSchema = z.tuple([exchangeRateListQuerySchema]);
+export const latestExchangeRateReadArgsSchema = z.tuple([latestExchangeRateQuerySchema]);
+export const quoteListReadArgsSchema = z.tuple([quoteListQuerySchema]);
+export const quoteDetailReadArgsSchema = z.tuple([quoteDetailQuerySchema]);
+
+export const quoteExportPdfReadArgsSchema = z.tuple([
+  z.object({ workspaceId: nonEmptyString, quoteId: nonEmptyString }).strict(),
+]);
+
+export const quoteVersionsReadArgsSchema = z.tuple([
+  z.object({ workspaceId: nonEmptyString, quoteId: nonEmptyString }).strict(),
+]);

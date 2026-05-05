@@ -27,6 +27,11 @@ export type AssistantChatMessageState = "draft" | "pending" | "sent" | "complete
 
 export type AssistantChatAttachmentStatus = "available" | "missing" | "deleted" | "cleanup_pending";
 
+export type PendingMutationPreview = {
+  toolName: string;
+  summary: string;
+};
+
 export type AssistantChatMessageMeta = {
   tone: "sending" | "routed" | "approval" | "error";
   label: string;
@@ -41,6 +46,7 @@ export type AssistantChatMessageMeta = {
   approvalDecision?: AgentRunApprovalDecision | null;
   approvalScope?: AgentRunApprovalScope | null;
   approvalReason?: string | null;
+  pendingMutation?: PendingMutationPreview | null;
 };
 
 export type AssistantChatAttachmentRow = {

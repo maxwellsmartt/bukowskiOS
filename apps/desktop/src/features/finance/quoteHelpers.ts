@@ -1,0 +1,90 @@
+import type { QuoteStatus, QuoteTaxProfile } from "@contracts";
+
+export const currencySymbol = (code: string): string => {
+  const normalized = code.trim().toUpperCase();
+  switch (normalized) {
+    case "DOP":
+      return "RD$";
+    case "USD":
+      return "US$";
+    case "EUR":
+      return "€";
+    default:
+      return normalized + " ";
+  }
+};
+
+export const formatCurrency = (value: number, currency: string): string => {
+  const symbol = currencySymbol(currency);
+  const safe = Number.isFinite(value) ? value : 0;
+  const formatted = safe.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `${symbol}${formatted}`;
+};
+
+export const statusLabel = (status: QuoteStatus): string => {
+  switch (status) {
+    case "draft":
+      return "Draft";
+    case "sent":
+      return "Sent";
+    case "approved":
+      return "Approved";
+    case "rejected":
+      return "Rejected";
+    case "expired":
+      return "Expired";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return status;
+  }
+};
+
+export const statusTone = (
+  status: QuoteStatus,
+): "neutral" | "info" | "warning" | "success" | "critical" => {
+  switch (status) {
+    case "draft":
+      return "neutral";
+    case "sent":
+      return "info";
+    case "approved":
+      return "success";
+    case "rejected":
+      return "critical";
+    case "expired":
+      return "warning";
+    case "cancelled":
+      return "neutral";
+    default:
+      return "neutral";
+  }
+};
+
+export const taxProfileLabel = (profile: QuoteTaxProfile): string => {
+  switch (profile) {
+    case "film_law_exempt":
+      return "Film Law (exempt)";
+    case "standard_itbis":
+      return "Standard ITBIS";
+    case "mixed":
+      return "Mixed";
+    case "manual":
+      return "Manual";
+    default:
+      return profile;
+  }
+};
+
+export const validityCopy = (validityDays: number, validUntil: string): string => {
+  return `Valid for ${validityDays} day${validityDays === 1 ? "" : "s"} (until ${validUntil}).`;
+};
+
+/** Best-effort short id for newly drafted commands. */
+export const newCommandId = (prefix: string): string => {
+  const random = Math.random().toString(36).slice(2, 10);
+  return `${prefix}-${Date.now().toString(36)}-${random}`;
+};

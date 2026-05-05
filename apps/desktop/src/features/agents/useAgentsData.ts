@@ -27,6 +27,7 @@ import type {
   SaveConnectorConfigCommand,
   SendAssistantChatTurnCommand,
   SetActiveAssistantThreadCommand,
+  RenameAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
   SetAgentApprovalModeCommand,
   SetAgentStatusCommand,
@@ -367,6 +368,18 @@ export const updateAssistantThreadPreferences = async (
   }
 
   const result = await window.bukowskiAgents.updateAssistantThreadPreferences(input);
+  notifyAgentsChanged();
+  return result;
+};
+
+export const renameAssistantThread = async (
+  input: RenameAssistantThreadCommand,
+): Promise<AssistantChatSnapshot> => {
+  if (!window.bukowskiAgents) {
+    throw new Error("Agents bridge unavailable");
+  }
+
+  const result = await window.bukowskiAgents.renameAssistantThread(input);
   notifyAgentsChanged();
   return result;
 };

@@ -214,6 +214,19 @@ export const AgentsPage = () => {
                 <div>
                   <span className="agent-detail-kicker">Tools</span>
                   <strong>{detail.tools.join(" · ") || "No tools defined"}</strong>
+                  {(() => {
+                    const writeTools = detail.tools.filter((tool) =>
+                      /^(create_|update_|return_|assign_|release_|delegate_)/.test(tool),
+                    );
+                    if (!writeTools.length) {
+                      return <span className="agent-tools-badge agent-tools-badge-read">{detail.tools.length} read-only</span>;
+                    }
+                    return (
+                      <span className="agent-tools-badge agent-tools-badge-write">
+                        {writeTools.length} write tool{writeTools.length === 1 ? "" : "s"} · requires approval
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div>
                   <span className="agent-detail-kicker">Domains</span>

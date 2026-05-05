@@ -5,6 +5,7 @@ import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.p
 import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
 
 import { ShellProjectsPanel } from "./ShellProjectsPanel";
+import { SidebarUserMenu } from "./SidebarUserMenu";
 import { primaryNav, utilityNav } from "./navigation";
 
 export const ShellSidebar = () => {
@@ -52,7 +53,9 @@ export const ShellSidebar = () => {
         <nav className="shell-nav">
           {utilityNav.map((item) => {
             const Icon = item.icon;
-            const isActive = activeRoute.scopeMode === "global" && location.pathname === item.path;
+            const isExactMatch = location.pathname === item.path;
+            const isSubRouteMatch = location.pathname.startsWith(`${item.path}/`);
+            const isActive = activeRoute.scopeMode === "global" && (isExactMatch || isSubRouteMatch);
 
             return (
               <NavLink key={item.path} to={item.path} className={() => `shell-nav-link${isActive ? " active" : ""}`}>
@@ -62,6 +65,8 @@ export const ShellSidebar = () => {
             );
           })}
         </nav>
+
+        <SidebarUserMenu />
       </div>
     </aside>
   );

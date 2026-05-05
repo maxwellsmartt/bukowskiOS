@@ -1,8 +1,9 @@
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { ReactNode } from "react";
 
 export type SettingsSectionId =
   | "general"
+  | "account"
   | "workspace"
   | "team"
   | "data"
@@ -17,17 +18,19 @@ type SettingsNavEntry = {
 };
 
 export const settingsNavEntries: SettingsNavEntry[] = [
-  { id: "general", label: "General", description: "Workspace status", to: "/settings?section=general" },
-  { id: "workspace", label: "Workspace", description: "Identity, members & invites", to: "/settings/workspace" },
-  { id: "team", label: "Team", description: "Users and roles", to: "/settings?section=team" },
-  { id: "data", label: "Data", description: "Backups and integrity", to: "/settings?section=data" },
-  { id: "sync", label: "Sync activity", description: "Outbox & remote status", to: "/settings/sync" },
-  { id: "advanced", label: "Advanced", description: "Support tools", to: "/settings?section=advanced" },
+  { id: "general", label: "General", description: "Health & quick stats", to: "/settings?section=general" },
+  { id: "account", label: "Account", description: "Your profile, identity & sign-out", to: "/settings/account" },
+  { id: "workspace", label: "Workspace", description: "Identity, members, roles & invites", to: "/settings/workspace" },
+  { id: "team", label: "Team", description: "User profiles & access", to: "/settings?section=team" },
+  { id: "data", label: "Data", description: "Backups, integrity & exports", to: "/settings?section=data" },
+  { id: "sync", label: "Sync activity", description: "Outbox queue & remote status", to: "/settings/sync" },
+  { id: "advanced", label: "Advanced", description: "Diagnostics & support tools", to: "/settings?section=advanced" },
 ];
 
 const resolveActiveSection = (pathname: string, search: string): SettingsSectionId => {
   if (pathname === "/settings/workspace") return "workspace";
   if (pathname === "/settings/sync") return "sync";
+  if (pathname === "/settings/account") return "account";
 
   const params = new URLSearchParams(search);
   const fromQuery = params.get("section") as SettingsSectionId | null;
@@ -45,10 +48,33 @@ export const SettingsLayout = ({ children }: SettingsLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const activeId = resolveActiveSection(location.pathname, location.search);
+  const navRef = useRef<HTMLDivElement | null>(null);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+      return;
+    }
+    event.preventDefault();
+    const buttons = navRef.current?.querySelectorAll<HTMLButtonElement>("button.settings-section-tab");
+    if (!buttons || buttons.length === 0) return;
+
+    const current = document.activeElement as HTMLElement | null;
+    const list = Array.from(buttons);
+    const index = list.findIndex((btn) => btn === current);
+    const start = index === -1 ? list.findIndex((btn) => btn.classList.contains("is-active")) : index;
+    const delta = event.key === "ArrowDown" ? 1 : -1;
+    const nextIndex = (start + delta + list.length) % list.length;
+    list[nextIndex]?.focus();
+  };
 
   return (
     <div className="settings-shell-layout">
-      <nav aria-label="Settings sections" className="settings-section-nav">
+      <nav
+        aria-label="Settings sections"
+        className="settings-section-nav"
+        onKeyDown={handleKeyDown}
+        ref={navRef}
+      >
         {settingsNavEntries.map((entry) => (
           <button
             key={entry.id}
@@ -62,7 +88,25 @@ export const SettingsLayout = ({ children }: SettingsLayoutProps) => {
         ))}
       </nav>
 
-      <div className="settings-content-panel">{children}</div>
+      <SettingsContentPanel activeId={activeId}>{children}</SettingsContentPanel>
+    </div>
+  );
+};
+
+const SettingsContentPanel = ({ activeId, children }: { activeId: SettingsSectionId; children: ReactNode }) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    node.classList.remove("is-entering");
+    void node.offsetWidth;
+    node.classList.add("is-entering");
+  }, [activeId]);
+
+  return (
+    <div className="settings-content-panel" ref={ref} key={activeId}>
+      {children}
     </div>
   );
 };

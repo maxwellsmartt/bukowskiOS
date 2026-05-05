@@ -320,7 +320,8 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
             COALESCE(email, '') AS email,
             COALESCE(phone, '') AS phone,
             COALESCE(notes, '') AS notes,
-            is_active
+            is_active,
+            rnc
           FROM clients
           WHERE workspace_id = ?
           ORDER BY is_active DESC, name
@@ -334,6 +335,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       phone: string;
       notes: string;
       is_active: number;
+      rnc: string | null;
     }>;
 
     const productionCompanies = db
@@ -346,7 +348,8 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
             COALESCE(email, '') AS email,
             COALESCE(phone, '') AS phone,
             COALESCE(notes, '') AS notes,
-            is_active
+            is_active,
+            pur
           FROM production_companies
           WHERE workspace_id = ?
           ORDER BY is_active DESC, name
@@ -360,6 +363,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       phone: string;
       notes: string;
       is_active: number;
+      pur: string | null;
     }>;
 
     const manufacturers = db
@@ -606,6 +610,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         phone: row.phone,
         notes: row.notes,
         isActive: Boolean(row.is_active),
+        rnc: row.rnc ?? null,
       })),
       productionCompanies: productionCompanies.map((row) => ({
         id: row.id,
@@ -615,6 +620,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         phone: row.phone,
         notes: row.notes,
         isActive: Boolean(row.is_active),
+        pur: row.pur ?? null,
       })),
       manufacturers: manufacturers.map((row) => ({
         id: row.id,

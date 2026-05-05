@@ -107,6 +107,66 @@ export type AppActionResult = {
   diagnostics: AppDiagnosticsSnapshot;
 };
 
+export type CatalogPullEntityType = "asset_categories" | "locations" | "clients" | "manufacturers" | "production_companies";
+
+export type AppRemoteCatalogRow = {
+  id: string;
+  workspace_id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  parent_category_id?: string | null;
+  type?: string | null;
+  is_active?: boolean | null;
+  updated_at: string;
+};
+
+export type AppApplyRemoteCatalogRowsCommand = {
+  workspaceId: string;
+  entityType: CatalogPullEntityType;
+  rows: AppRemoteCatalogRow[];
+};
+
+export type AppApplyRemoteCatalogRowsResult = {
+  entityType: CatalogPullEntityType;
+  workspaceId: string;
+  appliedCount: number;
+  skippedDueToOutboxCount: number;
+  skippedDueToOlderCount: number;
+  errors: string[];
+  cursorAfter: string | null;
+};
+
+export type AppRemoteExchangeRateRow = {
+  id: string;
+  workspace_id: string;
+  base_currency: string;
+  quote_currency: string;
+  rate: number;
+  rate_type: string;
+  source: string;
+  source_label: string | null;
+  effective_date: string;
+  fetched_at: string | null;
+  created_by_user_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at?: string;
+};
+
+export type AppApplyRemoteExchangeRatesCommand = {
+  workspaceId: string;
+  rows: AppRemoteExchangeRateRow[];
+};
+
+export type AppApplyRemoteExchangeRatesResult = {
+  workspaceId: string;
+  appliedCount: number;
+  skippedDueToOutboxCount: number;
+  errors: string[];
+  cursorAfter: string | null;
+};
+
 export type AppExportResult = {
   saved: boolean;
   fileName: string | null;

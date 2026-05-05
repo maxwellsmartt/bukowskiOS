@@ -83,11 +83,17 @@ export const buildContentSecurityPolicy = (
   const connectSources = ["'self'", "https://api.openai.com"];
   const scriptSources = ["'self'"];
   const styleSources = ["'self'", "'unsafe-inline'"];
+  const imageSources = ["'self'", "data:", "blob:"];
 
   for (const remoteConnectUrl of remoteConnectUrls) {
     const origin = toAllowedConnectOrigin(remoteConnectUrl);
     if (origin && !connectSources.includes(origin)) {
       connectSources.push(origin);
+    }
+    // Same origins also serve user-uploaded images (avatars, workspace
+    // branding, attachments) via Supabase Storage public buckets.
+    if (origin && !imageSources.includes(origin)) {
+      imageSources.push(origin);
     }
   }
 
@@ -109,7 +115,7 @@ export const buildContentSecurityPolicy = (
     "default-src 'self'",
     `script-src ${scriptSources.join(" ")}`,
     `style-src ${styleSources.join(" ")}`,
-    "img-src 'self' data: blob:",
+    `img-src ${imageSources.join(" ")}`,
     "font-src 'self' data:",
     `connect-src ${connectSources.join(" ")}`,
     "worker-src 'self' blob:",
