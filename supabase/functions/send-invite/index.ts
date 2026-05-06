@@ -9,6 +9,12 @@ type SendInvitePayload = {
 
 type SupabaseAuthUser = {
   id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+};
+
+type SupabaseAuthListUsersPage = {
+  users?: SupabaseAuthUser[];
 };
 
 const allowedOrigins = [/^https?:\/\/localhost(?::\d+)?$/, /^https?:\/\/127\.0\.0\.1(?::\d+)?$/];
@@ -58,6 +64,79 @@ const getAuthenticatedUser = async (supabaseUrl: string, anonKey: string, bearer
   return user.id ? { user, error: null } : { user: null, error: "auth_user_missing_id" };
 };
 
+const normalizeEmail = (email: unknown) => (typeof email === "string" ? email.trim().toLowerCase() : "");
+
+const findAuthUserByEmail = async (adminClient: ReturnType<typeof createClient>, email: string) => {
+  const targetEmail = normalizeEmail(email);
+
+  if (!targetEmail) {
+    return null;
+  }
+
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await adminClient.auth.admin.listUsers({
+      page,
+      perPage: 100,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const users = ((data as SupabaseAuthListUsersPage | null)?.users ?? []) as SupabaseAuthUser[];
+    const match = users.find((user) => normalizeEmail(user.email) === targetEmail);
+
+    if (match) {
+      return match;
+    }
+
+    if (users.length < 100) {
+      return null;
+    }
+  }
+
+  return null;
+};
+
+const upsertUserProfile = async (adminClient: ReturnType<typeof createClient>, user: SupabaseAuthUser, fallbackEmail: string) => {
+  const fullName =
+    typeof user.user_metadata?.full_name === "string"
+      ? user.user_metadata.full_name
+      : typeof user.user_metadata?.name === "string"
+        ? user.user_metadata.name
+        : null;
+
+  await adminClient.from("user_profiles").upsert(
+    {
+      user_id: user.id,
+      email: normalizeEmail(user.email) || normalizeEmail(fallbackEmail),
+      full_name: fullName,
+      updated_at: new Date().toISOString(),
+    },
+    {
+      onConflict: "user_id",
+      ignoreDuplicates: false,
+    },
+  );
+};
+
+const sendExistingUserMagicLink = async (supabaseUrl: string, anonKey: string, email: string) => {
+  const publicClient = createClient(supabaseUrl, anonKey);
+  const { error } = await publicClient.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: "bukowskios://auth/callback?flow=first-login",
+      shouldCreateUser: false,
+    },
+  });
+
+  if (error) {
+    return error.message;
+  }
+
+  return null;
+};
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response(null, {
@@ -95,7 +174,14 @@ Deno.serve(async (request) => {
   }
 
   const caller = await getAuthenticatedUser(supabaseUrl, anonKey, bearerToken);
-  const { data: invite, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(payload.email, {
+  const normalizedEmail = normalizeEmail(payload.email);
+
+  if (!normalizedEmail) {
+    return json(request, { error: "email_required" }, 400);
+  }
+
+  let inviteUser: SupabaseAuthUser | null = null;
+  const { data: invite, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(normalizedEmail, {
     redirectTo: `bukowskios://auth/accept-invite?flow=invite&workspace_id=${encodeURIComponent(payload.workspaceId)}`,
     data: {
       workspace_id: payload.workspaceId,
@@ -105,21 +191,58 @@ Deno.serve(async (request) => {
   });
 
   if (inviteError || !invite.user) {
-    return json(request, { error: inviteError?.message ?? "invite_failed" }, 400);
+    const existingUser = await findAuthUserByEmail(adminClient, normalizedEmail);
+
+    if (!existingUser) {
+      return json(request, { error: inviteError?.message ?? "invite_failed" }, 400);
+    }
+
+    inviteUser = existingUser;
+  } else {
+    inviteUser = invite.user;
   }
+
+  await upsertUserProfile(adminClient, inviteUser, normalizedEmail);
+
+  const now = new Date().toISOString();
+  const isExistingUser = Boolean(inviteError);
 
   const { error: membershipError } = await adminClient.from("workspace_memberships").upsert({
     workspace_id: payload.workspaceId,
-    user_id: invite.user.id,
+    user_id: inviteUser.id,
     role_id: payload.roleId,
-    status: "invited",
+    status: isExistingUser ? "active" : "invited",
     invited_by: caller.user?.id ?? null,
-    invited_at: new Date().toISOString(),
+    invited_at: isExistingUser ? null : now,
+    accepted_at: isExistingUser ? now : null,
+    updated_at: now,
+  }, {
+    onConflict: "workspace_id,user_id",
+    ignoreDuplicates: false,
   });
 
   if (membershipError) {
     return json(request, { error: membershipError.message }, 400);
   }
 
-  return json(request, { ok: true, userId: invite.user.id });
+  const magicLinkError = isExistingUser ? await sendExistingUserMagicLink(supabaseUrl, anonKey, normalizedEmail) : null;
+
+  if (magicLinkError) {
+    return json(request, {
+      ok: true,
+      userId: inviteUser.id,
+      alreadyRegistered: true,
+      membershipStatus: "active",
+      magicLinkSent: false,
+      warning: magicLinkError,
+    });
+  }
+
+  return json(request, {
+    ok: true,
+    userId: inviteUser.id,
+    alreadyRegistered: isExistingUser,
+    membershipStatus: isExistingUser ? "active" : "invited",
+    magicLinkSent: true,
+  });
 });

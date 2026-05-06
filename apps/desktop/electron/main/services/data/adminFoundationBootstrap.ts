@@ -68,7 +68,7 @@ const legacyRoleMappings = [
   ["role-maintenance-operator", "role-maintenance"],
 ] as const;
 
-const defaultCommandActor = ["user-ops", "Ops Repair", "ops@metadata.cine", "+1 809 555 0199"] as const;
+const defaultCommandActor = ["user-ops", "AI Agent", "ai-agent@bukowskios.local", ""] as const;
 const demoPlaceholderUserIds = ["user-paola", "user-luis", "user-miguel"] as const;
 const demoPlaceholderCrewIds = ["crew-user-paola", "crew-user-luis", "crew-user-miguel", "crew-user-ops"] as const;
 
@@ -99,11 +99,14 @@ const ensureDefaultCommandActorAccess = (db: DatabaseSync, now: string) => {
   db.prepare(
     `
       UPDATE users
-      SET is_active = 1,
+      SET full_name = ?,
+          email = ?,
+          phone = ?,
+          is_active = 1,
           updated_at = ?
       WHERE id = ?
     `,
-  ).run(now, defaultCommandActor[0]);
+  ).run(defaultCommandActor[1], defaultCommandActor[2], defaultCommandActor[3], now, defaultCommandActor[0]);
 
   const workspaces = db.prepare("SELECT id FROM workspaces").all() as Array<{ id: string }>;
   const upsertMembership = db.prepare(

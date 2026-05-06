@@ -12,7 +12,7 @@ import { getDesktopEnvironment } from "./services/appEnvironment";
 import { createDocumentGenerationService } from "./services/data/documentGenerationService";
 import { initializeLocalDatabase } from "./services/data/localDatabase";
 import { getDesktopLogger, initializeDesktopLogger } from "./services/logger";
-import { createMainWindow } from "./windows/createMainWindow";
+import { createMainWindow, loadMainWindowContent } from "./windows/createMainWindow";
 
 const { devServerUrl, preloadPath, rendererDist } = getDesktopEnvironment(import.meta.url);
 const isE2E = process.env.BUKOWSKI_E2E === "1";
@@ -25,6 +25,15 @@ const createAppWindow = () =>
     devServerUrl,
     preloadPath,
     rendererDist,
+  });
+
+const createStartupWindow = () =>
+  createMainWindow({
+    devServerUrl,
+    preloadPath,
+    rendererDist,
+    deferAppLoad: true,
+    showImmediately: true,
   });
 
 const isBukowskiDeepLink = (value: string | undefined) => {
@@ -148,6 +157,7 @@ if (!isE2E) {
       existingWindow.restore();
     }
 
+    existingWindow.show();
     existingWindow.focus();
 
     const deepLink = argv.find(isBukowskiDeepLink);
@@ -180,9 +190,21 @@ app.whenReady().then(() => {
     });
   });
 
-  const localDatabase = initializeLocalDatabase();
+  Menu.setApplicationMenu(buildAppMenu());
+  const mainWindow = createStartupWindow();
+  logger.info("Startup window created before local database initialization.");
+
+  let localDatabase: ReturnType<typeof initializeLocalDatabase>;
+  try {
+    localDatabase = initializeLocalDatabase();
+    logger.info("Local database initialized; loading renderer.");
+  } catch (error) {
+    logger.error("Local database initialization failed before renderer load.", error);
+    throw error;
+  }
   const documentGeneration = createDocumentGenerationService();
   attachProcessRuntimeTelemetry(localDatabase.runtimeDiagnostics);
+  attachWindowRuntimeTelemetry(mainWindow, localDatabase.runtimeDiagnostics);
 
   registerAuthIpc();
   registerAppIpc({
@@ -501,12 +523,20 @@ app.whenReady().then(() => {
     agentMutations: localDatabase.agentMutations,
     runtimeDiagnostics: localDatabase.runtimeDiagnostics,
   });
-  Menu.setApplicationMenu(buildAppMenu());
-  const mainWindow = createAppWindow();
-  attachWindowRuntimeTelemetry(mainWindow, localDatabase.runtimeDiagnostics);
+  void loadMainWindowContent(mainWindow, devServerUrl, rendererDist);
   mainWindow.webContents.once("did-finish-load", flushPendingDeepLinks);
 
   app.on("activate", () => {
+    const existingWindow = BrowserWindow.getAllWindows()[0];
+    if (existingWindow) {
+      if (existingWindow.isMinimized()) {
+        existingWindow.restore();
+      }
+      existingWindow.show();
+      existingWindow.focus();
+      return;
+    }
+
     if (BrowserWindow.getAllWindows().length === 0) {
       const activatedWindow = createAppWindow();
       attachWindowRuntimeTelemetry(activatedWindow, localDatabase.runtimeDiagnostics);

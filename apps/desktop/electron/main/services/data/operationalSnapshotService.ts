@@ -137,6 +137,14 @@ const selectOne = <T extends Record<string, unknown>>(db: DatabaseSync, sql: str
 const selectMany = <T extends Record<string, unknown>>(db: DatabaseSync, sql: string, ...params: SQLInputValue[]) =>
   db.prepare(sql).all(...params) as T[];
 
+const rowExists = (db: DatabaseSync, table: string, id: unknown) => {
+  if (id === null || id === undefined || id === "") return false;
+  const row = db.prepare(`SELECT 1 AS found FROM ${table} WHERE id = ? LIMIT 1`).get(toSqlInputValue(id)) as
+    | { found: number }
+    | undefined;
+  return Boolean(row);
+};
+
 const filterRowToTable = (db: DatabaseSync, table: string, row: Record<string, unknown>) => {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   const columnNames = new Set(columns.map((column) => column.name));
@@ -161,6 +169,27 @@ const upsertRow = (db: DatabaseSync, table: string, row: Record<string, unknown>
         INSERT INTO ${table} (${columns.join(", ")})
         VALUES (${placeholders})
         ON CONFLICT(${conflictColumn}) DO UPDATE SET ${updates || `${conflictColumn} = excluded.${conflictColumn}`}
+      `,
+    )
+    .run(...entries.map(([, value]) => toSqlInputValue(value)));
+};
+
+const upsertRowWithConflict = (db: DatabaseSync, table: string, row: Record<string, unknown>, conflictColumns: string[]) => {
+  const filtered = filterRowToTable(db, table, row);
+  const entries = Object.entries(filtered);
+  if (!entries.length) return;
+
+  const columns = entries.map(([key]) => key);
+  const placeholders = columns.map(() => "?").join(", ");
+  const conflictTarget = conflictColumns.join(", ");
+  const updates = columns.map((column) => `${column} = excluded.${column}`).join(", ");
+
+  db
+    .prepare(
+      `
+        INSERT INTO ${table} (${columns.join(", ")})
+        VALUES (${placeholders})
+        ON CONFLICT(${conflictTarget}) DO UPDATE SET ${updates}
       `,
     )
     .run(...entries.map(([, value]) => toSqlInputValue(value)));
@@ -392,10 +421,31 @@ export const resolveOperationalSnapshot = (
 const applyProjectSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown>) => {
   const project = snapshot.project as Record<string, unknown> | undefined;
   if (!project) throw new Error("Project snapshot is missing project.");
-  upsertRow(db, "projects", project);
+
+  const safeProject = { ...project };
+  if (safeProject.client_id && !rowExists(db, "clients", safeProject.client_id)) {
+    logger.warn("Applied remote project without missing client reference.", { id: safeProject.id, clientId: safeProject.client_id });
+    safeProject.client_id = null;
+  }
+  if (safeProject.production_company_id && !rowExists(db, "production_companies", safeProject.production_company_id)) {
+    logger.warn("Applied remote project without missing production company reference.", {
+      id: safeProject.id,
+      productionCompanyId: safeProject.production_company_id,
+    });
+    safeProject.production_company_id = null;
+  }
+
+  upsertRow(db, "projects", safeProject);
   for (const row of (snapshot.units as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "project_units", row);
   for (const row of (snapshot.unitWindows as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "project_unit_windows", row);
   for (const row of (snapshot.projectDepartments as Record<string, unknown>[] | undefined) ?? []) {
+    if (!rowExists(db, "departments", row.department_id)) {
+      logger.warn("Skipped remote project department because related department is unavailable.", {
+        projectId: row.project_id,
+        departmentId: row.department_id,
+      });
+      continue;
+    }
     db
       .prepare(
         `
@@ -406,6 +456,13 @@ const applyProjectSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown
       .run(toSqlInputValue(row.project_id), toSqlInputValue(row.department_id), toSqlInputValue(row.created_at));
   }
   for (const row of (snapshot.unitDepartments as Record<string, unknown>[] | undefined) ?? []) {
+    if (!rowExists(db, "departments", row.department_id)) {
+      logger.warn("Skipped remote project unit department because related department is unavailable.", {
+        projectUnitId: row.project_unit_id,
+        departmentId: row.department_id,
+      });
+      continue;
+    }
     db
       .prepare(
         `
@@ -427,8 +484,45 @@ const applyProjectSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown
 const applyPackingSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown>) => {
   const slip = snapshot.packingSlip as Record<string, unknown> | undefined;
   if (!slip) throw new Error("Packing snapshot is missing packingSlip.");
-  upsertRow(db, "packing_slips", slip);
-  for (const row of (snapshot.items as Record<string, unknown>[] | undefined) ?? []) upsertRow(db, "packing_slip_items", row);
+  const projectId = slip.project_id;
+  const projectUnitId = slip.project_unit_id;
+  if (projectId && !rowExists(db, "projects", projectId)) {
+    throw new Error(`Packing snapshot references unavailable project ${String(projectId)}.`);
+  }
+  if (projectUnitId && !rowExists(db, "project_units", projectUnitId)) {
+    throw new Error(`Packing snapshot references unavailable project unit ${String(projectUnitId)}.`);
+  }
+
+  const safeSlip = { ...slip };
+  if (safeSlip.department_id && !rowExists(db, "departments", safeSlip.department_id)) {
+    logger.warn("Applied remote packing slip without missing department reference.", {
+      id: safeSlip.id,
+      departmentId: safeSlip.department_id,
+    });
+    safeSlip.department_id = null;
+  }
+  for (const userColumn of ["prepared_by_user_id", "approved_by_user_id", "responsible_user_id"]) {
+    if (safeSlip[userColumn] && !rowExists(db, "users", safeSlip[userColumn])) {
+      logger.warn("Applied remote packing slip without missing user reference.", {
+        id: safeSlip.id,
+        userColumn,
+        userId: safeSlip[userColumn],
+      });
+      safeSlip[userColumn] = userColumn === "prepared_by_user_id" ? "user-ops" : null;
+    }
+  }
+
+  upsertRow(db, "packing_slips", safeSlip);
+  for (const row of (snapshot.items as Record<string, unknown>[] | undefined) ?? []) {
+    if (!rowExists(db, "assets", row.asset_id)) {
+      logger.warn("Skipped remote packing item because related asset is unavailable.", {
+        packingSlipId: row.packing_slip_id,
+        assetId: row.asset_id,
+      });
+      continue;
+    }
+    upsertRowWithConflict(db, "packing_slip_items", row, ["packing_slip_id", "asset_id"]);
+  }
 };
 
 const applyIncidentSnapshot = (db: DatabaseSync, snapshot: Record<string, unknown>) => {
@@ -521,23 +615,22 @@ export const createOperationalSnapshotService = (db: DatabaseSync) => ({
       for (const row of rows) {
         if (row.workspace_id !== workspaceId || row.entity_type !== entityType) continue;
 
-        if (!result.cursorAfter || row.updated_at > result.cursorAfter) {
-          result.cursorAfter = row.updated_at;
-        }
-
         if (hasPendingOutbox(db, workspaceId, entityType, row.entity_id)) {
           result.skippedDueToOutboxCount += 1;
+          result.cursorAfter = row.updated_at;
           continue;
         }
 
         const localUpdatedAt = readLocalUpdatedAt(db, entityType, row.entity_id);
         if (localUpdatedAt && localUpdatedAt >= row.updated_at) {
           result.skippedDueToOlderCount += 1;
+          result.cursorAfter = row.updated_at;
           continue;
         }
 
         try {
           if (row.deleted_at) {
+            result.cursorAfter = row.updated_at;
             continue;
           }
 
@@ -546,6 +639,7 @@ export const createOperationalSnapshotService = (db: DatabaseSync) => ({
           if (entityType === "incident") applyIncidentSnapshot(db, row.snapshot_json);
           if (entityType === "rma_case") applyRmaSnapshot(db, row.snapshot_json);
           result.appliedCount += 1;
+          result.cursorAfter = row.updated_at;
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unknown operational snapshot error.";
           result.errors.push(`${row.entity_id}: ${message}`);

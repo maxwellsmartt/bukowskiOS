@@ -237,6 +237,32 @@ export const AppShell = () => {
   const shellStyle = {
     "--sidebar-width": `${sidebarWidth}px`,
   } as CSSProperties;
+  const isAuthSurface =
+    location.pathname.startsWith("/login") ||
+    location.pathname.startsWith("/workspaces/select") ||
+    location.pathname.startsWith("/workspaces/create");
+
+  if (isAuthSurface) {
+    return (
+      <div className="app-shell app-shell-auth" style={shellStyle}>
+        <WindowTitleBar />
+        <main className="auth-shell-main">
+          <ShellErrorBoundary>
+            <Suspense
+              fallback={
+                <div className="shell-loading-state">
+                  <div className="empty-state">Loading…</div>
+                </div>
+              }
+            >
+              <AppRoutes />
+            </Suspense>
+          </ShellErrorBoundary>
+        </main>
+        <FloatingTooltipLayer />
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell" style={shellStyle}>

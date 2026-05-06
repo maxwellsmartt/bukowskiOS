@@ -162,6 +162,19 @@ const logger = getDesktopLogger("local-database");
 
 const backupMaxAgeMs = 24 * 60 * 60 * 1000;
 
+const runStartupStep = <T>(label: string, step: () => T): T => {
+  const startedAt = Date.now();
+  logger.info(`Startup step started: ${label}.`);
+  try {
+    const result = step();
+    logger.info(`Startup step completed: ${label}.`, { durationMs: Date.now() - startedAt });
+    return result;
+  } catch (error) {
+    logger.error(`Startup step failed: ${label}.`, error);
+    throw error;
+  }
+};
+
 const isSupabaseSyncEnabled = () => {
   const value = process.env.VITE_SUPABASE_SYNC_ENABLED?.trim().toLowerCase();
   return value === "1" || value === "true";
@@ -469,53 +482,77 @@ const createRuntime = (): LocalDatabaseRuntime => {
     profileDatasetEnabled: process.env.BUKOWSKI_PROFILE_DATASET === "1",
   });
   const databaseAlreadyExisted = fs.existsSync(databasePath);
-  const database = withRecoveredDatabase(databasePath, backupPath);
+  const database = runStartupStep("open and verify local database", () => withRecoveredDatabase(databasePath, backupPath));
 
   if (databaseAlreadyExisted && shouldRefreshBackup(backupPath, backupMaxAgeMs)) {
-    createDatabaseBackup(database, backupPath);
+    runStartupStep("refresh startup database backup", () => createDatabaseBackup(database, backupPath));
     logger.info("Refreshed local database backup before migrations.");
   }
 
-  applyTrackedSqlMigrations(database, foundationMigrations);
-  applyTrackedStep(database, "runtime_admin_foundation_v1", () => applyAdminFoundationMigration(database));
-  applyTrackedStep(database, "runtime_scheduling_foundation_v1", () => applySchedulingFoundationMigration(database));
-  applyTrackedStep(database, "runtime_project_creation_wizard_v1", () =>
-    applyProjectCreationWizardFoundationMigration(database),
+  runStartupStep("apply tracked SQL migrations", () => applyTrackedSqlMigrations(database, foundationMigrations));
+  runStartupStep("apply admin foundation migration", () =>
+    applyTrackedStep(database, "runtime_admin_foundation_v1", () => applyAdminFoundationMigration(database)),
   );
-  applyTrackedStep(database, "runtime_project_archive_v1", () => applyProjectArchiveFoundationMigration(database));
-  applyTrackedStep(database, "runtime_project_unit_windows_v1", () => applyProjectUnitWindowsFoundationMigration(database));
-  applyTrackedStep(database, "runtime_project_departments_matrix_v1", () =>
-    applyProjectDepartmentsMatrixFoundationMigration(database),
+  runStartupStep("apply scheduling foundation migration", () =>
+    applyTrackedStep(database, "runtime_scheduling_foundation_v1", () => applySchedulingFoundationMigration(database)),
   );
-  applyTrackedStep(database, "runtime_crew_catalog_foundation_v2", () => applyCrewCatalogFoundationMigration(database));
-  applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database));
-  applyTrackedStep(database, "runtime_connector_foundation_v2", () => applyConnectorFoundationMigration(database));
-  applyTrackedStep(database, "runtime_operational_files_v2", () => applyOperationalFilesMigration(database));
-  seedFoundationData(database);
-  bootstrapAIGatewayFoundation(database);
-  bootstrapConnectorFoundation(database);
-  ensureProjectShellDefaults(database);
-  bootstrapLegacyRentmanDemo(database);
-  applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database));
-  applyTrackedStep(database, "runtime_asset_valuation_foundation_v1", () => applyAssetValuationFoundationMigration(database));
-  bootstrapAdminFoundation(database, { cleanupDemoPlaceholders: true });
-  bootstrapSchedulingFoundation(database);
+  runStartupStep("apply project creation wizard migration", () =>
+    applyTrackedStep(database, "runtime_project_creation_wizard_v1", () =>
+      applyProjectCreationWizardFoundationMigration(database),
+    ),
+  );
+  runStartupStep("apply project archive migration", () =>
+    applyTrackedStep(database, "runtime_project_archive_v1", () => applyProjectArchiveFoundationMigration(database)),
+  );
+  runStartupStep("apply project unit windows migration", () =>
+    applyTrackedStep(database, "runtime_project_unit_windows_v1", () => applyProjectUnitWindowsFoundationMigration(database)),
+  );
+  runStartupStep("apply project departments matrix migration", () =>
+    applyTrackedStep(database, "runtime_project_departments_matrix_v1", () =>
+      applyProjectDepartmentsMatrixFoundationMigration(database),
+    ),
+  );
+  runStartupStep("apply crew catalog foundation migration", () =>
+    applyTrackedStep(database, "runtime_crew_catalog_foundation_v2", () => applyCrewCatalogFoundationMigration(database)),
+  );
+  runStartupStep("apply AI gateway foundation migration", () =>
+    applyTrackedStep(database, "runtime_ai_gateway_foundation_v2", () => applyAIGatewayFoundationMigration(database)),
+  );
+  runStartupStep("apply connector foundation migration", () =>
+    applyTrackedStep(database, "runtime_connector_foundation_v2", () => applyConnectorFoundationMigration(database)),
+  );
+  runStartupStep("apply operational files migration", () =>
+    applyTrackedStep(database, "runtime_operational_files_v2", () => applyOperationalFilesMigration(database)),
+  );
+  runStartupStep("seed foundation data", () => seedFoundationData(database));
+  runStartupStep("bootstrap AI gateway foundation", () => bootstrapAIGatewayFoundation(database));
+  runStartupStep("bootstrap connector foundation", () => bootstrapConnectorFoundation(database));
+  runStartupStep("ensure project shell defaults", () => ensureProjectShellDefaults(database));
+  runStartupStep("bootstrap legacy Rentman demo", () => bootstrapLegacyRentmanDemo(database));
+  runStartupStep("apply asset quantity foundation migration", () =>
+    applyTrackedStep(database, "runtime_asset_quantity_foundation_v1", () => applyAssetQuantityFoundationMigration(database)),
+  );
+  runStartupStep("apply asset valuation foundation migration", () =>
+    applyTrackedStep(database, "runtime_asset_valuation_foundation_v1", () => applyAssetValuationFoundationMigration(database)),
+  );
+  runStartupStep("bootstrap admin foundation", () => bootstrapAdminFoundation(database, { cleanupDemoPlaceholders: true }));
+  runStartupStep("bootstrap scheduling foundation", () => bootstrapSchedulingFoundation(database));
   if (process.env.BUKOWSKI_PROFILE_DATASET === "1") {
-    seedPerformanceFoundationData(database);
+    runStartupStep("seed performance dataset", () => seedPerformanceFoundationData(database));
     logger.info("Seeded heavy performance dataset.");
   } else {
-    const cleanedRows = cleanupPerformanceFoundationData(database);
+    const cleanedRows = runStartupStep("cleanup performance dataset", () => cleanupPerformanceFoundationData(database));
 
     if (cleanedRows > 0) {
       logger.info("Removed synthetic performance dataset from the local workspace.", { cleanedRows });
     }
   }
-  runIntegrityChecks(database);
+  runStartupStep("run post-migration integrity checks", () => runIntegrityChecks(database));
   lastIntegrityCheckAt = new Date().toISOString();
   lastIntegrityCheckStatus = "healthy";
 
   if (!databaseAlreadyExisted || shouldRefreshBackup(backupPath, backupMaxAgeMs)) {
-    createDatabaseBackup(database, backupPath);
+    runStartupStep("create startup database backup", () => createDatabaseBackup(database, backupPath));
     logger.info("Created startup backup for local database.");
   }
 
@@ -606,8 +643,13 @@ const createRuntime = (): LocalDatabaseRuntime => {
     );
     const ensureCommandActorUser = database.prepare(
       `
-        INSERT OR IGNORE INTO users (id, full_name, email, phone, is_active, created_at, updated_at)
-        VALUES ('user-ops', 'Ops Repair', 'ops@metadata.cine', '+1 809 555 0199', 1, ?, ?)
+        INSERT INTO users (id, full_name, email, phone, is_active, created_at, updated_at)
+        VALUES ('user-ops', 'AI Agent', 'ai-agent@bukowskios.local', '', 1, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          full_name = 'AI Agent',
+          email = 'ai-agent@bukowskios.local',
+          is_active = 1,
+          updated_at = excluded.updated_at
       `,
     );
     const ensureCommandActorMembership = database.prepare(

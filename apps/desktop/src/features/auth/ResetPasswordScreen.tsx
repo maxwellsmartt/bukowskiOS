@@ -1,12 +1,13 @@
 import { KeyRound } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 export const ResetPasswordScreen = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { authError, isPasswordRecovery, updatePassword } = useSession();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -14,12 +15,18 @@ export const ResetPasswordScreen = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  const isFirstLogin = searchParams.get("mode") === "first-login";
 
   return (
     <div className="auth-screen">
       <section className="auth-panel" aria-labelledby="reset-password-title">
-        <p className="auth-eyebrow">Password reset</p>
-        <h1 id="reset-password-title">Set a new password</h1>
+        <p className="auth-eyebrow">{isFirstLogin ? "First login" : "Password reset"}</p>
+        <h1 id="reset-password-title">{isFirstLogin ? "Create your password" : "Set a new password"}</h1>
+        <p className="auth-lede">
+          {isFirstLogin
+            ? "Add a password so you can sign in quickly next time. You can still use magic links whenever needed."
+            : "Choose a new password for your bukowskiOS account."}
+        </p>
         <form
           className="auth-form"
           onSubmit={(event) => {
@@ -39,7 +46,7 @@ export const ResetPasswordScreen = () => {
             setStatus(null);
             void updatePassword(password)
               .then(() => {
-                setStatus("Password updated. You can sign in with the new password now.");
+                setStatus("Password updated. Opening your workspaces…");
                 navigate("/workspaces/select", { replace: true });
               })
               .catch((error: unknown) => {
@@ -49,7 +56,7 @@ export const ResetPasswordScreen = () => {
           }}
         >
           {!isPasswordRecovery ? (
-            <p className="auth-status">Open the recovery link from your email first, then return here to set the new password.</p>
+            <p className="auth-status">Open the secure email link first, then return here to set the password.</p>
           ) : null}
           <label className="auth-field">
             <span>New password</span>

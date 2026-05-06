@@ -1,4 +1,5 @@
 import { BrowserWindow, shell } from "electron";
+import fs from "node:fs";
 import path from "node:path";
 
 import { assertAllowedExternalUrl } from "../security/securityConfig";
@@ -8,15 +9,164 @@ type CreateMainWindowOptions = {
   devServerUrl?: string;
   preloadPath: string;
   rendererDist: string;
+  deferAppLoad?: boolean;
+  showImmediately?: boolean;
 };
 
-export const createMainWindow = ({
-  devServerUrl,
-  preloadPath,
-  rendererDist,
-}: CreateMainWindowOptions) => {
+export const loadMainWindowContent = (window: BrowserWindow, devServerUrl: string | undefined, rendererDist: string) => {
+  if (devServerUrl) {
+    return window.loadURL(devServerUrl);
+  }
+
+  return window.loadFile(path.join(rendererDist, "index.html"));
+};
+
+const escapeHtmlAttribute = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+
+const readStartupLogoDataUrl = () => {
+  const candidates = [
+    path.join(process.resourcesPath, "startup-logo.png"),
+    path.join(process.cwd(), "src/shared/assets/inbox/logos/bukowskiOS-desktop-logo.png"),
+    path.join(process.cwd(), "apps/desktop/src/shared/assets/inbox/logos/bukowskiOS-desktop-logo.png"),
+  ];
+  const logoPath = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!logoPath) return null;
+
+  try {
+    return `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
+  } catch {
+    return null;
+  }
+};
+
+const createStartupHtml = () => {
+  const logoDataUrl = readStartupLogoDataUrl();
+  const logoMarkup = logoDataUrl
+    ? `<img class="logo" src="${escapeHtmlAttribute(logoDataUrl)}" alt="bukowskiOS" />`
+    : `<div class="mark">b</div>`;
+
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root { color-scheme: dark; }
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background:
+          radial-gradient(circle at 50% 38%, rgba(255,255,255,0.08), transparent 30%),
+          #050607;
+        color: #f4f7fb;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+        overflow: hidden;
+      }
+      body {
+        display: grid;
+        place-items: center;
+      }
+      .shell {
+        display: grid;
+        gap: 12px;
+        width: min(360px, calc(100vw - 56px));
+        text-align: center;
+        justify-items: center;
+      }
+      .mark {
+        width: 68px;
+        height: 68px;
+        margin: 0 auto 8px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.12);
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        font-size: 28px;
+      }
+      .logo {
+        width: 76px;
+        height: 76px;
+        object-fit: contain;
+        filter: drop-shadow(0 18px 36px rgba(0,0,0,0.55));
+      }
+      .title {
+        margin-top: 4px;
+        font-size: 17px;
+        font-weight: 750;
+        letter-spacing: 0;
+      }
+      .copy {
+        min-height: 18px;
+        font-size: 13px;
+        color: rgba(244,247,251,0.62);
+      }
+      .progress {
+        position: relative;
+        width: min(248px, 70vw);
+        height: 5px;
+        margin-top: 8px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.09);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+      }
+      .progress::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        width: 42%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, rgba(154,183,229,0), rgba(154,183,229,0.95), rgba(154,183,229,0));
+        animation: loading 1.25s ease-in-out infinite;
+      }
+      .hint {
+        max-width: 300px;
+        margin-top: 2px;
+        font-size: 11px;
+        line-height: 1.5;
+        color: rgba(244,247,251,0.38);
+      }
+      @keyframes loading {
+        0% { transform: translateX(-110%); }
+        100% { transform: translateX(245%); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .progress::before { animation: none; width: 100%; opacity: 0.55; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      ${logoMarkup}
+      <div class="title">Starting bukowskiOS</div>
+      <div class="copy" id="startup-copy">Preparing local workspace data...</div>
+      <div class="progress" aria-label="Loading"></div>
+      <div class="hint">First launch can take a little longer while the local database is prepared.</div>
+    </main>
+    <script>
+      const messages = [
+        "Preparing local workspace data...",
+        "Checking local database health...",
+        "Loading workspace tools...",
+        "Almost ready..."
+      ];
+      let index = 0;
+      window.setInterval(() => {
+        index = (index + 1) % messages.length;
+        const copy = document.getElementById("startup-copy");
+        if (copy) copy.textContent = messages[index];
+      }, 2800);
+    </script>
+  </body>
+</html>`;
+};
+
+export const createMainWindow = ({ devServerUrl, preloadPath, rendererDist, deferAppLoad, showImmediately }: CreateMainWindowOptions) => {
   const savedWindowState = readWindowState();
   const fallbackBounds = getDefaultWindowBounds();
+  let didShowWindow = false;
   const window = new BrowserWindow({
     width: savedWindowState?.bounds.width ?? fallbackBounds.width,
     height: savedWindowState?.bounds.height ?? fallbackBounds.height,
@@ -43,10 +193,10 @@ export const createMainWindow = ({
   });
   bindWindowStatePersistence(window);
 
-  if (devServerUrl) {
-    window.loadURL(devServerUrl);
+  if (deferAppLoad) {
+    void window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(createStartupHtml())}`);
   } else {
-    window.loadFile(path.join(rendererDist, "index.html"));
+    void loadMainWindowContent(window, devServerUrl, rendererDist);
   }
 
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -60,12 +210,28 @@ export const createMainWindow = ({
     return { action: "deny" };
   });
 
-  window.once("ready-to-show", () => {
+  const showWindow = () => {
+    if (didShowWindow || window.isDestroyed()) {
+      return;
+    }
+
+    didShowWindow = true;
     if (savedWindowState?.isMaximized) {
       window.maximize();
     }
     window.show();
-  });
+    window.focus();
+  };
+
+  window.once("ready-to-show", showWindow);
+
+  const fallbackShowTimeout = setTimeout(showWindow, 2500);
+  fallbackShowTimeout.unref?.();
+  window.once("closed", () => clearTimeout(fallbackShowTimeout));
+
+  if (showImmediately) {
+    showWindow();
+  }
 
   return window;
 };

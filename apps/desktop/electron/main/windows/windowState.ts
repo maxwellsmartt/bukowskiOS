@@ -1,4 +1,4 @@
-import { app, type BrowserWindow, type Rectangle } from "electron";
+import { app, screen, type BrowserWindow, type Rectangle } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -34,12 +34,23 @@ const isValidBounds = (value: unknown): value is Rectangle => {
   );
 };
 
+const intersectsDisplay = (bounds: Rectangle) =>
+  screen.getAllDisplays().some((display) => {
+    const area = display.workArea;
+    return (
+      bounds.x < area.x + area.width &&
+      bounds.x + bounds.width > area.x &&
+      bounds.y < area.y + area.height &&
+      bounds.y + bounds.height > area.y
+    );
+  });
+
 export const readWindowState = (): PersistedWindowState | null => {
   try {
     const rawValue = fs.readFileSync(stateFilePath(), "utf8");
     const parsedValue = JSON.parse(rawValue) as Partial<PersistedWindowState>;
 
-    if (!isValidBounds(parsedValue.bounds)) {
+    if (!isValidBounds(parsedValue.bounds) || !intersectsDisplay(parsedValue.bounds)) {
       return null;
     }
 

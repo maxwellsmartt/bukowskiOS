@@ -24,6 +24,29 @@ export type BukowskiDatabase = {
         };
         Update: Partial<BukowskiDatabase["public"]["Tables"]["workspaces"]["Insert"]>;
       };
+      user_profiles: {
+        Row: {
+          user_id: string;
+          email: string | null;
+          full_name: string | null;
+          phone: string | null;
+          avatar_url: string | null;
+          preferences_json: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          email?: string | null;
+          full_name?: string | null;
+          phone?: string | null;
+          avatar_url?: string | null;
+          preferences_json?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<BukowskiDatabase["public"]["Tables"]["user_profiles"]["Insert"]>;
+      };
       workspace_memberships: {
         Row: {
           id: string;

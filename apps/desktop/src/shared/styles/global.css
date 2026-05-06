@@ -1083,9 +1083,10 @@ button:disabled {
   min-height: 100%;
   display: grid;
   place-items: center;
-  padding: 48px 24px;
+  padding: 56px 24px;
   background: transparent;
   isolation: isolate;
+  overflow: hidden;
 }
 
 .auth-screen::before {
@@ -1094,10 +1095,9 @@ button:disabled {
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(circle at 18% 20%, rgba(214, 179, 122, 0.1), transparent 45%),
-    radial-gradient(circle at 82% 78%, rgba(126, 183, 178, 0.08), transparent 50%),
-    radial-gradient(circle at 50% 110%, rgba(159, 178, 199, 0.06), transparent 55%),
-    var(--bg-app);
+    radial-gradient(circle at 20% 18%, rgba(142, 174, 214, 0.13), transparent 34%),
+    radial-gradient(circle at 76% 74%, rgba(214, 179, 122, 0.1), transparent 42%),
+    linear-gradient(145deg, #050607 0%, #0b0d10 46%, #090a0c 100%);
 }
 
 .auth-screen::after {
@@ -1107,7 +1107,12 @@ button:disabled {
   z-index: -1;
   backdrop-filter: blur(var(--blur-lg)) saturate(1.1);
   -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.1);
-  background: rgba(14, 16, 18, 0.32);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    rgba(3, 4, 5, 0.5);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle at center, black 0%, transparent 78%);
 }
 
 .auth-panel,
@@ -1115,15 +1120,48 @@ button:disabled {
   width: min(100%, 420px);
   display: grid;
   gap: 18px;
-  padding: 28px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
+  padding: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 22px;
   background:
-    linear-gradient(165deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)),
-    rgba(21, 24, 28, 0.92);
-  box-shadow: var(--shadow-modal);
-  backdrop-filter: blur(var(--blur-md));
+    linear-gradient(165deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015)),
+    rgba(12, 14, 17, 0.86);
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(24px) saturate(1.12);
   animation: auth-panel-in 280ms ease-out;
+}
+
+.auth-shell-main {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell-auth .window-title-bar {
+  border-bottom-color: transparent;
+  background: transparent;
+}
+
+.auth-ambient-panel {
+  position: absolute;
+  inset: auto auto 7% 7%;
+  display: grid;
+  gap: 10px;
+  width: 220px;
+  pointer-events: none;
+  opacity: 0.52;
+}
+
+.auth-ambient-panel span {
+  display: inline-flex;
+  width: max-content;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
 }
 
 @keyframes auth-panel-in {
@@ -1169,6 +1207,20 @@ button:disabled {
   font-size: 14px;
 }
 
+.auth-brand-logo {
+  width: 38px;
+  height: 38px;
+  padding: 7px;
+  background: rgba(255, 255, 255, 0.075);
+  color: var(--text-primary);
+}
+
+.auth-brand-logo img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
 .auth-eyebrow,
 .auth-field span {
   margin: 0;
@@ -1185,6 +1237,13 @@ button:disabled {
   color: var(--text-primary);
   font-size: 26px;
   line-height: 1.15;
+}
+
+.auth-lede {
+  margin: -6px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .auth-form,
@@ -1227,14 +1286,15 @@ button:disabled {
 }
 
 .auth-primary-button {
-  background: var(--accent-info);
-  color: var(--text-on-accent);
+  background: linear-gradient(180deg, rgba(148, 184, 230, 0.98), rgba(105, 141, 188, 0.98));
+  color: #071019;
   border-color: transparent;
+  box-shadow: 0 10px 24px rgba(65, 115, 180, 0.18);
 }
 
 .auth-secondary-button,
 .workspace-switcher-footer button {
-  background: var(--bg-elevated);
+  background: rgba(255, 255, 255, 0.045);
   color: var(--text-primary);
 }
 
@@ -10831,10 +10891,30 @@ select.field-input {
   box-shadow: var(--shadow-elevated);
 }
 
+.invite-member-dialog {
+  width: min(620px, calc(100vw - 48px));
+  gap: 0;
+  padding: 0;
+  border-color: rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008) 42%),
+    rgba(12, 14, 17, 0.98);
+  overflow: hidden;
+}
+
 .confirm-dialog-header {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+}
+
+.invite-member-dialog-header {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 30px;
+  align-items: start;
+  gap: 14px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
 }
 
 .confirm-dialog-icon {
@@ -10847,6 +10927,11 @@ select.field-input {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-secondary);
   flex-shrink: 0;
+}
+
+.invite-member-dialog-icon {
+  background: rgba(120, 160, 220, 0.11);
+  color: rgba(187, 211, 255, 0.92);
 }
 
 .confirm-dialog-icon-danger {
@@ -10869,6 +10954,47 @@ select.field-input {
   margin: 0;
   color: var(--text-secondary);
   line-height: 1.5;
+}
+
+.invite-member-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(210px, 0.92fr);
+  align-items: start;
+  gap: 16px;
+  padding: 18px 20px 20px;
+}
+
+.invite-member-email,
+.invite-member-role,
+.invite-member-note {
+  min-width: 0;
+}
+
+.invite-member-note {
+  grid-column: 1 / -1;
+}
+
+.invite-member-input,
+.invite-member-textarea {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.invite-member-input,
+.invite-member-role .field-input {
+  height: 44px;
+}
+
+.invite-member-textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.invite-member-actions {
+  align-items: center;
+  justify-content: flex-end;
+  padding: 16px 20px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.012);
 }
 
 .confirm-dialog-actions {
@@ -11101,12 +11227,22 @@ select.field-input {
   color: var(--accent-positive, #6fb98c);
 }
 
+.field-hint-info {
+  color: rgba(150, 186, 255, 0.92);
+}
+
 .field-hint-error {
   color: var(--accent-critical, #d36864);
 }
 
 .field-hint-warning {
   color: var(--accent-warning, #d6b37a);
+}
+
+@media (max-width: 640px) {
+  .invite-member-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .field-input-inline {

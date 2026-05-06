@@ -58,6 +58,147 @@ const resolveMembershipLabel = (status: AppUserAdminRow["membershipStatus"]) => 
   return "Not in workspace";
 };
 
+const toPermissionKeys = (rolePermissions: unknown) =>
+  Array.from(
+    new Set(
+      (Array.isArray(rolePermissions) ? rolePermissions : [])
+        .map((entry) => {
+          const typed = entry as { permissions?: { key?: unknown } | null };
+          return typeof typed.permissions?.key === "string" ? typed.permissions.key : null;
+        })
+        .filter((key): key is string => Boolean(key)),
+    ),
+  ).sort((left, right) => left.localeCompare(right));
+
+const loadRemoteUsersSnapshot = async (
+  supabase: NonNullable<ReturnType<typeof useSession>["supabase"]>,
+  workspaceId: string,
+): Promise<AppUsersSnapshot> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const looseSupabase = supabase as any;
+  const { data: rolesData, error: rolesError } = await looseSupabase
+    .from("roles")
+    .select("id,key,name,description,is_system_role,role_permissions(permissions(key))")
+    .eq("workspace_id", workspaceId)
+    .order("name", { ascending: true });
+
+  if (rolesError) {
+    throw rolesError;
+  }
+
+  const { data: membershipsData, error: membershipsError } = await looseSupabase
+    .from("workspace_memberships")
+    .select("id,user_id,status,role_id,roles(key,name,role_permissions(permissions(key)))")
+    .eq("workspace_id", workspaceId)
+    .in("status", ["active", "inactive", "invited"]);
+
+  if (membershipsError) {
+    throw membershipsError;
+  }
+
+  const userIds = Array.from(
+    new Set(
+      ((membershipsData ?? []) as Array<{ user_id?: string | null }>)
+        .map((row) => row.user_id)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  const profilesByUserId = new Map<string, { email: string; fullName: string; phone: string }>();
+
+  if (userIds.length > 0) {
+    const { data: profilesData, error: profilesError } = await looseSupabase
+      .from("user_profiles")
+      .select("user_id,email,full_name,phone")
+      .in("user_id", userIds);
+
+    if (profilesError) {
+      throw profilesError;
+    }
+
+    for (const profile of (profilesData ?? []) as Array<{
+      user_id?: string | null;
+      email?: string | null;
+      full_name?: string | null;
+      phone?: string | null;
+    }>) {
+      if (!profile.user_id) {
+        continue;
+      }
+
+      profilesByUserId.set(profile.user_id, {
+        email: profile.email ?? "",
+        fullName: profile.full_name ?? profile.email ?? "Workspace member",
+        phone: profile.phone ?? "",
+      });
+    }
+  }
+
+  const assignedCounts = new Map<string, number>();
+  for (const membership of (membershipsData ?? []) as Array<{ role_id?: string | null }>) {
+    if (membership.role_id) {
+      assignedCounts.set(membership.role_id, (assignedCounts.get(membership.role_id) ?? 0) + 1);
+    }
+  }
+
+  const roles = ((rolesData ?? []) as Array<{
+    id: string;
+    key: string;
+    name: string;
+    description?: string | null;
+    is_system_role?: boolean | null;
+    role_permissions?: unknown;
+  }>).map((role) => ({
+    id: role.id,
+    key: role.key,
+    name: role.name,
+    description: role.description ?? "",
+    isSystemRole: Boolean(role.is_system_role),
+    permissionKeys: toPermissionKeys(role.role_permissions),
+    assignedUserCount: assignedCounts.get(role.id) ?? 0,
+  }));
+
+  const users = ((membershipsData ?? []) as Array<{
+    user_id: string;
+    status: "active" | "inactive" | "invited";
+    role_id: string | null;
+    roles?: {
+      key?: string | null;
+      name?: string | null;
+      role_permissions?: unknown;
+    } | null;
+  }>).map((membership) => {
+    const profile = profilesByUserId.get(membership.user_id);
+    const membershipStatus =
+      membership.status === "active" || membership.status === "inactive" ? membership.status : "missing";
+
+    return {
+      id: membership.user_id,
+      fullName: profile?.fullName ?? "Workspace member",
+      email: profile?.email ?? "",
+      phone: profile?.phone ?? "",
+      isActive: membership.status === "active",
+      membershipStatus,
+      roleId: membership.role_id,
+      roleKey: membership.roles?.key ?? null,
+      roleName: membership.roles?.name ?? null,
+      permissionKeys: toPermissionKeys(membership.roles?.role_permissions),
+      linkedCrewId: null,
+      linkedCrewLabel: null,
+      telegramAccountId: null,
+      telegramLinkStatus: "none" as const,
+      telegramDisplayName: null,
+      telegramUsername: null,
+      telegramExternalUserId: null,
+      telegramLinkedAt: null,
+      telegramLastSeenAt: null,
+      readyForTelegram: membership.status === "active" && Boolean(membership.role_id),
+    } satisfies AppUserAdminRow;
+  });
+
+  return { roles, users };
+};
+
 type WorkspaceDisclosureProps = {
   children: ReactNode;
   defaultOpen?: boolean;
@@ -151,6 +292,17 @@ export const WorkspaceSettingsPage = () => {
   }, [activeWorkspaceId, isLocalFallback, supabase]);
 
   const loadMembers = useCallback(async () => {
+    if (supabase && !isLocalFallback) {
+      try {
+        const next = await loadRemoteUsersSnapshot(supabase, activeWorkspaceId);
+        setUsersSnapshot(next);
+        setError(null);
+      } catch (nextError) {
+        setError(getUserFacingErrorMessage(nextError, "Could not load remote workspace members."));
+      }
+      return;
+    }
+
     if (!window.bukowskiApp) {
       return;
     }
@@ -162,7 +314,7 @@ export const WorkspaceSettingsPage = () => {
     } catch (nextError) {
       setError(getUserFacingErrorMessage(nextError, "Could not load workspace members."));
     }
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, isLocalFallback, supabase]);
 
   const loadWorkspaceProfile = useCallback(async () => {
     if (!supabase || isLocalFallback || !activeWorkspaceId) {

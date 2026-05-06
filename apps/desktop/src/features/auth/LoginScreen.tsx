@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
+import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.png";
+import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 export const LoginScreen = () => {
@@ -35,14 +37,23 @@ export const LoginScreen = () => {
 
   return (
     <div className="auth-screen">
+      <div className="auth-ambient-panel" aria-hidden="true">
+        <span>Inventory</span>
+        <span>Projects</span>
+        <span>Sync</span>
+        <span>Agents</span>
+      </div>
       <section className="auth-panel" aria-labelledby="login-title">
         <div className="auth-brand">
-          <span className="auth-brand-mark">B</span>
+          <span className="auth-brand-mark auth-brand-logo">
+            <img src={brandLogoWhite1x} srcSet={`${brandLogoWhite1x} 1x, ${brandLogoWhite} 2x`} alt="" />
+          </span>
           <div>
             <p className="auth-eyebrow">bukowskiOS</p>
-            <h1 id="login-title">Sign in</h1>
+            <h1 id="login-title">Welcome back</h1>
           </div>
         </div>
+        <p className="auth-lede">Sign in to your production workspace, sync inventory, and keep operations moving.</p>
 
         <form
           className="auth-form"

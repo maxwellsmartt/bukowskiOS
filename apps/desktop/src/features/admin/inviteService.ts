@@ -25,7 +25,7 @@ const readFunctionErrorMessage = async (response: Response) => {
 export const sendWorkspaceInvite = async (
   supabase: SupabaseClient,
   input: SendWorkspaceInviteInput,
-): Promise<{ userId: string }> => {
+): Promise<{ alreadyRegistered: boolean; magicLinkSent: boolean; membershipStatus: "active" | "invited"; warning: string | null; userId: string }> => {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   const accessToken = sessionData.session?.access_token;
 
@@ -63,12 +63,24 @@ export const sendWorkspaceInvite = async (
     throw new Error(`Invite failed (${response.status}): ${detail}`);
   }
 
-  const payload = (await response.json()) as { userId?: string };
+  const payload = (await response.json()) as {
+    alreadyRegistered?: boolean;
+    magicLinkSent?: boolean;
+    membershipStatus?: "active" | "invited";
+    userId?: string;
+    warning?: string;
+  };
   if (!payload.userId) {
     throw new Error("Invite was sent but the response did not include a user id.");
   }
 
-  return { userId: payload.userId };
+  return {
+    alreadyRegistered: Boolean(payload.alreadyRegistered),
+    magicLinkSent: payload.magicLinkSent !== false,
+    membershipStatus: payload.membershipStatus ?? "invited",
+    warning: payload.warning ?? null,
+    userId: payload.userId,
+  };
 };
 
 export type RevokeWorkspaceInviteInput = {

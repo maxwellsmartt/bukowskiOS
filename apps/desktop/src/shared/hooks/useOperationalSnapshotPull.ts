@@ -7,6 +7,7 @@ import type { AppRemoteOperationalSnapshotRow, OperationalSnapshotEntityType } f
 const POLL_INTERVAL_MS = 60_000;
 const PULL_BATCH_SIZE = 100;
 const MAX_BATCHES_PER_ENTITY = 3;
+const CURSOR_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
 
 const entityTypes: OperationalSnapshotEntityType[] = ["project", "packing_slip", "incident", "rma_case"];
 
@@ -31,6 +32,13 @@ const writeCursor = (key: string, value: string | null) => {
   } catch {
     // Ignore storage errors; pull remains idempotent and can retry from an older cursor.
   }
+};
+
+const getCursorWithLookback = (cursor: string | null) => {
+  if (!cursor) return null;
+  const time = Date.parse(cursor);
+  if (Number.isNaN(time)) return cursor;
+  return new Date(Math.max(0, time - CURSOR_LOOKBACK_MS)).toISOString();
 };
 
 const mapSnapshot = (row: Record<string, unknown>): AppRemoteOperationalSnapshotRow => ({
@@ -82,7 +90,7 @@ export const useOperationalSnapshotPull = () => {
               .limit(PULL_BATCH_SIZE);
 
             if (cursor) {
-              query = query.gt("updated_at", cursor);
+              query = query.gte("updated_at", getCursorWithLookback(cursor) ?? cursor);
             }
 
             const { data, error } = await query;

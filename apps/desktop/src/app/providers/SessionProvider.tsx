@@ -452,11 +452,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         const flow = parsedUrl.searchParams.get("flow");
         const type = parsedUrl.searchParams.get("type");
         const isRecoveryFlow = flow === "password-recovery" || type === "recovery";
+        const isFirstLoginFlow = flow === "first-login";
         const isInviteFlow = flow === "invite" || parsedUrl.pathname === "/accept-invite";
         const workspaceId = parsedUrl.searchParams.get("workspace_id") ?? parsedUrl.searchParams.get("workspaceId");
 
         if (!code) {
-          return isRecoveryFlow ? "/login/reset-password" : "/workspaces/select";
+          return isRecoveryFlow || isFirstLoginFlow || isInviteFlow ? "/login/reset-password?mode=first-login" : "/workspaces/select";
         }
 
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
@@ -479,8 +480,8 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
           window.dispatchEvent(new CustomEvent("bukowski:workspace-memberships-changed"));
         }
 
-        setIsPasswordRecovery(isRecoveryFlow);
-        return isRecoveryFlow ? "/login/reset-password" : "/workspaces/select";
+        setIsPasswordRecovery(isRecoveryFlow || isFirstLoginFlow || isInviteFlow);
+        return isRecoveryFlow || isFirstLoginFlow || isInviteFlow ? "/login/reset-password?mode=first-login" : "/workspaces/select";
       } catch (error) {
         setAuthError(getUserFacingErrorMessage(error, "The auth callback could not be processed."));
         throw error;

@@ -13,7 +13,7 @@ type SupabaseAuthUser = {
 
 const allowedOrigins = [/^https?:\/\/localhost(?::\d+)?$/, /^https?:\/\/127\.0\.0\.1(?::\d+)?$/];
 
-const adminPermissions = [
+const operationalPermissions = [
   { key: "projects.read", label: "Read projects", description: "View project registry, details and schedule" },
   { key: "projects.manage", label: "Manage projects", description: "Create, edit and archive projects" },
   { key: "assets.read", label: "Read assets", description: "View asset registry and current state" },
@@ -26,6 +26,55 @@ const adminPermissions = [
   { key: "rma.read", label: "Read RMAs", description: "Review RMA queues and manufacturer cases" },
   { key: "rma.create", label: "Create RMAs", description: "Open or prepare new RMA cases" },
   { key: "users.invite", label: "Invite users", description: "Invite a teammate to join a workspace by email." },
+];
+
+const operationalRoles = [
+  {
+    key: "admin",
+    name: "Admin",
+    description: "Full access to settings, team, assets, projects and finance.",
+    isSystemRole: true,
+    permissionKeys: operationalPermissions.map((permission) => permission.key),
+  },
+  {
+    key: "crew",
+    name: "Crew",
+    description: "Daily crew access for assigned gear, packing context and incident reports.",
+    isSystemRole: false,
+    permissionKeys: ["projects.read", "assets.read", "incidents.read", "incidents.create", "packing-slips.read"],
+  },
+  {
+    key: "supervisor",
+    name: "Supervisor",
+    description: "Coordinate projects, assets, incidents, RMAs and packing slips.",
+    isSystemRole: false,
+    permissionKeys: [
+      "projects.read",
+      "projects.manage",
+      "assets.read",
+      "assets.manage",
+      "incidents.read",
+      "incidents.create",
+      "packing-slips.read",
+      "packing-slips.create",
+      "rma.read",
+      "rma.create",
+    ],
+  },
+  {
+    key: "finance_viewer",
+    name: "Finance Viewer",
+    description: "Review finance status without edit access.",
+    isSystemRole: false,
+    permissionKeys: ["finance.read"],
+  },
+  {
+    key: "maintenance",
+    name: "Maintenance",
+    description: "Handle incidents, repairs and RMA follow-up.",
+    isSystemRole: false,
+    permissionKeys: ["assets.read", "incidents.read", "incidents.create", "rma.read", "rma.create"],
+  },
 ];
 
 const corsHeaders = (request: Request) => {
@@ -125,32 +174,31 @@ Deno.serve(async (request) => {
     return json(request, { error: workspaceError?.message ?? "workspace_create_failed" }, 400);
   }
 
-  const { data: adminRole, error: roleError } = await adminClient
+  const { data: roles, error: roleError } = await adminClient
     .from("roles")
     .upsert(
-      {
+      operationalRoles.map((role) => ({
         workspace_id: workspace.id,
-        key: "admin",
-        name: "Admin",
-        description: "System admin role. Clone to customize.",
-        is_system_role: true,
+        key: role.key,
+        name: role.name,
+        description: role.description,
+        is_system_role: role.isSystemRole,
         updated_at: now,
-      },
+      })),
       {
         onConflict: "workspace_id,key",
         ignoreDuplicates: false,
       },
     )
-    .select("id")
-    .single();
+    .select("id,key");
 
-  if (roleError || !adminRole) {
+  if (roleError || !roles) {
     return json(request, { error: roleError?.message ?? "role_create_failed" }, 400);
   }
 
   const { data: permissions, error: permissionsError } = await adminClient
     .from("permissions")
-    .upsert(adminPermissions, {
+    .upsert(operationalPermissions, {
       onConflict: "key",
       ignoreDuplicates: false,
     })
@@ -160,11 +208,25 @@ Deno.serve(async (request) => {
     return json(request, { error: permissionsError?.message ?? "permissions_create_failed" }, 400);
   }
 
+  const permissionByKey = new Map(permissions.map((permission) => [permission.key, permission.id]));
+  const roleByKey = new Map(((roles ?? []) as Array<{ id: string; key: string }>).map((role) => [role.key, role.id]));
+  const rolePermissionRows = operationalRoles.flatMap((role) => {
+    const roleId = roleByKey.get(role.key);
+
+    if (!roleId) {
+      return [];
+    }
+
+    return role.permissionKeys
+      .map((permissionKey) => {
+        const permissionId = permissionByKey.get(permissionKey);
+        return permissionId ? { role_id: roleId, permission_id: permissionId } : null;
+      })
+      .filter((row): row is { role_id: string; permission_id: string } => Boolean(row));
+  });
+
   const { error: rolePermissionsError } = await adminClient.from("role_permissions").upsert(
-    permissions.map((permission) => ({
-      role_id: adminRole.id,
-      permission_id: permission.id,
-    })),
+    rolePermissionRows,
     {
       onConflict: "role_id,permission_id",
       ignoreDuplicates: true,
@@ -178,7 +240,7 @@ Deno.serve(async (request) => {
   const { error: membershipError } = await adminClient.from("workspace_memberships").upsert({
     workspace_id: workspace.id,
     user_id: caller.user.id,
-    role_id: adminRole.id,
+    role_id: roleByKey.get("admin") ?? null,
     status: "active",
     accepted_at: now,
     updated_at: now,

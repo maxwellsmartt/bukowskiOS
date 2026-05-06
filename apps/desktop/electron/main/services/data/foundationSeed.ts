@@ -19,7 +19,7 @@ const users = [
   ["user-paola", "Paola Rivas", "paola@metadata.cine", "+1 809 555 0101"],
   ["user-luis", "Luis Mena", "luis@metadata.cine", "+1 809 555 0102"],
   ["user-miguel", "Miguel Peralta", "miguel@metadata.cine", "+1 809 555 0103"],
-  ["user-ops", "Ops Repair", "ops@metadata.cine", "+1 809 555 0199"],
+  ["user-ops", "AI Agent", "ai-agent@bukowskios.local", ""],
 ] as const;
 
 const departments = [

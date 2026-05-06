@@ -20,6 +20,12 @@ module.exports = {
     buildResources: "build",
   },
   files: ["dist/**", "dist-electron/**", "package.json"],
+  extraResources: [
+    {
+      from: "src/shared/assets/inbox/logos/bukowskiOS-desktop-logo.png",
+      to: "startup-logo.png",
+    },
+  ],
   asar: true,
   npmRebuild: false,
   mac: {

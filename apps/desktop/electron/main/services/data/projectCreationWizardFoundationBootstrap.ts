@@ -9,6 +9,15 @@ type TableInfoRow = {
   notnull: number;
 };
 
+const hasRow = (db: DatabaseSync, tableName: string, id: string) => {
+  if (!tableExists(db, tableName)) {
+    return false;
+  }
+
+  const row = db.prepare(`SELECT id FROM ${tableName} WHERE id = ? LIMIT 1`).get(id) as { id: string } | undefined;
+  return Boolean(row);
+};
+
 const tableExists = (db: DatabaseSync, tableName: string) => {
   const row = db
     .prepare(
@@ -76,12 +85,16 @@ const rebuildPackingSlipsForProjectSetup = (db: DatabaseSync) => {
     SELECT
       id,
       workspace_id,
-      project_id,
-      ${hasProjectUnitId ? "project_unit_id" : "NULL"},
-      department_id,
-      prepared_by_user_id,
-      approved_by_user_id,
-      responsible_user_id,
+      CASE WHEN project_id IS NOT NULL AND EXISTS (SELECT 1 FROM projects WHERE projects.id = packing_slips.project_id) THEN project_id ELSE NULL END,
+      ${
+        hasProjectUnitId
+          ? "CASE WHEN project_unit_id IS NOT NULL AND EXISTS (SELECT 1 FROM project_units WHERE project_units.id = packing_slips.project_unit_id) THEN project_unit_id ELSE NULL END"
+          : "NULL"
+      },
+      CASE WHEN department_id IS NOT NULL AND EXISTS (SELECT 1 FROM departments WHERE departments.id = packing_slips.department_id) THEN department_id ELSE NULL END,
+      CASE WHEN prepared_by_user_id IS NOT NULL AND EXISTS (SELECT 1 FROM users WHERE users.id = packing_slips.prepared_by_user_id) THEN prepared_by_user_id ELSE NULL END,
+      CASE WHEN approved_by_user_id IS NOT NULL AND EXISTS (SELECT 1 FROM users WHERE users.id = packing_slips.approved_by_user_id) THEN approved_by_user_id ELSE NULL END,
+      CASE WHEN responsible_user_id IS NOT NULL AND EXISTS (SELECT 1 FROM users WHERE users.id = packing_slips.responsible_user_id) THEN responsible_user_id ELSE NULL END,
       ${
         hasLifecycleState
           ? "COALESCE(lifecycle_state, 'operational')"
@@ -93,7 +106,12 @@ const rebuildPackingSlipsForProjectSetup = (db: DatabaseSync) => {
       notes,
       created_at,
       updated_at
-    FROM packing_slips;
+    FROM packing_slips
+    WHERE EXISTS (
+      SELECT 1
+      FROM workspaces
+      WHERE workspaces.id = packing_slips.workspace_id
+    );
   `);
 
   db.exec(`
@@ -165,24 +183,26 @@ export const applyProjectCreationWizardFoundationMigration = (db: DatabaseSync) 
     `,
   ).run();
 
-  const now = new Date().toISOString();
-  db.prepare(
-    `
-      INSERT OR IGNORE INTO production_companies (
-        id,
-        workspace_id,
-        name,
-        contact_name,
-        email,
-        phone,
-        notes,
-        is_active,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, NULL, NULL, NULL, 'Default production company catalog seed.', 1, ?, ?)
-    `,
-  ).run("production-company-metadata-internal", workspaceId, "Metadata Internal", now, now);
+  if (hasRow(db, "workspaces", workspaceId)) {
+    const now = new Date().toISOString();
+    db.prepare(
+      `
+        INSERT OR IGNORE INTO production_companies (
+          id,
+          workspace_id,
+          name,
+          contact_name,
+          email,
+          phone,
+          notes,
+          is_active,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, NULL, NULL, NULL, 'Default production company catalog seed.', 1, ?, ?)
+      `,
+    ).run("production-company-metadata-internal", workspaceId, "Metadata Internal", now, now);
+  }
 };
 
 export const applyProjectArchiveFoundationMigration = (db: DatabaseSync) => {
