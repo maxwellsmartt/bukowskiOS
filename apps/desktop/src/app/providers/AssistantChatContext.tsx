@@ -270,6 +270,16 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
     { enabled: hasLiveWork, intervalMs: 1500 },
   );
 
+  useVisiblePolling(
+    () => {
+      notifyWorkspaceDataChanged({
+        source: "assistant-chat",
+        entities: ["projects", "assets", "packing", "quotes", "incidents"],
+      });
+    },
+    { enabled: hasLiveWork, intervalMs: 1500 },
+  );
+
   const sessions = useMemo(() => {
     const rows = snapshot?.threads.map(normalizeThread) ?? [];
     return rows.length ? rows : [buildFallbackSession(location.pathname)];

@@ -16,6 +16,7 @@ import type { createQuoteMutationService } from "../data/quoteMutationService";
 
 type ProjectLookupService = {
   findByCode(workspaceId: string, code: string): { id: string; code: string; name: string; status: string } | null;
+  findByIdentifier?(workspaceId: string, identifier: string): { id: string; code: string; name: string; status: string } | null;
 };
 
 export type AgentWriteServices = {
@@ -102,6 +103,39 @@ const normalizeQuoteDurationUnit = (value: unknown): QuoteItemDurationUnit | nul
 const lookupProjectByCode = (services: AgentWriteServices, workspaceId: string, code: string) =>
   services.projectLookup?.findByCode(workspaceId, code) ?? null;
 
+const lookupProjectByIdentifier = (services: AgentWriteServices, workspaceId: string, identifier: string) => {
+  const normalizedIdentifier = identifier.trim();
+  if (!normalizedIdentifier) {
+    return null;
+  }
+
+  return (
+    services.projectLookup?.findByIdentifier?.(workspaceId, normalizedIdentifier) ??
+    services.projectLookup?.findByCode(workspaceId, normalizedIdentifier) ??
+    null
+  );
+};
+
+const resolveRequiredProjectId = (services: AgentWriteServices, workspaceId: string, identifier: unknown) => {
+  const projectIdentifier = asString(identifier);
+  if (!projectIdentifier) {
+    throw new Error("Project is required before this action can continue.");
+  }
+
+  const project = lookupProjectByIdentifier(services, workspaceId, projectIdentifier);
+  return project?.id ?? projectIdentifier;
+};
+
+const resolveOptionalProjectId = (services: AgentWriteServices, workspaceId: string, identifier: unknown) => {
+  const projectIdentifier = asOptionalString(identifier);
+  if (!projectIdentifier) {
+    return null;
+  }
+
+  const project = lookupProjectByIdentifier(services, workspaceId, projectIdentifier);
+  return project?.id ?? projectIdentifier;
+};
+
 const requireWorkspaceId = (context: AIGatewayToolContext): string => {
   const workspaceId = context.workspaceId;
   if (!workspaceId) {
@@ -141,7 +175,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
         workspaceId,
         actorUserId: context.sourceActorUserId ?? undefined,
         assetId: asOptionalString(args.asset_id),
-        projectId: asOptionalString(args.project_id),
+        projectId: resolveOptionalProjectId(services, workspaceId, args.project_id) ?? undefined,
         projectUnitId: asOptionalString(args.project_unit_id),
         departmentId: asOptionalString(args.department_id),
         responsibleUserId: asOptionalString(args.responsible_user_id),
@@ -299,6 +333,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
     },
     execute: (args, context) => {
       const workspaceId = requireWorkspaceId(context);
+      const projectId = resolveRequiredProjectId(services, workspaceId, args.project_id);
       const assetIds = Array.isArray(args.asset_ids)
         ? (args.asset_ids as unknown[]).map((value) => asString(value)).filter(Boolean)
         : [];
@@ -317,7 +352,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
         actorUserId: context.sourceActorUserId ?? undefined,
         assetIds,
         assetSelections: assetSelections.length ? assetSelections : undefined,
-        projectId: asString(args.project_id),
+        projectId,
         projectUnitId: asOptionalString(args.project_unit_id),
         departmentId: asOptionalString(args.department_id),
         responsibleUserId: asOptionalString(args.responsible_user_id),
@@ -330,7 +365,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
         summary: result.summary,
         payload: {
           packingSlipId: result.packingSlipId,
-          projectId: asString(args.project_id),
+          projectId,
           repeated: result.repeated,
           slipNumber: result.slipNumber,
         },
@@ -497,8 +532,9 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
         color_key: { type: "string" },
       },
     },
-    execute: (args) => {
-      const projectId = asString(args.project_id);
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const projectId = resolveRequiredProjectId(services, workspaceId, args.project_id);
       const code = asString(args.code);
       const name = asString(args.name);
 
@@ -547,8 +583,9 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
         notes: { type: "string" },
       },
     },
-    execute: (args) => {
-      const projectId = asString(args.project_id);
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const projectId = resolveRequiredProjectId(services, workspaceId, args.project_id);
       const code = asString(args.code).toUpperCase();
       const name = asString(args.name);
 
@@ -668,7 +705,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
         workspaceSirecineSnapshot: asOptionalString(args.workspace_sirecine) ?? null,
         attentionName: asOptionalString(args.attention_name) ?? null,
         attentionPhone: asOptionalString(args.attention_phone) ?? null,
-        projectId: asOptionalString(args.project_id) ?? null,
+        projectId: resolveOptionalProjectId(services, workspaceId, args.project_id),
         projectNameSnapshot: asOptionalString(args.project_name) ?? null,
         productionName: asOptionalString(args.production_name) ?? null,
         description: asOptionalString(args.description) ?? null,

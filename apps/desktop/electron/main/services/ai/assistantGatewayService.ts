@@ -818,6 +818,7 @@ export const createAssistantGatewayService = (
       "When the user asks to create, prepare, save, or draft a quote, treat it as a saved draft in Quotes and route toward create_quote. prepare_quote_draft is only for an explicitly non-saved outline.",
       "If the user is continuing a partially completed task, use the previous session summary and last tool results to continue the pending steps. Do not make them repeat the full original prompt.",
       "If the user replies with a short continuation like 'usa el primero', 'dale', 'hazlo', or 'continúa', use recentAssistantMessages plus the previous tool summary as the pending action context.",
+      "If recentAssistantMessages contain candidate assets/projects/options and the user chooses one, reuse the exact IDs already shown there. Do not restart the task or ask for the same project again.",
       "For packing slips, asset availability searches must use the full workspace inventory unless the user explicitly asks for assets already assigned to a specific project. Do not let activeProjectId limit inventory discovery by accident.",
       "If an asset search finds no available match, the specialist should run one broader workspace-level search_assets query and propose the closest available alternatives before asking the user what to use.",
       "Choose one target_agent from the allowed list below.",
@@ -1148,6 +1149,7 @@ export const createAssistantGatewayService = (
           "Asset miss rule: if search_assets returns zero matches for a requested asset, immediately run one broader workspace-level search_assets query (shorter term or empty query with status='Available') and offer the closest available options. Do not simply stop at 'no assets found'.",
           "Continuation rule: when the user replies briefly after a partial task, use the prior session/tool summary to continue unresolved steps. Do not require the original prompt again.",
           "Pending action rule: recentAssistantMessages may contain the option list or blocker you just gave the user. Treat short replies like 'use the first one' as instructions to continue from that list.",
+          "Choice reuse rule: when recentAssistantMessages contain candidate options with IDs, reuse those exact IDs for the next tool call. Do not run the full task from scratch unless the selected ID no longer works.",
           "Do NOT mention 'supervised' or 'pending approval' to the user unless the action is genuinely gated. The default is to execute and report results.",
           targetMemoryOverlay.agentEntries.length
             ? `Agent memory:\n${targetMemoryOverlay.agentEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`

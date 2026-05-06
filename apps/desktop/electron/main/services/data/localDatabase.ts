@@ -1019,6 +1019,50 @@ const createRuntime = (): LocalDatabaseRuntime => {
 
           return row ?? null;
         },
+        findByIdentifier(workspaceId, identifier) {
+          const normalizedIdentifier = identifier.trim();
+          if (!normalizedIdentifier) {
+            return null;
+          }
+
+          const row = database
+            .prepare(
+              `
+                SELECT id, code, name, status
+                FROM projects
+                WHERE workspace_id = ?
+                  AND (
+                    id = ?
+                    OR code = ?
+                    OR lower(name) = lower(?)
+                  )
+                ORDER BY
+                  CASE
+                    WHEN id = ? THEN 0
+                    WHEN code = ? THEN 1
+                    ELSE 2
+                  END
+                LIMIT 1
+              `,
+            )
+            .get(
+              workspaceId,
+              normalizedIdentifier,
+              normalizedIdentifier.toUpperCase(),
+              normalizedIdentifier,
+              normalizedIdentifier,
+              normalizedIdentifier.toUpperCase(),
+            ) as
+            | {
+                id: string;
+                code: string;
+                name: string;
+                status: string;
+              }
+            | undefined;
+
+          return row ?? null;
+        },
       },
     },
   });
