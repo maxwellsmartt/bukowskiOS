@@ -44,7 +44,7 @@ export const PackingSlipDetailPanel = ({
 
   if (isLoading) {
     return (
-      <SurfaceCard title="Packing Details">
+      <SurfaceCard className="packing-detail-card" title="Packing Details">
         <TableSkeleton body="Loading slip details." columns={5} />
       </SurfaceCard>
     );
@@ -52,7 +52,7 @@ export const PackingSlipDetailPanel = ({
 
   if (error) {
     return (
-      <SurfaceCard title="Packing Details">
+      <SurfaceCard className="packing-detail-card" title="Packing Details">
         <div className="empty-state">Unable to load this slip. Try again.</div>
       </SurfaceCard>
     );
@@ -60,7 +60,7 @@ export const PackingSlipDetailPanel = ({
 
   if (!data.slip) {
     return (
-      <SurfaceCard title="Packing Details">
+      <SurfaceCard className="packing-detail-card" title="Packing Details">
         <div className="empty-state">Choose a packing slip to see details.</div>
       </SurfaceCard>
     );
@@ -109,6 +109,7 @@ export const PackingSlipDetailPanel = ({
 
   return (
     <SurfaceCard
+      className="packing-detail-card"
       title={data.slip.number}
       aside={headerActions}
     >

@@ -3,6 +3,7 @@ import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
+  AssistantActionLink,
   AssistantApprovalPreference,
   AssistantChatAttachmentRow,
   AssistantChatAttachmentStatus,
@@ -94,6 +95,7 @@ const normalizeMeta = (response: {
   approvalScope?: "run" | "session" | null;
   approvalReason?: string | null;
   orchestration: { requiresApproval: boolean } | null;
+  actionLinks?: AssistantActionLink[];
 }): AssistantChatMessageMeta => ({
   tone:
     response.status === "provider_error" ||
@@ -116,6 +118,7 @@ const normalizeMeta = (response: {
   approvalDecision: response.approvalDecision ?? null,
   approvalScope: response.approvalScope ?? null,
   approvalReason: response.approvalReason ?? null,
+  actionLinks: response.actionLinks ?? [],
 });
 
 const mapThreadStateFromResponse = (status: string): AssistantChatThreadState => {
@@ -566,6 +569,7 @@ export const createAssistantChatService = (
       approvalDecision?: "pending" | "approved" | "approved_for_session" | "denied" | null;
       approvalScope?: "run" | "session" | null;
       approvalReason?: string | null;
+      actionLinks?: AssistantActionLink[];
     },
   ) => {
     const completedAt = new Date().toISOString();

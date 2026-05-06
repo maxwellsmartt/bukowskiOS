@@ -328,7 +328,12 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
       });
       return {
         summary: result.summary,
-        payload: { packingSlipId: result.packingSlipId, repeated: result.repeated, slipNumber: result.slipNumber },
+        payload: {
+          packingSlipId: result.packingSlipId,
+          projectId: asString(args.project_id),
+          repeated: result.repeated,
+          slipNumber: result.slipNumber,
+        },
       };
     },
   },

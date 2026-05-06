@@ -1,5 +1,6 @@
 import type {
   AgentApprovalMode,
+  AssistantActionLink,
   AssistantApprovalPreference,
   AssistantChatMessageSource,
   AgentRunApprovalDecision,
@@ -285,4 +286,5 @@ export type AssistantGatewayResponse = {
   modelKey: string | null;
   toolTraces: AIGatewayToolCallTrace[];
   orchestration: OrchestrationResult | null;
+  actionLinks?: AssistantActionLink[];
 };

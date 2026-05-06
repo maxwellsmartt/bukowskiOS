@@ -4015,6 +4015,16 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   min-width: 0;
 }
 
+.packing-detail-card {
+  min-width: 0;
+  min-height: 0;
+  align-self: start;
+  max-height: calc(100dvh - 190px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
 .select-field-shell {
   position: relative;
 }

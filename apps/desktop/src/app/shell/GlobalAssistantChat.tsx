@@ -266,15 +266,32 @@ const buildStateActions = (state: AssistantChatSessionState | null) => {
   }
 
   const actions: Array<{ label: string; to: string }> = [];
+  const seenPaths = new Set<string>();
+
+  for (const link of state.actionLinks ?? []) {
+    if (!link.path || seenPaths.has(link.path)) {
+      continue;
+    }
+
+    seenPaths.add(link.path);
+    actions.push({ label: link.label, to: link.path });
+  }
 
   if (state.tone !== "sending") {
+    seenPaths.add("/agents/runs");
     actions.push({ label: "Open runs", to: "/agents/runs" });
   }
 
   if (state.routedAgentId) {
+    const agentPath = `/agents/mission-control?agent=${encodeURIComponent(state.routedAgentId)}`;
+    if (seenPaths.has(agentPath)) {
+      return actions;
+    }
+
+    seenPaths.add(agentPath);
     actions.push({
       label: "View agent",
-      to: `/agents/mission-control?agent=${encodeURIComponent(state.routedAgentId)}`,
+      to: agentPath,
     });
   }
 

@@ -32,6 +32,13 @@ export type PendingMutationPreview = {
   summary: string;
 };
 
+export type AssistantActionLink = {
+  label: string;
+  path: string;
+  entityType: "project" | "asset" | "packing_slip" | "quote" | "incident" | "rma";
+  entityId: string;
+};
+
 export type AssistantChatMessageMeta = {
   tone: "sending" | "routed" | "approval" | "error";
   label: string;
@@ -47,6 +54,7 @@ export type AssistantChatMessageMeta = {
   approvalScope?: AgentRunApprovalScope | null;
   approvalReason?: string | null;
   pendingMutation?: PendingMutationPreview | null;
+  actionLinks?: AssistantActionLink[];
 };
 
 export type AssistantChatAttachmentRow = {

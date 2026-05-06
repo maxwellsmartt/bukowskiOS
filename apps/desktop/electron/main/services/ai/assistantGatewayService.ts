@@ -1,5 +1,6 @@
 import type {
   AIGatewayToolCallTrace,
+  AssistantActionLink,
   AssistantGatewayAttachment,
   AssistantGatewayRequest,
   AssistantGatewayResponse,
@@ -115,6 +116,131 @@ const serializeToolPayload = (payload: unknown) => {
     originalType: Array.isArray(payload) ? "array" : typeof payload,
     preview: truncateText(serialized, maxToolPayloadChars - 160),
   });
+};
+
+const asPayloadRecord = (payload: unknown): Record<string, unknown> | null =>
+  payload && typeof payload === "object" && !Array.isArray(payload) ? (payload as Record<string, unknown>) : null;
+
+const asPayloadString = (payload: Record<string, unknown>, key: string) => {
+  const value = payload[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+};
+
+const appendActionLink = (links: AssistantActionLink[], seen: Set<string>, link: AssistantActionLink | null) => {
+  if (!link) {
+    return;
+  }
+
+  const key = `${link.entityType}:${link.entityId}`;
+  if (seen.has(key)) {
+    return;
+  }
+
+  seen.add(key);
+  links.push(link);
+};
+
+const buildActionLinks = (
+  executedToolPayloads: Array<{
+    toolName: string;
+    payload: unknown;
+  }>,
+): AssistantActionLink[] => {
+  const links: AssistantActionLink[] = [];
+  const seen = new Set<string>();
+
+  for (const { payload } of executedToolPayloads) {
+    const record = asPayloadRecord(payload);
+    if (!record) {
+      continue;
+    }
+
+    const projectId = asPayloadString(record, "projectId");
+    appendActionLink(
+      links,
+      seen,
+      projectId
+        ? {
+            label: "Open project",
+            path: `/projects/${encodeURIComponent(projectId)}/info`,
+            entityType: "project",
+            entityId: projectId,
+          }
+        : null,
+    );
+
+    const assetId = asPayloadString(record, "assetId");
+    appendActionLink(
+      links,
+      seen,
+      assetId
+        ? {
+            label: "Open asset",
+            path: `/assets/${encodeURIComponent(assetId)}`,
+            entityType: "asset",
+            entityId: assetId,
+          }
+        : null,
+    );
+
+    const quoteId = asPayloadString(record, "quoteId");
+    appendActionLink(
+      links,
+      seen,
+      quoteId
+        ? {
+            label: "Open quote",
+            path: `/finance/quotes/${encodeURIComponent(quoteId)}`,
+            entityType: "quote",
+            entityId: quoteId,
+          }
+        : null,
+    );
+
+    const packingSlipId = asPayloadString(record, "packingSlipId");
+    appendActionLink(
+      links,
+      seen,
+      packingSlipId
+        ? {
+            label: "Open packing slip",
+            path: `/packing-slips?focus=${encodeURIComponent(packingSlipId)}`,
+            entityType: "packing_slip",
+            entityId: packingSlipId,
+          }
+        : null,
+    );
+
+    const incidentId = asPayloadString(record, "incidentId");
+    appendActionLink(
+      links,
+      seen,
+      incidentId
+        ? {
+            label: "Open incident",
+            path: `/incidents?focus=${encodeURIComponent(incidentId)}`,
+            entityType: "incident",
+            entityId: incidentId,
+          }
+        : null,
+    );
+
+    const rmaCaseId = asPayloadString(record, "rmaCaseId");
+    appendActionLink(
+      links,
+      seen,
+      rmaCaseId
+        ? {
+            label: "Open RMA",
+            path: `/incidents/rma?focus=${encodeURIComponent(rmaCaseId)}`,
+            entityType: "rma",
+            entityId: rmaCaseId,
+          }
+        : null,
+    );
+  }
+
+  return links;
 };
 
 const summarizeToolName = (value: string) =>
@@ -1371,6 +1497,8 @@ export const createAssistantGatewayService = (
       error: null,
     });
 
+    const actionLinks = buildActionLinks(executedToolPayloads);
+
     return {
       status: draftRunId ? "draft_created" : "answered",
       stateLabel: requiresApproval ? "Needs approval" : `Routed to ${typedOrchestration.targetAgentName}`,
@@ -1420,6 +1548,7 @@ export const createAssistantGatewayService = (
         ...typedOrchestration,
         requiresApproval,
       },
+      actionLinks,
     };
   };
 
