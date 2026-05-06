@@ -7190,7 +7190,15 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .agents-health-card {
+  display: grid;
   gap: 6px;
+  min-height: 92px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.012);
 }
 
 .agents-health-label,
@@ -9731,7 +9739,8 @@ select.field-input {
   align-content: start;
   grid-auto-rows: max-content;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 8px;
   scrollbar-gutter: stable;
 }
@@ -9739,6 +9748,7 @@ select.field-input {
 .assistant-chat-session-row {
   display: grid;
   gap: 0;
+  min-width: 0;
   padding: 0;
   position: relative;
 }
@@ -9763,6 +9773,8 @@ select.field-input {
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  width: 100%;
   min-height: 24px;
   padding: 1px 8px 1px 12px;
   border-radius: 6px;
@@ -9815,7 +9827,7 @@ select.field-input {
   align-items: center;
   gap: 2px;
   padding-left: 4px;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 120ms ease;
   flex: 0 0 auto;
 }

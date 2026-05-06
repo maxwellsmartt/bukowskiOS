@@ -146,6 +146,7 @@ const summarizeMessageForSession = (request: AssistantGatewayRequest) => {
 const buildGatewayInput = (
   request: AssistantGatewayRequest,
   recentUserMessages: string[],
+  recentAssistantMessages: string[],
 ): string | Array<Record<string, unknown>> => {
   const attachments = request.attachments ?? [];
   const trimmedMessage = request.message.trim();
@@ -154,6 +155,7 @@ const buildGatewayInput = (
       trimmedMessage || (attachments.length ? "Please review the attached image context for BukowskiOS." : ""),
     appContext: parseAppContextSummary(request),
     recentUserMessages,
+    recentAssistantMessages,
     attachments: attachments.length ? summarizeAttachments(attachments) : [],
   });
 
@@ -342,6 +344,27 @@ const loadThreadRouteContext = (db: DatabaseSync, threadId: string) =>
       }
     | undefined;
 
+const loadRecentAssistantMessages = (db: DatabaseSync, threadId: string, limit = 2) =>
+  (
+    db
+      .prepare(
+        `
+          SELECT body
+          FROM assistant_chat_messages
+          WHERE thread_id = ?
+            AND role = 'assistant'
+            AND message_state = 'completed'
+            AND deleted_at IS NULL
+            AND trim(body) <> ''
+          ORDER BY created_at DESC
+          LIMIT ?
+        `,
+      )
+      .all(threadId, limit) as Array<{ body: string }>
+  )
+    .map((row) => row.body.trim().replace(/\s+/g, " ").slice(0, 1200))
+    .reverse();
+
 const loadThreadSessionApproval = (db: DatabaseSync, threadId: string) =>
   db
     .prepare(
@@ -466,7 +489,7 @@ const createDraftRun = (
     args.title,
     args.inputSummary,
     args.outputSummary,
-    args.requiresApproval ? "needs_approval" : args.approvalDecision ? "approved" : "queued",
+    args.requiresApproval ? "needs_approval" : args.approvalDecision ? "approved" : "done",
     args.approvalMode,
     args.requiresApproval ? 1 : 0,
     args.threadId,
@@ -668,6 +691,7 @@ export const createAssistantGatewayService = (
       "Specialists must use search_assets / search_projects / etc. to resolve names → IDs BEFORE asking the user anything. They can use ask_user_choice to surface a small set of options when search returns ambiguous results.",
       "When the user asks to create, prepare, save, or draft a quote, treat it as a saved draft in Quotes and route toward create_quote. prepare_quote_draft is only for an explicitly non-saved outline.",
       "If the user is continuing a partially completed task, use the previous session summary and last tool results to continue the pending steps. Do not make them repeat the full original prompt.",
+      "If the user replies with a short continuation like 'usa el primero', 'dale', 'hazlo', or 'continúa', use recentAssistantMessages plus the previous tool summary as the pending action context.",
       "For packing slips, asset availability searches must use the full workspace inventory unless the user explicitly asks for assets already assigned to a specific project. Do not let activeProjectId limit inventory discovery by accident.",
       "If an asset search finds no available match, the specialist should run one broader workspace-level search_assets query and propose the closest available alternatives before asking the user what to use.",
       "Choose one target_agent from the allowed list below.",
@@ -690,7 +714,8 @@ export const createAssistantGatewayService = (
       financeContextHint ?? null,
     ].join("\n");
 
-    const initialPrompt = buildGatewayInput(request, sessionSnapshot.recentUserMessages);
+    const recentAssistantMessages = loadRecentAssistantMessages(db, request.threadId);
+    const initialPrompt = buildGatewayInput(request, sessionSnapshot.recentUserMessages, recentAssistantMessages);
     const toolTraces: AIGatewayToolCallTrace[] = [];
     const executedToolPayloads: Array<{
       toolName: string;
@@ -996,6 +1021,7 @@ export const createAssistantGatewayService = (
           "Packing slip inventory rule: search the full workspace inventory for available assets before creating a packing slip. Only pass scope='project' or project_id when the user explicitly asks what is already inside that project.",
           "Asset miss rule: if search_assets returns zero matches for a requested asset, immediately run one broader workspace-level search_assets query (shorter term or empty query with status='Available') and offer the closest available options. Do not simply stop at 'no assets found'.",
           "Continuation rule: when the user replies briefly after a partial task, use the prior session/tool summary to continue unresolved steps. Do not require the original prompt again.",
+          "Pending action rule: recentAssistantMessages may contain the option list or blocker you just gave the user. Treat short replies like 'use the first one' as instructions to continue from that list.",
           "Do NOT mention 'supervised' or 'pending approval' to the user unless the action is genuinely gated. The default is to execute and report results.",
           targetMemoryOverlay.agentEntries.length
             ? `Agent memory:\n${targetMemoryOverlay.agentEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`

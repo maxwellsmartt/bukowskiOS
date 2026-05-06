@@ -213,6 +213,22 @@ export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
     /* tolerate brand-new installs where the agents table does not exist yet */
   }
 
+  // Older unsupervised chat runs were inserted as `queued` even after the
+  // assistant had already finished responding. Normalize those completed rows
+  // so Activity reflects the truth instead of looking permanently pending.
+  try {
+    db.prepare(
+      `UPDATE agent_runs
+          SET status = 'done',
+              updated_at = COALESCE(updated_at, ?)
+        WHERE status = 'queued'
+          AND approval_required = 0
+          AND COALESCE(trim(output_summary), '') <> ''`,
+    ).run(new Date().toISOString());
+  } catch {
+    /* tolerate brand-new installs where the agent_runs table does not exist yet */
+  }
+
   // Sprint B: ensure every operational agent has the `ask_user_choice` tool
   // available so it can ask multi-choice clarifications instead of free-text
   // questions. We patch the tools list in place for agents whose JSON does not

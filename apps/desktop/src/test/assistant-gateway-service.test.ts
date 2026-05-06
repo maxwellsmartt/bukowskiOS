@@ -986,7 +986,7 @@ describe("assistant gateway service", () => {
       .get(result.draftRunId) as { status: string; approval_required: number } | undefined;
 
     expect(runRow).toEqual({
-      status: "queued",
+      status: "done",
       approval_required: 0,
     });
 
