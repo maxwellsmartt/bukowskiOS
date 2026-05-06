@@ -582,4 +582,93 @@ describe("agent tool registry", () => {
 
     cleanup();
   });
+
+  it("searches the full workspace inventory by default even from a project context", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-asset-workspace-scope");
+    const secretStore = {
+      hasProviderSecret: () => false,
+    };
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+    });
+
+    const workspaceSearch = registry.execute(
+      "search_assets",
+      JSON.stringify({ query: "Aputure", status: "Available", limit: 5 }),
+      {
+        workspaceId: "workspace-metadata",
+        activePath: "/projects/project-aurora/info",
+        currentView: "Project",
+        activeProjectId: "project-aurora",
+      },
+    );
+    const projectSearch = registry.execute(
+      "search_assets",
+      JSON.stringify({ query: "Aputure", status: "Available", scope: "project", limit: 5 }),
+      {
+        workspaceId: "workspace-metadata",
+        activePath: "/projects/project-aurora/info",
+        currentView: "Project",
+        activeProjectId: "project-aurora",
+      },
+    );
+
+    expect(workspaceSearch.result.payload.scope).toBe("workspace");
+    expect((workspaceSearch.result.payload.items as Array<{ name: string }>).some((item) => item.name.includes("Aputure"))).toBe(true);
+    expect(projectSearch.result.payload.scope).toBe("project");
+    expect(projectSearch.result.payload.count).toBe(0);
+
+    cleanup();
+  });
+
+  it("resolves projects from the active workspace instead of the default seed workspace", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-project-workspace-scope");
+    const secretStore = {
+      hasProviderSecret: () => false,
+    };
+    const now = new Date().toISOString();
+
+    database
+      .prepare(
+        "INSERT INTO workspaces (id, slug, name, base_currency, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)",
+      )
+      .run("workspace-cine2-test", "metadata-cine2-test", "Metadata Cine2 Test", "DOP", now, now);
+    database
+      .prepare(
+        "INSERT INTO projects (id, workspace_id, code, name, client_name, status, start_date, end_date, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(
+        "project-agent-test-shoot",
+        "workspace-cine2-test",
+        "AGT",
+        "Agent Test Shoot",
+        "Metadata Cine",
+        "Prep",
+        "2026-06-01",
+        "2026-06-03",
+        "Agent smoke project",
+        now,
+        now,
+      );
+
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+    });
+
+    const defaultWorkspaceSearch = registry.execute("search_projects", JSON.stringify({ query: "AGT", limit: 5 }), {
+      workspaceId: "workspace-metadata",
+      activePath: "/projects",
+      currentView: "Projects",
+    });
+    const activeWorkspaceSearch = registry.execute("search_projects", JSON.stringify({ query: "AGT", limit: 5 }), {
+      workspaceId: "workspace-cine2-test",
+      activePath: "/projects",
+      currentView: "Projects",
+    });
+
+    expect(defaultWorkspaceSearch.result.payload.count).toBe(0);
+    expect((activeWorkspaceSearch.result.payload.items as Array<{ id: string }>)[0]?.id).toBe("project-agent-test-shoot");
+
+    cleanup();
+  });
 });

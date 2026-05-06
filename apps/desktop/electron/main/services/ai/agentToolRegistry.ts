@@ -224,9 +224,10 @@ export const createAgentToolRegistry = (
         },
         required: ["query"],
       },
-      execute: (args) => {
+      execute: (args, context) => {
         const rows = foundationReads
           .getProjects({
+            workspaceId: context.workspaceId,
             search: asString(args.query),
             sortBy: "name",
             sortDirection: "asc",
@@ -245,23 +246,29 @@ export const createAgentToolRegistry = (
     },
     {
       name: "search_assets",
-      description: "Search assets using compact registry, assignment and location data.",
+      description:
+        "Search assets using compact registry, assignment and location data. Defaults to the full workspace inventory, which is the correct scope for availability checks and packing slip creation. Pass scope='project' or project_id only when the user explicitly asks for assets already tied to a project. If a specific query returns no available asset for a user request, call this again with a broader query or an empty query plus status='Available' to propose close alternatives.",
       parameters: {
         type: "object",
         additionalProperties: false,
         properties: {
           query: { type: "string" },
           project_id: { type: "string" },
+          scope: { type: "string", enum: ["workspace", "project"] },
           status: { type: "string" },
           limit: { type: "number" },
         },
         required: ["query"],
       },
       execute: (args, context) => {
+        const requestedScope = asOptionalString(args.scope);
+        const explicitProjectId = asOptionalString(args.project_id);
+        const scopedProjectId = explicitProjectId ?? (requestedScope === "project" ? inferProjectIdFromContext(context) : null);
         const rows = foundationReads
           .getAssets({
+            workspaceId: context.workspaceId,
             search: asString(args.query),
-            scopeProjectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context) ?? undefined,
+            scopeProjectId: scopedProjectId ?? undefined,
             sortBy: "name",
             sortDirection: "asc",
           })
@@ -271,6 +278,8 @@ export const createAgentToolRegistry = (
         return {
           summary: rows.length ? `Found ${rows.length} matching assets.` : "No matching assets found.",
           payload: {
+            scope: scopedProjectId ? "project" : "workspace",
+            projectId: scopedProjectId,
             count: rows.length,
             items: rows.map((row) => ({
               id: row.id,
@@ -461,9 +470,10 @@ export const createAgentToolRegistry = (
         },
         required: ["query"],
       },
-      execute: (args) => {
+      execute: (args, context) => {
         const rows = foundationReads
           .getProjects({
+            workspaceId: context.workspaceId,
             search: asString(args.query),
             sortBy: "name",
             sortDirection: "asc",
@@ -1910,7 +1920,7 @@ export const createAgentToolRegistry = (
     definitions.push({
       name: "prepare_quote_draft",
       description:
-        "Suggest a draft shape (header + items) for a new quote based on a client/project intent and a list of items the user described. Returns the draft as a structured payload — the user must approve and create it manually from the Quotes UI; this tool never persists.",
+        "Non-persistent quote sketch only. Use this only when the user explicitly asks for a rough quote outline that should NOT be saved. If the user asks to create, prepare, save, or draft a quote they can see in the app, use create_quote instead.",
       parameters: {
         type: "object",
         additionalProperties: false,

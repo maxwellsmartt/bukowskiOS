@@ -93,7 +93,7 @@ export const WorkspaceBrandingCard = () => {
     event.target.value = "";
     if (!file) return;
     if (!supabase) {
-      toast.error("Supabase not connected", "Branding upload needs an active Supabase session.");
+      toast.error("Sign in required", "You need to be signed in to upload workspace assets.");
       return;
     }
     if (!acceptedTypes.test(file.type)) {

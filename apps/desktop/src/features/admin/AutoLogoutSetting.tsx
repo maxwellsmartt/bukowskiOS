@@ -4,11 +4,11 @@ import { useToast } from "@app/providers/ToastProvider";
 import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 const presetMinutes: Array<{ value: number; label: string; helper: string }> = [
-  { value: 0, label: "Off", helper: "Stay signed in until you sign out manually." },
-  { value: 5, label: "5 min", helper: "High-traffic kiosks and shared laptops." },
-  { value: 15, label: "15 min", helper: "Default for most studios." },
-  { value: 30, label: "30 min", helper: "Personal workstations." },
-  { value: 60, label: "1 hour", helper: "Lower friction for solo operators." },
+  { value: 0, label: "Off", helper: "Stay signed in until you sign out." },
+  { value: 5, label: "5 min", helper: "Best for shared computers." },
+  { value: 15, label: "15 min", helper: "Balanced for daily work." },
+  { value: 30, label: "30 min", helper: "Good for a personal workstation." },
+  { value: 60, label: "1 hour", helper: "Fewer interruptions on trusted devices." },
 ];
 
 export const AutoLogoutSetting = () => {
@@ -50,7 +50,7 @@ export const AutoLogoutSetting = () => {
       </label>
       <p className="auto-logout-helper">{helper}</p>
       <p className="surface-card-subtitle" style={{ fontSize: "var(--font-2xs)", color: "var(--text-muted)" }}>
-        Saved on this device. Activity = mouse, keyboard, scroll or touch inside the app window.
+        Saved on this device. The timer resets when you use the app.
       </p>
     </div>
   );

@@ -8,7 +8,8 @@ import type {
   AppSupportSnapshot,
   AppSyncOutboxRow,
 } from "@contracts";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
@@ -72,6 +73,7 @@ type UserEditorDraft = {
 import { AutoLogoutSetting } from "./AutoLogoutSetting";
 import { SettingsLayout, useActiveSettingsSection } from "./SettingsLayout";
 import { UserChannelDots } from "./UserChannelDots";
+import { UserAccountSettings } from "./UserAccountSettings";
 
 const roleCoverageGroups = [
   { label: "Assets", keys: ["assets.read", "assets.manage"] },
@@ -171,6 +173,35 @@ type RolesPermissionMatrixProps = {
   roles: AppUsersSnapshot["roles"];
 };
 
+type SettingsDisclosureProps = {
+  children: ReactNode;
+  defaultOpen?: boolean;
+  summary: string;
+  title: string;
+};
+
+const SettingsDisclosure = ({ children, defaultOpen = false, summary, title }: SettingsDisclosureProps) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <section className={`settings-disclosure${isOpen ? " is-open" : ""}`}>
+      <button
+        aria-expanded={isOpen}
+        className="settings-disclosure-trigger"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span>
+          <strong>{title}</strong>
+          <small>{summary}</small>
+        </span>
+        <ChevronDown size={17} aria-hidden="true" />
+      </button>
+      {isOpen ? <div className="settings-disclosure-body">{children}</div> : null}
+    </section>
+  );
+};
+
 const RolesPermissionMatrix = ({ roles }: RolesPermissionMatrixProps) => {
   const allPermissionKeys = useMemo(() => {
     const set = new Set<string>();
@@ -216,15 +247,15 @@ const RolesPermissionMatrix = ({ roles }: RolesPermissionMatrixProps) => {
           {allPermissionKeys.map((key) => {
             const group = permissionGroupForKey(key);
             const showGroup = group !== lastGroup;
+            const permissionLabel = permissionLabelOverrides[key] ?? key;
             lastGroup = group;
             return (
               <tr key={key}>
                 <td className="permission-matrix-permission">
                   {showGroup ? <span className="permission-matrix-group">{group}</span> : null}
                   <span className="permission-matrix-permission-label">
-                    {permissionLabelOverrides[key] ?? key}
+                    {permissionLabel}
                   </span>
-                  <span className="permission-matrix-permission-key">{key}</span>
                 </td>
                 {roles.map((role) => {
                   const has = role.permissionKeys.includes(key);
@@ -232,7 +263,7 @@ const RolesPermissionMatrix = ({ roles }: RolesPermissionMatrixProps) => {
                     <td
                       key={role.id}
                       className={`permission-matrix-cell${has ? " is-allowed" : " is-denied"}`}
-                      aria-label={has ? `${role.name} has ${key}` : `${role.name} does not have ${key}`}
+                      aria-label={has ? `${role.name} can ${permissionLabel}` : `${role.name} cannot ${permissionLabel}`}
                     >
                       {has ? "✓" : "—"}
                     </td>
@@ -354,11 +385,11 @@ export const SettingsPage = () => {
   const dataHealthRows = useMemo(
     () => [
       {
-        label: "Database file",
+        label: "Local data",
         value: diagnostics.databaseExists ? formatBytes(diagnostics.databaseSizeBytes) : "Not created yet",
       },
       {
-        label: "Backup file",
+        label: "Latest backup",
         value: diagnostics.backupExists ? formatBytes(diagnostics.backupSizeBytes) : "No backup available yet",
       },
       {
@@ -366,7 +397,7 @@ export const SettingsPage = () => {
         value: formatDateLabel(diagnostics.lastBackupAt),
       },
       {
-        label: "Integrity status",
+        label: "Data check",
         value: resolveIntegrityLabel(diagnostics.lastIntegrityCheckStatus),
       },
       {
@@ -374,7 +405,7 @@ export const SettingsPage = () => {
         value: formatDateLabel(diagnostics.lastIntegrityCheckAt),
       },
       {
-        label: "Secure storage",
+        label: "Device security",
         value: diagnostics.encryptionAvailable ? "Available" : "Unavailable on this device",
       },
     ],
@@ -384,19 +415,19 @@ export const SettingsPage = () => {
   const syncHealthRows = useMemo(
     () => [
       {
-        label: "Last cleanup",
+        label: "Maintenance",
         value: formatDateLabel(diagnostics.lastRetentionRunAt),
       },
       {
-        label: "Cleanup result",
+        label: "Maintenance result",
         value: diagnostics.lastRetentionSummary ?? "Not run yet",
       },
       {
-        label: "Last sync",
+        label: "Last upload",
         value: formatDateLabel(diagnostics.lastSyncRunAt),
       },
       {
-        label: "Sync status",
+        label: "Upload status",
         value:
           diagnostics.lastSyncStatus === "healthy"
             ? "Healthy"
@@ -405,19 +436,19 @@ export const SettingsPage = () => {
               : "Idle",
       },
       {
-        label: "Sync result",
+        label: "Upload result",
         value: diagnostics.lastSyncSummary ?? "No sync run yet",
       },
       {
-        label: "Pending",
+        label: "Waiting",
         value: String(diagnostics.syncOutboxPendingCount),
       },
       {
-        label: "Processing",
+        label: "Uploading",
         value: String(diagnostics.syncOutboxProcessingCount),
       },
       {
-        label: "Failed",
+        label: "Needs attention",
         value: String(diagnostics.syncOutboxFailedCount),
       },
     ],
@@ -483,51 +514,10 @@ export const SettingsPage = () => {
       {
         label: "Roles",
         value: usersSnapshot.roles.length,
-        detail: "Inherited access",
+        detail: "Access presets",
       },
     ],
     [usersSnapshot.roles.length, usersSnapshot.users],
-  );
-
-  const settingsHealthCards = useMemo(
-    () => [
-      {
-        label: "Data health",
-        value: resolveIntegrityLabel(diagnostics.lastIntegrityCheckStatus),
-        detail:
-          diagnostics.lastIntegrityCheckStatus === "healthy"
-            ? `Last checked ${formatDateLabel(diagnostics.lastIntegrityCheckAt)}`
-            : "Run an integrity check before export or handoff.",
-        tone: diagnostics.lastIntegrityCheckStatus === "healthy" ? "success" : diagnostics.lastIntegrityCheckStatus === "failed" ? "critical" : "warning",
-      },
-      {
-        label: "Sync queue",
-        value: diagnostics.syncOutboxFailedCount ? `${diagnostics.syncOutboxFailedCount} failed` : diagnostics.syncOutboxPendingCount ? `${diagnostics.syncOutboxPendingCount} pending` : "Clear",
-        detail: diagnostics.syncOutboxFailedCount ? "Review failed rows before continuing sync." : "No blocking sync errors.",
-        tone: diagnostics.syncOutboxFailedCount ? "critical" : diagnostics.syncOutboxPendingCount ? "warning" : "success",
-      },
-      {
-        label: "Team setup",
-        value: `${usersSnapshot.users.filter((user) => user.isActive).length} active`,
-        detail: `${usersSnapshot.users.filter((user) => user.readyForTelegram).length} ready for Telegram.`,
-        tone: usersSnapshot.users.some((user) => user.isActive) ? "success" : "warning",
-      },
-      {
-        label: "Support",
-        value: supportSnapshot.lastCrash || supportSnapshot.lastError ? "Review" : "Stable",
-        detail: supportSnapshot.lastCrash || supportSnapshot.lastError ? "Recent runtime events are available." : "No recent crash or strong error captured.",
-        tone: supportSnapshot.lastCrash || supportSnapshot.lastError ? "warning" : "success",
-      },
-    ],
-    [
-      diagnostics.lastIntegrityCheckAt,
-      diagnostics.lastIntegrityCheckStatus,
-      diagnostics.syncOutboxFailedCount,
-      diagnostics.syncOutboxPendingCount,
-      supportSnapshot.lastCrash,
-      supportSnapshot.lastError,
-      usersSnapshot.users,
-    ],
   );
 
   useEffect(() => {
@@ -673,12 +663,7 @@ export const SettingsPage = () => {
 
   return (
     <div className="page-stack settings-page">
-      <SectionHeader
-        eyebrow="Settings"
-        title="Settings"
-        body="Workspace identity, team, data health and advanced tools — everything that shapes how your studio uses bukowskiOS."
-        titleTone="accent"
-      />
+      <SectionHeader title="Settings" />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
       {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
@@ -687,15 +672,10 @@ export const SettingsPage = () => {
 
       {activeSection === "general" ? (
         <div className="page-stack">
-          <div className="settings-health-grid">
-            {settingsHealthCards.map((card) => (
-              <div key={card.label} className={`settings-health-card settings-health-card-${card.tone}`}>
-                <span className="summary-label">{card.label}</span>
-                <strong>{card.value}</strong>
-                <span>{card.detail}</span>
-              </div>
-            ))}
-          </div>
+          <UserAccountSettings showHeader={false} />
+          <SurfaceCard title="Preferences">
+            <AutoLogoutSetting />
+          </SurfaceCard>
         </div>
       ) : null}
 
@@ -711,223 +691,232 @@ export const SettingsPage = () => {
             ))}
           </div>
 
-          <div className="settings-team-layout">
-            <SurfaceCard title="Users">
-              <button className={`settings-user-row${selectedUserId === "new" ? " is-selected" : ""}`} onClick={() => setSelectedUserId("new")} type="button">
-                <span className="settings-user-create-mark">+</span>
-                <span className="settings-user-row-copy">
-                  <span className="settings-user-row-topline">
-                    <strong>Create user</strong>
-                    <span>Add access</span>
-                  </span>
-                  <span className="settings-user-row-meta">Internal profile, role and optional Telegram link.</span>
-                </span>
-              </button>
-
-              <div className="settings-user-list">
-                {usersSnapshot.users.map((user) => (
-                  <button
-                    key={user.id}
-                    className={`settings-user-row${selectedUserId === user.id ? " is-selected" : ""}`}
-                    onClick={() => setSelectedUserId(user.id)}
-                    type="button"
-                  >
-                    <span
-                      aria-label={user.isActive ? "active" : "inactive"}
-                      className={`settings-user-status-dot settings-user-status-dot-${user.isActive ? "active" : "inactive"}`}
-                    />
-                    <span className="settings-user-row-copy">
-                      <span className="settings-user-row-topline">
-                        <strong>{user.fullName}</strong>
-                        <span>{user.roleName ?? "No role"}</span>
-                      </span>
-                      <span className="settings-user-row-meta">
-                        {user.isActive ? "Active" : "Inactive"}
-                        {user.linkedCrewLabel ? ` · ${user.linkedCrewLabel}` : ""}
-                      </span>
-                      <UserChannelDots user={user} />
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </SurfaceCard>
-
-            <SurfaceCard
-              title={selectedUser ? selectedUser.fullName : "Create user"}
-              aside={
-                <span className={`run-status-pill run-status-pill-${selectedUser?.isActive ? "configured" : "disabled"}`}>
-                  {selectedUser ? (selectedUser.isActive ? "Active" : "Inactive") : "New"}
-                </span>
-              }
-            >
-              <div className="agent-form-grid">
-                <label className="field-block">
-                  <span className="field-label">Full name</span>
-                  <input
-                    className="field-input"
-                    onChange={(event) => setUserDraft((current) => ({ ...current, fullName: event.target.value }))}
-                    placeholder="Daniel VTR"
-                    value={userDraft.fullName}
-                  />
-                </label>
-                <label className="field-block">
-                  <span className="field-label">Role</span>
-                  <select
-                    className="field-input"
-                    onChange={(event) => {
-                      const nextRoleId = event.target.value;
-                      setUserDraft((current) => ({ ...current, roleId: nextRoleId }));
-                      setRoleDirectoryId(nextRoleId);
-                    }}
-                    value={userDraft.roleId}
-                  >
-                    <option value="">Select a role</option>
-                    {usersSnapshot.roles.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field-block">
-                  <span className="field-label">Email</span>
-                  <input
-                    className="field-input"
-                    onChange={(event) => setUserDraft((current) => ({ ...current, email: event.target.value }))}
-                    placeholder="optional@metadata.cine"
-                    value={userDraft.email}
-                  />
-                </label>
-                <label className="field-block">
-                  <span className="field-label">Phone</span>
-                  <input
-                    className="field-input"
-                    onChange={(event) => setUserDraft((current) => ({ ...current, phone: event.target.value }))}
-                    placeholder="+1 809 ..."
-                    value={userDraft.phone}
-                  />
-                </label>
-                <label className="field-block field-block-span-2">
-                  <span className="field-label">Crew member</span>
-                  <select
-                    className="field-input"
-                    onChange={(event) => handleCrewMemberChange(event.target.value)}
-                    value={userDraft.linkedCrewMemberId}
-                  >
-                    <option value="">No linked crew</option>
-                    {catalog.crewMembers.map((crewMember) => (
-                      <option key={crewMember.id} value={crewMember.id}>
-                        {crewMember.fullName}
-                        {crewMember.roleLabel ? ` · ${crewMember.roleLabel}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="settings-user-context-grid">
-                <div className="summary-row">
-                  <span className="summary-label">Access</span>
-                  <span className="summary-value">{selectedRoleCoverage.length ? selectedRoleCoverage.join(", ") : "Choose a role"}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Telegram</span>
-                  <span className="summary-value">
-                    {selectedUser
-                      ? selectedUser.telegramLinkStatus === "linked"
-                        ? `${selectedUser.telegramDisplayName ?? selectedUser.fullName}`
-                        : selectedUser.telegramLinkStatus === "pending"
-                          ? "Pending link"
-                          : selectedUser.telegramLinkStatus === "revoked"
-                            ? "Revoked"
-                            : "Not linked"
-                      : "Create user first"}
-                  </span>
-                </div>
-              </div>
-
-              {selectedUser?.telegramExternalUserId ? (
-                <div className="models-provider-diagnostic">
-                  <span className="agent-detail-kicker">Telegram</span>
-                  <p>
-                    {selectedUser.telegramUsername ? `@${selectedUser.telegramUsername}` : selectedUser.telegramDisplayName ?? selectedUser.fullName}
-                    {selectedUser.telegramLastSeenAt ? ` · last seen ${new Date(selectedUser.telegramLastSeenAt).toLocaleString()}` : ""}
-                  </p>
-                </div>
-              ) : null}
-
-              <div className="action-panel-actions action-panel-actions-start">
-                <button
-                  className="action-primary-button"
-                  disabled={isSavingUser || !userDraft.fullName.trim() || !userDraft.roleId}
-                  onClick={() => void handleSaveUser()}
-                  type="button"
-                >
-                  {isSavingUser ? "Saving..." : selectedUser ? "Save user" : "Add User"}
-                </button>
-                {selectedUser ? (
-                  <button className="ghost-control" disabled={isTogglingUser} onClick={() => void handleToggleUser()} type="button">
-                    {isTogglingUser ? "Updating..." : selectedUser.isActive ? "Deactivate" : "Activate"}
-                  </button>
-                ) : null}
-                {selectedUser?.telegramLinkStatus === "linked" ? (
-                  <button className="ghost-control" disabled={isRevokingTelegram} onClick={() => void handleRevokeTelegram()} type="button">
-                    {isRevokingTelegram ? "Revoking..." : "Revoke Telegram"}
-                  </button>
-                ) : null}
-                {selectedUser && canRequestUserDelete ? (
-                  <button
-                    className="ghost-control is-danger"
-                    disabled={isDeletingUser}
-                    onClick={() => setIsDeleteUserConfirmOpen(true)}
-                    type="button"
-                  >
-                    Remove user
-                  </button>
-                ) : null}
-                <button className="ghost-control" onClick={() => navigate("/agents/connectors")} type="button">
-                  Channels
-                </button>
-              </div>
-            </SurfaceCard>
-          </div>
-
-          <SurfaceCard title="Roles">
-            <div className="settings-role-grid">
-              {usersSnapshot.roles.map((role) => {
-                const coverageLabels = getRoleCoverageLabels(role.permissionKeys);
-
-                return (
-                  <button
-                    key={role.id}
-                    className={`settings-role-card${roleDirectoryId === role.id ? " is-selected" : ""}`}
-                    onClick={() => setRoleDirectoryId(role.id)}
-                    type="button"
-                  >
-                    <span className="settings-role-card-head">
-                      <strong>{role.name}</strong>
-                      <span>{role.assignedUserCount} user{role.assignedUserCount === 1 ? "" : "s"}</span>
-                    </span>
-                    <span className="settings-role-card-copy">{roleUseCaseMap[role.key] ?? role.description}</span>
-                    <span className="settings-role-access">{coverageLabels.length ? coverageLabels.join(" · ") : "No access"}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </SurfaceCard>
-
-          <SurfaceCard
-            title="Permission matrix"
-            subtitle="Read-only view. Custom roles and editable matrix ship in the next release."
+          <SettingsDisclosure
+            title="Users"
+            summary={`${usersSnapshot.users.length} user${usersSnapshot.users.length === 1 ? "" : "s"} · ${usersSnapshot.users.filter((user) => user.isActive).length} active`}
           >
-            <RolesPermissionMatrix roles={usersSnapshot.roles} />
-          </SurfaceCard>
+            <div className="settings-team-layout">
+              <SurfaceCard title="Users">
+                <button className={`settings-user-row${selectedUserId === "new" ? " is-selected" : ""}`} onClick={() => setSelectedUserId("new")} type="button">
+                  <span className="settings-user-create-mark">+</span>
+                  <span className="settings-user-row-copy">
+                    <span className="settings-user-row-topline">
+                      <strong>Create user</strong>
+                      <span>Add access</span>
+                    </span>
+                    <span className="settings-user-row-meta">Name, role and optional channel access.</span>
+                  </span>
+                </button>
+
+                <div className="settings-user-list">
+                  {usersSnapshot.users.map((user) => (
+                    <button
+                      key={user.id}
+                      className={`settings-user-row${selectedUserId === user.id ? " is-selected" : ""}`}
+                      onClick={() => setSelectedUserId(user.id)}
+                      type="button"
+                    >
+                      <span
+                        aria-label={user.isActive ? "active" : "inactive"}
+                        className={`settings-user-status-dot settings-user-status-dot-${user.isActive ? "active" : "inactive"}`}
+                      />
+                      <span className="settings-user-row-copy">
+                        <span className="settings-user-row-topline">
+                          <strong>{user.fullName}</strong>
+                          <span>{user.roleName ?? "No role"}</span>
+                        </span>
+                        <span className="settings-user-row-meta">
+                          {user.isActive ? "Active" : "Inactive"}
+                          {user.linkedCrewLabel ? ` · ${user.linkedCrewLabel}` : ""}
+                        </span>
+                        <UserChannelDots user={user} />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </SurfaceCard>
+
+              <SurfaceCard
+                title={selectedUser ? selectedUser.fullName : "Create user"}
+                aside={
+                  <span className={`run-status-pill run-status-pill-${selectedUser?.isActive ? "configured" : "disabled"}`}>
+                    {selectedUser ? (selectedUser.isActive ? "Active" : "Inactive") : "New"}
+                  </span>
+                }
+              >
+                <div className="agent-form-grid">
+                  <label className="field-block">
+                    <span className="field-label">Full name</span>
+                    <input
+                      className="field-input"
+                      onChange={(event) => setUserDraft((current) => ({ ...current, fullName: event.target.value }))}
+                      placeholder="Full name"
+                      value={userDraft.fullName}
+                    />
+                  </label>
+                  <label className="field-block">
+                    <span className="field-label">Role</span>
+                    <select
+                      className="field-input"
+                      onChange={(event) => {
+                        const nextRoleId = event.target.value;
+                        setUserDraft((current) => ({ ...current, roleId: nextRoleId }));
+                        setRoleDirectoryId(nextRoleId);
+                      }}
+                      value={userDraft.roleId}
+                    >
+                      <option value="">Select a role</option>
+                      {usersSnapshot.roles.map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field-block">
+                    <span className="field-label">Email</span>
+                    <input
+                      className="field-input"
+                      onChange={(event) => setUserDraft((current) => ({ ...current, email: event.target.value }))}
+                      placeholder="name@studio.com"
+                      value={userDraft.email}
+                    />
+                  </label>
+                  <label className="field-block">
+                    <span className="field-label">Phone</span>
+                    <input
+                      className="field-input"
+                      onChange={(event) => setUserDraft((current) => ({ ...current, phone: event.target.value }))}
+                      placeholder="Optional phone"
+                      value={userDraft.phone}
+                    />
+                  </label>
+                  <label className="field-block field-block-span-2">
+                    <span className="field-label">Crew member</span>
+                    <select
+                      className="field-input"
+                      onChange={(event) => handleCrewMemberChange(event.target.value)}
+                      value={userDraft.linkedCrewMemberId}
+                    >
+                      <option value="">No linked crew</option>
+                      {catalog.crewMembers.map((crewMember) => (
+                        <option key={crewMember.id} value={crewMember.id}>
+                          {crewMember.fullName}
+                          {crewMember.roleLabel ? ` · ${crewMember.roleLabel}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="settings-user-context-grid">
+                  <div className="summary-row">
+                    <span className="summary-label">Access</span>
+                    <span className="summary-value">{selectedRoleCoverage.length ? selectedRoleCoverage.join(", ") : "Choose a role"}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">Telegram</span>
+                    <span className="summary-value">
+                      {selectedUser
+                        ? selectedUser.telegramLinkStatus === "linked"
+                          ? `${selectedUser.telegramDisplayName ?? selectedUser.fullName}`
+                          : selectedUser.telegramLinkStatus === "pending"
+                            ? "Pending link"
+                            : selectedUser.telegramLinkStatus === "revoked"
+                              ? "Revoked"
+                              : "Not linked"
+                        : "Create user first"}
+                    </span>
+                  </div>
+                </div>
+
+                {selectedUser?.telegramExternalUserId ? (
+                  <div className="models-provider-diagnostic">
+                    <span className="agent-detail-kicker">Telegram</span>
+                    <p>
+                      {selectedUser.telegramUsername ? `@${selectedUser.telegramUsername}` : selectedUser.telegramDisplayName ?? selectedUser.fullName}
+                      {selectedUser.telegramLastSeenAt ? ` · last seen ${new Date(selectedUser.telegramLastSeenAt).toLocaleString()}` : ""}
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="action-panel-actions action-panel-actions-start">
+                  <button
+                    className="action-primary-button"
+                    disabled={isSavingUser || !userDraft.fullName.trim() || !userDraft.roleId}
+                    onClick={() => void handleSaveUser()}
+                    type="button"
+                  >
+                    {isSavingUser ? "Saving..." : selectedUser ? "Save user" : "Add user"}
+                  </button>
+                  {selectedUser ? (
+                    <button className="ghost-control" disabled={isTogglingUser} onClick={() => void handleToggleUser()} type="button">
+                      {isTogglingUser ? "Updating..." : selectedUser.isActive ? "Deactivate" : "Activate"}
+                    </button>
+                  ) : null}
+                  {selectedUser?.telegramLinkStatus === "linked" ? (
+                    <button className="ghost-control" disabled={isRevokingTelegram} onClick={() => void handleRevokeTelegram()} type="button">
+                      {isRevokingTelegram ? "Revoking..." : "Revoke Telegram"}
+                    </button>
+                  ) : null}
+                  {selectedUser && canRequestUserDelete ? (
+                    <button
+                      className="ghost-control is-danger"
+                      disabled={isDeletingUser}
+                      onClick={() => setIsDeleteUserConfirmOpen(true)}
+                      type="button"
+                    >
+                      Remove user
+                    </button>
+                  ) : null}
+                  <button className="ghost-control" onClick={() => navigate("/agents/connectors")} type="button">
+                    Channels
+                  </button>
+                </div>
+              </SurfaceCard>
+            </div>
+          </SettingsDisclosure>
+
+          <SettingsDisclosure
+            title="Roles"
+            summary={`${usersSnapshot.roles.length} role${usersSnapshot.roles.length === 1 ? "" : "s"} · access presets`}
+          >
+            <SurfaceCard title="Roles">
+              <div className="settings-role-grid">
+                {usersSnapshot.roles.map((role) => {
+                  const coverageLabels = getRoleCoverageLabels(role.permissionKeys);
+
+                  return (
+                    <button
+                      key={role.id}
+                      className={`settings-role-card${roleDirectoryId === role.id ? " is-selected" : ""}`}
+                      onClick={() => setRoleDirectoryId(role.id)}
+                      type="button"
+                    >
+                      <span className="settings-role-card-head">
+                        <strong>{role.name}</strong>
+                        <span>{role.assignedUserCount} user{role.assignedUserCount === 1 ? "" : "s"}</span>
+                      </span>
+                      <span className="settings-role-card-copy">{roleUseCaseMap[role.key] ?? role.description}</span>
+                      <span className="settings-role-access">{coverageLabels.length ? coverageLabels.join(" · ") : "No access"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </SurfaceCard>
+          </SettingsDisclosure>
+
+          <SettingsDisclosure title="Permission matrix" summary="Detailed access by role">
+            <SurfaceCard title="Permission matrix">
+              <RolesPermissionMatrix roles={usersSnapshot.roles} />
+            </SurfaceCard>
+          </SettingsDisclosure>
         </div>
       ) : null}
 
       {activeSection === "data" ? (
         <div className="settings-data-stack">
-          <SurfaceCard title="Data health" subtitle="Use these actions before exports, handoffs or troubleshooting.">
+          <SurfaceCard title="Data health">
             <div className="summary-grid">
               {dataHealthRows.map((row) => (
                 <div key={row.label} className="summary-row">
@@ -965,7 +954,7 @@ export const SettingsPage = () => {
             </div>
           </SurfaceCard>
 
-          <SurfaceCard title="Sync activity" subtitle="Queue status for local changes waiting to be processed.">
+          <SurfaceCard title="Sync activity">
             <div className="summary-grid">
               {syncHealthRows.map((row) => (
                 <div key={row.label} className="summary-row">
@@ -1004,7 +993,7 @@ export const SettingsPage = () => {
 
       {activeSection === "advanced" ? (
         <div className="settings-advanced-layout">
-          <SurfaceCard className="settings-advanced-card settings-advanced-card-wide" title="Support" subtitle="Use this when something fails or you need a clean handoff for debugging.">
+          <SurfaceCard className="settings-advanced-card settings-advanced-card-wide" title="Support">
             <div className="summary-grid">
               <div className="summary-row">
                 <span className="summary-label">Last crash</span>
@@ -1075,7 +1064,7 @@ export const SettingsPage = () => {
             </div>
           </SurfaceCard>
 
-          <SurfaceCard className="settings-advanced-card" title="Workspace export" subtitle="Technical export for backups, handoff or inspection.">
+          <SurfaceCard className="settings-advanced-card" title="Data export">
             <div className="summary-grid">
               <div className="summary-row">
                 <span className="summary-label">Format</span>
@@ -1105,15 +1094,7 @@ export const SettingsPage = () => {
             </div>
           </SurfaceCard>
 
-          <SurfaceCard
-            className="settings-advanced-card"
-            title="Sign-in & security"
-            subtitle="Auto sign-out keeps shared machines safe when you walk away."
-          >
-            <AutoLogoutSetting />
-          </SurfaceCard>
-
-          <SurfaceCard className="settings-advanced-card" title="System" subtitle="Build and runtime details for support.">
+          <SurfaceCard className="settings-advanced-card" title="App info">
             <div className="summary-grid">
               <div className="summary-row">
                 <span className="summary-label">App</span>

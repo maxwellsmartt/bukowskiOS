@@ -22,6 +22,7 @@ import {
   updateAssistantThreadPreferences,
 } from "@features/agents/useAgentsData";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
+import { notifyWorkspaceDataChanged } from "@shared/hooks/useWorkspaceDataRefresh";
 
 import { useWorkspace } from "./WorkspaceProvider";
 
@@ -366,6 +367,10 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
         const nextSnapshot = await sendAssistantChatTurn(input);
         setSnapshot(nextSnapshot);
         setIsHydrated(true);
+        notifyWorkspaceDataChanged({
+          source: "assistant-chat",
+          entities: ["projects", "assets", "packing", "quotes", "incidents"],
+        });
       },
       setCompareTrayVisible,
     }),

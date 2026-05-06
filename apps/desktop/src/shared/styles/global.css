@@ -8385,17 +8385,23 @@ select.field-input {
 
 .settings-page {
   max-width: 1440px;
+  width: 100%;
 }
 
 .settings-shell-layout {
+  --settings-nav-width: clamp(190px, 18vw, 230px);
   display: grid;
-  grid-template-columns: clamp(180px, 22vw, 240px) minmax(0, 1fr);
+  grid-template-columns: var(--settings-nav-width) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-lg);
+  width: 100%;
+  min-height: min(76vh, 920px);
 }
 
 .settings-content-panel {
   min-width: 0;
+  width: 100%;
+  min-height: min(76vh, 920px);
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
@@ -8403,21 +8409,6 @@ select.field-input {
 
 .settings-content-panel > .page-stack {
   gap: var(--space-md);
-}
-
-.settings-content-panel.is-entering {
-  animation: settings-content-fade-in 160ms ease-out;
-}
-
-@keyframes settings-content-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .settings-section-tab:focus-visible {
@@ -8472,6 +8463,81 @@ select.field-input {
 .workspace-details-id {
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: var(--font-xs);
+}
+
+.workspace-disclosure,
+.settings-disclosure {
+  border: 1px solid var(--hairline-faint);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.014);
+  overflow: hidden;
+}
+
+.workspace-disclosure-trigger,
+.settings-disclosure-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: 16px 18px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.workspace-disclosure-trigger > span,
+.settings-disclosure-trigger > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workspace-disclosure-trigger strong,
+.settings-disclosure-trigger strong {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.workspace-disclosure-trigger small,
+.settings-disclosure-trigger small {
+  font-size: var(--font-xs);
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.workspace-disclosure-trigger svg,
+.settings-disclosure-trigger svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.workspace-disclosure-trigger:hover svg,
+.workspace-disclosure.is-open .workspace-disclosure-trigger svg,
+.settings-disclosure-trigger:hover svg,
+.settings-disclosure.is-open .settings-disclosure-trigger svg {
+  color: var(--text-secondary);
+}
+
+.workspace-disclosure.is-open .workspace-disclosure-trigger svg,
+.settings-disclosure.is-open .settings-disclosure-trigger svg {
+  transform: rotate(180deg);
+}
+
+.workspace-disclosure-body,
+.settings-disclosure-body {
+  padding: 0 12px 12px;
+}
+
+.workspace-disclosure-body > .surface-card,
+.settings-disclosure-body > .surface-card {
+  border-color: var(--hairline-faint);
+  background: rgba(9, 10, 13, 0.34);
 }
 
 .user-channel-dots {
@@ -9182,8 +9248,7 @@ select.field-input {
   text-align: left;
   transition:
     background 180ms ease,
-    color 180ms ease,
-    transform 180ms ease;
+    color 180ms ease;
 }
 
 .settings-section-tab span {
@@ -9201,7 +9266,6 @@ select.field-input {
 .settings-section-tab:hover {
   background: rgba(255, 255, 255, 0.045);
   color: var(--text-primary);
-  transform: translateY(-1px);
 }
 
 .settings-section-tab.is-active {

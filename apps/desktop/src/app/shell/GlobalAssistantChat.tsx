@@ -371,7 +371,7 @@ export const GlobalAssistantChat = () => {
   const [isSending, setIsSending] = useState(false);
   const [selectedModel, setSelectedModel] = useState("GPT-5.4");
   const [selectedReasoning, setSelectedReasoning] = useState("High");
-  const [selectedApproval, setSelectedApproval] = useState<AssistantApprovalPreference>("supervised");
+  const [selectedApproval, setSelectedApproval] = useState<AssistantApprovalPreference>("unsupervised");
   const [attachments, setAttachments] = useState<AssistantGatewayAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [activeSelector, setActiveSelector] = useState<ActiveSelector>(null);

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Pencil, Save, Send, X } from "lucide-react";
+import { ChevronDown, Pencil, Save, Send, X } from "lucide-react";
 
 import type { AppUserAdminRow, AppUsersSnapshot } from "@contracts";
 import { useSession } from "@app/providers/SessionProvider";
@@ -56,6 +56,35 @@ const resolveMembershipLabel = (status: AppUserAdminRow["membershipStatus"]) => 
   }
 
   return "Not in workspace";
+};
+
+type WorkspaceDisclosureProps = {
+  children: ReactNode;
+  defaultOpen?: boolean;
+  summary: string;
+  title: string;
+};
+
+const WorkspaceDisclosure = ({ children, defaultOpen = false, summary, title }: WorkspaceDisclosureProps) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <section className={`workspace-disclosure${isOpen ? " is-open" : ""}`}>
+      <button
+        aria-expanded={isOpen}
+        className="workspace-disclosure-trigger"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span>
+          <strong>{title}</strong>
+          <small>{summary}</small>
+        </span>
+        <ChevronDown size={17} aria-hidden="true" />
+      </button>
+      {isOpen ? <div className="workspace-disclosure-body">{children}</div> : null}
+    </section>
+  );
 };
 
 export const WorkspaceSettingsPage = () => {
@@ -295,20 +324,14 @@ export const WorkspaceSettingsPage = () => {
 
   return (
     <div className="page-stack settings-page">
-      <SectionHeader
-        eyebrow="Workspace"
-        title={activeWorkspaceName}
-        body="Identity, currency, branding, members and roles for this workspace."
-        titleTone="accent"
-      />
+      <SectionHeader eyebrow="Workspace" title={activeWorkspaceName} />
 
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
       <SettingsLayout>
 
       <SurfaceCard
-        title="Identity"
-        subtitle="The workspace's name, slug and accent. Currency lives below."
+        title="General info"
         aside={
           workspaceProfile && !isEditingWorkspace && !isLocalFallback ? (
             <button className="ghost-control" onClick={() => setIsEditingWorkspace(true)} type="button">
@@ -329,7 +352,7 @@ export const WorkspaceSettingsPage = () => {
               />
             </label>
             <label className="field-block">
-              <span className="field-label">Icon color (hex, optional)</span>
+              <span className="field-label">Accent color</span>
               <input
                 className="field-input"
                 onChange={(event) => setWorkspaceDraft((current) => ({ ...current, iconColor: event.target.value }))}
@@ -377,11 +400,11 @@ export const WorkspaceSettingsPage = () => {
                   <span className="summary-value">{workspaceProfile?.name ?? activeWorkspaceName}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Slug</span>
+                  <span className="summary-label">Short name</span>
                   <span className="summary-value">{workspaceProfile?.slug ?? "—"}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Icon color</span>
+                  <span className="summary-label">Accent color</span>
                   <span className="summary-value">
                     {workspaceProfile?.iconColor ? (
                       <span className="workspace-color-chip">
@@ -394,8 +417,8 @@ export const WorkspaceSettingsPage = () => {
                   </span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Workspace ID</span>
-                  <span className="summary-value workspace-details-id">{activeWorkspaceId}</span>
+                  <span className="summary-label">Base currency</span>
+                  <span className="summary-value">{workspaceProfile?.baseCurrency ?? "USD"}</span>
                 </div>
               </div>
             </div>
@@ -421,189 +444,201 @@ export const WorkspaceSettingsPage = () => {
         )}
       </SurfaceCard>
 
-      <CurrencySettingsCard />
-      <WorkspaceBrandingCard />
+      <WorkspaceDisclosure title="Currency" summary={`Base currency and exchange rates${workspaceProfile?.baseCurrency ? ` · ${workspaceProfile.baseCurrency}` : ""}`}>
+        <CurrencySettingsCard />
+      </WorkspaceDisclosure>
 
-      <SurfaceCard
-        title="Members"
-        aside={
-          <button
-            className="action-primary-button"
-            disabled={isLocalFallback || !inviteRolesForDialog.length}
-            data-tooltip={isLocalFallback ? "Invites require a Supabase session" : undefined}
-            onClick={() => setInviteOpen(true)}
-            type="button"
-          >
-            <Send size={14} />
-            <span>Invite member</span>
-          </button>
-        }
-      >
-        <DataTable
-          getRowId={(row) => row.id}
-          maxHeight="min(48vh, 540px)"
-          persistKey="workspace-settings-members"
-          columns={[
-            {
-              key: "person",
-              label: "Member",
-              render: (row) => (
-                <div className="identity-cell">
-                  <span className="identity-title">{row.fullName}</span>
-                  <span className="identity-meta">{row.email || "Email pending"}</span>
-                </div>
-              ),
-            },
-            {
-              key: "role",
-              label: "Role",
-              render: (row) => {
-                const isSelf = row.id === sessionUser?.id;
-                const canEdit = !isLocalFallback && Boolean(supabase) && !isSelf;
-                if (!canEdit) {
-                  return <span>{row.roleName ?? "Member"}</span>;
-                }
-                return (
-                  <select
-                    className="field-input field-input-inline"
-                    onChange={(event) => void handleChangeMemberRole(row, event.target.value)}
-                    onClick={(event) => event.stopPropagation()}
-                    value={row.roleId ?? ""}
-                  >
-                    {usersSnapshot.roles.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.name}
-                      </option>
-                    ))}
-                  </select>
-                );
-              },
-            },
-            {
-              key: "status",
-              label: "Membership",
-              render: (row) => (
-                <StatusBadge tone={resolveMembershipTone(row.membershipStatus)}>
-                  {resolveMembershipLabel(row.membershipStatus)}
-                </StatusBadge>
-              ),
-            },
-            {
-              key: "permissions",
-              label: "Permissions",
-              align: "right",
-              render: (row) => row.permissionKeys.length,
-            },
-            {
-              key: "actions",
-              label: "Actions",
-              align: "right",
-              render: (row) => {
-                const isSelf = row.id === sessionUser?.id;
-                if (isSelf || isLocalFallback || !supabase) {
-                  return null;
-                }
-                const isActive = row.membershipStatus === "active";
-                return (
-                  <button
-                    className={`ghost-control${isActive ? " is-danger" : ""}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void handleToggleMemberStatus(row);
-                    }}
-                    type="button"
-                  >
-                    {isActive ? "Suspend" : "Reactivate"}
-                  </button>
-                );
-              },
-            },
-          ]}
-          rows={teamMembers}
-          emptyMessage="No members yet."
-        />
-      </SurfaceCard>
+      <WorkspaceDisclosure title="Branding" summary="Logo and document assets">
+        <WorkspaceBrandingCard />
+      </WorkspaceDisclosure>
 
-      <SurfaceCard title="Pending invites">
-        {pendingInvites.length === 0 ? (
-          <p className="surface-card-subtitle">
-            No invitations waiting. When you send one, your teammate gets a magic link in their inbox — no password required.
-          </p>
-        ) : (
+      <WorkspaceDisclosure title="Members" summary={`${teamMembers.length} member${teamMembers.length === 1 ? "" : "s"} · ${teamMembers.filter((member) => member.membershipStatus === "active").length} active`}>
+        <SurfaceCard
+          title="Members"
+          aside={
+            <button
+              className="action-primary-button"
+              disabled={isLocalFallback || !inviteRolesForDialog.length}
+              data-tooltip={isLocalFallback ? "Sign in to send invites" : undefined}
+              onClick={() => setInviteOpen(true)}
+              type="button"
+            >
+              <Send size={14} />
+              <span>Invite member</span>
+            </button>
+          }
+        >
           <DataTable
             getRowId={(row) => row.id}
-            persistKey="workspace-settings-pending-invites"
+            maxHeight="min(48vh, 540px)"
+            persistKey="workspace-settings-members"
             columns={[
-              { key: "email", label: "Email", render: (row) => row.email },
-              { key: "role", label: "Role", render: (row) => row.roleName },
               {
-                key: "invitedAt",
-                label: "Invited",
-                render: (row) => (row.invitedAt ? new Date(row.invitedAt).toLocaleDateString() : "Pending"),
+                key: "person",
+                label: "Member",
+                render: (row) => (
+                  <div className="identity-cell">
+                    <span className="identity-title">{row.fullName}</span>
+                    <span className="identity-meta">{row.email || "Email pending"}</span>
+                  </div>
+                ),
+              },
+              {
+                key: "role",
+                label: "Role",
+                render: (row) => {
+                  const isSelf = row.id === sessionUser?.id;
+                  const canEdit = !isLocalFallback && Boolean(supabase) && !isSelf;
+                  if (!canEdit) {
+                    return <span>{row.roleName ?? "Member"}</span>;
+                  }
+                  return (
+                    <select
+                      className="field-input field-input-inline"
+                      onChange={(event) => void handleChangeMemberRole(row, event.target.value)}
+                      onClick={(event) => event.stopPropagation()}
+                      value={row.roleId ?? ""}
+                    >
+                      {usersSnapshot.roles.map((role) => (
+                        <option key={role.id} value={role.id}>
+                          {role.name}
+                        </option>
+                      ))}
+                    </select>
+                  );
+                },
+              },
+              {
+                key: "status",
+                label: "Membership",
+                render: (row) => (
+                  <StatusBadge tone={resolveMembershipTone(row.membershipStatus)}>
+                    {resolveMembershipLabel(row.membershipStatus)}
+                  </StatusBadge>
+                ),
+              },
+              {
+                key: "permissions",
+                label: "Permissions",
+                align: "right",
+                render: (row) => row.permissionKeys.length,
               },
               {
                 key: "actions",
                 label: "Actions",
                 align: "right",
-                render: (row) => (
-                  <div className="surface-card-actions" style={{ justifyContent: "flex-end" }}>
+                render: (row) => {
+                  const isSelf = row.id === sessionUser?.id;
+                  if (isSelf || isLocalFallback || !supabase) {
+                    return null;
+                  }
+                  const isActive = row.membershipStatus === "active";
+                  return (
                     <button
-                      className="ghost-control"
-                      disabled={!row.roleId}
-                      onClick={() => void handleResendInvite(row)}
+                      className={`ghost-control${isActive ? " is-danger" : ""}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleToggleMemberStatus(row);
+                      }}
                       type="button"
                     >
-                      Resend
+                      {isActive ? "Suspend" : "Reactivate"}
                     </button>
-                    <button
-                      className="ghost-control is-danger"
-                      onClick={() => void handleRevokeInvite(row)}
-                      type="button"
-                    >
-                      Revoke
-                    </button>
-                  </div>
-                ),
+                  );
+                },
               },
             ]}
-            rows={pendingInvites}
-            emptyMessage="No pending invites."
+            rows={teamMembers}
+            emptyMessage="No members yet."
           />
-        )}
-      </SurfaceCard>
+        </SurfaceCard>
+      </WorkspaceDisclosure>
+
+      <WorkspaceDisclosure title="Pending invites" summary={pendingInvites.length ? `${pendingInvites.length} waiting` : "No pending invites"}>
+        <SurfaceCard title="Pending invites">
+          {pendingInvites.length === 0 ? (
+            <p className="surface-card-subtitle">
+              No invitations waiting. New teammates get a magic link by email.
+            </p>
+          ) : (
+            <DataTable
+              getRowId={(row) => row.id}
+              persistKey="workspace-settings-pending-invites"
+              columns={[
+                { key: "email", label: "Email", render: (row) => row.email },
+                { key: "role", label: "Role", render: (row) => row.roleName },
+                {
+                  key: "invitedAt",
+                  label: "Invited",
+                  render: (row) => (row.invitedAt ? new Date(row.invitedAt).toLocaleDateString() : "Pending"),
+                },
+                {
+                  key: "actions",
+                  label: "Actions",
+                  align: "right",
+                  render: (row) => (
+                    <div className="surface-card-actions" style={{ justifyContent: "flex-end" }}>
+                      <button
+                        className="ghost-control"
+                        disabled={!row.roleId}
+                        onClick={() => void handleResendInvite(row)}
+                        type="button"
+                      >
+                        Resend
+                      </button>
+                      <button
+                        className="ghost-control is-danger"
+                        onClick={() => void handleRevokeInvite(row)}
+                        type="button"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  ),
+                },
+              ]}
+              rows={pendingInvites}
+              emptyMessage="No pending invites."
+            />
+          )}
+        </SurfaceCard>
+      </WorkspaceDisclosure>
 
       {supabase && !isLocalFallback ? (
-        <CustomRolesEditor supabase={supabase} workspaceId={activeWorkspaceId} />
+        <WorkspaceDisclosure title="Roles" summary={`${usersSnapshot.roles.length} role${usersSnapshot.roles.length === 1 ? "" : "s"} available`}>
+          <CustomRolesEditor supabase={supabase} workspaceId={activeWorkspaceId} />
+        </WorkspaceDisclosure>
       ) : null}
 
-      <SurfaceCard
-        title="Channel access"
-        subtitle="Link members to the messaging channels they should reach the assistant from."
-        aside={
-          <button className="action-primary-button" onClick={() => navigate("/agents/connectors")} type="button">
-            <Send size={13} />
-            <span>Manage channels</span>
-          </button>
-        }
-      >
-        <p className="surface-card-subtitle">
-          Today only Telegram is wired with a delivery provider — find each member there and pair them with their
-          internal account. WhatsApp, Email and Webhook are staged but ship in a future release.
-        </p>
-      </SurfaceCard>
+      <WorkspaceDisclosure title="Channels" summary="Messaging access for workspace members">
+        <SurfaceCard
+          title="Channel access"
+          aside={
+            <button className="action-primary-button" onClick={() => navigate("/agents/connectors")} type="button">
+              <Send size={13} />
+              <span>Manage channels</span>
+            </button>
+          }
+        >
+          <p className="surface-card-subtitle">
+            Connect members to the messaging channels they use with the assistant.
+          </p>
+        </SurfaceCard>
+      </WorkspaceDisclosure>
 
       {memberships.length > 1 ? (
-        <SurfaceCard title="Switch workspace">
-          <p className="surface-card-subtitle">You belong to {memberships.length} workspaces.</p>
-          <ul className="confirm-dialog-list" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-            {memberships.map((membership) => (
-              <li key={membership.workspaceId}>
-                <strong>{membership.workspaceName}</strong> · {membership.roleName}
-                {membership.workspaceId === activeWorkspaceId ? " (active)" : null}
-              </li>
-            ))}
-          </ul>
-        </SurfaceCard>
+        <WorkspaceDisclosure title="Other workspaces" summary={`${memberships.length} workspaces connected`}>
+          <SurfaceCard title="Other workspaces">
+            <ul className="confirm-dialog-list" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+              {memberships.map((membership) => (
+                <li key={membership.workspaceId}>
+                  <strong>{membership.workspaceName}</strong> · {membership.roleName}
+                  {membership.workspaceId === activeWorkspaceId ? " (active)" : null}
+                </li>
+              ))}
+            </ul>
+          </SurfaceCard>
+        </WorkspaceDisclosure>
       ) : null}
 
       </SettingsLayout>

@@ -18,7 +18,11 @@ const initialsFor = (value: string): string => {
   return trimmed.slice(0, 2).toUpperCase();
 };
 
-export const UserAccountSettings = () => {
+type UserAccountSettingsProps = {
+  showHeader?: boolean;
+};
+
+export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsProps) => {
   const toast = useToast();
   const { user, status, supabase, isLocalFallback, signOut, refreshUser } = useSession();
   const { activeMembership, activeWorkspaceName } = useWorkspace();
@@ -145,12 +149,12 @@ export const UserAccountSettings = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        eyebrow="Account"
-        title="Your account"
-        body="Profile, identity and session controls. These settings apply to you on this workspace."
-        titleTone="accent"
-      />
+      {showHeader ? (
+        <SectionHeader
+          eyebrow="Account"
+          title="Your account"
+        />
+      ) : null}
 
       <SurfaceCard title="Profile">
         <div className="user-account-row">
@@ -203,7 +207,7 @@ export const UserAccountSettings = () => {
             <input
               className="field-input"
               onChange={(event) => setFullName(event.target.value)}
-              placeholder="Ernesto Maxwell"
+              placeholder="Your display name"
               value={fullName}
             />
           </label>
@@ -226,11 +230,11 @@ export const UserAccountSettings = () => {
         </div>
 
         <p className="surface-card-subtitle" style={{ marginTop: 8, fontSize: "var(--font-2xs)", color: "var(--text-muted)" }}>
-          Click your avatar to upload a photo. PNG, JPEG or WebP, up to 2 MB. We store it on Supabase Storage.
+          Click your avatar to upload a photo. PNG, JPEG or WebP, up to 2 MB.
         </p>
       </SurfaceCard>
 
-      <SurfaceCard title="Session">
+      <SurfaceCard title="Access">
         <div className="summary-grid compact-summary-grid">
           <div className="summary-row">
             <span className="summary-label">Signed in as</span>

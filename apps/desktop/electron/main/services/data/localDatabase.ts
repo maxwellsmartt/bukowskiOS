@@ -1,10 +1,11 @@
-import { app, safeStorage } from "electron";
+import { app, BrowserWindow, safeStorage } from "electron";
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 
 import {
   DEFAULT_WORKSPACE_ID,
+  ipcChannels,
   type AppDiagnosticsSnapshot,
   type AppExportResult,
   type AppInfo,
@@ -994,6 +995,31 @@ const createRuntime = (): LocalDatabaseRuntime => {
       rma: rmaMutations,
       assets: assetMutations,
       finance: financeMutations,
+      quotes: quoteMutations,
+      projectLookup: {
+        findByCode(workspaceId, code) {
+          const row = database
+            .prepare(
+              `
+                SELECT id, code, name, status
+                FROM projects
+                WHERE workspace_id = ?
+                  AND code = ?
+                LIMIT 1
+              `,
+            )
+            .get(workspaceId, code.toUpperCase()) as
+            | {
+                id: string;
+                code: string;
+                name: string;
+                status: string;
+              }
+            | undefined;
+
+          return row ?? null;
+        },
+      },
     },
   });
   const memoryService = createAssistantMemoryService(database);
@@ -1011,6 +1037,15 @@ const createRuntime = (): LocalDatabaseRuntime => {
     assistantGatewayService,
     memoryService,
     attachmentsRootPath,
+    onWorkspaceDataChanged: (detail) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send(ipcChannels.shell.appAction, {
+          type: "workspace-data-changed",
+          source: detail.source,
+          entities: detail.entities,
+        });
+      }
+    },
   });
   const connectorBridgeService = createConnectorBridgeService(database, {
     assistantChatService,

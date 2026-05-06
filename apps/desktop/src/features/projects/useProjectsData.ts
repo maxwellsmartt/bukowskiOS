@@ -25,6 +25,7 @@ import type {
 import type { CatalogSnapshot, ProjectCardRow, ProjectDetailSnapshot } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
 import { useEffect, useState } from "react";
 
 const catalogRefreshEvent = "bukowski:catalog-changed";
@@ -106,8 +107,10 @@ export const notifyCatalogChanged = () => {
   window.dispatchEvent(new Event(catalogRefreshEvent));
 };
 
-export const useProjectsRegistry = (query: ProjectListQuery = defaultProjectListQuery) =>
-  useAsyncValue(
+export const useProjectsRegistry = (query: ProjectListQuery = defaultProjectListQuery) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiProjects) {
         return emptyProjects;
@@ -116,8 +119,9 @@ export const useProjectsRegistry = (query: ProjectListQuery = defaultProjectList
       return window.bukowskiProjects.getList(query);
     },
     emptyProjects,
-    [query.includeArchived, query.search, query.sortBy, query.sortDirection, query.workspaceId],
+    [query.includeArchived, query.search, query.sortBy, query.sortDirection, query.workspaceId, refreshVersion],
   );
+};
 
 export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery) => {
   const refreshVersion = useCatalogRefreshVersion();
@@ -139,8 +143,10 @@ export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery
   );
 };
 
-export const useProjectDetail = (projectId: string | null) =>
-  useAsyncValue(
+export const useProjectDetail = (projectId: string | null) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiProjects || !projectId) {
         return emptyProjectDetail;
@@ -149,8 +155,9 @@ export const useProjectDetail = (projectId: string | null) =>
       return window.bukowskiProjects.getDetail(projectId);
     },
     emptyProjectDetail,
-    [projectId],
+    [projectId, refreshVersion],
   );
+};
 
 export const createCatalogEntity = async (input: CreateCatalogEntityInput): Promise<CatalogSnapshot> => {
   if (!window.bukowskiCatalog) {

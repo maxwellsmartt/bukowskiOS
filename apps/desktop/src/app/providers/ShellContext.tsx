@@ -15,6 +15,7 @@ import type {
 import type { ProjectRouteSection, ScopeMode } from "@app/routing/route-meta";
 import { resolveActiveRoute, resolveRememberedGlobalPath } from "@app/routing/route-meta";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
 import { readJsonPreference, readStringPreference, uiPreferenceKeys, writeJsonPreference, writePreference } from "@shared/lib/preferences";
 import { useWorkspace } from "./WorkspaceProvider";
 
@@ -85,6 +86,7 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   const [rememberedProjectId, setRememberedProjectId] = useState<string | null>(() =>
     readStringPreference(uiPreferenceKeys.activeProjectId),
   );
+  const workspaceDataRefreshVersion = useWorkspaceDataRefreshVersion();
 
   useEffect(() => {
     const load = async () => {
@@ -156,6 +158,16 @@ export const ShellContextProvider = ({ children }: ShellContextProviderProps) =>
   useEffect(() => {
     void refreshProjects();
   }, [refreshProjects]);
+
+  useEffect(() => {
+    if (workspaceDataRefreshVersion === 0) {
+      return;
+    }
+
+    void refreshProjects().finally(() => {
+      setProjectDataVersion((current) => current + 1);
+    });
+  }, [refreshProjects, workspaceDataRefreshVersion]);
 
   useEffect(() => {
     writePreference(uiPreferenceKeys.activeProjectId, rememberedProjectId);

@@ -8,6 +8,7 @@ import { useAssetSnapshotPull } from "@shared/hooks/useAssetSnapshotPull";
 import { useCatalogPull } from "@shared/hooks/useCatalogPull";
 import { useOperationalSnapshotPull } from "@shared/hooks/useOperationalSnapshotPull";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { notifyWorkspaceDataChanged } from "@shared/hooks/useWorkspaceDataRefresh";
 import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { Breadcrumb } from "@shared/components/Breadcrumb";
@@ -185,6 +186,14 @@ export const AppShell = () => {
 
       if (action.type === "switch-workspace") {
         navigate("/workspaces/select");
+        return;
+      }
+
+      if (action.type === "workspace-data-changed") {
+        notifyWorkspaceDataChanged({
+          source: action.source === "assistant-tool" ? "assistant-tool" : "sync",
+          entities: action.entities,
+        });
         return;
       }
 

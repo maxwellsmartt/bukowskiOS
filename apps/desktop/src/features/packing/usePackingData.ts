@@ -9,6 +9,7 @@ import type {
   ReturnPackingSlipItemsResult,
 } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
+import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
 
 const emptyPackingSlips: PackingSlipRow[] = [];
 const emptyPackingSlipDetail: PackingSlipDetailSnapshot = {
@@ -23,8 +24,10 @@ const defaultPackingListQuery: PackingSlipListQuery = {
   sortDirection: "desc",
 };
 
-export const usePackingList = (query: PackingSlipListQuery = defaultPackingListQuery) =>
-  useAsyncValue(
+export const usePackingList = (query: PackingSlipListQuery = defaultPackingListQuery) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiPacking) {
         return emptyPackingSlips;
@@ -33,11 +36,14 @@ export const usePackingList = (query: PackingSlipListQuery = defaultPackingListQ
       return window.bukowskiPacking.getList(query);
     },
     emptyPackingSlips,
-    [query.workspaceId, query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
+    [query.workspaceId, query.scopeProjectId, query.search, query.sortBy, query.sortDirection, refreshVersion],
   );
+};
 
-export const usePackingDetail = (packingSlipId: string | null) =>
-  useAsyncValue(
+export const usePackingDetail = (packingSlipId: string | null) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiPacking || !packingSlipId) {
         return emptyPackingSlipDetail;
@@ -46,8 +52,9 @@ export const usePackingDetail = (packingSlipId: string | null) =>
       return window.bukowskiPacking.getDetail(packingSlipId);
     },
     emptyPackingSlipDetail,
-    [packingSlipId],
+    [packingSlipId, refreshVersion],
   );
+};
 
 export const createPackingSlip = async (input: CreatePackingSlipCommand): Promise<CreatePackingSlipResult> => {
   if (!window.bukowskiPacking) {

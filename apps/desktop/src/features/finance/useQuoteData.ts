@@ -10,6 +10,7 @@ import type {
   SetQuoteStatusCommand,
   UpdateQuoteCommand,
 } from "@contracts";
+import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
 
 const emptyQuotes: QuoteRow[] = [];
 
@@ -18,6 +19,7 @@ export const useQuotesList = (filter: QuoteListFilter) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -54,6 +56,7 @@ export const useQuotesList = (filter: QuoteListFilter) => {
     filter.search,
     filter.limit,
     version,
+    refreshVersion,
   ]);
 
   return { data, isLoading, error, refresh };
@@ -64,6 +67,7 @@ export const useQuoteDetail = (workspaceId: string, quoteId: string | null | und
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -89,7 +93,7 @@ export const useQuoteDetail = (workspaceId: string, quoteId: string | null | und
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, quoteId, version]);
+  }, [workspaceId, quoteId, version, refreshVersion]);
 
   return { data, isLoading, error, refresh };
 };
@@ -107,6 +111,7 @@ export const useQuoteVersions = (workspaceId: string, quoteId: string | null | u
   const [data, setData] = useState<QuoteVersionRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -131,7 +136,7 @@ export const useQuoteVersions = (workspaceId: string, quoteId: string | null | u
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, quoteId, version]);
+  }, [workspaceId, quoteId, version, refreshVersion]);
 
   return { data, isLoading, refresh };
 };

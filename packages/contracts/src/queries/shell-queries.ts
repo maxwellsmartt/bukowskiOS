@@ -24,6 +24,11 @@ export type ShellAppAction =
     }
   | {
       type: "switch-workspace";
+    }
+  | {
+      type: "workspace-data-changed";
+      source?: string;
+      entities?: string[];
     };
 
 export type GlobalSearchEntityType = "asset" | "project" | "project_unit" | "packing_slip" | "incident" | "financial_entry";

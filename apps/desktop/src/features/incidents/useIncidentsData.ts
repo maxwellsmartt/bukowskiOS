@@ -9,6 +9,7 @@ import type {
   UpdateIncidentCommand,
 } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
+import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
 
 const emptyIncidents: IncidentListRow[] = [];
 
@@ -24,8 +25,10 @@ const emptyIncidentDetail: IncidentDetailSnapshot = {
   files: [],
 };
 
-export const useIncidentsData = (query: IncidentListQuery = defaultIncidentListQuery) =>
-  useAsyncValue(
+export const useIncidentsData = (query: IncidentListQuery = defaultIncidentListQuery) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiIncidents) {
         return emptyIncidents;
@@ -34,11 +37,14 @@ export const useIncidentsData = (query: IncidentListQuery = defaultIncidentListQ
       return window.bukowskiIncidents.getList(query);
     },
     emptyIncidents,
-    [query.workspaceId, query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
+    [query.workspaceId, query.scopeProjectId, query.search, query.sortBy, query.sortDirection, refreshVersion],
   );
+};
 
-export const useIncidentDetail = (incidentId: string | null) =>
-  useAsyncValue(
+export const useIncidentDetail = (incidentId: string | null) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiIncidents || !incidentId) {
         return emptyIncidentDetail;
@@ -47,8 +53,9 @@ export const useIncidentDetail = (incidentId: string | null) =>
       return window.bukowskiIncidents.getDetail(incidentId);
     },
     emptyIncidentDetail,
-    [incidentId],
+    [incidentId, refreshVersion],
   );
+};
 
 export const reportIncident = async (input: ReportIncidentCommand): Promise<ReportIncidentResult> => {
   if (!window.bukowskiIncidents) {

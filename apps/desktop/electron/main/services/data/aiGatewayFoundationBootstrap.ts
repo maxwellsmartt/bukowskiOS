@@ -182,6 +182,37 @@ export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
     /* table may not exist yet on a brand-new install — ignore */
   }
 
+  // Project writes were promoted from read-only analysis to operational tools.
+  // Patch installed workspaces in place so existing agent rows don't keep the
+  // old "do not mutate schedules" prompt after the seed changes.
+  try {
+    const projectAgentSeed = agentConfig.agents.find((agent) => agent.agent_key === "projects-scheduling-agent");
+    if (projectAgentSeed) {
+      db.prepare(
+        `UPDATE agents
+            SET role_summary = ?,
+                mission = ?,
+                allowed_tools_json = ?,
+                notes = ?,
+                base_prompt = ?,
+                can_execute_write_actions = ?,
+                updated_at = ?
+          WHERE agent_key = ?`,
+      ).run(
+        projectAgentSeed.role_summary,
+        projectAgentSeed.mission,
+        toJson(projectAgentSeed.allowed_tools_json),
+        projectAgentSeed.notes,
+        projectAgentSeed.base_prompt,
+        projectAgentSeed.can_execute_write_actions ? 1 : 0,
+        new Date().toISOString(),
+        projectAgentSeed.agent_key,
+      );
+    }
+  } catch {
+    /* tolerate brand-new installs where the agents table does not exist yet */
+  }
+
   // Sprint B: ensure every operational agent has the `ask_user_choice` tool
   // available so it can ask multi-choice clarifications instead of free-text
   // questions. We patch the tools list in place for agents whose JSON does not

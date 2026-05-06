@@ -364,6 +364,147 @@ describe("assistant gateway service", () => {
     cleanup();
   });
 
+  it("forces specialist tool use when the supervisor marks an action as tool-backed", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-specialist-required-tool");
+    const secrets = new Map<string, string>();
+    const secretStore = {
+      hasProviderSecret: (workspaceId: string, providerKey: string) => secrets.has(`${workspaceId}:${providerKey}`),
+      getProviderSecret: (workspaceId: string, providerKey: string) => secrets.get(`${workspaceId}:${providerKey}`) ?? null,
+      setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => {
+        secrets.set(`${workspaceId}:${providerKey}`, secret);
+      },
+      clearProviderSecret: (workspaceId: string, providerKey: string) => {
+        secrets.delete(`${workspaceId}:${providerKey}`);
+      },
+    };
+
+    const configMutations = createAgentMutationService(database, {
+      secretStore,
+      openaiProviderService: {
+        createResponse: async () => ({
+          ok: true as const,
+          responseId: "noop",
+          status: "completed",
+          outputText: "{}",
+          functionCalls: [],
+        }),
+        testConnection: async () => ({
+          ok: true as const,
+          status: "healthy" as const,
+          summary: "OpenAI responded successfully.",
+        }),
+      },
+      assistantGatewayService: {
+        sendMessage: async () => {
+          throw new Error("Not used while setting provider config.");
+        },
+        continueApprovedRun: async () => {
+          throw new Error("Not used while setting provider config.");
+        },
+      },
+    });
+
+    configMutations.saveAIProviderConfig({
+      commandId: "cmd-openai-config-specialist-required-tool",
+      workspaceId: "workspace-metadata",
+      providerKey: "openai",
+      enabled: true,
+      apiKey: "sk-test",
+      defaultModelKey: "openai:gpt-5.4",
+      timeoutMs: 20000,
+      retryCount: 1,
+      baseUrl: "",
+    });
+
+    const calls: Array<{ toolChoice?: "auto" | "none" | "required"; input: unknown }> = [];
+    let responseCount = 0;
+    const gateway = createAssistantGatewayService(database, {
+      secretStore,
+      sessionStore: createAssistantGatewaySessionStore(),
+      toolRegistry: createAgentToolRegistry(createFoundationReadService(database), {
+        getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+      }),
+      openaiProviderService: {
+        createResponse: async (_config, input) => {
+          calls.push({ toolChoice: input.toolChoice, input: input.input });
+          responseCount += 1;
+
+          if (responseCount === 1) {
+            return {
+              ok: true as const,
+              responseId: "resp-supervisor",
+              status: "completed",
+              outputText: JSON.stringify({
+                intent: "run_operational_test",
+                target_agent: "finance-agent",
+                confidence: 0.95,
+                requires_approval: false,
+                tool_call_requested: true,
+                user_facing_summary: "Routed to Finance Agent to run the operational test.",
+                answer_kind: "informational",
+                draft_run_title: null,
+                draft_run_description: null,
+              }),
+              functionCalls: [],
+            };
+          }
+
+          if (responseCount === 2) {
+            return {
+              ok: true as const,
+              responseId: "resp-specialist-tool",
+              status: "completed",
+              outputText: "",
+              functionCalls: [
+                {
+                  id: "fc-specialist-1",
+                  call_id: "call-specialist-1",
+                  name: "get_agent_health_status",
+                  arguments: "{}",
+                  type: "function_call" as const,
+                },
+              ],
+            };
+          }
+
+          return {
+            ok: true as const,
+            responseId: "resp-specialist-final",
+            status: "completed",
+            outputText: "I checked live agent health using tools and completed the operational test.",
+            functionCalls: [],
+          };
+        },
+        testConnection: async () => ({
+          ok: true as const,
+          status: "healthy" as const,
+          summary: "OpenAI responded successfully.",
+        }),
+      },
+    });
+
+    const result = await gateway.sendMessage({
+      commandId: "cmd-chat-specialist-required-tool",
+      workspaceId: "workspace-metadata",
+      threadId: "thread-specialist-required-tool",
+      message: "Run an operational test and use the app tools.",
+      context: {
+        workspaceId: "workspace-metadata",
+        activePath: "/agents",
+        currentView: "Agents",
+        requestedApprovalMode: "unsupervised",
+      },
+    });
+
+    expect(calls[1]?.toolChoice).toBe("required");
+    expect(calls[2]?.toolChoice).toBe("auto");
+    expect(result.status).toBe("answered");
+    expect(result.toolTraces.some((trace) => trace.toolName === "get_agent_health_status")).toBe(true);
+    expect(result.assistantMessage).toContain("using tools");
+
+    cleanup();
+  });
+
   it("supports more tool calls and truncates oversized tool payloads before the second pass", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-tool-budget");
     const secrets = new Map<string, string>();

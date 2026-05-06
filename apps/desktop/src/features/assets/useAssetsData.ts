@@ -13,6 +13,7 @@ import type {
   UpdateAssetCommand,
 } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
+import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
 
 const emptyAssetList: AssetListRow[] = [];
 const emptyAssetSummary: AssetSummarySnapshot = {
@@ -70,8 +71,10 @@ const defaultAssetListQuery: AssetListQuery = {
   sortDirection: "asc",
 };
 
-export const useAssetsList = (query: AssetListQuery = defaultAssetListQuery) =>
-  useAsyncValue(
+export const useAssetsList = (query: AssetListQuery = defaultAssetListQuery) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiAssets) {
         return emptyAssetList;
@@ -80,11 +83,14 @@ export const useAssetsList = (query: AssetListQuery = defaultAssetListQuery) =>
       return window.bukowskiAssets.getList(query);
     },
     emptyAssetList,
-    [query.workspaceId, query.scopeProjectId, query.search, query.sortBy, query.sortDirection],
+    [query.workspaceId, query.scopeProjectId, query.search, query.sortBy, query.sortDirection, refreshVersion],
   );
+};
 
-export const useAssetSummary = (query: AssetWorkspaceQuery = {}) =>
-  useAsyncValue(
+export const useAssetSummary = (query: AssetWorkspaceQuery = {}) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiAssets) {
         return emptyAssetSummary;
@@ -93,11 +99,14 @@ export const useAssetSummary = (query: AssetWorkspaceQuery = {}) =>
       return window.bukowskiAssets.getSummary(query);
     },
     emptyAssetSummary,
-    [query.workspaceId],
+    [query.workspaceId, refreshVersion],
   );
+};
 
-export const useAssetsOverview = (query: AssetWorkspaceQuery = {}) =>
-  useAsyncValue(
+export const useAssetsOverview = (query: AssetWorkspaceQuery = {}) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiAssets) {
         return emptyAssetsOverview;
@@ -106,11 +115,14 @@ export const useAssetsOverview = (query: AssetWorkspaceQuery = {}) =>
       return window.bukowskiAssets.getOverview(query);
     },
     emptyAssetsOverview,
-    [query.workspaceId],
+    [query.workspaceId, refreshVersion],
   );
+};
 
-export const useAssetDetail = (assetId: string | undefined) =>
-  useAsyncValue(
+export const useAssetDetail = (assetId: string | undefined) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiAssets || !assetId) {
         return emptyAssetDetail;
@@ -119,8 +131,9 @@ export const useAssetDetail = (assetId: string | undefined) =>
       return window.bukowskiAssets.getDetail(assetId);
     },
     emptyAssetDetail,
-    [assetId],
+    [assetId, refreshVersion],
   );
+};
 
 export const assignMoveAssets = async (input: AssignMoveAssetsInput): Promise<AssignMoveAssetsResult> => {
   if (!window.bukowskiAssets) {

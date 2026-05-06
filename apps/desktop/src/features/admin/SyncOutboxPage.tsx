@@ -1,6 +1,6 @@
-import { AlertTriangle, CheckCircle2, CloudDownload, CloudUpload, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, CloudDownload, CloudUpload, RefreshCw, Search } from "lucide-react";
 import type { AppActionResult, AppDiagnosticsSnapshot, AppSyncOutboxRow, AppSyncPullCursorRow } from "@contracts";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { DataTable } from "@shared/components/DataTable";
@@ -37,6 +37,35 @@ const emptyDiagnostics: AppDiagnosticsSnapshot = {
 
 type SyncFilter = "all" | "pending" | "processing" | "failed" | "sent";
 type SyncEntityFilter = "all" | string;
+
+type SyncDisclosureProps = {
+  children: ReactNode;
+  defaultOpen?: boolean;
+  summary: string;
+  title: string;
+};
+
+const SyncDisclosure = ({ children, defaultOpen = false, summary, title }: SyncDisclosureProps) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <section className={`settings-disclosure${isOpen ? " is-open" : ""}`}>
+      <button
+        aria-expanded={isOpen}
+        className="settings-disclosure-trigger"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span>
+          <strong>{title}</strong>
+          <small>{summary}</small>
+        </span>
+        <ChevronDown size={17} aria-hidden="true" />
+      </button>
+      {isOpen ? <div className="settings-disclosure-body">{children}</div> : null}
+    </section>
+  );
+};
 
 const syncFilters: Array<{ value: SyncFilter; label: string }> = [
   { value: "all", label: "All" },
@@ -420,198 +449,207 @@ export const SyncOutboxPage = () => {
         </SurfaceCard>
       </div>
 
-      <div className="sync-action-row">
-        <button
-          className="action-primary-button"
-          disabled={isRunningLocalSync}
-          onClick={() => void runAction(() => window.bukowskiApp!.runLocalSync(), setIsRunningLocalSync)}
-          type="button"
-        >
-          <RefreshCw size={14} />
-          <span>{isRunningLocalSync ? "Syncing..." : "Run upload sync"}</span>
-        </button>
-        <button
-          className="ghost-control"
-          disabled={!diagnostics.syncOutboxFailedCount || isRetryingAllFailed}
-          onClick={() => void runAction(() => window.bukowskiApp!.retryAllFailedSyncOutboxRows(), setIsRetryingAllFailed)}
-          type="button"
-        >
-          {isRetryingAllFailed ? "Retrying failed..." : "Retry failed uploads"}
-        </button>
-        <button
-          className="ghost-control"
-          disabled={!visibleRetryableRows.length || isRetryingVisible}
-          onClick={() => void retryVisibleRows()}
-          type="button"
-        >
-          {isRetryingVisible ? "Retrying visible..." : `Retry visible (${visibleRetryableRows.length})`}
-        </button>
-        <button
-          className="ghost-control"
-          disabled={!isWorkspaceReady || !activeWorkspaceId || isBackfillingOperational || isRunningLocalSync}
-          onClick={() => void backfillOperationalSnapshots()}
-          type="button"
-        >
-          {isBackfillingOperational ? "Backfilling operational..." : "Backfill operational data"}
-        </button>
-      </div>
-
-      <SurfaceCard title="Download coverage">
-        <div className="sync-coverage-grid">
-          {inboundCoverage.map((item) => {
-            const cursor = pullCursorByEntity.get(item.entityType);
-            const isActive = item.status === "active";
-            const hasError = Boolean(cursor?.lastError);
-            return (
-              <div className={`sync-coverage-item${isActive ? "" : " is-planned"}`} key={item.entityType}>
-                <span className={`sync-coverage-icon${hasError ? " is-error" : isActive ? " is-active" : ""}`}>
-                  {hasError ? <AlertTriangle size={14} /> : isActive ? <CheckCircle2 size={14} /> : <CloudDownload size={14} />}
-                </span>
-                <div>
-                  <strong>{item.label}</strong>
-                  <small>{hasError ? cursor?.lastError : cursor ? `${cursor.lastPulledCount} rows in latest pull` : item.detail}</small>
-                </div>
-                <StatusBadge tone={hasError ? "critical" : isActive ? "success" : "neutral"}>
-                  {hasError ? "Error" : isActive ? "Active" : "Planned"}
-                </StatusBadge>
-              </div>
-            );
-          })}
+      <SyncDisclosure
+        title="Actions"
+        summary={diagnostics.syncOutboxFailedCount ? `${diagnostics.syncOutboxFailedCount} failed upload${diagnostics.syncOutboxFailedCount === 1 ? "" : "s"} can be retried` : "Manual sync and repair tools"}
+      >
+        <div className="sync-action-row">
+          <button
+            className="action-primary-button"
+            disabled={isRunningLocalSync}
+            onClick={() => void runAction(() => window.bukowskiApp!.runLocalSync(), setIsRunningLocalSync)}
+            type="button"
+          >
+            <RefreshCw size={14} />
+            <span>{isRunningLocalSync ? "Syncing..." : "Run upload sync"}</span>
+          </button>
+          <button
+            className="ghost-control"
+            disabled={!diagnostics.syncOutboxFailedCount || isRetryingAllFailed}
+            onClick={() => void runAction(() => window.bukowskiApp!.retryAllFailedSyncOutboxRows(), setIsRetryingAllFailed)}
+            type="button"
+          >
+            {isRetryingAllFailed ? "Retrying failed..." : "Retry failed uploads"}
+          </button>
+          <button
+            className="ghost-control"
+            disabled={!visibleRetryableRows.length || isRetryingVisible}
+            onClick={() => void retryVisibleRows()}
+            type="button"
+          >
+            {isRetryingVisible ? "Retrying visible..." : `Retry visible (${visibleRetryableRows.length})`}
+          </button>
+          <button
+            className="ghost-control"
+            disabled={!isWorkspaceReady || !activeWorkspaceId || isBackfillingOperational || isRunningLocalSync}
+            onClick={() => void backfillOperationalSnapshots()}
+            type="button"
+          >
+            {isBackfillingOperational ? "Backfilling operational..." : "Backfill operational data"}
+          </button>
         </div>
-      </SurfaceCard>
+      </SyncDisclosure>
 
-      <ResizableSideRailLayout className="split-layout" defaultWidth={420} maxWidth={680} minWidth={320} storageKey="sync-outbox-side-rail-width">
-        <SurfaceCard title="Upload queue">
-          <div className="sync-outbox-toolbar">
-            <div className="sync-outbox-filter-grid">
-              <label className="compact-filter-field">
-                <span>Status</span>
-                <select
-                  className="compact-filter-select"
-                  onChange={(event) => setFilter(event.target.value as SyncFilter)}
-                  value={filter}
-                >
-                  {syncFilters.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="compact-filter-field">
-                <span>Entity</span>
-                <select
-                  className="compact-filter-select"
-                  onChange={(event) => setEntityFilter(event.target.value)}
-                  value={entityFilter}
-                >
-                  {entityFilters.map((item) => (
-                    <option key={item} value={item}>
-                      {item === "all" ? "All entities" : formatEntityLabel(item)}
-                    </option>
-                  ))}
-                </select>
+      <SyncDisclosure title="Download coverage" summary={`${inboundCoverage.length} data areas · ${pullCursors.filter((row) => row.lastError).length} errors`}>
+        <SurfaceCard title="Download coverage">
+          <div className="sync-coverage-grid">
+            {inboundCoverage.map((item) => {
+              const cursor = pullCursorByEntity.get(item.entityType);
+              const isActive = item.status === "active";
+              const hasError = Boolean(cursor?.lastError);
+              return (
+                <div className={`sync-coverage-item${isActive ? "" : " is-planned"}`} key={item.entityType}>
+                  <span className={`sync-coverage-icon${hasError ? " is-error" : isActive ? " is-active" : ""}`}>
+                    {hasError ? <AlertTriangle size={14} /> : isActive ? <CheckCircle2 size={14} /> : <CloudDownload size={14} />}
+                  </span>
+                  <div>
+                    <strong>{item.label}</strong>
+                    <small>{hasError ? cursor?.lastError : cursor ? `${cursor.lastPulledCount} rows in latest pull` : item.detail}</small>
+                  </div>
+                  <StatusBadge tone={hasError ? "critical" : isActive ? "success" : "neutral"}>
+                    {hasError ? "Error" : isActive ? "Active" : "Planned"}
+                  </StatusBadge>
+                </div>
+              );
+            })}
+          </div>
+        </SurfaceCard>
+      </SyncDisclosure>
+
+      <SyncDisclosure title="Upload queue" summary={`${visibleRows.length} visible · ${rows.length} total`}>
+        <ResizableSideRailLayout className="split-layout" defaultWidth={420} maxWidth={680} minWidth={320} storageKey="sync-outbox-side-rail-width">
+          <SurfaceCard title="Upload queue">
+            <div className="sync-outbox-toolbar">
+              <div className="sync-outbox-filter-grid">
+                <label className="compact-filter-field">
+                  <span>Status</span>
+                  <select
+                    className="compact-filter-select"
+                    onChange={(event) => setFilter(event.target.value as SyncFilter)}
+                    value={filter}
+                  >
+                    {syncFilters.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="compact-filter-field">
+                  <span>Entity</span>
+                  <select
+                    className="compact-filter-select"
+                    onChange={(event) => setEntityFilter(event.target.value)}
+                    value={entityFilter}
+                  >
+                    {entityFilters.map((item) => (
+                      <option key={item} value={item}>
+                        {item === "all" ? "All entities" : formatEntityLabel(item)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="list-toolbar-search sync-outbox-search" aria-label="Search upload queue">
+                <Search aria-hidden size={14} />
+                <input
+                  className="list-toolbar-search-input"
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search upload, operation, payload or error"
+                  type="search"
+                  value={search}
+                />
               </label>
             </div>
-            <label className="list-toolbar-search sync-outbox-search" aria-label="Search upload queue">
-              <Search aria-hidden size={14} />
-              <input
-                className="list-toolbar-search-input"
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search upload, operation, payload or error"
-                type="search"
-                value={search}
-              />
-            </label>
-          </div>
 
-          <DataTable
-            activeRowId={activeRowId}
-            getRowId={(row) => row.id}
-            maxHeight="min(60vh, 680px)"
-            onRowClick={(row) => setActiveRowId(row.id)}
-            persistKey="sync-outbox"
-            columns={[
-              {
-                key: "status",
-                label: "Status",
-                render: (row) => <StatusBadge tone={formatSyncStatusTone(row.status)}>{getSyncOutboxStatusLabel(row.status)}</StatusBadge>,
-              },
-              { key: "entityType", label: "Entity", render: (row) => row.entityType },
-              { key: "entityId", label: "Entity ID", render: (row) => row.entityId },
-              { key: "operationType", label: "Operation", render: (row) => row.operationType },
-              { key: "attemptCount", label: "Attempts", align: "right", render: (row) => row.attemptCount },
-              { key: "updatedAt", label: "Updated", render: (row) => formatDateLabel(row.updatedAt) },
-            ]}
-            emptyMessage="No upload rows match the current filter."
-            rows={visibleRows}
-          />
-        </SurfaceCard>
+            <DataTable
+              activeRowId={activeRowId}
+              getRowId={(row) => row.id}
+              maxHeight="min(60vh, 680px)"
+              onRowClick={(row) => setActiveRowId(row.id)}
+              persistKey="sync-outbox"
+              columns={[
+                {
+                  key: "status",
+                  label: "Status",
+                  render: (row) => <StatusBadge tone={formatSyncStatusTone(row.status)}>{getSyncOutboxStatusLabel(row.status)}</StatusBadge>,
+                },
+                { key: "entityType", label: "Entity", render: (row) => row.entityType },
+                { key: "entityId", label: "Entity ID", render: (row) => row.entityId },
+                { key: "operationType", label: "Operation", render: (row) => row.operationType },
+                { key: "attemptCount", label: "Attempts", align: "right", render: (row) => row.attemptCount },
+                { key: "updatedAt", label: "Updated", render: (row) => formatDateLabel(row.updatedAt) },
+              ]}
+              emptyMessage="No upload rows match the current filter."
+              rows={visibleRows}
+            />
+          </SurfaceCard>
 
-        <SurfaceCard title="Upload detail" subtitle={summarizeSelection(activeRow)}>
-          {!activeRow ? (
-            <div className="empty-state">Select an upload row to inspect it.</div>
-          ) : (
-            <div className="sync-outbox-detail-stack">
-              <div className="summary-grid">
-                <div className="summary-row">
-                  <span className="summary-label">Status</span>
-                  <span className="summary-value">{getSyncOutboxStatusLabel(activeRow.status)}</span>
+          <SurfaceCard title="Upload detail" subtitle={summarizeSelection(activeRow)}>
+            {!activeRow ? (
+              <div className="empty-state">Select an upload row to inspect it.</div>
+            ) : (
+              <div className="sync-outbox-detail-stack">
+                <div className="summary-grid">
+                  <div className="summary-row">
+                    <span className="summary-label">Status</span>
+                    <span className="summary-value">{getSyncOutboxStatusLabel(activeRow.status)}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">Entity</span>
+                    <span className="summary-value">{activeRow.entityType}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">Entity ID</span>
+                    <span className="summary-value">{activeRow.entityId}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">Operation</span>
+                    <span className="summary-value">{activeRow.operationType}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">Attempts</span>
+                    <span className="summary-value">{activeRow.attemptCount}</span>
+                  </div>
+                  <div className="summary-row">
+                    <span className="summary-label">Next retry</span>
+                    <span className="summary-value">{formatDateLabel(activeRow.nextRetryAt)}</span>
+                  </div>
                 </div>
-                <div className="summary-row">
-                  <span className="summary-label">Entity</span>
-                  <span className="summary-value">{activeRow.entityType}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Entity ID</span>
-                  <span className="summary-value">{activeRow.entityId}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Operation</span>
-                  <span className="summary-value">{activeRow.operationType}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Attempts</span>
-                  <span className="summary-value">{activeRow.attemptCount}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">Next retry</span>
-                  <span className="summary-value">{formatDateLabel(activeRow.nextRetryAt)}</span>
-                </div>
-              </div>
 
-              {activeRow.lastError ? (
-                <div className="form-inline-error">Last error: {activeRow.lastError}</div>
-              ) : null}
+                {activeRow.lastError ? (
+                  <div className="form-inline-error">Last error: {activeRow.lastError}</div>
+                ) : null}
 
-              <div className="action-panel-actions action-panel-actions-start">
-                <button
-                  className="ghost-control"
-                  disabled={retryingRowId === activeRow.id || (activeRow.status !== "failed" && activeRow.status !== "processing")}
-                  onClick={() => void retrySingleRow(activeRow.id)}
-                  type="button"
-                >
-                  {retryingRowId === activeRow.id ? "Retrying row..." : "Retry row"}
-                </button>
-                {resolveEntityNavigationPath(activeRow) ? (
+                <div className="action-panel-actions action-panel-actions-start">
                   <button
                     className="ghost-control"
-                    onClick={() => navigate(resolveEntityNavigationPath(activeRow)!)}
+                    disabled={retryingRowId === activeRow.id || (activeRow.status !== "failed" && activeRow.status !== "processing")}
+                    onClick={() => void retrySingleRow(activeRow.id)}
                     type="button"
                   >
-                    Open entity
+                    {retryingRowId === activeRow.id ? "Retrying row..." : "Retry row"}
                   </button>
-                ) : null}
-              </div>
+                  {resolveEntityNavigationPath(activeRow) ? (
+                    <button
+                      className="ghost-control"
+                      onClick={() => navigate(resolveEntityNavigationPath(activeRow)!)}
+                      type="button"
+                    >
+                      Open entity
+                    </button>
+                  ) : null}
+                </div>
 
-              <div className="sync-outbox-payload-block">
-                <span className="summary-label">Payload</span>
-                <pre className="sync-outbox-payload">{activeRow.payloadJson}</pre>
+                <div className="sync-outbox-payload-block">
+                  <span className="summary-label">Payload</span>
+                  <pre className="sync-outbox-payload">{activeRow.payloadJson}</pre>
+                </div>
               </div>
-            </div>
-          )}
-        </SurfaceCard>
-      </ResizableSideRailLayout>
+            )}
+          </SurfaceCard>
+        </ResizableSideRailLayout>
+      </SyncDisclosure>
       </SettingsLayout>
     </div>
   );

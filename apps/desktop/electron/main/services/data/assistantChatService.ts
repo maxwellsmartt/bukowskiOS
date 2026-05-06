@@ -228,6 +228,7 @@ export const createAssistantChatService = (
     assistantGatewayService: AssistantGatewayService;
     memoryService: AssistantMemoryService;
     attachmentsRootPath: string;
+    onWorkspaceDataChanged?: (detail: { source: "assistant-tool"; workspaceId: string; entities: string[] }) => void;
   },
 ) => {
   const writeWelcomeMessage = (threadId: string) => {
@@ -434,7 +435,7 @@ export const createAssistantChatService = (
           preferred_approval_mode,
           is_active,
           updated_at
-        ) VALUES (?, 'idle', '[]', 'supervised', 1, ?)
+        ) VALUES (?, 'idle', '[]', 'unsupervised', 1, ?)
       `,
     ).run(threadId, now);
 
@@ -821,6 +822,11 @@ export const createAssistantChatService = (
       try {
         const response = await options.assistantGatewayService.sendMessage(input);
         completeAssistantMessage(input.threadId, assistantMessageId, userBody, response);
+        options.onWorkspaceDataChanged?.({
+          source: "assistant-tool",
+          workspaceId: input.workspaceId,
+          entities: ["projects", "assets", "packing", "quotes", "incidents", "rma"],
+        });
 
         try {
           options.memoryService.extractAndPersist({

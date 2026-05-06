@@ -7,6 +7,7 @@ import type {
   UpdateRmaCaseCommand,
 } from "@contracts";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
+import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
 
 const emptyRmaSnapshot: RmaSnapshot = {
   cases: [],
@@ -19,8 +20,10 @@ const emptyRmaDetail: RmaCaseDetailSnapshot = {
   assets: [],
 };
 
-export const useRmaSnapshot = (query?: RmaSnapshotQuery) =>
-  useAsyncValue(
+export const useRmaSnapshot = (query?: RmaSnapshotQuery) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiRma) {
         return emptyRmaSnapshot;
@@ -29,11 +32,14 @@ export const useRmaSnapshot = (query?: RmaSnapshotQuery) =>
       return window.bukowskiRma.getSnapshot(query);
     },
     emptyRmaSnapshot,
-    [query?.workspaceId ?? ""],
+    [query?.workspaceId ?? "", refreshVersion],
   );
+};
 
-export const useRmaCaseDetail = (rmaCaseId: string | null) =>
-  useAsyncValue(
+export const useRmaCaseDetail = (rmaCaseId: string | null) => {
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  return useAsyncValue(
     async () => {
       if (!window.bukowskiRma || !rmaCaseId) {
         return emptyRmaDetail;
@@ -42,8 +48,9 @@ export const useRmaCaseDetail = (rmaCaseId: string | null) =>
       return window.bukowskiRma.getDetail(rmaCaseId);
     },
     emptyRmaDetail,
-    [rmaCaseId ?? ""],
+    [rmaCaseId ?? "", refreshVersion],
   );
+};
 
 export const createRmaCase = async (input: CreateRmaCaseCommand): Promise<RmaCaseMutationResult> => {
   if (!window.bukowskiRma) {

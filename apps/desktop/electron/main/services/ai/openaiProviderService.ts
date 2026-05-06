@@ -34,7 +34,7 @@ export type OpenAIResponseCreateInput = {
   input: string | Array<Record<string, unknown>>;
   previousResponseId?: string | null;
   tools?: OpenAIResponseFunctionTool[];
-  toolChoice?: "auto" | "none";
+  toolChoice?: "auto" | "none" | "required";
   maxOutputTokens?: number;
   textFormat?: Record<string, unknown>;
 };

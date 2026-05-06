@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useRef, type KeyboardEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 export type SettingsSectionId =
@@ -18,13 +18,12 @@ type SettingsNavEntry = {
 };
 
 export const settingsNavEntries: SettingsNavEntry[] = [
-  { id: "general", label: "General", description: "Health & quick stats", to: "/settings?section=general" },
-  { id: "account", label: "Account", description: "Your profile, identity & sign-out", to: "/settings/account" },
-  { id: "workspace", label: "Workspace", description: "Identity, members, roles & invites", to: "/settings/workspace" },
-  { id: "team", label: "Team", description: "User profiles & access", to: "/settings?section=team" },
-  { id: "data", label: "Data", description: "Backups, integrity & exports", to: "/settings?section=data" },
-  { id: "sync", label: "Sync activity", description: "Outbox queue & remote status", to: "/settings/sync" },
-  { id: "advanced", label: "Advanced", description: "Diagnostics & support tools", to: "/settings?section=advanced" },
+  { id: "general", label: "General", description: "Profile & preferences", to: "/settings?section=general" },
+  { id: "workspace", label: "Workspace", description: "Company setup", to: "/settings/workspace" },
+  { id: "team", label: "Team", description: "Users & access", to: "/settings?section=team" },
+  { id: "data", label: "Data", description: "Backups & exports", to: "/settings?section=data" },
+  { id: "sync", label: "Sync", description: "Cloud status", to: "/settings/sync" },
+  { id: "advanced", label: "Advanced", description: "Support tools", to: "/settings?section=advanced" },
 ];
 
 const resolveActiveSection = (pathname: string, search: string): SettingsSectionId => {
@@ -88,25 +87,7 @@ export const SettingsLayout = ({ children }: SettingsLayoutProps) => {
         ))}
       </nav>
 
-      <SettingsContentPanel activeId={activeId}>{children}</SettingsContentPanel>
-    </div>
-  );
-};
-
-const SettingsContentPanel = ({ activeId, children }: { activeId: SettingsSectionId; children: ReactNode }) => {
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    node.classList.remove("is-entering");
-    void node.offsetWidth;
-    node.classList.add("is-entering");
-  }, [activeId]);
-
-  return (
-    <div className="settings-content-panel" ref={ref} key={activeId}>
-      {children}
+      <div className="settings-content-panel">{children}</div>
     </div>
   );
 };
