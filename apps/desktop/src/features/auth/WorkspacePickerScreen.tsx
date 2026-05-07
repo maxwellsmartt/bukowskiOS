@@ -1,23 +1,26 @@
-import { Check, Plus, RefreshCw } from "lucide-react";
+import { ArrowLeft, Check, Plus, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.png";
+import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
 
 export const WorkspacePickerScreen = () => {
   const navigate = useNavigate();
+  const { signOut } = useSession();
   const { activeWorkspaceId, isLoadingWorkspaces, memberships, refreshWorkspaces, switchWorkspace, workspaceError } =
     useWorkspace();
   const hasNoWorkspaceAccess = !isLoadingWorkspaces && memberships.length === 0;
 
   return (
     <div className="auth-screen">
+      <div className="auth-lockup" aria-hidden="true">
+        <img src={brandLogoWhite1x} srcSet={`${brandLogoWhite1x} 1x, ${brandLogoWhite} 2x`} alt="" />
+      </div>
       <section className="workspace-picker-panel" aria-labelledby="workspace-picker-title">
-        <div className="auth-brand">
-          <span className="auth-brand-mark">B</span>
-          <div>
-            <p className="auth-eyebrow">Workspace</p>
-            <h1 id="workspace-picker-title">Choose workspace</h1>
-          </div>
+        <div className="auth-brand workspace-picker-header">
+          <h1 id="workspace-picker-title">Choose workspace</h1>
         </div>
 
         <div className="workspace-picker-list">
@@ -36,7 +39,7 @@ export const WorkspacePickerScreen = () => {
               key={membership.workspaceId}
               onClick={() => {
                 switchWorkspace(membership.workspaceId);
-                navigate("/", { replace: true });
+                window.setTimeout(() => navigate("/", { replace: true }), 110);
               }}
               type="button"
             >
@@ -45,7 +48,7 @@ export const WorkspacePickerScreen = () => {
                 <strong>{membership.workspaceName}</strong>
                 <small>{membership.roleName}</small>
               </span>
-              {membership.workspaceId === activeWorkspaceId ? <Check size={16} /> : null}
+              {membership.workspaceId === activeWorkspaceId ? <Check className="workspace-picker-check" size={16} /> : null}
             </button>
           ))}
           {hasNoWorkspaceAccess ? (
@@ -66,6 +69,16 @@ export const WorkspacePickerScreen = () => {
         </button>
         {workspaceError ? <p className="auth-status">{workspaceError}</p> : null}
       </section>
+      <button
+        className="auth-back-button workspace-picker-back"
+        onClick={() => {
+          void signOut().finally(() => navigate("/login", { replace: true }));
+        }}
+        type="button"
+      >
+        <ArrowLeft size={15} />
+        <span>Back to login</span>
+      </button>
     </div>
   );
 };

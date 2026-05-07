@@ -1,5 +1,5 @@
-import { Github, KeyRound, Mail } from "lucide-react";
-import { useState } from "react";
+import { Github, Mail } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
@@ -10,9 +10,10 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 export const LoginScreen = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { authError, isLocalFallback, signInWithMagicLink, signInWithOAuth, signInWithPassword } = useSession();
+  const { authError, isLocalFallback, requestFirstLoginLink, signInWithMagicLink, signInWithOAuth, signInWithPassword } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberLogin, setRememberLogin] = useState(true);
   const [status, setStatus] = useState<string | null>(isLocalFallback ? "Local dev session is active." : null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -24,6 +25,11 @@ export const LoginScreen = () => {
 
     try {
       await action();
+      if (rememberLogin && email.trim()) {
+        window.localStorage.setItem("bukowski:last-login-email", email.trim().toLowerCase());
+      } else {
+        window.localStorage.removeItem("bukowski:last-login-email");
+      }
       setStatus(successMessage ?? null);
       if (!successMessage) {
         navigate(from, { replace: true });
@@ -35,25 +41,23 @@ export const LoginScreen = () => {
     }
   };
 
+  useEffect(() => {
+    const savedEmail = window.localStorage.getItem("bukowski:last-login-email");
+
+    if (savedEmail) {
+      setEmail(savedEmail);
+    }
+  }, []);
+
   return (
     <div className="auth-screen">
-      <div className="auth-ambient-panel" aria-hidden="true">
-        <span>Inventory</span>
-        <span>Projects</span>
-        <span>Sync</span>
-        <span>Agents</span>
+      <div className="auth-lockup" aria-hidden="true">
+        <img src={brandLogoWhite1x} srcSet={`${brandLogoWhite1x} 1x, ${brandLogoWhite} 2x`} alt="" />
       </div>
       <section className="auth-panel" aria-labelledby="login-title">
         <div className="auth-brand">
-          <span className="auth-brand-mark auth-brand-logo">
-            <img src={brandLogoWhite1x} srcSet={`${brandLogoWhite1x} 1x, ${brandLogoWhite} 2x`} alt="" />
-          </span>
-          <div>
-            <p className="auth-eyebrow">bukowskiOS</p>
-            <h1 id="login-title">Welcome back</h1>
-          </div>
+          <h1 id="login-title">Welcome back</h1>
         </div>
-        <p className="auth-lede">Sign in to your production workspace, sync inventory, and keep operations moving.</p>
 
         <form
           className="auth-form"
@@ -90,8 +94,16 @@ export const LoginScreen = () => {
             <Link to="/login/mfa">Use 2FA</Link>
           </div>
 
+          <label className="auth-check-row">
+            <input
+              checked={rememberLogin}
+              onChange={(event) => setRememberLogin(event.target.checked)}
+              type="checkbox"
+            />
+            <span>Keep me signed in on this Mac</span>
+          </label>
+
           <button className="auth-primary-button" disabled={isSubmitting} type="submit">
-            <KeyRound size={16} />
             <span>{isSubmitting ? "Signing in..." : "Sign in"}</span>
           </button>
         </form>
@@ -105,16 +117,42 @@ export const LoginScreen = () => {
             onClick={() => void runAuthAction(() => signInWithMagicLink(email), "Magic link sent. Check your email.")}
             type="button"
           >
-            <Mail size={16} />
-            <span>Send magic link</span>
+            <span className="auth-button-content">
+              <span className="auth-button-icon">
+                <Mail size={16} />
+              </span>
+              <span>Send magic link</span>
+            </span>
           </button>
           <button className="auth-secondary-button" disabled={isSubmitting} onClick={() => void runAuthAction(() => signInWithOAuth("google"))} type="button">
-            <span className="auth-provider-dot">G</span>
-            <span>Continue with Google</span>
+            <span className="auth-button-content">
+              <span className="auth-button-icon">
+                <span className="auth-provider-dot">G</span>
+              </span>
+              <span>Continue with Google</span>
+            </span>
           </button>
           <button className="auth-secondary-button" disabled={isSubmitting} onClick={() => void runAuthAction(() => signInWithOAuth("github"))} type="button">
-            <Github size={16} />
-            <span>Continue with GitHub</span>
+            <span className="auth-button-content">
+              <span className="auth-button-icon">
+                <Github size={16} />
+              </span>
+              <span>Continue with GitHub</span>
+            </span>
+          </button>
+        </div>
+
+        <div className="auth-first-login">
+          <div>
+            <p>First time here?</p>
+            <span>Enter your email and get a secure link to create your password.</span>
+          </div>
+          <button
+            disabled={isSubmitting || !email.trim()}
+            onClick={() => void runAuthAction(() => requestFirstLoginLink(email), "Setup link sent. Open it to create your password.")}
+            type="button"
+          >
+            Set up password
           </button>
         </div>
 

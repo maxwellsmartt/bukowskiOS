@@ -109,7 +109,7 @@
    * ====================================================================== */
   --bp-compact: 1280px;
   --bp-standard: 2559px;
-  --shell-content-max: 1680px;
+  --shell-content-max: min(100%, 2200px);
   --sidebar-width-min: 220px;
   --sidebar-width-max: 320px;
   --row-height: 36px;

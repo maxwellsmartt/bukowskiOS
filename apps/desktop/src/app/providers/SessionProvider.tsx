@@ -26,6 +26,7 @@ type SessionContextValue = {
   authError: string | null;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<void>;
+  requestFirstLoginLink: (email: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   signInWithOAuth: (provider: "google" | "github") => Promise<void>;
@@ -337,6 +338,30 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     [supabase],
   );
 
+  const requestFirstLoginLink = useCallback(
+    async (email: string) => {
+      if (!supabase) {
+        setStatus("authenticated");
+        return;
+      }
+
+      setAuthError(null);
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: "bukowskios://auth/callback?flow=first-login",
+          shouldCreateUser: false,
+        },
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        throw error;
+      }
+    },
+    [supabase],
+  );
+
   const requestPasswordReset = useCallback(
     async (email: string) => {
       if (!supabase) {
@@ -501,6 +526,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       authError,
       signInWithPassword,
       signInWithMagicLink,
+      requestFirstLoginLink,
       requestPasswordReset,
       updatePassword,
       signInWithOAuth,
@@ -513,6 +539,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       handleAuthDeepLink,
       isPasswordRecovery,
       refreshUser,
+      requestFirstLoginLink,
       requestPasswordReset,
       signInWithMagicLink,
       signInWithOAuth,

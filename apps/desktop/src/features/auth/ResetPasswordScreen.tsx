@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
+import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.png";
+import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 export const ResetPasswordScreen = () => {
@@ -19,6 +21,9 @@ export const ResetPasswordScreen = () => {
 
   return (
     <div className="auth-screen">
+      <div className="auth-lockup" aria-hidden="true">
+        <img src={brandLogoWhite1x} srcSet={`${brandLogoWhite1x} 1x, ${brandLogoWhite} 2x`} alt="" />
+      </div>
       <section className="auth-panel" aria-labelledby="reset-password-title">
         <p className="auth-eyebrow">{isFirstLogin ? "First login" : "Password reset"}</p>
         <h1 id="reset-password-title">{isFirstLogin ? "Create your password" : "Set a new password"}</h1>
