@@ -16,6 +16,12 @@ export type BukowskiSessionUser = {
   avatarUrl: string | null;
 };
 
+type BukowskiUserProfile = {
+  avatarUrl: string | null;
+  email: string | null;
+  fullName: string | null;
+};
+
 type SessionContextValue = {
   status: SessionStatus;
   user: BukowskiSessionUser | null;
@@ -37,22 +43,27 @@ type SessionContextValue = {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-const toSessionUser = (user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> }): BukowskiSessionUser => {
+const toSessionUser = (
+  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> },
+  profile?: BukowskiUserProfile | null,
+): BukowskiSessionUser => {
   const displayName =
-    typeof user.user_metadata?.full_name === "string"
+    profile?.fullName?.trim() ||
+    (typeof user.user_metadata?.full_name === "string"
       ? user.user_metadata.full_name
       : typeof user.user_metadata?.name === "string"
         ? user.user_metadata.name
-        : user.email ?? "BukowskiOS user";
+        : user.email ?? "BukowskiOS user");
 
   const avatarUrl =
-    typeof user.user_metadata?.avatar_url === "string" && user.user_metadata.avatar_url.length > 0
+    profile?.avatarUrl ||
+    (typeof user.user_metadata?.avatar_url === "string" && user.user_metadata.avatar_url.length > 0
       ? user.user_metadata.avatar_url
-      : null;
+      : null);
 
   return {
     id: user.id,
-    email: user.email ?? null,
+    email: profile?.email ?? user.email ?? null,
     displayName,
     avatarUrl,
   };
@@ -123,6 +134,40 @@ const persistStoredTokens = (tokens: { accessToken: string | null; refreshToken:
   void window.bukowskiAuth?.setStoredTokens(tokens).catch((error) => {
     console.warn("Unable to persist the Supabase session locally.", error);
   });
+};
+
+const loadUserProfile = async (supabase: BukowskiSupabaseClient, userId: string): Promise<BukowskiUserProfile | null> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const looseSupabase = supabase as any;
+  const { data, error } = await looseSupabase
+    .from("user_profiles")
+    .select("avatar_url,email,full_name")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  const profile = data as { avatar_url?: string | null; email?: string | null; full_name?: string | null };
+  return {
+    avatarUrl: profile.avatar_url ?? null,
+    email: profile.email ?? null,
+    fullName: profile.full_name ?? null,
+  };
+};
+
+const resolveSessionUser = async (
+  supabase: BukowskiSupabaseClient,
+  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> },
+) => {
+  const sessionUser = toSessionUser(user, await loadUserProfile(supabase, user.id));
+  if (!sessionUser.avatarUrl) {
+    return sessionUser;
+  }
+
+  const avatarDataUrl = await window.bukowskiAuth?.getAvatarDataUrl(sessionUser.avatarUrl).catch(() => null);
+  return avatarDataUrl ? { ...sessionUser, avatarUrl: avatarDataUrl } : sessionUser;
 };
 
 const acceptWorkspaceInvite = async (supabase: BukowskiSupabaseClient, workspaceId: string | null) => {
@@ -227,7 +272,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         }
 
         return {
-          sessionUser: data.session?.user ? toSessionUser(data.session.user) : null,
+          sessionUser: data.session?.user ? await resolveSessionUser(supabase, data.session.user) : null,
           status: data.session?.user ? ("authenticated" as const) : ("unauthenticated" as const),
           authError: null,
           shouldPersistTokens: Boolean(data.session),
@@ -282,7 +327,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setIsPasswordRecovery(event === "PASSWORD_RECOVERY");
-      setUser(nextSession?.user ? toSessionUser(nextSession.user) : null);
+      if (nextSession?.user) {
+        setUser(toSessionUser(nextSession.user));
+        void resolveSessionUser(supabase, nextSession.user).then(setUser).catch(() => {
+          setUser(toSessionUser(nextSession.user));
+        });
+      } else {
+        setUser(null);
+      }
       setStatus(nextSession?.user ? "authenticated" : "unauthenticated");
       setAuthError(null);
 
@@ -410,10 +462,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setAuthError(null);
+      const redirectTo = await window.bukowskiAuth?.getOAuthRedirectUrl().catch(() => null);
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: "bukowskios://auth/callback",
+          redirectTo: redirectTo ?? "bukowskios://auth/callback",
           skipBrowserRedirect: true,
         },
       });
@@ -439,7 +492,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (error || !data.user) {
       return;
     }
-    setUser(toSessionUser(data.user));
+    setUser(await resolveSessionUser(supabase, data.user));
   }, [supabase]);
 
   const signOut = useCallback(async () => {
@@ -450,11 +503,13 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       const { error } = await supabase.auth.signOut();
       if (error) {
         setAuthError(error.message);
-        throw error;
+        console.warn("Supabase sign out returned an error; clearing local session anyway.", error);
       }
     }
 
-    await window.bukowskiAuth?.clearStoredTokens();
+    await window.bukowskiAuth?.clearStoredTokens().catch((error) => {
+      console.warn("Unable to clear stored auth tokens during sign out.", error);
+    });
     setUser(
       supabase
         ? null
@@ -492,7 +547,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (data.session) {
-          setUser(toSessionUser(data.session.user));
+          setUser(await resolveSessionUser(supabase, data.session.user));
           setStatus("authenticated");
           persistStoredTokens({
             accessToken: data.session.access_token,

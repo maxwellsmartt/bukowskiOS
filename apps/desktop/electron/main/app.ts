@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu, session } from "electron";
+import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { format } from "date-fns";
 import { ipcChannels, type CreateProjectBlueprintInput } from "@contracts";
@@ -19,6 +20,10 @@ const isE2E = process.env.BUKOWSKI_E2E === "1";
 const logger = getDesktopLogger("app");
 const authProtocol = "bukowskios";
 const pendingDeepLinks: string[] = [];
+const devAuthCallbackHost = "127.0.0.1";
+const devAuthCallbackPort = 17654;
+let devAuthCallbackServer: Server | null = null;
+let devAuthCallbackUrl: string | null = null;
 
 const createAppWindow = () =>
   createMainWindow({
@@ -65,6 +70,96 @@ const sendAuthDeepLinkToRenderer = (url: string) => {
 const flushPendingDeepLinks = () => {
   const queuedLinks = pendingDeepLinks.splice(0);
   queuedLinks.forEach((url) => sendAuthDeepLinkToRenderer(url));
+};
+
+const focusExistingWindow = () => {
+  const existingWindow = BrowserWindow.getAllWindows()[0];
+
+  if (!existingWindow || existingWindow.isDestroyed()) {
+    return;
+  }
+
+  if (existingWindow.isMinimized()) {
+    existingWindow.restore();
+  }
+
+  existingWindow.show();
+  existingWindow.focus();
+};
+
+const createDevAuthCallbackHtml = () => `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>bukowskiOS sign in</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        background: #050607;
+        color: #f4f7fb;
+        font: 14px -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      }
+      main {
+        width: min(420px, calc(100vw - 48px));
+        padding: 24px;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 18px;
+        background: rgba(18,20,24,0.86);
+        box-shadow: 0 24px 70px rgba(0,0,0,0.38);
+      }
+      h1 { margin: 0 0 8px; font-size: 18px; }
+      p { margin: 0; color: rgba(244,247,251,0.68); line-height: 1.5; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Returning to bukowskiOS</h1>
+      <p>The desktop app is processing your secure sign-in callback. You can close this browser tab.</p>
+    </main>
+  </body>
+</html>`;
+
+const startDevAuthCallbackServer = () => {
+  if (!devServerUrl) {
+    return null;
+  }
+
+  const server = createServer((request, response) => {
+    const requestUrl = new URL(request.url ?? "/", `http://${devAuthCallbackHost}:${devAuthCallbackPort}`);
+
+    if (request.method !== "GET" || requestUrl.pathname !== "/auth/callback") {
+      response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      response.end("Not found");
+      return;
+    }
+
+    const forwardedUrl = `${authProtocol}://auth/callback${requestUrl.search}`;
+    sendAuthDeepLinkToRenderer(forwardedUrl);
+    focusExistingWindow();
+
+    response.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+    });
+    response.end(createDevAuthCallbackHtml());
+  });
+
+  server.on("error", (error) => {
+    logger.warn("Dev OAuth callback server could not start; falling back to custom protocol.", error);
+    devAuthCallbackUrl = null;
+  });
+
+  server.listen(devAuthCallbackPort, devAuthCallbackHost, () => {
+    devAuthCallbackUrl = `http://${devAuthCallbackHost}:${devAuthCallbackPort}/auth/callback`;
+    logger.info(`Dev OAuth callback server listening on ${devAuthCallbackUrl}.`);
+  });
+
+  devAuthCallbackServer = server;
+  return server;
 };
 
 const attachWindowRuntimeTelemetry = (
@@ -136,7 +231,11 @@ app.setName("bukowskiOS");
 app.setPath("userData", path.join(app.getPath("appData"), "@bukowski/desktop"));
 
 if (!isE2E) {
-  app.setAsDefaultProtocolClient(authProtocol);
+  if (process.defaultApp && process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(authProtocol, process.execPath, [path.resolve(process.argv[1])]);
+  } else {
+    app.setAsDefaultProtocolClient(authProtocol);
+  }
 }
 
 if (!isE2E) {
@@ -147,18 +246,7 @@ if (!isE2E) {
   }
 
   app.on("second-instance", (_event, argv) => {
-    const existingWindow = BrowserWindow.getAllWindows()[0];
-
-    if (!existingWindow) {
-      return;
-    }
-
-    if (existingWindow.isMinimized()) {
-      existingWindow.restore();
-    }
-
-    existingWindow.show();
-    existingWindow.focus();
+    focusExistingWindow();
 
     const deepLink = argv.find(isBukowskiDeepLink);
     if (deepLink) {
@@ -175,9 +263,15 @@ app.on("open-url", (event, url) => {
   }
 });
 
+const initialDeepLink = process.argv.find(isBukowskiDeepLink);
+if (initialDeepLink) {
+  pendingDeepLinks.push(initialDeepLink);
+}
+
 app.whenReady().then(() => {
   initializeDesktopLogger();
   logger.info("Electron main ready.");
+  startDevAuthCallbackServer();
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       cancel: false,
@@ -206,7 +300,9 @@ app.whenReady().then(() => {
   attachProcessRuntimeTelemetry(localDatabase.runtimeDiagnostics);
   attachWindowRuntimeTelemetry(mainWindow, localDatabase.runtimeDiagnostics);
 
-  registerAuthIpc();
+  registerAuthIpc({
+    getOAuthRedirectUrl: () => devAuthCallbackUrl ?? "bukowskios://auth/callback",
+  });
   registerAppIpc({
     database: localDatabase.database,
     getDiagnosticsSnapshot: localDatabase.getDiagnosticsSnapshot,
@@ -563,4 +659,10 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  devAuthCallbackServer?.close();
+  devAuthCallbackServer = null;
+  devAuthCallbackUrl = null;
 });

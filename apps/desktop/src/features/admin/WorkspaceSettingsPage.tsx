@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, Pencil, Save, Send, X } from "lucide-react";
+import { Bot, ChevronDown, Pencil, Save, Send, X } from "lucide-react";
 
 import type { AppUserAdminRow, AppUsersSnapshot } from "@contracts";
 import { useSession } from "@app/providers/SessionProvider";
@@ -34,6 +34,16 @@ type PendingInviteRow = {
   invitedAt: string | null;
 };
 
+type SystemActorRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  kind: string;
+  status: "active" | "paused" | "inactive";
+  description: string | null;
+  permissionKeys: string[];
+};
+
 const resolveMembershipTone = (status: AppUserAdminRow["membershipStatus"]) => {
   if (status === "active") {
     return "success" as const;
@@ -56,6 +66,18 @@ const resolveMembershipLabel = (status: AppUserAdminRow["membershipStatus"]) => 
   }
 
   return "Not in workspace";
+};
+
+const resolveSystemActorTone = (status: SystemActorRow["status"]) => {
+  if (status === "active") {
+    return "success" as const;
+  }
+
+  if (status === "paused") {
+    return "warning" as const;
+  }
+
+  return "neutral" as const;
 };
 
 const toPermissionKeys = (rolePermissions: unknown) =>
@@ -199,6 +221,41 @@ const loadRemoteUsersSnapshot = async (
   return { roles, users };
 };
 
+const loadRemoteSystemActors = async (
+  supabase: NonNullable<ReturnType<typeof useSession>["supabase"]>,
+  workspaceId: string,
+): Promise<SystemActorRow[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const looseSupabase = supabase as any;
+  const { data, error } = await looseSupabase
+    .from("workspace_system_actors")
+    .select("id,name,email,kind,status,description,workspace_system_actor_permissions(permissions(key))")
+    .eq("workspace_id", workspaceId)
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Array<{
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    kind?: string | null;
+    status?: "active" | "paused" | "inactive" | null;
+    description?: string | null;
+    workspace_system_actor_permissions?: unknown;
+  }>).map((actor) => ({
+    id: actor.id,
+    name: actor.name ?? "System actor",
+    email: actor.email ?? null,
+    kind: actor.kind ?? "agent",
+    status: actor.status ?? "active",
+    description: actor.description ?? null,
+    permissionKeys: toPermissionKeys(actor.workspace_system_actor_permissions),
+  }));
+};
+
 type WorkspaceDisclosureProps = {
   children: ReactNode;
   defaultOpen?: boolean;
@@ -235,6 +292,7 @@ export const WorkspaceSettingsPage = () => {
   const { activeWorkspaceId, activeWorkspaceName, activeMembership, memberships, refreshWorkspaces } = useWorkspace();
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
   const [pendingInvites, setPendingInvites] = useState<PendingInviteRow[]>([]);
+  const [systemActors, setSystemActors] = useState<SystemActorRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [workspaceProfile, setWorkspaceProfile] = useState<{
@@ -316,6 +374,24 @@ export const WorkspaceSettingsPage = () => {
     }
   }, [activeWorkspaceId, isLocalFallback, supabase]);
 
+  const loadSystemActors = useCallback(async () => {
+    if (!supabase || isLocalFallback || !activeWorkspaceId) {
+      setSystemActors([]);
+      return;
+    }
+
+    try {
+      const next = await loadRemoteSystemActors(supabase, activeWorkspaceId);
+      setSystemActors(next);
+    } catch (nextError) {
+      setSystemActors([]);
+      // System actors are additive during rollout. If the migration has not
+      // landed yet, Team should still remain usable for human members.
+      // eslint-disable-next-line no-console
+      console.warn("Could not load workspace system actors", nextError);
+    }
+  }, [activeWorkspaceId, isLocalFallback, supabase]);
+
   const loadWorkspaceProfile = useCallback(async () => {
     if (!supabase || isLocalFallback || !activeWorkspaceId) {
       setWorkspaceProfile(null);
@@ -355,8 +431,9 @@ export const WorkspaceSettingsPage = () => {
   useEffect(() => {
     void loadMembers();
     void loadPendingInvites();
+    void loadSystemActors();
     void loadWorkspaceProfile();
-  }, [loadMembers, loadPendingInvites, loadWorkspaceProfile]);
+  }, [loadMembers, loadPendingInvites, loadSystemActors, loadWorkspaceProfile]);
 
   const handleSaveWorkspace = async () => {
     if (!supabase || !workspaceProfile) {
@@ -705,6 +782,61 @@ export const WorkspaceSettingsPage = () => {
           />
         </SurfaceCard>
       </WorkspaceDisclosure>
+
+      {supabase && !isLocalFallback ? (
+        <WorkspaceDisclosure
+          title="System actors"
+          summary={
+            systemActors.length
+              ? `${systemActors.length} automation identity${systemActors.length === 1 ? "" : "ies"}`
+              : "No automation identities yet"
+          }
+        >
+          <SurfaceCard title="Automation identities">
+            <p className="surface-card-subtitle">
+              System actors audit assistant-driven actions without creating fake human accounts or invite emails.
+            </p>
+            <DataTable
+              getRowId={(row) => row.id}
+              persistKey="workspace-settings-system-actors"
+              columns={[
+                {
+                  key: "actor",
+                  label: "Actor",
+                  minWidth: 220,
+                  render: (row) => (
+                    <div className="identity-cell">
+                      <span className="identity-title">
+                        <Bot size={14} aria-hidden="true" />
+                        {row.name}
+                      </span>
+                      <span className="identity-meta">{row.email ?? row.description ?? "Managed by bukowskiOS"}</span>
+                    </div>
+                  ),
+                },
+                {
+                  key: "kind",
+                  label: "Type",
+                  render: (row) => row.kind,
+                },
+                {
+                  key: "status",
+                  label: "Status",
+                  render: (row) => <StatusBadge tone={resolveSystemActorTone(row.status)}>{row.status}</StatusBadge>,
+                },
+                {
+                  key: "permissions",
+                  label: "Permissions",
+                  align: "right",
+                  render: (row) => row.permissionKeys.length,
+                },
+              ]}
+              rows={systemActors}
+              emptyMessage="Run the system actors migration to create the AI Agent identity for this workspace."
+            />
+          </SurfaceCard>
+        </WorkspaceDisclosure>
+      ) : null}
 
       <WorkspaceDisclosure title="Pending invites" summary={pendingInvites.length ? `${pendingInvites.length} waiting` : "No pending invites"}>
         <SurfaceCard title="Pending invites">

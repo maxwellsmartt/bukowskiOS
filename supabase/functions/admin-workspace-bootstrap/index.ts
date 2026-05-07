@@ -23,6 +23,14 @@ const operationalPermissions = [
   { key: "packing-slips.read", label: "Read packing slips", description: "View packing slip detail and status" },
   { key: "packing-slips.create", label: "Create packing slips", description: "Issue and return packing slips" },
   { key: "finance.read", label: "Read finance", description: "View finance exposure and entries" },
+  { key: "currency.manage_rates", label: "Manage exchange rates", description: "Create and edit currency settings and exchange rates." },
+  { key: "quotes.read", label: "Read quotes", description: "View workspace quotes." },
+  { key: "quotes.create", label: "Create quotes", description: "Create new quotes." },
+  { key: "quotes.edit", label: "Edit quotes", description: "Edit drafts and send quotes." },
+  { key: "quotes.approve", label: "Approve quotes", description: "Approve or reject quotes." },
+  { key: "quotes.cancel", label: "Cancel quotes", description: "Cancel or delete quotes." },
+  { key: "quotes.export", label: "Export quotes", description: "Generate PDFs of quotes." },
+  { key: "quotes.manage_templates", label: "Manage quote templates", description: "Create and edit quote templates." },
   { key: "rma.read", label: "Read RMAs", description: "Review RMA queues and manufacturer cases" },
   { key: "rma.create", label: "Create RMAs", description: "Open or prepare new RMA cases" },
   { key: "users.invite", label: "Invite users", description: "Invite a teammate to join a workspace by email." },
@@ -66,7 +74,7 @@ const operationalRoles = [
     name: "Finance Viewer",
     description: "Review finance status without edit access.",
     isSystemRole: false,
-    permissionKeys: ["finance.read"],
+    permissionKeys: ["finance.read", "quotes.read", "quotes.export"],
   },
   {
     key: "maintenance",
@@ -75,6 +83,24 @@ const operationalRoles = [
     isSystemRole: false,
     permissionKeys: ["assets.read", "incidents.read", "incidents.create", "rma.read", "rma.create"],
   },
+];
+
+const systemActorPermissionKeys = [
+  "projects.read",
+  "projects.manage",
+  "assets.read",
+  "assets.manage",
+  "incidents.read",
+  "incidents.create",
+  "packing-slips.read",
+  "packing-slips.create",
+  "finance.read",
+  "rma.read",
+  "rma.create",
+  "quotes.read",
+  "quotes.create",
+  "quotes.edit",
+  "quotes.export",
 ];
 
 const corsHeaders = (request: Request) => {
@@ -251,6 +277,55 @@ Deno.serve(async (request) => {
 
   if (membershipError) {
     return json(request, { error: membershipError.message }, 400);
+  }
+
+  const { data: systemActor, error: systemActorError } = await adminClient
+    .from("workspace_system_actors")
+    .upsert(
+      {
+        workspace_id: workspace.id,
+        key: "ai_agent",
+        name: "AI Agent",
+        email: "ai-agent@bukowskios.local",
+        kind: "agent",
+        description: "System actor used to audit assistant-driven operational actions in this workspace.",
+        status: "active",
+        metadata_json: {
+          local_actor_id: "user-ops",
+          managed_by: "bukowskiOS",
+        },
+        updated_at: now,
+      },
+      {
+        onConflict: "workspace_id,key",
+        ignoreDuplicates: false,
+      },
+    )
+    .select("id")
+    .single();
+
+  if (systemActorError || !systemActor) {
+    return json(request, { error: systemActorError?.message ?? "system_actor_create_failed" }, 400);
+  }
+
+  const systemActorPermissionRows = systemActorPermissionKeys
+    .map((permissionKey) => {
+      const permissionId = permissionByKey.get(permissionKey);
+      return permissionId ? { actor_id: systemActor.id, permission_id: permissionId } : null;
+    })
+    .filter((row): row is { actor_id: string; permission_id: string } => Boolean(row));
+
+  if (systemActorPermissionRows.length > 0) {
+    const { error: systemActorPermissionsError } = await adminClient
+      .from("workspace_system_actor_permissions")
+      .upsert(systemActorPermissionRows, {
+        onConflict: "actor_id,permission_id",
+        ignoreDuplicates: true,
+      });
+
+    if (systemActorPermissionsError) {
+      return json(request, { error: systemActorPermissionsError.message }, 400);
+    }
   }
 
   const baseCategories = [

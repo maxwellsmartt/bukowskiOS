@@ -36,11 +36,16 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
   const [isSaving, setIsSaving] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setFullName(initialFullName);
   }, [initialFullName]);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.avatarUrl]);
 
   if (status !== "authenticated" || !user) {
     return (
@@ -57,6 +62,37 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
   const dirty = (fullName.trim() || null) !== (initialFullName.trim() || null);
   const initials = initialsFor(fullName.trim() || user.email || "?");
 
+  const upsertProfile = async (updates: { avatarUrl?: string | null; fullName?: string | null }) => {
+    if (!supabase) {
+      return;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const looseSupabase = supabase as any;
+    const payload: Record<string, string | null> = {
+      user_id: user.id,
+      email: user.email,
+      updated_at: new Date().toISOString(),
+    };
+
+    if ("avatarUrl" in updates) {
+      payload.avatar_url = updates.avatarUrl ?? null;
+    }
+
+    if ("fullName" in updates) {
+      payload.full_name = updates.fullName ?? null;
+    }
+
+    const { error } = await looseSupabase.from("user_profiles").upsert(payload, {
+      onConflict: "user_id",
+      ignoreDuplicates: false,
+    });
+
+    if (error) {
+      throw error;
+    }
+  };
+
   const handleSave = async () => {
     if (!supabase) {
       toast.error("Cannot save", "Supabase is not configured for this device.");
@@ -71,6 +107,7 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
         },
       });
       if (error) throw error;
+      await upsertProfile({ fullName: fullName.trim() || null });
       await refreshUser();
       toast.success("Account saved", "Your name now appears across the app.");
     } catch (error) {
@@ -110,6 +147,7 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
         data: { avatar_url: avatarUrl },
       });
       if (updateError) throw updateError;
+      await upsertProfile({ avatarUrl });
 
       await refreshUser();
       toast.success("Avatar updated", "Your photo now appears across the app.");
@@ -126,6 +164,7 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
     try {
       const { error } = await supabase.auth.updateUser({ data: { avatar_url: null } });
       if (error) throw error;
+      await upsertProfile({ avatarUrl: null });
       await refreshUser();
       toast.success("Avatar removed", "Your initials are back.");
     } catch (error) {
@@ -165,8 +204,13 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
             onClick={() => avatarInputRef.current?.click()}
             type="button"
           >
-            {user.avatarUrl ? (
-              <img alt={fullName || user.email || "Avatar"} className="user-account-avatar-image" src={user.avatarUrl} />
+            {user.avatarUrl && !avatarLoadFailed ? (
+              <img
+                alt={fullName || user.email || "Avatar"}
+                className="user-account-avatar-image"
+                onError={() => setAvatarLoadFailed(true)}
+                src={user.avatarUrl}
+              />
             ) : (
               <span className="user-account-avatar" aria-hidden="true">{initials}</span>
             )}

@@ -187,6 +187,8 @@ declare global {
         accessToken: string | null;
         refreshToken: string | null;
       }>;
+      getOAuthRedirectUrl: () => Promise<string>;
+      getAvatarDataUrl: (url: string) => Promise<string | null>;
       setStoredTokens: (tokens: { accessToken: string | null; refreshToken: string | null }) => Promise<void>;
       clearStoredTokens: () => Promise<void>;
     };

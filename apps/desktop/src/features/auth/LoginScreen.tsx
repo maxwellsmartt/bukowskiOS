@@ -7,6 +7,10 @@ import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.p
 import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
+type OAuthProvider = "google" | "github";
+
+const providerLabel = (provider: OAuthProvider) => (provider === "google" ? "Google" : "GitHub");
+
 export const LoginScreen = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -16,10 +20,12 @@ export const LoginScreen = () => {
   const [rememberLogin, setRememberLogin] = useState(true);
   const [status, setStatus] = useState<string | null>(isLocalFallback ? "Local dev session is active." : null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingOAuthProvider, setPendingOAuthProvider] = useState<OAuthProvider | null>(null);
 
   const from = typeof location.state === "object" && location.state && "from" in location.state ? String(location.state.from) : "/";
 
   const runAuthAction = async (action: () => Promise<void>, successMessage?: string) => {
+    setPendingOAuthProvider(null);
     setIsSubmitting(true);
     setStatus(null);
 
@@ -36,6 +42,22 @@ export const LoginScreen = () => {
       }
     } catch (error) {
       setStatus(getUserFacingErrorMessage(error, "Authentication failed."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const runOAuthAction = async (provider: OAuthProvider) => {
+    setPendingOAuthProvider(provider);
+    setIsSubmitting(true);
+    setStatus(`Opening ${providerLabel(provider)}. Approve access in your browser and bukowskiOS will continue here.`);
+
+    try {
+      await signInWithOAuth(provider);
+      setStatus(`Waiting for ${providerLabel(provider)} approval. You can return here after approving in the browser.`);
+    } catch (error) {
+      setPendingOAuthProvider(null);
+      setStatus(getUserFacingErrorMessage(error, `${providerLabel(provider)} sign in could not start.`));
     } finally {
       setIsSubmitting(false);
     }
@@ -63,6 +85,9 @@ export const LoginScreen = () => {
           className="auth-form"
           onSubmit={(event) => {
             event.preventDefault();
+            if (pendingOAuthProvider) {
+              return;
+            }
             void runAuthAction(() => signInWithPassword(email, password));
           }}
         >
@@ -103,7 +128,7 @@ export const LoginScreen = () => {
             <span>Keep me signed in on this Mac</span>
           </label>
 
-          <button className="auth-primary-button" disabled={isSubmitting} type="submit">
+          <button className="auth-primary-button" disabled={isSubmitting || Boolean(pendingOAuthProvider)} type="submit">
             <span>{isSubmitting ? "Signing in..." : "Sign in"}</span>
           </button>
         </form>
@@ -113,7 +138,7 @@ export const LoginScreen = () => {
         <div className="auth-actions">
           <button
             className="auth-secondary-button"
-            disabled={isSubmitting || !email.trim()}
+            disabled={isSubmitting || Boolean(pendingOAuthProvider) || !email.trim()}
             onClick={() => void runAuthAction(() => signInWithMagicLink(email), "Magic link sent. Check your email.")}
             type="button"
           >
@@ -124,7 +149,12 @@ export const LoginScreen = () => {
               <span>Send magic link</span>
             </span>
           </button>
-          <button className="auth-secondary-button" disabled={isSubmitting} onClick={() => void runAuthAction(() => signInWithOAuth("google"))} type="button">
+          <button
+            className="auth-secondary-button"
+            disabled={isSubmitting || Boolean(pendingOAuthProvider)}
+            onClick={() => void runOAuthAction("google")}
+            type="button"
+          >
             <span className="auth-button-content">
               <span className="auth-button-icon">
                 <span className="auth-provider-dot">G</span>
@@ -132,7 +162,12 @@ export const LoginScreen = () => {
               <span>Continue with Google</span>
             </span>
           </button>
-          <button className="auth-secondary-button" disabled={isSubmitting} onClick={() => void runAuthAction(() => signInWithOAuth("github"))} type="button">
+          <button
+            className="auth-secondary-button"
+            disabled={isSubmitting || Boolean(pendingOAuthProvider)}
+            onClick={() => void runOAuthAction("github")}
+            type="button"
+          >
             <span className="auth-button-content">
               <span className="auth-button-icon">
                 <Github size={16} />
@@ -148,13 +183,32 @@ export const LoginScreen = () => {
             <span>Enter your email and get a secure link to create your password.</span>
           </div>
           <button
-            disabled={isSubmitting || !email.trim()}
+            disabled={isSubmitting || Boolean(pendingOAuthProvider) || !email.trim()}
             onClick={() => void runAuthAction(() => requestFirstLoginLink(email), "Setup link sent. Open it to create your password.")}
             type="button"
           >
             Set up password
           </button>
         </div>
+
+        {pendingOAuthProvider ? (
+          <div className="auth-oauth-waiting" role="status" aria-live="polite">
+            <div className="auth-oauth-spinner" aria-hidden="true" />
+            <div>
+              <p>Waiting for {providerLabel(pendingOAuthProvider)}</p>
+              <span>Approve access in your browser. This window will continue automatically when the secure callback returns.</span>
+            </div>
+            <button
+              onClick={() => {
+                setPendingOAuthProvider(null);
+                setStatus(null);
+              }}
+              type="button"
+            >
+              Use another method
+            </button>
+          </div>
+        ) : null}
 
         {status || authError ? <p className="auth-status">{status ?? authError}</p> : null}
       </section>

@@ -74,6 +74,48 @@ export type BukowskiDatabase = {
         };
         Update: Partial<BukowskiDatabase["public"]["Tables"]["workspace_memberships"]["Insert"]>;
       };
+      workspace_system_actors: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          key: string;
+          name: string;
+          email: string | null;
+          kind: "agent" | "integration" | "system";
+          description: string | null;
+          status: "active" | "paused" | "inactive";
+          metadata_json: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          key: string;
+          name: string;
+          email?: string | null;
+          kind?: "agent" | "integration" | "system";
+          description?: string | null;
+          status?: "active" | "paused" | "inactive";
+          metadata_json?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<BukowskiDatabase["public"]["Tables"]["workspace_system_actors"]["Insert"]>;
+      };
+      workspace_system_actor_permissions: {
+        Row: {
+          actor_id: string;
+          permission_id: string;
+          created_at: string;
+        };
+        Insert: {
+          actor_id: string;
+          permission_id: string;
+          created_at?: string;
+        };
+        Update: Partial<BukowskiDatabase["public"]["Tables"]["workspace_system_actor_permissions"]["Insert"]>;
+      };
       notifications: {
         Row: {
           id: string;

@@ -31,6 +31,8 @@ export const ipcChannels = {
   },
   auth: {
     getStoredTokens: "bukowskiAuth:getStoredTokens",
+    getOAuthRedirectUrl: "bukowskiAuth:getOAuthRedirectUrl",
+    getAvatarDataUrl: "bukowskiAuth:getAvatarDataUrl",
     setStoredTokens: "bukowskiAuth:setStoredTokens",
     clearStoredTokens: "bukowskiAuth:clearStoredTokens",
   },

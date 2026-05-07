@@ -2,6 +2,11 @@ import type { HeadersReceivedResponse, IpcMainInvokeEvent, OnHeadersReceivedList
 
 const trustedDevHosts = new Set(["localhost", "127.0.0.1"]);
 const blockedExternalProtocols = new Set(["file:", "javascript:", "data:", "smb:", "ftp:", "blob:", "ws:", "wss:"]);
+const trustedRemoteImageOrigins = [
+  "https://lh3.googleusercontent.com",
+  "https://avatars.githubusercontent.com",
+  "https://secure.gravatar.com",
+];
 
 const createSanitizedError = (message: string) => {
   const error = new Error(message);
@@ -84,6 +89,10 @@ export const buildContentSecurityPolicy = (
   const scriptSources = ["'self'"];
   const styleSources = ["'self'", "'unsafe-inline'"];
   const imageSources = ["'self'", "data:", "blob:"];
+
+  for (const imageOrigin of trustedRemoteImageOrigins) {
+    imageSources.push(imageOrigin);
+  }
 
   for (const remoteConnectUrl of remoteConnectUrls) {
     const origin = toAllowedConnectOrigin(remoteConnectUrl);

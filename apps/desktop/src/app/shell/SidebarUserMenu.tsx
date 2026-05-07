@@ -23,7 +23,12 @@ export const SidebarUserMenu = () => {
   const { user, status, signOut, isLocalFallback } = useSession();
   const { activeMembership } = useWorkspace();
   const [open, setOpen] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.avatarUrl]);
 
   useEffect(() => {
     if (!open) return;
@@ -76,8 +81,8 @@ export const SidebarUserMenu = () => {
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
-        {user?.avatarUrl ? (
-          <img alt="" className="sidebar-user-avatar-img" src={user.avatarUrl} />
+        {user?.avatarUrl && !avatarLoadFailed ? (
+          <img alt="" className="sidebar-user-avatar-img" onError={() => setAvatarLoadFailed(true)} src={user.avatarUrl} />
         ) : (
           <span className="sidebar-user-avatar" aria-hidden="true">
             {initials}
@@ -93,8 +98,13 @@ export const SidebarUserMenu = () => {
       {open ? (
         <div className="sidebar-user-popover" role="menu">
           <div className="sidebar-user-popover-header">
-            {user?.avatarUrl ? (
-              <img alt="" className="sidebar-user-avatar-img sidebar-user-avatar-lg" src={user.avatarUrl} />
+            {user?.avatarUrl && !avatarLoadFailed ? (
+              <img
+                alt=""
+                className="sidebar-user-avatar-img sidebar-user-avatar-lg"
+                onError={() => setAvatarLoadFailed(true)}
+                src={user.avatarUrl}
+              />
             ) : (
               <span className="sidebar-user-avatar sidebar-user-avatar-lg" aria-hidden="true">
                 {initials}
