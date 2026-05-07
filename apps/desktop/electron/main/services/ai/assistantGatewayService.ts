@@ -4,6 +4,7 @@ import type {
   AssistantGatewayAttachment,
   AssistantGatewayRequest,
   AssistantGatewayResponse,
+  AgentNotificationIntent,
   OrchestrationResult,
 } from "@contracts";
 import type { DatabaseSync } from "node:sqlite";
@@ -116,6 +117,37 @@ const serializeToolPayload = (payload: unknown) => {
     originalType: Array.isArray(payload) ? "array" : typeof payload,
     preview: truncateText(serialized, maxToolPayloadChars - 160),
   });
+};
+
+const collectNotificationIntents = (
+  payloads: Array<{
+    toolName: string;
+    payload: unknown;
+  }>,
+): AgentNotificationIntent[] => {
+  const intents: AgentNotificationIntent[] = [];
+
+  for (const entry of payloads) {
+    if (!entry.payload || typeof entry.payload !== "object") {
+      continue;
+    }
+
+    const maybeIntent = (entry.payload as { notificationIntent?: unknown }).notificationIntent;
+    if (!maybeIntent || typeof maybeIntent !== "object") {
+      continue;
+    }
+
+    const intent = maybeIntent as AgentNotificationIntent;
+    if (
+      intent.type === "create_notification" ||
+      intent.type === "create_todo" ||
+      intent.type === "create_reminder"
+    ) {
+      intents.push(intent);
+    }
+  }
+
+  return intents;
 };
 
 const asPayloadRecord = (payload: unknown): Record<string, unknown> | null =>
@@ -1500,6 +1532,7 @@ export const createAssistantGatewayService = (
     });
 
     const actionLinks = buildActionLinks(executedToolPayloads);
+    const notificationIntents = collectNotificationIntents(executedToolPayloads);
 
     return {
       status: draftRunId ? "draft_created" : "answered",
@@ -1551,6 +1584,7 @@ export const createAssistantGatewayService = (
         requiresApproval,
       },
       actionLinks,
+      notificationIntents,
     };
   };
 

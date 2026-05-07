@@ -11,10 +11,11 @@ import {
 import { ArrowUp, Bot, CheckCircle2, ChevronDown, Ellipsis, ExternalLink, PanelLeft, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AssistantChatSession, AssistantChatSessionState } from "@app/providers/AssistantChatContext";
-import type { AssistantApprovalPreference, AssistantGatewayAttachment } from "@contracts";
+import type { AssistantApprovalPreference, AssistantChatMessageMeta, AssistantChatSnapshot, AssistantGatewayAttachment } from "@contracts";
 
 import { useAssistantChat } from "@app/providers/AssistantChatContext";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
+import { useNotifications } from "@app/providers/NotificationsProvider";
 import { reviewAgentRun } from "@features/agents/useAgentsData";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { readJsonPreference, uiPreferenceKeys, writeJsonPreference } from "@shared/lib/preferences";
@@ -260,6 +261,88 @@ const toImageAttachment = async (file: File): Promise<AssistantGatewayAttachment
   };
 };
 
+const getLatestAssistantMeta = (snapshot: AssistantChatSnapshot, threadId: string): AssistantChatMessageMeta | null => {
+  const thread = snapshot.threads.find((item) => item.id === threadId);
+  if (!thread) {
+    return null;
+  }
+
+  for (let index = thread.messages.length - 1; index >= 0; index -= 1) {
+    const message = thread.messages[index];
+    if (message.role === "assistant" && message.meta) {
+      return message.meta;
+    }
+  }
+
+  return null;
+};
+
+const buildAgentCompletionNotification = (meta: AssistantChatMessageMeta | null, fallbackPath: string, threadId: string) => {
+  if (!meta) {
+    return {
+      title: "Agent update ready",
+      body: "Your assistant response is ready in BukowskiOS.",
+      linkTo: fallbackPath,
+      sourceRef: { threadId },
+    };
+  }
+
+  const firstActionLink = meta.actionLinks?.[0] ?? null;
+  const needsReview = Boolean(meta.draftRunId) || meta.tone === "approval";
+  const linkTo = firstActionLink?.path ?? (needsReview ? "/agents/runs" : fallbackPath);
+
+  if (meta.tone === "error") {
+    return {
+      title: `${meta.routedAgentName} needs attention`,
+      body: meta.body || meta.commandStateLabel || "The agent could not complete the request.",
+      linkTo,
+      sourceRef: {
+        threadId,
+        draftRunId: meta.draftRunId ?? null,
+        routedAgentId: meta.routedAgentId,
+        state: "error",
+      },
+    };
+  }
+
+  if (needsReview) {
+    return {
+      title: "Agent draft ready for review",
+      body: meta.body || meta.commandStateLabel || "A supervised agent run is waiting for your review.",
+      linkTo,
+      sourceRef: {
+        threadId,
+        draftRunId: meta.draftRunId ?? null,
+        routedAgentId: meta.routedAgentId,
+        state: "approval",
+      },
+    };
+  }
+
+  if (firstActionLink) {
+    return {
+      title: `${meta.routedAgentName} finished an operation`,
+      body: `${firstActionLink.label}${meta.toolLabel ? ` · ${meta.toolLabel}` : ""}`,
+      linkTo,
+      sourceRef: {
+        threadId,
+        routedAgentId: meta.routedAgentId,
+        actionLink: firstActionLink,
+      },
+    };
+  }
+
+  return {
+    title: `${meta.routedAgentName} update ready`,
+    body: meta.body || meta.commandStateLabel || "The assistant response is ready.",
+    linkTo,
+    sourceRef: {
+      threadId,
+      routedAgentId: meta.routedAgentId,
+    },
+  };
+};
+
 const buildStateActions = (state: AssistantChatSessionState | null) => {
   if (!state) {
     return [];
@@ -389,6 +472,7 @@ export const GlobalAssistantChat = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { items } = useCompareTray();
+  const { applyAgentNotificationIntents, createNotification, unreadCount } = useNotifications();
   const {
     activeSession,
     compareTrayVisible,
@@ -601,6 +685,7 @@ export const GlobalAssistantChat = () => {
 
     const sessionId = activeSession.id;
     const intentLabel = deriveIntentLabel(location.pathname);
+    const shouldNotifyCompletion = !isOpen || !document.hasFocus();
     const outgoingUserMessage = buildUserBubbleMessage(nextMessage, attachments);
     const pendingState = {
       tone: "sending",
@@ -635,7 +720,7 @@ export const GlobalAssistantChat = () => {
     setIsSending(true);
 
     try {
-      await sendTurn({
+      const nextSnapshot = await sendTurn({
         commandId: `cmd-chat-${Date.now().toString(36)}`,
         workspaceId,
         threadId: sessionId,
@@ -650,6 +735,22 @@ export const GlobalAssistantChat = () => {
           requestedApprovalMode: selectedApproval,
         },
       });
+      const latestMeta = getLatestAssistantMeta(nextSnapshot, sessionId);
+      if (latestMeta?.notificationIntents?.length) {
+        await applyAgentNotificationIntents(latestMeta.notificationIntents, sessionId).catch(() => undefined);
+      }
+      if (shouldNotifyCompletion) {
+        const notification = buildAgentCompletionNotification(latestMeta, location.pathname, sessionId);
+        await createNotification({
+          kind: "agent_completion",
+          title: notification.title,
+          body: notification.body,
+          linkTo: notification.linkTo,
+          sourceType: "agent",
+          sourceRef: notification.sourceRef,
+          notifyNow: true,
+        }).catch(() => undefined);
+      }
     } catch (error) {
       setAttachmentError(getUserFacingErrorMessage(error, "Mission Control could not prepare this draft run."));
     } finally {
@@ -696,13 +797,29 @@ export const GlobalAssistantChat = () => {
     }
 
     try {
-      await reviewAgentRun({
+      const result = await reviewAgentRun({
         commandId: `cmd-chat-review-${Date.now().toString(36)}`,
         workspaceId,
         runId,
         decision,
       });
       await refresh();
+      if (!isOpen || !document.hasFocus()) {
+        await createNotification({
+          kind: "agent_completion",
+          title: decision === "deny" ? "Agent run denied" : "Agent run updated",
+          body: result.summary,
+          linkTo: "/agents/runs",
+          sourceType: "agent",
+          sourceRef: {
+            runId: result.runId,
+            status: result.status,
+            approvalDecision: result.approvalDecision,
+            approvalScope: result.approvalScope,
+          },
+          notifyNow: true,
+        }).catch(() => undefined);
+      }
     } catch (error) {
       setActionError(getUserFacingErrorMessage(error, "I could not record that decision yet."));
     } finally {
@@ -1396,6 +1513,7 @@ export const GlobalAssistantChat = () => {
 
       <button aria-label="Open global assistant" className="assistant-chat-fab" onClick={toggle} type="button">
         <Bot size={24} />
+        {!isOpen && unreadCount > 0 ? <span className="assistant-chat-fab-badge">{Math.min(unreadCount, 99)}</span> : null}
       </button>
     </div>
   );

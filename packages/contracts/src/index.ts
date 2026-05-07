@@ -5,6 +5,7 @@ export * from "./queries/compare-queries";
 export * from "./constants";
 export * from "./queries/finance-queries";
 export * from "./queries/list-controls-queries";
+export * from "./queries/notification-queries";
 export * from "./queries/operations-queries";
 export * from "./queries/rma-queries";
 export * from "./commands/asset-commands";

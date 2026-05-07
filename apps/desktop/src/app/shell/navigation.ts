@@ -10,6 +10,7 @@ import {
   FolderCog,
   FolderOpenDot,
   Info,
+  Inbox,
   PackageSearch,
   ScrollText,
   Settings,
@@ -31,6 +32,7 @@ export const primaryNav: NavItem[] = [
   { label: "Projects", path: "/projects/schedule", icon: FolderOpenDot },
   { label: "Assets", path: "/assets", icon: Boxes },
   { label: "Finance", path: "/finance", icon: BriefcaseBusiness },
+  { label: "Inbox", path: "/inbox", icon: Inbox },
   { label: "Automation", path: "/agents/mission-control", icon: Bot },
 ];
 

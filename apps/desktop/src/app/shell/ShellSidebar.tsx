@@ -32,6 +32,8 @@ export const ShellSidebar = () => {
               ? "projects"
               : item.path.startsWith("/finance")
                 ? "finance"
+                : item.path.startsWith("/inbox")
+                  ? "inbox"
                 : item.path.startsWith("/agents")
                   ? "agents"
                   : "assets";

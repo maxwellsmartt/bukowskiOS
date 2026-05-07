@@ -7,6 +7,7 @@ import { useShellContext } from "@shared/hooks/useShellContext";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import type { AppDiagnosticsSnapshot } from "@contracts";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { NotificationsButton } from "./NotificationsTray";
 
 type TopContextBarProps = {
   onOpenSearch: () => void;
@@ -99,6 +100,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
           <span>Search</span>
           <kbd>⌘K</kbd>
         </button>
+        <NotificationsButton />
         <HelpMenu />
         <button
           aria-label={syncState.label}

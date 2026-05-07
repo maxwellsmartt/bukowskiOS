@@ -6,7 +6,7 @@ export type ScopeMode = "global" | "project";
 export type GlobalDomainKey = "projects" | "assets" | "finance" | "agents" | "utility";
 export type ProjectRouteSection = "overview" | "assets" | "packing" | "incidents" | "budget" | "info";
 export type DomainKey = GlobalDomainKey | "project";
-export type PrimaryNavKey = "projects" | "assets" | "finance" | "agents";
+export type PrimaryNavKey = "projects" | "assets" | "finance" | "inbox" | "agents";
 
 export type AppRouteMeta = {
   path: string;
@@ -25,6 +25,7 @@ export const globalRouteMeta: AppRouteMeta[] = [
   { path: "/assets/:assetId", label: "Asset Detail", scopeMode: "global", domain: "assets" },
   { path: "/packing-slips", label: "Packing Slips", scopeMode: "global", domain: "assets" },
   { path: "/incidents", label: "Incidents", scopeMode: "global", domain: "assets" },
+  { path: "/inbox", label: "Inbox", scopeMode: "global", domain: "utility" },
   { path: "/projects", label: "Projects", scopeMode: "global", domain: "projects" },
   { path: "/projects/schedule", label: "Schedule Overview", scopeMode: "global", domain: "projects" },
   { path: "/rma", label: "RMA", scopeMode: "global", domain: "assets" },
@@ -168,6 +169,10 @@ export const resolvePrimaryNavKey = (pathname: string): PrimaryNavKey | null => 
 
   if (activeRoute.domain === "finance") {
     return "finance";
+  }
+
+  if (activeRoute.path === "/inbox") {
+    return "inbox";
   }
 
   if (activeRoute.domain === "agents") {

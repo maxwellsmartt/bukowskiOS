@@ -10,6 +10,7 @@ import { useOperationalSnapshotPull } from "@shared/hooks/useOperationalSnapshot
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { notifyWorkspaceDataChanged } from "@shared/hooks/useWorkspaceDataRefresh";
 import { useSession } from "@app/providers/SessionProvider";
+import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { Breadcrumb } from "@shared/components/Breadcrumb";
 import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
@@ -22,6 +23,7 @@ import { FloatingTooltipLayer } from "./FloatingTooltipLayer";
 import { GlobalAssistantChat } from "./GlobalAssistantChat";
 import { GlobalSearchPalette } from "./GlobalSearchPalette";
 import { agentsSubnav, assetsSubnav, buildProjectSubnav, financeSubnav, projectsSubnav } from "./navigation";
+import { NotificationsTray } from "./NotificationsTray";
 import { ShellErrorBoundary } from "./ShellErrorBoundary";
 import { ShellSidebar } from "./ShellSidebar";
 import { SubnavTabs } from "./SubnavTabs";
@@ -39,6 +41,7 @@ export const AppShell = () => {
   const navigate = useNavigate();
   const { activeProjectId, activeProjectRouteSection, isScopeReady } = useShellContext();
   const { handleAuthDeepLink } = useSession();
+  const { markReminderDone, snoozeReminder } = useNotifications();
   const { activeWorkspaceId } = useWorkspace();
   useAutoLogout();
   useCatalogPull();
@@ -197,11 +200,29 @@ export const AppShell = () => {
         return;
       }
 
+      if (action.type === "notification-clicked") {
+        if (action.linkTo) {
+          navigate(action.linkTo);
+        }
+        return;
+      }
+
+      if (action.type === "reminder-native-action") {
+        if (action.action === "mark_done") {
+          void markReminderDone(action.reminderId);
+        } else if (action.action === "snooze_15m") {
+          void snoozeReminder(action.reminderId, 15);
+        } else if (action.action === "snooze_1h") {
+          void snoozeReminder(action.reminderId, 60);
+        }
+        return;
+      }
+
       if (action.type === "auth-deep-link") {
         void handleAuthDeepLink(action.url).then((targetPath) => navigate(targetPath, { replace: true }));
       }
     });
-  }, [handleAuthDeepLink, navigate]);
+  }, [handleAuthDeepLink, markReminderDone, navigate, snoozeReminder]);
 
   useEffect(
     () => () => {
@@ -307,6 +328,7 @@ export const AppShell = () => {
         </div>
       </div>
       <GlobalSearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <NotificationsTray />
       <GlobalAssistantChat />
       <OnboardingTour />
       <FloatingTooltipLayer />

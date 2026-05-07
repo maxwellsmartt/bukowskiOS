@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { AssistantChatProvider } from "./AssistantChatContext";
 import { CompareTrayProvider } from "./CompareTrayContext";
+import { NotificationsProvider } from "./NotificationsProvider";
 import { SessionProvider } from "./SessionProvider";
 import { ShellContextProvider } from "./ShellContext";
 import { ToastProvider } from "./ToastProvider";
@@ -15,11 +16,13 @@ export const AppProviders = ({ children }: AppProvidersProps) => (
   <SessionProvider>
     <WorkspaceProvider>
       <ToastProvider>
-        <ShellContextProvider>
-          <CompareTrayProvider>
-            <AssistantChatProvider>{children}</AssistantChatProvider>
-          </CompareTrayProvider>
-        </ShellContextProvider>
+        <NotificationsProvider>
+          <ShellContextProvider>
+            <CompareTrayProvider>
+              <AssistantChatProvider>{children}</AssistantChatProvider>
+            </CompareTrayProvider>
+          </ShellContextProvider>
+        </NotificationsProvider>
       </ToastProvider>
     </WorkspaceProvider>
   </SessionProvider>

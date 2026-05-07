@@ -8,11 +8,13 @@ import { buildContentSecurityPolicy } from "./security/securityConfig";
 import { registerAuthIpc } from "./ipc/registerAuthIpc";
 import { registerAppIpc } from "./ipc/registerAppIpc";
 import { registerFoundationIpc } from "./ipc/registerFoundationIpc";
+import { registerNotificationIpc } from "./ipc/registerNotificationIpc";
 import { buildAppMenu } from "./menus/buildAppMenu";
 import { getDesktopEnvironment } from "./services/appEnvironment";
 import { createDocumentGenerationService } from "./services/data/documentGenerationService";
 import { initializeLocalDatabase } from "./services/data/localDatabase";
 import { getDesktopLogger, initializeDesktopLogger } from "./services/logger";
+import { attachNativeNotificationWindowState, setNativeNotificationDockBadge } from "./services/notifications/nativeNotifier";
 import { createMainWindow, loadMainWindowContent } from "./windows/createMainWindow";
 
 const { devServerUrl, preloadPath, rendererDist } = getDesktopEnvironment(import.meta.url);
@@ -299,10 +301,12 @@ app.whenReady().then(() => {
   const documentGeneration = createDocumentGenerationService();
   attachProcessRuntimeTelemetry(localDatabase.runtimeDiagnostics);
   attachWindowRuntimeTelemetry(mainWindow, localDatabase.runtimeDiagnostics);
+  attachNativeNotificationWindowState(mainWindow);
 
   registerAuthIpc({
     getOAuthRedirectUrl: () => devAuthCallbackUrl ?? "bukowskios://auth/callback",
   });
+  registerNotificationIpc();
   registerAppIpc({
     database: localDatabase.database,
     getDiagnosticsSnapshot: localDatabase.getDiagnosticsSnapshot,
@@ -636,6 +640,7 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) {
       const activatedWindow = createAppWindow();
       attachWindowRuntimeTelemetry(activatedWindow, localDatabase.runtimeDiagnostics);
+      attachNativeNotificationWindowState(activatedWindow);
       activatedWindow.webContents.once("did-finish-load", flushPendingDeepLinks);
     }
   });
@@ -662,6 +667,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  setNativeNotificationDockBadge(0);
   devAuthCallbackServer?.close();
   devAuthCallbackServer = null;
   devAuthCallbackUrl = null;

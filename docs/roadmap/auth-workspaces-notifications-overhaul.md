@@ -26,7 +26,7 @@ Decisiones bloqueadas:
 | 2 — Roles, Permissions e Invites | In progress | 2026-04-29 |  | Codex | Primer corte de Settings: navegación compacta, health cards, Data/Advanced más separados y Team usando workspace activo. |
 | 3 — Workspaces CRUD + Sharing | Todo |  |  | Codex | Pendiente. |
 | 4 — Archiving Wrapped-Gate | Todo |  |  | Codex | Pendiente. |
-| 5 — Notifications, Todos y Reminders | Todo |  |  | Codex | Pendiente. |
+| 5 — Notifications, Todos y Reminders | In progress | 2026-05-07 |  | Codex | Primer corte: provider realtime, popover tray compacto, badge en top bar/FAB, notificaciones nativas macOS y migración realtime/grants. `typecheck` y `build` pasan; último polish de popover con `typecheck` pasa. |
 
 ## Checklist por slice
 
@@ -96,10 +96,18 @@ Decisiones bloqueadas:
 
 ### Slice 5 — Notifications, Todos y Reminders
 
-- Todo — Crear tablas `notifications`, `todos`, `reminders`.
-- Todo — Implementar provider/tray/badge/FAB.
-- Todo — Scheduler reminders en main.
-- Todo — Tools para agent runtime.
+- Done — Confirmar tablas base `notifications`, `todos`, `reminders` ya existentes en foundation.
+- Done — Agregar hardening Supabase para notifications: índices, policy INSERT propia, grants y publicación `supabase_realtime`.
+- Done — Implementar `NotificationsProvider` con pull inicial, Realtime INSERT/UPDATE, unread count y mark read/all read.
+- Done — Implementar tray in-app, badge en top bar y badge en FAB del assistant.
+- Done — Implementar bridge Electron main/preload para notificación nativa macOS, foreground state, click-to-navigate y Dock badge.
+- Done — Conectar primer evento real: agent completion crea notification sólo cuando el chat estaba cerrado o app sin foco.
+- Done — Enriquecer notifications de agentes con metadata real del run: drafts pendientes, links accionables, errores y decisiones de aprobación.
+- Done — Agregar fallback de refresh por foco/polling para que badges/notificaciones aparezcan sin reload aunque Realtime tarde o el cliente pierda el evento.
+- Done — Agregar tools profundas del agent runtime (`create_notification`, `create_todo`, `create_reminder`) como intents seguros que el renderer materializa con JWT/RLS del usuario.
+- Done — Agregar scheduler real de reminders en renderer con notificación nativa macOS, recurrencia básica daily/weekly/monthly y entrega one-shot para reminders no recurrentes.
+- Done — Pulir acciones nativas de reminders: botones macOS `Done`/`Snooze 15m` enviados desde Electron hacia renderer y aplicados con JWT/RLS del usuario.
+- Done — Agregar creación manual mínima de Todos y Reminders en `/inbox` para que el usuario no dependa obligatoriamente de los agents.
 
 ## Bitácora de cambios
 
@@ -164,12 +172,19 @@ Decisiones bloqueadas:
 | 2026-05-07 | Working tree | Al validar Google OAuth se detecta avatar roto por CSP de imágenes externas. Se agregan orígenes de avatar Google/GitHub/Gravatar al CSP y fallback a iniciales si una imagen falla en sidebar/account. | Mantener seguridad estricta sin romper la identidad visual del usuario después de OAuth. |
 | 2026-05-07 | Working tree | Se cambia la prioridad de avatar: `user_profiles.avatar_url` queda como foto propia persistente del usuario; OAuth `avatar_url` de Google/GitHub se usa sólo como fallback. Account Settings ahora guarda nombre/avatar también en `user_profiles`, y se agrega policy `users can insert own profile`. | Evitar que un login social pise una foto cargada manualmente por el usuario. |
 | 2026-05-07 | Working tree | El avatar OAuth seguía rompiéndose en dev, así que renderer ya no pinta directo la URL remota. Electron main descarga avatares sólo desde Google/GitHub/Gravatar permitidos y devuelve `data:` al renderer. `signOut` ahora limpia sesión local aunque Supabase/Keychain devuelva un error secundario. | Hacer OAuth más predecible y evitar falsos errores de logout en piloto. |
+| 2026-05-07 | Working tree | Se inicia Slice 5 con un MVP pro de notifications: migración `notifications_realtime_hardening`, provider Realtime, tray in-app, badge top bar/FAB, Dock badge y notificaciones nativas macOS con click-to-navigate. Agent chat crea `agent_completion` sólo cuando el chat estaba cerrado o la app sin foco. Verificación: `typecheck` y `build` pasan. | Avanzar en Notifications sin esperar el smoke de empaquetado, pero manteniendo el alcance estable y testeable para piloto. |
+| 2026-05-07 | Working tree | Se convierte el notification tray en popover compacto anclado al icono de campana, con cierre por click fuera/Escape, animación sutil, flecha visual y densidad más premium. Verificación: `typecheck` pasa. | Hacer que notifications se sienta como una superficie nativa/ligera, no como un panel grande que compite con el workspace. |
+| 2026-05-07 | Working tree | Se integra Agents con Notifications: `sendTurn` devuelve snapshot, el chat deriva la última metadata del assistant y crea notifications con link a `/agents/runs` para drafts/reviews, links accionables para operaciones creadas y estado de error cuando aplique. `reviewAgentRun` también crea notification si el resultado termina fuera de foco. Verificación: `typecheck` pasa. | Que las notificaciones de agentes sean útiles y auditables, no sólo un mensaje genérico de “respuesta lista”. |
+| 2026-05-07 | Working tree | Se endurece Slice 5: badges rojos estilo macOS, refresh por foco/polling para no depender de reload, publicación Realtime de `todos`/`reminders`, tools profundas de agents como intents (`create_notification`, `create_todo`, `create_reminder`), scheduler de reminders con native notification y pestañas básicas Notifications/Todos/Reminders en `/inbox`. Verificación: `typecheck` pasa. | Completar el flujo agent-driven/user-driven mínimo sin exponer secretos ni escribir desde main con permisos admin. |
+| 2026-05-07 | Working tree | Se agregan acciones nativas de reminders: Electron muestra botones `Done` y `Snooze 15m`, emite `reminder-native-action` al renderer y `NotificationsProvider` aplica `completed_at`/`snoozed_until` vía Supabase RLS. `/inbox` suma quick-add manual para Todos y Reminders, más acciones `Done`/`Snooze` en lista. Verificación: `typecheck` pasa. | Cerrar la UX básica de reminders para usuarios humanos, no sólo agents, manteniendo seguridad por sesión. |
+| 2026-05-07 | Working tree | Se pule Inbox como superficie operativa: entrada en sidebar, hero más claro, métricas de unread/open todos/next reminder, tabs con conteos, quick-add más elegante y filas con iconografía/estado visual. Verificación: `typecheck` pasa. | Hacer que Notifications/Todos/Reminders sea usable y atractivo para usuarios no técnicos, no sólo una pantalla de debug. |
 
 ## Decisiones tomadas
 
 - Supabase es source of truth; SQLite queda como cache local + outbox.
 - Electron nunca contiene `service_role`.
 - Edge Functions/RPC cubren operaciones admin como invites.
+- Tools de agents para notifications/todos/reminders no escriben directo desde Electron main; generan intents y el renderer los persiste con la sesión Supabase del usuario para mantener RLS y auditoría por `(user, workspace)`.
 - Se conserva `DEFAULT_WORKSPACE_ID` solo en seeds/test fixtures durante la migración.
 - Magic link queda dentro de auth v1.
 - First login por invite debe permitir crear password antes de operar; el magic link de usuarios existentes usa `flow=first-login`.
@@ -203,6 +218,8 @@ Decisiones bloqueadas:
 | medio | En dev, macOS puede abrir una segunda instancia Electron si el protocolo `bukowskios://` no registra el script de arranque junto al binario. | Registrar protocolo con `process.execPath` + `process.argv[1]` cuando `process.defaultApp` está activo y reenviar deep links por single-instance. | Mitigado en código; falta smoke Google/GitHub en dev. |
 | medio | Aun con registro de protocolo correcto, Launch Services puede seguir abriendo otra instancia Electron en dev. | Usar callback HTTP local fijo en Electron main para dev y conservar deep link custom para build instalada. | Mitigado en código; requiere agregar `http://127.0.0.1:17654/auth/callback` a Supabase Redirect URLs. |
 | medio | No se pudo aplicar/deployar remoto desde Codex porque el Supabase MCP expone herramientas pero responde `Unknown tool`, y el CLI local no tiene access token. | Mantener migración y Edge Function en repo; aplicar con Dashboard/CLI autenticado antes de probar workspace create nuevo. | Bloqueado por auth/tooling local, no por código. |
+| medio | Realtime de notifications no funciona si la tabla no está en `supabase_realtime` o si el proyecto no tiene replication habilitada. | Migración agrega `public.notifications` a `supabase_realtime`; smoke debe insertar una fila remota y validar tray/nativa. | Mitigado en repo; falta aplicar migración y smoke. |
+| medio | Notificaciones nativas pueden sentirse invasivas si disparamos eventos mientras el usuario ya está viendo el chat. | `agent_completion` sólo se crea si el chat estaba cerrado o la app sin foco; los eventos remotos siguen entrando por tray. | Mitigado en primer corte. |
 | crítico | Datos operativos existentes antes del nuevo sync podrían no aparecer en otro usuario hasta que se editen localmente. | Crear backfill idempotente para `project`, `packing_slip`, `incident` y `rma_case`, o re-enqueue controlado desde Sync Activity. | Mitigado en código; ejecutado parcialmente por usuario, falta smoke multiusuario con build actualizado. |
 | medio | Fallback local-dev podría ocultar errores de Supabase si se usa en prod. | Mostrar estado local fallback y requerir env Supabase para builds release en hardening. | Abierto. |
 | bajo | Edge Functions pueden quedar desactualizadas frente al código local si se redeployan manualmente desde Dashboard. | Documentar evidencia en roadmap y migrar a Supabase CLI antes de más functions. | Abierto. |
@@ -229,6 +246,7 @@ Decisiones bloqueadas:
 - Onboarding UX: login/first-login ya no muestra sidebar/subnav y el flujo de magic link para usuarios existentes puede llevar a crear password. Falta smoke real con un usuario nuevo/invitado: magic link -> password -> workspace picker -> workspace visible.
 - AI Agent: el actor local `user-ops` ya se presenta como `AI Agent` y ahora existe migración remota `workspace_system_actors` para sembrarlo por workspace. Falta correr la migración en Supabase prod/dev y redeployar `admin-workspace-bootstrap` antes de crear workspaces nuevos.
 - OAuth Google/GitHub: el código del renderer ya tiene botones y deep link base. La configuración quedó documentada en `docs/foundation/oauth-provider-setup.md`; falta activar providers con credenciales reales y validar callback `bukowskios://auth/callback` en build instalada.
+- Notifications MVP: falta aplicar `20260507175328_notifications_realtime_hardening.sql` en Supabase antes de validar Realtime real. Scheduler reminders y tools profundas de agentes quedan diferidos hasta confirmar tray/native base.
 - Icono desktop: `apps/desktop/build/icon.icns` fue regenerado desde la nueva base `bukowskiOS-desktop-logo.png` y el DMG/ZIP arm64 ya incluyen ese `icon.icns`; falta validar visualmente en Finder/Dock en una instalación limpia.
 - Deuda de UX Settings: Sync Activity ya es más consistente, pero Settings sigue teniendo demasiada información técnica visible. Requiere un slice de simplificación: overview simple, secciones avanzadas colapsadas y mensajes orientados a acciones.
 - MFA TOTP está como pantalla placeholder; falta wiring real Supabase MFA.

@@ -36,6 +36,11 @@ export const ipcChannels = {
     setStoredTokens: "bukowskiAuth:setStoredTokens",
     clearStoredTokens: "bukowskiAuth:clearStoredTokens",
   },
+  notifications: {
+    showNative: "bukowskiNotifications:showNative",
+    setDockBadge: "bukowskiNotifications:setDockBadge",
+    getForegroundState: "bukowskiNotifications:getForegroundState",
+  },
   shell: {
     getBootstrap: "bukowskiShell:getBootstrap",
     searchGlobal: "bukowskiShell:searchGlobal",

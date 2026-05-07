@@ -192,6 +192,11 @@ declare global {
       setStoredTokens: (tokens: { accessToken: string | null; refreshToken: string | null }) => Promise<void>;
       clearStoredTokens: () => Promise<void>;
     };
+    bukowskiNotifications?: {
+      showNative: (input: import("@contracts").ShowNativeNotificationCommand) => Promise<void>;
+      setDockBadge: (count: number) => Promise<void>;
+      getForegroundState: () => Promise<{ isForeground: boolean }>;
+    };
     bukowskiShell?: {
       getBootstrap: () => Promise<ShellBootstrap>;
       searchGlobal: (query: GlobalSearchQuery) => Promise<GlobalSearchGroup[]>;

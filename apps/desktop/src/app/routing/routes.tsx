@@ -37,6 +37,7 @@ const FinanceOverviewPage = lazyPage(() => import("@features/finance/FinanceOver
 const QuotesPage = lazyPage(() => import("@features/finance/QuotesPage"), "QuotesPage");
 const QuoteEditorPage = lazyPage(() => import("@features/finance/QuoteEditorPage"), "QuoteEditorPage");
 const IncidentsPage = lazyPage(() => import("@features/incidents/IncidentsPage"), "IncidentsPage");
+const InboxPage = lazyPage(() => import("@features/inbox/InboxPage"), "InboxPage");
 const PackingPage = lazyPage(() => import("@features/packing/PackingPage"), "PackingPage");
 const CatalogPage = lazyPage(() => import("@features/projects/CatalogPage"), "CatalogPage");
 const ProjectAssetsPage = lazyPage(() => import("@features/projects/ProjectAssetsPage"), "ProjectAssetsPage");
@@ -60,6 +61,7 @@ const routeElements = {
   "/assets/:assetId": <AssetDetailPage />,
   "/packing-slips": <PackingPage />,
   "/incidents": <IncidentsPage />,
+  "/inbox": <InboxPage />,
   "/projects": <ProjectsPage />,
   "/rma": <RmaPage />,
   "/catalog": <CatalogPage />,

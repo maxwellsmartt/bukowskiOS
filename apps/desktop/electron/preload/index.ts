@@ -109,6 +109,7 @@ import type {
   ScheduleTimelineSnapshot,
   ShellAppAction,
   ShellBootstrap,
+  ShowNativeNotificationCommand,
   SetAgentApprovalModeCommand,
   SetActiveAssistantThreadCommand,
   SetAgentStatusCommand,
@@ -209,6 +210,14 @@ const bukowskiAuth = {
   setStoredTokens: (tokens: StoredSupabaseTokens) =>
     ipcRenderer.invoke(ipcChannels.auth.setStoredTokens, tokens) as Promise<void>,
   clearStoredTokens: () => ipcRenderer.invoke(ipcChannels.auth.clearStoredTokens) as Promise<void>,
+};
+
+const bukowskiNotifications = {
+  showNative: (input: ShowNativeNotificationCommand) =>
+    ipcRenderer.invoke(ipcChannels.notifications.showNative, input) as Promise<void>,
+  setDockBadge: (count: number) => ipcRenderer.invoke(ipcChannels.notifications.setDockBadge, count) as Promise<void>,
+  getForegroundState: () =>
+    ipcRenderer.invoke(ipcChannels.notifications.getForegroundState) as Promise<{ isForeground: boolean }>,
 };
 
 const bukowskiShell = {
@@ -521,6 +530,7 @@ window.addEventListener("unhandledrejection", (event) => {
 
 contextBridge.exposeInMainWorld("bukowskiApp", bukowskiApp);
 contextBridge.exposeInMainWorld("bukowskiAuth", bukowskiAuth);
+contextBridge.exposeInMainWorld("bukowskiNotifications", bukowskiNotifications);
 contextBridge.exposeInMainWorld("bukowskiShell", bukowskiShell);
 contextBridge.exposeInMainWorld("bukowskiAgents", bukowskiAgents);
 contextBridge.exposeInMainWorld("bukowskiOverview", bukowskiOverview);

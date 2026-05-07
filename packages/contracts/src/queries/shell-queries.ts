@@ -29,6 +29,15 @@ export type ShellAppAction =
       type: "workspace-data-changed";
       source?: string;
       entities?: string[];
+    }
+  | {
+      type: "notification-clicked";
+      linkTo?: string | null;
+    }
+  | {
+      type: "reminder-native-action";
+      reminderId: string;
+      action: "mark_done" | "snooze_15m" | "snooze_1h";
     };
 
 export type GlobalSearchEntityType = "asset" | "project" | "project_unit" | "packing_slip" | "incident" | "financial_entry";

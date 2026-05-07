@@ -73,7 +73,7 @@ type AssistantChatContextValue = {
   deleteSession: (sessionId: string) => Promise<void>;
   updateSessionApprovalMode: (sessionId: string, preferredApprovalMode: AssistantApprovalPreference) => Promise<void>;
   renameSession: (sessionId: string, title: string) => Promise<void>;
-  sendTurn: (input: SendAssistantChatTurnCommand) => Promise<void>;
+  sendTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
   setCompareTrayVisible: (visible: boolean) => void;
 };
 
@@ -381,6 +381,7 @@ export const AssistantChatProvider = ({ children }: { children: ReactNode }) => 
           source: "assistant-chat",
           entities: ["projects", "assets", "packing", "quotes", "incidents"],
         });
+        return nextSnapshot;
       },
       setCompareTrayVisible,
     }),

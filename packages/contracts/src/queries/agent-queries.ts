@@ -1,3 +1,5 @@
+import type { AgentNotificationIntent } from "./notification-queries";
+
 export type AgentStatus = "active" | "paused";
 
 export type AgentApprovalMode = "auto" | "supervised" | "needs_approval";
@@ -55,6 +57,7 @@ export type AssistantChatMessageMeta = {
   approvalReason?: string | null;
   pendingMutation?: PendingMutationPreview | null;
   actionLinks?: AssistantActionLink[];
+  notificationIntents?: AgentNotificationIntent[];
 };
 
 export type AssistantChatAttachmentRow = {

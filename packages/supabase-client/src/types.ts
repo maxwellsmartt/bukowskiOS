@@ -145,6 +145,66 @@ export type BukowskiDatabase = {
         };
         Update: Partial<BukowskiDatabase["public"]["Tables"]["notifications"]["Insert"]>;
       };
+      todos: {
+        Row: {
+          id: string;
+          user_id: string;
+          workspace_id: string;
+          title: string;
+          notes: string | null;
+          due_at: string | null;
+          priority: number;
+          completed_at: string | null;
+          created_by: "user" | "agent";
+          agent_action_ref: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          workspace_id: string;
+          title: string;
+          notes?: string | null;
+          due_at?: string | null;
+          priority?: number;
+          completed_at?: string | null;
+          created_by?: "user" | "agent";
+          agent_action_ref?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<BukowskiDatabase["public"]["Tables"]["todos"]["Insert"]>;
+      };
+      reminders: {
+        Row: {
+          id: string;
+          user_id: string;
+          workspace_id: string;
+          title: string;
+          body: string | null;
+          remind_at: string;
+          recurrence_rule: string | null;
+          snoozed_until: string | null;
+          completed_at: string | null;
+          created_by: "user" | "agent";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          workspace_id: string;
+          title: string;
+          body?: string | null;
+          remind_at: string;
+          recurrence_rule?: string | null;
+          snoozed_until?: string | null;
+          completed_at?: string | null;
+          created_by?: "user" | "agent";
+          created_at?: string;
+        };
+        Update: Partial<BukowskiDatabase["public"]["Tables"]["reminders"]["Insert"]>;
+      };
       sync_outbox: {
         Row: {
           id: string;

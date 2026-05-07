@@ -9,6 +9,7 @@ import type {
   AgentStatus,
   AIProviderStatus,
 } from "../queries/agent-queries";
+import type { AgentNotificationIntent } from "../queries/notification-queries";
 
 export type AgentEditorInput = {
   workspaceId: string;
@@ -287,4 +288,5 @@ export type AssistantGatewayResponse = {
   toolTraces: AIGatewayToolCallTrace[];
   orchestration: OrchestrationResult | null;
   actionLinks?: AssistantActionLink[];
+  notificationIntents?: AgentNotificationIntent[];
 };

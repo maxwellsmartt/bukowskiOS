@@ -50,6 +50,13 @@ const asOptionalString = (value: unknown) => {
 };
 const asNumber = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
 const asBoolean = (value: unknown) => (typeof value === "boolean" ? value : undefined);
+const asPriority = (value: unknown) => {
+  const nextValue = asNumber(value);
+  if (nextValue === undefined) {
+    return 0;
+  }
+  return Math.max(0, Math.min(3, Math.floor(nextValue)));
+};
 
 const newCommandId = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -145,6 +152,139 @@ const requireWorkspaceId = (context: AIGatewayToolContext): string => {
 };
 
 export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteToolDefinition[] => [
+  {
+    name: "create_notification",
+    description:
+      "Create a personal in-app notification for the current user in the active workspace. Use for explicit reminders, operational handoffs, or agent completion notices the user asked to receive.",
+    requiresApproval: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["title"],
+      properties: {
+        title: { type: "string", description: "Short notification title." },
+        body: { type: "string", description: "Optional supporting detail." },
+        kind: { type: "string", description: "Defaults to operation." },
+        link_to: { type: "string", description: "Internal app route to open when clicked." },
+        notify_now: { type: "boolean", description: "Whether to show toast/native notification immediately. Defaults to true." },
+      },
+    },
+    execute: (args, context) => {
+      requireWorkspaceId(context);
+      const title = asString(args.title);
+      if (!title) {
+        throw new Error("Notification title is required.");
+      }
+
+      return {
+        summary: `Notification queued: ${title}`,
+        payload: {
+          notificationIntent: {
+            type: "create_notification",
+            title,
+            body: asOptionalString(args.body) ?? null,
+            kind: asOptionalString(args.kind) ?? "operation",
+            linkTo: asOptionalString(args.link_to) ?? context.activePath ?? null,
+            notifyNow: asBoolean(args.notify_now) ?? true,
+            sourceRef: {
+              tool: "create_notification",
+              correlationId: context.correlationId ?? null,
+            },
+          },
+        },
+      };
+    },
+  },
+
+  {
+    name: "create_todo",
+    description:
+      "Create a personal todo for the current user in the active workspace. Use when the user asks to track a follow-up task.",
+    requiresApproval: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["title"],
+      properties: {
+        title: { type: "string" },
+        notes: { type: "string" },
+        due_at: { type: "string", description: "ISO timestamp or date string when the todo is due." },
+        priority: { type: "number", description: "0 low/default, 1 normal, 2 high, 3 urgent." },
+      },
+    },
+    execute: (args, context) => {
+      requireWorkspaceId(context);
+      const title = asString(args.title);
+      if (!title) {
+        throw new Error("Todo title is required.");
+      }
+
+      return {
+        summary: `Todo queued: ${title}`,
+        payload: {
+          notificationIntent: {
+            type: "create_todo",
+            title,
+            notes: asOptionalString(args.notes) ?? null,
+            dueAt: asOptionalString(args.due_at) ?? null,
+            priority: asPriority(args.priority),
+            sourceRef: {
+              tool: "create_todo",
+              correlationId: context.correlationId ?? null,
+            },
+          },
+        },
+      };
+    },
+  },
+
+  {
+    name: "create_reminder",
+    description:
+      "Create a personal reminder for the current user in the active workspace. Use when the user asks to be reminded at a specific time.",
+    requiresApproval: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["title", "remind_at"],
+      properties: {
+        title: { type: "string" },
+        body: { type: "string" },
+        remind_at: { type: "string", description: "ISO timestamp for when the reminder should fire." },
+        recurrence_rule: { type: "string", description: "Optional basic RRULE, e.g. FREQ=DAILY, FREQ=WEEKLY, FREQ=MONTHLY." },
+      },
+    },
+    execute: (args, context) => {
+      requireWorkspaceId(context);
+      const title = asString(args.title);
+      const remindAt = asString(args.remind_at);
+      const parsedRemindAt = Date.parse(remindAt);
+      if (!title) {
+        throw new Error("Reminder title is required.");
+      }
+      if (!remindAt || !Number.isFinite(parsedRemindAt)) {
+        throw new Error("Reminder remind_at must be a valid ISO timestamp.");
+      }
+
+      return {
+        summary: `Reminder queued: ${title}`,
+        payload: {
+          notificationIntent: {
+            type: "create_reminder",
+            title,
+            body: asOptionalString(args.body) ?? null,
+            remindAt: new Date(parsedRemindAt).toISOString(),
+            recurrenceRule: asOptionalString(args.recurrence_rule) ?? null,
+            sourceRef: {
+              tool: "create_reminder",
+              correlationId: context.correlationId ?? null,
+            },
+          },
+        },
+      };
+    },
+  },
+
   {
     name: "create_incident",
     description:
