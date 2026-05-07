@@ -10166,6 +10166,13 @@ select.field-input {
   border-bottom-left-radius: 8px;
 }
 
+.assistant-chat-bubble-with-result,
+.assistant-chat-result-card {
+  width: min(84%, 560px);
+  max-width: 84%;
+  box-sizing: border-box;
+}
+
 .assistant-chat-bubble-user {
   align-self: flex-end;
   background: rgba(230, 151, 147, 0.12);
@@ -10427,6 +10434,79 @@ select.field-input {
   color: var(--text-primary);
   font-size: 11px;
   text-transform: capitalize;
+}
+
+.assistant-chat-result-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(92, 190, 146, 0.2);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(92, 190, 146, 0.105), rgba(115, 164, 255, 0.035)),
+    rgba(255, 255, 255, 0.022);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.assistant-chat-result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: rgba(92, 190, 146, 0.12);
+  color: #b8f2d3;
+}
+
+.assistant-chat-result-copy {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.assistant-chat-result-eyebrow {
+  color: rgba(184, 242, 211, 0.82);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.assistant-chat-result-copy strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.assistant-chat-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.assistant-chat-result-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(245, 248, 250, 0.94);
+  font-size: 11px;
+  font-weight: 600;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.assistant-chat-result-link:hover {
+  border-color: rgba(184, 242, 211, 0.22);
+  background: rgba(255, 255, 255, 0.065);
+  transform: translateY(-1px);
 }
 
 .assistant-chat-state-body {

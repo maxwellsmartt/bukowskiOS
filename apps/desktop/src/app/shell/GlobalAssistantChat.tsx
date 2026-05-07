@@ -8,7 +8,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { ArrowUp, Bot, ChevronDown, Ellipsis, PanelLeft, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowUp, Bot, CheckCircle2, ChevronDown, Ellipsis, ExternalLink, PanelLeft, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AssistantChatSession, AssistantChatSessionState } from "@app/providers/AssistantChatContext";
 import type { AssistantApprovalPreference, AssistantGatewayAttachment } from "@contracts";
@@ -296,6 +296,30 @@ const buildStateActions = (state: AssistantChatSessionState | null) => {
   }
 
   return actions;
+};
+
+const actionEntityLabels: Record<NonNullable<AssistantChatSessionState["actionLinks"]>[number]["entityType"], string> = {
+  asset: "Asset",
+  incident: "Incident",
+  packing_slip: "Packing slip",
+  project: "Project",
+  quote: "Quote",
+  rma: "RMA",
+};
+
+const buildActionResultSummary = (state: AssistantChatSessionState) => {
+  const links = state.actionLinks ?? [];
+  const labels = Array.from(new Set(links.map((link) => actionEntityLabels[link.entityType] ?? "Item")));
+
+  if (!labels.length) {
+    return "Action completed";
+  }
+
+  if (labels.length === 1) {
+    return `${labels[0]} ready`;
+  }
+
+  return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)} ready`;
 };
 
 const resolveApprovalToneClass = (decision: AssistantChatSessionState["approvalDecision"]) => {
@@ -960,6 +984,7 @@ export const GlobalAssistantChat = () => {
                 const messageState = entry.state ?? null;
                 const isExpanded = expandedMessageDetails[entry.id] ?? false;
                 const messageActions = buildStateActions(messageState);
+                const resultLinks = messageState?.actionLinks ?? [];
                 const needsApproval = Boolean(messageState?.draftRunId && messageState.approvalDecision === "pending");
                 const approvalResolved = Boolean(
                   messageState?.draftRunId &&
@@ -995,9 +1020,41 @@ export const GlobalAssistantChat = () => {
                       ) : null}
                     </div>
 
-                    <div className="assistant-chat-bubble assistant-chat-bubble-assistant">
+                    <div
+                      className={`assistant-chat-bubble assistant-chat-bubble-assistant${
+                        resultLinks.length ? " assistant-chat-bubble-with-result" : ""
+                      }`}
+                    >
                       <div className="assistant-chat-bubble-content">{renderMessageMarkdown(entry.body)}</div>
                     </div>
+
+                    {messageState && resultLinks.length ? (
+                      <div className="assistant-chat-result-card">
+                        <div className="assistant-chat-result-icon">
+                          <CheckCircle2 size={15} />
+                        </div>
+                        <div className="assistant-chat-result-copy">
+                          <span className="assistant-chat-result-eyebrow">Action completed</span>
+                          <strong>{buildActionResultSummary(messageState)}</strong>
+                          <div className="assistant-chat-result-actions">
+                            {resultLinks.map((link) => (
+                              <button
+                                key={`${link.entityType}:${link.entityId}:${link.path}`}
+                                className="assistant-chat-result-link"
+                                onClick={() => {
+                                  navigate(link.path);
+                                  close();
+                                }}
+                                type="button"
+                              >
+                                <span>{link.label}</span>
+                                <ExternalLink size={12} />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
 
                     {needsApproval && messageState?.draftRunId ? (
                       <div className="assistant-chat-approval-card">
