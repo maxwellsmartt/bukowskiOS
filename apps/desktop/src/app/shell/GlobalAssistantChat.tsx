@@ -512,6 +512,7 @@ export const GlobalAssistantChat = () => {
   const [optimisticAssistantMessage, setOptimisticAssistantMessage] = useState<OptimisticAssistantMessage | null>(null);
   const [reviewingRunId, setReviewingRunId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [dismissedFabUnreadCount, setDismissedFabUnreadCount] = useState(0);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
@@ -530,6 +531,19 @@ export const GlobalAssistantChat = () => {
     () => sessions.find((session) => session.id === threadMenuState?.sessionId) ?? null,
     [sessions, threadMenuState?.sessionId],
   );
+  const assistantFabUnreadCount = Math.max(0, unreadCount - dismissedFabUnreadCount);
+
+  useEffect(() => {
+    if (isOpen) {
+      setDismissedFabUnreadCount(unreadCount);
+    }
+  }, [isOpen, unreadCount]);
+
+  useEffect(() => {
+    if (unreadCount === 0) {
+      setDismissedFabUnreadCount(0);
+    }
+  }, [unreadCount]);
 
   useEffect(() => {
     setCompareTrayVisible(items.length > 0);
@@ -1513,7 +1527,7 @@ export const GlobalAssistantChat = () => {
 
       <button aria-label="Open global assistant" className="assistant-chat-fab" onClick={toggle} type="button">
         <Bot size={24} />
-        {!isOpen && unreadCount > 0 ? <span className="assistant-chat-fab-badge">{Math.min(unreadCount, 99)}</span> : null}
+        {!isOpen && assistantFabUnreadCount > 0 ? <span className="assistant-chat-fab-badge">{Math.min(assistantFabUnreadCount, 99)}</span> : null}
       </button>
     </div>
   );

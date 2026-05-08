@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, CalendarClock, Check, CheckCheck, Clock3, ExternalLink, Inbox as InboxIcon, ListTodo, Plus, Sparkles } from "lucide-react";
+import { Bell, CalendarClock, Check, CheckCheck, Clock3, ExternalLink, Inbox as InboxIcon, ListTodo, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useNotifications } from "@app/providers/NotificationsProvider";
@@ -27,11 +27,26 @@ const getDueTone = (value: string | null) => {
   return "info";
 };
 
+const getCardTone = (value: string | null, completedAt: string | null) => {
+  if (completedAt) return "done";
+  return getDueTone(value) === "critical" ? "past-due" : "active";
+};
+
+const toDateTimeLocalValue = (value: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+};
+
 export const InboxPage = () => {
   const navigate = useNavigate();
   const {
     createReminder,
     createTodo,
+    deleteReminder,
+    deleteTodo,
     items,
     isLoading,
     markAllRead,
@@ -42,6 +57,8 @@ export const InboxPage = () => {
     snoozeReminder,
     todos,
     unreadCount,
+    updateReminder,
+    updateTodo,
   } = useNotifications();
   const [activeTab, setActiveTab] = useState<"notifications" | "todos" | "reminders">("notifications");
   const [todoTitle, setTodoTitle] = useState("");
@@ -50,6 +67,13 @@ export const InboxPage = () => {
   const [reminderAt, setReminderAt] = useState("");
   const [reminderBody, setReminderBody] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
+  const [editingTodoTitle, setEditingTodoTitle] = useState("");
+  const [editingTodoDueAt, setEditingTodoDueAt] = useState("");
+  const [editingReminderId, setEditingReminderId] = useState<string | null>(null);
+  const [editingReminderTitle, setEditingReminderTitle] = useState("");
+  const [editingReminderAt, setEditingReminderAt] = useState("");
+  const [editingReminderBody, setEditingReminderBody] = useState("");
   const openTodos = todos.filter((todo) => !todo.completedAt);
   const pendingReminders = reminders.filter((reminder) => !reminder.completedAt);
   const nextReminder = pendingReminders[0] ?? null;
@@ -80,6 +104,50 @@ export const InboxPage = () => {
     setFormError(null);
   };
 
+  const startEditingTodo = (todo: (typeof todos)[number]) => {
+    setEditingTodoId(todo.id);
+    setEditingTodoTitle(todo.title);
+    setEditingTodoDueAt(toDateTimeLocalValue(todo.dueAt));
+  };
+
+  const saveEditingTodo = async () => {
+    if (!editingTodoId || !editingTodoTitle.trim()) {
+      setFormError("Add a todo title first.");
+      return;
+    }
+
+    await updateTodo({
+      id: editingTodoId,
+      title: editingTodoTitle.trim(),
+      dueAt: editingTodoDueAt ? new Date(editingTodoDueAt).toISOString() : null,
+    });
+    setEditingTodoId(null);
+    setFormError(null);
+  };
+
+  const startEditingReminder = (reminder: (typeof reminders)[number]) => {
+    setEditingReminderId(reminder.id);
+    setEditingReminderTitle(reminder.title);
+    setEditingReminderAt(toDateTimeLocalValue(reminder.remindAt));
+    setEditingReminderBody(reminder.body ?? "");
+  };
+
+  const saveEditingReminder = async () => {
+    if (!editingReminderId || !editingReminderTitle.trim() || !editingReminderAt) {
+      setFormError("Add a reminder title and time first.");
+      return;
+    }
+
+    await updateReminder({
+      id: editingReminderId,
+      title: editingReminderTitle.trim(),
+      body: editingReminderBody.trim() || null,
+      remindAt: new Date(editingReminderAt).toISOString(),
+    });
+    setEditingReminderId(null);
+    setFormError(null);
+  };
+
   const handleCreateReminder = async () => {
     const title = reminderTitle.trim();
     if (!title || !reminderAt) {
@@ -102,16 +170,10 @@ export const InboxPage = () => {
     <section className="page-stack inbox-page">
       <header className="inbox-hero">
         <div>
-          <p className="section-eyebrow">Operations Inbox</p>
           <h1>Inbox</h1>
-          <p>Agent updates, reminders and personal follow-ups for this workspace.</p>
         </div>
         <div className="inbox-hero-status">
-          <span className="inbox-native-pill">
-            <Sparkles size={13} />
-            macOS native alerts
-          </span>
-          <button className="secondary-button" disabled={unreadCount === 0} onClick={() => void markAllRead()} type="button">
+          <button className="secondary-button inbox-mark-all-button" disabled={unreadCount === 0} onClick={() => void markAllRead()} type="button">
             <CheckCheck size={14} />
             <span>Mark all read</span>
           </button>
@@ -161,9 +223,10 @@ export const InboxPage = () => {
           </button>
         </div>
 
-        {formError ? <div className="inline-form-error">{formError}</div> : null}
+        <div key={activeTab} className={`inbox-tab-pane inbox-tab-pane-${activeTab}`}>
+          {formError ? <div className="inline-form-error">{formError}</div> : null}
 
-        {activeTab === "notifications" && isLoading ? (
+          {activeTab === "notifications" && isLoading ? (
           <div className="notifications-empty">
             <InboxIcon size={18} />
             <span>Loading notifications…</span>
@@ -199,38 +262,77 @@ export const InboxPage = () => {
           <div className="inbox-list">
             <div className="inbox-composer">
               <div>
-                <p className="section-eyebrow">Quick add</p>
-                <strong>New todo</strong>
+                <p className="inbox-composer-title">Quick add</p>
               </div>
               <div className="inbox-quick-form">
                 <input aria-label="Todo title" value={todoTitle} onChange={(event) => setTodoTitle(event.target.value)} placeholder="What needs to happen?" />
                 <input aria-label="Todo due date" value={todoDueAt} onChange={(event) => setTodoDueAt(event.target.value)} type="datetime-local" />
-                <button className="primary-button" onClick={() => void handleCreateTodo()} type="button">
+                <button className="inbox-add-button" onClick={() => void handleCreateTodo()} type="button">
                   <Plus size={14} />
-                  <span>Add</span>
+                  <span>Add todo</span>
                 </button>
               </div>
             </div>
             {todos.length ? (
-              todos.map((todo) => (
-                <div key={todo.id} className={`inbox-row inbox-row-static${todo.completedAt ? "" : " is-unread"}`}>
-                  <span className="inbox-row-icon">
-                    <ListTodo size={14} />
-                  </span>
-                  <span className="inbox-row-copy">
-                    <span className={`inbox-meta-pill tone-${getDueTone(todo.dueAt)}`}>
-                      {todo.dueAt ? `Due ${shortDateFormatter.format(new Date(todo.dueAt))}` : "No due date"}
-                    </span>
-                    <strong>{todo.title}</strong>
-                    {todo.notes ? <span>{todo.notes}</span> : null}
-                  </span>
-                  {!todo.completedAt ? (
-                    <button className="icon-ghost-control" data-tooltip="Mark done" onClick={() => void markTodoDone(todo.id)} type="button">
-                      <Check size={14} />
-                    </button>
-                  ) : null}
-                </div>
-              ))
+              <div className="inbox-card-grid">
+                {todos.map((todo) => {
+                  const isEditing = editingTodoId === todo.id;
+                  return (
+                    <article key={todo.id} className={`inbox-task-card tone-${getCardTone(todo.dueAt, todo.completedAt)}`}>
+                      <div className="inbox-task-card-header">
+                        <span className="inbox-row-icon">
+                          <ListTodo size={14} />
+                        </span>
+                        <span className={`inbox-meta-pill tone-${getDueTone(todo.dueAt)}`}>
+                          {todo.dueAt ? `Due ${shortDateFormatter.format(new Date(todo.dueAt))}` : "No due date"}
+                        </span>
+                      </div>
+                      {isEditing ? (
+                        <div className="inbox-edit-form">
+                          <input aria-label="Todo title" value={editingTodoTitle} onChange={(event) => setEditingTodoTitle(event.target.value)} />
+                          <input aria-label="Todo due date" value={editingTodoDueAt} onChange={(event) => setEditingTodoDueAt(event.target.value)} type="datetime-local" />
+                        </div>
+                      ) : (
+                        <div className="inbox-task-card-copy">
+                          <strong>{todo.title}</strong>
+                          {todo.notes ? <span>{todo.notes}</span> : <span>No notes</span>}
+                        </div>
+                      )}
+                      <div className="inbox-task-card-actions">
+                        {isEditing ? (
+                          <>
+                            <button className="inbox-cancel-button" onClick={() => setEditingTodoId(null)} type="button">
+                              <X size={13} />
+                              Cancel
+                            </button>
+                            <button className="inbox-add-button compact" onClick={() => void saveEditingTodo()} type="button">
+                              <Check size={13} />
+                              Save
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {!todo.completedAt ? (
+                              <button className="inbox-card-done-button" onClick={() => void markTodoDone(todo.id)} type="button">
+                                <Check size={14} />
+                                <span>Done</span>
+                              </button>
+                            ) : null}
+                            <span className="inbox-card-hover-actions">
+                              <button className="icon-ghost-control" data-tooltip="Edit" onClick={() => startEditingTodo(todo)} type="button">
+                                <Pencil size={14} />
+                              </button>
+                              <button className="icon-ghost-control danger-icon-control" data-tooltip="Delete" onClick={() => void deleteTodo(todo.id)} type="button">
+                                <Trash2 size={14} />
+                              </button>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
             ) : (
               <div className="notifications-empty inbox-empty-state">
                 <ListTodo size={22} />
@@ -243,48 +345,92 @@ export const InboxPage = () => {
           <div className="inbox-list">
             <div className="inbox-composer">
               <div>
-                <p className="section-eyebrow">Quick add</p>
-                <strong>New reminder</strong>
+                <p className="inbox-composer-title">Quick add</p>
               </div>
               <div className="inbox-quick-form inbox-reminder-form">
                 <input aria-label="Reminder title" value={reminderTitle} onChange={(event) => setReminderTitle(event.target.value)} placeholder="Remind me to…" />
                 <input aria-label="Reminder time" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} type="datetime-local" />
                 <input aria-label="Reminder notes" value={reminderBody} onChange={(event) => setReminderBody(event.target.value)} placeholder="Notes optional" />
-                <button className="primary-button" onClick={() => void handleCreateReminder()} type="button">
+                <button className="inbox-add-button" onClick={() => void handleCreateReminder()} type="button">
                   <Plus size={14} />
-                  <span>Add</span>
+                  <span>Add reminder</span>
                 </button>
               </div>
             </div>
             {reminders.length ? (
-              reminders.map((reminder) => (
-                <div key={reminder.id} className={`inbox-row inbox-row-static${reminder.completedAt ? "" : " is-unread"}`}>
-                  <span className="inbox-row-icon">
-                    <CalendarClock size={14} />
-                  </span>
-                  <span className="inbox-row-copy">
-                    <span className={`inbox-meta-pill tone-${reminder.completedAt ? "neutral" : getDueTone(reminder.snoozedUntil ?? reminder.remindAt)}`}>
-                      {reminder.completedAt
-                        ? "Delivered"
-                        : reminder.snoozedUntil
-                          ? `Snoozed until ${shortDateFormatter.format(new Date(reminder.snoozedUntil))}`
-                          : `Reminds ${shortDateFormatter.format(new Date(reminder.remindAt))}`}
-                    </span>
-                    <strong>{reminder.title}</strong>
-                    {reminder.body ? <span>{reminder.body}</span> : null}
-                  </span>
-                  {!reminder.completedAt ? (
-                    <span className="inbox-row-actions">
-                      <button className="secondary-button compact" onClick={() => void snoozeReminder(reminder.id, 15)} type="button">
-                        Snooze
-                      </button>
-                      <button className="icon-ghost-control" data-tooltip="Mark done" onClick={() => void markReminderDone(reminder.id)} type="button">
-                        <Check size={14} />
-                      </button>
-                    </span>
-                  ) : null}
-                </div>
-              ))
+              <div className="inbox-card-grid">
+                {reminders.map((reminder) => {
+                  const isEditing = editingReminderId === reminder.id;
+                  const reminderMeta = reminder.completedAt
+                    ? "Delivered"
+                    : reminder.snoozedUntil
+                      ? `Snoozed until ${shortDateFormatter.format(new Date(reminder.snoozedUntil))}`
+                      : `Reminds ${shortDateFormatter.format(new Date(reminder.remindAt))}`;
+                  return (
+                    <article
+                      key={reminder.id}
+                      className={`inbox-task-card tone-${getCardTone(reminder.snoozedUntil ?? reminder.remindAt, reminder.completedAt)}`}
+                    >
+                      <div className="inbox-task-card-header">
+                        <span className="inbox-row-icon">
+                          <CalendarClock size={14} />
+                        </span>
+                        <span className={`inbox-meta-pill tone-${reminder.completedAt ? "neutral" : getDueTone(reminder.snoozedUntil ?? reminder.remindAt)}`}>
+                          {reminderMeta}
+                        </span>
+                      </div>
+                      {isEditing ? (
+                        <div className="inbox-edit-form">
+                          <input aria-label="Reminder title" value={editingReminderTitle} onChange={(event) => setEditingReminderTitle(event.target.value)} />
+                          <input aria-label="Reminder time" value={editingReminderAt} onChange={(event) => setEditingReminderAt(event.target.value)} type="datetime-local" />
+                          <input aria-label="Reminder body" value={editingReminderBody} onChange={(event) => setEditingReminderBody(event.target.value)} />
+                        </div>
+                      ) : (
+                        <div className="inbox-task-card-copy">
+                          <strong>{reminder.title}</strong>
+                          {reminder.body ? <span>{reminder.body}</span> : <span>No notes</span>}
+                        </div>
+                      )}
+                      <div className="inbox-task-card-actions">
+                        {isEditing ? (
+                          <>
+                            <button className="inbox-cancel-button" onClick={() => setEditingReminderId(null)} type="button">
+                              <X size={13} />
+                              Cancel
+                            </button>
+                            <button className="inbox-add-button compact" onClick={() => void saveEditingReminder()} type="button">
+                              <Check size={13} />
+                              Save
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {!reminder.completedAt ? (
+                              <>
+                                <button className="secondary-button compact" onClick={() => void snoozeReminder(reminder.id, 15)} type="button">
+                                  Snooze
+                                </button>
+                                <button className="inbox-card-done-button" onClick={() => void markReminderDone(reminder.id)} type="button">
+                                  <Check size={14} />
+                                  <span>Done</span>
+                                </button>
+                              </>
+                            ) : null}
+                            <span className="inbox-card-hover-actions">
+                              <button className="icon-ghost-control" data-tooltip="Edit" onClick={() => startEditingReminder(reminder)} type="button">
+                                <Pencil size={14} />
+                              </button>
+                              <button className="icon-ghost-control danger-icon-control" data-tooltip="Delete" onClick={() => void deleteReminder(reminder.id)} type="button">
+                                <Trash2 size={14} />
+                              </button>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
             ) : (
               <div className="notifications-empty inbox-empty-state">
                 <Clock3 size={22} />
@@ -293,7 +439,8 @@ export const InboxPage = () => {
               </div>
             )}
           </div>
-        )}
+          )}
+        </div>
       </section>
     </section>
   );

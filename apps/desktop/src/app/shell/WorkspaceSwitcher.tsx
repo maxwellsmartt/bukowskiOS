@@ -4,9 +4,15 @@ import { useNavigate } from "react-router-dom";
 
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 
+const WorkspaceAvatar = ({ color, name, url }: { color?: string | null; name: string; url?: string | null }) => (
+  <span className="workspace-avatar" style={color ? { background: color } : undefined}>
+    {url ? <img alt="" className="workspace-avatar-image" src={url} /> : name.slice(0, 1).toUpperCase()}
+  </span>
+);
+
 export const WorkspaceSwitcher = () => {
   const navigate = useNavigate();
-  const { activeWorkspaceId, activeWorkspaceName, memberships, switchWorkspace } = useWorkspace();
+  const { activeMembership, activeWorkspaceId, activeWorkspaceName, memberships, switchWorkspace } = useWorkspace();
   const [open, setOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement | null>(null);
 
@@ -37,7 +43,7 @@ export const WorkspaceSwitcher = () => {
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
-        <span className="workspace-avatar">{activeWorkspaceName.slice(0, 1).toUpperCase()}</span>
+        <WorkspaceAvatar color={activeMembership?.iconColor} name={activeWorkspaceName} url={activeMembership?.avatarUrl} />
         <span className="workspace-switcher-name">{activeWorkspaceName}</span>
         <ChevronDown className="workspace-switcher-chevron" size={13} />
       </button>
@@ -55,7 +61,7 @@ export const WorkspaceSwitcher = () => {
               }}
               type="button"
             >
-              <span className="workspace-avatar">{membership.workspaceName.slice(0, 1).toUpperCase()}</span>
+              <WorkspaceAvatar color={membership.iconColor} name={membership.workspaceName} url={membership.avatarUrl} />
               <span>
                 <strong>{membership.workspaceName}</strong>
                 <small>{membership.roleName}</small>

@@ -71,7 +71,7 @@ export const ProjectsPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Projects" body="Every shoot or production lives here. Open one to see its assets, crew, incidents and finance." />
+      <SectionHeader title="Projects" />
 
       {error ? <div className="empty-state">Projects unavailable: {error}</div> : null}
 

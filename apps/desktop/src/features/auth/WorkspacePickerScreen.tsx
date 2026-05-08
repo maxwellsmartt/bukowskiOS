@@ -6,6 +6,12 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.png";
 import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
 
+const WorkspaceAvatar = ({ color, name, url }: { color?: string | null; name: string; url?: string | null }) => (
+  <span className="workspace-avatar" style={color ? { background: color } : undefined}>
+    {url ? <img alt="" className="workspace-avatar-image" src={url} /> : name.slice(0, 1).toUpperCase()}
+  </span>
+);
+
 export const WorkspacePickerScreen = () => {
   const navigate = useNavigate();
   const { signOut } = useSession();
@@ -43,7 +49,7 @@ export const WorkspacePickerScreen = () => {
               }}
               type="button"
             >
-              <span className="workspace-avatar">{membership.workspaceName.slice(0, 1).toUpperCase()}</span>
+              <WorkspaceAvatar color={membership.iconColor} name={membership.workspaceName} url={membership.avatarUrl} />
               <span>
                 <strong>{membership.workspaceName}</strong>
                 <small>{membership.roleName}</small>

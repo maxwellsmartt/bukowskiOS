@@ -189,10 +189,7 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
   return (
     <div className="page-stack">
       {showHeader ? (
-        <SectionHeader
-          eyebrow="Account"
-          title="Your account"
-        />
+        <SectionHeader title="Account" />
       ) : null}
 
       <SurfaceCard title="Profile">

@@ -125,7 +125,6 @@ export const NotificationsTray = () => {
     <aside ref={trayRef} className="notifications-tray" style={trayStyle} aria-label="Notifications">
       <div className="notifications-tray-header">
         <div>
-          <p className="section-eyebrow">Inbox</p>
           <h2>Notifications</h2>
         </div>
         <div className="notifications-tray-actions">

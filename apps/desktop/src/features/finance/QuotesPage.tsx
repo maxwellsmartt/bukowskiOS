@@ -275,7 +275,6 @@ export const QuotesPage = () => {
         <SectionHeader
           eyebrow="Finance"
           title="Quotes"
-          body="Client and project quotes in DOP, USD or EUR. The exchange rate is captured at quote creation so older quotes never change."
           titleTone="accent"
         />
         <button

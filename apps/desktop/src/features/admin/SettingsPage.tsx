@@ -71,7 +71,7 @@ type UserEditorDraft = {
 };
 
 import { AutoLogoutSetting } from "./AutoLogoutSetting";
-import { SettingsLayout, useActiveSettingsSection } from "./SettingsLayout";
+import { SettingsLayout, settingsNavEntries, useActiveSettingsSection } from "./SettingsLayout";
 import { UserChannelDots } from "./UserChannelDots";
 import { UserAccountSettings } from "./UserAccountSettings";
 
@@ -293,6 +293,7 @@ export const SettingsPage = () => {
   const [supportSnapshot, setSupportSnapshot] = useState<AppSupportSnapshot>(emptySupportSnapshot);
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
   const activeSection = useActiveSettingsSection();
+  const activeSectionTitle = settingsNavEntries.find((entry) => entry.id === activeSection)?.label ?? "General";
   const [roleDirectoryId, setRoleDirectoryId] = useState<string>("");
   const [selectedUserId, setSelectedUserId] = useState<string>("new");
   const [userDraft, setUserDraft] = useState<UserEditorDraft>(buildUserDraft(null, []));
@@ -663,7 +664,7 @@ export const SettingsPage = () => {
 
   return (
     <div className="page-stack settings-page">
-      <SectionHeader title="Settings" />
+      <SectionHeader title={activeSectionTitle} />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
       {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}

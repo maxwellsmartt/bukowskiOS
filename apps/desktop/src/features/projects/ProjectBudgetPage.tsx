@@ -224,10 +224,7 @@ export const ProjectBudgetPage = () => {
 
   return (
     <div className="page-stack page-stack-project">
-      <SectionHeader
-        title="Budget"
-        body="Money flowing through this project. Set a target locally to see how close you are to your ceiling."
-      />
+      <SectionHeader title="Budget" />
 
       <div className="project-workspace-scroll">
         <SurfaceCard

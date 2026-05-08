@@ -1463,11 +1463,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     <div className="page-stack assets-page-stack">
       <SectionHeader
         title={isProjectMode ? "Project assets" : "Assets"}
-        body={
-          isProjectMode
-            ? "The gear assigned or available to this project. Click any row to see its history and status."
-            : "Every piece of equipment your team owns. Filter, search or import from CSV to build the catalog."
-        }
       />
 
       {error ? <div className="empty-state">Assets unavailable: {error}</div> : null}

@@ -34,6 +34,7 @@ const leafLabels: Record<string, string> = {
   "/assets": "Assets",
   "/packing-slips": "Packing slips",
   "/incidents": "Incidents",
+  "/inbox": "Inbox",
   "/rma": "Repair cases",
   "/projects": "Projects",
   "/projects/schedule": "Schedule overview",

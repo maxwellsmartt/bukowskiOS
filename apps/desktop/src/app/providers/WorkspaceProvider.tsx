@@ -9,6 +9,8 @@ import { useSession } from "./SessionProvider";
 export type WorkspaceMembership = {
   workspaceId: string;
   workspaceName: string;
+  avatarUrl?: string | null;
+  iconColor?: string | null;
   roleKey: string | null;
   roleName: string;
   status: "active" | "invited" | "inactive";
@@ -58,6 +60,8 @@ export type CreateWorkspaceInput = {
 const localMembership: WorkspaceMembership = {
   workspaceId: DEFAULT_WORKSPACE_ID,
   workspaceName: "Metadata Cine",
+  avatarUrl: null,
+  iconColor: null,
   roleKey: "admin",
   roleName: "Local admin",
   status: "active",
@@ -70,6 +74,8 @@ const toCachedMembership = (workspace: {
 }): WorkspaceMembership => ({
   workspaceId: workspace.id,
   workspaceName: workspace.name,
+  avatarUrl: null,
+  iconColor: null,
   roleKey: "admin",
   roleName: "Cached access",
   status: "active",
@@ -116,13 +122,25 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     setWorkspaceError(null);
 
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from("workspace_memberships")
         .select(
-          "workspace_id,status,workspaces(name,slug,base_currency,icon_color),roles(key,name,role_permissions(permissions(key)))",
+          "workspace_id,status,workspaces(name,slug,base_currency,icon_color,avatar_url),roles(key,name,role_permissions(permissions(key)))",
         )
         .eq("user_id", userId)
         .eq("status", "active");
+
+      if (error && /avatar_url/i.test(error.message ?? "")) {
+        const fallback = await supabase
+          .from("workspace_memberships")
+          .select(
+            "workspace_id,status,workspaces(name,slug,base_currency,icon_color),roles(key,name,role_permissions(permissions(key)))",
+          )
+          .eq("user_id", userId)
+          .eq("status", "active");
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) {
         throw error;
@@ -132,7 +150,13 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         const typedRow = row as {
           workspace_id: string;
           status: "active" | "invited" | "inactive";
-          workspaces?: { name?: string | null; slug?: string | null; base_currency?: string | null; icon_color?: string | null } | null;
+          workspaces?: {
+            name?: string | null;
+            slug?: string | null;
+            base_currency?: string | null;
+            icon_color?: string | null;
+            avatar_url?: string | null;
+          } | null;
           roles?: {
             key?: string | null;
             name?: string | null;
@@ -151,6 +175,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         return {
           workspaceId: typedRow.workspace_id,
           workspaceName: typedRow.workspaces?.name ?? "Workspace",
+          avatarUrl: typedRow.workspaces?.avatar_url ?? null,
+          iconColor: typedRow.workspaces?.icon_color ?? null,
           roleKey: typedRow.roles?.key ?? null,
           roleName: typedRow.roles?.name ?? "Member",
           status: typedRow.status,
@@ -166,6 +192,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
                   slug?: string | null;
                   base_currency?: string | null;
                   icon_color?: string | null;
+                  avatar_url?: string | null;
                 } | null;
               }
             | undefined;

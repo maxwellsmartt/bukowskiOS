@@ -26,12 +26,28 @@ type TodoInsertInput = {
   agentActionRef?: Json | null;
 };
 
+type TodoUpdateInput = {
+  id: string;
+  title: string;
+  notes?: string | null;
+  dueAt?: string | null;
+  priority?: number;
+};
+
 type ReminderInsertInput = {
   title: string;
   body?: string | null;
   remindAt: string;
   recurrenceRule?: string | null;
   createdBy?: "user" | "agent";
+};
+
+type ReminderUpdateInput = {
+  id: string;
+  title: string;
+  body?: string | null;
+  remindAt: string;
+  recurrenceRule?: string | null;
 };
 
 type NotificationsContextValue = {
@@ -49,7 +65,11 @@ type NotificationsContextValue = {
   markAllRead: () => Promise<void>;
   createNotification: (input: NotificationInsertInput) => Promise<NotificationRow | null>;
   createTodo: (input: TodoInsertInput) => Promise<TodoRow | null>;
+  updateTodo: (input: TodoUpdateInput) => Promise<void>;
+  deleteTodo: (todoId: string) => Promise<void>;
   createReminder: (input: ReminderInsertInput) => Promise<ReminderRow | null>;
+  updateReminder: (input: ReminderUpdateInput) => Promise<void>;
+  deleteReminder: (reminderId: string) => Promise<void>;
   markTodoDone: (todoId: string) => Promise<void>;
   markReminderDone: (reminderId: string) => Promise<void>;
   snoozeReminder: (reminderId: string, minutes: number) => Promise<void>;
@@ -497,6 +517,97 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     [activeUserId, activeWorkspaceId, supabase],
   );
 
+  const updateTodo = useCallback(
+    async (input: TodoUpdateInput) => {
+      if (!supabase) return;
+      const priority = Math.max(0, Math.min(3, Math.floor(input.priority ?? 0)));
+      const updatedAt = new Date().toISOString();
+      setTodos((current) =>
+        current.map((item) =>
+          item.id === input.id
+            ? {
+                ...item,
+                title: input.title,
+                notes: input.notes ?? null,
+                dueAt: input.dueAt ?? null,
+                priority,
+                updatedAt,
+              }
+            : item,
+        ),
+      );
+      await asLooseSupabase(supabase)
+        .from("todos")
+        .update({
+          title: input.title,
+          notes: input.notes ?? null,
+          due_at: input.dueAt ?? null,
+          priority,
+          updated_at: updatedAt,
+        })
+        .eq("id", input.id);
+    },
+    [supabase],
+  );
+
+  const deleteTodo = useCallback(
+    async (todoId: string) => {
+      if (!supabase) return;
+      setTodos((current) => current.filter((item) => item.id !== todoId));
+      await asLooseSupabase(supabase).from("todos").delete().eq("id", todoId);
+    },
+    [supabase],
+  );
+
+  const updateReminder = useCallback(
+    async (input: ReminderUpdateInput) => {
+      if (!supabase) return;
+      const remindAt = new Date(input.remindAt);
+      if (!Number.isFinite(remindAt.getTime())) {
+        throw new Error("Reminder time is invalid.");
+      }
+      const nextRemindAt = remindAt.toISOString();
+      setReminders((current) =>
+        current.map((item) =>
+          item.id === input.id
+            ? {
+                ...item,
+                title: input.title,
+                body: input.body ?? null,
+                remindAt: nextRemindAt,
+                recurrenceRule: input.recurrenceRule ?? null,
+                snoozedUntil: null,
+                completedAt: null,
+              }
+            : item,
+        ),
+      );
+      firedReminderIdsRef.current.delete(input.id);
+      await asLooseSupabase(supabase)
+        .from("reminders")
+        .update({
+          title: input.title,
+          body: input.body ?? null,
+          remind_at: nextRemindAt,
+          recurrence_rule: input.recurrenceRule ?? null,
+          snoozed_until: null,
+          completed_at: null,
+        })
+        .eq("id", input.id);
+    },
+    [supabase],
+  );
+
+  const deleteReminder = useCallback(
+    async (reminderId: string) => {
+      if (!supabase) return;
+      setReminders((current) => current.filter((item) => item.id !== reminderId));
+      firedReminderIdsRef.current.delete(reminderId);
+      await asLooseSupabase(supabase).from("reminders").delete().eq("id", reminderId);
+    },
+    [supabase],
+  );
+
   const markTodoDone = useCallback(
     async (todoId: string) => {
       if (!supabase) return;
@@ -699,7 +810,11 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       markAllRead,
       createNotification,
       createTodo,
+      updateTodo,
+      deleteTodo,
       createReminder,
+      updateReminder,
+      deleteReminder,
       markTodoDone,
       markReminderDone,
       snoozeReminder,
@@ -710,6 +825,8 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       createNotification,
       createReminder,
       createTodo,
+      deleteReminder,
+      deleteTodo,
       isLoading,
       isTrayOpen,
       items,
@@ -722,6 +839,8 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       trayAnchor,
       todos,
       unreadCount,
+      updateReminder,
+      updateTodo,
     ],
   );
 

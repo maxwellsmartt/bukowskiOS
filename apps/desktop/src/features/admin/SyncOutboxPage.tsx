@@ -402,10 +402,7 @@ export const SyncOutboxPage = () => {
 
   return (
     <div className="page-stack settings-page">
-      <SectionHeader
-        eyebrow="Settings"
-        title="Sync activity"
-      />
+      <SectionHeader title="Sync activity" />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
       {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}

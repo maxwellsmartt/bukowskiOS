@@ -14,10 +14,7 @@ export const FinanceCostLinksPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader
-        title="Cost links"
-        body="Each row connects a cost-bearing incident to the asset and project it impacts, so you can trace any peso back to its source."
-      />
+      <SectionHeader title="Cost links" />
 
       {error ? <div className="empty-state">Cost links unavailable: {error}</div> : null}
 
