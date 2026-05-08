@@ -297,6 +297,7 @@ type ProviderConfigRow = {
   supports_live_requests: number;
   enabled: number;
   default_model_key: string;
+  fallback_model_key: string;
   base_url: string;
   timeout_ms: number;
   retry_count: number;
@@ -318,6 +319,7 @@ const loadProviderRows = (db: DatabaseSync) =>
           supports_live_requests,
           enabled,
           default_model_key,
+          COALESCE(fallback_model_key, '') AS fallback_model_key,
           base_url,
           timeout_ms,
           retry_count,
@@ -461,6 +463,62 @@ const isVisibleRunRow = (row: ReturnType<typeof loadRuns>[number]) => shouldShow
 const isVisibleActivityRow = (row: ReturnType<typeof loadActivity>[number]) =>
   shouldShowInternalAgents() || row.agent_visibility !== "internal";
 
+const getDefaultProviderModelOptions = (providerKey: string) => {
+  const defaults: Record<string, Array<{ key: string; label: string; source: "default" }>> = {
+    openai: [
+      { key: "openai:gpt-5.2", label: "GPT-5.2", source: "default" },
+      { key: "openai:gpt-5-mini", label: "GPT-5 Mini", source: "default" },
+    ],
+    anthropic: [
+      { key: "anthropic:claude-sonnet-4-20250514", label: "Claude Sonnet 4", source: "default" },
+      { key: "anthropic:claude-opus-4-1-20250805", label: "Claude Opus 4.1", source: "default" },
+    ],
+    openclaw: [{ key: "openclaw:command", label: "OpenClaw Command", source: "default" }],
+    custom: [{ key: "custom:gateway-default", label: "Gateway Default", source: "default" }],
+  };
+
+  return defaults[providerKey] ?? defaults.custom ?? [];
+};
+
+const loadProviderModelOptions = (db: DatabaseSync, providerKey: string) => {
+  try {
+    return db
+      .prepare(
+        `
+          SELECT model_key, display_name, source
+          FROM ai_provider_model_cache
+          WHERE workspace_id = ?
+            AND provider_key = ?
+          ORDER BY
+            CASE WHEN source = 'api' THEN 0 ELSE 1 END,
+            display_name COLLATE NOCASE ASC
+        `,
+      )
+      .all(workspaceId, providerKey) as Array<{ model_key: string; display_name: string; source: string }>;
+  } catch {
+    return [];
+  }
+};
+
+const loadProviderModelOptionsLastSyncedAt = (db: DatabaseSync, providerKey: string) => {
+  try {
+    const row = db
+      .prepare(
+        `
+          SELECT MAX(fetched_at) AS fetched_at
+          FROM ai_provider_model_cache
+          WHERE workspace_id = ?
+            AND provider_key = ?
+            AND source = 'api'
+        `,
+      )
+      .get(workspaceId, providerKey) as { fetched_at: string | null } | undefined;
+    return row?.fetched_at ?? null;
+  } catch {
+    return null;
+  }
+};
+
 const buildProviderRows = (
   db: DatabaseSync,
   secretStore?: { hasProviderSecret: (workspaceId: string, providerKey: string) => boolean },
@@ -489,6 +547,28 @@ const buildProviderRows = (
     const assignedModels = Array.from(new Set(assignedRows.map((agent) => agent.modelLabel).filter(Boolean)));
     const hasStoredSecret = secretStore?.hasProviderSecret(workspaceId, row.provider_key) ?? false;
     const isActiveProvider = row.enabled === 1 && assignedRows.length > 0;
+    const modelOptions = loadProviderModelOptions(db, row.provider_key).map((model) => ({
+      key: model.model_key,
+      label: model.display_name,
+      source: model.source === "api" ? ("api" as const) : ("default" as const),
+    }));
+    const mergedModelOptions = [
+      ...(modelOptions.length ? modelOptions : getDefaultProviderModelOptions(row.provider_key)),
+    ];
+    [row.default_model_key, row.fallback_model_key]
+      .filter(Boolean)
+      .forEach((modelKey) => {
+        if (!mergedModelOptions.some((option) => option.key === modelKey)) {
+          mergedModelOptions.push({
+            key: modelKey,
+            label: modelKey.includes(":") ? modelKey.split(":").slice(1).join(":") : modelKey,
+            source: "default",
+          });
+        }
+      });
+    const modelsLastSyncedAtLabel = formatOptionalTimestampLabel(
+      loadProviderModelOptionsLastSyncedAt(db, row.provider_key),
+    );
 
     return {
       id: row.id,
@@ -500,6 +580,9 @@ const buildProviderRows = (
       supportsLiveRequests: row.supports_live_requests === 1,
       hasStoredSecret,
       defaultModelKey: row.default_model_key,
+      fallbackModelKey: row.fallback_model_key,
+      modelOptions: mergedModelOptions,
+      modelsLastSyncedAtLabel,
       baseUrl: row.base_url,
       timeoutMs: row.timeout_ms,
       retryCount: row.retry_count,

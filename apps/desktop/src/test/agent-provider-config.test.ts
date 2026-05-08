@@ -22,13 +22,23 @@ describe("agent provider config", () => {
     bootstrapAIGatewayFoundation(database);
 
     const rows = database
-      .prepare("SELECT provider_key FROM ai_provider_configs WHERE workspace_id = ? ORDER BY provider_key")
-      .all("workspace-metadata") as Array<{ provider_key: string }>;
+      .prepare(
+        "SELECT provider_key, supports_live_requests, default_model_key FROM ai_provider_configs WHERE workspace_id = ? ORDER BY provider_key",
+      )
+      .all("workspace-metadata") as Array<{
+      provider_key: string;
+      supports_live_requests: number;
+      default_model_key: string;
+    }>;
     const agentRows = database
       .prepare("SELECT agent_key FROM agents WHERE workspace_id = ? ORDER BY sort_order")
       .all("workspace-metadata") as Array<{ agent_key: string }>;
 
     expect(rows.map((row) => row.provider_key)).toEqual(["anthropic", "custom", "openai", "openclaw"]);
+    expect(rows.find((row) => row.provider_key === "anthropic")).toMatchObject({
+      supports_live_requests: 1,
+      default_model_key: "anthropic:claude-sonnet-4-20250514",
+    });
     expect(agentRows.map((row) => row.agent_key)).toEqual([
       "supervisor-agent",
       "assets-agent",
@@ -38,6 +48,112 @@ describe("agent provider config", () => {
       "projects-scheduling-agent",
       "bugs-agent",
       "product-agent",
+    ]);
+
+    cleanup();
+  });
+
+  it("saves and tests Anthropic as a live provider", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-provider-anthropic-config");
+    const secrets = new Map<string, string>();
+    const secretStore = {
+      hasProviderSecret: (workspaceId: string, providerKey: string) => secrets.has(`${workspaceId}:${providerKey}`),
+      getProviderSecret: (workspaceId: string, providerKey: string) => secrets.get(`${workspaceId}:${providerKey}`) ?? null,
+      setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => {
+        secrets.set(`${workspaceId}:${providerKey}`, secret);
+      },
+      clearProviderSecret: (workspaceId: string, providerKey: string) => {
+        secrets.delete(`${workspaceId}:${providerKey}`);
+      },
+    };
+    const calls: string[] = [];
+    const mutations = createAgentMutationService(database, {
+      secretStore,
+      openaiProviderService: {
+        createResponse: async () => ({
+          ok: false as const,
+          status: "unavailable" as const,
+          summary: "OpenAI should not be used for Anthropic.",
+        }),
+        testConnection: async () => ({
+          ok: false as const,
+          status: "unavailable" as const,
+          summary: "OpenAI should not be used for Anthropic.",
+        }),
+      },
+      anthropicProviderService: {
+        listModels: async () => [
+          {
+            key: "anthropic:claude-sonnet-4-20250514",
+            label: "Claude Sonnet 4",
+          },
+          {
+            key: "anthropic:claude-opus-4-1-20250805",
+            label: "Claude Opus 4.1",
+          },
+        ],
+        createResponse: async () => ({
+          ok: true as const,
+          responseId: "msg-test",
+          status: "completed",
+          outputText: "OK",
+          functionCalls: [],
+        }),
+        testConnection: async (config) => {
+          calls.push(config.defaultModelKey);
+          return {
+            ok: true as const,
+            status: "healthy" as const,
+            summary: "Anthropic responded successfully.",
+          };
+        },
+      },
+      assistantGatewayService: {
+        sendMessage: async () => {
+          throw new Error("Not used in this test.");
+        },
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
+      },
+    });
+
+    const saveResult = mutations.saveAIProviderConfig({
+      commandId: "cmd-provider-save-anthropic",
+      workspaceId: "workspace-metadata",
+      providerKey: "anthropic",
+      enabled: true,
+      apiKey: "sk-ant-test",
+      baseUrl: "",
+      defaultModelKey: "anthropic:claude-sonnet-4-20250514",
+      fallbackModelKey: "anthropic:claude-opus-4-1-20250805",
+      timeoutMs: 45000,
+      retryCount: 2,
+    });
+
+    expect(saveResult.status).toBe("configured");
+    expect(secretStore.hasProviderSecret("workspace-metadata", "anthropic")).toBe(true);
+
+    const testResult = await mutations.testAIProviderConnection({
+      workspaceId: "workspace-metadata",
+      providerKey: "anthropic",
+    });
+
+    expect(testResult.status).toBe("healthy");
+    expect(calls).toEqual(["anthropic:claude-sonnet-4-20250514"]);
+
+    const refreshResult = await mutations.refreshAIProviderModels({
+      workspaceId: "workspace-metadata",
+      providerKey: "anthropic",
+    });
+    expect(refreshResult.summary).toContain("2 models");
+
+    const modelsSnapshot = createAgentReadService(database, secretStore).getModelsSnapshot();
+    const anthropicProvider = modelsSnapshot.providers.find((provider) => provider.providerKey === "anthropic");
+    expect(anthropicProvider?.fallbackModelKey).toBe("anthropic:claude-opus-4-1-20250805");
+    expect(anthropicProvider?.modelOptions.map((model) => model.key)).toEqual([
+      "anthropic:claude-opus-4-1-20250805",
+      "anthropic:claude-sonnet-4-20250514",
     ]);
 
     cleanup();

@@ -24,6 +24,7 @@ import type {
   SendAssistantChatTurnCommand,
   SetActiveAssistantThreadCommand,
   RenameAssistantThreadCommand,
+  RefreshAIProviderModelsCommand,
   UpdateAssistantThreadPreferencesCommand,
   SetAgentApprovalModeCommand,
   SetAgentStatusCommand,
@@ -41,6 +42,11 @@ import type { TelegramConnectorService } from "../connectors/telegramConnectorSe
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
+type AIModelListingService = {
+  listModels?: OpenAIProviderService["listModels"];
+  testConnection: OpenAIProviderService["testConnection"];
+  createResponse: OpenAIProviderService["createResponse"];
+};
 
 const ensureValue = (value: string | undefined, label: string) => {
   const nextValue = value?.trim() ?? "";
@@ -60,16 +66,16 @@ const optionalValue = (value: string | undefined) => {
 const normalizeProviderBaseUrl = (providerKey: string, value: string | undefined) => {
   const nextValue = optionalValue(value) ?? "";
 
-  if (providerKey !== "openai") {
-    return nextValue;
-  }
-
   const trimmed = nextValue.replace(/\/+$/, "");
   if (!trimmed) {
     return "";
   }
 
-  return trimmed.endsWith("/v1") ? trimmed.slice(0, -3) : trimmed;
+  return providerKey === "openai" || providerKey === "anthropic"
+    ? trimmed.endsWith("/v1")
+      ? trimmed.slice(0, -3)
+      : trimmed
+    : trimmed;
 };
 
 const resolveProviderKey = (modelKey: string) => {
@@ -83,6 +89,21 @@ const resolveProviderKey = (modelKey: string) => {
 };
 
 const formatModelLabel = (modelKey: string) => {
+  const labels: Record<string, string> = {
+    "openai:gpt-5.2": "GPT-5.2",
+    "openai:gpt-5-mini": "GPT-5 Mini",
+    "openai:gpt-5.4": "GPT-5.4",
+    "openai:gpt-5.4-mini": "GPT-5.4 Mini",
+    "anthropic:claude-sonnet-4-20250514": "Claude Sonnet 4",
+    "anthropic:claude-opus-4-1-20250805": "Claude Opus 4.1",
+    "anthropic:sonnet-4": "Claude Sonnet 4",
+    "openclaw:command": "OpenClaw Command",
+  };
+
+  if (labels[modelKey]) {
+    return labels[modelKey];
+  }
+
   const nextValue = modelKey.includes(":") ? modelKey.split(":")[1] : modelKey;
   return nextValue.replace(/[-_]/g, " ").trim();
 };
@@ -95,6 +116,67 @@ const normalizeTokenList = (values: string[]) =>
         .filter(Boolean),
     ),
   );
+
+const persistProviderModelOptions = (
+  db: DatabaseSync,
+  providerKey: string,
+  models: Array<{ key: string; label: string; raw?: Record<string, unknown> }>,
+) => {
+  const now = new Date().toISOString();
+  const insert = db.prepare(
+    `
+      INSERT INTO ai_provider_model_cache (
+        id,
+        workspace_id,
+        provider_key,
+        model_key,
+        display_name,
+        source,
+        raw_json,
+        fetched_at,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, 'api', ?, ?, ?, ?)
+      ON CONFLICT(workspace_id, provider_key, model_key) DO UPDATE SET
+        display_name = excluded.display_name,
+        source = excluded.source,
+        raw_json = excluded.raw_json,
+        fetched_at = excluded.fetched_at,
+        updated_at = excluded.updated_at
+    `,
+  );
+
+  db.exec("BEGIN");
+  try {
+    db.prepare(
+      `
+        DELETE FROM ai_provider_model_cache
+        WHERE workspace_id = ?
+          AND provider_key = ?
+          AND source = 'api'
+      `,
+    ).run(workspaceId, providerKey);
+
+    models.forEach((model) => {
+      insert.run(
+        `provider-model-${workspaceId}-${providerKey}-${model.key.replace(/[^a-zA-Z0-9_-]/gu, "-")}`,
+        workspaceId,
+        providerKey,
+        model.key,
+        model.label || model.key,
+        JSON.stringify(model.raw ?? {}),
+        now,
+        now,
+        now,
+      );
+    });
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+};
 
 const loadAgent = (db: DatabaseSync, id: string) =>
   db
@@ -306,7 +388,8 @@ export const createAgentMutationService = (
       setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => void;
       clearProviderSecret: (workspaceId: string, providerKey: string) => void;
     };
-    openaiProviderService: OpenAIProviderService;
+    openaiProviderService: AIModelListingService;
+    anthropicProviderService?: AIModelListingService;
     assistantGatewayService: AssistantGatewayService;
     assistantChatService?: AssistantChatService;
     connectorBridgeService?: ConnectorBridgeService;
@@ -562,9 +645,10 @@ export const createAgentMutationService = (
 
   saveAIProviderConfig(input: SaveAIProviderConfigCommand): AIProviderMutationResult {
     const now = new Date().toISOString();
-    const providerKey = ensureValue(input.providerKey, "Provider key").toLowerCase();
-    const supportsLiveRequests = providerKey === "openai";
+  const providerKey = ensureValue(input.providerKey, "Provider key").toLowerCase();
+    const supportsLiveRequests = providerKey === "openai" || providerKey === "anthropic";
     const defaultModelKey = ensureValue(input.defaultModelKey, "Default model");
+    const fallbackModelKey = optionalValue(input.fallbackModelKey) ?? "";
     const timeoutMs = Math.max(3_000, Math.min(120_000, Math.round(input.timeoutMs)));
     const retryCount = Math.max(0, Math.min(5, Math.round(input.retryCount)));
     const hasIncomingSecret = Boolean(input.apiKey?.trim());
@@ -592,7 +676,9 @@ export const createAgentMutationService = (
     const notes =
       providerKey === "openai"
         ? "First live AI provider for supervised routing."
-        : "Provider shell staged for future expansion.";
+        : providerKey === "anthropic"
+          ? "Live Claude provider for users who prefer Anthropic."
+          : "Provider shell staged for future expansion.";
 
     db.prepare(
       `
@@ -604,6 +690,7 @@ export const createAgentMutationService = (
           supports_live_requests,
           enabled,
           default_model_key,
+          fallback_model_key,
           base_url,
           timeout_ms,
           retry_count,
@@ -615,12 +702,13 @@ export const createAgentMutationService = (
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?)
         ON CONFLICT(workspace_id, provider_key) DO UPDATE SET
           display_name = excluded.display_name,
           supports_live_requests = excluded.supports_live_requests,
           enabled = excluded.enabled,
           default_model_key = excluded.default_model_key,
+          fallback_model_key = excluded.fallback_model_key,
           base_url = excluded.base_url,
           timeout_ms = excluded.timeout_ms,
           retry_count = excluded.retry_count,
@@ -636,6 +724,7 @@ export const createAgentMutationService = (
       supportsLiveRequests ? 1 : 0,
       enabled,
       defaultModelKey,
+      fallbackModelKey,
       baseUrl,
       timeoutMs,
       retryCount,
@@ -720,7 +809,11 @@ export const createAgentMutationService = (
       };
     }
 
-    const result = await options.openaiProviderService.testConnection({
+    const providerService =
+      providerKey === "anthropic" && options.anthropicProviderService
+        ? options.anthropicProviderService
+        : options.openaiProviderService;
+    const result = await providerService.testConnection({
       apiKey,
       baseUrl: config.base_url,
       defaultModelKey: config.default_model_key,
@@ -774,6 +867,99 @@ export const createAgentMutationService = (
           ? `${result.summary} ${config.display_name} is now enabled for chat.`
           : result.summary,
     };
+  },
+
+  async refreshAIProviderModels(input: RefreshAIProviderModelsCommand): Promise<AIProviderMutationResult> {
+    const now = new Date().toISOString();
+    const providerKey = ensureValue(input.providerKey, "Provider key").toLowerCase();
+    const config = db
+      .prepare(
+        `
+          SELECT display_name, supports_live_requests, default_model_key, base_url, timeout_ms
+          FROM ai_provider_configs
+          WHERE workspace_id = ?
+            AND provider_key = ?
+          LIMIT 1
+        `,
+      )
+      .get(workspaceId, providerKey) as
+      | {
+          display_name: string;
+          supports_live_requests: number;
+          default_model_key: string;
+          base_url: string;
+          timeout_ms: number;
+        }
+      | undefined;
+
+    if (!config || config.supports_live_requests !== 1) {
+      return {
+        providerKey,
+        status: "not_configured",
+        summary: "This provider cannot list live models yet.",
+      };
+    }
+
+    const apiKey = options.secretStore.getProviderSecret(workspaceId, providerKey);
+    if (!apiKey) {
+      return {
+        providerKey,
+        status: "not_configured",
+        summary: "Store an API key before refreshing model options.",
+      };
+    }
+
+    const providerService: AIModelListingService =
+      providerKey === "anthropic" && options.anthropicProviderService
+        ? options.anthropicProviderService
+        : options.openaiProviderService;
+
+    try {
+      if (!providerService.listModels) {
+        throw new Error("This provider cannot refresh model options in this build.");
+      }
+
+      const models = await providerService.listModels({
+        apiKey,
+        baseUrl: config.base_url,
+        defaultModelKey: config.default_model_key,
+        timeoutMs: config.timeout_ms,
+      });
+      persistProviderModelOptions(db, providerKey, models);
+
+      db.prepare(
+        `
+          UPDATE ai_provider_configs
+          SET last_error_summary = NULL,
+              updated_at = ?
+          WHERE workspace_id = ?
+            AND provider_key = ?
+        `,
+      ).run(now, workspaceId, providerKey);
+
+      return {
+        providerKey,
+        status: "configured",
+        summary: `${config.display_name} model list refreshed (${models.length} models).`,
+      };
+    } catch (error) {
+      const summary = error instanceof Error ? error.message : "Could not refresh model options.";
+      db.prepare(
+        `
+          UPDATE ai_provider_configs
+          SET last_error_summary = ?,
+              updated_at = ?
+          WHERE workspace_id = ?
+            AND provider_key = ?
+        `,
+      ).run(summary, now, workspaceId, providerKey);
+
+      return {
+        providerKey,
+        status: "unavailable",
+        summary,
+      };
+    }
   },
 
   async saveConnectorConfig(input: SaveConnectorConfigCommand): Promise<ConnectorMutationResult> {

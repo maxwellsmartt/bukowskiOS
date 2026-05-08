@@ -7,7 +7,7 @@ import { isSubnavItemActive } from "@app/shell/SubnavTabs";
 
 describe("foundation navigation shell", () => {
   it("keeps the approved primary domains visible", () => {
-    expect(primaryNav.map((item) => item.label)).toEqual(["Projects", "Assets", "Finance", "Automation"]);
+    expect(primaryNav.map((item) => item.label)).toEqual(["Projects", "Assets", "Finance", "Inbox", "Automation"]);
   });
 
   it("keeps finance shell structurally real", () => {

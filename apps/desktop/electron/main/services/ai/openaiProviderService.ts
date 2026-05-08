@@ -21,6 +21,12 @@ export type OpenAIConnectionResult =
       summary: string;
     };
 
+export type AIProviderModelOption = {
+  key: string;
+  label: string;
+  raw?: Record<string, unknown>;
+};
+
 export type OpenAIResponseFunctionTool = {
   type: "function";
   name: string;
@@ -136,6 +142,51 @@ const mapErrorSummary = async (response: Response) => {
 };
 
 export const createOpenAIProviderService = () => ({
+  async listModels(config: OpenAIProviderConfig): Promise<AIProviderModelOption[]> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), Math.max(3_000, config.timeoutMs));
+
+    try {
+      const response = await fetch(`${resolveBaseUrl(config.baseUrl)}/v1/models`, {
+        method: "GET",
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+      });
+
+      if (!response.ok) {
+        const summary = await mapErrorSummary(response);
+        throw new Error(summary);
+      }
+
+      const payload = (await response.json()) as { data?: Array<Record<string, unknown>> };
+      return (payload.data ?? [])
+        .map((model) => {
+          const id = typeof model.id === "string" ? model.id : "";
+          return {
+            key: `openai:${id}`,
+            label: id,
+            raw: model,
+          };
+        })
+        .filter((model) => {
+          const id = model.label.toLowerCase();
+          if (!id) {
+            return false;
+          }
+
+          return (
+            /^(gpt|o\d|chatgpt)/u.test(id) &&
+            !/(image|embedding|audio|tts|whisper|dall-e|moderation|transcribe|realtime)/u.test(id)
+          );
+        })
+        .sort((left, right) => left.label.localeCompare(right.label));
+    } finally {
+      clearTimeout(timeout);
+    }
+  },
+
   async createResponse(config: OpenAIProviderConfig, input: OpenAIResponseCreateInput): Promise<OpenAIResponseCreateResult> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Math.max(3_000, config.timeoutMs));

@@ -113,7 +113,9 @@ describe("agent tool registry", () => {
     expect(registry.requiresApproval("create_packing_slip")).toBe(true);
     expect(registry.requiresApproval("get_asset_availability")).toBe(false);
 
-    const writeDefs = registry.definitions.filter((tool) => tool.name.startsWith("create_") || tool.name === "update_incident");
+    const approvalRequiredToolNames = ["create_incident", "update_incident", "create_rma", "create_packing_slip"];
+    const writeDefs = registry.definitions.filter((tool) => approvalRequiredToolNames.includes(tool.name));
+    expect(writeDefs).toHaveLength(approvalRequiredToolNames.length);
     for (const tool of writeDefs) {
       expect((tool as { requiresApproval?: boolean }).requiresApproval).toBe(true);
     }

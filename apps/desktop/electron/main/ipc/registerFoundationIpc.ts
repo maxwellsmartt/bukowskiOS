@@ -61,6 +61,7 @@ import {
   previewCatalogCsvImportSchema,
   rmaSnapshotReadArgsSchema,
   reviewAgentRunSchema,
+  refreshAiProviderModelsSchema,
   saveAiProviderConfigSchema,
   saveConnectorConfigSchema,
   sendAssistantChatTurnSchema,
@@ -91,6 +92,7 @@ import type {
   CreateAssistantThreadCommand,
   AssistantGatewayRequest,
   SaveAIProviderConfigCommand,
+  RefreshAIProviderModelsCommand,
   SaveConnectorConfigCommand,
   TestAIProviderConnectionCommand,
   TestConnectorConnectionCommand,
@@ -326,6 +328,7 @@ type RegisterFoundationIpcOptions = {
     setAgentStatus: (input: SetAgentStatusCommand) => unknown;
     setAgentApprovalMode: (input: SetAgentApprovalModeCommand) => unknown;
     saveAIProviderConfig: (input: SaveAIProviderConfigCommand) => unknown;
+    refreshAIProviderModels: (input: RefreshAIProviderModelsCommand) => unknown;
     saveConnectorConfig: (input: SaveConnectorConfigCommand) => unknown;
     testAIProviderConnection: (input: TestAIProviderConnectionCommand) => unknown;
     testConnectorConnection: (input: TestConnectorConnectionCommand) => unknown;
@@ -498,6 +501,11 @@ export const registerFoundationIpc = ({
     ipcChannels.agents.testAIProviderConnection,
     testAiProviderConnectionSchema,
     (_event, input) => agentMutations.testAIProviderConnection(input),
+  );
+  safeHandle(
+    ipcChannels.agents.refreshAIProviderModels,
+    refreshAiProviderModelsSchema,
+    (_event, input) => agentMutations.refreshAIProviderModels(input),
   );
   safeHandle(
     ipcChannels.agents.testConnectorConnection,

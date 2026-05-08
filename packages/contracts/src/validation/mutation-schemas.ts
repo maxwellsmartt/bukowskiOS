@@ -85,12 +85,20 @@ export const saveAiProviderConfigSchema = z
     clearStoredKey: z.boolean().optional(),
     baseUrl: optionalTrimmedString,
     defaultModelKey: nonEmptyString,
+    fallbackModelKey: optionalTrimmedString,
     timeoutMs: z.number().int().nonnegative(),
     retryCount: z.number().int().nonnegative(),
   })
   .strict();
 
 export const testAiProviderConnectionSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    providerKey: nonEmptyString,
+  })
+  .strict();
+
+export const refreshAiProviderModelsSchema = z
   .object({
     workspaceId: nonEmptyString,
     providerKey: nonEmptyString,

@@ -166,11 +166,17 @@ export type SaveAIProviderConfigCommand = {
   clearStoredKey?: boolean;
   baseUrl?: string;
   defaultModelKey: string;
+  fallbackModelKey?: string;
   timeoutMs: number;
   retryCount: number;
 };
 
 export type TestAIProviderConnectionCommand = {
+  workspaceId: string;
+  providerKey: string;
+};
+
+export type RefreshAIProviderModelsCommand = {
   workspaceId: string;
   providerKey: string;
 };

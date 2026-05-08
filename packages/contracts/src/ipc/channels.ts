@@ -64,6 +64,7 @@ export const ipcChannels = {
     setApprovalMode: "bukowskiAgents:setApprovalMode",
     saveAIProviderConfig: "bukowskiAgents:saveAIProviderConfig",
     testAIProviderConnection: "bukowskiAgents:testAIProviderConnection",
+    refreshAIProviderModels: "bukowskiAgents:refreshAIProviderModels",
     assignAgentModel: "bukowskiAgents:assignAgentModel",
     createAssistantThread: "bukowskiAgents:createAssistantThread",
     deleteAssistantThread: "bukowskiAgents:deleteAssistantThread",

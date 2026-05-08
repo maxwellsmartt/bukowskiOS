@@ -193,6 +193,13 @@ export type AgentModelRow = {
   supportsLiveRequests: boolean;
   hasStoredSecret: boolean;
   defaultModelKey: string;
+  fallbackModelKey: string;
+  modelOptions: Array<{
+    key: string;
+    label: string;
+    source: "api" | "default";
+  }>;
+  modelsLastSyncedAtLabel: string;
   baseUrl: string;
   timeoutMs: number;
   retryCount: number;

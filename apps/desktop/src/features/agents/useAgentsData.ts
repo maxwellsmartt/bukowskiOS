@@ -24,6 +24,7 @@ import type {
   MissionControlSnapshot,
   ReviewAgentRunCommand,
   SaveAIProviderConfigCommand,
+  RefreshAIProviderModelsCommand,
   SaveConnectorConfigCommand,
   SendAssistantChatTurnCommand,
   SetActiveAssistantThreadCommand,
@@ -264,6 +265,18 @@ export const testAIProviderConnection = async (
   }
 
   const result = await window.bukowskiAgents.testAIProviderConnection(input);
+  notifyAgentsChanged();
+  return result;
+};
+
+export const refreshAIProviderModels = async (
+  input: RefreshAIProviderModelsCommand,
+): Promise<AIProviderMutationResult> => {
+  if (!window.bukowskiAgents) {
+    throw new Error("Agents bridge unavailable");
+  }
+
+  const result = await window.bukowskiAgents.refreshAIProviderModels(input);
   notifyAgentsChanged();
   return result;
 };

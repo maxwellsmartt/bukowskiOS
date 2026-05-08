@@ -10,6 +10,7 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import {
   assignAgentModel,
+  refreshAIProviderModels,
   saveAIProviderConfig,
   testAIProviderConnection,
   useAgentModels,
@@ -22,16 +23,6 @@ const providerStatusLabelMap: Record<AgentModelRow["status"], string> = {
   healthy: "Healthy",
   invalid_key: "Invalid key",
   unavailable: "Unavailable",
-};
-
-const providerModelOptions: Record<string, Array<{ key: string; label: string }>> = {
-  openai: [
-    { key: "openai:gpt-5.4", label: "GPT-5.4" },
-    { key: "openai:gpt-5.4-mini", label: "GPT-5.4 Mini" },
-  ],
-  anthropic: [{ key: "anthropic:sonnet-4", label: "Claude Sonnet 4" }],
-  openclaw: [{ key: "openclaw:command", label: "OpenClaw Command" }],
-  custom: [{ key: "custom:gateway-default", label: "Gateway Default" }],
 };
 
 const providerStatusIndicatorToneMap: Record<AgentModelRow["status"], "green" | "amber" | "red"> = {
@@ -50,6 +41,7 @@ type ProviderDraft = {
   apiKey: string;
   baseUrl: string;
   defaultModelKey: string;
+  fallbackModelKey: string;
   timeoutMs: number;
   retryCount: number;
 };
@@ -65,6 +57,7 @@ const buildProviderDraft = (provider: AgentModelRow | null): ProviderDraft => ({
   apiKey: "",
   baseUrl: provider?.baseUrl ?? "",
   defaultModelKey: provider?.defaultModelKey ?? "",
+  fallbackModelKey: provider?.fallbackModelKey ?? "",
   timeoutMs: provider?.timeoutMs ?? 30_000,
   retryCount: provider?.retryCount ?? 1,
 });
@@ -89,6 +82,7 @@ export const AgentModelsPage = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSavingProvider, setIsSavingProvider] = useState(false);
   const [isTestingProvider, setIsTestingProvider] = useState(false);
+  const [isRefreshingModels, setIsRefreshingModels] = useState(false);
   const [assignmentBusyAgentId, setAssignmentBusyAgentId] = useState<string | null>(null);
 
   const selectedProvider = useMemo(
@@ -174,6 +168,7 @@ export const AgentModelsPage = () => {
         apiKey: providerDraft.apiKey,
         baseUrl: providerDraft.baseUrl,
         defaultModelKey: providerDraft.defaultModelKey,
+        fallbackModelKey: providerDraft.fallbackModelKey,
         timeoutMs: providerDraft.timeoutMs,
         retryCount: providerDraft.retryCount,
       });
@@ -208,6 +203,7 @@ export const AgentModelsPage = () => {
         clearStoredKey: true,
         baseUrl: providerDraft.baseUrl,
         defaultModelKey: providerDraft.defaultModelKey,
+        fallbackModelKey: providerDraft.fallbackModelKey,
         timeoutMs: providerDraft.timeoutMs,
         retryCount: providerDraft.retryCount,
       });
@@ -217,6 +213,28 @@ export const AgentModelsPage = () => {
       setErrorMessage(getUserFacingErrorMessage(saveError, "Unable to clear the stored API key."));
     } finally {
       setIsSavingProvider(false);
+    }
+  };
+
+  const handleRefreshModels = async () => {
+    if (!selectedProvider) {
+      return;
+    }
+
+    setIsRefreshingModels(true);
+    setFeedback(null);
+    setErrorMessage(null);
+
+    try {
+      const result = await refreshAIProviderModels({
+        workspaceId,
+        providerKey: selectedProvider.providerKey,
+      });
+      setFeedback(result.summary);
+    } catch (refreshError) {
+      setErrorMessage(getUserFacingErrorMessage(refreshError, "Unable to refresh model options."));
+    } finally {
+      setIsRefreshingModels(false);
     }
   };
 
@@ -247,20 +265,22 @@ export const AgentModelsPage = () => {
       const previous = current[agentId];
       const next = {
         providerKey: previous?.providerKey ?? "openai",
-        modelKey: previous?.modelKey ?? "openai:gpt-5.4-mini",
-        modelLabel: previous?.modelLabel ?? "GPT-5.4 Mini",
+        modelKey: previous?.modelKey ?? "openai:gpt-5-mini",
+        modelLabel: previous?.modelLabel ?? "GPT-5 Mini",
       };
 
       next[field] = value;
 
       if (field === "providerKey") {
-        const fallbackModel = providerModelOptions[value]?.[0];
+        const fallbackModel = data.providers.find((provider) => provider.providerKey === value)?.modelOptions[0];
         next.modelKey = fallbackModel?.key ?? `${value}:default`;
         next.modelLabel = fallbackModel?.label ?? "Default model";
       }
 
       if (field === "modelKey") {
-        const selectedOption = providerModelOptions[next.providerKey]?.find((option) => option.key === value);
+        const selectedOption = data.providers
+          .find((provider) => provider.providerKey === next.providerKey)
+          ?.modelOptions.find((option) => option.key === value);
         next.modelLabel = selectedOption?.label ?? value;
       }
 
@@ -435,6 +455,10 @@ export const AgentModelsPage = () => {
                   <span className="agent-detail-kicker">Assigned models</span>
                   <strong>{selectedProvider.assignedModels.join(" · ") || "None yet"}</strong>
                 </div>
+                <div className="models-provider-health-card">
+                  <span className="agent-detail-kicker">Models synced</span>
+                  <strong>{selectedProvider.modelsLastSyncedAtLabel}</strong>
+                </div>
               </div>
 
               <div className="action-form-grid">
@@ -469,9 +493,25 @@ export const AgentModelsPage = () => {
                     onChange={(event) => handleProviderFieldChange("defaultModelKey", event.target.value)}
                     value={providerDraft.defaultModelKey}
                   >
-                    {(providerModelOptions[selectedProvider.providerKey] ?? []).map((option) => (
+                    {selectedProvider.modelOptions.map((option) => (
                       <option key={option.key} value={option.key}>
-                        {option.label}
+                        {option.label}{option.source === "api" ? "" : " · default"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field-block">
+                  <span className="field-label">Fallback model</span>
+                  <select
+                    className="field-input"
+                    disabled={!selectedProvider.supportsLiveRequests}
+                    onChange={(event) => handleProviderFieldChange("fallbackModelKey", event.target.value)}
+                    value={providerDraft.fallbackModelKey}
+                  >
+                    <option value="">No fallback</option>
+                    {selectedProvider.modelOptions.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}{option.source === "api" ? "" : " · default"}
                       </option>
                     ))}
                   </select>
@@ -543,6 +583,15 @@ export const AgentModelsPage = () => {
                   <RadioTower size={14} />
                   <span>{isTestingProvider ? "Testing..." : "Test connection"}</span>
                 </button>
+                <button
+                  className="ghost-control"
+                  disabled={!selectedProvider.supportsLiveRequests || isRefreshingModels || !selectedProvider.hasStoredSecret}
+                  onClick={handleRefreshModels}
+                  type="button"
+                >
+                  <RotateCcw size={14} />
+                  <span>{isRefreshingModels ? "Refreshing..." : "Refresh models"}</span>
+                </button>
                 {selectedProvider.hasStoredSecret ? (
                   <button className="ghost-control" disabled={isSavingProvider} onClick={handleClearStoredKey} type="button">
                     <RotateCcw size={14} />
@@ -591,7 +640,7 @@ export const AgentModelsPage = () => {
                     onChange={(event) => handleAssignmentFieldChange(assignment.agentId, "modelKey", event.target.value)}
                     value={draft.modelKey}
                   >
-                    {(providerModelOptions[draft.providerKey] ?? []).map((option) => (
+                    {(data.providers.find((provider) => provider.providerKey === draft.providerKey)?.modelOptions ?? []).map((option) => (
                       <option key={option.key} value={option.key}>
                         {option.label}
                       </option>

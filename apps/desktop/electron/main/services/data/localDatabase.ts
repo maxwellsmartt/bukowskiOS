@@ -22,6 +22,7 @@ import { createAssistantMemoryService } from "../ai/assistantMemoryService";
 import { createAssistantGatewaySessionStore } from "../ai/assistantGatewaySessionStore";
 import { createAgentToolRegistry } from "../ai/agentToolRegistry";
 import { createAISecretStore } from "../ai/aiSecretStore";
+import { createAnthropicProviderService } from "../ai/anthropicProviderService";
 import { createOpenAIProviderService } from "../ai/openaiProviderService";
 import { createAssistantChatService, type AssistantChatService } from "./assistantChatService";
 import { createAgentMutationService } from "./agentMutationService";
@@ -1008,6 +1009,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   const secretStore = createAISecretStore();
   reconcileLiveProviderEnablement(database, secretStore);
   const openaiProviderService = createOpenAIProviderService();
+  const anthropicProviderService = createAnthropicProviderService();
   const foundationReads = createFoundationReadService(database);
   const userAdmin = createUserAdminService(database);
   const agentReads = createAgentReadService(database, secretStore);
@@ -1113,6 +1115,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   const assistantGatewayService = createAssistantGatewayService(database, {
     secretStore,
     openaiProviderService,
+    anthropicProviderService,
     sessionStore,
     toolRegistry,
     memoryService,
@@ -1301,6 +1304,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     agentMutations: createAgentMutationService(database, {
       secretStore,
       openaiProviderService,
+      anthropicProviderService,
       assistantGatewayService,
       assistantChatService,
       connectorBridgeService,

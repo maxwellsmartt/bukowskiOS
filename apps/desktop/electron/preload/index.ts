@@ -100,6 +100,7 @@ import type {
   ReportIncidentResult,
   ResolveIncidentCommand,
   RecordRuntimeErrorCommand,
+  RefreshAIProviderModelsCommand,
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
   ScheduleTimelineRange,
@@ -261,6 +262,8 @@ const bukowskiAgents = {
     ipcRenderer.invoke(ipcChannels.agents.setApprovalMode, input) as Promise<AgentMutationResult>,
   saveAIProviderConfig: (input: SaveAIProviderConfigCommand) =>
     ipcRenderer.invoke(ipcChannels.agents.saveAIProviderConfig, input) as Promise<AIProviderMutationResult>,
+  refreshAIProviderModels: (input: RefreshAIProviderModelsCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.refreshAIProviderModels, input) as Promise<AIProviderMutationResult>,
   saveConnectorConfig: (input: SaveConnectorConfigCommand) =>
     ipcRenderer.invoke(ipcChannels.agents.saveConnectorConfig, input) as Promise<ConnectorMutationResult>,
   testAIProviderConnection: (input: TestAIProviderConnectionCommand) =>

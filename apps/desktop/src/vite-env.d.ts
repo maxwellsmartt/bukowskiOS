@@ -102,6 +102,7 @@ import type {
   ReportIncidentResult,
   ResolveIncidentCommand,
   ReviewAgentRunCommand,
+  RefreshAIProviderModelsCommand,
   AgentRunReviewResult,
   ReturnPackingSlipItemsCommand,
   ReturnPackingSlipItemsResult,
@@ -216,6 +217,7 @@ declare global {
       setStatus: (input: SetAgentStatusCommand) => Promise<AgentMutationResult>;
       setApprovalMode: (input: SetAgentApprovalModeCommand) => Promise<AgentMutationResult>;
       saveAIProviderConfig: (input: SaveAIProviderConfigCommand) => Promise<AIProviderMutationResult>;
+      refreshAIProviderModels: (input: RefreshAIProviderModelsCommand) => Promise<AIProviderMutationResult>;
       saveConnectorConfig: (input: SaveConnectorConfigCommand) => Promise<ConnectorMutationResult>;
       testAIProviderConnection: (input: TestAIProviderConnectionCommand) => Promise<AIProviderMutationResult>;
       testConnectorConnection: (input: TestConnectorConnectionCommand) => Promise<ConnectorMutationResult>;

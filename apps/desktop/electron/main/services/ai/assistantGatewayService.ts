@@ -10,6 +10,7 @@ import type {
 import type { DatabaseSync } from "node:sqlite";
 
 import type { AISecretStore } from "./aiSecretStore";
+import type { AnthropicProviderService } from "./anthropicProviderService";
 import type { AssistantMemoryService } from "./assistantMemoryService";
 import type { AgentToolRegistry } from "./agentToolRegistry";
 import type { OpenAIProviderService } from "./openaiProviderService";
@@ -22,6 +23,7 @@ const workspaceId = DEFAULT_WORKSPACE_ID;
 const maxToolCalls = 10;
 const maxToolPayloadChars = 4000;
 const logger = getDesktopLogger("assistant-gateway");
+type AssistantProviderService = Pick<OpenAIProviderService, "createResponse" | "testConnection">;
 
 const orchestrationSchema = {
   type: "json_schema",
@@ -360,7 +362,7 @@ const loadProviderConfig = (db: DatabaseSync, providerKey: string) =>
   db
     .prepare(
       `
-        SELECT display_name, enabled, default_model_key, base_url, timeout_ms, retry_count, status
+        SELECT display_name, enabled, default_model_key, COALESCE(fallback_model_key, '') AS fallback_model_key, base_url, timeout_ms, retry_count, status
         FROM ai_provider_configs
         WHERE workspace_id = ?
           AND provider_key = ?
@@ -372,6 +374,7 @@ const loadProviderConfig = (db: DatabaseSync, providerKey: string) =>
         display_name: string;
         enabled: number;
         default_model_key: string;
+        fallback_model_key: string;
         base_url: string;
         timeout_ms: number;
         retry_count: number;
@@ -733,12 +736,69 @@ export const createAssistantGatewayService = (
   db: DatabaseSync,
   options: {
     secretStore: AISecretStore;
-    openaiProviderService: OpenAIProviderService;
+    openaiProviderService: AssistantProviderService;
+    anthropicProviderService?: AnthropicProviderService;
     sessionStore: AssistantGatewaySessionStore;
     toolRegistry: AgentToolRegistry;
     memoryService?: AssistantMemoryService;
   },
 ) => {
+  const getProviderService = (providerKey: string | null | undefined) =>
+    providerKey === "anthropic" && options.anthropicProviderService
+      ? options.anthropicProviderService
+      : options.openaiProviderService;
+  const createProviderResponse = async (
+    providerKey: string,
+    config: {
+      apiKey: string;
+      baseUrl: string;
+      defaultModelKey: string;
+      fallbackModelKey?: string | null;
+      timeoutMs: number;
+    },
+    input: Parameters<OpenAIProviderService["createResponse"]>[1],
+  ) => {
+    const providerService = getProviderService(providerKey);
+    const primaryResult = await providerService.createResponse(
+      {
+        apiKey: config.apiKey,
+        baseUrl: config.baseUrl,
+        defaultModelKey: config.defaultModelKey,
+        timeoutMs: config.timeoutMs,
+      },
+      input,
+    );
+
+    const fallbackModelKey = config.fallbackModelKey?.trim();
+    if (primaryResult.ok || !fallbackModelKey || fallbackModelKey === input.model) {
+      return {
+        result: primaryResult,
+        modelKey: input.model,
+        usedFallback: false,
+      };
+    }
+
+    const fallbackResult = await providerService.createResponse(
+      {
+        apiKey: config.apiKey,
+        baseUrl: config.baseUrl,
+        defaultModelKey: fallbackModelKey,
+        timeoutMs: config.timeoutMs,
+      },
+      {
+        ...input,
+        previousResponseId: null,
+        model: fallbackModelKey,
+      },
+    );
+
+    return {
+      result: fallbackResult,
+      modelKey: fallbackResult.ok ? fallbackModelKey : input.model,
+      usedFallback: fallbackResult.ok,
+    };
+  };
+
   const runGatewayTurn = async (
     request: AssistantGatewayRequest,
     executionOptions?: {
@@ -750,7 +810,7 @@ export const createAssistantGatewayService = (
   ): Promise<AssistantGatewayResponse> => {
     const supervisor = loadSupervisorConfig(db);
     const supervisorProviderKey = supervisor?.provider_key ?? "openai";
-    const supervisorModelKey = supervisor?.model_key ?? "openai:gpt-5.4";
+    const supervisorModelKey = supervisor?.model_key ?? "openai:gpt-5.2";
 
     if (!supervisor) {
       return buildHumanErrorResponse(
@@ -887,11 +947,14 @@ export const createAssistantGatewayService = (
     const executedWriteToolNames: string[] = [];
 
     let previousResponseId = sessionSnapshot.isExpired ? null : sessionSnapshot.previousResponseId;
-    let result = await options.openaiProviderService.createResponse(
+    let supervisorRuntimeModelKey = supervisorModelKey;
+    const initialProviderResponse = await createProviderResponse(
+      supervisorProviderKey,
       {
         apiKey: supervisorApiKey,
         baseUrl: supervisorProvider.base_url,
         defaultModelKey: supervisorModelKey,
+        fallbackModelKey: supervisorProvider.fallback_model_key,
         timeoutMs: supervisorProvider.timeout_ms,
       },
       {
@@ -905,6 +968,8 @@ export const createAssistantGatewayService = (
         textFormat: orchestrationSchema,
       },
     );
+    let result = initialProviderResponse.result;
+    supervisorRuntimeModelKey = initialProviderResponse.modelKey;
 
     if (!result.ok) {
       const now = new Date().toISOString();
@@ -1020,15 +1085,17 @@ export const createAssistantGatewayService = (
         }
       }
 
-      result = await options.openaiProviderService.createResponse(
+      const nextProviderResponse = await createProviderResponse(
+        supervisorProviderKey,
         {
           apiKey: supervisorApiKey,
           baseUrl: supervisorProvider.base_url,
-          defaultModelKey: supervisorModelKey,
+          defaultModelKey: supervisorRuntimeModelKey,
+          fallbackModelKey: supervisorProvider.fallback_model_key,
           timeoutMs: supervisorProvider.timeout_ms,
         },
         {
-          model: supervisorModelKey,
+          model: supervisorRuntimeModelKey,
           previousResponseId,
           input: outputs,
           tools: options.toolRegistry.definitions,
@@ -1037,6 +1104,8 @@ export const createAssistantGatewayService = (
           textFormat: orchestrationSchema,
         },
       );
+      result = nextProviderResponse.result;
+      supervisorRuntimeModelKey = nextProviderResponse.modelKey;
 
       if (!result.ok) {
         return buildHumanErrorResponse(
@@ -1149,7 +1218,7 @@ export const createAssistantGatewayService = (
 
       if (targetProvider?.enabled === 1 && targetApiKey) {
         responseProviderKey = targetProviderKey;
-        responseModelKey = targetRuntime.model_key || supervisorModelKey;
+        responseModelKey = targetRuntime.model_key || supervisorRuntimeModelKey;
 
         const todayIso = new Date().toISOString().slice(0, 10);
         const todayHumanEs = new Date().toLocaleDateString("es-DO", {
@@ -1213,11 +1282,13 @@ export const createAssistantGatewayService = (
         const specialistMustUseTool =
           orchestration.tool_call_requested && executedToolPayloads.length === 0 && deferredWriteToolCalls.length === 0;
 
-        let specialistResult = await options.openaiProviderService.createResponse(
+        const initialSpecialistProviderResponse = await createProviderResponse(
+          targetProviderKey,
           {
             apiKey: targetApiKey,
             baseUrl: targetProvider.base_url,
             defaultModelKey: responseModelKey,
+            fallbackModelKey: targetProvider.fallback_model_key,
             timeoutMs: targetProvider.timeout_ms,
           },
           {
@@ -1229,6 +1300,8 @@ export const createAssistantGatewayService = (
             maxOutputTokens: 700,
           },
         );
+        let specialistResult = initialSpecialistProviderResponse.result;
+        responseModelKey = initialSpecialistProviderResponse.modelKey;
 
         let specialistPreviousResponseId = specialistResult.ok ? specialistResult.responseId : null;
         let specialistToolCallsUsed = 0;
@@ -1314,11 +1387,13 @@ export const createAssistantGatewayService = (
             }
           }
 
-          specialistResult = await options.openaiProviderService.createResponse(
+          const nextSpecialistProviderResponse = await createProviderResponse(
+            targetProviderKey,
             {
               apiKey: targetApiKey,
               baseUrl: targetProvider.base_url,
               defaultModelKey: responseModelKey,
+              fallbackModelKey: targetProvider.fallback_model_key,
               timeoutMs: targetProvider.timeout_ms,
             },
             {
@@ -1330,6 +1405,8 @@ export const createAssistantGatewayService = (
               maxOutputTokens: 700,
             },
           );
+          specialistResult = nextSpecialistProviderResponse.result;
+          responseModelKey = nextSpecialistProviderResponse.modelKey;
 
           if (!specialistResult.ok) {
             return buildHumanErrorResponse(

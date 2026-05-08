@@ -53,10 +53,10 @@ const defaultDomainsByDomain: Record<string, string[]> = {
 };
 
 const defaultModelByDomain: Record<string, string> = {
-  assets: "openai:gpt-5.4-mini",
-  incidents: "anthropic:sonnet-4",
-  finance: "openai:gpt-5.4-mini",
-  projects: "anthropic:sonnet-4",
+  assets: "openai:gpt-5-mini",
+  incidents: "anthropic:claude-sonnet-4-20250514",
+  finance: "openai:gpt-5-mini",
+  projects: "anthropic:claude-sonnet-4-20250514",
   communications: "openclaw:command",
 };
 
@@ -96,7 +96,7 @@ const buildDraftFromMission = (mission: string): AgentDraft => {
     agentId,
     displayName,
     emoji: "◌",
-    modelKey: defaultModelByDomain[domain] ?? "openai:gpt-5.4-mini",
+    modelKey: defaultModelByDomain[domain] ?? "openai:gpt-5-mini",
     role: defaultRole,
     mission: missionText || "Supports operational routing inside BukowskiOS.",
     domain,
@@ -114,10 +114,10 @@ const buildDraftFromAgent = (agent: AgentRosterRow): AgentDraft => ({
   displayName: agent.displayName,
   emoji: agent.emoji,
   modelKey: agent.modelLabel.toLowerCase().includes("claude")
-    ? "anthropic:sonnet-4"
+    ? "anthropic:claude-sonnet-4-20250514"
     : agent.modelLabel.toLowerCase().includes("openclaw")
       ? "openclaw:command"
-      : "openai:gpt-5.4-mini",
+      : "openai:gpt-5-mini",
   role: agent.role,
   mission: agent.mission,
   domain: agent.domain,
@@ -310,11 +310,12 @@ export const AgentWizardPanel = ({
                 <select
                   className="field-input"
                   onChange={(event) => setDraft((current) => (current ? { ...current, modelKey: event.target.value } : current))}
-                  value={draft?.modelKey ?? "openai:gpt-5.4-mini"}
+                  value={draft?.modelKey ?? "openai:gpt-5-mini"}
                 >
-                  <option value="openai:gpt-5.4">OpenAI · GPT-5.4</option>
-                  <option value="openai:gpt-5.4-mini">OpenAI · GPT-5.4 Mini</option>
-                  <option value="anthropic:sonnet-4">Anthropic · Sonnet 4</option>
+                  <option value="openai:gpt-5.2">OpenAI · GPT-5.2</option>
+                  <option value="openai:gpt-5-mini">OpenAI · GPT-5 Mini</option>
+                  <option value="anthropic:claude-sonnet-4-20250514">Anthropic · Claude Sonnet 4</option>
+                  <option value="anthropic:claude-opus-4-1-20250805">Anthropic · Claude Opus 4.1</option>
                   <option value="openclaw:command">OpenClaw · Command</option>
                 </select>
               </label>

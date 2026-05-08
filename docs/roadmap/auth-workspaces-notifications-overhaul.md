@@ -185,6 +185,8 @@ Decisiones bloqueadas:
 | 2026-05-08 | Working tree | Settings > Workspace gana edición real de identidad: se elimina el nombre duplicado junto al header, `General info` permite cambiar accent color con picker validado, subir avatar de workspace al bucket `workspace-assets`, guardar `avatar_url`, refrescar switcher/picker y copiar el workspace ID. Se agrega migración `20260508130000_workspace_avatar_url.sql`. Verificación: `typecheck` y `build` pasan. | Completar la identidad visual multi-workspace y hacer más fácil soporte/debug con el workspace ID copiable. |
 | 2026-05-08 | Working tree | Se pule la microinteracción de `General info`: se elimina el nombre duplicado junto al avatar, el avatar visible abre upload, el chip circular de accent color abre el picker, y el botón de copiar Workspace ID sólo aparece en hover/focus y cambia a check verde temporal. Verificación: `typecheck` y `build` pasan. | Reducir pasos y hacer que la edición de identidad se sienta directa, ligera y más parecida a una app nativa. |
 | 2026-05-08 | Working tree | Se corrige el picker de accent color para no disparar múltiples escrituras/toasts mientras se arrastra: ahora previsualiza localmente y persiste al cerrar el picker. El update directo de color ya no envía `avatar_url`, así funciona aunque la migración nueva aún no esté aplicada. El upload de avatar acepta PNG/JPEG/WebP/SVG, tipos MIME vacíos con extensión válida y sube el límite a 8 MB. Verificación: `typecheck` y `build` pasan. | Evitar ruido de errores, reducir dependencia entre campos y hacer robusto el flujo con archivos exportados por Finder/diseño. |
+| 2026-05-08 | Working tree | Se convierte Anthropic en provider live en AI Models: Claude usa API key local cifrada por workspace, se puede guardar/probar desde Models, asignar a agentes y el gateway enruta Supervisor/Specialists por provider. Se agrega adaptador Anthropic Messages API compatible con tool use básico y modelos Claude Sonnet 4/Opus 4.1. Verificación: `typecheck`, `build` y suite Vitest completa pasan. | Permitir que usuarios como Carlos configuren y usen Anthropic sin depender de OpenAI ni de secretos compartidos. |
+| 2026-05-08 | Working tree | AI Models suma registry dinámico: `Refresh models` consulta `/v1/models` en OpenAI/Anthropic con la key local, cachea opciones por provider/workspace en SQLite, expone Default model + Fallback model y el gateway intenta fallback manteniendo las mismas instrucciones, tools, memoria y documentos. Se corrige Anthropic default a `claude-sonnet-4-20250514` según docs oficiales. Verificación: `typecheck`, `build` y suite Vitest completa pasan. | Evitar dropdowns hardcodeados y permitir cambios de modelo sin perder contexto operativo ni herramientas. |
 
 ## Decisiones tomadas
 
@@ -198,6 +200,8 @@ Decisiones bloqueadas:
 - El actor `user-ops` se conserva como ID técnico compatible, pero su identidad visible local pasa a ser `AI Agent`.
 - El `AI Agent` remoto se modela como `workspace_system_actors`, no como `auth.users`; así auditamos acciones automatizadas sin crear emails, passwords o memberships humanas falsas.
 - Google/GitHub OAuth se activa con credenciales en Supabase Dashboard y provider dashboards; esos secretos no viven en repo ni en Electron.
+- Anthropic queda como provider live igual que OpenAI, pero sus API keys siguen siendo locales por Mac/workspace (`safeStorage`); no se sincronizan por Supabase para evitar exponer secretos entre usuarios.
+- Los modelos disponibles de OpenAI/Anthropic se descubren desde sus APIs y se cachean localmente. El fallback sólo cambia el modelo de ejecución; no cambia tools, memoria, documentos ni contexto custom del usuario.
 
 ## Alternativas descartadas
 
@@ -254,6 +258,7 @@ Decisiones bloqueadas:
 - AI Agent: el actor local `user-ops` ya se presenta como `AI Agent` y ahora existe migración remota `workspace_system_actors` para sembrarlo por workspace. Falta correr la migración en Supabase prod/dev y redeployar `admin-workspace-bootstrap` antes de crear workspaces nuevos.
 - OAuth Google/GitHub: el código del renderer ya tiene botones y deep link base. La configuración quedó documentada en `docs/foundation/oauth-provider-setup.md`; falta activar providers con credenciales reales y validar callback `bukowskios://auth/callback` en build instalada.
 - Notifications MVP: falta aplicar `20260507175328_notifications_realtime_hardening.sql` en Supabase antes de validar Realtime real. Scheduler reminders y tools profundas de agentes quedan diferidos hasta confirmar tray/native base.
+- Anthropic/OpenAI model registry: falta smoke manual con API keys reales para validar `Refresh models`, selección de default/fallback, asignación de agente y conversación con tool calls. El adaptador Anthropic emula continuidad de conversación en memoria para tool results; si más adelante necesitamos reanudar turnos Anthropic después de reiniciar la app, habrá que persistir el snapshot de mensajes por thread.
 - Icono desktop: `apps/desktop/build/icon.icns` fue regenerado desde la nueva base `bukowskiOS-desktop-logo.png` y el DMG/ZIP arm64 ya incluyen ese `icon.icns`; falta validar visualmente en Finder/Dock en una instalación limpia.
 - Deuda de UX Settings: Sync Activity ya es más consistente, pero Settings sigue teniendo demasiada información técnica visible. Requiere un slice de simplificación: overview simple, secciones avanzadas colapsadas y mensajes orientados a acciones.
 - MFA TOTP está como pantalla placeholder; falta wiring real Supabase MFA.
@@ -280,5 +285,6 @@ Orden sugerido:
 5. Probar instalación en otra Mac (idealmente Carlos) y confirmar login/workspace/sync.
 6. Abrir Sync Activity en la build nueva, dejar que el pull corra o forzar refresh, y confirmar que `projects`/`packing_slips` dejan de mostrar errores de cursor/FK.
 7. Smoke manual con dos usuarios/workspace: login, switch workspace, crear proyecto, crear packing slip, incidente, RMA y retorno.
-8. Rediseñar Agents para workspace activo, eliminando `DEFAULT_WORKSPACE_ID` del runtime de agentes.
-9. Retomar Notifications/Todos/Reminders cuando el piloto no dependa de estados manuales de sync.
+8. Smoke de AI Models: guardar key -> `Refresh models` -> elegir default/fallback -> Test connection -> asignar agente -> pedir una acción simple y otra con tool call.
+9. Rediseñar Agents para workspace activo, eliminando `DEFAULT_WORKSPACE_ID` del runtime de agentes.
+10. Retomar Notifications/Todos/Reminders cuando el piloto no dependa de estados manuales de sync.

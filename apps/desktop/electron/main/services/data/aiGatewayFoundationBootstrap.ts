@@ -12,7 +12,7 @@ const providerDefaults = [
     displayName: "OpenAI",
     supportsLiveRequests: 1,
     enabled: 0,
-    defaultModelKey: "openai:gpt-5.4-mini",
+    defaultModelKey: "openai:gpt-5.2",
     baseUrl: "https://api.openai.com",
     timeoutMs: 20000,
     retryCount: 1,
@@ -22,14 +22,14 @@ const providerDefaults = [
   {
     providerKey: "anthropic",
     displayName: "Anthropic",
-    supportsLiveRequests: 0,
+    supportsLiveRequests: 1,
     enabled: 0,
-    defaultModelKey: "anthropic:claude-sonnet-4.5",
-    baseUrl: "",
+    defaultModelKey: "anthropic:claude-sonnet-4-20250514",
+    baseUrl: "https://api.anthropic.com",
     timeoutMs: 20000,
     retryCount: 1,
     status: "not_configured",
-    notes: "Future provider shell. Not wired yet.",
+    notes: "Live Claude provider for users who prefer Anthropic.",
   },
   {
     providerKey: "openclaw",
@@ -136,6 +136,7 @@ const buildSystemAgentRecord = (agent: AgentConfigRecord) => ({
 });
 
 export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
+  ensureColumn(db, "ai_provider_configs", "fallback_model_key", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "agents", "provider_key", "TEXT");
   ensureColumn(db, "agents", "role_label", "TEXT");
   ensureColumn(db, "agents", "agent_type", "TEXT DEFAULT 'specialist'");
@@ -164,6 +165,24 @@ export const applyAIGatewayFoundationMigration = (db: DatabaseSync) => {
   ensureColumn(db, "assistant_chat_thread_state", "session_approval_agent_id", "TEXT");
   ensureColumn(db, "assistant_chat_thread_state", "session_approval_granted_at", "TEXT");
   ensureColumn(db, "assistant_chat_thread_state", "preferred_approval_mode", "TEXT DEFAULT 'unsupervised'");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_provider_model_cache (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+      provider_key TEXT NOT NULL,
+      model_key TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'api',
+      raw_json TEXT,
+      fetched_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (workspace_id, provider_key, model_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ai_provider_model_cache_provider
+      ON ai_provider_model_cache(workspace_id, provider_key, display_name);
+  `);
 
   // One-time bump: when we shipped Sprint A we relaxed Assets and Incidents
   // agents from `needs_approval` → `auto` so writes don't gate by default.
@@ -317,6 +336,25 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
       updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
+  const refreshProviderMetadata = db.prepare(`
+    UPDATE ai_provider_configs
+    SET display_name = ?,
+        supports_live_requests = ?,
+        default_model_key = CASE
+          WHEN provider_key = 'anthropic'
+            AND default_model_key IN ('anthropic:sonnet-4', 'anthropic:claude-sonnet-4.5')
+          THEN ?
+          ELSE default_model_key
+        END,
+        base_url = CASE
+          WHEN trim(COALESCE(base_url, '')) = '' THEN ?
+          ELSE base_url
+        END,
+        notes = ?,
+        updated_at = ?
+    WHERE workspace_id = ?
+      AND provider_key = ?
+  `);
 
   workspaceRows.forEach((workspace) => {
     providerDefaults.forEach((provider) => {
@@ -335,6 +373,16 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
         provider.notes,
         now,
         now,
+      );
+      refreshProviderMetadata.run(
+        provider.displayName,
+        provider.supportsLiveRequests,
+        provider.defaultModelKey,
+        provider.baseUrl,
+        provider.notes,
+        now,
+        workspace.id,
+        provider.providerKey,
       );
     });
   });
