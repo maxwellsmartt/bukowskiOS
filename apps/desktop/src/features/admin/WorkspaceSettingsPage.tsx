@@ -322,9 +322,13 @@ export const WorkspaceSettingsPage = () => {
     }
 
     try {
-      const { data, error: queryError } = await supabase
+      // Load memberships and profiles separately; embedded profile joins can be hidden
+      // by RLS and made pending invites look empty even when the invite exists.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const looseSupabase = supabase as any;
+      const { data, error: queryError } = await looseSupabase
         .from("workspace_memberships")
-        .select("id,invited_at,role_id,roles(name),user_profiles(email)")
+        .select("id,user_id,invited_at,role_id,roles(name)")
         .eq("workspace_id", activeWorkspaceId)
         .eq("status", "invited");
 
@@ -332,18 +336,41 @@ export const WorkspaceSettingsPage = () => {
         throw queryError;
       }
 
-      const rows = ((data ?? []) as unknown[]).map((row) => {
+      const inviteRows = (data ?? []) as Array<{
+        id: string;
+        user_id: string | null;
+        invited_at: string | null;
+        role_id: string | null;
+        roles?: { name?: string | null } | null;
+      }>;
+      const inviteUserIds = inviteRows.map((row) => row.user_id).filter((value): value is string => Boolean(value));
+      const profilesByUserId = new Map<string, string>();
+
+      if (inviteUserIds.length > 0) {
+        const { data: profilesData } = await looseSupabase
+          .from("user_profiles")
+          .select("user_id,email")
+          .in("user_id", inviteUserIds);
+
+        for (const profile of (profilesData ?? []) as Array<{ user_id?: string | null; email?: string | null }>) {
+          if (profile.user_id && profile.email) {
+            profilesByUserId.set(profile.user_id, profile.email);
+          }
+        }
+      }
+
+      const rows = inviteRows.map((row) => {
         const typed = row as {
           id: string;
+          user_id: string | null;
           invited_at: string | null;
           role_id: string | null;
           roles?: { name?: string | null } | null;
-          user_profiles?: { email?: string | null } | null;
         };
 
         return {
           id: typed.id,
-          email: typed.user_profiles?.email ?? "Pending",
+          email: typed.user_id ? profilesByUserId.get(typed.user_id) ?? "Pending" : "Pending",
           roleId: typed.role_id,
           roleName: typed.roles?.name ?? "Member",
           invitedAt: typed.invited_at,

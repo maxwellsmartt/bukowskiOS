@@ -76,7 +76,7 @@ import { UserChannelDots } from "./UserChannelDots";
 import { UserAccountSettings } from "./UserAccountSettings";
 
 const roleCoverageGroups = [
-  { label: "Assets", keys: ["assets.read", "assets.manage"] },
+  { label: "Assets", keys: ["assets.read", "assets.manage", "licenses.manage"] },
   { label: "Incidents", keys: ["incidents.read", "incidents.create"] },
   { label: "RMA", keys: ["rma.read", "rma.create"] },
   { label: "Packing", keys: ["packing-slips.read", "packing-slips.create"] },
@@ -148,6 +148,7 @@ const permissionLabelOverrides: Record<string, string> = {
   "projects.manage": "Manage projects",
   "assets.read": "View assets",
   "assets.manage": "Manage assets",
+  "licenses.manage": "Manage licenses",
   "incidents.read": "View incidents",
   "incidents.create": "Report incidents",
   "packing-slips.read": "View packing slips",
@@ -161,6 +162,7 @@ const permissionLabelOverrides: Record<string, string> = {
 const permissionGroupForKey = (key: string) => {
   if (key.startsWith("projects.")) return "Projects";
   if (key.startsWith("assets.")) return "Assets";
+  if (key.startsWith("licenses.")) return "Assets";
   if (key.startsWith("incidents.")) return "Incidents";
   if (key.startsWith("packing-slips.")) return "Packing";
   if (key.startsWith("finance.")) return "Finance";

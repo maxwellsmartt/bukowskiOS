@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Bot, ChevronDown, CircleAlert, PauseCircle, PlayCircle, ShieldCheck, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
@@ -8,6 +8,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { getAgentApprovalModeLabel, getAgentRunStatusLabel, titleCaseEnum } from "@shared/labels/statusLabels";
 import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
+import { getConnectorBrand } from "@shared/lib/connectorBranding";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { AgentWizardPanel } from "./AgentWizardPanel";
@@ -53,6 +54,51 @@ const getAgentIndicatorLabel = (
 
   return operationalStateLabelMap[operationalState];
 };
+
+type MissionSectionKey = "queue" | "activity" | "models" | "connectors";
+const providerDisplayOrder = ["openai", "anthropic", "openclaw", "custom"] as const;
+const connectorDisplayOrder = ["telegram", "whatsapp", "email", "webhook"] as const;
+
+const sortByDisplayOrder = <T extends { label: string }>(items: T[], key: (item: T) => string, displayOrder: readonly string[]) =>
+  [...items].sort((left, right) => {
+    const leftOrder = displayOrder.indexOf(key(left));
+    const rightOrder = displayOrder.indexOf(key(right));
+
+    if (leftOrder !== -1 || rightOrder !== -1) {
+      if (leftOrder === -1) return 1;
+      if (rightOrder === -1) return -1;
+      if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+    }
+
+    return left.label.localeCompare(right.label);
+  });
+
+const CollapsibleMissionCard = ({
+  children,
+  className = "",
+  collapsed,
+  onToggle,
+  title,
+}: {
+  children: ReactNode;
+  className?: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  title: string;
+}) => (
+  <SurfaceCard className={`${className}${collapsed ? " is-collapsed" : ""}`.trim()}>
+    <button
+      aria-expanded={!collapsed}
+      className="mission-card-header-button"
+      onClick={onToggle}
+      type="button"
+    >
+      <span className="surface-card-title">{title}</span>
+      <ChevronDown className={`mission-section-toggle${collapsed ? " is-collapsed" : ""}`} size={14} />
+    </button>
+    {!collapsed ? children : null}
+  </SurfaceCard>
+);
 
 export const AgentsMissionControlPage = () => {
   const { activeWorkspaceId: workspaceId } = useWorkspace();
@@ -116,8 +162,16 @@ export const AgentsMissionControlPage = () => {
     return data.queue.filter((run) => run.status === queueFilter);
   }, [data.queue, queueFilter]);
   const pendingApprovals = useMemo(() => data.queue.filter((run) => run.status === "needs_approval"), [data.queue]);
+  const orderedModelSummary = useMemo(
+    () => sortByDisplayOrder(data.modelSummary, (model) => model.providerKey, providerDisplayOrder),
+    [data.modelSummary],
+  );
+  const orderedConnectorSummary = useMemo(
+    () => sortByDisplayOrder(data.connectorSummary, (connector) => connector.connectorKey, connectorDisplayOrder),
+    [data.connectorSummary],
+  );
 
-  const toggleSection = (section: keyof typeof collapsedSections) => {
+  const toggleSection = (section: MissionSectionKey) => {
     setCollapsedSections((current) => ({
       ...current,
       [section]: !current[section],
@@ -340,7 +394,7 @@ export const AgentsMissionControlPage = () => {
             }
           >
             <div className="agent-detail-stack">
-              <div className="agent-detail-row">
+              <div className="agent-detail-row agent-activity-filter-row">
                 <span className={`mission-operational-pill mission-operational-pill-${selectedAgent.operationalState}`}>
                   {operationalStateLabelMap[selectedAgent.operationalState]}
                 </span>
@@ -474,23 +528,13 @@ export const AgentsMissionControlPage = () => {
       ) : null}
 
       <div className="agents-support-grid">
-        <SurfaceCard
-          className={collapsedSections.queue ? "is-collapsed" : ""}
+        <CollapsibleMissionCard
+          className="mission-activity-card"
+          collapsed={collapsedSections.queue}
+          onToggle={() => toggleSection("queue")}
           title="Recent Activity"
-          aside={
-            <button
-              aria-label={collapsedSections.queue ? "Expand queue" : "Collapse queue"}
-              className={`mission-section-toggle${collapsedSections.queue ? " is-collapsed" : ""}`}
-              data-tooltip={collapsedSections.queue ? "Expand queue" : "Collapse queue"}
-              onClick={() => toggleSection("queue")}
-              type="button"
-            >
-              <ChevronDown size={14} />
-            </button>
-          }
         >
-          {!collapsedSections.queue ? (
-            <>
+            <div className="mission-collapsible-content">
               <div className="agent-detail-row">
                 <button className={`chip-button${queueFilter === "all" ? " is-active" : ""}`} onClick={() => setQueueFilter("all")} type="button">
                   All
@@ -513,7 +557,7 @@ export const AgentsMissionControlPage = () => {
                   Done
                 </button>
               </div>
-              <div className="agent-support-list">
+              <div className="agent-support-list agent-support-list-scroll">
                 {filteredQueue.map((run) => (
                   <button
                     key={run.id}
@@ -532,27 +576,16 @@ export const AgentsMissionControlPage = () => {
                   </button>
                 ))}
               </div>
-            </>
-          ) : null}
-        </SurfaceCard>
+            </div>
+        </CollapsibleMissionCard>
 
-        <SurfaceCard
-          className={collapsedSections.activity ? "is-collapsed" : ""}
+        <CollapsibleMissionCard
+          className="mission-activity-card"
+          collapsed={collapsedSections.activity}
+          onToggle={() => toggleSection("activity")}
           title="Updates"
-          aside={
-            <button
-              aria-label={collapsedSections.activity ? "Expand activity" : "Collapse activity"}
-              className={`mission-section-toggle${collapsedSections.activity ? " is-collapsed" : ""}`}
-              data-tooltip={collapsedSections.activity ? "Expand activity" : "Collapse activity"}
-              onClick={() => toggleSection("activity")}
-              type="button"
-            >
-              <ChevronDown size={14} />
-            </button>
-          }
         >
-          {!collapsedSections.activity ? (
-            <div className="agent-support-list agent-support-list-scroll">
+            <div className="agent-support-list agent-support-list-scroll mission-collapsible-content">
               {data.activity.map((activity) => (
                 <button
                   key={activity.id}
@@ -573,70 +606,69 @@ export const AgentsMissionControlPage = () => {
                 </button>
               ))}
             </div>
-          ) : null}
-        </SurfaceCard>
+        </CollapsibleMissionCard>
       </div>
 
       <div className="agents-support-grid">
-        <SurfaceCard
-          className={collapsedSections.models ? "is-collapsed" : ""}
+        <CollapsibleMissionCard
+          collapsed={collapsedSections.models}
+          onToggle={() => toggleSection("models")}
           title="AI Models"
-          aside={
-            <button
-              aria-label={collapsedSections.models ? "Expand models" : "Collapse models"}
-              className={`mission-section-toggle${collapsedSections.models ? " is-collapsed" : ""}`}
-              data-tooltip={collapsedSections.models ? "Expand models" : "Collapse models"}
-              onClick={() => toggleSection("models")}
-              type="button"
-            >
-              <ChevronDown size={14} />
-            </button>
-          }
         >
-          {!collapsedSections.models ? (
-            <div className="agent-compact-grid">
-              {data.modelSummary.map((model) => (
+            <div className="agent-compact-grid mission-collapsible-content">
+              {orderedModelSummary.map((model) => (
                 <div key={model.id} className="agent-compact-row">
                   <div>
-                    <strong>{model.label}</strong>
+                    <strong className="provider-heading">
+                      {(() => {
+                        const providerBrand = getAgentProviderBrand(model.providerKey);
+                        return providerBrand.logoSrc ? (
+                          <img
+                            alt={providerBrand.logoAlt ?? model.label}
+                            className={`provider-heading-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
+                            src={providerBrand.logoSrc}
+                          />
+                        ) : null;
+                      })()}
+                      <span>{model.label}</span>
+                    </strong>
                     <p>{model.assignedAgents.join(" · ") || "No agents assigned yet"}</p>
                   </div>
                   <span className={`run-status-pill run-status-pill-${model.status}`}>{titleCaseEnum(model.status)}</span>
                 </div>
               ))}
             </div>
-          ) : null}
-        </SurfaceCard>
+        </CollapsibleMissionCard>
 
-        <SurfaceCard
-          className={collapsedSections.connectors ? "is-collapsed" : ""}
+        <CollapsibleMissionCard
+          collapsed={collapsedSections.connectors}
+          onToggle={() => toggleSection("connectors")}
           title="Channels"
-          aside={
-            <button
-              aria-label={collapsedSections.connectors ? "Expand connectors" : "Collapse connectors"}
-              className={`mission-section-toggle${collapsedSections.connectors ? " is-collapsed" : ""}`}
-              data-tooltip={collapsedSections.connectors ? "Expand connectors" : "Collapse connectors"}
-              onClick={() => toggleSection("connectors")}
-              type="button"
-            >
-              <ChevronDown size={14} />
-            </button>
-          }
         >
-          {!collapsedSections.connectors ? (
-            <div className="agent-compact-grid">
-              {data.connectorSummary.map((connector) => (
+            <div className="agent-compact-grid mission-collapsible-content">
+              {orderedConnectorSummary.map((connector) => (
                 <div key={connector.id} className="agent-compact-row">
                   <div>
-                    <strong>{connector.label}</strong>
+                    <strong className="provider-heading">
+                      {(() => {
+                        const connectorBrand = getConnectorBrand(connector.connectorKey);
+                        return connectorBrand.logoSrc ? (
+                          <img
+                            alt={connectorBrand.logoAlt ?? connector.label}
+                            className={`provider-heading-logo${connectorBrand.logoClassName ? ` ${connectorBrand.logoClassName}` : ""}`}
+                            src={connectorBrand.logoSrc}
+                          />
+                        ) : null;
+                      })()}
+                      <span>{connector.label}</span>
+                    </strong>
                     <p>{connector.capability}</p>
                   </div>
                   <span className={`run-status-pill run-status-pill-${connector.status}`}>{titleCaseEnum(connector.status)}</span>
                 </div>
               ))}
             </div>
-          ) : null}
-        </SurfaceCard>
+        </CollapsibleMissionCard>
       </div>
 
       <AgentWizardPanel initialAgent={selectedAgent} mode="edit" onClose={() => setEditorOpen(false)} open={editorOpen} />

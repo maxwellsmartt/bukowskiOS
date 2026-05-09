@@ -61,6 +61,7 @@ export const AppShell = () => {
     return undefined;
   }, [activeWorkspaceId]);
   const activeRoute = resolveActiveRoute(location.pathname);
+  const isLicensesRoute = location.pathname === "/assets/licenses";
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     clampSidebarWidth(readNumberPreference(uiPreferenceKeys.shellSidebarWidth, sidebarWidthDefault)),
   );
@@ -303,7 +304,7 @@ export const AppShell = () => {
           <Breadcrumb />
           {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
           <RouteTransitionMain
-            className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}${activeRoute.domain === "assets" ? " shell-content-assets" : ""}`}
+            className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}${activeRoute.domain === "assets" ? " shell-content-assets" : ""}${isLicensesRoute ? " shell-content-licenses" : ""}`}
             transitionKey={location.pathname}
           >
             {!isScopeReady ? (

@@ -34,6 +34,7 @@ const slugify = (value: string) =>
 const groupForKey = (key: string) => {
   if (key.startsWith("projects.")) return "Projects";
   if (key.startsWith("assets.")) return "Assets";
+  if (key.startsWith("licenses.")) return "Assets";
   if (key.startsWith("incidents.")) return "Incidents";
   if (key.startsWith("packing-slips.")) return "Packing";
   if (key.startsWith("finance.")) return "Finance";

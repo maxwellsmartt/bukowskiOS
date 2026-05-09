@@ -21,6 +21,7 @@ type TodoInsertInput = {
   title: string;
   notes?: string | null;
   dueAt?: string | null;
+  recurrenceRule?: string | null;
   priority?: number;
   createdBy?: "user" | "agent";
   agentActionRef?: Json | null;
@@ -31,6 +32,7 @@ type TodoUpdateInput = {
   title: string;
   notes?: string | null;
   dueAt?: string | null;
+  recurrenceRule?: string | null;
   priority?: number;
 };
 
@@ -113,6 +115,7 @@ const toTodoRow = (row: {
   title: string;
   notes: string | null;
   due_at: string | null;
+  recurrence_rule?: string | null;
   priority: number;
   completed_at: string | null;
   created_by: "user" | "agent";
@@ -126,6 +129,7 @@ const toTodoRow = (row: {
   title: row.title,
   notes: row.notes,
   dueAt: row.due_at,
+  recurrenceRule: row.recurrence_rule ?? null,
   priority: row.priority,
   completedAt: row.completed_at,
   createdBy: row.created_by,
@@ -166,6 +170,9 @@ const sortNotifications = (rows: NotificationRow[]) =>
 const isRecentSelfEcho = (row: NotificationRow, seenIds: Set<string>) => seenIds.has(row.id);
 const reminderPollMs = 30_000;
 const notificationRefreshMs = 20_000;
+const todoColumnsBase = "id,user_id,workspace_id,title,notes,due_at,priority,completed_at,created_by,agent_action_ref,created_at,updated_at";
+const todoColumnsWithRecurrence =
+  "id,user_id,workspace_id,title,notes,due_at,recurrence_rule,priority,completed_at,created_by,agent_action_ref,created_at,updated_at";
 const parseBasicRecurrenceNext = (rule: string | null, current: string) => {
   if (!rule) {
     return null;
@@ -179,6 +186,11 @@ const parseBasicRecurrenceNext = (rule: string | null, current: string) => {
   const normalized = rule.toUpperCase();
   if (normalized.includes("FREQ=DAILY")) {
     next.setUTCDate(next.getUTCDate() + 1);
+    if (normalized.includes("BYDAY=MO,TU,WE,TH,FR")) {
+      while (next.getUTCDay() === 0 || next.getUTCDay() === 6) {
+        next.setUTCDate(next.getUTCDate() + 1);
+      }
+    }
   } else if (normalized.includes("FREQ=WEEKLY")) {
     next.setUTCDate(next.getUTCDate() + 7);
   } else if (normalized.includes("FREQ=MONTHLY")) {
@@ -259,10 +271,10 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     }
 
     const looseSupabase = asLooseSupabase(supabase);
-    const [todosResult, remindersResult] = await Promise.all([
+    const [todosResultWithRecurrence, remindersResult] = await Promise.all([
       looseSupabase
         .from("todos")
-        .select("id,user_id,workspace_id,title,notes,due_at,priority,completed_at,created_by,agent_action_ref,created_at,updated_at")
+        .select(todoColumnsWithRecurrence)
         .eq("user_id", activeUserId)
         .eq("workspace_id", activeWorkspaceId)
         .order("created_at", { ascending: false })
@@ -275,6 +287,15 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
         .order("remind_at", { ascending: true })
         .limit(80),
     ]);
+    const todosResult = todosResultWithRecurrence.error
+      ? await looseSupabase
+          .from("todos")
+          .select(todoColumnsBase)
+          .eq("user_id", activeUserId)
+          .eq("workspace_id", activeWorkspaceId)
+          .order("created_at", { ascending: false })
+          .limit(80)
+      : todosResultWithRecurrence;
 
     setTodos(((todosResult.data ?? []) as Parameters<typeof toTodoRow>[0][]).map(toTodoRow));
     setReminders(((remindersResult.data ?? []) as Parameters<typeof toReminderRow>[0][]).map(toReminderRow));
@@ -450,22 +471,34 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       }
 
       const looseSupabase = asLooseSupabase(supabase);
+      const insertPayload = {
+        user_id: activeUserId,
+        workspace_id: activeWorkspaceId,
+        title: input.title,
+        notes: input.notes ?? null,
+        due_at: input.dueAt ?? null,
+        recurrence_rule: input.recurrenceRule ?? null,
+        priority: Math.max(0, Math.min(3, Math.floor(input.priority ?? 0))),
+        created_by: input.createdBy ?? "user",
+        agent_action_ref: input.agentActionRef ?? null,
+      };
       const { data, error } = await looseSupabase
         .from("todos")
-        .insert({
-          user_id: activeUserId,
-          workspace_id: activeWorkspaceId,
-          title: input.title,
-          notes: input.notes ?? null,
-          due_at: input.dueAt ?? null,
-          priority: Math.max(0, Math.min(3, Math.floor(input.priority ?? 0))),
-          created_by: input.createdBy ?? "user",
-          agent_action_ref: input.agentActionRef ?? null,
-        })
-        .select("id,user_id,workspace_id,title,notes,due_at,priority,completed_at,created_by,agent_action_ref,created_at,updated_at")
+        .insert(insertPayload)
+        .select(todoColumnsWithRecurrence)
         .single();
 
       if (error || !data) {
+        if (error && input.recurrenceRule) {
+          const fallbackPayload: Record<string, unknown> = { ...insertPayload };
+          delete fallbackPayload.recurrence_rule;
+          const fallback = await looseSupabase.from("todos").insert(fallbackPayload).select(todoColumnsBase).single();
+          if (!fallback.error && fallback.data) {
+            const row = toTodoRow(fallback.data as Parameters<typeof toTodoRow>[0]);
+            setTodos((current) => [row, ...current.filter((item) => item.id !== row.id)].slice(0, 80));
+            return row;
+          }
+        }
         throw error ?? new Error("Todo was not created.");
       }
 
@@ -530,22 +563,30 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
                 title: input.title,
                 notes: input.notes ?? null,
                 dueAt: input.dueAt ?? null,
+                recurrenceRule: input.recurrenceRule ?? null,
                 priority,
                 updatedAt,
               }
             : item,
         ),
       );
-      await asLooseSupabase(supabase)
+      const updatePayload = {
+        title: input.title,
+        notes: input.notes ?? null,
+        due_at: input.dueAt ?? null,
+        recurrence_rule: input.recurrenceRule ?? null,
+        priority,
+        updated_at: updatedAt,
+      };
+      const updateResult = await asLooseSupabase(supabase)
         .from("todos")
-        .update({
-          title: input.title,
-          notes: input.notes ?? null,
-          due_at: input.dueAt ?? null,
-          priority,
-          updated_at: updatedAt,
-        })
+        .update(updatePayload)
         .eq("id", input.id);
+      if (updateResult.error && input.recurrenceRule) {
+        const fallbackPayload: Record<string, unknown> = { ...updatePayload };
+        delete fallbackPayload.recurrence_rule;
+        await asLooseSupabase(supabase).from("todos").update(fallbackPayload).eq("id", input.id);
+      }
     },
     [supabase],
   );
@@ -611,11 +652,18 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   const markTodoDone = useCallback(
     async (todoId: string) => {
       if (!supabase) return;
+      const todo = todos.find((item) => item.id === todoId);
+      const nextDueAt = todo?.dueAt ? parseBasicRecurrenceNext(todo.recurrenceRule, todo.dueAt) : null;
+      if (nextDueAt) {
+        setTodos((current) => current.map((item) => (item.id === todoId ? { ...item, dueAt: nextDueAt, completedAt: null } : item)));
+        await asLooseSupabase(supabase).from("todos").update({ due_at: nextDueAt, completed_at: null }).eq("id", todoId);
+        return;
+      }
       const completedAt = new Date().toISOString();
       setTodos((current) => current.map((item) => (item.id === todoId ? { ...item, completedAt } : item)));
       await asLooseSupabase(supabase).from("todos").update({ completed_at: completedAt }).eq("id", todoId);
     },
-    [supabase],
+    [supabase, todos],
   );
 
   const markReminderDone = useCallback(
@@ -663,6 +711,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
             title: intent.title,
             notes: intent.notes ?? null,
             dueAt: intent.dueAt ?? null,
+            recurrenceRule: intent.recurrenceRule ?? null,
             priority: intent.priority ?? 0,
             createdBy: "agent",
             agentActionRef: {

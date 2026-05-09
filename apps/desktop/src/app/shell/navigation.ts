@@ -11,6 +11,7 @@ import {
   FolderOpenDot,
   Info,
   Inbox,
+  KeyRound,
   PackageSearch,
   ScrollText,
   Settings,
@@ -43,6 +44,7 @@ export const projectsSubnav: NavItem[] = [
 
 export const assetsSubnav: NavItem[] = [
   { label: "Assets", path: "/assets", icon: PackageSearch },
+  { label: "Licenses", path: "/assets/licenses", icon: KeyRound },
   { label: "Packing Slips", path: "/packing-slips", icon: ScrollText },
   { label: "Incidents", path: "/incidents", icon: ClipboardList },
 ];

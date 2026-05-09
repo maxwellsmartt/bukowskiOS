@@ -30,7 +30,7 @@ describe("foundation navigation shell", () => {
   });
 
   it("preserves the full asset operations sub-navigation", () => {
-    expect(assetsSubnav.map((item) => item.label)).toEqual(["Assets", "Packing Slips", "Incidents"]);
+    expect(assetsSubnav.map((item) => item.label)).toEqual(["Assets", "Licenses", "Packing Slips", "Incidents"]);
   });
 
   it("adds the global project schedule to projects navigation", () => {
@@ -56,6 +56,7 @@ describe("foundation navigation shell", () => {
 
   it("registers global operations routes", () => {
     expect(appRoutes.some((route) => route.path === "/assets")).toBe(true);
+    expect(appRoutes.some((route) => route.path === "/assets/licenses")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/projects/schedule")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/rma")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/compare")).toBe(true);

@@ -209,6 +209,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
         title: { type: "string" },
         notes: { type: "string" },
         due_at: { type: "string", description: "ISO timestamp or date string when the todo is due." },
+        recurrence_rule: { type: "string", description: "Optional basic RRULE, e.g. FREQ=DAILY, FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR, FREQ=WEEKLY." },
         priority: { type: "number", description: "0 low/default, 1 normal, 2 high, 3 urgent." },
       },
     },
@@ -227,6 +228,7 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
             title,
             notes: asOptionalString(args.notes) ?? null,
             dueAt: asOptionalString(args.due_at) ?? null,
+            recurrenceRule: asOptionalString(args.recurrence_rule) ?? null,
             priority: asPriority(args.priority),
             sourceRef: {
               tool: "create_todo",

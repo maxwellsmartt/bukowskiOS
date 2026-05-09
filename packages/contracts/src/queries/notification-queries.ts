@@ -23,6 +23,7 @@ export type TodoRow = {
   title: string;
   notes: string | null;
   dueAt: string | null;
+  recurrenceRule: string | null;
   priority: number;
   completedAt: string | null;
   createdBy: "user" | "agent";
@@ -60,6 +61,7 @@ export type AgentNotificationIntent =
       title: string;
       notes?: string | null;
       dueAt?: string | null;
+      recurrenceRule?: string | null;
       priority?: number;
       sourceRef?: Json | null;
     }

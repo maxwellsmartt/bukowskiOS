@@ -1,4 +1,4 @@
-import { RefreshCcw, Search } from "lucide-react";
+import { CloudCog, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -109,7 +109,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
           onClick={() => navigate("/settings/sync")}
           type="button"
         >
-          <RefreshCcw size={14} />
+          <CloudCog size={14} />
           {syncState.badge ? <span className="sync-control-badge">{syncState.badge}</span> : null}
         </button>
       </div>

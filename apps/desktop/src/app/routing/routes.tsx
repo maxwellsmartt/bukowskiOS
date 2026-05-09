@@ -29,6 +29,7 @@ const AgentsMissionControlPage = lazyPage(
 );
 const AgentsPage = lazyPage(() => import("@features/agents/AgentsPage"), "AgentsPage");
 const AssetDetailPage = lazyPage(() => import("@features/assets/AssetDetailPage"), "AssetDetailPage");
+const AssetLicensesPage = lazyPage(() => import("@features/assets/AssetLicensesPage"), "AssetLicensesPage");
 const AssetsPage = lazyPage(() => import("@features/assets/AssetsPage"), "AssetsPage");
 const CompareView = lazyPage(() => import("@features/compare/CompareView"), "CompareView");
 const FinanceCostLinksPage = lazyPage(() => import("@features/finance/FinanceCostLinksPage"), "FinanceCostLinksPage");
@@ -58,6 +59,7 @@ const WorkspaceCreateScreen = lazyPage(() => import("@features/auth/WorkspaceCre
 
 const routeElements = {
   "/assets": <AssetsPage />,
+  "/assets/licenses": <AssetLicensesPage />,
   "/assets/:assetId": <AssetDetailPage />,
   "/packing-slips": <PackingPage />,
   "/incidents": <IncidentsPage />,

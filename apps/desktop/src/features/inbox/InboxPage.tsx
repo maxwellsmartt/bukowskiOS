@@ -19,6 +19,21 @@ const shortDateFormatter = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
+const recurrenceOptions = [
+  { label: "One time", value: "" },
+  { label: "Every day", value: "FREQ=DAILY" },
+  { label: "Weekdays", value: "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR" },
+  { label: "Every week", value: "FREQ=WEEKLY" },
+  { label: "Every month", value: "FREQ=MONTHLY" },
+] as const;
+
+const getRecurrenceLabel = (rule: string | null | undefined) => {
+  if (!rule) return "One time";
+  return recurrenceOptions.find((option) => option.value === rule)?.label ?? "Repeats";
+};
+
+const isLicenseReminder = (title: string) => title.startsWith("License renewal:");
+
 const getDueTone = (value: string | null) => {
   if (!value) return "neutral";
   const diff = new Date(value).getTime() - Date.now();
@@ -63,16 +78,20 @@ export const InboxPage = () => {
   const [activeTab, setActiveTab] = useState<"notifications" | "todos" | "reminders">("notifications");
   const [todoTitle, setTodoTitle] = useState("");
   const [todoDueAt, setTodoDueAt] = useState("");
+  const [todoRecurrenceRule, setTodoRecurrenceRule] = useState("");
   const [reminderTitle, setReminderTitle] = useState("");
   const [reminderAt, setReminderAt] = useState("");
+  const [reminderRecurrenceRule, setReminderRecurrenceRule] = useState("");
   const [reminderBody, setReminderBody] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
   const [editingTodoTitle, setEditingTodoTitle] = useState("");
   const [editingTodoDueAt, setEditingTodoDueAt] = useState("");
+  const [editingTodoRecurrenceRule, setEditingTodoRecurrenceRule] = useState("");
   const [editingReminderId, setEditingReminderId] = useState<string | null>(null);
   const [editingReminderTitle, setEditingReminderTitle] = useState("");
   const [editingReminderAt, setEditingReminderAt] = useState("");
+  const [editingReminderRecurrenceRule, setEditingReminderRecurrenceRule] = useState("");
   const [editingReminderBody, setEditingReminderBody] = useState("");
   const openTodos = todos.filter((todo) => !todo.completedAt);
   const pendingReminders = reminders.filter((reminder) => !reminder.completedAt);
@@ -98,9 +117,11 @@ export const InboxPage = () => {
     await createTodo({
       title,
       dueAt: todoDueAt ? new Date(todoDueAt).toISOString() : null,
+      recurrenceRule: todoRecurrenceRule || null,
     });
     setTodoTitle("");
     setTodoDueAt("");
+    setTodoRecurrenceRule("");
     setFormError(null);
   };
 
@@ -108,6 +129,7 @@ export const InboxPage = () => {
     setEditingTodoId(todo.id);
     setEditingTodoTitle(todo.title);
     setEditingTodoDueAt(toDateTimeLocalValue(todo.dueAt));
+    setEditingTodoRecurrenceRule(todo.recurrenceRule ?? "");
   };
 
   const saveEditingTodo = async () => {
@@ -120,6 +142,7 @@ export const InboxPage = () => {
       id: editingTodoId,
       title: editingTodoTitle.trim(),
       dueAt: editingTodoDueAt ? new Date(editingTodoDueAt).toISOString() : null,
+      recurrenceRule: editingTodoRecurrenceRule || null,
     });
     setEditingTodoId(null);
     setFormError(null);
@@ -129,6 +152,7 @@ export const InboxPage = () => {
     setEditingReminderId(reminder.id);
     setEditingReminderTitle(reminder.title);
     setEditingReminderAt(toDateTimeLocalValue(reminder.remindAt));
+    setEditingReminderRecurrenceRule(reminder.recurrenceRule ?? "");
     setEditingReminderBody(reminder.body ?? "");
   };
 
@@ -143,6 +167,7 @@ export const InboxPage = () => {
       title: editingReminderTitle.trim(),
       body: editingReminderBody.trim() || null,
       remindAt: new Date(editingReminderAt).toISOString(),
+      recurrenceRule: editingReminderRecurrenceRule || null,
     });
     setEditingReminderId(null);
     setFormError(null);
@@ -159,9 +184,11 @@ export const InboxPage = () => {
       title,
       body: reminderBody.trim() || null,
       remindAt: new Date(reminderAt).toISOString(),
+      recurrenceRule: reminderRecurrenceRule || null,
     });
     setReminderTitle("");
     setReminderAt("");
+    setReminderRecurrenceRule("");
     setReminderBody("");
     setFormError(null);
   };
@@ -267,6 +294,13 @@ export const InboxPage = () => {
               <div className="inbox-quick-form">
                 <input aria-label="Todo title" value={todoTitle} onChange={(event) => setTodoTitle(event.target.value)} placeholder="What needs to happen?" />
                 <input aria-label="Todo due date" value={todoDueAt} onChange={(event) => setTodoDueAt(event.target.value)} type="datetime-local" />
+                <select aria-label="Todo frequency" value={todoRecurrenceRule} onChange={(event) => setTodoRecurrenceRule(event.target.value)}>
+                  {recurrenceOptions.map((option) => (
+                    <option key={option.value || "one-time"} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
                 <button className="inbox-add-button" onClick={() => void handleCreateTodo()} type="button">
                   <Plus size={14} />
                   <span>Add todo</span>
@@ -286,11 +320,19 @@ export const InboxPage = () => {
                         <span className={`inbox-meta-pill tone-${getDueTone(todo.dueAt)}`}>
                           {todo.dueAt ? `Due ${shortDateFormatter.format(new Date(todo.dueAt))}` : "No due date"}
                         </span>
+                        {todo.recurrenceRule ? <span className="inbox-meta-pill tone-info">{getRecurrenceLabel(todo.recurrenceRule)}</span> : null}
                       </div>
                       {isEditing ? (
                         <div className="inbox-edit-form">
                           <input aria-label="Todo title" value={editingTodoTitle} onChange={(event) => setEditingTodoTitle(event.target.value)} />
                           <input aria-label="Todo due date" value={editingTodoDueAt} onChange={(event) => setEditingTodoDueAt(event.target.value)} type="datetime-local" />
+                          <select aria-label="Todo frequency" value={editingTodoRecurrenceRule} onChange={(event) => setEditingTodoRecurrenceRule(event.target.value)}>
+                            {recurrenceOptions.map((option) => (
+                              <option key={option.value || "one-time"} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       ) : (
                         <div className="inbox-task-card-copy">
@@ -350,6 +392,13 @@ export const InboxPage = () => {
               <div className="inbox-quick-form inbox-reminder-form">
                 <input aria-label="Reminder title" value={reminderTitle} onChange={(event) => setReminderTitle(event.target.value)} placeholder="Remind me to…" />
                 <input aria-label="Reminder time" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} type="datetime-local" />
+                <select aria-label="Reminder frequency" value={reminderRecurrenceRule} onChange={(event) => setReminderRecurrenceRule(event.target.value)}>
+                  {recurrenceOptions.map((option) => (
+                    <option key={option.value || "one-time"} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
                 <input aria-label="Reminder notes" value={reminderBody} onChange={(event) => setReminderBody(event.target.value)} placeholder="Notes optional" />
                 <button className="inbox-add-button" onClick={() => void handleCreateReminder()} type="button">
                   <Plus size={14} />
@@ -378,11 +427,20 @@ export const InboxPage = () => {
                         <span className={`inbox-meta-pill tone-${reminder.completedAt ? "neutral" : getDueTone(reminder.snoozedUntil ?? reminder.remindAt)}`}>
                           {reminderMeta}
                         </span>
+                        {isLicenseReminder(reminder.title) ? <span className="inbox-meta-pill tone-info">Licenses</span> : null}
+                        {reminder.recurrenceRule ? <span className="inbox-meta-pill tone-info">{getRecurrenceLabel(reminder.recurrenceRule)}</span> : null}
                       </div>
                       {isEditing ? (
                         <div className="inbox-edit-form">
                           <input aria-label="Reminder title" value={editingReminderTitle} onChange={(event) => setEditingReminderTitle(event.target.value)} />
                           <input aria-label="Reminder time" value={editingReminderAt} onChange={(event) => setEditingReminderAt(event.target.value)} type="datetime-local" />
+                          <select aria-label="Reminder frequency" value={editingReminderRecurrenceRule} onChange={(event) => setEditingReminderRecurrenceRule(event.target.value)}>
+                            {recurrenceOptions.map((option) => (
+                              <option key={option.value || "one-time"} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
                           <input aria-label="Reminder body" value={editingReminderBody} onChange={(event) => setEditingReminderBody(event.target.value)} />
                         </div>
                       ) : (
