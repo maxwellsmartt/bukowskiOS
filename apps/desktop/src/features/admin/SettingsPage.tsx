@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { useToast } from "@app/providers/ToastProvider";
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -291,6 +292,7 @@ export const SettingsPage = () => {
     sortDirection: "asc",
   });
   const navigate = useNavigate();
+  const toast = useToast();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
   const [supportSnapshot, setSupportSnapshot] = useState<AppSupportSnapshot>(emptySupportSnapshot);
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
@@ -300,7 +302,6 @@ export const SettingsPage = () => {
   const [selectedUserId, setSelectedUserId] = useState<string>("new");
   const [userDraft, setUserDraft] = useState<UserEditorDraft>(buildUserDraft(null, []));
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [isRunningLocalSync, setIsRunningLocalSync] = useState(false);
@@ -341,17 +342,16 @@ export const SettingsPage = () => {
   }, [activeWorkspaceId]);
 
   useEffect(() => {
-    if (!error && !feedback) {
+    if (!error) {
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
       setError(null);
-      setFeedback(null);
     }, 6500);
 
     return () => window.clearTimeout(timeoutId);
-  }, [error, feedback]);
+  }, [error]);
 
   const runAction = async (
     action: () => Promise<AppActionResult | AppExportResult>,
@@ -360,7 +360,7 @@ export const SettingsPage = () => {
     try {
       stateSetter(true);
       const result = await action();
-      setFeedback(result.summary);
+      toast.success("Settings action complete", result.summary);
       setError(null);
 
       if ("diagnostics" in result) {
@@ -553,7 +553,7 @@ export const SettingsPage = () => {
     try {
       const result = await action();
       setUsersSnapshot(result.snapshot);
-      setFeedback(result.summary);
+      toast.success("Users updated", result.summary);
       setError(null);
       setSelectedUserId(result.userId ?? "new");
     } catch (nextError) {
@@ -669,7 +669,6 @@ export const SettingsPage = () => {
       <SectionHeader title={activeSectionTitle} />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
-      {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
       <SettingsLayout>
 
@@ -1054,7 +1053,7 @@ export const SettingsPage = () => {
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(supportSummaryText);
-                    setFeedback("Copied the diagnostics summary.");
+                    toast.success("Copied", "Diagnostics summary copied.");
                     setError(null);
                   } catch (copyError) {
                     setError(getUserFacingErrorMessage(copyError, "The app could not copy the diagnostics summary."));

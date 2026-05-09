@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { createAgentToolRegistry } from "../../electron/main/services/ai/agentToolRegistry";
+import { createCurrencyMutationService } from "../../electron/main/services/data/currencyMutationService";
+import { createCurrencyReadService } from "../../electron/main/services/data/currencyReadService";
 import { createFoundationReadService } from "../../electron/main/services/data/foundationReadService";
 import { createAgentReadService } from "../../electron/main/services/data/agentReadService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
@@ -758,6 +760,69 @@ describe("agent tool registry", () => {
 
     expect(defaultWorkspaceSearch.result.payload.count).toBe(0);
     expect((activeWorkspaceSearch.result.payload.items as Array<{ id: string }>)[0]?.id).toBe("project-agent-test-shoot");
+
+    cleanup();
+  });
+
+  it("exposes exchange-rate tools with source proof and best-bank comparison", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-exchange-rates");
+    const secretStore = {
+      hasProviderSecret: () => false,
+    };
+    const currencyMutations = createCurrencyMutationService(database);
+    const currencyReads = createCurrencyReadService(database);
+
+    currencyMutations.createRate({
+      commandId: "cmd-agent-rate-popular-buy",
+      workspaceId: "workspace-metadata",
+      actorType: "integration",
+      sourceChannel: "desktop",
+      baseCurrency: "USD",
+      quoteCurrency: "DOP",
+      rate: 58,
+      rateType: "buy",
+      source: "banco_popular",
+      sourceLabel: "Banco Popular",
+      effectiveDate: "2026-05-09",
+      fetchedAt: new Date().toISOString(),
+      notes: "Imported from TasaReal. Source: https://tasareal.com.",
+    });
+    currencyMutations.createRate({
+      commandId: "cmd-agent-rate-central-buy",
+      workspaceId: "workspace-metadata",
+      actorType: "integration",
+      sourceChannel: "desktop",
+      baseCurrency: "USD",
+      quoteCurrency: "DOP",
+      rate: 58.5,
+      rateType: "buy",
+      source: "banco_central",
+      sourceLabel: "Banco Central",
+      effectiveDate: "2026-05-09",
+      fetchedAt: new Date().toISOString(),
+      notes: "Imported from TasaReal. Source: https://tasareal.com.",
+    });
+
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      currencyReads,
+      getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+    });
+
+    const rates = registry.execute("get_exchange_rates", JSON.stringify({ base_currency: "USD", limit: 5 }), {
+      workspaceId: "workspace-metadata",
+      activePath: "/finance",
+      currentView: "Finance",
+    });
+    const comparison = registry.execute("compare_exchange_rates", JSON.stringify({ base_currency: "USD", amount: 100 }), {
+      workspaceId: "workspace-metadata",
+      activePath: "/finance",
+      currentView: "Finance",
+    });
+
+    expect(rates.result.payload.count).toBe(2);
+    expect((rates.result.payload.items as Array<{ sourceProof: string | null }>)[0]?.sourceProof).toBe("https://tasareal.com");
+    expect(comparison.result.payload.bestBuySource).toBe("Banco Central");
+    expect((comparison.result.payload.items as Array<{ receiveDopIfSellingForeign: number | null }>)[0]?.receiveDopIfSellingForeign).toBeTruthy();
 
     cleanup();
   });

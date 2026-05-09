@@ -991,6 +991,8 @@ export const createAssistantGatewayService = (
       "If the user is continuing a partially completed task, use the previous session summary and last tool results to continue the pending steps. Do not make them repeat the full original prompt.",
       "If the user replies with a short continuation like 'usa el primero', 'dale', 'hazlo', or 'continúa', use recentAssistantMessages plus the previous tool summary as the pending action context.",
       "If recentAssistantMessages contain candidate assets/projects/options and the user chooses one, reuse the exact IDs already shown there. Do not restart the task or ask for the same project again.",
+      "Never ask the user for internal IDs for projects, quotes, assets, units, users or departments before trying the available search/detail tools. Users know names, codes and context; tools resolve IDs.",
+      "For exchange-rate questions, route to the Finance Agent and use exchange-rate tools before answering. Include buy/sell meaning, source and fetchedAt when available.",
       "For packing slips, asset availability searches must use the full workspace inventory unless the user explicitly asks for assets already assigned to a specific project. Do not let activeProjectId limit inventory discovery by accident.",
       "If an asset search finds no available match, the specialist should run one broader workspace-level search_assets query and propose the closest available alternatives before asking the user what to use.",
       "Choose one target_agent from the allowed list below.",
@@ -1331,6 +1333,8 @@ export const createAssistantGatewayService = (
           "Continuation rule: when the user replies briefly after a partial task, use the prior session/tool summary to continue unresolved steps. Do not require the original prompt again.",
           "Pending action rule: recentAssistantMessages may contain the option list or blocker you just gave the user. Treat short replies like 'use the first one' as instructions to continue from that list.",
           "Choice reuse rule: when recentAssistantMessages contain candidate options with IDs, reuse those exact IDs for the next tool call. Do not run the full task from scratch unless the selected ID no longer works.",
+          "ID resolution rule: never ask the user for internal IDs before trying search/detail tools. Resolve by name, code, number, recent tool result, or current route context first.",
+          "Exchange-rate rule: when asked about USD/EUR/DOP rates, comparisons, best bank, or 24h history, call the exchange-rate tools and include source/fetchedAt if available.",
           "Do NOT mention 'supervised' or 'pending approval' to the user unless the action is genuinely gated. The default is to execute and report results.",
           targetMemoryOverlay.agentEntries.length
             ? `Agent memory:\n${targetMemoryOverlay.agentEntries.map((entry) => `- [${entry.kind}] ${entry.body}`).join("\n")}`

@@ -233,7 +233,9 @@ export const createQuoteMutationService = (db: DatabaseSync) => ({
             tax_profile, itbis_rate, tax_added_to_total, tax_notes,
             subtotal_amount, discount_amount, discount_rate, tax_amount,
             total_amount, base_currency_total_amount,
-            observations, created_by_user_id, updated_by_user_id, created_at, updated_at
+            observations, created_by_user_id, updated_by_user_id,
+            created_by_actor_type, source_channel,
+            created_at, updated_at
           ) VALUES (
             ?, ?, ?, ?, ?, 'draft',
             ?, ?, ?,
@@ -248,7 +250,7 @@ export const createQuoteMutationService = (db: DatabaseSync) => ({
             ?, ?, ?, ?,
             ?, ?, ?, ?,
             ?, ?,
-            ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?
           )
         `,
       ).run(
@@ -299,6 +301,8 @@ export const createQuoteMutationService = (db: DatabaseSync) => ({
         input.observations?.trim() || null,
         defaultActorUserId,
         defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
         now,
         now,
       );
@@ -698,7 +702,9 @@ export const createQuoteMutationService = (db: DatabaseSync) => ({
             tax_profile, itbis_rate, tax_added_to_total, tax_notes,
             subtotal_amount, discount_amount, discount_rate, tax_amount,
             total_amount, base_currency_total_amount,
-            observations, created_by_user_id, updated_by_user_id, created_at, updated_at
+            observations, created_by_user_id, updated_by_user_id,
+            created_by_actor_type, source_channel,
+            created_at, updated_at
           )
           SELECT
             ?, workspace_id, ?, ?, ?, 'draft',
@@ -714,7 +720,7 @@ export const createQuoteMutationService = (db: DatabaseSync) => ({
             tax_profile, itbis_rate, tax_added_to_total, tax_notes,
             subtotal_amount, discount_amount, discount_rate, tax_amount,
             total_amount, base_currency_total_amount,
-            observations, ?, ?, ?, ?
+            observations, ?, ?, ?, ?, ?, ?
           FROM quotes WHERE id = ? AND workspace_id = ?
         `,
       ).run(
@@ -726,6 +732,8 @@ export const createQuoteMutationService = (db: DatabaseSync) => ({
         validUntil,
         defaultActorUserId,
         defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
         now,
         now,
         input.quoteId,

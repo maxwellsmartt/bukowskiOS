@@ -887,7 +887,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [packingPanelOpen, setPackingPanelOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [packingError, setPackingError] = useState<string | null>(null);
-  const [actionWarning, setActionWarning] = useState<string | null>(null);
   const toast = useToast();
   const [assignNextStep, setAssignNextStep] = useState<{ projectId: string; projectName: string } | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
@@ -1063,7 +1062,9 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       await Promise.all([reload(), refreshProjects()]);
       setActionError(null);
       toast.success("Done", result.summary);
-      setActionWarning(result.warningSummary ?? null);
+      if (result.warningSummary) {
+        toast.warning("Review assignment", result.warningSummary);
+      }
       setActionPanelOpen(false);
       if (formValue.mode === "assign" && formValue.projectId) {
         const assignedProject = projects.find((project) => project.id === formValue.projectId);
@@ -1103,7 +1104,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       writePreference(uiPreferenceKeys.activePackingSlipId, result.packingSlipId);
       setPackingError(null);
       toast.success("Done", result.summary);
-      setActionWarning(null);
       setAssignNextStep(null);
       setPackingPanelOpen(false);
       clearOperationCart();
@@ -1132,7 +1132,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
         await Promise.all([reload(), refreshProjects(), reloadEditorDetail()]);
         toast.success("Done", result.summary);
-        setActionWarning(null);
       } else {
         const result = await createAsset({
           commandId: crypto.randomUUID(),
@@ -1146,7 +1145,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         await Promise.all([reload(), refreshProjects()]);
         setSelectedAssetId(result.assetId);
         toast.success("Done", result.summary);
-        setActionWarning(null);
       }
 
       setEditorError(null);
@@ -1178,7 +1176,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setSelectedAssetId(null);
       setEditorError(null);
       toast.success("Done", result.summary);
-      setActionWarning(null);
     } catch (nextError) {
       setEditorError(getUserFacingErrorMessage(nextError, "Unable to archive asset."));
     } finally {
@@ -1194,7 +1191,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     try {
       setEditorError(null);
 
-      setActionWarning(null);
       const csvText = await file.text();
       setCsvImportPreview(buildAssetCsvPreview({ assets, catalog, csvText, fileName: file.name }));
       setCsvShowAllRows(false);
@@ -1217,7 +1213,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setIsImportingAssets(true);
       setEditorError(null);
 
-      setActionWarning(null);
       const existingCodes = new Set(assets.map((asset) => asset.code.trim().toUpperCase()).filter(Boolean));
       const readyRowNumbers =
         mode === "ready"
@@ -1507,7 +1502,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           </div>
         </div>
       ) : null}
-      {actionWarning ? <div className="action-feedback action-feedback-warning">{actionWarning}</div> : null}
       {editorError && !editorMode ? <div className="action-feedback action-feedback-error">{editorError}</div> : null}
       {selectedKitLockSummary ? (
         <div className="action-feedback action-feedback-warning">

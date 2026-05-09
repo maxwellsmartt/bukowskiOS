@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { CatalogSnapshot, IncidentDetailSnapshot } from "@contracts";
+import { useToast } from "@app/providers/ToastProvider";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -11,7 +12,6 @@ import { openIncidentFile, uploadIncidentFiles } from "./useIncidentsData";
 type IncidentDetailPanelProps = {
   detail: IncidentDetailSnapshot;
   error: string | null;
-  feedback: string | null;
   isSubmitting: boolean;
   repairCase?: { id: string; title: string; status: string } | null;
   users: CatalogSnapshot["users"];
@@ -95,7 +95,6 @@ const resolveFileTone = (status: "available" | "missing" | "deleted") => {
 export const IncidentDetailPanel = ({
   detail,
   error,
-  feedback,
   isSubmitting,
   repairCase,
   users,
@@ -106,6 +105,7 @@ export const IncidentDetailPanel = ({
   onResolve,
   onUpdate,
 }: IncidentDetailPanelProps) => {
+  const toast = useToast();
   const incident = detail.incident;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -117,7 +117,6 @@ export const IncidentDetailPanel = ({
   const [notes, setNotes] = useState("");
   const [resolutionNotes, setResolutionNotes] = useState("");
   const [retireAsset, setRetireAsset] = useState(false);
-  const [filesFeedback, setFilesFeedback] = useState<string | null>(null);
   const [filesError, setFilesError] = useState<string | null>(null);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [openingFileId, setOpeningFileId] = useState<string | null>(null);
@@ -332,12 +331,11 @@ export const IncidentDetailPanel = ({
               disabled={isUploadingFiles}
               onClick={() => {
                 setFilesError(null);
-                setFilesFeedback(null);
                 void (async () => {
                   try {
                     setIsUploadingFiles(true);
                     const result = await uploadIncidentFiles(incident.id);
-                    setFilesFeedback(result.summary);
+                    toast.success("Files attached", result.summary);
                     await onRefresh();
                   } catch (nextError) {
                     setFilesError(getUserFacingErrorMessage(nextError, "Unable to attach files to this incident."));
@@ -398,10 +396,8 @@ export const IncidentDetailPanel = ({
           )}
         </SurfaceCard>
 
-        {filesFeedback ? <div className="action-feedback action-feedback-success">{filesFeedback}</div> : null}
         {filesError ? <div className="action-feedback action-feedback-error">{filesError}</div> : null}
 
-        {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
         {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
         <div className="action-panel-actions">

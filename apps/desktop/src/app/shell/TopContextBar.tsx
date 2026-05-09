@@ -109,7 +109,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
           onClick={() => navigate("/settings/sync")}
           type="button"
         >
-          <CloudCog size={14} />
+          <CloudCog size={17} />
           {syncState.badge ? <span className="sync-control-badge">{syncState.badge}</span> : null}
         </button>
       </div>

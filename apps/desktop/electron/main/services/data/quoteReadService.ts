@@ -1,6 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
+  CommandActorType,
+  CommandSourceChannel,
   CurrencyRateSource,
   CurrencyRateType,
   QuoteDetail,
@@ -79,6 +81,8 @@ const mapQuote = (row: Record<string, unknown>): QuoteRow => ({
   rejectedAt: (row.rejected_at as string | null) ?? null,
   expiredAt: (row.expired_at as string | null) ?? null,
   cancelledAt: (row.cancelled_at as string | null) ?? null,
+  createdByActorType: ((row.created_by_actor_type as CommandActorType | null) ?? "user") as CommandActorType,
+  sourceChannel: (row.source_channel as CommandSourceChannel | null) ?? null,
   createdAt: row.created_at as string,
   updatedAt: row.updated_at as string,
 });

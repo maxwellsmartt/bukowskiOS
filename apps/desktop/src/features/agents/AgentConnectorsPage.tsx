@@ -3,6 +3,7 @@ import { Check, Copy, KeyRound, Link2, RadioTower, RotateCcw, ShieldCheck } from
 
 import type { AgentConnectorRow, AppUsersSnapshot } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { useToast } from "@app/providers/ToastProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -104,13 +105,13 @@ const getIdentityTone = (state: LinkableIdentityOption["linkState"]) => {
 
 export const AgentConnectorsPage = () => {
   const { activeWorkspaceId } = useWorkspace();
+  const toast = useToast();
   const { data, error } = useAgentConnectors();
   const { data: catalog } = useCatalogData();
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
   const [selectedConnectorKey, setSelectedConnectorKey] = useState<string | null>(null);
   const [draft, setDraft] = useState<ConnectorDraft>(buildConnectorDraft(null));
   const [selectedUserId, setSelectedUserId] = useState<string>("");
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [generatedLinkToken, setGeneratedLinkToken] = useState<string | null>(null);
   const [copiedLinkCommand, setCopiedLinkCommand] = useState(false);
@@ -274,7 +275,6 @@ export const AgentConnectorsPage = () => {
   useEffect(() => {
     setGeneratedLinkToken(null);
     setCopiedLinkCommand(false);
-    setFeedback(null);
     setErrorMessage(null);
   }, [selectedConnectorKey]);
 
@@ -313,7 +313,6 @@ export const AgentConnectorsPage = () => {
     }
 
     setIsSaving(true);
-    setFeedback(null);
     setErrorMessage(null);
 
     try {
@@ -324,7 +323,7 @@ export const AgentConnectorsPage = () => {
         enabled: draft.enabled,
         botToken: draft.botToken,
       });
-      setFeedback(result.summary);
+      toast.success("Channel saved", result.summary);
       setDraft((current) => ({
         ...current,
         botToken: "",
@@ -342,7 +341,6 @@ export const AgentConnectorsPage = () => {
     }
 
     setIsSaving(true);
-    setFeedback(null);
     setErrorMessage(null);
 
     try {
@@ -352,7 +350,7 @@ export const AgentConnectorsPage = () => {
         connectorKey: selectedConnector.connectorKey,
         enabled: false,
       });
-      setFeedback(result.summary);
+      toast.success("Channel disabled", result.summary);
     } catch (saveError) {
       setErrorMessage(getUserFacingErrorMessage(saveError, "Unable to disable this channel."));
     } finally {
@@ -366,7 +364,6 @@ export const AgentConnectorsPage = () => {
     }
 
     setIsSaving(true);
-    setFeedback(null);
     setErrorMessage(null);
 
     try {
@@ -377,7 +374,7 @@ export const AgentConnectorsPage = () => {
         enabled: false,
         clearStoredSecret: true,
       });
-      setFeedback(result.summary);
+      toast.success("Token cleared", result.summary);
       setGeneratedLinkToken(null);
     } catch (saveError) {
       setErrorMessage(getUserFacingErrorMessage(saveError, "Unable to clear the stored token."));
@@ -392,7 +389,6 @@ export const AgentConnectorsPage = () => {
     }
 
     setIsTesting(true);
-    setFeedback(null);
     setErrorMessage(null);
 
     try {
@@ -400,7 +396,7 @@ export const AgentConnectorsPage = () => {
         workspaceId: activeWorkspaceId,
         connectorKey: selectedConnector.connectorKey,
       });
-      setFeedback(result.summary);
+      toast.success("Channel tested", result.summary);
     } catch (testError) {
       setErrorMessage(getUserFacingErrorMessage(testError, "Unable to test this channel."));
     } finally {
@@ -414,7 +410,6 @@ export const AgentConnectorsPage = () => {
     }
 
     setIsGeneratingToken(true);
-    setFeedback(null);
     setErrorMessage(null);
 
     try {
@@ -427,7 +422,7 @@ export const AgentConnectorsPage = () => {
       });
       setGeneratedLinkToken(result.linkToken ?? null);
       setCopiedLinkCommand(false);
-      setFeedback(result.summary);
+      toast.success("Link code ready", result.summary);
     } catch (tokenError) {
       setErrorMessage(getUserFacingErrorMessage(tokenError, "Unable to generate a link code."));
     } finally {
@@ -739,7 +734,6 @@ export const AgentConnectorsPage = () => {
                 </div>
               ) : null}
 
-              {feedback ? <div className="models-provider-feedback models-provider-feedback-success">{feedback}</div> : null}
               {errorMessage ? <div className="form-inline-error">{errorMessage}</div> : null}
 
               <div className="agent-detail-actions">

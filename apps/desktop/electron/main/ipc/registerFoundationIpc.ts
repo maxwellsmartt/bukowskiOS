@@ -17,6 +17,7 @@ import {
   deleteCatalogEntitiesSchema,
   createDraftRunFromChatSchema,
   createExchangeRateSchema,
+  currencyRateProviderStatusReadArgsSchema,
   createFinancialEntrySchema,
   createQuoteSchema,
   currencySettingsReadArgsSchema,
@@ -62,7 +63,9 @@ import {
   rmaSnapshotReadArgsSchema,
   reviewAgentRunSchema,
   refreshAiProviderModelsSchema,
+  refreshCurrencyRatesSchema,
   saveAiProviderConfigSchema,
+  saveCurrencyRateProviderConfigSchema,
   saveConnectorConfigSchema,
   sendAssistantChatTurnSchema,
   setActiveAssistantThreadSchema,
@@ -252,6 +255,15 @@ type RegisterFoundationIpcOptions = {
       rateType?: import("@contracts").CurrencyRateType,
     ) => import("@contracts").ExchangeRateRow | null;
   };
+  currencyRateProviders: {
+    getStatus: (workspaceId: string) => import("@contracts").CurrencyRateProviderStatus;
+    saveConfig: (
+      input: import("@contracts").SaveCurrencyRateProviderConfigCommand,
+    ) => import("@contracts").CurrencyRateProviderStatus;
+    refreshRates: (
+      input: import("@contracts").RefreshCurrencyRatesCommand,
+    ) => Promise<import("@contracts").RefreshCurrencyRatesResult>;
+  };
   quoteMutations: {
     createQuote: (input: import("@contracts").CreateQuoteCommand) => import("@contracts").QuoteMutationResult;
     updateQuote: (input: import("@contracts").UpdateQuoteCommand) => import("@contracts").QuoteMutationResult;
@@ -403,6 +415,7 @@ export const registerFoundationIpc = ({
   financeMutations,
   currencyMutations,
   currencyReads,
+  currencyRateProviders,
   quoteMutations,
   quoteReads,
   exportQuotePdf,
@@ -1658,6 +1671,42 @@ export const registerFoundationIpc = ({
       requiredPermission: "finance.read",
     });
     return currencyMutations.deleteRate(input);
+  });
+  safeHandleReadWithSchema(
+    ipcChannels.currency.getProviderStatus,
+    currencyRateProviderStatusReadArgsSchema,
+    async (_event, query: { workspaceId: string; provider: import("@contracts").CurrencyRateProviderKey }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load exchange-rate provider",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return currencyRateProviders.getStatus(query.workspaceId);
+    },
+    "The app could not load exchange-rate provider status.",
+  );
+  safeHandle(
+    ipcChannels.currency.saveProviderConfig,
+    saveCurrencyRateProviderConfigSchema,
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "update exchange-rate provider",
+        accessLevel: "write",
+        requiredPermission: "finance.read",
+      });
+      return currencyRateProviders.saveConfig(input);
+    },
+  );
+  safeHandle(ipcChannels.currency.refreshRates, refreshCurrencyRatesSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "refresh exchange rates",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return currencyRateProviders.refreshRates(input);
   });
 
   safeHandleReadWithSchema(

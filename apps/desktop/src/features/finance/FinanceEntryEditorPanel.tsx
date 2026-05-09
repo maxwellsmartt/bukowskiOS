@@ -26,7 +26,6 @@ type FinanceEntryEditorPanelProps = {
   incidents: IncidentListRow[];
   projects: ProjectCardRow[];
   error: string | null;
-  feedback: string | null;
   initialValue?: FinanceEntryRow | null;
   isSubmitting: boolean;
   isUploadingDocuments: boolean;
@@ -68,7 +67,6 @@ export const FinanceEntryEditorPanel = ({
   incidents,
   projects,
   error,
-  feedback,
   initialValue,
   isSubmitting,
   isUploadingDocuments,
@@ -169,7 +167,6 @@ export const FinanceEntryEditorPanel = ({
       </div>
 
       {error ? <div className="form-inline-error">{error}</div> : null}
-      {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
       <div className="action-form-grid">
         <label className="action-field">

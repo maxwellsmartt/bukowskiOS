@@ -496,9 +496,15 @@ export const AssetLicensesPage = () => {
         <SurfaceCard
           title="Add license"
           aside={
-            <button className="ghost-control" disabled={isLoading} onClick={() => void loadLicenses()} type="button">
+            <button
+              aria-label="Refresh licenses"
+              className="icon-ghost-control license-refresh-button"
+              data-tooltip="Refresh licenses"
+              disabled={isLoading}
+              onClick={() => void loadLicenses()}
+              type="button"
+            >
               <RefreshCw size={14} />
-              <span>Refresh</span>
             </button>
           }
         >

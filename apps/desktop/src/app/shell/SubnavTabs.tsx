@@ -8,7 +8,7 @@ type SubnavTabsProps = {
 
 export const isSubnavItemActive = (pathname: string, path: string) => {
   if (path === "/assets") {
-    return pathname === "/assets" || Boolean(matchPath({ path: "/assets/:assetId", end: true }, pathname));
+    return pathname === "/assets" || (pathname !== "/assets/licenses" && Boolean(matchPath({ path: "/assets/:assetId", end: true }, pathname)));
   }
   if (path === "/finance/quotes") {
     // Keep "Quotes" highlighted on /new and /:quoteId detail too.

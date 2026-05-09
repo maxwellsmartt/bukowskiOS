@@ -3,6 +3,7 @@ import { Bell, CalendarClock, Check, CheckCheck, Clock3, ExternalLink, Inbox as 
 import { useNavigate } from "react-router-dom";
 
 import { useNotifications } from "@app/providers/NotificationsProvider";
+import { AgentCreatedBadge } from "@shared/components/AgentCreatedBadge";
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -226,7 +227,7 @@ export const InboxPage = () => {
       </div>
 
       <section className="surface-panel inbox-panel">
-        <div className="inbox-panel-header">
+        <div className={`inbox-panel-header inbox-panel-header-${activeTab}`}>
           <button className={activeTab === "notifications" ? "inbox-tab is-active" : "inbox-tab"} onClick={() => setActiveTab("notifications")} type="button">
             <Bell size={15} />
             <span>
@@ -278,10 +279,15 @@ export const InboxPage = () => {
                 </span>
                 <span className="inbox-row-copy">
                   <span>{dateFormatter.format(new Date(item.createdAt))}</span>
-                  <strong>{item.title}</strong>
+                  <strong className="inbox-copy-title">
+                    <span>{item.title}</span>
+                  </strong>
                   {item.body ? <span>{item.body}</span> : null}
                 </span>
-                {item.linkTo ? <ExternalLink size={14} /> : null}
+                <span className="inbox-row-indicators">
+                  {item.sourceType === "agent" ? <AgentCreatedBadge variant="table" /> : null}
+                  {item.linkTo ? <ExternalLink size={14} /> : null}
+                </span>
               </button>
             ))}
           </div>
@@ -313,6 +319,7 @@ export const InboxPage = () => {
                   const isEditing = editingTodoId === todo.id;
                   return (
                     <article key={todo.id} className={`inbox-task-card tone-${getCardTone(todo.dueAt, todo.completedAt)}`}>
+                      {todo.createdBy === "agent" ? <AgentCreatedBadge variant="corner" /> : null}
                       <div className="inbox-task-card-header">
                         <span className="inbox-row-icon">
                           <ListTodo size={14} />
@@ -336,7 +343,9 @@ export const InboxPage = () => {
                         </div>
                       ) : (
                         <div className="inbox-task-card-copy">
-                          <strong>{todo.title}</strong>
+                          <strong className="inbox-copy-title">
+                            <span>{todo.title}</span>
+                          </strong>
                           {todo.notes ? <span>{todo.notes}</span> : <span>No notes</span>}
                         </div>
                       )}
@@ -420,6 +429,7 @@ export const InboxPage = () => {
                       key={reminder.id}
                       className={`inbox-task-card tone-${getCardTone(reminder.snoozedUntil ?? reminder.remindAt, reminder.completedAt)}`}
                     >
+                      {reminder.createdBy === "agent" ? <AgentCreatedBadge variant="corner" /> : null}
                       <div className="inbox-task-card-header">
                         <span className="inbox-row-icon">
                           <CalendarClock size={14} />
@@ -445,7 +455,9 @@ export const InboxPage = () => {
                         </div>
                       ) : (
                         <div className="inbox-task-card-copy">
-                          <strong>{reminder.title}</strong>
+                          <strong className="inbox-copy-title">
+                            <span>{reminder.title}</span>
+                          </strong>
                           {reminder.body ? <span>{reminder.body}</span> : <span>No notes</span>}
                         </div>
                       )}

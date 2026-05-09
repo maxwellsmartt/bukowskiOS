@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS public.quotes (
   observations text,
   created_by_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   updated_by_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_by_actor_type text NOT NULL DEFAULT 'user',
+  source_channel text,
   sent_at timestamptz,
   approved_at timestamptz,
   rejected_at timestamptz,

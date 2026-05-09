@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 
 import type { FinanceEntryListQuery, FinanceEntrySortField } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
+import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAssetsList } from "@features/assets/useAssetsData";
 import { useIncidentsData } from "@features/incidents/useIncidentsData";
@@ -33,6 +34,7 @@ const financeEntrySortOptions: Array<ListSortOption<FinanceEntrySortField>> = [
 
 export const FinanceEntriesPage = () => {
   const { activeWorkspaceId: workspaceId } = useWorkspace();
+  const toast = useToast();
   const [searchParams] = useSearchParams();
   const financeControls = useListControls<FinanceEntrySortField, FinanceEntryListQuery>({
     viewKey: "finance-entries-list",
@@ -62,7 +64,6 @@ export const FinanceEntriesPage = () => {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingDocuments, setIsUploadingDocuments] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const focusedEntryId = searchParams.get("focus");
 
@@ -76,7 +77,6 @@ export const FinanceEntriesPage = () => {
 
     setEditingEntryId(focusedEntryId);
     setSubmitError(null);
-    setFeedback(null);
     setIsEditorOpen(true);
   }, [data, focusedEntryId]);
 
@@ -101,7 +101,7 @@ export const FinanceEntriesPage = () => {
             ...draft,
           });
 
-      setFeedback(result.summary);
+      toast.success(editingEntry ? "Entry updated" : "Entry created", result.summary);
       setIsEditorOpen(false);
       setEditingEntryId(null);
       reload();
@@ -122,15 +122,12 @@ export const FinanceEntriesPage = () => {
         {selectedRowIds.length ? <StatusBadge>{`${selectedRowIds.length} selected`}</StatusBadge> : null}
       </div>
 
-      {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
-
       <div className="action-panel-actions action-panel-actions-start">
         <button
           className="action-primary-button"
           onClick={() => {
             setEditingEntryId(null);
             setSubmitError(null);
-            setFeedback(null);
             setIsEditorOpen(true);
           }}
           type="button"
@@ -177,7 +174,6 @@ export const FinanceEntriesPage = () => {
           assets={assets}
           documents={documents}
           error={submitError}
-          feedback={feedback}
           incidents={incidents}
           initialValue={editingEntry}
           isSubmitting={isSubmitting}
@@ -191,7 +187,7 @@ export const FinanceEntriesPage = () => {
             try {
               setIsUploadingDocuments(true);
               const result = await uploadFinanceDocuments(editingEntryId);
-              setFeedback(result.summary);
+              toast.success("Documents attached", result.summary);
               setSubmitError(null);
               await reloadDocuments();
             } catch (nextError) {
@@ -253,7 +249,6 @@ export const FinanceEntriesPage = () => {
                   : () => {
                       setEditingEntryId(null);
                       setSubmitError(null);
-                      setFeedback(null);
                       setIsEditorOpen(true);
                     }
               }
@@ -273,7 +268,6 @@ export const FinanceEntriesPage = () => {
           onRowClick={(row) => {
             setEditingEntryId(row.id);
             setSubmitError(null);
-            setFeedback(null);
             setIsEditorOpen(true);
           }}
           onSortRequest={financeControls.handleColumnSortRequest}

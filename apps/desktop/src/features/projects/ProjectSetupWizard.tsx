@@ -18,6 +18,7 @@ import type {
 } from "@contracts";
 import { projectColorPalette } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { useToast } from "@app/providers/ToastProvider";
 import { useCatalogData, exportProjectBlueprintPdf, getProjectCreationConflicts, getStagingPackingSlips } from "@features/projects/useProjectsData";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { SelectField } from "@shared/components/SelectField";
@@ -437,6 +438,7 @@ export const ProjectSetupWizard = ({
 }: ProjectSetupWizardProps) => {
   const { data: catalog } = useCatalogData();
   const { activeWorkspaceId } = useWorkspace();
+  const toast = useToast();
   const { createProjectBlueprint, openProject } = useShellContext();
   const [stagingSlips, setStagingSlips] = useState<StagingPackingSlipRow[]>([]);
   const [stagingError, setStagingError] = useState<string | null>(null);
@@ -446,7 +448,6 @@ export const ProjectSetupWizard = ({
   const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitFeedback, setSubmitFeedback] = useState<string | null>(null);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [expandedUnitIds, setExpandedUnitIds] = useState<string[]>([]);
   const [additionalUnitPresetValue, setAdditionalUnitPresetValue] = useState("");
@@ -1071,7 +1072,7 @@ export const ProjectSetupWizard = ({
     try {
       setSubmitError(null);
       const result = await exportProjectBlueprintPdf({ ...normalizeDraftForSubmit(draft), workspaceId: activeWorkspaceId });
-      setSubmitFeedback(result.summary);
+      toast.success("Project setup exported", result.summary);
     } catch (error) {
       setSubmitError(getUserFacingErrorMessage(error, "Unable to export project setup summary."));
     }
@@ -2217,8 +2218,6 @@ export const ProjectSetupWizard = ({
         ) : null}
         {stagingError ? <div className="action-feedback action-feedback-error project-setup-feedback">{stagingError}</div> : null}
         {submitError ? <div className="action-feedback action-feedback-error project-setup-feedback">{submitError}</div> : null}
-        {submitFeedback ? <div className="action-feedback action-feedback-success project-setup-feedback">{submitFeedback}</div> : null}
-
         <footer className="project-setup-footer">
           {activeTab === "summary" ? (
             <button className="ghost-control" onClick={() => void handleExportPdf()} type="button">

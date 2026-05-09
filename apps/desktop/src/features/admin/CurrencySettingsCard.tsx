@@ -1,21 +1,42 @@
-import { Save } from "lucide-react";
+import { RefreshCw, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import type { CurrencyRateSource, CurrencyRateType } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { NumberStepper } from "@shared/components/NumberStepper";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { newCommandId } from "@features/finance/quoteHelpers";
-import { useCurrencySettings, useExchangeRates } from "@features/finance/useCurrencyData";
+import {
+  refreshCurrencyRates,
+  saveCurrencyRateProviderConfig,
+  useCurrencyRateProviderStatus,
+  useCurrencySettings,
+  useExchangeRates,
+} from "@features/finance/useCurrencyData";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 const enabledCurrencyOptions = ["DOP", "USD", "EUR"];
+const rateSourceOptions: Array<{ label: string; value: CurrencyRateSource }> = [
+  { label: "Manual", value: "manual" },
+  { label: "Banco Popular", value: "banco_popular" },
+  { label: "Banco Central", value: "banco_central" },
+  { label: "Banco Santa Cruz", value: "banco_santa_cruz" },
+  { label: "Other", value: "custom" },
+];
+const rateTypeOptions: Array<{ label: string; value: CurrencyRateType }> = [
+  { label: "Buy", value: "buy" },
+  { label: "Sell", value: "sell" },
+  { label: "Average", value: "average" },
+  { label: "Manual", value: "manual" },
+];
 
 export const CurrencySettingsCard = () => {
   const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const { data: settings, refresh } = useCurrencySettings(activeWorkspaceId);
   const { data: rates, refresh: refreshRates } = useExchangeRates(activeWorkspaceId, { limit: 10 });
+  const { data: providerStatus, refresh: refreshProviderStatus } = useCurrencyRateProviderStatus(activeWorkspaceId);
 
   const [baseCurrency, setBaseCurrency] = useState("DOP");
   const [defaultQuoteCurrency, setDefaultQuoteCurrency] = useState("DOP");
@@ -30,7 +51,12 @@ export const CurrencySettingsCard = () => {
   const [newRateQuote, setNewRateQuote] = useState("DOP");
   const [newRateValue, setNewRateValue] = useState("");
   const [newRateDate, setNewRateDate] = useState(new Date().toISOString().slice(0, 10));
+  const [newRateSource, setNewRateSource] = useState<CurrencyRateSource>("manual");
+  const [newRateType, setNewRateType] = useState<CurrencyRateType>("sell");
   const [isAddingRate, setIsAddingRate] = useState(false);
+  const [providerApiKey, setProviderApiKey] = useState("");
+  const [isSavingProvider, setIsSavingProvider] = useState(false);
+  const [isRefreshingProvider, setIsRefreshingProvider] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
@@ -97,13 +123,14 @@ export const CurrencySettingsCard = () => {
         baseCurrency: newRateBase,
         quoteCurrency: newRateQuote,
         rate,
-        rateType: "manual",
-        source: "manual",
+        rateType: newRateType,
+        source: newRateSource,
+        sourceLabel: rateSourceOptions.find((option) => option.value === newRateSource)?.label ?? null,
         effectiveDate: newRateDate,
       });
       setNewRateValue("");
       refreshRates();
-      toast.success("Rate added", `${newRateBase}→${newRateQuote} = ${rate} effective ${newRateDate}.`);
+      toast.success("Rate added", `${newRateBase}→${newRateQuote} = ${rate} · ${newRateType} · ${newRateDate}.`);
     } catch (error) {
       toast.error("Could not add rate", getUserFacingErrorMessage(error, "Try again in a moment."));
     } finally {
@@ -125,6 +152,60 @@ export const CurrencySettingsCard = () => {
       toast.success("Rate removed", "Older quotes keep their snapshot.");
     } catch (error) {
       toast.error("Could not remove", getUserFacingErrorMessage(error, "Try again in a moment."));
+    }
+  };
+
+  const handleSaveProvider = async () => {
+    setIsSavingProvider(true);
+    try {
+      const result = await saveCurrencyRateProviderConfig({
+        workspaceId: activeWorkspaceId,
+        provider: "tasareal",
+        apiKey: providerApiKey.trim() || null,
+      });
+      setProviderApiKey("");
+      refreshProviderStatus();
+      toast.success("Exchange API connected", result.summary);
+    } catch (error) {
+      toast.error("Could not save API key", getUserFacingErrorMessage(error, "Check the key and try again."));
+    } finally {
+      setIsSavingProvider(false);
+    }
+  };
+
+  const handleClearProvider = async () => {
+    setIsSavingProvider(true);
+    try {
+      const result = await saveCurrencyRateProviderConfig({
+        workspaceId: activeWorkspaceId,
+        provider: "tasareal",
+        clearApiKey: true,
+      });
+      refreshProviderStatus();
+      toast.success("Exchange API disconnected", result.summary);
+    } catch (error) {
+      toast.error("Could not disconnect", getUserFacingErrorMessage(error, "Try again in a moment."));
+    } finally {
+      setIsSavingProvider(false);
+    }
+  };
+
+  const handleRefreshProvider = async () => {
+    setIsRefreshingProvider(true);
+    try {
+      const result = await refreshCurrencyRates({
+        commandId: newCommandId("fx-refresh"),
+        workspaceId: activeWorkspaceId,
+        provider: "tasareal",
+        currency: "USD",
+      });
+      refreshRates();
+      refreshProviderStatus();
+      toast.success("Rates refreshed", result.summary);
+    } catch (error) {
+      toast.error("Could not refresh rates", getUserFacingErrorMessage(error, "Check the API connection and try again."));
+    } finally {
+      setIsRefreshingProvider(false);
     }
   };
 
@@ -231,6 +312,48 @@ export const CurrencySettingsCard = () => {
 
       <div className="surface-card-divider" />
 
+      <div className="currency-provider-card">
+        <div className="currency-provider-copy">
+          <strong>TasaReal API</strong>
+          <span>{providerStatus?.summary ?? "Connect an API key to refresh Dominican bank rates."}</span>
+        </div>
+        <div className="currency-provider-controls">
+          <input
+            className="field-input currency-provider-key-input"
+            onChange={(e) => setProviderApiKey(e.target.value)}
+            placeholder={providerStatus?.hasApiKey ? "API key stored" : "Paste API key"}
+            type="password"
+            value={providerApiKey}
+          />
+          <button
+            className="ghost-control"
+            disabled={isSavingProvider || !providerApiKey.trim()}
+            onClick={() => void handleSaveProvider()}
+            type="button"
+          >
+            <span>{providerStatus?.hasApiKey ? "Update key" : "Connect"}</span>
+          </button>
+          <button
+            aria-label="Refresh rates from TasaReal"
+            className="ghost-control"
+            disabled={isRefreshingProvider || !providerStatus?.hasApiKey}
+            onClick={() => void handleRefreshProvider()}
+            title="Refresh rates from TasaReal"
+            type="button"
+          >
+            <RefreshCw size={13} />
+            <span>{isRefreshingProvider ? "Refreshing…" : "Refresh"}</span>
+          </button>
+          {providerStatus?.hasApiKey ? (
+            <button className="ghost-control is-danger" disabled={isSavingProvider} onClick={() => void handleClearProvider()} type="button">
+              Disconnect
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="surface-card-divider" />
+
       <div className="page-stack-row" style={{ marginBottom: 8 }}>
         <strong>Exchange rates</strong>
         <small className="text-muted">Older quotes keep the rate that was active when they were created.</small>
@@ -271,6 +394,30 @@ export const CurrencySettingsCard = () => {
           />
         </label>
         <label className="field-block">
+          <span className="field-label">Institution</span>
+          <select
+            className="field-input"
+            onChange={(e) => setNewRateSource(e.target.value as CurrencyRateSource)}
+            value={newRateSource}
+          >
+            {rateSourceOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field-block">
+          <span className="field-label">Rate type</span>
+          <select className="field-input" onChange={(e) => setNewRateType(e.target.value as CurrencyRateType)} value={newRateType}>
+            {rateTypeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field-block">
           <span className="field-label">Effective date</span>
           <input
             className="field-input"
@@ -298,6 +445,7 @@ export const CurrencySettingsCard = () => {
             <tr>
               <th>Pair</th>
               <th>Rate</th>
+              <th>Type</th>
               <th>Effective</th>
               <th>Source</th>
               <th></th>
@@ -310,9 +458,12 @@ export const CurrencySettingsCard = () => {
                   {rate.baseCurrency} → {rate.quoteCurrency}
                 </td>
                 <td style={{ fontVariantNumeric: "tabular-nums" }}>{rate.rate}</td>
+                <td>
+                  <small className="text-muted">{rate.rateType}</small>
+                </td>
                 <td>{rate.effectiveDate}</td>
                 <td>
-                  <small className="text-muted">{rate.source}</small>
+                  <small className="text-muted">{rate.sourceLabel ?? rate.source}</small>
                 </td>
                 <td style={{ textAlign: "right" }}>
                   <button

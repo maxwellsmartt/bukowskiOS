@@ -896,7 +896,8 @@ export const updateRmaCaseSchema = createRmaCaseSchema.extend({
 
 const currencyCodeSchema = z.string().trim().min(2).max(8).transform((v) => v.toUpperCase());
 const currencyRateTypeSchema = z.enum(["buy", "sell", "average", "manual"]);
-const currencyRateSourceSchema = z.enum(["manual", "banco_popular", "banco_central", "custom"]);
+const currencyRateSourceSchema = z.enum(["manual", "banco_popular", "banco_central", "banco_santa_cruz", "custom"]);
+const currencyRateProviderSchema = z.enum(["tasareal"]);
 
 // Accepts string | null | undefined and normalises null/empty to undefined.
 // Used for optional text fields that the renderer sends as `null` when empty.
@@ -950,6 +951,31 @@ export const deleteExchangeRateSchema = z
     actorType: commandActorTypeSchema,
     sourceChannel: commandSourceChannelSchema,
     rateId: nonEmptyString,
+  })
+  .strict();
+
+export const currencyRateProviderStatusReadArgsSchema = z.tuple([
+  z.object({
+    workspaceId: nonEmptyString,
+    provider: currencyRateProviderSchema.default("tasareal"),
+  }),
+]);
+
+export const saveCurrencyRateProviderConfigSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    provider: currencyRateProviderSchema,
+    apiKey: nullableOrOptionalText,
+    clearApiKey: z.boolean().optional(),
+  })
+  .strict();
+
+export const refreshCurrencyRatesSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    provider: currencyRateProviderSchema,
+    currency: currencyCodeSchema.optional(),
   })
   .strict();
 
@@ -1028,7 +1054,7 @@ const quoteHeaderInputSchema = z.object({
   currency: z.string().trim().min(2).max(8).transform((v) => v.toUpperCase()),
   baseCurrency: z.string().trim().min(2).max(8).transform((v) => v.toUpperCase()),
   exchangeRate: z.number().finite().positive(),
-  exchangeRateSource: z.enum(["manual", "banco_popular", "banco_central", "custom"]),
+  exchangeRateSource: z.enum(["manual", "banco_popular", "banco_central", "banco_santa_cruz", "custom"]),
   exchangeRateType: z.enum(["buy", "sell", "average", "manual"]),
   exchangeRateEffectiveDate: nullableOrOptionalString,
   taxProfile: quoteTaxProfileSchema,

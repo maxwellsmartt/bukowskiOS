@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS quotes (
   observations TEXT,
   created_by_user_id TEXT,
   updated_by_user_id TEXT,
+  created_by_actor_type TEXT NOT NULL DEFAULT 'user',
+  source_channel TEXT,
   sent_at TEXT,
   approved_at TEXT,
   rejected_at TEXT,

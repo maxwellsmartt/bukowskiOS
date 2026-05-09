@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createCurrencyMutationService } from "../../electron/main/services/data/currencyMutationService";
+import { createCurrencyRateProviderService } from "../../electron/main/services/data/currencyRateProviderService";
 import { createCurrencyReadService } from "../../electron/main/services/data/currencyReadService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 const baseChannel = { actorType: "user" as const, sourceChannel: "desktop" as const };
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("currency mutation service", () => {
   it("upserts settings and returns sensible defaults until then", () => {
@@ -140,6 +145,60 @@ describe("currency mutation service", () => {
         defaultQuoteValidityDays: 30,
       }),
     ).toThrow(/ITBIS rate/);
+
+    cleanup();
+  });
+
+  it("imports TasaReal buy and sell rates into the exchange-rate register", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-currency-provider-refresh");
+    const reads = createCurrencyReadService(database);
+    const mutations = createCurrencyMutationService(database);
+    const secrets = new Map<string, string>();
+    const secretStore = {
+      hasProviderSecret: () => false,
+      getProviderSecret: () => null,
+      setProviderSecret: () => undefined,
+      clearProviderSecret: () => undefined,
+      hasConnectorSecret: (_workspaceId: string, connectorKey: string) => secrets.has(connectorKey),
+      getConnectorSecret: (_workspaceId: string, connectorKey: string) => secrets.get(connectorKey) ?? null,
+      setConnectorSecret: (_workspaceId: string, connectorKey: string, secret: string) => {
+        secrets.set(connectorKey, secret);
+      },
+      clearConnectorSecret: (_workspaceId: string, connectorKey: string) => {
+        secrets.delete(connectorKey);
+      },
+    };
+    const providers = createCurrencyRateProviderService({
+      currencyMutations: mutations,
+      currencyReads: reads,
+      secretStore,
+    });
+
+    providers.saveConfig({ workspaceId: "workspace-metadata", provider: "tasareal", apiKey: "test-key" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          rates: [
+            { institution: "Banco Popular Dominicano", currency: "USD", buy: 59.25, sell: 60.1, date: "2026-05-09" },
+            { slug: "bancosantacruz", currency: "USD", compra: "59.40", venta: "60.20", date: "2026-05-09" },
+          ],
+        }),
+      })),
+    );
+
+    const result = await providers.refreshRates({
+      commandId: "cmd-rate-provider-refresh",
+      workspaceId: "workspace-metadata",
+      provider: "tasareal",
+      currency: "USD",
+    });
+
+    expect(result.importedCount).toBe(4);
+    const importedRates = reads.listRates("workspace-metadata", { baseCurrency: "USD", quoteCurrency: "DOP" });
+    expect(importedRates).toHaveLength(4);
+    expect(importedRates.some((rate) => rate.source === "banco_santa_cruz" && rate.rateType === "buy" && rate.rate === 59.4)).toBe(true);
 
     cleanup();
   });

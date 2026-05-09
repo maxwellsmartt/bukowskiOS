@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type {
+  CurrencyRateProviderKey,
+  CurrencyRateProviderStatus,
   CurrencyRateType,
   CurrencySettingsRow,
   ExchangeRateRow,
+  RefreshCurrencyRatesCommand,
+  RefreshCurrencyRatesResult,
+  SaveCurrencyRateProviderConfigCommand,
 } from "@contracts";
 
 const fallbackSettings = (workspaceId: string): CurrencySettingsRow => ({
@@ -112,4 +117,53 @@ export const fetchLatestRate = async (
 ): Promise<ExchangeRateRow | null> => {
   if (!window.bukowskiCurrency) return null;
   return window.bukowskiCurrency.getLatestRate({ workspaceId, baseCurrency, quoteCurrency, rateType });
+};
+
+export const useCurrencyRateProviderStatus = (workspaceId: string, provider: CurrencyRateProviderKey = "tasareal") => {
+  const [data, setData] = useState<CurrencyRateProviderStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!workspaceId || !window.bukowskiCurrency) {
+      setData(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    window.bukowskiCurrency
+      .getProviderStatus({ workspaceId, provider })
+      .then((row) => {
+        if (!cancelled) setData(row);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load exchange-rate provider.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [provider, workspaceId, version]);
+
+  return { data, isLoading, error, refresh };
+};
+
+export const saveCurrencyRateProviderConfig = async (
+  input: SaveCurrencyRateProviderConfigCommand,
+): Promise<CurrencyRateProviderStatus> => {
+  if (!window.bukowskiCurrency) throw new Error("Currency services are unavailable on this device.");
+  return window.bukowskiCurrency.saveProviderConfig(input);
+};
+
+export const refreshCurrencyRates = async (
+  input: RefreshCurrencyRatesCommand,
+): Promise<RefreshCurrencyRatesResult> => {
+  if (!window.bukowskiCurrency) throw new Error("Currency services are unavailable on this device.");
+  return window.bukowskiCurrency.refreshRates(input);
 };

@@ -166,6 +166,8 @@ export type QuoteRow = {
   rejectedAt: string | null;
   expiredAt: string | null;
   cancelledAt: string | null;
+  createdByActorType: CommandActorType;
+  sourceChannel: CommandSourceChannel | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -31,6 +31,8 @@ describe("foundation navigation shell", () => {
 
   it("preserves the full asset operations sub-navigation", () => {
     expect(assetsSubnav.map((item) => item.label)).toEqual(["Assets", "Licenses", "Packing Slips", "Incidents"]);
+    expect(isSubnavItemActive("/assets/licenses", "/assets/licenses")).toBe(true);
+    expect(isSubnavItemActive("/assets/licenses", "/assets")).toBe(false);
   });
 
   it("adds the global project schedule to projects navigation", () => {

@@ -1,7 +1,7 @@
 import type { CommandActorType, CommandSourceChannel } from "./asset-commands";
 
 export type CurrencyRateType = "buy" | "sell" | "average" | "manual";
-export type CurrencyRateSource = "manual" | "banco_popular" | "banco_central" | "custom";
+export type CurrencyRateSource = "manual" | "banco_popular" | "banco_central" | "banco_santa_cruz" | "custom";
 
 export type CurrencySettingsRow = {
   id: string;
@@ -79,6 +79,32 @@ export type DeleteExchangeRateCommand = {
   rateId: string;
 };
 
+export type CurrencyRateProviderKey = "tasareal";
+
+export type CurrencyRateProviderStatus = {
+  workspaceId: string;
+  provider: CurrencyRateProviderKey;
+  providerLabel: string;
+  hasApiKey: boolean;
+  lastFetchedAt: string | null;
+  lastEffectiveDate: string | null;
+  summary: string;
+};
+
+export type SaveCurrencyRateProviderConfigCommand = {
+  workspaceId: string;
+  provider: CurrencyRateProviderKey;
+  apiKey?: string | null;
+  clearApiKey?: boolean;
+};
+
+export type RefreshCurrencyRatesCommand = {
+  commandId: string;
+  workspaceId: string;
+  provider: CurrencyRateProviderKey;
+  currency?: string;
+};
+
 export type CurrencySettingsMutationResult = {
   commandId: string;
   workspaceId: string;
@@ -90,5 +116,16 @@ export type ExchangeRateMutationResult = {
   commandId: string;
   rateId: string;
   repeated: boolean;
+  summary: string;
+};
+
+export type RefreshCurrencyRatesResult = {
+  commandId: string;
+  workspaceId: string;
+  provider: CurrencyRateProviderKey;
+  importedCount: number;
+  skippedCount: number;
+  effectiveDate: string | null;
+  fetchedAt: string;
   summary: string;
 };

@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import type { QuoteRow, QuoteStatus } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useToast } from "@app/providers/ToastProvider";
+import { AgentCreatedBadge } from "@shared/components/AgentCreatedBadge";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
@@ -138,9 +139,12 @@ export const QuotesPage = () => {
         key: "number",
         label: "Quote #",
         render: (row: QuoteRow) => (
-          <Link className="quotes-list-number" to={`/finance/quotes/${row.id}`}>
-            {row.quoteNumber}
-          </Link>
+          <span className="quotes-list-number-cell">
+            <Link className="quotes-list-number" to={`/finance/quotes/${row.id}`}>
+              {row.quoteNumber}
+            </Link>
+            {row.createdByActorType === "agent" ? <AgentCreatedBadge variant="table" /> : null}
+          </span>
         ),
       },
       {
@@ -374,7 +378,7 @@ export const QuotesPage = () => {
           />
         )}
 
-        {error ? <p className="error-banner">{error}</p> : null}
+        {error ? <div className="form-inline-error">{error}</div> : null}
       </SurfaceCard>
 
       <ConfirmDialog

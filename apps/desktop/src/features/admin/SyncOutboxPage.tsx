@@ -9,6 +9,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { useToast } from "@app/providers/ToastProvider";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { getSyncOutboxStatusLabel } from "@shared/labels/statusLabels";
@@ -215,11 +216,11 @@ const summarizeSelection = (row: AppSyncOutboxRow | null) => {
 export const SyncOutboxPage = () => {
   const navigate = useNavigate();
   const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const toast = useToast();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
   const [rows, setRows] = useState<AppSyncOutboxRow[]>([]);
   const [pullCursors, setPullCursors] = useState<AppSyncPullCursorRow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [filter, setFilter] = useState<SyncFilter>("all");
   const [entityFilter, setEntityFilter] = useState<SyncEntityFilter>("all");
   const [search, setSearch] = useState("");
@@ -315,7 +316,7 @@ export const SyncOutboxPage = () => {
     try {
       setPending(true);
       const result = await action();
-      setFeedback(result.summary);
+      toast.success("Sync action complete", result.summary);
       setDiagnostics(result.diagnostics);
       setError(null);
       const nextRows = await window.bukowskiApp!.getSyncOutboxRows();
@@ -335,7 +336,7 @@ export const SyncOutboxPage = () => {
     try {
       setRetryingRowId(rowId);
       const result = await window.bukowskiApp.retrySyncOutboxRow(rowId);
-      setFeedback(result.summary);
+      toast.success("Sync row queued", result.summary);
       setDiagnostics(result.diagnostics);
       setError(null);
       const nextRows = await window.bukowskiApp.getSyncOutboxRows();
@@ -361,7 +362,7 @@ export const SyncOutboxPage = () => {
       }
 
       if (lastResult) {
-        setFeedback(`${visibleRetryableRows.length} visible rows queued again.`);
+        toast.success("Sync rows queued", `${visibleRetryableRows.length} visible rows queued again.`);
         setDiagnostics(lastResult.diagnostics);
       }
       setError(null);
@@ -384,7 +385,7 @@ export const SyncOutboxPage = () => {
       const result = await window.bukowskiApp.backfillOperationalSnapshots({
         workspaceId: activeWorkspaceId,
       });
-      setFeedback(result.summary);
+      toast.success("Backfill complete", result.summary);
       setDiagnostics(result.diagnostics);
       setError(null);
       const [nextRows, nextPullCursors] = await Promise.all([
@@ -405,7 +406,6 @@ export const SyncOutboxPage = () => {
       <SectionHeader title="Sync activity" />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
-      {feedback ? <div className="action-feedback action-feedback-success">{feedback}</div> : null}
 
       <SettingsLayout>
       <div className="sync-overview-grid">

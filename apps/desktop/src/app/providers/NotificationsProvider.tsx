@@ -82,6 +82,16 @@ const NotificationsContext = createContext<NotificationsContextValue | null>(nul
 
 const maxTrayItems = 80;
 
+const stableAgentIntentKey = (intent: AgentNotificationIntent, threadId: string) => {
+  if (intent.type === "create_todo") {
+    return ["todo", threadId, intent.title, intent.dueAt ?? "", intent.recurrenceRule ?? "", intent.priority ?? 0].join("|");
+  }
+  if (intent.type === "create_reminder") {
+    return ["reminder", threadId, intent.title, intent.remindAt, intent.recurrenceRule ?? ""].join("|");
+  }
+  return ["notification", threadId, intent.title, intent.body ?? "", intent.linkTo ?? ""].join("|");
+};
+
 const toNotificationRow = (row: {
   id: string;
   user_id: string;
@@ -218,6 +228,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   const [trayAnchor, setTrayAnchor] = useState<DOMRect | null>(null);
   const seenIdsRef = useRef(new Set<string>());
   const firedReminderIdsRef = useRef(new Set<string>());
+  const processedAgentIntentKeysRef = useRef(new Set<string>());
   const activeUserId = user?.id ?? null;
   const canUseRemote = Boolean(supabase && activeUserId && activeWorkspaceId && isWorkspaceReady && status === "authenticated");
 
@@ -309,6 +320,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       setIsLoading(false);
       seenIdsRef.current.clear();
       firedReminderIdsRef.current.clear();
+      processedAgentIntentKeysRef.current.clear();
       return undefined;
     }
 
@@ -693,6 +705,12 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   const applyAgentNotificationIntents = useCallback(
     async (intents: AgentNotificationIntent[], threadId: string) => {
       for (const intent of intents) {
+        const intentKey = stableAgentIntentKey(intent, threadId);
+        if (processedAgentIntentKeysRef.current.has(intentKey)) {
+          continue;
+        }
+        processedAgentIntentKeysRef.current.add(intentKey);
+
         if (intent.type === "create_notification") {
           await createNotification({
             kind: intent.kind ?? "operation",

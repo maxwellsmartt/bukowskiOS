@@ -346,6 +346,7 @@ app.whenReady().then(() => {
     financeMutations: localDatabase.financeMutations,
     currencyMutations: localDatabase.currencyMutations,
     currencyReads: localDatabase.currencyReads,
+    currencyRateProviders: localDatabase.currencyRateProviders,
     quoteMutations: localDatabase.quoteMutations,
     quoteReads: localDatabase.quoteReads,
     exportQuotePdf: async (workspaceId: string, quoteId: string) => {

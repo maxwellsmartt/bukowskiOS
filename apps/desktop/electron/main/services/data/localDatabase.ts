@@ -45,7 +45,9 @@ import { applyConnectorFoundationMigration, bootstrapConnectorFoundation } from 
 import { applyCrewCatalogFoundationMigration } from "./crewCatalogFoundationBootstrap";
 import { createDataRetentionService, summarizeDataRetention } from "./dataRetentionService";
 import { createCurrencyMutationService } from "./currencyMutationService";
+import { createCurrencyRateProviderService, type CurrencyRateProviderService } from "./currencyRateProviderService";
 import { createCurrencyReadService } from "./currencyReadService";
+import { applyQuoteAgentSourceMigration } from "./quoteAgentSourceBootstrap";
 import { createQuoteMutationService } from "./quoteMutationService";
 import { createQuoteReadService } from "./quoteReadService";
 import { createFinanceMutationService } from "./financeMutationService";
@@ -108,6 +110,7 @@ type LocalDatabaseRuntime = {
   financeMutations: FinanceMutationService;
   currencyMutations: CurrencyMutationService;
   currencyReads: CurrencyReadService;
+  currencyRateProviders: CurrencyRateProviderService;
   quoteMutations: QuoteMutationServiceType;
   quoteReads: QuoteReadServiceType;
   packingMutations: PackingMutationService;
@@ -535,6 +538,9 @@ const createRuntime = (): LocalDatabaseRuntime => {
   );
   runStartupStep("apply asset valuation foundation migration", () =>
     applyTrackedStep(database, "runtime_asset_valuation_foundation_v1", () => applyAssetValuationFoundationMigration(database)),
+  );
+  runStartupStep("apply quote agent source migration", () =>
+    applyTrackedStep(database, "runtime_quote_agent_source_v1", () => applyQuoteAgentSourceMigration(database)),
   );
   runStartupStep("bootstrap admin foundation", () => bootstrapAdminFoundation(database, { cleanupDemoPlaceholders: true }));
   runStartupStep("bootstrap scheduling foundation", () => bootstrapSchedulingFoundation(database));
@@ -1025,12 +1031,18 @@ const createRuntime = (): LocalDatabaseRuntime => {
   const financeMutations = createFinanceMutationService(database);
   const currencyMutations = createCurrencyMutationService(database);
   const currencyReads = createCurrencyReadService(database);
+  const currencyRateProviders = createCurrencyRateProviderService({
+    currencyMutations,
+    currencyReads,
+    secretStore,
+  });
   const quoteMutations = createQuoteMutationService(database);
   const quoteReads = createQuoteReadService(database);
   const packingMutations = createPackingMutationService(database);
   const rmaMutations = createRmaMutationService(database);
   const toolRegistry = createAgentToolRegistry(foundationReads, {
     getRunsList: () => agentReads.getRunsList(),
+    currencyReads,
     quoteReads,
     writeServices: {
       packing: packingMutations,
@@ -1079,12 +1091,17 @@ const createRuntime = (): LocalDatabaseRuntime => {
                     id = ?
                     OR code = ?
                     OR lower(name) = lower(?)
+                    OR lower(code) LIKE lower(?)
+                    OR lower(name) LIKE lower(?)
                   )
                 ORDER BY
                   CASE
                     WHEN id = ? THEN 0
                     WHEN code = ? THEN 1
-                    ELSE 2
+                    WHEN lower(name) = lower(?) THEN 2
+                    WHEN lower(code) LIKE lower(?) THEN 3
+                    WHEN lower(name) LIKE lower(?) THEN 4
+                    ELSE 5
                   END
                 LIMIT 1
               `,
@@ -1094,8 +1111,13 @@ const createRuntime = (): LocalDatabaseRuntime => {
               normalizedIdentifier,
               normalizedIdentifier.toUpperCase(),
               normalizedIdentifier,
+              `${normalizedIdentifier.toUpperCase()}%`,
+              `%${normalizedIdentifier}%`,
               normalizedIdentifier,
               normalizedIdentifier.toUpperCase(),
+              normalizedIdentifier,
+              `${normalizedIdentifier.toUpperCase()}%`,
+              `%${normalizedIdentifier}%`,
             ) as
             | {
                 id: string;
@@ -1256,6 +1278,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     financeMutations,
     currencyMutations,
     currencyReads,
+    currencyRateProviders,
     quoteMutations,
     quoteReads,
     packingMutations,

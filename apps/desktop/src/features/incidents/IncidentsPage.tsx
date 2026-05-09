@@ -99,7 +99,6 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
   const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
   const toast = useToast();
   const [activeIncidentId, setActiveIncidentId] = useState<string | null>(null);
-  const [incidentDetailFeedback, setIncidentDetailFeedback] = useState<string | null>(null);
   const [incidentDetailError, setIncidentDetailError] = useState<string | null>(null);
   const [isSubmittingIncidentDetail, setIsSubmittingIncidentDetail] = useState(false);
   const {
@@ -205,7 +204,6 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
               setReportOpen(false);
               setReportError(null);
               toast.success("Incident reported", result.summary);
-              setIncidentDetailFeedback(null);
             } catch (nextError) {
               setReportError(getUserFacingErrorMessage(nextError, "Unable to create incident."));
             } finally {
@@ -242,7 +240,6 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           onRowClick={(row) => {
             setActiveIncidentId(row.id);
             setIncidentDetailError(null);
-            setIncidentDetailFeedback(null);
           }}
           onSortRequest={incidentControls.handleColumnSortRequest}
           persistKey="incidents-queue"
@@ -293,7 +290,6 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       <IncidentDetailPanel
         detail={activeIncidentDetail}
         error={incidentDetailError ?? activeIncidentDetailLoadError}
-        feedback={incidentDetailFeedback}
         isSubmitting={isSubmittingIncidentDetail}
         repairCase={
           activeIncidentRepairCase
@@ -307,7 +303,6 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
         onClose={() => {
           setActiveIncidentId(null);
           setIncidentDetailError(null);
-          setIncidentDetailFeedback(null);
         }}
         onCreateRepairCase={!isProjectMode ? handleCreateRepairCaseFromIncident : undefined}
         onOpenRepairCase={!isProjectMode ? handleOpenRepairCaseFromIncident : undefined}
@@ -334,7 +329,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
 
             await Promise.all([reload(), refreshProjects(), reloadIncidentDetail()]);
             setIncidentDetailError(null);
-            setIncidentDetailFeedback(result.summary);
+            toast.success("Incident resolved", result.summary);
           } catch (nextError) {
             setIncidentDetailError(getUserFacingErrorMessage(nextError, "Unable to resolve incident."));
           } finally {
@@ -366,7 +361,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
 
             await Promise.all([reload(), refreshProjects(), reloadIncidentDetail()]);
             setIncidentDetailError(null);
-            setIncidentDetailFeedback(result.summary);
+            toast.success("Incident updated", result.summary);
           } catch (nextError) {
             setIncidentDetailError(getUserFacingErrorMessage(nextError, "Unable to update incident."));
           } finally {

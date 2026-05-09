@@ -168,6 +168,9 @@ export const ipcChannels = {
     getLatestRate: "bukowskiCurrency:getLatestRate",
     createRate: "bukowskiCurrency:createRate",
     deleteRate: "bukowskiCurrency:deleteRate",
+    getProviderStatus: "bukowskiCurrency:getProviderStatus",
+    saveProviderConfig: "bukowskiCurrency:saveProviderConfig",
+    refreshRates: "bukowskiCurrency:refreshRates",
   },
   quotes: {
     list: "bukowskiQuotes:list",

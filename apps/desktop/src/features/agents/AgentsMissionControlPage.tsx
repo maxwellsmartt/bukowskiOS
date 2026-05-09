@@ -527,7 +527,7 @@ export const AgentsMissionControlPage = () => {
         </SurfaceCard>
       ) : null}
 
-      <div className="agents-support-grid">
+      <div className="agents-support-grid mission-overview-activity-grid">
         <CollapsibleMissionCard
           className="mission-activity-card"
           collapsed={collapsedSections.queue}

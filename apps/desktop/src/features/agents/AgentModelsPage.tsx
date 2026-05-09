@@ -3,6 +3,7 @@ import { CheckCircle2, KeyRound, RadioTower, RotateCcw, ServerCog } from "lucide
 
 import type { AgentModelAssignmentRow, AgentModelRow } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { useToast } from "@app/providers/ToastProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
@@ -74,11 +75,11 @@ const buildAssignmentDraftMap = (assignments: AgentModelAssignmentRow[]) =>
 
 export const AgentModelsPage = () => {
   const { activeWorkspaceId: workspaceId } = useWorkspace();
+  const toast = useToast();
   const { data, error } = useAgentModels();
   const [selectedProviderKey, setSelectedProviderKey] = useState<string | null>(null);
   const [providerDraft, setProviderDraft] = useState<ProviderDraft>(buildProviderDraft(null));
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, AssignmentDraft>>({});
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSavingProvider, setIsSavingProvider] = useState(false);
   const [isTestingProvider, setIsTestingProvider] = useState(false);
@@ -126,10 +127,6 @@ export const AgentModelsPage = () => {
   }, [selectedProvider]);
 
   useEffect(() => {
-    setFeedback(null);
-  }, [selectedProviderKey]);
-
-  useEffect(() => {
     setAssignmentDrafts(buildAssignmentDraftMap(data.assignments));
   }, [data.assignments]);
 
@@ -156,7 +153,6 @@ export const AgentModelsPage = () => {
     }
 
     setIsSavingProvider(true);
-    setFeedback(null);
     setErrorMessage(null);
 
     try {
@@ -173,7 +169,7 @@ export const AgentModelsPage = () => {
         retryCount: providerDraft.retryCount,
       });
 
-      setFeedback(result.summary);
+      toast.success("Provider saved", result.summary);
       setProviderDraft((current) => ({
         ...current,
         apiKey: "",
@@ -191,7 +187,6 @@ export const AgentModelsPage = () => {
     }
 
     setIsSavingProvider(true);
-    setFeedback(null);
     setErrorMessage(null);
 
     try {
@@ -208,7 +203,7 @@ export const AgentModelsPage = () => {
         retryCount: providerDraft.retryCount,
       });
 
-      setFeedback(result.summary);
+      toast.success("Provider key cleared", result.summary);
     } catch (saveError) {
       setErrorMessage(getUserFacingErrorMessage(saveError, "Unable to clear the stored API key."));
     } finally {
@@ -222,7 +217,6 @@ export const AgentModelsPage = () => {
     }
 
     setIsRefreshingModels(true);
-    setFeedback(null);
     setErrorMessage(null);
 
     try {
@@ -230,7 +224,7 @@ export const AgentModelsPage = () => {
         workspaceId,
         providerKey: selectedProvider.providerKey,
       });
-      setFeedback(result.summary);
+      toast.success("Models refreshed", result.summary);
     } catch (refreshError) {
       setErrorMessage(getUserFacingErrorMessage(refreshError, "Unable to refresh model options."));
     } finally {
@@ -244,7 +238,6 @@ export const AgentModelsPage = () => {
     }
 
     setIsTestingProvider(true);
-    setFeedback(null);
     setErrorMessage(null);
 
     try {
@@ -252,7 +245,7 @@ export const AgentModelsPage = () => {
         workspaceId,
         providerKey: selectedProvider.providerKey,
       });
-      setFeedback(result.summary);
+      toast.success("Provider tested", result.summary);
     } catch (testError) {
       setErrorMessage(getUserFacingErrorMessage(testError, "Unable to test the provider connection."));
     } finally {
@@ -299,7 +292,6 @@ export const AgentModelsPage = () => {
     }
 
     setAssignmentBusyAgentId(assignment.agentId);
-    setFeedback(null);
     setErrorMessage(null);
 
     try {
@@ -312,7 +304,7 @@ export const AgentModelsPage = () => {
         modelLabel: draft.modelLabel,
       });
 
-      setFeedback(result.summary);
+      toast.success("Agent model updated", result.summary);
     } catch (assignmentError) {
       setErrorMessage(getUserFacingErrorMessage(assignmentError, "Unable to update the agent assignment."));
     } finally {
@@ -561,7 +553,6 @@ export const AgentModelsPage = () => {
                 </div>
               ) : null}
 
-              {feedback ? <div className="models-provider-feedback models-provider-feedback-success">{feedback}</div> : null}
               {errorMessage ? <div className="form-inline-error">{errorMessage}</div> : null}
 
               <div className="agent-detail-actions">

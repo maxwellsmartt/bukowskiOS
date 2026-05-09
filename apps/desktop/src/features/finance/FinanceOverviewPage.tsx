@@ -1,5 +1,5 @@
-import { Download } from "lucide-react";
-import { useMemo, useState } from "react";
+import { RefreshCw, Upload } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -15,7 +15,12 @@ import {
   YAxis,
 } from "recharts";
 
-import type { FinanceOverviewPeriodPreset, FinanceOverviewQuery } from "@contracts";
+import type {
+  CurrencyRateSource,
+  ExchangeRateRow,
+  FinanceOverviewPeriodPreset,
+  FinanceOverviewQuery,
+} from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
@@ -27,8 +32,13 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import bancoCentralLogo from "@shared/assets/inbox/logos/banco-central-logo.png";
+import bancoPopularLogo from "@shared/assets/inbox/logos/banco popular dominicano-logo.jpg";
+import bancoSantaCruzLogo from "@shared/assets/inbox/logos/banco santa cruz-logo.png";
 
 import { exportFinanceReportPdf, useFinanceOverview } from "./useFinanceData";
+import { refreshCurrencyRates, useCurrencyRateProviderStatus, useExchangeRates } from "./useCurrencyData";
+import { newCommandId } from "./quoteHelpers";
 
 const periodOptions: Array<{ label: string; value: FinanceOverviewPeriodPreset }> = [
   { label: "Month", value: "month" },
@@ -38,6 +48,12 @@ const periodOptions: Array<{ label: string; value: FinanceOverviewPeriodPreset }
 ];
 
 const chartPalette = ["#d6b37a", "#7eb7b2", "#92a7c1", "#c88d7f", "#a29cd8", "#8ca772"];
+const fxRefreshIntervalMs = 30 * 60 * 1000;
+const exchangeRateInstitutions: Array<{ label: string; logo: string; source: CurrencyRateSource }> = [
+  { label: "Banco Popular", logo: bancoPopularLogo, source: "banco_popular" },
+  { label: "Banco Central", logo: bancoCentralLogo, source: "banco_central" },
+  { label: "Banco Santa Cruz", logo: bancoSantaCruzLogo, source: "banco_santa_cruz" },
+];
 
 const formatAxisCurrency = (value: number) => {
   if (value >= 1_000_000) {
@@ -49,6 +65,105 @@ const formatAxisCurrency = (value: number) => {
   }
 
   return `$${Math.round(value)}`;
+};
+
+const formatRateValue = (value: number | null) => (typeof value === "number" ? value.toFixed(2) : "—");
+
+const formatRateTimestamp = (value: string | null | undefined) => {
+  if (!value) return "Not refreshed yet";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+};
+
+const formatRateTrendTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+};
+
+const minuteBucketIso = (value: number) => new Date(Math.floor(value / 60_000) * 60_000).toISOString();
+
+const nextLocalMidnightIso = () => {
+  const next = new Date();
+  next.setDate(next.getDate() + 1);
+  next.setHours(0, 0, 0, 0);
+  return next.toISOString();
+};
+
+const readRateLimitBlock = (key: string) => {
+  const saved = window.localStorage.getItem(key);
+  if (!saved) return null;
+  const blockedUntilMs = new Date(saved).getTime();
+  if (!blockedUntilMs || blockedUntilMs <= Date.now()) {
+    window.localStorage.removeItem(key);
+    return null;
+  }
+  return saved;
+};
+
+const findLatestRate = (
+  rows: ExchangeRateRow[],
+  source: CurrencyRateSource,
+  rateType: ExchangeRateRow["rateType"],
+  baseCurrency: string,
+) =>
+  rows.find(
+    (row) =>
+      row.source === source &&
+      row.baseCurrency === baseCurrency &&
+      row.quoteCurrency === "DOP" &&
+      row.rateType === rateType,
+  ) ?? null;
+
+const findDecisionRate = (rows: ExchangeRateRow[], source: CurrencyRateSource, baseCurrency: string) =>
+  findLatestRate(rows, source, "buy", baseCurrency) ??
+  findLatestRate(rows, source, "average", baseCurrency) ??
+  findLatestRate(rows, source, "manual", baseCurrency) ??
+  rows.find((row) => row.source === source && row.baseCurrency === baseCurrency && row.quoteCurrency === "DOP") ??
+  null;
+
+const rateSourceLabel = (source: CurrencyRateSource) =>
+  exchangeRateInstitutions.find((institution) => institution.source === source)?.label ?? source;
+
+const rateSourceColor = (source: CurrencyRateSource) => {
+  if (source === "banco_popular") return "#7eb7b2";
+  if (source === "banco_central") return "#d6b37a";
+  if (source === "banco_santa_cruz") return "#92a7c1";
+  return "#c88d7f";
+};
+
+const RateChartTooltip = ({
+  active,
+  label,
+  payload,
+}: {
+  active?: boolean;
+  label?: string;
+  payload?: Array<{ color?: string; dataKey?: string; value?: number | string }>;
+}) => {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div className="finance-chart-tooltip">
+      {label ? <strong>{label}</strong> : null}
+      {payload.map((entry) => (
+        <div key={`${entry.dataKey}-${entry.color}`} className="finance-chart-tooltip-row">
+          <span className="finance-chart-tooltip-dot" style={{ background: entry.color ?? "rgba(255,255,255,0.6)" }} />
+          <span>
+            {rateSourceLabel(entry.dataKey as CurrencyRateSource)} ·{" "}
+            {typeof entry.value === "number" ? entry.value.toFixed(2) : String(entry.value ?? "—")}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 };
 
 const ChartTooltip = ({
@@ -86,7 +201,11 @@ export const FinanceOverviewPage = () => {
   const [customEndDate, setCustomEndDate] = useState("");
   const [exportError, setExportError] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isRefreshingRates, setIsRefreshingRates] = useState(false);
+  const [selectedFxCurrency, setSelectedFxCurrency] = useState<"USD" | "EUR">("USD");
+  const [rateLimitBlockedUntil, setRateLimitBlockedUntil] = useState<string | null>(null);
   const isCustomRangeReady = period !== "custom" || (Boolean(customStartDate) && Boolean(customEndDate));
+  const rateLimitStorageKey = `bukowski:fx-rate-limit:${activeWorkspaceId}:tasareal:${selectedFxCurrency}`;
 
   const overviewQuery = useMemo<FinanceOverviewQuery>(
     () =>
@@ -101,6 +220,13 @@ export const FinanceOverviewPage = () => {
   );
 
   const { data, error, isLoading } = useFinanceOverview(overviewQuery);
+  const {
+    data: exchangeRates,
+    error: exchangeRatesError,
+    isLoading: isLoadingExchangeRates,
+    refresh: reloadExchangeRates,
+  } = useExchangeRates(activeWorkspaceId, { baseCurrency: selectedFxCurrency, quoteCurrency: "DOP", limit: 200 });
+  const { data: providerStatus, refresh: reloadProviderStatus } = useCurrencyRateProviderStatus(activeWorkspaceId);
 
   const exposureChartRows = useMemo(
     () =>
@@ -115,6 +241,166 @@ export const FinanceOverviewPage = () => {
   const categoryChartRows = data.categoryBreakdown.length
     ? data.categoryBreakdown
     : [{ category: "No tracked spend", amount: "$0", amountValue: 0, percentage: 100 }];
+
+  const exchangeRateRows = useMemo(() => {
+    const rows = exchangeRateInstitutions.map((institution) => {
+      const decisionRate = findDecisionRate(exchangeRates, institution.source, selectedFxCurrency);
+      const sellRate = findLatestRate(exchangeRates, institution.source, "sell", selectedFxCurrency);
+      return {
+        ...institution,
+        decisionRate,
+        sellRate,
+      };
+    });
+    const bestBuy = Math.max(...rows.map((row) => row.decisionRate?.rate ?? 0));
+    return rows.map((row) => ({
+      ...row,
+      differenceFromBest: row.decisionRate && bestBuy > 0 ? row.decisionRate.rate - bestBuy : null,
+      isBest: row.decisionRate ? row.decisionRate.rate === bestBuy : false,
+    }));
+  }, [exchangeRates, selectedFxCurrency]);
+
+  const rateTrendRows = useMemo(() => {
+    const rowsByTimestamp = new Map<string, Record<string, number | string>>();
+    const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
+    const trendRates = [...exchangeRates].sort((a, b) => String(a.fetchedAt ?? "").localeCompare(String(b.fetchedAt ?? "")));
+    for (const rate of trendRates) {
+      if (rate.rateType !== "buy" && rate.rateType !== "average" && rate.rateType !== "manual") continue;
+      if (!exchangeRateInstitutions.some((institution) => institution.source === rate.source)) continue;
+      if (!rate.fetchedAt) continue;
+      const fetchedMs = new Date(rate.fetchedAt).getTime();
+      if (Number.isNaN(fetchedMs) || fetchedMs < cutoffMs) continue;
+      const bucket = minuteBucketIso(fetchedMs);
+      const row = rowsByTimestamp.get(bucket) ?? {
+        label: formatRateTrendTime(bucket),
+        timestamp: bucket,
+      };
+      if (typeof row[rate.source] !== "number" || rate.rateType === "buy") {
+        row[rate.source] = rate.rate;
+      }
+      rowsByTimestamp.set(bucket, row);
+    }
+    return Array.from(rowsByTimestamp.values()).sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
+  }, [exchangeRates]);
+
+  const rateTrendDomain = useMemo<[number, number]>(() => {
+    const values = rateTrendRows.flatMap((row) =>
+      exchangeRateInstitutions
+        .map((institution) => row[institution.source])
+        .filter((value): value is number => typeof value === "number"),
+    );
+    if (!values.length) return [0, 1];
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const padding = Math.max((max - min) * 0.35, 0.08);
+    return [Math.floor((min - padding) * 100) / 100, Math.ceil((max + padding) * 100) / 100];
+  }, [rateTrendRows]);
+
+  const hasExchangeRates = exchangeRateRows.some((row) => row.decisionRate);
+  const exchangeRateStatus = exchangeRates.some((row) => row.fetchedAt)
+    ? "Synced"
+    : hasExchangeRates
+      ? "Manual"
+      : providerStatus?.hasApiKey
+        ? "Connected"
+        : "Setup needed";
+  const exchangeRateStatusTone = hasExchangeRates || providerStatus?.hasApiKey ? "success" : "neutral";
+  const isRateLimitBlocked = rateLimitBlockedUntil ? Date.now() < new Date(rateLimitBlockedUntil).getTime() : false;
+  const latestVisibleRate = exchangeRates.find((row) => row.fetchedAt) ?? exchangeRates[0] ?? null;
+
+  useEffect(() => {
+    setRateLimitBlockedUntil(readRateLimitBlock(rateLimitStorageKey));
+  }, [rateLimitStorageKey]);
+
+  const handleRefreshRates = useCallback(
+    async ({ quiet = false }: { quiet?: boolean } = {}) => {
+      if (!providerStatus?.hasApiKey || isRefreshingRates) return;
+      if (isRateLimitBlocked) {
+        if (!quiet) {
+          toast.warning(
+            "Daily exchange-rate limit reached",
+            `Showing saved rates. TasaReal refresh unlocks after ${formatRateTimestamp(rateLimitBlockedUntil)}.`,
+          );
+        }
+        return;
+      }
+      setIsRefreshingRates(true);
+      try {
+        const result = await refreshCurrencyRates({
+          commandId: newCommandId("fx-refresh"),
+          workspaceId: activeWorkspaceId,
+          provider: "tasareal",
+          currency: selectedFxCurrency,
+        });
+        reloadExchangeRates();
+        reloadProviderStatus();
+        window.localStorage.removeItem(rateLimitStorageKey);
+        setRateLimitBlockedUntil(null);
+        if (!quiet) {
+          toast.success("Rates refreshed", result.summary);
+        }
+      } catch (nextError) {
+        const errorMessage = nextError instanceof Error ? nextError.message : String(nextError);
+        if (errorMessage.includes("429")) {
+          const blockedUntil = nextLocalMidnightIso();
+          window.localStorage.setItem(rateLimitStorageKey, blockedUntil);
+          setRateLimitBlockedUntil(blockedUntil);
+        }
+        if (!quiet) {
+          toast.error(
+            errorMessage.includes("429") ? "Daily exchange-rate limit reached" : "Could not refresh rates",
+            getUserFacingErrorMessage(
+              nextError,
+              errorMessage.includes("429")
+                ? "Showing saved rates. TasaReal should reset the quota at midnight."
+                : "Check the API connection and try again.",
+            ),
+          );
+        }
+      } finally {
+        setIsRefreshingRates(false);
+      }
+    },
+    [
+      activeWorkspaceId,
+      isRateLimitBlocked,
+      isRefreshingRates,
+      providerStatus?.hasApiKey,
+      rateLimitBlockedUntil,
+      rateLimitStorageKey,
+      reloadExchangeRates,
+      reloadProviderStatus,
+      selectedFxCurrency,
+      toast,
+    ],
+  );
+
+  useEffect(() => {
+    if (!providerStatus?.hasApiKey) return;
+    if (isRateLimitBlocked) return;
+    const lastFetchedMs = providerStatus.lastFetchedAt ? new Date(providerStatus.lastFetchedAt).getTime() : 0;
+    const today = new Date().toISOString().slice(0, 10);
+    const hasFreshCurrencyRates = exchangeRates.some(
+      (row) => row.fetchedAt && row.baseCurrency === selectedFxCurrency && row.fetchedAt.slice(0, 10) === today,
+    );
+    const isStale = !lastFetchedMs || Date.now() - lastFetchedMs > fxRefreshIntervalMs;
+    if (hasExchangeRates && (isStale || !hasFreshCurrencyRates)) {
+      void handleRefreshRates({ quiet: true });
+    }
+    if (!hasExchangeRates) return;
+    const interval = window.setInterval(() => {
+      void handleRefreshRates({ quiet: true });
+    }, fxRefreshIntervalMs);
+    return () => window.clearInterval(interval);
+  }, [
+    exchangeRates,
+    handleRefreshRates,
+    hasExchangeRates,
+    isRateLimitBlocked,
+    providerStatus?.hasApiKey,
+    providerStatus?.lastFetchedAt,
+    selectedFxCurrency,
+  ]);
 
   const handleExportPdf = async () => {
     try {
@@ -140,9 +426,9 @@ export const FinanceOverviewPage = () => {
         title="Period"
         aside={
           <div className="finance-overview-aside">
-            <StatusBadge tone="info">{data.activePeriodLabel}</StatusBadge>
-            <button className="ghost-control" disabled={isExportingPdf} onClick={() => void handleExportPdf()} type="button">
-              <Download size={14} />
+            <span className="finance-period-active-pill">{data.activePeriodLabel}</span>
+            <button className="finance-export-button" disabled={isExportingPdf} onClick={() => void handleExportPdf()} type="button">
+              <Upload size={15} />
               <span>{isExportingPdf ? "Exporting PDF..." : "Export PDF"}</span>
             </button>
           </div>
@@ -204,6 +490,168 @@ export const FinanceOverviewPage = () => {
           </SurfaceCard>
         ))}
       </div>
+
+      <SurfaceCard
+        title="Exchange rates"
+        aside={
+          <div className="finance-overview-aside">
+            <label className="compact-filter-field finance-fx-currency-select">
+              <span>Currency</span>
+              <select
+                className="compact-filter-select"
+                onChange={(event) => setSelectedFxCurrency(event.target.value as "USD" | "EUR")}
+                value={selectedFxCurrency}
+              >
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </label>
+            <span
+              aria-label={`Exchange rates ${exchangeRateStatus}`}
+              className={`finance-fx-status-dot finance-fx-status-${exchangeRateStatusTone}`}
+              title={exchangeRateStatus}
+            >
+              <span aria-hidden="true" />
+              <span className="sr-only">{exchangeRateStatus}</span>
+            </span>
+            <button
+              aria-label="Refresh exchange rates"
+              className="icon-ghost-control"
+              disabled={isRefreshingRates || !providerStatus?.hasApiKey || isRateLimitBlocked}
+              onClick={() => void handleRefreshRates()}
+              title={
+                isRateLimitBlocked
+                  ? `TasaReal limit reached until ${formatRateTimestamp(rateLimitBlockedUntil)}`
+                  : providerStatus?.hasApiKey
+                    ? "Refresh exchange rates"
+                    : "Connect TasaReal in Settings"
+              }
+              type="button"
+            >
+              <RefreshCw size={14} />
+            </button>
+          </div>
+        }
+      >
+        <div className="finance-fx-grid">
+          {exchangeRateRows.map((row) => (
+            <div className={`finance-fx-provider-card${row.isBest ? " is-best" : ""}`} key={row.source}>
+              <div className="finance-fx-provider-header">
+                <span className="finance-fx-logo" aria-hidden="true">
+                  <img alt="" src={row.logo} />
+                </span>
+                <div className="finance-fx-provider-copy">
+                  <strong>{row.label}</strong>
+                  <span>
+                    {row.decisionRate?.fetchedAt
+                      ? `TasaReal · ${formatRateTimestamp(row.decisionRate.fetchedAt)}`
+                      : row.decisionRate
+                        ? "Manual snapshot"
+                        : providerStatus?.hasApiKey
+                          ? `No ${selectedFxCurrency} rate yet`
+                          : "Not connected"}
+                  </span>
+                </div>
+                {row.isBest ? <StatusBadge tone="success">Best</StatusBadge> : null}
+              </div>
+              <div className="finance-fx-rate-row">
+                <span className="finance-fx-rate-buy">
+                  <small>Buy</small>
+                  <strong>{formatRateValue(row.decisionRate?.rate ?? null)}</strong>
+                </span>
+                <span className="finance-fx-rate-sell">
+                  <small>Sell</small>
+                  <strong>{formatRateValue(row.sellRate?.rate ?? null)}</strong>
+                </span>
+                <span className="finance-fx-rate-diff">
+                  <small>Diff</small>
+                  <strong className={row.differenceFromBest === 0 ? "is-positive" : ""}>
+                    {row.differenceFromBest === null ? "—" : row.differenceFromBest === 0 ? "Best" : row.differenceFromBest.toFixed(2)}
+                  </strong>
+                </span>
+              </div>
+              <div className="finance-fx-provider-meta">
+                <span>
+                  {row.decisionRate?.effectiveDate ? `Effective ${row.decisionRate.effectiveDate}` : `No ${selectedFxCurrency} rate saved`}
+                </span>
+                {row.decisionRate?.fetchedAt ? (
+                  <a href="https://tasareal.com" rel="noreferrer" target="_blank">
+                    tasareal.com · {formatRateTimestamp(row.decisionRate.fetchedAt)}
+                  </a>
+                ) : (
+                  <span>{row.decisionRate?.sourceLabel ?? row.decisionRate?.source ?? "Ready to refresh"}</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        {exchangeRatesError ? (
+          <div className="action-feedback action-feedback-warning">Exchange rates unavailable: {exchangeRatesError}</div>
+        ) : !hasExchangeRates && !isLoadingExchangeRates ? (
+          <div className="action-feedback action-feedback-info">
+            {providerStatus?.hasApiKey
+              ? `No saved ${selectedFxCurrency}/DOP rates yet. Refresh when quota is available or add a manual rate in Settings.`
+              : "Add bank rates in Settings → Workspace → Currency. API connectors can later update this same register automatically."}
+          </div>
+        ) : null}
+        {isRateLimitBlocked ? (
+          <div className="action-feedback action-feedback-warning">
+            Daily TasaReal limit reached. Showing last saved rates until {formatRateTimestamp(rateLimitBlockedUntil)}.
+          </div>
+        ) : latestVisibleRate?.fetchedAt ? (
+          <div className="finance-fx-source-note">
+            Source: tasareal.com · Last fetched {formatRateTimestamp(latestVisibleRate.fetchedAt)} · Stored as a quote-safe snapshot.
+          </div>
+        ) : null}
+      </SurfaceCard>
+
+      <SurfaceCard title={`${selectedFxCurrency}/DOP 24h trend`}>
+        {rateTrendRows.length > 0 ? (
+          <div className="finance-chart-shell finance-fx-trend-chart">
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={rateTrendRows} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
+                <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="label" stroke="rgba(255,255,255,0.48)" tickLine={false} axisLine={false} />
+                <YAxis
+                  domain={rateTrendDomain}
+                  stroke="rgba(255,255,255,0.44)"
+                  tickFormatter={(value) => Number(value).toFixed(2)}
+                  tickLine={false}
+                  axisLine={false}
+                  width={58}
+                />
+                <Tooltip content={<RateChartTooltip />} />
+                {exchangeRateInstitutions.map((institution) => (
+                  <Line
+                    key={institution.source}
+                    type="monotone"
+                    dataKey={institution.source}
+                    name={institution.label}
+                    stroke={rateSourceColor(institution.source)}
+                    strokeWidth={2.3}
+                    dot={{ r: 3, fill: rateSourceColor(institution.source) }}
+                    activeDot={{ r: 5 }}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+            <div className="finance-fx-trend-legend">
+              {exchangeRateInstitutions.map((institution) => (
+                <span key={institution.source}>
+                  <i style={{ background: rateSourceColor(institution.source) }} />
+                  {institution.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <GuidedEmptyState
+            title="No 24h trend yet"
+            body={`Refresh ${selectedFxCurrency} rates through the day to build a local 24-hour trend from verified TasaReal snapshots.`}
+          />
+        )}
+      </SurfaceCard>
 
       <div className="finance-dashboard-grid">
         <SurfaceCard

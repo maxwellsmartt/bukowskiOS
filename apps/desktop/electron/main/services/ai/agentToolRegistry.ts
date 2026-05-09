@@ -2,6 +2,7 @@ import type { AIGatewayToolContext, AIGatewayToolCallTrace } from "@contracts";
 import type { AgentRunRow } from "@contracts";
 
 import type { FoundationReadService } from "../data/foundationReadService";
+import type { CurrencyReadService } from "../data/currencyReadService";
 import type { QuoteReadService } from "../data/quoteReadService";
 import { buildWriteToolDefinitions, type AgentWriteServices } from "./agentWriteTools";
 
@@ -61,6 +62,33 @@ const inferProjectIdFromContext = (context: AIGatewayToolContext) => {
   return match?.[1] ?? null;
 };
 
+const resolveProjectIdFromReadTools = (
+  foundationReads: FoundationReadService,
+  context: AIGatewayToolContext,
+  identifier: unknown,
+) => {
+  const candidate = asOptionalString(identifier) ?? inferProjectIdFromContext(context);
+  if (!candidate) return null;
+  if (candidate.startsWith("project-")) return candidate;
+
+  const rows = foundationReads.getProjects({
+    workspaceId: context.workspaceId,
+    search: candidate,
+    sortBy: "name",
+    sortDirection: "asc",
+  });
+  const normalizedCandidate = normalizeLookupText(candidate);
+  const exact =
+    rows.find(
+      (row) =>
+        normalizeLookupText(row.id) === normalizedCandidate ||
+        normalizeLookupText(row.code) === normalizedCandidate ||
+        normalizeLookupText(row.name) === normalizedCandidate,
+    ) ?? null;
+
+  return (exact ?? rows[0] ?? null)?.id ?? candidate;
+};
+
 const compactProject = (
   row: {
     id: string;
@@ -115,6 +143,29 @@ const compactAsset = (row: {
   incidentsOpen: row.incidentsOpen,
 });
 
+const compactExchangeRate = (row: {
+  id: string;
+  baseCurrency: string;
+  quoteCurrency: string;
+  rate: number;
+  rateType: string;
+  source: string;
+  sourceLabel: string | null;
+  effectiveDate: string;
+  fetchedAt: string | null;
+  notes: string | null;
+}) => ({
+  id: row.id,
+  pair: `${row.baseCurrency}/${row.quoteCurrency}`,
+  rate: row.rate,
+  rateType: row.rateType,
+  source: row.source,
+  sourceLabel: row.sourceLabel ?? row.source,
+  effectiveDate: row.effectiveDate,
+  fetchedAt: row.fetchedAt,
+  sourceProof: row.notes?.includes("tasareal.com") ? "https://tasareal.com" : null,
+});
+
 const scoreAssetAlternative = (
   row: {
     code: string;
@@ -137,6 +188,7 @@ export const createAgentToolRegistry = (
   foundationReads: FoundationReadService,
   options: {
     getRunsList: () => AgentRunRow[];
+    currencyReads?: CurrencyReadService;
     quoteReads?: QuoteReadService;
     writeServices?: AgentWriteServices;
   },
@@ -153,7 +205,7 @@ export const createAgentToolRegistry = (
           limit: { type: "number" },
         },
       },
-      execute: (args) => {
+      execute: (args, context) => {
         const agentKey = asOptionalString(args.agent_key);
         const rows = foundationReads
           .getAgentCapabilitiesSnapshot()
@@ -190,7 +242,7 @@ export const createAgentToolRegistry = (
           limit: { type: "number" },
         },
       },
-      execute: (args) => {
+      execute: (args, context) => {
         const rows = foundationReads.getPendingApprovals(asInteger(args.limit, 6));
 
         return {
@@ -270,6 +322,151 @@ export const createAgentToolRegistry = (
               toolCount: row.toolCount,
               tools: row.tools,
             })),
+          },
+        };
+      },
+    },
+    {
+      name: "get_exchange_rates",
+      description:
+        "Return saved USD/DOP or EUR/DOP exchange rates from the workspace, including buy, sell, source proof and fetched timestamps. Use this before answering questions about current bank rates.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          base_currency: { type: "string", description: "USD or EUR. Defaults to USD." },
+          quote_currency: { type: "string", description: "Defaults to DOP." },
+          limit: { type: "number" },
+        },
+      },
+      execute: (args, context) => {
+        if (!options.currencyReads) {
+          return {
+            summary: "Exchange-rate tools are not available on this device.",
+            payload: { items: [] },
+          };
+        }
+        const baseCurrency = (asOptionalString(args.base_currency) ?? "USD").toUpperCase();
+        const quoteCurrency = (asOptionalString(args.quote_currency) ?? "DOP").toUpperCase();
+        const rows = options.currencyReads
+          .listRates(context.workspaceId, {
+            baseCurrency,
+            quoteCurrency,
+            limit: asInteger(args.limit, 24),
+          })
+          .map(compactExchangeRate);
+
+        return {
+          summary: rows.length
+            ? `Loaded ${rows.length} saved ${baseCurrency}/${quoteCurrency} exchange-rate snapshots.`
+            : `No saved ${baseCurrency}/${quoteCurrency} exchange rates found.`,
+          payload: {
+            pair: `${baseCurrency}/${quoteCurrency}`,
+            count: rows.length,
+            items: rows,
+          },
+        };
+      },
+    },
+    {
+      name: "compare_exchange_rates",
+      description:
+        "Compare the latest buy and sell rates by bank for USD/DOP or EUR/DOP. Use buy when Metadata sells foreign currency to receive DOP; use sell when Metadata buys foreign currency with DOP.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          base_currency: { type: "string", description: "USD or EUR. Defaults to USD." },
+          quote_currency: { type: "string", description: "Defaults to DOP." },
+          amount: { type: "number", description: "Optional foreign-currency amount to compare." },
+        },
+      },
+      execute: (args, context) => {
+        if (!options.currencyReads) {
+          return {
+            summary: "Exchange-rate comparison is not available on this device.",
+            payload: { items: [] },
+          };
+        }
+        const baseCurrency = (asOptionalString(args.base_currency) ?? "USD").toUpperCase();
+        const quoteCurrency = (asOptionalString(args.quote_currency) ?? "DOP").toUpperCase();
+        const amount = asNumber(args.amount);
+        const rows = options.currencyReads.listRates(context.workspaceId, { baseCurrency, quoteCurrency, limit: 80 });
+        const sources = Array.from(new Set(rows.map((row) => row.source)));
+        const items = sources.map((source) => {
+          const sourceRows = rows.filter((row) => row.source === source);
+          const buy = sourceRows.find((row) => row.rateType === "buy") ?? sourceRows.find((row) => row.rateType === "average") ?? null;
+          const sell = sourceRows.find((row) => row.rateType === "sell") ?? null;
+          return {
+            source,
+            sourceLabel: buy?.sourceLabel ?? sell?.sourceLabel ?? source,
+            buy: buy ? compactExchangeRate(buy) : null,
+            sell: sell ? compactExchangeRate(sell) : null,
+            receiveDopIfSellingForeign: amount && buy ? amount * buy.rate : null,
+            payDopIfBuyingForeign: amount && sell ? amount * sell.rate : null,
+          };
+        });
+        const bestBuy = items
+          .filter((item) => item.buy)
+          .sort((left, right) => (right.buy?.rate ?? 0) - (left.buy?.rate ?? 0))[0];
+        const bestSell = items
+          .filter((item) => item.sell)
+          .sort((left, right) => (left.sell?.rate ?? Number.POSITIVE_INFINITY) - (right.sell?.rate ?? Number.POSITIVE_INFINITY))[0];
+
+        return {
+          summary: items.length
+            ? `Compared ${items.length} banks for ${baseCurrency}/${quoteCurrency}. Best buy: ${
+                bestBuy?.sourceLabel ?? "n/a"
+              }. Best sell: ${bestSell?.sourceLabel ?? "n/a"}.`
+            : `No saved ${baseCurrency}/${quoteCurrency} rates available to compare.`,
+          payload: {
+            pair: `${baseCurrency}/${quoteCurrency}`,
+            amount: amount ?? null,
+            bestBuySource: bestBuy?.sourceLabel ?? null,
+            bestSellSource: bestSell?.sourceLabel ?? null,
+            items,
+          },
+        };
+      },
+    },
+    {
+      name: "get_exchange_rate_history",
+      description:
+        "Return the saved 24-hour exchange-rate history by fetchedAt timestamp for USD/DOP or EUR/DOP. This is the local verified snapshot history used by the Finance chart.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          base_currency: { type: "string", description: "USD or EUR. Defaults to USD." },
+          quote_currency: { type: "string", description: "Defaults to DOP." },
+          hours: { type: "number", description: "Defaults to 24." },
+        },
+      },
+      execute: (args, context) => {
+        if (!options.currencyReads) {
+          return {
+            summary: "Exchange-rate history is not available on this device.",
+            payload: { items: [] },
+          };
+        }
+        const baseCurrency = (asOptionalString(args.base_currency) ?? "USD").toUpperCase();
+        const quoteCurrency = (asOptionalString(args.quote_currency) ?? "DOP").toUpperCase();
+        const hours = Math.min(168, asInteger(args.hours, 24));
+        const cutoffMs = Date.now() - hours * 60 * 60 * 1000;
+        const rows = options.currencyReads
+          .listRates(context.workspaceId, { baseCurrency, quoteCurrency, limit: 200 })
+          .filter((row) => row.fetchedAt && new Date(row.fetchedAt).getTime() >= cutoffMs)
+          .map(compactExchangeRate);
+
+        return {
+          summary: rows.length
+            ? `Loaded ${rows.length} ${baseCurrency}/${quoteCurrency} snapshots from the last ${hours} hours.`
+            : `No saved ${baseCurrency}/${quoteCurrency} snapshots found in the last ${hours} hours.`,
+          payload: {
+            pair: `${baseCurrency}/${quoteCurrency}`,
+            hours,
+            count: rows.length,
+            items: rows,
           },
         };
       },
@@ -587,8 +784,9 @@ export const createAgentToolRegistry = (
         },
         required: ["project_id"],
       },
-      execute: (args) => {
-        const detail = foundationReads.getProjectDetail(asString(args.project_id));
+      execute: (args, context) => {
+        const projectId = resolveProjectIdFromReadTools(foundationReads, context, args.project_id);
+        const detail = foundationReads.getProjectDetail(projectId ?? asString(args.project_id));
 
         return {
           summary: detail.project ? `Loaded detailed project context for ${detail.project.name}.` : "Project was not found.",
@@ -625,8 +823,9 @@ export const createAgentToolRegistry = (
         },
         required: ["projectId"],
       },
-      execute: (args) => {
-        const detail = foundationReads.getProjectDetail(asString(args.projectId));
+      execute: (args, context) => {
+        const projectId = resolveProjectIdFromReadTools(foundationReads, context, args.projectId);
+        const detail = foundationReads.getProjectDetail(projectId ?? asString(args.projectId));
 
         return {
           summary: detail.project ? `Loaded schedule for ${detail.project.name}.` : "Project was not found.",
@@ -662,8 +861,9 @@ export const createAgentToolRegistry = (
         },
         required: ["projectId"],
       },
-      execute: (args) => {
-        const detail = foundationReads.getProjectDetail(asString(args.projectId));
+      execute: (args, context) => {
+        const projectId = resolveProjectIdFromReadTools(foundationReads, context, args.projectId);
+        const detail = foundationReads.getProjectDetail(projectId ?? asString(args.projectId));
 
         return {
           summary: detail.project ? `Loaded ${detail.units.length} units for ${detail.project.name}.` : "Project was not found.",
@@ -700,7 +900,7 @@ export const createAgentToolRegistry = (
       },
       execute: (args, context) => {
         const items = foundationReads.getProjectConflicts({
-          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          projectId: resolveProjectIdFromReadTools(foundationReads, context, args.project_id),
           rangeStart: asOptionalString(args.range_start),
           rangeEnd: asOptionalString(args.range_end),
         });
@@ -725,8 +925,9 @@ export const createAgentToolRegistry = (
         },
         required: ["project_id"],
       },
-      execute: (args) => {
-        const payload = foundationReads.getProjectCrewAllocations(asString(args.project_id));
+      execute: (args, context) => {
+        const projectId = resolveProjectIdFromReadTools(foundationReads, context, args.project_id);
+        const payload = foundationReads.getProjectCrewAllocations(projectId ?? asString(args.project_id));
 
         return {
           summary: payload.project ? `Loaded crew allocations for ${payload.project.name}.` : "Project was not found.",
@@ -788,7 +989,7 @@ export const createAgentToolRegistry = (
         const rows = foundationReads
           .getIncidents({
             search: asOptionalString(args.query) ?? undefined,
-            scopeProjectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context) ?? undefined,
+            scopeProjectId: resolveProjectIdFromReadTools(foundationReads, context, args.project_id) ?? undefined,
             sortBy: "reportedAt",
             sortDirection: "desc",
           })
@@ -874,7 +1075,7 @@ export const createAgentToolRegistry = (
       execute: (args, context) => {
         const items = foundationReads.getIncidentEstimates({
           incidentId: asOptionalString(args.incident_id),
-          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          projectId: resolveProjectIdFromReadTools(foundationReads, context, args.project_id),
           limit: asInteger(args.limit, 8),
         });
 
@@ -1005,8 +1206,9 @@ export const createAgentToolRegistry = (
         },
         required: ["project_id"],
       },
-      execute: (args) => {
-        const payload = foundationReads.getBudgetVsActual(asString(args.project_id));
+      execute: (args, context) => {
+        const projectId = resolveProjectIdFromReadTools(foundationReads, context, args.project_id);
+        const payload = foundationReads.getBudgetVsActual(projectId ?? asString(args.project_id));
 
         return {
           summary: payload.project ? `Loaded budget versus actual context for ${payload.project.name}.` : "Project budget context was not found.",
@@ -1027,7 +1229,7 @@ export const createAgentToolRegistry = (
       },
       execute: (args, context) => {
         const payload = foundationReads.getMonthlyBurnRate({
-          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          projectId: resolveProjectIdFromReadTools(foundationReads, context, args.project_id),
           months: asInteger(args.months, 6),
         });
 
@@ -1051,7 +1253,7 @@ export const createAgentToolRegistry = (
       execute: (args, context) => {
         const period = asOptionalString(args.period);
         const payload = foundationReads.getExpenseBreakdown({
-          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          projectId: resolveProjectIdFromReadTools(foundationReads, context, args.project_id),
           query: period ? { period: ["month", "quarter", "year", "custom"].includes(period) ? (period as "month" | "quarter" | "year" | "custom") : "month" } : undefined,
         });
 
@@ -1075,7 +1277,7 @@ export const createAgentToolRegistry = (
       execute: (args, context) => {
         const period = asOptionalString(args.period);
         const payload = foundationReads.getFinancialHealth({
-          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          projectId: resolveProjectIdFromReadTools(foundationReads, context, args.project_id),
           query: period ? { period: ["month", "quarter", "year", "custom"].includes(period) ? (period as "month" | "quarter" | "year" | "custom") : "month" } : undefined,
         });
 
@@ -1165,7 +1367,7 @@ export const createAgentToolRegistry = (
         const items = foundationReads.listCommunicationRecipients({
           query: asOptionalString(args.query),
           recipientType: asOptionalString(args.recipient_type),
-          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          projectId: resolveProjectIdFromReadTools(foundationReads, context, args.project_id),
           limit: asInteger(args.limit, 8),
         });
 
@@ -1221,7 +1423,7 @@ export const createAgentToolRegistry = (
           recipientIds: asStringArray(args.recipient_ids),
           query: asOptionalString(args.query),
           recipientType: asOptionalString(args.recipient_type),
-          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          projectId: resolveProjectIdFromReadTools(foundationReads, context, args.project_id),
           limit: asInteger(args.limit, 8),
         });
 
@@ -1661,8 +1863,9 @@ export const createAgentToolRegistry = (
         },
         required: ["project_id"],
       },
-      execute: (args) => {
-        const payload = foundationReads.getProjectFinancials(asString(args.project_id));
+      execute: (args, context) => {
+        const projectId = resolveProjectIdFromReadTools(foundationReads, context, args.project_id);
+        const payload = foundationReads.getProjectFinancials(projectId ?? asString(args.project_id));
 
         return {
           summary: payload.project ? `Loaded project financials for ${payload.project.name}.` : "Project was not found.",
@@ -1685,7 +1888,7 @@ export const createAgentToolRegistry = (
       execute: (args, context) => {
         const items = foundationReads.getIncidentCosts({
           incidentId: asOptionalString(args.incident_id),
-          projectId: asOptionalString(args.project_id) ?? inferProjectIdFromContext(context),
+          projectId: resolveProjectIdFromReadTools(foundationReads, context, args.project_id),
           limit: asInteger(args.limit, 8),
         });
 
@@ -1753,7 +1956,7 @@ export const createAgentToolRegistry = (
         },
       },
       execute: (args, context) => {
-        const payload = foundationReads.getReservesStatus(asOptionalString(args.project_id) ?? inferProjectIdFromContext(context));
+        const payload = foundationReads.getReservesStatus(resolveProjectIdFromReadTools(foundationReads, context, args.project_id));
 
         return {
           summary: payload.items.length ? "Loaded reserve status." : "No reserve entries found.",

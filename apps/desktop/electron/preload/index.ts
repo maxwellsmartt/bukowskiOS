@@ -425,6 +425,21 @@ const bukowskiCurrency = {
     ipcRenderer.invoke(ipcChannels.currency.deleteRate, input) as Promise<
       import("@contracts").ExchangeRateMutationResult
     >,
+  getProviderStatus: (input: {
+    workspaceId: string;
+    provider: import("@contracts").CurrencyRateProviderKey;
+  }) =>
+    ipcRenderer.invoke(ipcChannels.currency.getProviderStatus, input) as Promise<
+      import("@contracts").CurrencyRateProviderStatus
+    >,
+  saveProviderConfig: (input: import("@contracts").SaveCurrencyRateProviderConfigCommand) =>
+    ipcRenderer.invoke(ipcChannels.currency.saveProviderConfig, input) as Promise<
+      import("@contracts").CurrencyRateProviderStatus
+    >,
+  refreshRates: (input: import("@contracts").RefreshCurrencyRatesCommand) =>
+    ipcRenderer.invoke(ipcChannels.currency.refreshRates, input) as Promise<
+      import("@contracts").RefreshCurrencyRatesResult
+    >,
 };
 
 const bukowskiQuotes = {

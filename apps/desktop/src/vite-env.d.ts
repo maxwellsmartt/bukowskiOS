@@ -327,6 +327,16 @@ declare global {
       deleteRate: (
         input: import("@contracts").DeleteExchangeRateCommand,
       ) => Promise<import("@contracts").ExchangeRateMutationResult>;
+      getProviderStatus: (input: {
+        workspaceId: string;
+        provider: import("@contracts").CurrencyRateProviderKey;
+      }) => Promise<import("@contracts").CurrencyRateProviderStatus>;
+      saveProviderConfig: (
+        input: import("@contracts").SaveCurrencyRateProviderConfigCommand,
+      ) => Promise<import("@contracts").CurrencyRateProviderStatus>;
+      refreshRates: (
+        input: import("@contracts").RefreshCurrencyRatesCommand,
+      ) => Promise<import("@contracts").RefreshCurrencyRatesResult>;
     };
     bukowskiQuotes?: {
       list: (filter: import("@contracts").QuoteListFilter) => Promise<import("@contracts").QuoteRow[]>;

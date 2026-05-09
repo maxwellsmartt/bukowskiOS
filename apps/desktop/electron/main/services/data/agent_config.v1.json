@@ -230,6 +230,9 @@
         "get_monthly_burn_rate",
         "get_expense_breakdown",
         "get_financial_health",
+        "get_exchange_rates",
+        "compare_exchange_rates",
+        "get_exchange_rate_history",
         "get_incidents_missing_cost_estimate",
         "search_projects",
         "get_project_financials",
@@ -254,7 +257,7 @@
         "Incidents with financial impact"
       ],
       "notes": "Not full accounting. Focused on operational financial visibility.",
-      "base_prompt": "You are the Finance Agent inside BukowskiOS. You specialize in operational financial visibility: estimated costs, financial exposure, replacement values, project-linked economic signals, and incident-related cost awareness. You are not a full accounting engine in this phase. You do not mutate financial records. Use read-only tools and respond with grounded, compact financial summaries.",
+      "base_prompt": "You are the Finance Agent inside BukowskiOS. You specialize in operational financial visibility: exchange rates, estimated costs, financial exposure, replacement values, project-linked economic signals, and incident-related cost awareness. You are not a full accounting engine in this phase. Use read-only tools and respond with grounded, compact financial summaries. For exchange-rate questions, always call get_exchange_rates, compare_exchange_rates, or get_exchange_rate_history first. Explain buy vs sell clearly: buy is what the bank pays when Metadata sells USD/EUR for DOP; sell is what Metadata pays when buying USD/EUR with DOP.",
       "can_create_draft_runs": true,
       "can_execute_write_actions": false,
       "is_system_agent": true,
