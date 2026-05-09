@@ -37,6 +37,16 @@ const addDays = (date: string, offset: number) => {
   nextDate.setUTCDate(nextDate.getUTCDate() + offset);
   return nextDate.toISOString().slice(0, 10);
 };
+const normalizeLookupText = (value: string | null | undefined) =>
+  (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+const tokenizeLookupText = (value: string | null | undefined) =>
+  normalizeLookupText(value)
+    .split(/[^a-z0-9]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3);
 const resolveDraftLanguage = (value: unknown) => {
   const nextValue = asString(value).toLowerCase();
   return nextValue.startsWith("es") || nextValue.includes("spanish") ? "es" : "en";
@@ -70,6 +80,58 @@ const compactProject = (
   exposure: row.exposure ?? "—",
   activeUnitCount: row.activeUnitCount ?? 0,
 });
+
+const compactAsset = (row: {
+  id: string;
+  code: string;
+  name: string;
+  category?: string;
+  quantity: number;
+  totalQuantity?: number;
+  assignedQuantity?: number;
+  checkedOutQuantity?: number;
+  status: string;
+  location: string;
+  project: string;
+  projectUnit?: string;
+  responsible: string;
+  serialNumber?: string;
+  incidentsOpen: number;
+}) => ({
+  id: row.id,
+  code: row.code,
+  name: row.name,
+  category: row.category ?? "—",
+  status: row.status,
+  availableQuantity: row.quantity,
+  totalQuantity: row.totalQuantity ?? row.quantity,
+  assignedQuantity: row.assignedQuantity ?? 0,
+  checkedOutQuantity: row.checkedOutQuantity ?? 0,
+  location: row.location,
+  project: row.project,
+  projectUnit: row.projectUnit ?? "—",
+  responsible: row.responsible,
+  serialNumber: row.serialNumber ?? "—",
+  incidentsOpen: row.incidentsOpen,
+});
+
+const scoreAssetAlternative = (
+  row: {
+    code: string;
+    name: string;
+    category?: string;
+    location: string;
+    responsible: string;
+    serialNumber?: string;
+  },
+  tokens: string[],
+) => {
+  const searchable = normalizeLookupText(
+    [row.name, row.code, row.category, row.location, row.responsible, row.serialNumber].filter(Boolean).join(" "),
+  );
+
+  return tokens.reduce((score, token) => score + (searchable.includes(token) ? 1 : 0), 0);
+};
 
 export const createAgentToolRegistry = (
   foundationReads: FoundationReadService,
@@ -264,34 +326,51 @@ export const createAgentToolRegistry = (
         const requestedScope = asOptionalString(args.scope);
         const explicitProjectId = asOptionalString(args.project_id);
         const scopedProjectId = explicitProjectId ?? (requestedScope === "project" ? inferProjectIdFromContext(context) : null);
+        const requestedStatus = asOptionalString(args.status);
+        const requestedQuery = asString(args.query);
         const rows = foundationReads
           .getAssets({
             workspaceId: context.workspaceId,
-            search: asString(args.query),
+            search: requestedQuery,
             scopeProjectId: scopedProjectId ?? undefined,
             sortBy: "name",
             sortDirection: "asc",
           })
-          .filter((row) => !asOptionalString(args.status) || row.status.toLowerCase() === asString(args.status).toLowerCase())
+          .filter((row) => !requestedStatus || row.status.toLowerCase() === requestedStatus.toLowerCase())
           .slice(0, asInteger(args.limit, 5));
+        const fallbackRows =
+          rows.length || scopedProjectId || !requestedQuery
+            ? []
+            : foundationReads
+                .getAssets({
+                  workspaceId: context.workspaceId,
+                  search: "",
+                  sortBy: "name",
+                  sortDirection: "asc",
+                })
+                .filter((row) => !requestedStatus || row.status.toLowerCase() === requestedStatus.toLowerCase())
+                .map((row) => ({
+                  row,
+                  score: scoreAssetAlternative(row, tokenizeLookupText(requestedQuery)),
+                }))
+                .filter((entry) => entry.score > 0)
+                .sort((left, right) => right.score - left.score || left.row.name.localeCompare(right.row.name))
+                .slice(0, asInteger(args.limit, 5))
+                .map((entry) => entry.row);
 
         return {
-          summary: rows.length ? `Found ${rows.length} matching assets.` : "No matching assets found.",
+          summary: rows.length
+            ? `Found ${rows.length} matching assets.`
+            : fallbackRows.length
+              ? `No exact asset matches found. Returned ${fallbackRows.length} available alternatives from the workspace.`
+              : "No matching assets found.",
           payload: {
             scope: scopedProjectId ? "project" : "workspace",
             projectId: scopedProjectId,
-            count: rows.length,
-            items: rows.map((row) => ({
-              id: row.id,
-              code: row.code,
-              name: row.name,
-              status: row.status,
-              location: row.location,
-              project: row.project,
-              projectUnit: row.projectUnit,
-              responsible: row.responsible,
-              incidentsOpen: row.incidentsOpen,
-            })),
+            count: rows.length || fallbackRows.length,
+            exactMatch: rows.length > 0,
+            fallbackQuery: fallbackRows.length ? requestedQuery : null,
+            items: (rows.length ? rows : fallbackRows).map(compactAsset),
           },
         };
       },

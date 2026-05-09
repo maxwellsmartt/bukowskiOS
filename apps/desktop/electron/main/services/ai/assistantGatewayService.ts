@@ -4,6 +4,7 @@ import type {
   AssistantGatewayAttachment,
   AssistantGatewayRequest,
   AssistantGatewayResponse,
+  AssistantOperationalReceipt,
   AgentNotificationIntent,
   OrchestrationResult,
 } from "@contracts";
@@ -281,6 +282,85 @@ const summarizeToolName = (value: string) =>
   value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (match) => match.toUpperCase());
+
+const buildOperationalReceipt = (args: {
+  toolTraces: AIGatewayToolCallTrace[];
+  actionLinks: AssistantActionLink[];
+  deferredWriteToolCalls: Array<{ toolName: string; arguments: Record<string, unknown> }>;
+  executedWriteToolNames: string[];
+}): AssistantOperationalReceipt | null => {
+  if (!args.toolTraces.length && !args.actionLinks.length && !args.deferredWriteToolCalls.length) {
+    return null;
+  }
+
+  const completed = args.toolTraces
+    .filter((trace) => trace.status === "completed")
+    .map((trace) => ({
+      label: summarizeToolName(trace.toolName),
+      status: "done" as const,
+      detail: trace.summary,
+    }));
+  const blocked = args.toolTraces
+    .filter((trace) => trace.status === "failed")
+    .map((trace) => ({
+      label: summarizeToolName(trace.toolName),
+      status: "blocked" as const,
+      detail: trace.summary,
+    }));
+  const pending = args.deferredWriteToolCalls.map((tool) => ({
+    label: summarizeToolName(tool.toolName),
+    status: "pending" as const,
+    detail: "Needs approval before changing the workspace.",
+  }));
+  const nextSteps: string[] = [];
+
+  if (blocked.length) {
+    nextSteps.push("Reply with the missing detail or corrected target so the agent can continue from the blocked step.");
+  }
+
+  if (pending.length) {
+    nextSteps.push("Approve the pending action or adjust it before it changes the workspace.");
+  }
+
+  if (args.actionLinks.length) {
+    nextSteps.push("Open the created records from the action links if you want to inspect them.");
+  }
+
+  if (!nextSteps.length && args.executedWriteToolNames.length) {
+    nextSteps.push("No follow-up is required unless you want to adjust the created records.");
+  }
+
+  const summary = blocked.length
+    ? `${completed.length} step(s) completed, ${blocked.length} blocked.`
+    : pending.length
+      ? `${pending.length} action(s) waiting for approval.`
+      : args.executedWriteToolNames.length
+        ? `${args.executedWriteToolNames.length} action(s) completed.`
+        : completed.length
+          ? `${completed.length} lookup step(s) completed.`
+          : "Assistant action recorded.";
+
+  return {
+    summary,
+    completed,
+    blocked,
+    pending,
+    nextSteps,
+  };
+};
+
+const summarizeOperationalReceiptForSession = (receipt: AssistantOperationalReceipt | null) => {
+  if (!receipt) {
+    return null;
+  }
+
+  const details = [
+    ...receipt.blocked.map((item) => `blocked:${item.label}${item.detail ? ` (${item.detail})` : ""}`),
+    ...receipt.pending.map((item) => `pending:${item.label}`),
+    ...receipt.completed.slice(0, 3).map((item) => `done:${item.label}`),
+  ];
+  return truncateText([receipt.summary, ...details].join(" | "), 1000);
+};
 
 const parseToolArgumentsPreview = (value: string) => {
   const parsed = safeJsonParse<Record<string, unknown>>(value);
@@ -1467,6 +1547,14 @@ export const createAssistantGatewayService = (
         : approvalDecision === "approved"
           ? "run"
           : null;
+    const actionLinks = buildActionLinks(executedToolPayloads);
+    const notificationIntents = collectNotificationIntents(executedToolPayloads);
+    const operationalReceipt = buildOperationalReceipt({
+      toolTraces,
+      actionLinks,
+      deferredWriteToolCalls,
+      executedWriteToolNames,
+    });
 
     const detailsJson = JSON.stringify({
       provider_key: responseProviderKey,
@@ -1476,9 +1564,11 @@ export const createAssistantGatewayService = (
       tool_calls: toolTraces.map((trace) => trace.toolName),
       deferred_write_tools: deferredWriteToolCalls,
       executed_write_tools: executedWriteToolNames,
+      action_links: actionLinks,
       status: orchestration.answer_kind,
       approval_decision: approvalDecision,
       approval_reason: approvalReason,
+      operational_receipt: operationalReceipt,
       existing_run_id: executionOptions?.existingRunId ?? null,
       source_connector_key: request.context.sourceConnectorKey ?? null,
       source_channel_id: request.context.sourceChannelId ?? null,
@@ -1603,13 +1693,10 @@ export const createAssistantGatewayService = (
       previousResponseId,
       intent: typedOrchestration.intent,
       targetAgent: orchestration.target_agent,
-      toolResultSummary,
+      toolResultSummary: summarizeOperationalReceiptForSession(operationalReceipt) ?? toolResultSummary,
       status: typedOrchestration.answerKind,
       error: null,
     });
-
-    const actionLinks = buildActionLinks(executedToolPayloads);
-    const notificationIntents = collectNotificationIntents(executedToolPayloads);
 
     return {
       status: draftRunId ? "draft_created" : "answered",
@@ -1662,6 +1749,7 @@ export const createAssistantGatewayService = (
       },
       actionLinks,
       notificationIntents,
+      operationalReceipt,
     };
   };
 

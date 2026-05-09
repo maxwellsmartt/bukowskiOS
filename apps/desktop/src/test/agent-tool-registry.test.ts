@@ -123,6 +123,61 @@ describe("agent tool registry", () => {
     cleanup();
   });
 
+  it("resolves combined project labels before executing write tools", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-project-label-write");
+    const secretStore = { hasProviderSecret: () => false };
+    const noopMutation = (label: string) =>
+      new Proxy({}, {
+        get: () => () => {
+          throw new Error(`mutation '${label}' should not be invoked in this test`);
+        },
+      });
+    let createdUnitProjectId: string | null = null;
+
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      writeServices: {
+        packing: noopMutation("packing"),
+        projects: {
+          createProjectUnit(input: { projectId: string }) {
+            createdUnitProjectId = input.projectId;
+          },
+        },
+        incidents: noopMutation("incidents"),
+        rma: noopMutation("rma"),
+        assets: noopMutation("assets"),
+        finance: noopMutation("finance"),
+        quotes: noopMutation("quotes"),
+        projectLookup: {
+          findByCode(_workspaceId: string, code: string) {
+            return code === "AGT" ? { id: "project-agent-test-shoot", code: "AGT", name: "Agent Test Shoot", status: "Prep" } : null;
+          },
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    });
+
+    const result = registry.execute(
+      "create_project_unit",
+      JSON.stringify({
+        project_id: "Agent Test Shoot / AGT",
+        code: "MAIN",
+        name: "Main Unit",
+      }),
+      {
+        workspaceId: "workspace-metadata",
+        activePath: "/projects",
+        currentView: "Projects",
+      },
+    );
+
+    expect(createdUnitProjectId).toBe("project-agent-test-shoot");
+    expect(result.result.payload.projectId).toBe("project-agent-test-shoot");
+
+    cleanup();
+  });
+
   it("returns compact operational payloads for the new tools", () => {
     const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-payload");
     const secretStore = {
@@ -616,9 +671,42 @@ describe("agent tool registry", () => {
     );
 
     expect(workspaceSearch.result.payload.scope).toBe("workspace");
-    expect((workspaceSearch.result.payload.items as Array<{ name: string }>).some((item) => item.name.includes("Aputure"))).toBe(true);
+    expect(
+      (workspaceSearch.result.payload.items as Array<{ name: string; availableQuantity: number }>).some(
+        (item) => item.name.includes("Aputure") && item.availableQuantity > 0,
+      ),
+    ).toBe(true);
     expect(projectSearch.result.payload.scope).toBe("project");
     expect(projectSearch.result.payload.count).toBe(0);
+
+    cleanup();
+  });
+
+  it("returns available workspace alternatives when an exact asset search misses", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-asset-alternatives");
+    const secretStore = {
+      hasProviderSecret: () => false,
+    };
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+    });
+
+    const search = registry.execute(
+      "search_assets",
+      JSON.stringify({ query: "aputure phantom", status: "Available", limit: 5 }),
+      {
+        workspaceId: "workspace-metadata",
+        activePath: "/assets",
+        currentView: "Assets",
+      },
+    );
+
+    expect(search.result.payload.exactMatch).toBe(false);
+    expect(search.result.payload.fallbackQuery).toBe("aputure phantom");
+    expect((search.result.payload.items as Array<{ name: string; availableQuantity: number }>)[0]).toMatchObject({
+      name: "Aputure 600D",
+      availableQuantity: 1,
+    });
 
     cleanup();
   });

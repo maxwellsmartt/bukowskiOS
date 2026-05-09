@@ -110,17 +110,43 @@ const normalizeQuoteDurationUnit = (value: unknown): QuoteItemDurationUnit | nul
 const lookupProjectByCode = (services: AgentWriteServices, workspaceId: string, code: string) =>
   services.projectLookup?.findByCode(workspaceId, code) ?? null;
 
-const lookupProjectByIdentifier = (services: AgentWriteServices, workspaceId: string, identifier: string) => {
+const buildProjectIdentifierCandidates = (identifier: string) => {
   const normalizedIdentifier = identifier.trim();
+  const candidates = new Set<string>();
+
   if (!normalizedIdentifier) {
-    return null;
+    return [];
   }
 
-  return (
-    services.projectLookup?.findByIdentifier?.(workspaceId, normalizedIdentifier) ??
-    services.projectLookup?.findByCode(workspaceId, normalizedIdentifier) ??
-    null
-  );
+  candidates.add(normalizedIdentifier);
+
+  normalizedIdentifier
+    .split(/\s*(?:\/|\||·|—|–|-)\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .forEach((part) => candidates.add(part));
+
+  const codeMatch = normalizedIdentifier.match(/\b[A-Z0-9]{2,8}\b/);
+  if (codeMatch?.[0]) {
+    candidates.add(codeMatch[0]);
+  }
+
+  return Array.from(candidates);
+};
+
+const lookupProjectByIdentifier = (services: AgentWriteServices, workspaceId: string, identifier: string) => {
+  for (const candidate of buildProjectIdentifierCandidates(identifier)) {
+    const project =
+      services.projectLookup?.findByIdentifier?.(workspaceId, candidate) ??
+      services.projectLookup?.findByCode(workspaceId, candidate) ??
+      null;
+
+    if (project) {
+      return project;
+    }
+  }
+
+  return null;
 };
 
 const resolveRequiredProjectId = (services: AgentWriteServices, workspaceId: string, identifier: unknown) => {

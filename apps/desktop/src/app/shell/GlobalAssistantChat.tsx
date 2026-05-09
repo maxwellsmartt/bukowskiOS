@@ -405,6 +405,16 @@ const buildActionResultSummary = (state: AssistantChatSessionState) => {
   return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)} ready`;
 };
 
+const buildOperationalReceiptRows = (state: AssistantChatSessionState | null) => {
+  const receipt = state?.operationalReceipt;
+
+  if (!receipt) {
+    return [];
+  }
+
+  return [...receipt.blocked, ...receipt.pending, ...receipt.completed].slice(0, 5);
+};
+
 const resolveApprovalToneClass = (decision: AssistantChatSessionState["approvalDecision"]) => {
   if (decision === "denied") {
     return "is-denied";
@@ -1116,6 +1126,9 @@ export const GlobalAssistantChat = () => {
                 const isExpanded = expandedMessageDetails[entry.id] ?? false;
                 const messageActions = buildStateActions(messageState);
                 const resultLinks = messageState?.actionLinks ?? [];
+                const receipt = messageState?.operationalReceipt ?? null;
+                const receiptRows = buildOperationalReceiptRows(messageState);
+                const showReceipt = Boolean(receipt && (receiptRows.length || receipt.nextSteps.length));
                 const needsApproval = Boolean(messageState?.draftRunId && messageState.approvalDecision === "pending");
                 const approvalResolved = Boolean(
                   messageState?.draftRunId &&
@@ -1184,6 +1197,29 @@ export const GlobalAssistantChat = () => {
                             ))}
                           </div>
                         </div>
+                      </div>
+                    ) : null}
+
+                    {showReceipt && receipt ? (
+                      <div className="assistant-chat-receipt-card">
+                        <div className="assistant-chat-receipt-header">
+                          <span className="assistant-chat-result-eyebrow">Operational receipt</span>
+                          <strong>{receipt.summary}</strong>
+                        </div>
+                        {receiptRows.length ? (
+                          <div className="assistant-chat-receipt-items">
+                            {receiptRows.map((item, index) => (
+                              <div key={`${item.status}:${item.label}:${index}`} className="assistant-chat-receipt-item">
+                                <span className={`assistant-chat-receipt-dot assistant-chat-receipt-dot-${item.status}`} />
+                                <div>
+                                  <strong>{item.label}</strong>
+                                  {item.detail ? <p>{item.detail}</p> : null}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                        {receipt.nextSteps[0] ? <p className="assistant-chat-receipt-next">Next: {receipt.nextSteps[0]}</p> : null}
                       </div>
                     ) : null}
 

@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
+import { ExternalLink, MessageSquareText } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
+import { useAssistantChat } from "@app/providers/AssistantChatContext";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -9,16 +12,22 @@ import { getAgentApprovalDecisionLabel, getAgentRunStatusLabel } from "@shared/l
 import { reviewAgentRun, useAgentRuns } from "./useAgentsData";
 
 export const AgentRunsPage = () => {
+  const navigate = useNavigate();
   const { activeWorkspaceId: workspaceId, isWorkspaceReady } = useWorkspace();
+  const { selectSession } = useAssistantChat();
   const { data, error } = useAgentRuns();
   const [processingRunId, setProcessingRunId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"all" | "needs_approval" | "queued" | "running" | "done">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "needs_attention" | "needs_approval" | "queued" | "running" | "done">("all");
   const [agentFilter, setAgentFilter] = useState<string>("all");
 
   const summaryCards = useMemo(
     () => [
-      { label: "Queued", value: data.filter((run) => run.status === "queued").length, filter: "queued" as const },
+      {
+        label: "Needs attention",
+        value: data.filter((run) => run.operationalReceipt?.blocked.length || run.status === "failed").length,
+        filter: "needs_attention" as const,
+      },
       {
         label: "Needs approval",
         value: data.filter((run) => run.status === "needs_approval").length,
@@ -48,7 +57,9 @@ export const AgentRunsPage = () => {
 
   const filteredRuns = useMemo(() => {
     return data.filter((run) => {
-      if (statusFilter === "running") {
+      if (statusFilter === "needs_attention") {
+        if (!run.operationalReceipt?.blocked.length && run.status !== "failed") return false;
+      } else if (statusFilter === "running") {
         if (run.status !== "running" && run.status !== "routing") return false;
       } else if (statusFilter !== "all" && run.status !== statusFilter) {
         return false;
@@ -60,6 +71,14 @@ export const AgentRunsPage = () => {
       return true;
     });
   }, [agentFilter, data, statusFilter]);
+
+  const openRunThread = async (threadId: string | null) => {
+    if (!threadId) {
+      return;
+    }
+
+    await selectSession(threadId);
+  };
 
   const handleReview = async (runId: string, decision: "approve" | "deny" | "approve_for_session") => {
     if (!isWorkspaceReady) {
@@ -115,6 +134,7 @@ export const AgentRunsPage = () => {
               value={statusFilter}
             >
               <option value="all">All</option>
+              <option value="needs_attention">Needs attention</option>
               <option value="needs_approval">Needs approval</option>
               <option value="queued">Queued</option>
               <option value="running">Running</option>
@@ -158,7 +178,56 @@ export const AgentRunsPage = () => {
               <div className="agent-run-row-copy">
                 <strong>{run.title}</strong>
                 <p>{run.summary}</p>
-                <p className="agent-run-note">{run.agentDisplayName || "Supervisor Agent"} · No changes yet</p>
+                <p className="agent-run-note">
+                  {run.agentDisplayName || "Supervisor Agent"} · {run.updatedAtLabel}
+                </p>
+                {run.operationalReceipt ? (
+                  <div className="agent-run-receipt">
+                    <div className="agent-run-receipt-header">
+                      <span>Operational receipt</span>
+                      <strong>{run.operationalReceipt.summary}</strong>
+                    </div>
+                    {[...run.operationalReceipt.blocked, ...run.operationalReceipt.pending, ...run.operationalReceipt.completed]
+                      .slice(0, 4)
+                      .map((item, index) => (
+                        <div key={`${run.id}:${item.status}:${item.label}:${index}`} className="agent-run-receipt-row">
+                          <span className={`assistant-chat-receipt-dot assistant-chat-receipt-dot-${item.status}`} />
+                          <div>
+                            <strong>{item.label}</strong>
+                            {item.detail ? <p>{item.detail}</p> : null}
+                          </div>
+                        </div>
+                      ))}
+                    {run.operationalReceipt.nextSteps[0] ? (
+                      <p className="agent-run-receipt-next">Next: {run.operationalReceipt.nextSteps[0]}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                {run.actionLinks.length || run.threadId ? (
+                  <div className="agent-run-action-row">
+                    {run.threadId ? (
+                      <button
+                        className="surface-card-action-text"
+                        onClick={() => void openRunThread(run.threadId)}
+                        type="button"
+                      >
+                        <MessageSquareText size={14} />
+                        Continue in chat
+                      </button>
+                    ) : null}
+                    {run.actionLinks.map((link) => (
+                      <button
+                        key={`${run.id}:${link.entityType}:${link.entityId}`}
+                        className="surface-card-action-text"
+                        onClick={() => navigate(link.path)}
+                        type="button"
+                      >
+                        <span>{link.label}</span>
+                        <ExternalLink size={13} />
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 {run.status === "needs_approval" ? (
                   <div className="agent-run-approval-panel">
                     <div className="agent-run-approval-copy">

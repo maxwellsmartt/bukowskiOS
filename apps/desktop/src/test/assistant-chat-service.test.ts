@@ -83,6 +83,13 @@ describe("assistant chat service", () => {
             draftRunTitle: null,
             draftRunDescription: null,
           },
+          operationalReceipt: {
+            summary: "1 lookup step(s) completed.",
+            completed: [{ label: "Review image", status: "done", detail: "Image was reviewed." }],
+            blocked: [],
+            pending: [],
+            nextSteps: ["No follow-up required."],
+          },
         }),
         continueApprovedRun: async () => {
           throw new Error("Not used in this test.");
@@ -145,6 +152,9 @@ describe("assistant chat service", () => {
     fs.unlinkSync(attachmentRow?.storage_path ?? "");
     const snapshotWithMissingAttachment = service.getSnapshot();
     expect(snapshotWithMissingAttachment.threads[0]?.messages[1]?.attachments[0]?.status).toBe("missing");
+    expect(snapshotWithMissingAttachment.threads[0]?.messages[2]?.meta?.operationalReceipt?.summary).toBe(
+      "1 lookup step(s) completed.",
+    );
 
     service.deleteThread({
       commandId: "cmd-thread-delete-attachments",

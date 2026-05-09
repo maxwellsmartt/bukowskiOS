@@ -2,6 +2,8 @@ import type { DatabaseSync } from "node:sqlite";
 
 import type {
   AgentActivityRow,
+  AssistantActionLink,
+  AssistantOperationalReceipt,
   AgentConnectorRow,
   AgentDetailSnapshot,
   AgentGraphNode,
@@ -40,16 +42,48 @@ const parseJsonArray = (value: string | null | undefined) => {
 
 const parseRunDetails = (value: string | null | undefined) => {
   if (!value) {
-    return { approvalReason: null as string | null };
+    return {
+      approvalReason: null as string | null,
+      actionLinks: [] as AssistantActionLink[],
+      operationalReceipt: null as AssistantOperationalReceipt | null,
+    };
   }
 
   try {
-    const parsed = JSON.parse(value) as { approval_reason?: unknown };
+    const parsed = JSON.parse(value) as {
+      approval_reason?: unknown;
+      action_links?: unknown;
+      actionLinks?: unknown;
+      operational_receipt?: unknown;
+      operationalReceipt?: unknown;
+    };
+    const rawActionLinks = parsed.action_links ?? parsed.actionLinks;
+    const actionLinks = Array.isArray(rawActionLinks)
+      ? rawActionLinks.filter((link): link is AssistantActionLink => {
+          if (!link || typeof link !== "object") {
+            return false;
+          }
+          const candidate = link as Partial<AssistantActionLink>;
+          return (
+            typeof candidate.label === "string" &&
+            typeof candidate.path === "string" &&
+            typeof candidate.entityType === "string" &&
+            typeof candidate.entityId === "string"
+          );
+        })
+      : [];
+    const rawReceipt = parsed.operational_receipt ?? parsed.operationalReceipt;
     return {
       approvalReason: typeof parsed.approval_reason === "string" ? parsed.approval_reason : null,
+      actionLinks,
+      operationalReceipt: rawReceipt && typeof rawReceipt === "object" ? (rawReceipt as AssistantOperationalReceipt) : null,
     };
   } catch {
-    return { approvalReason: null as string | null };
+    return {
+      approvalReason: null as string | null,
+      actionLinks: [] as AssistantActionLink[],
+      operationalReceipt: null as AssistantOperationalReceipt | null,
+    };
   }
 };
 
@@ -412,6 +446,8 @@ const toRunRow = (row: ReturnType<typeof loadRuns>[number]): AgentRunRow => {
     approvalDecision: row.approval_decision,
     approvalScope: row.approval_scope,
     approvalReason: details.approvalReason ?? fallbackApprovalReason,
+    actionLinks: details.actionLinks,
+    operationalReceipt: details.operationalReceipt,
     createdAtLabel: formatTimestampLabel(row.created_at),
     updatedAtLabel: formatTimestampLabel(row.updated_at),
   };

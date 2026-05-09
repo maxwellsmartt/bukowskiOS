@@ -3,6 +3,7 @@ import type {
   AssistantActionLink,
   AssistantApprovalPreference,
   AssistantChatMessageSource,
+  AssistantOperationalReceipt,
   AgentRunApprovalDecision,
   AgentRunApprovalScope,
   AgentRunStatus,
@@ -295,4 +296,5 @@ export type AssistantGatewayResponse = {
   orchestration: OrchestrationResult | null;
   actionLinks?: AssistantActionLink[];
   notificationIntents?: AgentNotificationIntent[];
+  operationalReceipt?: AssistantOperationalReceipt | null;
 };

@@ -15,6 +15,7 @@ import type {
   AssistantChatThreadRow,
   AssistantChatThreadState,
   AssistantGatewayAttachment,
+  AssistantOperationalReceipt,
   CreateAssistantThreadCommand,
   DeleteAssistantThreadCommand,
   SendAssistantChatTurnCommand,
@@ -98,6 +99,7 @@ const normalizeMeta = (response: {
   orchestration: { requiresApproval: boolean } | null;
   actionLinks?: AssistantActionLink[];
   notificationIntents?: AgentNotificationIntent[];
+  operationalReceipt?: AssistantOperationalReceipt | null;
 }): AssistantChatMessageMeta => ({
   tone:
     response.status === "provider_error" ||
@@ -122,6 +124,7 @@ const normalizeMeta = (response: {
   approvalReason: response.approvalReason ?? null,
   actionLinks: response.actionLinks ?? [],
   notificationIntents: response.notificationIntents ?? [],
+  operationalReceipt: response.operationalReceipt ?? null,
 });
 
 const mapThreadStateFromResponse = (status: string): AssistantChatThreadState => {
@@ -574,6 +577,7 @@ export const createAssistantChatService = (
       approvalReason?: string | null;
       actionLinks?: AssistantActionLink[];
       notificationIntents?: AgentNotificationIntent[];
+      operationalReceipt?: AssistantOperationalReceipt | null;
     },
   ) => {
     const completedAt = new Date().toISOString();

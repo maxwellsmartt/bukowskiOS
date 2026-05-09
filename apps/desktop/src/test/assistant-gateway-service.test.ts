@@ -343,6 +343,8 @@ describe("assistant gateway service", () => {
     expect(result.routedAgentName).toBe("Finance Agent");
     expect(result.toolTraces[0]?.toolName).toBe("search_projects");
     expect(result.commandStateLabel).toContain("no changes made");
+    expect(result.operationalReceipt?.summary).toBe("1 lookup step(s) completed.");
+    expect(result.operationalReceipt?.completed[0]?.label).toBe("Search Projects");
 
     const runRow = database
       .prepare("SELECT source, title, status FROM agent_runs WHERE id = ?")

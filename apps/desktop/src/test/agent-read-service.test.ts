@@ -29,10 +29,38 @@ describe("agent read service", () => {
         `,
       )
       .run("workspace-metadata", supervisor?.id ?? null);
+    database
+      .prepare(
+        `
+          UPDATE agent_runs
+          SET details_json = ?
+          WHERE id = 'run-supervisor-working'
+        `,
+      )
+      .run(
+        JSON.stringify({
+          action_links: [
+            {
+              label: "Open project",
+              path: "/projects/project-test/info",
+              entityType: "project",
+              entityId: "project-test",
+            },
+          ],
+          operational_receipt: {
+            summary: "1 action(s) completed.",
+            completed: [{ label: "Create Project", status: "done", detail: "Project created." }],
+            blocked: [],
+            pending: [],
+            nextSteps: ["Open the created project."],
+          },
+        }),
+      );
 
     const reads = createAgentReadService(database);
     const missionControl = reads.getMissionControlSnapshot();
     const agents = reads.getAgentsList();
+    const workingRun = reads.getRunsList().find((run) => run.id === "run-supervisor-working");
 
     expect(missionControl.supervisor?.displayName).toBe("Supervisor Agent");
     expect(missionControl.supervisor?.modelLabel).toBeTruthy();
@@ -44,6 +72,8 @@ describe("agent read service", () => {
     expect(agents.some((agent) => agent.displayName === "Assets Agent")).toBe(true);
     expect(agents.some((agent) => agent.role === "Assets Agent")).toBe(true);
     expect(reads.getRunsList().some((run) => run.status === "needs_approval")).toBe(true);
+    expect(workingRun?.actionLinks[0]?.path).toBe("/projects/project-test/info");
+    expect(workingRun?.operationalReceipt?.summary).toBe("1 action(s) completed.");
     expect(reads.getModelsSnapshot().providers.some((provider) => provider.providerKey === "openai")).toBe(true);
     expect(reads.getConnectorsSnapshot().some((connector) => connector.connectorKey === "telegram")).toBe(true);
     expect(

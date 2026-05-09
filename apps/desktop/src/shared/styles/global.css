@@ -8245,6 +8245,73 @@ button.timeline-signal-chip:focus-visible {
   font-size: 11px !important;
 }
 
+.agent-run-receipt {
+  display: grid;
+  gap: 9px;
+  margin-top: 2px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035), rgba(115, 164, 255, 0.02)),
+    rgba(255, 255, 255, 0.016);
+}
+
+.agent-run-receipt-header {
+  display: grid;
+  gap: 3px;
+}
+
+.agent-run-receipt-header span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-run-receipt-header strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.agent-run-receipt-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.agent-run-receipt-row strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.agent-run-receipt-row p,
+.agent-run-receipt-next {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.agent-run-receipt-next {
+  color: var(--text-muted);
+}
+
+.agent-run-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agent-run-action-row .surface-card-action-text {
+  min-height: 32px;
+}
+
 .agent-run-row-button,
 .agent-activity-row-button {
   width: 100%;
@@ -11116,7 +11183,8 @@ select.field-input {
 }
 
 .assistant-chat-bubble-with-result,
-.assistant-chat-result-card {
+.assistant-chat-result-card,
+.assistant-chat-receipt-card {
   width: min(84%, 560px);
   max-width: 84%;
   box-sizing: border-box;
@@ -11456,6 +11524,90 @@ select.field-input {
   border-color: rgba(184, 242, 211, 0.22);
   background: rgba(255, 255, 255, 0.065);
   transform: translateY(-1px);
+}
+
+.assistant-chat-receipt-card {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(115, 164, 255, 0.025)),
+    rgba(255, 255, 255, 0.018);
+}
+
+.assistant-chat-receipt-header {
+  display: grid;
+  gap: 4px;
+}
+
+.assistant-chat-receipt-header strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.assistant-chat-receipt-items {
+  display: grid;
+  gap: 8px;
+}
+
+.assistant-chat-receipt-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.assistant-chat-receipt-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.035);
+}
+
+.assistant-chat-receipt-dot-done {
+  background: #8ee6b9;
+  box-shadow: 0 0 0 4px rgba(92, 190, 146, 0.1);
+}
+
+.assistant-chat-receipt-dot-blocked {
+  background: #ff9a9a;
+  box-shadow: 0 0 0 4px rgba(227, 113, 113, 0.12);
+}
+
+.assistant-chat-receipt-dot-pending {
+  background: #ffd17a;
+  box-shadow: 0 0 0 4px rgba(245, 184, 101, 0.12);
+}
+
+.assistant-chat-receipt-dot-info {
+  background: #9fbaff;
+  box-shadow: 0 0 0 4px rgba(115, 164, 255, 0.12);
+}
+
+.assistant-chat-receipt-item strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.assistant-chat-receipt-item p,
+.assistant-chat-receipt-next {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.assistant-chat-receipt-next {
+  padding-top: 2px;
+  color: var(--text-muted);
 }
 
 .assistant-chat-state-body {

@@ -41,6 +41,20 @@ export type AssistantActionLink = {
   entityId: string;
 };
 
+export type AssistantOperationalReceiptItem = {
+  label: string;
+  status: "done" | "blocked" | "pending" | "info";
+  detail?: string | null;
+};
+
+export type AssistantOperationalReceipt = {
+  summary: string;
+  completed: AssistantOperationalReceiptItem[];
+  blocked: AssistantOperationalReceiptItem[];
+  pending: AssistantOperationalReceiptItem[];
+  nextSteps: string[];
+};
+
 export type AssistantChatMessageMeta = {
   tone: "sending" | "routed" | "approval" | "error";
   label: string;
@@ -58,6 +72,7 @@ export type AssistantChatMessageMeta = {
   pendingMutation?: PendingMutationPreview | null;
   actionLinks?: AssistantActionLink[];
   notificationIntents?: AgentNotificationIntent[];
+  operationalReceipt?: AssistantOperationalReceipt | null;
 };
 
 export type AssistantChatAttachmentRow = {
@@ -169,6 +184,8 @@ export type AgentRunRow = {
   approvalDecision: AgentRunApprovalDecision | null;
   approvalScope: AgentRunApprovalScope | null;
   approvalReason: string | null;
+  actionLinks: AssistantActionLink[];
+  operationalReceipt: AssistantOperationalReceipt | null;
   createdAtLabel: string;
   updatedAtLabel: string;
 };
