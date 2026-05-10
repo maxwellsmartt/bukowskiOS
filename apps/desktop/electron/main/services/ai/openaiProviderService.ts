@@ -67,6 +67,25 @@ export type OpenAIResponseCreateResult =
       summary: string;
     };
 
+export type OpenAIAudioTranscriptionInput = {
+  data: Buffer;
+  fileName: string;
+  mimeType: string;
+  model?: string;
+};
+
+export type OpenAIAudioTranscriptionResult =
+  | {
+      ok: true;
+      text: string;
+      model: string;
+    }
+  | {
+      ok: false;
+      status: "invalid_key" | "unavailable";
+      summary: string;
+    };
+
 const resolveBaseUrl = (baseUrl?: string) => {
   const value = baseUrl?.trim();
   const normalized = value ? value.replace(/\/+$/, "") : "https://api.openai.com";
@@ -139,6 +158,25 @@ const mapErrorSummary = async (response: Response) => {
   }
 
   return errorSummary;
+};
+
+const toOpenAIUserFacingFailure = (summary: string, statusCode?: number) => {
+  const normalized = summary.toLowerCase();
+
+  if (
+    normalized.includes("insufficient_quota") ||
+    normalized.includes("exceeded your current quota") ||
+    normalized.includes("billing") ||
+    normalized.includes("credit")
+  ) {
+    return "OpenAI no pudo responder porque la cuenta parece estar sin créditos o con un límite de billing activo. Revisa Billing en OpenAI, recarga créditos y vuelve a intentarlo.";
+  }
+
+  if (statusCode === 429 || normalized.includes("rate limit")) {
+    return "OpenAI está limitando temporalmente las solicitudes. Espera unos segundos y vuelve a intentarlo.";
+  }
+
+  return summary;
 };
 
 export const createOpenAIProviderService = () => ({
@@ -214,6 +252,7 @@ export const createOpenAIProviderService = () => ({
 
       if (!response.ok) {
         const summary = await mapErrorSummary(response);
+        const userFacingSummary = toOpenAIUserFacingFailure(summary, response.status);
         logger.warn("OpenAI request failed.", {
           status: response.status,
           baseUrl: resolveBaseUrl(config.baseUrl),
@@ -223,7 +262,7 @@ export const createOpenAIProviderService = () => ({
         return {
           ok: false,
           status: response.status === 401 || response.status === 403 ? "invalid_key" : "unavailable",
-          summary,
+          summary: userFacingSummary,
         };
       }
 
@@ -240,6 +279,83 @@ export const createOpenAIProviderService = () => ({
       logger.error("OpenAI request threw before completion.", {
         baseUrl: resolveBaseUrl(config.baseUrl),
         model: resolveModel(input.model),
+        summary,
+      });
+
+      return {
+        ok: false,
+        status: "unavailable",
+        summary,
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  },
+
+  async transcribeAudio(
+    config: OpenAIProviderConfig,
+    input: OpenAIAudioTranscriptionInput,
+  ): Promise<OpenAIAudioTranscriptionResult> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), Math.max(15_000, config.timeoutMs));
+    const model = resolveModel(input.model ?? "gpt-4o-mini-transcribe");
+
+    try {
+      const formData = new FormData();
+      const fileData = input.data.buffer.slice(
+        input.data.byteOffset,
+        input.data.byteOffset + input.data.byteLength,
+      ) as ArrayBuffer;
+      const fileBlob = new Blob([fileData], { type: input.mimeType });
+      formData.append("file", fileBlob, input.fileName);
+      formData.append("model", model);
+
+      const response = await fetch(`${resolveBaseUrl(config.baseUrl)}/v1/audio/transcriptions`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const summary = await mapErrorSummary(response);
+        const userFacingSummary = toOpenAIUserFacingFailure(summary, response.status);
+        logger.warn("OpenAI transcription failed.", {
+          status: response.status,
+          baseUrl: resolveBaseUrl(config.baseUrl),
+          model,
+          summary,
+        });
+        return {
+          ok: false,
+          status: response.status === 401 || response.status === 403 ? "invalid_key" : "unavailable",
+          summary: userFacingSummary,
+        };
+      }
+
+      const payload = (await response.json()) as { text?: unknown };
+      const text = typeof payload.text === "string" ? payload.text.trim() : "";
+
+      if (!text) {
+        return {
+          ok: false,
+          status: "unavailable",
+          summary: "No speech was detected in that audio.",
+        };
+      }
+
+      return {
+        ok: true,
+        text,
+        model,
+      };
+    } catch (error) {
+      const summary = error instanceof Error ? error.message : "OpenAI transcription failed.";
+      logger.error("OpenAI transcription threw before completion.", {
+        baseUrl: resolveBaseUrl(config.baseUrl),
+        model,
         summary,
       });
 

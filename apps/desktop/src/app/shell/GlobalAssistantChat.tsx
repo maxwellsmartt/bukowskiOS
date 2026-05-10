@@ -4,11 +4,27 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { ArrowUp, Bot, CheckCircle2, ChevronDown, Ellipsis, ExternalLink, PanelLeft, Paperclip, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+  ArrowUp,
+  Bot,
+  CheckCircle2,
+  ChevronDown,
+  Ellipsis,
+  ExternalLink,
+  LoaderCircle,
+  Mic,
+  PanelLeft,
+  Pencil,
+  Plus,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AssistantChatSession, AssistantChatSessionState } from "@app/providers/AssistantChatContext";
 import type { AssistantApprovalPreference, AssistantChatMessageMeta, AssistantChatSnapshot, AssistantGatewayAttachment } from "@contracts";
@@ -16,7 +32,7 @@ import type { AssistantApprovalPreference, AssistantChatMessageMeta, AssistantCh
 import { useAssistantChat } from "@app/providers/AssistantChatContext";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { useNotifications } from "@app/providers/NotificationsProvider";
-import { reviewAgentRun } from "@features/agents/useAgentsData";
+import { reviewAgentRun, transcribeAssistantAudio } from "@features/agents/useAgentsData";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { readJsonPreference, uiPreferenceKeys, writeJsonPreference } from "@shared/lib/preferences";
 
@@ -63,6 +79,24 @@ type OptimisticAssistantMessage = {
 
 const maxImageAttachments = 3;
 const maxImageAttachmentBytes = 6 * 1024 * 1024;
+const maxVoiceRecordingMs = 90_000;
+const voiceWaveformBarCount = 42;
+const silentVoiceLevels = Array.from({ length: voiceWaveformBarCount }, () => 0.08);
+
+const readBlobAsDataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("The voice recording could not be read."));
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("The voice recording could not be read."));
+        return;
+      }
+
+      resolve(reader.result);
+    };
+    reader.readAsDataURL(blob);
+  });
 
 const deriveIntentLabel = (pathname: string) => {
   if (pathname.startsWith("/finance")) {
@@ -95,6 +129,13 @@ const formatThreadTimestamp = (timestamp: number) => {
   }
 
   return `${Math.floor(diff / day)}d`;
+};
+
+const formatVoiceDuration = (durationMs: number) => {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
 const formatAttachmentSummary = (count: number) => (count === 1 ? "Attached 1 image." : `Attached ${count} images.`);
@@ -522,12 +563,22 @@ export const GlobalAssistantChat = () => {
   const [optimisticAssistantMessage, setOptimisticAssistantMessage] = useState<OptimisticAssistantMessage | null>(null);
   const [reviewingRunId, setReviewingRunId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [voiceState, setVoiceState] = useState<"idle" | "recording" | "transcribing">("idle");
+  const [voiceLevels, setVoiceLevels] = useState<number[]>(silentVoiceLevels);
+  const [voiceElapsedMs, setVoiceElapsedMs] = useState(0);
   const [dismissedFabUnreadCount, setDismissedFabUnreadCount] = useState(0);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const threadEndRef = useRef<HTMLDivElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceStopTimeoutRef = useRef<number | null>(null);
+  const voiceMeterFrameRef = useRef<number | null>(null);
+  const voiceTimerRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const previousIsOpenRef = useRef(isOpen);
   const previousThreadSignatureRef = useRef("");
 
@@ -624,7 +675,7 @@ export const GlobalAssistantChat = () => {
     }
 
     textarea.style.height = "0px";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 170)}px`;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 140)}px`;
   }, [isOpen, message]);
 
   useEffect(() => {
@@ -700,10 +751,212 @@ export const GlobalAssistantChat = () => {
     return () => window.cancelAnimationFrame(nextFrame);
   }, [isOpen, resolvedActiveSession.id, resolvedActiveSession.latestState, resolvedActiveSession.messages.length]);
 
+  useEffect(
+    () => () => {
+      if (voiceStopTimeoutRef.current) {
+        window.clearTimeout(voiceStopTimeoutRef.current);
+      }
+      if (voiceTimerRef.current) {
+        window.clearInterval(voiceTimerRef.current);
+      }
+      if (voiceMeterFrameRef.current) {
+        window.cancelAnimationFrame(voiceMeterFrameRef.current);
+      }
+      void audioContextRef.current?.close();
+      mediaRecorderRef.current?.state === "recording" && mediaRecorderRef.current.stop();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    },
+    [],
+  );
+
+  const stopVoiceMeter = () => {
+    if (voiceMeterFrameRef.current) {
+      window.cancelAnimationFrame(voiceMeterFrameRef.current);
+      voiceMeterFrameRef.current = null;
+    }
+
+    if (voiceTimerRef.current) {
+      window.clearInterval(voiceTimerRef.current);
+      voiceTimerRef.current = null;
+    }
+
+    void audioContextRef.current?.close();
+    audioContextRef.current = null;
+  };
+
+  const startVoiceMeter = (stream: MediaStream) => {
+    stopVoiceMeter();
+    const AudioContextConstructor = window.AudioContext;
+
+    if (!AudioContextConstructor) {
+      setVoiceLevels(silentVoiceLevels);
+      return;
+    }
+
+    const audioContext = new AudioContextConstructor();
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.72;
+    audioContext.createMediaStreamSource(stream).connect(analyser);
+    audioContextRef.current = audioContext;
+
+    const data = new Uint8Array(analyser.frequencyBinCount);
+
+    const tick = () => {
+      analyser.getByteFrequencyData(data);
+      const bucketSize = Math.max(1, Math.floor(data.length / voiceWaveformBarCount));
+      const nextLevels = Array.from({ length: voiceWaveformBarCount }, (_, index) => {
+        const start = index * bucketSize;
+        const bucket = data.slice(start, start + bucketSize);
+        const average = bucket.reduce((sum, value) => sum + value, 0) / Math.max(1, bucket.length);
+        return Math.max(0.08, Math.min(1, average / 128));
+      });
+
+      setVoiceLevels(nextLevels);
+      voiceMeterFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    tick();
+  };
+
+  const appendVoiceTranscript = (transcript: string) => {
+    setMessage((current) => {
+      const trimmedCurrent = current.trim();
+      return trimmedCurrent ? `${trimmedCurrent}\n\n${transcript}` : transcript;
+    });
+  };
+
+  const finishVoiceRecording = async (audioBlob: Blob) => {
+    stopVoiceMeter();
+    setVoiceState("transcribing");
+    setAttachmentError(null);
+
+    try {
+      const dataUrl = await readBlobAsDataUrl(audioBlob);
+      const result = await transcribeAssistantAudio({
+        commandId: `cmd-voice-${Date.now().toString(36)}`,
+        workspaceId,
+        fileName: `assistant-voice-${Date.now().toString(36)}.webm`,
+        mimeType: audioBlob.type || "audio/webm",
+        dataUrl,
+        source: "desktop",
+      });
+
+      appendVoiceTranscript(result.text);
+      window.requestAnimationFrame(() => textareaRef.current?.focus());
+    } catch (error) {
+      setAttachmentError(getUserFacingErrorMessage(error, "Voice transcription is unavailable right now."));
+    } finally {
+      setVoiceState("idle");
+      setVoiceElapsedMs(0);
+      setVoiceLevels(silentVoiceLevels);
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state !== "recording") {
+      return;
+    }
+
+    recorder.stop();
+  };
+
+  const startVoiceRecording = async () => {
+    if (voiceState !== "idle" || !isWorkspaceReady) {
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setAttachmentError("Voice recording is not available on this device.");
+      return;
+    }
+
+    setAttachmentError(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferredType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "";
+      const recorder = preferredType ? new MediaRecorder(stream, { mimeType: preferredType }) : new MediaRecorder(stream);
+      voiceChunksRef.current = [];
+      mediaStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      startVoiceMeter(stream);
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          voiceChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        stopVoiceMeter();
+        setAttachmentError("The microphone stopped unexpectedly. Try recording again.");
+        setVoiceState("idle");
+        setVoiceElapsedMs(0);
+        setVoiceLevels(silentVoiceLevels);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      recorder.onstop = () => {
+        stopVoiceMeter();
+        if (voiceStopTimeoutRef.current) {
+          window.clearTimeout(voiceStopTimeoutRef.current);
+          voiceStopTimeoutRef.current = null;
+        }
+
+        const audioBlob = new Blob(voiceChunksRef.current, { type: preferredType || recorder.mimeType || "audio/webm" });
+        voiceChunksRef.current = [];
+        mediaRecorderRef.current = null;
+        mediaStreamRef.current = null;
+        stream.getTracks().forEach((track) => track.stop());
+
+        if (!audioBlob.size) {
+          setAttachmentError("No audio was captured. Try recording again.");
+          setVoiceState("idle");
+          setVoiceElapsedMs(0);
+          setVoiceLevels(silentVoiceLevels);
+          return;
+        }
+
+        void finishVoiceRecording(audioBlob);
+      };
+
+      recorder.start();
+      const startedAt = Date.now();
+      setVoiceState("recording");
+      setVoiceElapsedMs(0);
+      voiceTimerRef.current = window.setInterval(() => setVoiceElapsedMs(Date.now() - startedAt), 250);
+      voiceStopTimeoutRef.current = window.setTimeout(stopVoiceRecording, maxVoiceRecordingMs);
+    } catch (error) {
+      stopVoiceMeter();
+      setVoiceState("idle");
+      setVoiceElapsedMs(0);
+      setVoiceLevels(silentVoiceLevels);
+      setAttachmentError(getUserFacingErrorMessage(error, "Microphone access was blocked. Allow microphone access and try again."));
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
+    }
+  };
+
+  const handleVoiceButtonClick = () => {
+    if (voiceState === "recording") {
+      stopVoiceRecording();
+      return;
+    }
+
+    void startVoiceRecording();
+  };
+
   const handleSend = async () => {
     const nextMessage = message.trim();
 
-    if ((!nextMessage && !attachments.length) || isSending || !isWorkspaceReady) {
+    if ((!nextMessage && !attachments.length) || isSending || voiceState !== "idle" || !isWorkspaceReady) {
       return;
     }
 
@@ -1342,21 +1595,81 @@ export const GlobalAssistantChat = () => {
                   value={message}
                 />
                 <button
-                  aria-label={isSending ? "Routing message" : "Send message"}
-                  className="assistant-chat-send-button"
-                  data-tooltip={
-                    !isWorkspaceReady
-                      ? "Select a workspace to start chatting"
-                      : isSending
-                        ? "Routing message"
-                        : "Send message"
-                  }
-                  disabled={isSending || !isWorkspaceReady || (!message.trim() && !attachments.length)}
-                  onClick={handleSend}
+                  aria-label="Attach image"
+                  className="assistant-chat-attach-button"
+                  data-tooltip="Attach image"
+                  onClick={() => attachmentInputRef.current?.click()}
                   type="button"
                 >
-                  <ArrowUp size={18} />
+                  <Plus size={18} />
                 </button>
+                <div className="assistant-chat-compose-actions">
+                  <button
+                    aria-label={
+                      voiceState === "recording"
+                        ? "Stop voice recording"
+                        : voiceState === "transcribing"
+                          ? "Transcribing voice recording"
+                          : "Record voice message"
+                    }
+                    className={`assistant-chat-mic-button${voiceState === "recording" ? " is-recording" : ""}${voiceState === "transcribing" ? " is-transcribing" : ""}`}
+                    data-tooltip={
+                      !isWorkspaceReady
+                        ? "Select a workspace to record voice"
+                        : voiceState === "recording"
+                          ? "Stop recording"
+                          : voiceState === "transcribing"
+                            ? "Transcribing"
+                            : "Record voice"
+                    }
+                    disabled={isSending || !isWorkspaceReady || voiceState === "transcribing"}
+                    onClick={handleVoiceButtonClick}
+                    type="button"
+                  >
+                    {voiceState === "transcribing" ? (
+                      <LoaderCircle className="assistant-chat-voice-spinner" size={16} />
+                    ) : voiceState === "recording" ? (
+                      <Square size={15} />
+                    ) : (
+                      <Mic size={16} />
+                    )}
+                  </button>
+                  <button
+                    aria-label={isSending ? "Routing message" : "Send message"}
+                    className="assistant-chat-send-button"
+                    data-tooltip={
+                      !isWorkspaceReady
+                        ? "Select a workspace to start chatting"
+                        : isSending
+                          ? "Routing message"
+                          : "Send message"
+                    }
+                    disabled={isSending || voiceState !== "idle" || !isWorkspaceReady || (!message.trim() && !attachments.length)}
+                    onClick={handleSend}
+                    type="button"
+                  >
+                    <ArrowUp size={18} />
+                  </button>
+                </div>
+                {voiceState === "recording" ? (
+                  <div aria-live="polite" className="assistant-chat-voice-waveform" role="status">
+                    <span className="assistant-chat-voice-waveform-label">{formatVoiceDuration(voiceElapsedMs)}</span>
+                    <span aria-hidden="true" className="assistant-chat-voice-waveform-bars">
+                      {voiceLevels.map((level, index) => (
+                        <span key={index} style={{ "--bar-level": level, "--bar-index": index } as CSSProperties} />
+                      ))}
+                    </span>
+                  </div>
+                ) : voiceState === "transcribing" ? (
+                  <div aria-live="polite" className="assistant-chat-voice-waveform is-transcribing" role="status">
+                    <span className="assistant-chat-voice-waveform-label">Transcribing</span>
+                    <span aria-hidden="true" className="assistant-chat-voice-waveform-bars">
+                      {silentVoiceLevels.map((level, index) => (
+                        <span key={index} style={{ "--bar-level": level, "--bar-index": index } as CSSProperties} />
+                      ))}
+                    </span>
+                  </div>
+                ) : null}
               </div>
 
               <input
@@ -1393,11 +1706,6 @@ export const GlobalAssistantChat = () => {
               {attachmentError ? <p className="assistant-chat-attachment-error">{attachmentError}</p> : null}
 
               <div className="assistant-chat-controls-row">
-                <button className="assistant-chat-control-link" onClick={() => attachmentInputRef.current?.click()} type="button">
-                  <Paperclip size={14} />
-                  <span>Add</span>
-                </button>
-
                 <div className="assistant-chat-selector">
                   <button
                     className={`assistant-chat-control-link${activeSelector === "model" ? " is-open" : ""}`}

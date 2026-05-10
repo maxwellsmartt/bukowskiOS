@@ -19,6 +19,7 @@ import { createSupabaseOutboxTransport } from "@sync";
 
 import { createAssistantGatewayService } from "../ai/assistantGatewayService";
 import { createAssistantMemoryService } from "../ai/assistantMemoryService";
+import { createAssistantAudioTranscriptionService } from "../ai/assistantAudioTranscriptionService";
 import { createAssistantGatewaySessionStore } from "../ai/assistantGatewaySessionStore";
 import { createAgentToolRegistry } from "../ai/agentToolRegistry";
 import { createAISecretStore } from "../ai/aiSecretStore";
@@ -95,6 +96,21 @@ type QuoteReadServiceType = ReturnType<typeof createQuoteReadService>;
 type PackingMutationService = ReturnType<typeof createPackingMutationService>;
 type RmaMutationService = ReturnType<typeof createRmaMutationService>;
 type AgentMutationService = ReturnType<typeof createAgentMutationService>;
+type AssistantAudioTranscriptionService = ReturnType<typeof createAssistantAudioTranscriptionService>;
+
+const resolveTelegramPollingMode = (): "host" | "disabled" => {
+  const rawMode = (process.env.BUKOWSKI_TELEGRAM_POLLING_MODE ?? "").trim().toLowerCase();
+  if (rawMode === "host" || rawMode === "polling") {
+    return "host";
+  }
+  if (rawMode === "disabled" || rawMode === "off" || rawMode === "webhook") {
+    return "disabled";
+  }
+
+  // Packaged installs should not compete for Telegram getUpdates. Run one
+  // explicit host/webhook process and keep regular desktop clients passive.
+  return app.isPackaged ? "disabled" : "host";
+};
 
 type LocalDatabaseRuntime = {
   database: DatabaseSync;
@@ -103,6 +119,7 @@ type LocalDatabaseRuntime = {
   foundationReads: FoundationReadService;
   agentReads: AgentReadService;
   assistantChatService: AssistantChatService;
+  assistantAudioTranscription: AssistantAudioTranscriptionService;
   projectMutations: ProjectMutationService;
   catalogMutations: CatalogMutationService;
   assetMutations: AssetMutationService;
@@ -1158,12 +1175,18 @@ const createRuntime = (): LocalDatabaseRuntime => {
       }
     },
   });
+  const assistantAudioTranscription = createAssistantAudioTranscriptionService(database, {
+    secretStore,
+    openaiProviderService,
+  });
   const connectorBridgeService = createConnectorBridgeService(database, {
     assistantChatService,
   });
   const telegramConnectorService = createTelegramConnectorService(database, {
     secretStore,
     bridgeService: connectorBridgeService,
+    audioTranscriptionService: assistantAudioTranscription,
+    pollingMode: resolveTelegramPollingMode(),
   });
   const runtimeDiagnostics = createRuntimeDiagnosticsService(database);
   const supportDiagnostics = createSupportDiagnosticsService({
@@ -1270,6 +1293,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     foundationReads,
     agentReads,
     assistantChatService,
+    assistantAudioTranscription,
     projectMutations,
     catalogMutations,
     assetMutations,

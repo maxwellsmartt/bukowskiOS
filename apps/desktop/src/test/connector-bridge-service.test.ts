@@ -212,6 +212,271 @@ describe("connector bridge service", () => {
     fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
   });
 
+  it("recovers telegram DM bindings when an older archived binding already exists", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-connector-bridge-binding-recovery");
+    const attachmentsRootPath = createAttachmentsRoot("bukowski-connector-bridge-binding-recovery");
+    database.prepare("UPDATE agent_connector_configs SET status = 'configured' WHERE connector_key = 'telegram'").run();
+    database.prepare(
+      `
+        INSERT INTO connector_accounts (
+          id,
+          workspace_id,
+          connector_key,
+          external_user_id,
+          external_username,
+          display_name,
+          linked_user_id,
+          link_status,
+          linked_at,
+          created_at,
+          updated_at
+        ) VALUES (?, 'workspace-metadata', 'telegram', ?, ?, ?, ?, 'linked', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+    ).run("connector-account-recovery", "telegram-user-recovery", "ops_recovery", "Ops via Telegram", "user-ops");
+
+    const assistantChatService = createAssistantChatService(database, {
+      attachmentsRootPath,
+      assistantGatewayService: {
+        sendMessage: async (input) => ({
+          status: "answered" as const,
+          stateLabel: "Routed to Supervisor Agent",
+          stateBody: "Recovered stale Telegram thread binding.",
+          assistantMessage: `Binding recuperado para: ${input.message}`,
+          routedAgentId: "agent-supervisor",
+          routedAgentName: "Supervisor Agent",
+          routedAgentRole: "Supervisor Agent",
+          intentLabel: "Telegram DM intent",
+          commandStateLabel: "No changes applied",
+          draftRunId: null,
+          providerKey: "openai",
+          modelKey: "openai:gpt-5.4",
+          toolTraces: [],
+          orchestration: {
+            intent: "telegram_binding_recovery",
+            targetAgentId: "agent-supervisor",
+            targetAgentName: "Supervisor Agent",
+            confidence: 0.9,
+            requiresApproval: false,
+            toolCallRequested: false,
+            toolCalls: [],
+            userFacingSummary: "Recovered stale binding.",
+            answerKind: "informational",
+            draftRunTitle: null,
+            draftRunDescription: null,
+          },
+        }),
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
+      },
+      memoryService: {
+        extractAndPersist: () => [],
+        getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        pruneStaleEntries: () => undefined,
+        recordFailure: () => undefined,
+      },
+    });
+    const service = createConnectorBridgeService(database, {
+      assistantChatService,
+    });
+    const archivedThread = assistantChatService.createThread({
+      commandId: "cmd-archived-binding-thread",
+      workspaceId: "workspace-metadata",
+      contextKey: "/agents/chat?connector=telegram",
+      contextLabel: "Telegram DM",
+    }).activeThreadId;
+    const deletedThread = assistantChatService.createThread({
+      commandId: "cmd-deleted-binding-thread",
+      workspaceId: "workspace-metadata",
+      contextKey: "/agents/chat?connector=telegram",
+      contextLabel: "Telegram DM",
+    }).activeThreadId;
+    expect(archivedThread).toBeTruthy();
+    expect(deletedThread).toBeTruthy();
+    database.prepare("UPDATE assistant_chat_threads SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?").run(deletedThread);
+    database.prepare(
+      `
+        INSERT INTO connector_channels (
+          id,
+          workspace_id,
+          connector_key,
+          external_channel_id,
+          display_name,
+          channel_type,
+          created_at,
+          updated_at
+        ) VALUES (?, 'workspace-metadata', 'telegram', ?, ?, 'dm', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+    ).run("connector-channel-recovery", "telegram-dm-recovery", "Ops via Telegram");
+    database.prepare(
+      `
+        INSERT INTO connector_thread_bindings (
+          id,
+          workspace_id,
+          connector_key,
+          external_user_id,
+          channel_id,
+          thread_id,
+          status,
+          last_inbound_at,
+          expires_at,
+          created_at,
+          updated_at
+        ) VALUES
+          (?, 'workspace-metadata', 'telegram', ?, ?, ?, 'expired', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+          (?, 'workspace-metadata', 'telegram', ?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+    ).run(
+      "connector-binding-old-expired",
+      "telegram-user-recovery",
+      "connector-channel-recovery",
+      archivedThread,
+      "connector-binding-stale-active",
+      "telegram-user-recovery",
+      "connector-channel-recovery",
+      deletedThread,
+    );
+
+    const result = await service.processTelegramDm({
+      externalUserId: "telegram-user-recovery",
+      externalUsername: "ops_recovery",
+      displayName: "Ops via Telegram",
+      externalChannelId: "telegram-dm-recovery",
+      externalMessageId: "telegram-recovery-msg",
+      message: "Prueba desde voz",
+    });
+
+    expect(result.status).toBe("delivery_pending");
+    expect(result.threadId).toBeTruthy();
+    expect(result.threadId).not.toBe(deletedThread);
+
+    const staleBinding = database
+      .prepare("SELECT status FROM connector_thread_bindings WHERE id = ?")
+      .get("connector-binding-stale-active") as { status: string } | undefined;
+    expect(staleBinding?.status).toBe("expired:connector-binding-stale-active");
+
+    cleanup();
+    fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
+  });
+
+  it("routes Telegram work to the linked user's operational workspace instead of the seed workspace", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-connector-bridge-operational-workspace");
+    const attachmentsRootPath = createAttachmentsRoot("bukowski-connector-bridge-operational-workspace");
+    database.prepare("UPDATE agent_connector_configs SET status = 'configured' WHERE workspace_id = 'workspace-metadata' AND connector_key = 'telegram'").run();
+    database.prepare(
+      `
+        INSERT INTO workspaces (id, slug, name, base_currency, is_active, created_at, updated_at)
+        VALUES ('workspace-real', 'metadata-cine2', 'Metadata Cine2', 'USD', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+    ).run();
+    database.prepare(
+      `
+        INSERT INTO workspace_memberships (id, workspace_id, user_id, role_id, status, joined_at, created_at)
+        VALUES ('membership-real-luis', 'workspace-real', 'user-luis', 'role-admin', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+    ).run();
+    database.prepare(
+      `
+        INSERT INTO exchange_rates (
+          id,
+          workspace_id,
+          base_currency,
+          quote_currency,
+          rate,
+          rate_type,
+          source,
+          source_label,
+          effective_date,
+          fetched_at,
+          notes,
+          created_at
+        ) VALUES ('rate-real-usd-buy', 'workspace-real', 'USD', 'DOP', 58.5, 'buy', 'banco_santa_cruz', 'Banco Santa Cruz', '2026-05-10', '2026-05-10T16:00:00.000Z', 'Imported from TasaReal. Source: https://tasareal.com.', CURRENT_TIMESTAMP)
+      `,
+    ).run();
+    database.prepare(
+      `
+        INSERT INTO connector_accounts (
+          id,
+          workspace_id,
+          connector_key,
+          external_user_id,
+          external_username,
+          display_name,
+          linked_user_id,
+          link_status,
+          linked_at,
+          created_at,
+          updated_at
+        ) VALUES (?, 'workspace-metadata', 'telegram', ?, ?, ?, ?, 'linked', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+    ).run("connector-account-operational-workspace", "telegram-user-operational", "luis_ops", "Luis via Telegram", "user-luis");
+
+    let gatewayWorkspaceId: string | null = null;
+    const assistantChatService = createAssistantChatService(database, {
+      attachmentsRootPath,
+      assistantGatewayService: {
+        sendMessage: async (input) => {
+          gatewayWorkspaceId = input.workspaceId;
+          return {
+            status: "answered" as const,
+            stateLabel: "Routed to Finance Agent",
+            stateBody: "Exchange rates loaded.",
+            assistantMessage: "Banco Santa Cruz compra USD a 58.50 DOP.",
+            routedAgentId: "agent-finance",
+            routedAgentName: "Finance Agent",
+            routedAgentRole: "Finance Agent",
+            intentLabel: "Exchange rate request",
+            commandStateLabel: "No changes applied",
+            draftRunId: null,
+            providerKey: "openai",
+            modelKey: "openai:gpt-5.4",
+            toolTraces: [],
+            orchestration: {
+              intent: "exchange_rate_lookup",
+              targetAgentId: "agent-finance",
+              targetAgentName: "Finance Agent",
+              confidence: 0.9,
+              requiresApproval: false,
+              toolCallRequested: false,
+              toolCalls: [],
+              userFacingSummary: "Exchange rates loaded.",
+              answerKind: "informational",
+              draftRunTitle: null,
+              draftRunDescription: null,
+            },
+          };
+        },
+        continueApprovedRun: async () => {
+          throw new Error("Not used in this test.");
+        },
+      },
+      memoryService: {
+        extractAndPersist: () => [],
+        getOverlay: () => ({ agentEntries: [], workspaceEntries: [], projectEntries: [], all: [] }),
+        pruneStaleEntries: () => undefined,
+        recordFailure: () => undefined,
+      },
+    });
+    const service = createConnectorBridgeService(database, {
+      assistantChatService,
+    });
+
+    const result = await service.processTelegramDm({
+      externalUserId: "telegram-user-operational",
+      externalUsername: "luis_ops",
+      displayName: "Luis via Telegram",
+      externalChannelId: "telegram-dm-operational",
+      externalMessageId: "telegram-operational-msg",
+      message: "Dime las tasas de USD",
+    });
+
+    expect(result.status).toBe("delivery_pending");
+    expect(gatewayWorkspaceId).toBe("workspace-real");
+
+    cleanup();
+    fs.rmSync(attachmentsRootPath, { recursive: true, force: true });
+  });
+
   it("treats duplicated inbound telegram messages as idempotent", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-connector-bridge-duplicate");
     const attachmentsRootPath = createAttachmentsRoot("bukowski-connector-bridge-duplicate");

@@ -36,6 +36,7 @@ module.exports = {
     entitlements: "build/entitlements.mac.plist",
     entitlementsInherit: "build/entitlements.mac.plist",
     extendInfo: {
+      NSMicrophoneUsageDescription: "bukowskiOS uses the microphone to transcribe voice notes for assistant chat.",
       CFBundleURLTypes: [
         {
           CFBundleURLName: "bukowskiOS Auth",

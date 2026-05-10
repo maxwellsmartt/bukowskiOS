@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import type { AssistantChatService } from "../data/assistantChatService";
 
-const workspaceId = "workspace-metadata";
+const defaultWorkspaceId = "workspace-metadata";
 const defaultThreadTtlMs = 12 * 60 * 60 * 1000;
 
 type TelegramDmInboundMessage = {
@@ -39,6 +39,8 @@ type ConsumeLinkTokenResult = {
 const nowIso = () => new Date().toISOString();
 
 const buildId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const archivedBindingStatus = (bindingId: string) => `expired:${bindingId}`;
 
 const parseJsonObject = (value: string | null) => {
   if (!value) {
@@ -124,6 +126,11 @@ const buildOperationalReply = (args: {
   }
 
   if (args.status === "provider_error" || args.status === "tool_error" || args.status === "structured_error") {
+    const summary = toPlainTelegramText(args.assistantMessage ?? "");
+    if (/créditos|credits|billing|quota|rate limit|limitando/i.test(summary)) {
+      return summary;
+    }
+
     return "Estoy teniendo problemas para conectarme al servicio. Ya estoy intentando reconectar. Vuelve a escribirme en un momento.";
   }
 
@@ -149,7 +156,7 @@ export const createConnectorBridgeService = (
 ) => {
   const threadTtlMs = options.threadTtlMs ?? defaultThreadTtlMs;
 
-  const resolveConnectorConfig = (connectorKey: string) =>
+  const resolveConnectorConfig = (workspaceId: string, connectorKey: string) =>
     db
       .prepare(
         `
@@ -162,7 +169,98 @@ export const createConnectorBridgeService = (
       )
       .get(workspaceId, connectorKey) as { id: string; status: string; display_name: string } | undefined;
 
-  const upsertChannel = (externalChannelId: string, displayName: string) => {
+  const resolveUsableConnectorConfig = (workspaceId: string, connectorKey: string) => {
+    const workspaceConfig = resolveConnectorConfig(workspaceId, connectorKey);
+    if (workspaceConfig?.status === "configured") {
+      return workspaceConfig;
+    }
+
+    return db
+      .prepare(
+        `
+          SELECT id, status, display_name
+          FROM agent_connector_configs
+          WHERE connector_key = ?
+            AND status = 'configured'
+          ORDER BY updated_at DESC
+          LIMIT 1
+        `,
+      )
+      .get(connectorKey) as { id: string; status: string; display_name: string } | undefined;
+  };
+
+  const loadLinkedTelegramAccount = (externalUserId: string) =>
+    db
+      .prepare(
+        `
+          SELECT id, workspace_id, linked_user_id, link_status
+          FROM connector_accounts
+          WHERE connector_key = 'telegram'
+            AND external_user_id = ?
+            AND linked_user_id IS NOT NULL
+            AND link_status = 'linked'
+          ORDER BY updated_at DESC
+          LIMIT 1
+        `,
+      )
+      .get(externalUserId) as
+      | {
+          id: string;
+          workspace_id: string;
+          linked_user_id: string;
+          link_status: string;
+        }
+      | undefined;
+
+  const resolveOperationalWorkspaceId = (externalUserId: string, linkedUserId: string | null) => {
+    if (!linkedUserId) {
+      return defaultWorkspaceId;
+    }
+
+    const preferred = db
+      .prepare(
+        `
+          SELECT
+            workspace_memberships.workspace_id,
+            workspaces.slug,
+            COUNT(exchange_rates.id) AS exchange_rate_count,
+            MAX(CASE WHEN connector_accounts.id IS NOT NULL THEN 1 ELSE 0 END) AS has_connector_account
+          FROM workspace_memberships
+          JOIN workspaces
+            ON workspaces.id = workspace_memberships.workspace_id
+          LEFT JOIN exchange_rates
+            ON exchange_rates.workspace_id = workspace_memberships.workspace_id
+          LEFT JOIN connector_accounts
+            ON connector_accounts.workspace_id = workspace_memberships.workspace_id
+            AND connector_accounts.connector_key = 'telegram'
+            AND connector_accounts.external_user_id = ?
+            AND connector_accounts.linked_user_id = ?
+            AND connector_accounts.link_status = 'linked'
+          WHERE workspace_memberships.user_id = ?
+            AND workspace_memberships.status = 'active'
+            AND COALESCE(workspaces.is_active, 1) = 1
+          GROUP BY workspace_memberships.workspace_id, workspaces.slug
+          ORDER BY
+            CASE WHEN workspace_memberships.workspace_id != ? THEN 1 ELSE 0 END DESC,
+            exchange_rate_count DESC,
+            has_connector_account DESC,
+            workspace_memberships.workspace_id ASC
+          LIMIT 1
+        `,
+      )
+      .get(externalUserId, linkedUserId, linkedUserId, defaultWorkspaceId) as
+      | {
+          workspace_id: string;
+          slug: string;
+          exchange_rate_count: number;
+          has_connector_account: number;
+        }
+      | undefined;
+
+    return preferred?.workspace_id ?? defaultWorkspaceId;
+  };
+
+  const upsertChannel = (workspaceId: string, externalChannelId: string, displayName: string) => {
     const existing = db
       .prepare(
         `
@@ -205,7 +303,11 @@ export const createConnectorBridgeService = (
     return id;
   };
 
-  const upsertAccount = (input: TelegramDmInboundMessage) => {
+  const upsertAccount = (
+    workspaceId: string,
+    input: TelegramDmInboundMessage,
+    seed?: { linkedUserId: string | null; linkStatus: string } | null,
+  ) => {
     const existing = db
       .prepare(
         `
@@ -254,16 +356,20 @@ export const createConnectorBridgeService = (
       input.externalUserId,
       input.externalUsername ?? null,
       input.displayName,
-      existing?.linked_user_id ?? null,
-      existing?.link_status ?? "pending",
+      existing?.linked_user_id ?? seed?.linkedUserId ?? null,
+      existing?.link_status ?? seed?.linkStatus ?? "pending",
       now,
       now,
     );
 
-    return { id, linkedUserId: existing?.linked_user_id ?? null, linkStatus: existing?.link_status ?? "pending" };
+    return {
+      id,
+      linkedUserId: existing?.linked_user_id ?? seed?.linkedUserId ?? null,
+      linkStatus: existing?.link_status ?? seed?.linkStatus ?? "pending",
+    };
   };
 
-  const upsertMembership = (channelId: string, externalUserId: string, linkedUserId: string | null) => {
+  const upsertMembership = (workspaceId: string, channelId: string, externalUserId: string, linkedUserId: string | null) => {
     const now = nowIso();
     db.prepare(
       `
@@ -298,7 +404,7 @@ export const createConnectorBridgeService = (
     );
   };
 
-  const loadLinkedIdentity = (linkedUserId: string) =>
+  const loadLinkedIdentity = (workspaceId: string, linkedUserId: string) =>
     db
       .prepare(
         `
@@ -332,6 +438,7 @@ export const createConnectorBridgeService = (
       | undefined;
 
   const upsertReceipt = (args: {
+    workspaceId: string;
     direction: "inbound" | "outbound";
     externalMessageId: string;
     channelId: string | null;
@@ -383,7 +490,7 @@ export const createConnectorBridgeService = (
       `,
     ).run(
       id,
-      workspaceId,
+      args.workspaceId,
       args.channelId,
       args.direction,
       args.externalMessageId,
@@ -399,12 +506,12 @@ export const createConnectorBridgeService = (
     return id;
   };
 
-  const resolveBoundThreadId = (externalUserId: string, channelId: string, forceNewThread: boolean) => {
+  const resolveBoundThreadId = (workspaceId: string, externalUserId: string, channelId: string, forceNewThread: boolean) => {
     if (forceNewThread) {
       db.prepare(
         `
           UPDATE connector_thread_bindings
-          SET status = 'expired',
+          SET status = 'expired:' || id,
               updated_at = ?
           WHERE workspace_id = ?
             AND connector_key = 'telegram'
@@ -424,7 +531,7 @@ export const createConnectorBridgeService = (
               connector_thread_bindings.expires_at,
               assistant_chat_threads.deleted_at
             FROM connector_thread_bindings
-            JOIN assistant_chat_threads ON assistant_chat_threads.id = connector_thread_bindings.thread_id
+            LEFT JOIN assistant_chat_threads ON assistant_chat_threads.id = connector_thread_bindings.thread_id
             WHERE connector_thread_bindings.workspace_id = ?
               AND connector_thread_bindings.connector_key = 'telegram'
               AND connector_thread_bindings.external_user_id = ?
@@ -444,12 +551,17 @@ export const createConnectorBridgeService = (
 
       const expiresAt = binding?.expires_at ? new Date(binding.expires_at).getTime() : null;
       const isExpired = expiresAt !== null && expiresAt <= Date.now();
-      if (binding && !binding.deleted_at && !isExpired) {
+      const threadExists = binding?.deleted_at !== undefined;
+      if (binding && threadExists && !binding.deleted_at && !isExpired) {
         return binding.thread_id;
       }
 
       if (binding) {
-        db.prepare("UPDATE connector_thread_bindings SET status = 'expired', updated_at = ? WHERE id = ?").run(nowIso(), binding.id);
+        db.prepare("UPDATE connector_thread_bindings SET status = ?, updated_at = ? WHERE id = ?").run(
+          archivedBindingStatus(binding.id),
+          nowIso(),
+          binding.id,
+        );
       }
     }
 
@@ -508,9 +620,17 @@ export const createConnectorBridgeService = (
         }
       | undefined;
 
-  const deliverOutboundReply = async (externalChannelId: string, body: string, correlationId: string, channelId: string, threadId: string | null) => {
+  const deliverOutboundReply = async (
+    workspaceId: string,
+    externalChannelId: string,
+    body: string,
+    correlationId: string,
+    channelId: string,
+    threadId: string | null,
+  ) => {
     if (!options.deliveryAdapter?.sendTelegramMessage) {
       upsertReceipt({
+        workspaceId,
         direction: "outbound",
         externalMessageId: `pending:${correlationId}`,
         channelId,
@@ -529,6 +649,7 @@ export const createConnectorBridgeService = (
         correlationId,
       });
       upsertReceipt({
+        workspaceId,
         direction: "outbound",
         externalMessageId: result.externalMessageId,
         channelId,
@@ -541,6 +662,7 @@ export const createConnectorBridgeService = (
       return "delivered" as const;
     } catch (error) {
       upsertReceipt({
+        workspaceId,
         direction: "outbound",
         externalMessageId: `failed:${correlationId}`,
         channelId,
@@ -555,10 +677,11 @@ export const createConnectorBridgeService = (
   };
 
   return {
-    createLinkToken(input: { connectorKey: string; userId: string; expiresInMinutes?: number }) {
+    createLinkToken(input: { workspaceId?: string; connectorKey: string; userId: string; expiresInMinutes?: number }) {
       if (input.connectorKey !== "telegram") {
         throw new Error("Only Telegram link tokens are supported right now.");
       }
+      const workspaceId = input.workspaceId ?? defaultWorkspaceId;
 
       const user = db
         .prepare(
@@ -615,17 +738,17 @@ export const createConnectorBridgeService = (
       const tokenRow = db
         .prepare(
           `
-            SELECT id, target_user_id, status, expires_at
+            SELECT id, workspace_id, target_user_id, status, expires_at
             FROM connector_link_tokens
-            WHERE workspace_id = ?
-              AND connector_key = 'telegram'
+            WHERE connector_key = 'telegram'
               AND token = ?
             LIMIT 1
           `,
         )
-        .get(workspaceId, input.token.trim().toUpperCase()) as
+        .get(input.token.trim().toUpperCase()) as
         | {
             id: string;
+            workspace_id: string;
             target_user_id: string;
             status: string;
             expires_at: string;
@@ -645,15 +768,20 @@ export const createConnectorBridgeService = (
         return { ok: false, replyText: "Ese token expiró. Genera uno nuevo desde bukowskiOS." };
       }
 
-      const channelId = upsertChannel(input.externalChannelId, input.displayName);
-      const account = upsertAccount({
-        externalUserId: input.externalUserId,
-        externalUsername: input.externalUsername ?? null,
-        displayName: input.displayName,
-        externalChannelId: input.externalChannelId,
-        externalMessageId: `link-${Date.now()}`,
-        message: `/link ${input.token}`,
-      });
+      const workspaceId = tokenRow.workspace_id;
+      const channelId = upsertChannel(workspaceId, input.externalChannelId, input.displayName);
+      const account = upsertAccount(
+        workspaceId,
+        {
+          externalUserId: input.externalUserId,
+          externalUsername: input.externalUsername ?? null,
+          displayName: input.displayName,
+          externalChannelId: input.externalChannelId,
+          externalMessageId: `link-${Date.now()}`,
+          message: `/link ${input.token}`,
+        },
+        { linkedUserId: tokenRow.target_user_id, linkStatus: "linked" },
+      );
       const now = nowIso();
 
       db.prepare(
@@ -668,7 +796,7 @@ export const createConnectorBridgeService = (
         `,
       ).run(tokenRow.target_user_id, now, now, account.id);
 
-      upsertMembership(channelId, input.externalUserId, tokenRow.target_user_id);
+      upsertMembership(workspaceId, channelId, input.externalUserId, tokenRow.target_user_id);
       db.prepare(
         `
           UPDATE connector_link_tokens
@@ -686,7 +814,6 @@ export const createConnectorBridgeService = (
     },
 
     async processTelegramDm(input: TelegramDmInboundMessage): Promise<ProcessTelegramDmResult> {
-      const connectorConfig = resolveConnectorConfig("telegram");
       const correlationId = `telegram:${input.externalChannelId}:${input.externalMessageId}`;
       const duplicateReceipt = db
         .prepare(
@@ -717,14 +844,27 @@ export const createConnectorBridgeService = (
         };
       }
 
-      const channelId = upsertChannel(input.externalChannelId, input.displayName);
-      const account = upsertAccount(input);
-      upsertMembership(channelId, input.externalUserId, account.linkedUserId);
+      const linkedAccount = loadLinkedTelegramAccount(input.externalUserId);
+      const workspaceId = resolveOperationalWorkspaceId(input.externalUserId, linkedAccount?.linked_user_id ?? null);
+      const connectorConfig = resolveUsableConnectorConfig(workspaceId, "telegram");
+      const channelId = upsertChannel(workspaceId, input.externalChannelId, input.displayName);
+      const account = upsertAccount(
+        workspaceId,
+        input,
+        linkedAccount
+          ? {
+              linkedUserId: linkedAccount.linked_user_id,
+              linkStatus: linkedAccount.link_status,
+            }
+          : null,
+      );
+      upsertMembership(workspaceId, channelId, input.externalUserId, account.linkedUserId);
       const previousInboundReceipt = loadLatestInboundReceipt(channelId);
 
       if (!connectorConfig || connectorConfig.status === "disabled" || connectorConfig.status === "not_configured") {
         const replyText = "Bloqueado. Telegram todavía no está habilitado para operación en este workspace.";
         upsertReceipt({
+          workspaceId,
           direction: "inbound",
           externalMessageId: input.externalMessageId,
           channelId,
@@ -739,6 +879,7 @@ export const createConnectorBridgeService = (
       if (!account.linkedUserId || account.linkStatus !== "linked") {
         const replyText = "Bloqueado. Tu cuenta de Telegram todavía no está vinculada a un usuario interno.";
         upsertReceipt({
+          workspaceId,
           direction: "inbound",
           externalMessageId: input.externalMessageId,
           channelId,
@@ -750,10 +891,11 @@ export const createConnectorBridgeService = (
         return { status: "linked_required", threadId: null, correlationId, replyText };
       }
 
-      const identity = loadLinkedIdentity(account.linkedUserId);
+      const identity = loadLinkedIdentity(workspaceId, account.linkedUserId);
       if (!identity || identity.membership_status !== "active") {
         const replyText = "Bloqueado. Tu usuario interno no tiene una membresía activa en este workspace.";
         upsertReceipt({
+          workspaceId,
           direction: "inbound",
           externalMessageId: input.externalMessageId,
           channelId,
@@ -782,6 +924,7 @@ export const createConnectorBridgeService = (
                 ? "Bloqueado. Tu rol no permite crear o consultar RMAs."
             : "Bloqueado. Tu rol no permite esta consulta u orden.";
         upsertReceipt({
+          workspaceId,
           direction: "inbound",
           externalMessageId: input.externalMessageId,
           channelId,
@@ -794,7 +937,7 @@ export const createConnectorBridgeService = (
       }
 
       const forceNewThread = /\b(new thread|nuevo hilo|nuevo chat)\b/i.test(input.message);
-      const threadId = resolveBoundThreadId(input.externalUserId, channelId, forceNewThread);
+      const threadId = resolveBoundThreadId(workspaceId, input.externalUserId, channelId, forceNewThread);
       const snapshot = await options.assistantChatService.sendTurn({
         commandId: buildId("cmd-telegram-dm"),
         workspaceId,
@@ -860,6 +1003,7 @@ export const createConnectorBridgeService = (
             : "processed";
 
       upsertReceipt({
+        workspaceId,
         direction: "inbound",
         externalMessageId: input.externalMessageId,
         channelId,
@@ -875,6 +1019,7 @@ export const createConnectorBridgeService = (
       });
 
       const deliveryStatus = await deliverOutboundReply(
+        workspaceId,
         input.externalChannelId,
         replyTextWithRecovery,
         correlationId,

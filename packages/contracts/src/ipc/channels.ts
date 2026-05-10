@@ -72,6 +72,7 @@ export const ipcChannels = {
     updateAssistantThreadPreferences: "bukowskiAgents:updateAssistantThreadPreferences",
     renameAssistantThread: "bukowskiAgents:renameAssistantThread",
     sendAssistantChatTurn: "bukowskiAgents:sendAssistantChatTurn",
+    transcribeAudio: "bukowskiAgents:transcribeAudio",
     reviewRun: "bukowskiAgents:reviewRun",
     sendAssistantMessage: "bukowskiAgents:sendAssistantMessage",
     createDraftRunFromChat: "bukowskiAgents:createDraftRunFromChat",

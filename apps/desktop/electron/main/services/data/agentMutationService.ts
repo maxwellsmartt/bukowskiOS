@@ -1018,6 +1018,7 @@ export const createAgentMutationService = (
     }
     const result = options.connectorBridgeService.createLinkToken({
       connectorKey,
+      workspaceId: input.workspaceId,
       userId: input.userId,
       expiresInMinutes: input.expiresInMinutes,
     });

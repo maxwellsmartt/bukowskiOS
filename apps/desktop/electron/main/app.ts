@@ -274,6 +274,15 @@ app.whenReady().then(() => {
   initializeDesktopLogger();
   logger.info("Electron main ready.");
   startDevAuthCallbackServer();
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
+    if (permission !== "media") {
+      callback(false);
+      return;
+    }
+
+    const mediaTypes = (details as { mediaTypes?: string[] } | undefined)?.mediaTypes ?? [];
+    callback(!mediaTypes.length || mediaTypes.includes("audio"));
+  });
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       cancel: false,
@@ -387,6 +396,7 @@ app.whenReady().then(() => {
       return documentGeneration.createQuotePdf(payload);
     },
     packingMutations: localDatabase.packingMutations,
+    assistantAudioTranscription: localDatabase.assistantAudioTranscription,
     exportFinanceReportPdf: async (query, targetFilePath) => {
       const overview = localDatabase.foundationReads.getFinanceOverview(query);
       const pdf = await documentGeneration.createFinanceReportPdf({

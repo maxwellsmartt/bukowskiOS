@@ -73,6 +73,7 @@ import {
   setAgentStatusSchema,
   testConnectorConnectionSchema,
   testAiProviderConnectionSchema,
+  transcribeAssistantAudioSchema,
   unarchiveProjectSchema,
   renameAssistantThreadSchema,
   unassignCrewFromProjectUnitSchema,
@@ -100,6 +101,7 @@ import type {
   TestAIProviderConnectionCommand,
   TestConnectorConnectionCommand,
   AssistantGatewayResponse,
+  AssistantAudioTranscriptionResult,
   DeleteAssistantThreadCommand,
   CreateAgentCommand,
   ArchiveAssetCommand,
@@ -109,6 +111,7 @@ import type {
   RecordRuntimeErrorCommand,
   ReviewAgentRunCommand,
   SendAssistantChatTurnCommand,
+  TranscribeAssistantAudioCommand,
   AssetListQuery,
   AssetWorkspaceQuery,
   SetActiveAssistantThreadCommand,
@@ -357,6 +360,9 @@ type RegisterFoundationIpcOptions = {
     sendAssistantMessage: (input: AssistantGatewayRequest) => Promise<AssistantGatewayResponse>;
     createDraftRunFromChat: (input: CreateDraftRunFromChatCommand) => unknown;
   };
+  assistantAudioTranscription: {
+    transcribeDataUrl: (input: TranscribeAssistantAudioCommand) => Promise<AssistantAudioTranscriptionResult>;
+  };
   runtimeDiagnostics: {
     recordRuntimeError: (input: RecordRuntimeErrorCommand) => unknown;
   };
@@ -426,6 +432,7 @@ export const registerFoundationIpc = ({
   exportProjectBlueprintPdf,
   rmaMutations,
   agentMutations,
+  assistantAudioTranscription,
   runtimeDiagnostics,
 }: RegisterFoundationIpcOptions) => {
   const normalizeProjectListQuery = (query: ProjectListQuery | undefined): ProjectListQuery => ({
@@ -564,6 +571,11 @@ export const registerFoundationIpc = ({
     ipcChannels.agents.sendAssistantChatTurn,
     sendAssistantChatTurnSchema,
     (_event, input) => agentMutations.sendAssistantChatTurn(input),
+  );
+  safeHandle(
+    ipcChannels.agents.transcribeAudio,
+    transcribeAssistantAudioSchema,
+    (_event, input) => assistantAudioTranscription.transcribeDataUrl(input),
   );
   safeHandle(ipcChannels.agents.reviewRun, reviewAgentRunSchema, (_event, input) => agentMutations.reviewRun(input));
   safeHandle(

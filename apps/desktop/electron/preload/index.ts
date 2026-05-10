@@ -4,6 +4,7 @@ import { ipcChannels } from "@contracts/ipc/channels";
 import type {
   AIProviderMutationResult,
   AssistantChatSnapshot,
+  AssistantAudioTranscriptionResult,
   AssistantGatewayRequest,
   AssistantGatewayResponse,
   AgentConnectorRow,
@@ -139,6 +140,7 @@ import type {
   AgentRunReviewResult,
   DraftRunFromChatResult,
   SendAssistantChatTurnCommand,
+  TranscribeAssistantAudioCommand,
   RenameAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
   StagingPackingSlipRow,
@@ -286,6 +288,8 @@ const bukowskiAgents = {
     ipcRenderer.invoke(ipcChannels.agents.renameAssistantThread, input) as Promise<AssistantChatSnapshot>,
   sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) =>
     ipcRenderer.invoke(ipcChannels.agents.sendAssistantChatTurn, input) as Promise<AssistantChatSnapshot>,
+  transcribeAudio: (input: TranscribeAssistantAudioCommand) =>
+    ipcRenderer.invoke(ipcChannels.agents.transcribeAudio, input) as Promise<AssistantAudioTranscriptionResult>,
   reviewRun: (input: ReviewAgentRunCommand) =>
     ipcRenderer.invoke(ipcChannels.agents.reviewRun, input) as Promise<AgentRunReviewResult>,
   sendAssistantMessage: (input: AssistantGatewayRequest) =>

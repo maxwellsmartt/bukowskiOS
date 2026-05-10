@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type {
   AIProviderMutationResult,
   AssistantChatSnapshot,
+  AssistantAudioTranscriptionResult,
   AssistantGatewayRequest,
   AssistantGatewayResponse,
   AgentConnectorRow,
@@ -27,6 +28,7 @@ import type {
   RefreshAIProviderModelsCommand,
   SaveConnectorConfigCommand,
   SendAssistantChatTurnCommand,
+  TranscribeAssistantAudioCommand,
   SetActiveAssistantThreadCommand,
   RenameAssistantThreadCommand,
   UpdateAssistantThreadPreferencesCommand,
@@ -405,6 +407,16 @@ export const sendAssistantChatTurn = async (input: SendAssistantChatTurnCommand)
   const result = await window.bukowskiAgents.sendAssistantChatTurn(input);
   notifyAgentsChanged();
   return result;
+};
+
+export const transcribeAssistantAudio = async (
+  input: TranscribeAssistantAudioCommand,
+): Promise<AssistantAudioTranscriptionResult> => {
+  if (!window.bukowskiAgents) {
+    throw new Error("Agents bridge unavailable");
+  }
+
+  return window.bukowskiAgents.transcribeAudio(input);
 };
 
 export const reviewAgentRun = async (input: ReviewAgentRunCommand): Promise<AgentRunReviewResult> => {

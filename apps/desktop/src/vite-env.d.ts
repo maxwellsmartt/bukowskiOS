@@ -2,6 +2,7 @@
 
 import type {
   AIProviderMutationResult,
+  AssistantAudioTranscriptionResult,
   AssistantChatSnapshot,
   AssistantGatewayRequest,
   AssistantGatewayResponse,
@@ -124,6 +125,7 @@ import type {
   ShellAppAction,
   ShellBootstrap,
   SendAssistantChatTurnCommand,
+  TranscribeAssistantAudioCommand,
   TestAIProviderConnectionCommand,
   TestConnectorConnectionCommand,
   UnassignCrewFromProjectUnitInput,
@@ -229,6 +231,7 @@ declare global {
       updateAssistantThreadPreferences: (input: UpdateAssistantThreadPreferencesCommand) => Promise<AssistantChatSnapshot>;
       renameAssistantThread: (input: RenameAssistantThreadCommand) => Promise<AssistantChatSnapshot>;
       sendAssistantChatTurn: (input: SendAssistantChatTurnCommand) => Promise<AssistantChatSnapshot>;
+      transcribeAudio: (input: TranscribeAssistantAudioCommand) => Promise<AssistantAudioTranscriptionResult>;
       reviewRun: (input: ReviewAgentRunCommand) => Promise<AgentRunReviewResult>;
       sendAssistantMessage: (input: AssistantGatewayRequest) => Promise<AssistantGatewayResponse>;
       createDraftRunFromChat: (input: CreateDraftRunFromChatCommand) => Promise<DraftRunFromChatResult>;

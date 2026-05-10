@@ -495,17 +495,20 @@ export const FinanceOverviewPage = () => {
         title="Exchange rates"
         aside={
           <div className="finance-overview-aside">
-            <label className="compact-filter-field finance-fx-currency-select">
-              <span>Currency</span>
-              <select
-                className="compact-filter-select"
-                onChange={(event) => setSelectedFxCurrency(event.target.value as "USD" | "EUR")}
-                value={selectedFxCurrency}
-              >
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-              </select>
-            </label>
+            <div aria-label="Currency" className="finance-fx-currency-toggle" role="group">
+              <span aria-hidden="true" className={`finance-fx-currency-thumb is-${selectedFxCurrency.toLowerCase()}`} />
+              {(["USD", "EUR"] as const).map((currency) => (
+                <button
+                  aria-pressed={selectedFxCurrency === currency}
+                  className="finance-fx-currency-option"
+                  key={currency}
+                  onClick={() => setSelectedFxCurrency(currency)}
+                  type="button"
+                >
+                  {currency}
+                </button>
+              ))}
+            </div>
             <span
               aria-label={`Exchange rates ${exchangeRateStatus}`}
               className={`finance-fx-status-dot finance-fx-status-${exchangeRateStatusTone}`}

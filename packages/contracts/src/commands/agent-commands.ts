@@ -81,6 +81,21 @@ export type AssistantGatewayAttachment = {
   dataUrl: string;
 };
 
+export type TranscribeAssistantAudioCommand = {
+  commandId: string;
+  workspaceId: string;
+  fileName: string;
+  mimeType: string;
+  dataUrl: string;
+  source: "desktop" | "telegram";
+};
+
+export type AssistantAudioTranscriptionResult = {
+  text: string;
+  model: string;
+  byteSize: number;
+};
+
 export type AssistantChatMessageSourceInput = Omit<
   AssistantChatMessageSource,
   "connectorLabel" | "channelLabel" | "actorUserId" | "actorRole" | "externalMessageId" | "correlationId"

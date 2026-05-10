@@ -236,6 +236,17 @@ export const assistantGatewayAttachmentSchema = z
   })
   .strict();
 
+export const transcribeAssistantAudioSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    fileName: nonEmptyString,
+    mimeType: nonEmptyString,
+    dataUrl: nonEmptyString,
+    source: z.enum(["desktop", "telegram"]),
+  })
+  .strict();
+
 export const assistantGatewayToolContextSchema = z
   .object({
     workspaceId: nonEmptyString,

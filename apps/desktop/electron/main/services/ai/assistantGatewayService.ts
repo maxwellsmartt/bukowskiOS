@@ -1,5 +1,6 @@
 import type {
   AIGatewayToolCallTrace,
+  AIGatewayToolContext,
   AssistantActionLink,
   AssistantGatewayAttachment,
   AssistantGatewayRequest,
@@ -20,7 +21,7 @@ import type { AssistantGatewaySessionStore } from "./assistantGatewaySessionStor
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { getDesktopLogger } from "../logger";
 
-const workspaceId = DEFAULT_WORKSPACE_ID;
+const defaultWorkspaceId = DEFAULT_WORKSPACE_ID;
 const maxToolCalls = 10;
 const maxToolPayloadChars = 4000;
 const logger = getDesktopLogger("assistant-gateway");
@@ -417,18 +418,19 @@ const buildGatewayInput = (
   ];
 };
 
-const loadSupervisorConfig = (db: DatabaseSync) =>
+const loadSupervisorConfig = (db: DatabaseSync, workspaceId: string) =>
   db
     .prepare(
       `
         SELECT id, agent_key, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
         FROM agents
-        WHERE workspace_id = ?
+        WHERE workspace_id IN (?, ?)
           AND is_supervisor = 1
+        ORDER BY CASE WHEN workspace_id = ? THEN 0 ELSE 1 END
         LIMIT 1
       `,
     )
-    .get(workspaceId) as
+    .get(workspaceId, defaultWorkspaceId, workspaceId) as
     | {
         id: string;
         agent_key: string;
@@ -438,18 +440,19 @@ const loadSupervisorConfig = (db: DatabaseSync) =>
       }
     | undefined;
 
-const loadProviderConfig = (db: DatabaseSync, providerKey: string) =>
+const loadProviderConfig = (db: DatabaseSync, providerKey: string, workspaceId: string) =>
   db
     .prepare(
       `
         SELECT display_name, enabled, default_model_key, COALESCE(fallback_model_key, '') AS fallback_model_key, base_url, timeout_ms, retry_count, status
         FROM ai_provider_configs
-        WHERE workspace_id = ?
+        WHERE workspace_id IN (?, ?)
           AND provider_key = ?
+        ORDER BY CASE WHEN workspace_id = ? THEN 0 ELSE 1 END
         LIMIT 1
       `,
     )
-    .get(workspaceId, providerKey) as
+    .get(workspaceId, defaultWorkspaceId, providerKey, workspaceId) as
     | {
         display_name: string;
         enabled: number;
@@ -462,8 +465,8 @@ const loadProviderConfig = (db: DatabaseSync, providerKey: string) =>
       }
     | undefined;
 
-const loadAgentsPrompt = (db: DatabaseSync) => {
-  const rows = db
+const loadAgentsPrompt = (db: DatabaseSync, workspaceId: string) => {
+  let rows = db
     .prepare(
       `
         SELECT agent_key, display_name, domain_key, role_summary, approval_mode
@@ -482,6 +485,20 @@ const loadAgentsPrompt = (db: DatabaseSync) => {
       mission: string;
     }>;
 
+  if (!rows.length && workspaceId !== defaultWorkspaceId) {
+    rows = db
+      .prepare(
+        `
+          SELECT agent_key, display_name, domain_key, role_summary, approval_mode
+          , COALESCE(mission, role_summary) AS mission
+          FROM agents
+          WHERE workspace_id = ?
+          ORDER BY is_supervisor DESC, sort_order ASC
+        `,
+      )
+      .all(defaultWorkspaceId) as typeof rows;
+  }
+
   return rows
     .map(
       (row) =>
@@ -490,18 +507,19 @@ const loadAgentsPrompt = (db: DatabaseSync) => {
     .join("\n");
 };
 
-const loadAgentTarget = (db: DatabaseSync, agentKey: string) =>
+const loadAgentTarget = (db: DatabaseSync, agentKey: string, workspaceId: string) =>
   db
     .prepare(
       `
         SELECT id, display_name, COALESCE(NULLIF(trim(role_label), ''), display_name) AS role_label, approval_mode
         FROM agents
-        WHERE workspace_id = ?
+        WHERE workspace_id IN (?, ?)
           AND agent_key = ?
+        ORDER BY CASE WHEN workspace_id = ? THEN 0 ELSE 1 END
         LIMIT 1
       `,
     )
-    .get(workspaceId, agentKey) as
+    .get(workspaceId, defaultWorkspaceId, agentKey, workspaceId) as
     | {
         id: string;
         display_name: string;
@@ -510,18 +528,19 @@ const loadAgentTarget = (db: DatabaseSync, agentKey: string) =>
       }
     | undefined;
 
-const loadAgentRuntimeConfigByKey = (db: DatabaseSync, agentKey: string) =>
+const loadAgentRuntimeConfigByKey = (db: DatabaseSync, agentKey: string, workspaceId: string) =>
   db
     .prepare(
       `
         SELECT id, agent_key, display_name, COALESCE(NULLIF(trim(role_label), ''), display_name) AS role_label, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
         FROM agents
-        WHERE workspace_id = ?
+        WHERE workspace_id IN (?, ?)
           AND agent_key = ?
+        ORDER BY CASE WHEN workspace_id = ? THEN 0 ELSE 1 END
         LIMIT 1
       `,
     )
-    .get(workspaceId, agentKey) as
+    .get(workspaceId, defaultWorkspaceId, agentKey, workspaceId) as
     | {
         id: string;
         agent_key: string;
@@ -534,18 +553,19 @@ const loadAgentRuntimeConfigByKey = (db: DatabaseSync, agentKey: string) =>
       }
     | undefined;
 
-const loadAgentRuntimeConfigById = (db: DatabaseSync, agentId: string) =>
+const loadAgentRuntimeConfigById = (db: DatabaseSync, agentId: string, workspaceId: string) =>
   db
     .prepare(
       `
         SELECT id, agent_key, display_name, COALESCE(NULLIF(trim(role_label), ''), display_name) AS role_label, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
         FROM agents
-        WHERE workspace_id = ?
+        WHERE workspace_id IN (?, ?)
           AND id = ?
+        ORDER BY CASE WHEN workspace_id = ? THEN 0 ELSE 1 END
         LIMIT 1
       `,
     )
-    .get(workspaceId, agentId) as
+    .get(workspaceId, defaultWorkspaceId, agentId, workspaceId) as
     | {
         id: string;
         agent_key: string;
@@ -626,6 +646,7 @@ const loadThreadSessionApproval = (db: DatabaseSync, threadId: string) =>
 const createActivityEvent = (
   db: DatabaseSync,
   event: {
+    workspaceId: string;
     id: string;
     agentId: string | null;
     runId: string | null;
@@ -657,7 +678,7 @@ const createActivityEvent = (
     `,
   ).run(
     event.id,
-    workspaceId,
+    event.workspaceId,
     event.agentId,
     event.runId,
     event.kind,
@@ -673,6 +694,7 @@ const createActivityEvent = (
 const createDraftRun = (
   db: DatabaseSync,
   args: {
+    workspaceId: string;
     threadId: string;
     routedAgentId: string | null;
     title: string;
@@ -725,7 +747,7 @@ const createDraftRun = (
     `,
   ).run(
     runId,
-    workspaceId,
+    args.workspaceId,
     args.routedAgentId,
     args.title,
     args.inputSummary,
@@ -773,6 +795,240 @@ const buildHumanErrorResponse = (
   toolTraces: [],
   orchestration: null,
 });
+
+const normalizeFastPathMessage = (message: string) =>
+  message
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const hasActionIntent = (normalizedMessage: string) =>
+  /\b(crea|crear|creame|genera|generar|prepara|preparar|haz|hacer|asigna|asignar|mueve|mover|borra|borrar|elimina|eliminar|actualiza|actualizar|edita|editar|packing|quote|cotizacion|rma|incidente|reminder|todo)\b/i.test(
+    normalizedMessage,
+  );
+
+const formatRateValue = (value: unknown) =>
+  typeof value === "number"
+    ? new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
+      }).format(value)
+    : "—";
+
+const formatFastPathTimestamp = (value: unknown) => {
+  if (typeof value !== "string" || !value) {
+    return "sin hora guardada";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString("es-DO", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const buildFastPathResponse = (input: {
+  assistantMessage: string;
+  intentLabel: string;
+  commandStateLabel?: string;
+  toolTraces: AIGatewayToolCallTrace[];
+}): AssistantGatewayResponse => ({
+  status: "answered",
+  stateLabel: "Answered",
+  stateBody: "Answered from workspace data.",
+  assistantMessage: input.assistantMessage,
+  routedAgentId: null,
+  routedAgentName: "Fast path",
+  routedAgentRole: "Workspace tools",
+  intentLabel: input.intentLabel,
+  commandStateLabel: input.commandStateLabel ?? "No changes applied",
+  draftRunId: null,
+  approvalDecision: null,
+  approvalScope: null,
+  approvalReason: null,
+  providerKey: "workspace-tools",
+  modelKey: "fast-path",
+  toolTraces: input.toolTraces,
+  orchestration: {
+    intent: input.intentLabel,
+    targetAgentId: null,
+    targetAgentName: "Fast path",
+    confidence: 1,
+    requiresApproval: false,
+    toolCallRequested: true,
+    toolCalls: input.toolTraces,
+    userFacingSummary: input.assistantMessage,
+    answerKind: "informational",
+    draftRunTitle: null,
+    draftRunDescription: null,
+  },
+});
+
+const getCurrencyRequests = (normalizedMessage: string) => {
+  const mentionsUsd = /\b(usd|dolar|dolares|dollar|dollars)\b/.test(normalizedMessage);
+  const mentionsEur = /\b(eur|euro|euros)\b/.test(normalizedMessage);
+  if (mentionsUsd && mentionsEur) {
+    return ["USD", "EUR"];
+  }
+  if (mentionsEur) {
+    return ["EUR"];
+  }
+  return ["USD"];
+};
+
+const buildExchangeFastPathMessage = (payloads: Array<Record<string, unknown>>) => {
+  const sections = payloads.map((payload) => {
+    const pair = typeof payload.pair === "string" ? payload.pair : "USD/DOP";
+    const items = Array.isArray(payload.items) ? (payload.items as Array<Record<string, unknown>>) : [];
+    const bestBuySource = typeof payload.bestBuySource === "string" ? payload.bestBuySource : null;
+    const bestSellSource = typeof payload.bestSellSource === "string" ? payload.bestSellSource : null;
+
+    if (!items.length) {
+      return `No tengo tasas activas guardadas para ${pair}. Prueba Refresh rates en Finance para traer el último snapshot.`;
+    }
+
+    const lines = items.slice(0, 6).map((item) => {
+      const buy = item.buy && typeof item.buy === "object" ? (item.buy as Record<string, unknown>) : null;
+      const sell = item.sell && typeof item.sell === "object" ? (item.sell as Record<string, unknown>) : null;
+      const sourceLabel = typeof item.sourceLabel === "string" ? item.sourceLabel : "Banco";
+      const fetchedAt = formatFastPathTimestamp(buy?.fetchedAt ?? sell?.fetchedAt);
+      const sourceProof = typeof buy?.sourceProof === "string" ? buy.sourceProof : typeof sell?.sourceProof === "string" ? sell.sourceProof : null;
+      const bestMarkers = [
+        bestBuySource === sourceLabel ? "mejor compra" : null,
+        bestSellSource === sourceLabel ? "mejor venta" : null,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      return `- ${sourceLabel}: compra ${formatRateValue(buy?.rate)} | venta ${formatRateValue(sell?.rate)}${
+        bestMarkers ? ` (${bestMarkers})` : ""
+      }. Actualizado: ${fetchedAt}${sourceProof ? ` · fuente: ${sourceProof}` : ""}`;
+    });
+
+    return [`${pair}`, ...lines].join("\n");
+  });
+
+  return sections.join("\n\n");
+};
+
+const extractLookupQuery = (normalizedMessage: string, originalMessage: string) => {
+  if (/\bmonitor(es)?\b/.test(normalizedMessage)) {
+    return "monitor";
+  }
+  if (/\bteradek\b/.test(normalizedMessage)) {
+    return "teradek";
+  }
+  if (/\bflanders\b/.test(normalizedMessage)) {
+    return "flanders";
+  }
+  if (/\blicen(c|s)ia(s)?\b/.test(normalizedMessage)) {
+    return "license";
+  }
+  return originalMessage
+    .replace(/[¿?]/g, " ")
+    .replace(/\b(busca|buscar|buscame|hay|tienes|disponible|disponibles|availability|search|asset|assets|equipo|equipos|en|el|la|los|las|un|una|de|del|para|por|favor)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+};
+
+const buildAssetFastPathMessage = (payload: Record<string, unknown>, query: string) => {
+  const items = Array.isArray(payload.items) ? (payload.items as Array<Record<string, unknown>>) : [];
+  if (!items.length) {
+    return `No encontré assets disponibles para “${query}”. Puedo hacer una búsqueda más amplia o revisar por categoría si quieres.`;
+  }
+  const exactMatch = payload.exactMatch !== false;
+  const intro = exactMatch
+    ? `Encontré ${items.length} asset${items.length === 1 ? "" : "s"} para “${query}”:`
+    : `No encontré match exacto para “${query}”, pero estas alternativas están disponibles:`;
+  const lines = items.map((item) => {
+    const name = typeof item.name === "string" ? item.name : "Asset";
+    const code = typeof item.code === "string" ? item.code : "sin código";
+    const quantity = typeof item.availableQuantity === "number" ? item.availableQuantity : null;
+    const location = typeof item.location === "string" ? item.location : "sin ubicación";
+    return `- ${name} (${code})${quantity !== null ? ` · disponible: ${quantity}` : ""} · ${location}`;
+  });
+  return [intro, ...lines].join("\n");
+};
+
+const maybeRunFastPath = (
+  request: AssistantGatewayRequest,
+  toolRegistry: AgentToolRegistry,
+): AssistantGatewayResponse | null => {
+  if (request.attachments?.length) {
+    return null;
+  }
+  const normalizedMessage = normalizeFastPathMessage(request.message);
+  if (hasActionIntent(normalizedMessage)) {
+    return null;
+  }
+
+  const context: AIGatewayToolContext = {
+    ...request.context,
+    workspaceId: request.workspaceId || request.context.workspaceId || defaultWorkspaceId,
+  };
+
+  if (/\b(tasa|tasas|exchange|cambio|dolar|dolares|usd|euro|eur|banco|popular|central|santa cruz)\b/.test(normalizedMessage)) {
+    const toolTraces: AIGatewayToolCallTrace[] = [];
+    const payloads: Array<Record<string, unknown>> = [];
+    for (const currency of getCurrencyRequests(normalizedMessage)) {
+      const execution = toolRegistry.execute(
+        "compare_exchange_rates",
+        JSON.stringify({ base_currency: currency, quote_currency: "DOP" }),
+        context,
+      );
+      toolTraces.push(execution.trace);
+      payloads.push(execution.result.payload as Record<string, unknown>);
+    }
+    return buildFastPathResponse({
+      assistantMessage: buildExchangeFastPathMessage(payloads),
+      intentLabel: "Exchange-rate lookup",
+      toolTraces,
+    });
+  }
+
+  if (/\b(busca|buscar|buscame|search|disponible|disponibles|availability|hay|tienes|asset|assets|equipo|equipos|monitor|teradek|flanders)\b/.test(normalizedMessage)) {
+    const query = extractLookupQuery(normalizedMessage, request.message);
+    if (!query) {
+      return null;
+    }
+    const execution = toolRegistry.execute(
+      "search_assets",
+      JSON.stringify({ query, status: "Available", scope: "workspace", limit: 5 }),
+      context,
+    );
+    return buildFastPathResponse({
+      assistantMessage: buildAssetFastPathMessage(execution.result.payload as Record<string, unknown>, query),
+      intentLabel: "Asset availability lookup",
+      toolTraces: [execution.trace],
+    });
+  }
+
+  return null;
+};
+
+const formatProviderFailureForUser = (summary: string, fallback: string) => {
+  const normalized = summary.toLowerCase();
+
+  if (
+    normalized.includes("sin créditos") ||
+    normalized.includes("insufficient_quota") ||
+    normalized.includes("exceeded your current quota") ||
+    normalized.includes("billing") ||
+    normalized.includes("credit")
+  ) {
+    return "El proveedor de AI no pudo responder porque la cuenta parece estar sin créditos o con un límite de billing activo. Revisa Billing, recarga créditos y vuelve a intentarlo.";
+  }
+
+  if (normalized.includes("rate limit") || normalized.includes("limitando temporalmente")) {
+    return "El proveedor de AI está limitando temporalmente las solicitudes. Espera unos segundos y vuelve a intentarlo.";
+  }
+
+  return fallback;
+};
 
 const deriveApprovalReason = (args: {
   requestedApprovalMode: "supervised" | "needs_approval" | "unsupervised";
@@ -888,7 +1144,21 @@ export const createAssistantGatewayService = (
       existingRunTitle?: string | null;
     },
   ): Promise<AssistantGatewayResponse> => {
-    const supervisor = loadSupervisorConfig(db);
+    const workspaceId = request.workspaceId || request.context.workspaceId || defaultWorkspaceId;
+    const fastPathResponse = maybeRunFastPath(request, options.toolRegistry);
+    if (fastPathResponse) {
+      options.sessionStore.writeResult(request.workspaceId, request.threadId, {
+        previousResponseId: null,
+        intent: fastPathResponse.intentLabel,
+        targetAgent: fastPathResponse.routedAgentName,
+        toolResultSummary: fastPathResponse.toolTraces[fastPathResponse.toolTraces.length - 1]?.summary ?? null,
+        status: fastPathResponse.status,
+        error: null,
+      });
+      return fastPathResponse;
+    }
+
+    const supervisor = loadSupervisorConfig(db, workspaceId);
     const supervisorProviderKey = supervisor?.provider_key ?? "openai";
     const supervisorModelKey = supervisor?.model_key ?? "openai:gpt-5.2";
 
@@ -901,7 +1171,7 @@ export const createAssistantGatewayService = (
       );
     }
 
-    const supervisorProvider = loadProviderConfig(db, supervisorProviderKey);
+    const supervisorProvider = loadProviderConfig(db, supervisorProviderKey, workspaceId);
 
     if (!supervisorProvider) {
       return buildHumanErrorResponse(
@@ -1000,7 +1270,7 @@ export const createAssistantGatewayService = (
       "When the user asks for an action and the specialist has enough data, route it and let the specialist execute. Do not stall by asking the user to confirm what they already asked for.",
       "Keep user_facing_summary practical and concise — describe what got done, not what could be done.",
       "Allowed agents:",
-      loadAgentsPrompt(db),
+      loadAgentsPrompt(db, workspaceId),
       "When tool data is needed, call only the smallest relevant tool.",
       `Previous session summary: intent=${sessionSnapshot.lastIntent ?? "none"} | target=${sessionSnapshot.lastTargetAgent ?? "none"} | tool=${sessionSnapshot.lastToolResultSummary ?? "none"}`,
       supervisorMemoryOverlay.agentEntries.length
@@ -1078,7 +1348,7 @@ export const createAssistantGatewayService = (
 
       return buildHumanErrorResponse(
         "provider_error",
-        "The provider could not answer right now. Check the connection in Models and try again.",
+        formatProviderFailureForUser(result.summary, "The provider could not answer right now. Check the connection in Models and try again."),
         supervisorProviderKey,
         supervisorModelKey,
       );
@@ -1192,7 +1462,7 @@ export const createAssistantGatewayService = (
       if (!result.ok) {
         return buildHumanErrorResponse(
           "provider_error",
-          "The provider stopped responding while finishing the supervised answer.",
+          formatProviderFailureForUser(result.summary, "The provider stopped responding while finishing the supervised answer."),
           supervisorProviderKey,
           supervisorModelKey,
         );
@@ -1241,8 +1511,8 @@ export const createAssistantGatewayService = (
       };
     }
 
-    const target = loadAgentTarget(db, orchestration.target_agent);
-    const targetRuntime = loadAgentRuntimeConfigByKey(db, orchestration.target_agent);
+    const target = loadAgentTarget(db, orchestration.target_agent, workspaceId);
+    const targetRuntime = loadAgentRuntimeConfigByKey(db, orchestration.target_agent, workspaceId);
 
     markThreadRoutedAgentPending(db, request.threadId, target?.id ?? null);
 
@@ -1295,7 +1565,7 @@ export const createAssistantGatewayService = (
 
     if (targetRuntime) {
       const targetProviderKey = targetRuntime.provider_key ?? supervisorProviderKey;
-      const targetProvider = loadProviderConfig(db, targetProviderKey);
+      const targetProvider = loadProviderConfig(db, targetProviderKey, workspaceId);
       const targetApiKey = options.secretStore.getProviderSecret(workspaceId, targetProviderKey);
 
       if (targetProvider?.enabled === 1 && targetApiKey) {
@@ -1495,7 +1765,7 @@ export const createAssistantGatewayService = (
           if (!specialistResult.ok) {
             return buildHumanErrorResponse(
               "provider_error",
-              "The provider stopped responding while the specialist was finishing the action.",
+              formatProviderFailureForUser(specialistResult.summary, "The provider stopped responding while the specialist was finishing the action."),
               responseProviderKey,
               responseModelKey,
             );
@@ -1610,6 +1880,7 @@ export const createAssistantGatewayService = (
       );
 
       createActivityEvent(db, {
+        workspaceId,
         id: createEventId("agent-activity"),
         agentId: target?.id ?? null,
         runId: draftRunId,
@@ -1636,6 +1907,7 @@ export const createAssistantGatewayService = (
         ? `The assistant prepared ${deferredWriteToolCalls.map((tool) => summarizeToolName(tool.toolName)).join(", ")}. Review and approve before it changes the workspace.`
         : typedOrchestration.userFacingSummary;
       const createdRun = createDraftRun(db, {
+        workspaceId,
         threadId: request.threadId,
         routedAgentId: target?.id ?? null,
         title: typedOrchestration.draftRunTitle ?? fallbackRunTitle,
@@ -1655,6 +1927,7 @@ export const createAssistantGatewayService = (
       draftRunId = createdRun.runId;
 
       createActivityEvent(db, {
+        workspaceId,
         id: createEventId("agent-activity"),
         agentId: target?.id ?? null,
         runId: draftRunId,
@@ -1668,6 +1941,7 @@ export const createAssistantGatewayService = (
       });
     } else {
       createActivityEvent(db, {
+        workspaceId,
         id: createEventId("agent-activity"),
         agentId: target?.id ?? null,
         runId: null,
@@ -1778,7 +2052,7 @@ export const createAssistantGatewayService = (
             LIMIT 1
           `,
         )
-        .get(workspaceId, args.runId) as
+        .get(args.workspaceId, args.runId) as
         | {
             id: string;
             thread_id: string | null;
@@ -1827,9 +2101,10 @@ export const createAssistantGatewayService = (
             WHERE workspace_id = ?
               AND id = ?
           `,
-        ).run(summary, now, workspaceId, run.id);
+        ).run(summary, now, args.workspaceId, run.id);
 
         createActivityEvent(db, {
+          workspaceId: args.workspaceId,
           id: `agent-activity-${Date.now().toString(36)}`,
           agentId: run.agent_id,
           runId: run.id,
