@@ -200,6 +200,7 @@ type MessageDbRow = {
   role: "assistant" | "user";
   body: string;
   message_state: AssistantChatMessageRow["state"];
+  source_connector_key: string | null;
   state_payload_json: string | null;
   source_metadata_json: string | null;
   created_at: string;
@@ -314,7 +315,7 @@ export const createAssistantChatService = (
 
     const messageRows = db.prepare(
       `
-        SELECT id, thread_id, role, body, message_state, state_payload_json, source_metadata_json, created_at, updated_at
+        SELECT id, thread_id, role, body, message_state, source_connector_key, state_payload_json, source_metadata_json, created_at, updated_at
         FROM assistant_chat_messages
         WHERE deleted_at IS NULL
         ORDER BY created_at ASC
@@ -323,13 +324,14 @@ export const createAssistantChatService = (
 
     const messagesByThread = messageRows.reduce<Record<string, AssistantChatMessageRow[]>>((accumulator, message) => {
       const list = accumulator[message.thread_id] ?? [];
+      const messageSource = parseMessageSource(message.source_metadata_json);
       list.push({
         id: message.id,
-        role: message.role,
+        role: message.source_connector_key ? "user" : message.role,
         body: message.body,
         state: message.message_state,
         meta: parseMessageMeta(message.state_payload_json),
-        source: parseMessageSource(message.source_metadata_json),
+        source: messageSource,
         attachments: attachmentMap[message.id] ?? [],
         createdAt: message.created_at,
         updatedAt: message.updated_at,
@@ -537,7 +539,7 @@ export const createAssistantChatService = (
     };
   };
 
-  const markThreadPending = (threadId: string, messageId: string, routedAgentId?: string | null) => {
+  const markThreadPending = (threadId: string, messageId: string, routedAgentId?: string | null, activate = true) => {
     const now = new Date().toISOString();
     db.prepare(
       `
@@ -547,12 +549,14 @@ export const createAssistantChatService = (
             last_error_summary = NULL,
             last_routed_agent_id = COALESCE(?, last_routed_agent_id),
             active_message_id = ?,
-            is_active = 1,
+            is_active = CASE WHEN ? = 1 THEN 1 ELSE is_active END,
             updated_at = ?
         WHERE thread_id = ?
       `,
-    ).run(routedAgentId ?? null, messageId, now, threadId);
-    setActiveThreadRow(threadId);
+    ).run(routedAgentId ?? null, messageId, activate ? 1 : 0, now, threadId);
+    if (activate) {
+      setActiveThreadRow(threadId);
+    }
   };
 
   const completeAssistantMessage = (
@@ -829,7 +833,7 @@ export const createAssistantChatService = (
         `,
       ).run(nextTitle, input.context.activePath ?? "/agents", input.context.currentView ?? "Agents", now, input.threadId);
 
-      markThreadPending(input.threadId, assistantMessageId, loadSupervisorAgentId(db));
+      markThreadPending(input.threadId, assistantMessageId, loadSupervisorAgentId(db), !input.source?.connectorKey);
 
       try {
         const response = await options.assistantGatewayService.sendMessage(input);

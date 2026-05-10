@@ -50,11 +50,18 @@ const approvalModeDescriptions: Record<AssistantApprovalPreference, string> = {
 };
 
 type ActiveSelector = "model" | "reasoning" | "approval" | null;
+type ThreadSourceFilter = "app" | "telegram" | "all";
 type ThreadMenuState = {
   sessionId: string;
   top: number;
   left: number;
 } | null;
+
+const threadSourceFilterOptions: Array<{ label: string; value: ThreadSourceFilter }> = [
+  { label: "App", value: "app" },
+  { label: "Telegram", value: "telegram" },
+  { label: "All", value: "all" },
+];
 
 type OptimisticTurn = {
   threadId: string;
@@ -139,6 +146,31 @@ const formatVoiceDuration = (durationMs: number) => {
 };
 
 const formatAttachmentSummary = (count: number) => (count === 1 ? "Attached 1 image." : `Attached ${count} images.`);
+
+const getSessionSource = (session: AssistantChatSession): "app" | "telegram" => {
+  if (session.contextKey.includes("connector=telegram")) {
+    return "telegram";
+  }
+
+  return session.messages.some((message) => message.source?.connectorKey === "telegram") ? "telegram" : "app";
+};
+
+const matchesThreadSourceFilter = (session: AssistantChatSession, filter: ThreadSourceFilter) =>
+  filter === "all" || getSessionSource(session) === filter;
+
+const getThreadSourceLabel = (session: AssistantChatSession) => (getSessionSource(session) === "telegram" ? "Telegram" : "App");
+
+const getUserMessageSourceLabel = (source: AssistantChatSession["messages"][number]["source"]) => {
+  if (!source) {
+    return null;
+  }
+
+  if (source.connectorKey === "telegram") {
+    return "You via Telegram";
+  }
+
+  return source.actorName || source.connectorLabel;
+};
 
 const buildUserBubbleMessage = (body: string, attachments: AssistantGatewayAttachment[]) => {
   const trimmedBody = body.trim();
@@ -555,6 +587,9 @@ export const GlobalAssistantChat = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() =>
     readJsonPreference<boolean>(uiPreferenceKeys.assistantChatSidebarCollapsed, false),
   );
+  const [threadSourceFilter, setThreadSourceFilter] = useState<ThreadSourceFilter>(() =>
+    readJsonPreference<ThreadSourceFilter>(uiPreferenceKeys.assistantChatThreadSourceFilter, "app"),
+  );
   const [threadMenuState, setThreadMenuState] = useState<ThreadMenuState>(null);
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState<string>("");
@@ -582,9 +617,20 @@ export const GlobalAssistantChat = () => {
   const previousIsOpenRef = useRef(isOpen);
   const previousThreadSignatureRef = useRef("");
 
+  const visibleSessions = useMemo(
+    () => sessions.filter((session) => matchesThreadSourceFilter(session, threadSourceFilter)),
+    [sessions, threadSourceFilter],
+  );
+  const activeVisibleSession = useMemo(
+    () =>
+      matchesThreadSourceFilter(activeSession, threadSourceFilter)
+        ? activeSession
+        : visibleSessions[0] ?? activeSession,
+    [activeSession, threadSourceFilter, visibleSessions],
+  );
   const resolvedActiveSession = useMemo(
-    () => buildOptimisticSession(activeSession, optimisticTurn, optimisticAssistantMessage),
-    [activeSession, optimisticAssistantMessage, optimisticTurn],
+    () => buildOptimisticSession(activeVisibleSession, optimisticTurn, optimisticAssistantMessage),
+    [activeVisibleSession, optimisticAssistantMessage, optimisticTurn],
   );
   const activeSessionState = resolvedActiveSession.latestState;
   const stateActions = useMemo(() => buildStateActions(activeSessionState), [activeSessionState]);
@@ -687,12 +733,12 @@ export const GlobalAssistantChat = () => {
     setThreadMenuState(null);
     setExpandedMessageDetails({});
     setOptimisticAssistantMessage(null);
-    setSelectedApproval(activeSession.preferredApprovalMode);
+    setSelectedApproval(activeVisibleSession.preferredApprovalMode);
 
     if (attachmentInputRef.current) {
       attachmentInputRef.current.value = "";
     }
-  }, [activeSession.preferredApprovalMode, resolvedActiveSession.id]);
+  }, [activeVisibleSession.preferredApprovalMode, resolvedActiveSession.id]);
 
   useEffect(() => {
     if (!sessions.some((session) => session.id === expandedSessionId)) {
@@ -703,6 +749,10 @@ export const GlobalAssistantChat = () => {
   useEffect(() => {
     writeJsonPreference(uiPreferenceKeys.assistantChatSidebarCollapsed, isSidebarCollapsed);
   }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    writeJsonPreference(uiPreferenceKeys.assistantChatThreadSourceFilter, threadSourceFilter);
+  }, [threadSourceFilter]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -1215,8 +1265,29 @@ export const GlobalAssistantChat = () => {
               </div>
             </div>
 
+            <div className="assistant-chat-source-filter" aria-label="Thread source filter">
+              {threadSourceFilterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={`assistant-chat-source-filter-button${threadSourceFilter === option.value ? " is-active" : ""}`}
+                  onClick={() => {
+                    setThreadSourceFilter(option.value);
+                    setThreadMenuState(null);
+                  }}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
             <div className="assistant-chat-session-list">
-              {sessions.map((session) => {
+              {visibleSessions.length ? null : (
+                <div className="assistant-chat-session-empty">
+                  No {threadSourceFilter === "telegram" ? "Telegram" : "app"} threads yet.
+                </div>
+              )}
+              {visibleSessions.map((session) => {
                 const isExpanded = expandedSessionId === session.id;
                 const hasState = Boolean(session.latestState);
 
@@ -1261,6 +1332,7 @@ export const GlobalAssistantChat = () => {
                         <button className="assistant-chat-session-select" onClick={() => void selectSession(session.id)} type="button">
                           <div className="assistant-chat-session-copy">
                             <strong>{session.title}</strong>
+                            <span>{getThreadSourceLabel(session)}</span>
                           </div>
                         </button>
                       )}
@@ -1356,13 +1428,14 @@ export const GlobalAssistantChat = () => {
               {resolvedActiveSession.messages.map((entry) => {
                 if (entry.role === "user") {
                   const sourceMeta = [entry.source?.actorRole, entry.source?.channelLabel].filter(Boolean).join(" · ");
+                  const sourceLabel = getUserMessageSourceLabel(entry.source);
                   return (
                     <div key={entry.id} className="assistant-chat-message-block assistant-chat-message-block-user">
                       {entry.source ? (
                         <div className="assistant-chat-message-meta assistant-chat-message-meta-user">
                           <div className="assistant-chat-speaker-meta">
                             <span className="assistant-chat-speaker-pill assistant-chat-speaker-pill-external">
-                              {entry.source.actorName}
+                              {sourceLabel}
                             </span>
                             {sourceMeta ? <span className="assistant-chat-speaker-role">{sourceMeta}</span> : null}
                           </div>

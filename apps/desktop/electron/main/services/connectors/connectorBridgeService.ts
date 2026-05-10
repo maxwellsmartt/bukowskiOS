@@ -3,7 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { AssistantChatService } from "../data/assistantChatService";
 
 const defaultWorkspaceId = "workspace-metadata";
-const defaultThreadTtlMs = 12 * 60 * 60 * 1000;
+const defaultThreadTtlMs: number | null = null;
 
 type TelegramDmInboundMessage = {
   externalUserId: string;
@@ -151,10 +151,11 @@ export const createConnectorBridgeService = (
   options: {
     assistantChatService: AssistantChatService;
     deliveryAdapter?: DeliveryAdapter;
-    threadTtlMs?: number;
+    threadTtlMs?: number | null;
   },
 ) => {
   const threadTtlMs = options.threadTtlMs ?? defaultThreadTtlMs;
+  const resolveThreadExpiresAt = () => (threadTtlMs ? new Date(Date.now() + threadTtlMs).toISOString() : null);
 
   const resolveConnectorConfig = (workspaceId: string, connectorKey: string) =>
     db
@@ -550,9 +551,21 @@ export const createConnectorBridgeService = (
         | undefined;
 
       const expiresAt = binding?.expires_at ? new Date(binding.expires_at).getTime() : null;
-      const isExpired = expiresAt !== null && expiresAt <= Date.now();
+      const isExpired = threadTtlMs !== null && expiresAt !== null && expiresAt <= Date.now();
       const threadExists = binding?.deleted_at !== undefined;
       if (binding && threadExists && !binding.deleted_at && !isExpired) {
+        db.prepare(
+          `
+            UPDATE connector_thread_bindings
+            SET status = 'expired:' || id,
+                updated_at = ?
+            WHERE workspace_id = ?
+              AND connector_key = 'telegram'
+              AND external_user_id = ?
+              AND status = 'active'
+              AND id != ?
+          `,
+        ).run(nowIso(), workspaceId, externalUserId, binding.id);
         return binding.thread_id;
       }
 
@@ -565,6 +578,7 @@ export const createConnectorBridgeService = (
       }
     }
 
+    const previousActiveThreadId = options.assistantChatService.getSnapshot().activeThreadId;
     const created = options.assistantChatService.createThread({
       commandId: buildId("cmd-connector-thread"),
       workspaceId,
@@ -575,9 +589,27 @@ export const createConnectorBridgeService = (
     if (!threadId) {
       throw new Error("Could not create a connector-backed thread.");
     }
+    if (previousActiveThreadId && previousActiveThreadId !== threadId) {
+      options.assistantChatService.setActiveThread({
+        commandId: buildId("cmd-connector-restore-active-thread"),
+        workspaceId,
+        threadId: previousActiveThreadId,
+      });
+    }
 
     const now = nowIso();
-    const expiresAt = new Date(Date.now() + threadTtlMs).toISOString();
+    db.prepare(
+      `
+        UPDATE connector_thread_bindings
+        SET status = 'expired:' || id,
+            updated_at = ?
+        WHERE workspace_id = ?
+          AND connector_key = 'telegram'
+          AND external_user_id = ?
+          AND status = 'active'
+      `,
+    ).run(now, workspaceId, externalUserId);
+    const expiresAt = resolveThreadExpiresAt();
     db.prepare(
       `
         INSERT INTO connector_thread_bindings (
@@ -979,7 +1011,7 @@ export const createConnectorBridgeService = (
             AND external_user_id = ?
             AND status = 'active'
         `,
-      ).run(correlationId, nowIso(), new Date(Date.now() + threadTtlMs).toISOString(), nowIso(), workspaceId, input.externalUserId);
+      ).run(correlationId, nowIso(), resolveThreadExpiresAt(), nowIso(), workspaceId, input.externalUserId);
 
       const thread = snapshot.threads.find((row) => row.id === threadId);
       const lastAssistantMessage = [...(thread?.messages ?? [])].reverse().find((message) => message.role === "assistant");

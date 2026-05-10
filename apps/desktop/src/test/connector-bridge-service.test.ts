@@ -184,6 +184,19 @@ describe("connector bridge service", () => {
       externalMessageId: "telegram-msg-thread-1",
       message: "Dame el estado del monitor Cine 7",
     });
+    expect(first.status).toBe("delivery_pending");
+    expect(first.threadId).toBeTruthy();
+
+    database.prepare(
+      `
+        UPDATE connector_thread_bindings
+        SET expires_at = '2026-01-01T00:00:00.000Z'
+        WHERE connector_key = 'telegram'
+          AND external_user_id = 'telegram-user-linked'
+          AND status = 'active'
+      `,
+    ).run();
+
     const second = await service.processTelegramDm({
       externalUserId: "telegram-user-linked",
       externalUsername: "luis_ops",
@@ -194,10 +207,21 @@ describe("connector bridge service", () => {
       replyToMessageId: "telegram-msg-thread-1",
     });
 
-    expect(first.status).toBe("delivery_pending");
     expect(second.status).toBe("delivery_pending");
-    expect(first.threadId).toBeTruthy();
     expect(second.threadId).toBe(first.threadId);
+
+    const activeBindings = database
+      .prepare(
+        `
+          SELECT thread_id, expires_at
+          FROM connector_thread_bindings
+          WHERE connector_key = 'telegram'
+            AND external_user_id = 'telegram-user-linked'
+            AND status = 'active'
+        `,
+      )
+      .all() as Array<{ thread_id: string; expires_at: string | null }>;
+    expect(activeBindings).toEqual([{ thread_id: first.threadId, expires_at: null }]);
 
     const snapshot = assistantChatService.getSnapshot();
     const thread = snapshot.threads.find((row) => row.id === first.threadId);

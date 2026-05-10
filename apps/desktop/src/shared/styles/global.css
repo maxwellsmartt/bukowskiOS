@@ -1099,9 +1099,9 @@ button:disabled {
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(circle at 20% 18%, rgba(142, 174, 214, 0.15), transparent 34%),
-    radial-gradient(circle at 76% 74%, rgba(214, 179, 122, 0.12), transparent 42%),
-    linear-gradient(145deg, #050607 0%, #0b0d10 46%, #090a0c 100%);
+    radial-gradient(ellipse 78% 62% at 18% 14%, rgba(142, 174, 214, 0.095) 0%, rgba(142, 174, 214, 0.04) 38%, rgba(142, 174, 214, 0) 72%),
+    radial-gradient(ellipse 86% 70% at 82% 82%, rgba(214, 179, 122, 0.075) 0%, rgba(214, 179, 122, 0.032) 42%, rgba(214, 179, 122, 0) 78%),
+    linear-gradient(145deg, #050607 0%, #0a0c0e 52%, #08090b 100%);
 }
 
 .auth-screen::after {
@@ -1112,12 +1112,12 @@ button:disabled {
   backdrop-filter: blur(var(--blur-lg)) saturate(1.1);
   -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.1);
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.044) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.036) 1px, transparent 1px),
-    radial-gradient(circle, rgba(255, 255, 255, 0.09) 0 0.7px, transparent 0.9px),
-    rgba(3, 4, 5, 0.44);
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.052) 0 0.62px, transparent 0.86px),
+    rgba(3, 4, 5, 0.5);
   background-size: 56px 56px, 56px 56px, 6px 6px, auto;
-  mask-image: radial-gradient(circle at center, black 0%, transparent 82%);
+  mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.78) 54%, transparent 88%);
 }
 
 .auth-panel,
@@ -1154,10 +1154,10 @@ button:disabled {
   inset: -28px -36px;
   z-index: -1;
   background:
-    radial-gradient(circle at 38% 44%, rgba(154, 190, 238, 0.14), transparent 42%),
-    radial-gradient(circle at 66% 54%, rgba(229, 195, 136, 0.105), transparent 48%);
-  filter: blur(22px);
-  opacity: 0.72;
+    radial-gradient(ellipse 62% 52% at 38% 44%, rgba(154, 190, 238, 0.1) 0%, rgba(154, 190, 238, 0.04) 45%, transparent 78%),
+    radial-gradient(ellipse 64% 52% at 66% 54%, rgba(229, 195, 136, 0.075) 0%, rgba(229, 195, 136, 0.03) 48%, transparent 82%);
+  filter: blur(28px);
+  opacity: 0.58;
 }
 
 .auth-lockup img {
@@ -8067,14 +8067,14 @@ button.timeline-signal-chip:focus-visible {
   z-index: -1;
   pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.038) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    radial-gradient(circle, rgba(255, 255, 255, 0.07) 0 0.7px, transparent 0.9px),
-    radial-gradient(circle at 22% 22%, rgba(154, 190, 238, 0.08), transparent 34%),
-    radial-gradient(circle at 78% 74%, rgba(229, 195, 136, 0.065), transparent 42%);
+    linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.048) 0 0.62px, transparent 0.86px),
+    radial-gradient(ellipse 74% 60% at 20% 18%, rgba(154, 190, 238, 0.048) 0%, rgba(154, 190, 238, 0.02) 42%, transparent 76%),
+    radial-gradient(ellipse 78% 64% at 82% 78%, rgba(229, 195, 136, 0.042) 0%, rgba(229, 195, 136, 0.018) 44%, transparent 78%);
   background-size: 52px 52px, 52px 52px, 6px 6px, auto, auto;
-  mask-image: radial-gradient(circle at center, black 0%, transparent 88%);
-  opacity: 0.72;
+  mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.66) 58%, transparent 90%);
+  opacity: 0.6;
 }
 
 .agents-graph-card > * {
@@ -11151,8 +11151,9 @@ select.field-input {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01)),
-    #15181c;
+    radial-gradient(ellipse 92% 62% at 74% 0%, rgba(102, 184, 146, 0.035) 0%, rgba(102, 184, 146, 0.015) 46%, transparent 82%),
+    linear-gradient(180deg, rgba(214, 230, 224, 0.02), rgba(255, 255, 255, 0.006)),
+    #13181a;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
 }
 
@@ -11168,10 +11169,11 @@ select.field-input {
 
 .assistant-chat-sidebar {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 8px;
   padding-right: 4px;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
 }
 
 .assistant-chat-panel.is-sidebar-collapsed .assistant-chat-sidebar {
@@ -11218,6 +11220,43 @@ select.field-input {
   color: var(--text-primary);
 }
 
+.assistant-chat-source-filter {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  margin-right: 8px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.assistant-chat-source-filter-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.assistant-chat-source-filter-button:hover {
+  color: var(--text-primary);
+}
+
+.assistant-chat-source-filter-button.is-active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
 .assistant-chat-session-list {
   display: grid;
   gap: 0;
@@ -11228,6 +11267,13 @@ select.field-input {
   overflow-x: hidden;
   padding-right: 8px;
   scrollbar-gutter: stable;
+}
+
+.assistant-chat-session-empty {
+  padding: 16px 12px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 .assistant-chat-session-row {
@@ -11260,8 +11306,8 @@ select.field-input {
   gap: 4px;
   min-width: 0;
   width: 100%;
-  min-height: 24px;
-  padding: 1px 8px 1px 12px;
+  min-height: 32px;
+  padding: 3px 8px 3px 12px;
   border-radius: 6px;
   background: transparent;
   transition: color 120ms ease;
@@ -11297,6 +11343,17 @@ select.field-input {
   font-size: 10px;
   line-height: 1.2;
   font-weight: 500;
+}
+
+.assistant-chat-session-copy span {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.1;
 }
 
 .assistant-chat-session-age {
@@ -11436,6 +11493,7 @@ select.field-input {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
+  min-width: 0;
 }
 
 .assistant-chat-topbar-leading {
@@ -11576,7 +11634,7 @@ select.field-input {
 
 .assistant-chat-bubble-assistant {
   align-self: flex-start;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.045);
   color: var(--text-primary);
   border-bottom-left-radius: 8px;
 }
@@ -11591,8 +11649,11 @@ select.field-input {
 
 .assistant-chat-bubble-user {
   align-self: flex-end;
-  background: rgba(230, 151, 147, 0.12);
-  color: #f4d1cd;
+  background:
+    linear-gradient(180deg, rgba(104, 198, 152, 0.24), rgba(62, 150, 111, 0.18)),
+    rgba(62, 150, 111, 0.16);
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(159, 231, 190, 0.14);
   border-bottom-right-radius: 8px;
 }
 
@@ -11861,7 +11922,7 @@ select.field-input {
   border: 1px solid rgba(92, 190, 146, 0.2);
   border-radius: 16px;
   background:
-    linear-gradient(135deg, rgba(92, 190, 146, 0.105), rgba(115, 164, 255, 0.035)),
+    linear-gradient(135deg, rgba(92, 190, 146, 0.08), rgba(115, 164, 255, 0.022)),
     rgba(255, 255, 255, 0.022);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
