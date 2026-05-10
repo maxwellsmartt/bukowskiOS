@@ -35,6 +35,30 @@ module.exports = {
     artifactName: "${productName}-${version}-${arch}.${ext}",
     entitlements: "build/entitlements.mac.plist",
     entitlementsInherit: "build/entitlements.mac.plist",
+    extendInfo: {
+      CFBundleURLTypes: [
+        {
+          CFBundleURLName: "bukowskiOS Auth",
+          CFBundleURLSchemes: ["bukowskios"],
+        },
+      ],
+      NSAppTransportSecurity: {
+        NSAllowsArbitraryLoads: false,
+        NSAllowsLocalNetworking: true,
+        NSExceptionDomains: {
+          localhost: {
+            NSIncludesSubdomains: false,
+            NSTemporaryExceptionAllowsInsecureHTTPLoads: true,
+            NSTemporaryExceptionAllowsInsecureHTTPSLoads: false,
+          },
+          "127.0.0.1": {
+            NSIncludesSubdomains: false,
+            NSTemporaryExceptionAllowsInsecureHTTPLoads: true,
+            NSTemporaryExceptionAllowsInsecureHTTPSLoads: false,
+          },
+        },
+      },
+    },
     gatekeeperAssess: false,
     hardenedRuntime: releaseSigningEnabled,
     identity: releaseSigningEnabled ? undefined : null,

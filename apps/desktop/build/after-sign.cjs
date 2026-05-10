@@ -42,6 +42,12 @@ module.exports = async function afterSign(context) {
     return;
   }
 
+  const infoPlistPath = path.join(appPath, "Contents", "Info.plist");
+  if (fs.existsSync(infoPlistPath)) {
+    console.log("[adhoc-sign] Hardening App Transport Security.");
+    runCommand("plutil", ["-replace", "NSAppTransportSecurity.NSAllowsArbitraryLoads", "-bool", "NO", infoPlistPath]);
+  }
+
   console.log(`[adhoc-sign] Signing ${appPath}`);
   runCommand("codesign", ["--force", "--deep", "--sign", "-", "--timestamp=none", appPath]);
 

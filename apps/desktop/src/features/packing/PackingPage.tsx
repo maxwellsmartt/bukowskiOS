@@ -103,7 +103,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   }, [activePackingSlipId]);
 
   return (
-    <div className="page-stack">
+    <div className="page-stack packing-page-stack">
       <SectionHeader
         title={isProjectMode ? "Project packing" : "Packing slips"}
       />

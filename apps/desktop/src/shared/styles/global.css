@@ -4404,6 +4404,29 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   overscroll-behavior: contain;
 }
 
+.packing-page-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.packing-page-stack > .split-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.packing-page-stack > .split-layout > .surface-card {
+  min-height: 0;
+}
+
+.packing-page-stack .packing-detail-card {
+  align-self: stretch;
+  max-height: none;
+  height: 100%;
+  padding-bottom: calc(var(--space-md) + 18px);
+}
+
 .select-field-shell {
   position: relative;
 }
@@ -5769,10 +5792,16 @@ body.is-resizing-side-rail {
   flex: 1 1 auto;
   min-height: 0;
   align-items: stretch;
+  overflow: hidden;
+}
+
+.resizable-side-layout.asset-list-layout {
+  align-items: stretch;
 }
 
 .asset-registry-card {
   min-height: 0;
+  overflow: hidden;
 }
 
 .asset-registry-card,
@@ -5788,7 +5817,10 @@ body.is-resizing-side-rail {
 
 .asset-registry-card .table-shell-wide-scroll {
   flex: 1 1 auto;
+  max-height: none;
+  height: 100%;
   min-height: 220px;
+  padding-bottom: 14px;
 }
 
 .projects-layout {
