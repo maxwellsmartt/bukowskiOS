@@ -11151,9 +11151,9 @@ select.field-input {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   background:
-    radial-gradient(ellipse 92% 62% at 74% 0%, rgba(88, 132, 196, 0.05) 0%, rgba(88, 132, 196, 0.02) 46%, transparent 82%),
-    linear-gradient(180deg, rgba(180, 202, 236, 0.024), rgba(255, 255, 255, 0.006)),
-    #111722;
+    radial-gradient(ellipse 92% 62% at 74% 0%, rgba(118, 145, 176, 0.042) 0%, rgba(118, 145, 176, 0.018) 46%, transparent 82%),
+    linear-gradient(180deg, rgba(190, 205, 222, 0.02), rgba(255, 255, 255, 0.006)),
+    #141922;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
 }
 
@@ -11192,7 +11192,7 @@ select.field-input {
 .assistant-chat-sidebar-title {
   display: block;
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -11242,7 +11242,7 @@ select.field-input {
   border-radius: 7px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1;
   transition: background 140ms ease, color 140ms ease;
@@ -11272,7 +11272,7 @@ select.field-input {
 .assistant-chat-session-empty {
   padding: 16px 12px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.4;
 }
 
@@ -11306,8 +11306,8 @@ select.field-input {
   gap: 4px;
   min-width: 0;
   width: 100%;
-  min-height: 32px;
-  padding: 3px 8px 3px 12px;
+  min-height: 36px;
+  padding: 4px 8px 4px 12px;
   border-radius: 6px;
   background: transparent;
   transition: color 120ms ease;
@@ -11340,7 +11340,7 @@ select.field-input {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-primary);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.2;
   font-weight: 500;
 }
@@ -11352,13 +11352,13 @@ select.field-input {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-muted);
-  font-size: 9px;
-  line-height: 1.1;
+  font-size: 10px;
+  line-height: 1.15;
 }
 
 .assistant-chat-session-age {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   flex: 0 0 auto;
   min-width: 28px;
   text-align: right;
@@ -11435,7 +11435,7 @@ select.field-input {
   border-radius: 8px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 12px;
   text-align: left;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
@@ -11467,12 +11467,12 @@ select.field-input {
 
 .assistant-chat-session-detail-row span {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .assistant-chat-session-detail-row strong {
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.35;
   font-weight: 500;
   text-align: right;
@@ -11486,7 +11486,7 @@ select.field-input {
 
 .assistant-chat-assigned-agent span {
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .assistant-chat-main {
@@ -11563,14 +11563,14 @@ select.field-input {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 
 .assistant-chat-speaker-role {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.2;
   padding-left: 4px;
 }
@@ -11618,10 +11618,10 @@ select.field-input {
   display: inline-flex;
   width: fit-content;
   max-width: 84%;
-  padding: 7px 10px;
+  padding: 8px 11px;
   border-radius: 15px;
-  font-size: 11px;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.45;
   min-width: 0;
   word-break: break-word;
 }
@@ -11665,14 +11665,14 @@ select.field-input {
 
 .assistant-chat-markdown-heading-1,
 .assistant-chat-markdown-heading-2 {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .assistant-chat-markdown-heading-3,
 .assistant-chat-markdown-heading-4,
 .assistant-chat-markdown-heading-5,
 .assistant-chat-markdown-heading-6 {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .assistant-chat-markdown-paragraph {
@@ -11764,7 +11764,7 @@ select.field-input {
 
 .assistant-chat-approval-eyebrow {
   color: #ffd7a1;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -11946,7 +11946,7 @@ select.field-input {
 
 .assistant-chat-result-eyebrow {
   color: rgba(184, 242, 211, 0.82);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -11954,7 +11954,7 @@ select.field-input {
 
 .assistant-chat-result-copy strong {
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.25;
 }
 
@@ -11975,7 +11975,7 @@ select.field-input {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.04);
   color: rgba(245, 248, 250, 0.94);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
@@ -12005,7 +12005,7 @@ select.field-input {
 
 .assistant-chat-receipt-header strong {
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.35;
 }
 
@@ -12053,7 +12053,7 @@ select.field-input {
 .assistant-chat-receipt-item strong {
   display: block;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -12061,7 +12061,7 @@ select.field-input {
 .assistant-chat-receipt-next {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -12073,7 +12073,7 @@ select.field-input {
 .assistant-chat-state-body {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -12088,7 +12088,7 @@ select.field-input {
 
 .assistant-chat-state-meta span {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.35;
 }
 
@@ -12116,7 +12116,7 @@ select.field-input {
 
 .assistant-chat-inline-thinking-label {
   color: #cbdcff;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -12145,7 +12145,7 @@ select.field-input {
 
 .assistant-chat-inline-status-copy {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.35;
   padding-left: 2px;
 }
@@ -12180,7 +12180,7 @@ select.field-input {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-primary);
-  font-size: 10px;
+  font-size: 11px;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
@@ -12230,7 +12230,7 @@ select.field-input {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.026);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -12263,7 +12263,7 @@ select.field-input {
 .assistant-chat-attachment-error {
   margin: 0;
   color: rgba(230, 151, 147, 0.92);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -12288,6 +12288,7 @@ select.field-input {
   border: none;
   background: transparent;
   color: var(--text-primary);
+  font-size: 13px;
   line-height: 1.55;
   resize: none;
 }
@@ -12401,7 +12402,7 @@ select.field-input {
 }
 
 .assistant-chat-voice-waveform-label {
-  font-size: 12px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   color: rgba(244, 247, 251, 0.68);
 }
@@ -12457,7 +12458,7 @@ select.field-input {
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 12px;
   transition: color 120ms ease, transform 120ms ease;
   flex: 0 0 auto;
 }
@@ -12543,7 +12544,7 @@ select.field-input {
   border-radius: 10px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 12px;
   text-align: left;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
@@ -12559,7 +12560,7 @@ select.field-input {
   margin: 2px 2px 0;
   padding: 6px 8px 2px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
