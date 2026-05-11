@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Camera, LogOut, Save, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { useSession } from "@app/providers/SessionProvider";
 import { useToast } from "@app/providers/ToastProvider";
@@ -23,6 +24,7 @@ type UserAccountSettingsProps = {
 };
 
 export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsProps) => {
+  const { t } = useTranslation();
   const toast = useToast();
   const { user, status, supabase, isLocalFallback, signOut, refreshUser } = useSession();
   const { activeMembership, activeWorkspaceName } = useWorkspace();
@@ -49,11 +51,14 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
 
   if (status !== "authenticated" || !user) {
     return (
-      <SurfaceCard title="Your account" subtitle="Sign in to manage your profile.">
+      <SurfaceCard
+        title={t("settings.account.signInRequiredTitle")}
+        subtitle={t("settings.account.signInRequiredSubtitle")}
+      >
         <p className="surface-card-subtitle">
           {isLocalFallback
-            ? "You are running in local fallback. Connect to Supabase to manage your account."
-            : "No active session detected."}
+            ? t("settings.account.localFallbackHelp")
+            : t("settings.account.noSession")}
         </p>
       </SurfaceCard>
     );
@@ -95,7 +100,10 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
 
   const handleSave = async () => {
     if (!supabase) {
-      toast.error("Cannot save", "Supabase is not configured for this device.");
+      toast.error(
+        t("settings.account.toasts.cannotSave"),
+        t("settings.account.toasts.supabaseUnavailable"),
+      );
       return;
     }
 
@@ -109,9 +117,15 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
       if (error) throw error;
       await upsertProfile({ fullName: fullName.trim() || null });
       await refreshUser();
-      toast.success("Account saved", "Your name now appears across the app.");
+      toast.success(
+        t("settings.account.toasts.accountSaved"),
+        t("settings.account.toasts.nameAppears"),
+      );
     } catch (error) {
-      toast.error("Could not save", getUserFacingErrorMessage(error, "Try again in a moment."));
+      toast.error(
+        t("common.couldNotSave"),
+        getUserFacingErrorMessage(error, t("settings.account.toasts.couldNotSaveBody")),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -123,11 +137,17 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
     if (!file || !supabase) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      toast.error("File too large", "Pick an image under 2 MB.");
+      toast.error(
+        t("settings.account.toasts.fileTooLargeTitle"),
+        t("settings.account.toasts.fileTooLargeBody"),
+      );
       return;
     }
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
-      toast.error("Unsupported format", "PNG, JPEG or WebP only.");
+      toast.error(
+        t("settings.account.toasts.unsupportedFormatTitle"),
+        t("settings.account.toasts.unsupportedFormatBody"),
+      );
       return;
     }
 
@@ -150,9 +170,15 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
       await upsertProfile({ avatarUrl });
 
       await refreshUser();
-      toast.success("Avatar updated", "Your photo now appears across the app.");
+      toast.success(
+        t("settings.account.toasts.avatarUpdatedTitle"),
+        t("settings.account.toasts.avatarUpdatedBody"),
+      );
     } catch (error) {
-      toast.error("Upload failed", getUserFacingErrorMessage(error, "Try again with a smaller file."));
+      toast.error(
+        t("settings.account.toasts.uploadFailedTitle"),
+        getUserFacingErrorMessage(error, t("settings.account.toasts.uploadFailedBody")),
+      );
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -166,9 +192,15 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
       if (error) throw error;
       await upsertProfile({ avatarUrl: null });
       await refreshUser();
-      toast.success("Avatar removed", "Your initials are back.");
+      toast.success(
+        t("settings.account.toasts.avatarRemovedTitle"),
+        t("settings.account.toasts.avatarRemovedBody"),
+      );
     } catch (error) {
-      toast.error("Could not remove", getUserFacingErrorMessage(error, "Try again in a moment."));
+      toast.error(
+        t("settings.account.toasts.couldNotRemove"),
+        getUserFacingErrorMessage(error, t("settings.account.toasts.couldNotSaveBody")),
+      );
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -178,9 +210,15 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
     setIsSigningOut(true);
     try {
       await signOut();
-      toast.success("Signed out", "See you soon.");
+      toast.success(
+        t("settings.account.toasts.signedOutTitle"),
+        t("settings.account.toasts.signedOutBody"),
+      );
     } catch (error) {
-      toast.error("Sign out failed", getUserFacingErrorMessage(error, "Try again in a moment."));
+      toast.error(
+        t("settings.account.toasts.signOutFailed"),
+        getUserFacingErrorMessage(error, t("settings.account.toasts.couldNotSaveBody")),
+      );
     } finally {
       setIsSigningOut(false);
     }
@@ -189,13 +227,13 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
   return (
     <div className="page-stack">
       {showHeader ? (
-        <SectionHeader title="Account" />
+        <SectionHeader title={t("settings.account.title")} />
       ) : null}
 
-      <SurfaceCard title="Profile">
+      <SurfaceCard title={t("settings.account.profile")}>
         <div className="user-account-row">
           <button
-            aria-label="Change avatar"
+            aria-label={t("settings.account.changeAvatar")}
             className="user-account-avatar-button"
             disabled={isUploadingAvatar}
             onClick={() => avatarInputRef.current?.click()}
@@ -203,7 +241,7 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
           >
             {user.avatarUrl && !avatarLoadFailed ? (
               <img
-                alt={fullName || user.email || "Avatar"}
+                alt={fullName || user.email || t("settings.account.changeAvatar")}
                 className="user-account-avatar-image"
                 onError={() => setAvatarLoadFailed(true)}
                 src={user.avatarUrl}
@@ -223,10 +261,10 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
             type="file"
           />
           <div className="user-account-copy">
-            <strong>{fullName.trim() || user.email || "Set your name"}</strong>
+            <strong>{fullName.trim() || user.email || t("settings.account.setYourName")}</strong>
             <small>{user.email}</small>
             <span className="user-account-membership">
-              {activeMembership?.roleName ?? "Member"} · {activeWorkspaceName}
+              {activeMembership?.roleName ?? t("settings.account.member")} · {activeWorkspaceName}
             </span>
             {user.avatarUrl ? (
               <button
@@ -236,7 +274,7 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
                 type="button"
               >
                 <Trash2 size={11} />
-                <span>Remove photo</span>
+                <span>{t("settings.account.removePhoto")}</span>
               </button>
             ) : null}
           </div>
@@ -244,16 +282,16 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
 
         <div className="agent-form-grid">
           <label className="field-block field-block-span-2">
-            <span className="field-label">Full name</span>
+            <span className="field-label">{t("settings.account.fullNameLabel")}</span>
             <input
               className="field-input"
               onChange={(event) => setFullName(event.target.value)}
-              placeholder="Your display name"
+              placeholder={t("settings.account.fullNamePlaceholder")}
               value={fullName}
             />
           </label>
           <label className="field-block field-block-span-2">
-            <span className="field-label">Email</span>
+            <span className="field-label">{t("settings.account.emailLabel")}</span>
             <input className="field-input" value={user.email ?? ""} readOnly disabled />
           </label>
         </div>
@@ -266,28 +304,28 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
             type="button"
           >
             <Save size={13} />
-            <span>{isSaving ? "Saving…" : "Save profile"}</span>
+            <span>{isSaving ? t("common.saving") : t("settings.account.saveProfile")}</span>
           </button>
         </div>
 
         <p className="surface-card-subtitle" style={{ marginTop: 8, fontSize: "var(--font-2xs)", color: "var(--text-muted)" }}>
-          Click your avatar to upload a photo. PNG, JPEG or WebP, up to 2 MB.
+          {t("settings.account.avatarHelper")}
         </p>
       </SurfaceCard>
 
-      <SurfaceCard title="Access">
+      <SurfaceCard title={t("settings.account.accessTitle")}>
         <div className="summary-grid compact-summary-grid">
           <div className="summary-row">
-            <span className="summary-label">Signed in as</span>
+            <span className="summary-label">{t("settings.account.signedInAs")}</span>
             <span className="summary-value">{user.email}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Active workspace</span>
+            <span className="summary-label">{t("settings.account.activeWorkspace")}</span>
             <span className="summary-value">{activeWorkspaceName}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Role</span>
-            <span className="summary-value">{activeMembership?.roleName ?? "Member"}</span>
+            <span className="summary-label">{t("settings.account.role")}</span>
+            <span className="summary-value">{activeMembership?.roleName ?? t("settings.account.member")}</span>
           </div>
         </div>
 
@@ -299,7 +337,7 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
             type="button"
           >
             <LogOut size={13} />
-            <span>{isSigningOut ? "Signing out…" : "Sign out"}</span>
+            <span>{isSigningOut ? t("settings.account.signingOut") : t("settings.account.signOut")}</span>
           </button>
         </div>
       </SurfaceCard>

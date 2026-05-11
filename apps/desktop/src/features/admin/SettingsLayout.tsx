@@ -1,5 +1,6 @@
 import { useRef, type KeyboardEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 export type SettingsSectionId =
   | "general"
@@ -12,19 +13,32 @@ export type SettingsSectionId =
 
 type SettingsNavEntry = {
   id: SettingsSectionId;
-  label: string;
-  description: string;
   to: string;
 };
 
+/**
+ * Static structural metadata for the settings nav. Labels are not stored
+ * here — they live in the i18n catalogs and are resolved by
+ * `useSettingsNavEntries()` at render time so language changes reflect
+ * immediately.
+ */
 export const settingsNavEntries: SettingsNavEntry[] = [
-  { id: "general", label: "General", description: "Profile & preferences", to: "/settings?section=general" },
-  { id: "workspace", label: "Workspace", description: "Company setup", to: "/settings/workspace" },
-  { id: "team", label: "Team", description: "Users & access", to: "/settings?section=team" },
-  { id: "data", label: "Data", description: "Backups & exports", to: "/settings?section=data" },
-  { id: "sync", label: "Sync", description: "Cloud status", to: "/settings/sync" },
-  { id: "advanced", label: "Advanced", description: "Support tools", to: "/settings?section=advanced" },
+  { id: "general", to: "/settings?section=general" },
+  { id: "workspace", to: "/settings/workspace" },
+  { id: "team", to: "/settings?section=team" },
+  { id: "data", to: "/settings?section=data" },
+  { id: "sync", to: "/settings/sync" },
+  { id: "advanced", to: "/settings?section=advanced" },
 ];
+
+/** Resolves localized label + description for a nav id. */
+export const useSettingsNavLabels = () => {
+  const { t } = useTranslation();
+  return (id: SettingsSectionId) => ({
+    label: t(`settings.nav.${id}.label`),
+    description: t(`settings.nav.${id}.description`),
+  });
+};
 
 const resolveActiveSection = (pathname: string, search: string): SettingsSectionId => {
   if (pathname === "/settings/workspace") return "workspace";
@@ -46,6 +60,8 @@ type SettingsLayoutProps = {
 export const SettingsLayout = ({ children }: SettingsLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
+  const labelsFor = useSettingsNavLabels();
   const activeId = resolveActiveSection(location.pathname, location.search);
   const navRef = useRef<HTMLDivElement | null>(null);
 
@@ -69,22 +85,25 @@ export const SettingsLayout = ({ children }: SettingsLayoutProps) => {
   return (
     <div className="settings-shell-layout">
       <nav
-        aria-label="Settings sections"
+        aria-label={t("settings.nav.general.label")}
         className="settings-section-nav"
         onKeyDown={handleKeyDown}
         ref={navRef}
       >
-        {settingsNavEntries.map((entry) => (
-          <button
-            key={entry.id}
-            className={`settings-section-tab${activeId === entry.id ? " is-active" : ""}`}
-            onClick={() => navigate(entry.to)}
-            type="button"
-          >
-            <span>{entry.label}</span>
-            <small>{entry.description}</small>
-          </button>
-        ))}
+        {settingsNavEntries.map((entry) => {
+          const labels = labelsFor(entry.id);
+          return (
+            <button
+              key={entry.id}
+              className={`settings-section-tab${activeId === entry.id ? " is-active" : ""}`}
+              onClick={() => navigate(entry.to)}
+              type="button"
+            >
+              <span>{labels.label}</span>
+              <small>{labels.description}</small>
+            </button>
+          );
+        })}
       </nav>
 
       <div className="settings-content-panel">{children}</div>

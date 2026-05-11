@@ -11,9 +11,19 @@
     "close": "Close",
     "ok": "OK",
     "confirm": "Confirm",
-    "search": "Search"
+    "search": "Search",
+    "tryAgain": "Try again in a moment.",
+    "couldNotSave": "Could not save"
   },
   "settings": {
+    "nav": {
+      "general": { "label": "General", "description": "Profile & preferences" },
+      "workspace": { "label": "Workspace", "description": "Company setup" },
+      "team": { "label": "Team", "description": "Users & access" },
+      "data": { "label": "Data", "description": "Backups & exports" },
+      "sync": { "label": "Sync", "description": "Cloud status" },
+      "advanced": { "label": "Advanced", "description": "Support tools" }
+    },
     "general": {
       "title": "General",
       "language": {
@@ -44,6 +54,139 @@
         "minutes_one": "{{count}} min",
         "minutes_other": "{{count}} min",
         "hour": "1 hour"
+      }
+    },
+    "account": {
+      "title": "Account",
+      "profile": "Profile",
+      "fullNameLabel": "Full name",
+      "fullNamePlaceholder": "Your display name",
+      "emailLabel": "Email",
+      "setYourName": "Set your name",
+      "changeAvatar": "Change avatar",
+      "removePhoto": "Remove photo",
+      "saveProfile": "Save profile",
+      "avatarHelper": "Click your avatar to upload a photo. PNG, JPEG or WebP, up to 2 MB.",
+      "accessTitle": "Access",
+      "signedInAs": "Signed in as",
+      "activeWorkspace": "Active workspace",
+      "role": "Role",
+      "member": "Member",
+      "signOut": "Sign out",
+      "signingOut": "Signing out…",
+      "signInRequiredTitle": "Your account",
+      "signInRequiredSubtitle": "Sign in to manage your profile.",
+      "localFallbackHelp": "You are running in local fallback. Connect to Supabase to manage your account.",
+      "noSession": "No active session detected.",
+      "toasts": {
+        "cannotSave": "Cannot save",
+        "supabaseUnavailable": "Supabase is not configured for this device.",
+        "accountSaved": "Account saved",
+        "nameAppears": "Your name now appears across the app.",
+        "couldNotSaveBody": "Try again in a moment.",
+        "fileTooLargeTitle": "File too large",
+        "fileTooLargeBody": "Pick an image under 2 MB.",
+        "unsupportedFormatTitle": "Unsupported format",
+        "unsupportedFormatBody": "PNG, JPEG or WebP only.",
+        "uploadFailedTitle": "Upload failed",
+        "uploadFailedBody": "Try again with a smaller file.",
+        "avatarUpdatedTitle": "Avatar updated",
+        "avatarUpdatedBody": "Your photo now appears across the app.",
+        "avatarRemovedTitle": "Avatar removed",
+        "avatarRemovedBody": "Your initials are back.",
+        "couldNotRemove": "Could not remove",
+        "signedOutTitle": "Signed out",
+        "signedOutBody": "See you soon.",
+        "signOutFailed": "Sign out failed"
+      }
+    },
+    "workspace": {
+      "title": "Workspace",
+      "sections": {
+        "generalInfo": "General info",
+        "members": "Members",
+        "pendingInvites": "Pending invites",
+        "systemActors": "System actors",
+        "roles": "Roles",
+        "branding": "Branding",
+        "currency": "Currency",
+        "channels": "Channels",
+        "otherWorkspaces": "Other workspaces"
+      },
+      "summaries": {
+        "membersCount_one": "{{count}} member · {{active}} active",
+        "membersCount_other": "{{count}} members · {{active}} active",
+        "pending_one": "{{count}} waiting",
+        "pending_other": "{{count}} waiting",
+        "noPending": "No pending invites",
+        "rolesCount_one": "{{count}} role available",
+        "rolesCount_other": "{{count}} roles available",
+        "actorsCount_one": "{{count}} automation identity",
+        "actorsCount_other": "{{count}} automation identities",
+        "noActors": "No automation identities yet",
+        "workspacesConnected_one": "{{count}} workspace connected",
+        "workspacesConnected_other": "{{count}} workspaces connected",
+        "currency": "Base currency and exchange rates",
+        "currencyWith": "Base currency and exchange rates · {{currency}}",
+        "branding": "Logo and document assets",
+        "channels": "Messaging access for workspace members"
+      },
+      "generalInfo": {
+        "workspaceLabel": "Workspace",
+        "shortName": "Short name",
+        "workspaceId": "Workspace ID",
+        "copyId": "Copy workspace ID",
+        "copied": "Copied",
+        "accentColor": "Accent color",
+        "baseCurrency": "Base currency",
+        "yourAccess": "Your access",
+        "permissionsGranted_one": "{{count}} permission granted",
+        "permissionsGranted_other": "{{count}} permissions granted",
+        "permissionsPending": "Pending — refresh the workspace if this stays empty",
+        "workspaceName": "Workspace name",
+        "workspaceAvatar": "Workspace avatar",
+        "workspaceAvatarHelp": "Appears in the workspace picker, switcher and navigation surfaces.",
+        "uploadAvatar": "Upload workspace avatar"
+      },
+      "members": {
+        "invite": "Invite member",
+        "inviteDisabledTooltip": "Sign in to send invites",
+        "column": {
+          "member": "Member",
+          "role": "Role",
+          "membership": "Membership",
+          "permissions": "Permissions",
+          "actions": "Actions"
+        },
+        "emailPending": "Email pending",
+        "membership": {
+          "active": "Active",
+          "inactive": "Inactive",
+          "missing": "Not in workspace"
+        },
+        "suspend": "Suspend",
+        "reactivate": "Reactivate",
+        "empty": "No members yet."
+      },
+      "invites": {
+        "column": { "email": "Email", "role": "Role", "invited": "Invited", "actions": "Actions" },
+        "pendingFallback": "Pending",
+        "empty": "No invitations waiting. New teammates get a magic link by email.",
+        "emptyTable": "No pending invites.",
+        "resend": "Resend",
+        "revoke": "Revoke"
+      },
+      "systemActors": {
+        "title": "Automation identities",
+        "subtitle": "System actors audit assistant-driven actions without creating fake human accounts or invite emails.",
+        "column": { "actor": "Actor", "type": "Type", "status": "Status", "permissions": "Permissions" },
+        "managedBy": "Managed by bukowskiOS",
+        "empty": "Run the system actors migration to create the AI Agent identity for this workspace."
+      },
+      "channels": {
+        "manage": "Manage channels",
+        "channelAccess": "Channel access",
+        "subtitle": "Connect members to the messaging channels they use with the assistant."
       }
     }
   }

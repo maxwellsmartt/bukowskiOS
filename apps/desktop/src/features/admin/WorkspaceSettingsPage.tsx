@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Bot, Camera, Check, ChevronDown, Copy, Pencil, Save, Send, Trash2, X } from "lucide-react";
 
 import type { AppUserAdminRow, AppUsersSnapshot } from "@contracts";
@@ -62,16 +63,11 @@ const resolveMembershipTone = (status: AppUserAdminRow["membershipStatus"]) => {
   return "neutral" as const;
 };
 
-const resolveMembershipLabel = (status: AppUserAdminRow["membershipStatus"]) => {
-  if (status === "active") {
-    return "Active";
-  }
-
-  if (status === "inactive") {
-    return "Inactive";
-  }
-
-  return "Not in workspace";
+/** Returns the i18n key suffix for the membership label. Translate at call site. */
+const membershipLabelKey = (status: AppUserAdminRow["membershipStatus"]): "active" | "inactive" | "missing" => {
+  if (status === "active") return "active";
+  if (status === "inactive") return "inactive";
+  return "missing";
 };
 
 const resolveSystemActorTone = (status: SystemActorRow["status"]) => {
@@ -292,6 +288,7 @@ const WorkspaceDisclosure = ({ children, defaultOpen = false, summary, title }: 
 };
 
 export const WorkspaceSettingsPage = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const navigate = useNavigate();
   const { supabase, isLocalFallback, user: sessionUser } = useSession();
@@ -766,19 +763,19 @@ export const WorkspaceSettingsPage = () => {
 
   return (
     <div className="page-stack settings-page">
-      <SectionHeader title="Workspace" />
+      <SectionHeader title={t("settings.workspace.title")} />
 
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
       <SettingsLayout>
 
       <SurfaceCard
-        title="General info"
+        title={t("settings.workspace.sections.generalInfo")}
         aside={
           workspaceProfile && !isEditingWorkspace && !isLocalFallback ? (
             <button className="ghost-control" onClick={() => setIsEditingWorkspace(true)} type="button">
               <Pencil size={13} />
-              <span>Edit</span>
+              <span>{t("common.edit")}</span>
             </button>
           ) : null
         }
@@ -794,7 +791,7 @@ export const WorkspaceSettingsPage = () => {
           <div className="agent-form-grid">
             <div className="workspace-avatar-editor" style={{ gridColumn: "1 / -1" }}>
               <button
-                aria-label="Upload workspace avatar"
+                aria-label={t("settings.workspace.generalInfo.uploadAvatar")}
                 className="workspace-avatar-editor-button"
                 disabled={isUploadingWorkspaceAvatar}
                 onClick={() => workspaceAvatarInputRef.current?.click()}
@@ -812,8 +809,8 @@ export const WorkspaceSettingsPage = () => {
                 </span>
               </button>
               <div className="workspace-avatar-editor-copy">
-                <strong>Workspace avatar</strong>
-                <span>Appears in the workspace picker, switcher and navigation surfaces.</span>
+                <strong>{t("settings.workspace.generalInfo.workspaceAvatar")}</strong>
+                <span>{t("settings.workspace.generalInfo.workspaceAvatarHelp")}</span>
               </div>
               {workspaceDraft.avatarUrl ? (
                 <button
@@ -823,12 +820,12 @@ export const WorkspaceSettingsPage = () => {
                   type="button"
                 >
                   <Trash2 size={13} />
-                  <span>Remove</span>
+                  <span>{t("common.remove")}</span>
                 </button>
               ) : null}
             </div>
             <label className="field-block">
-              <span className="field-label">Workspace name</span>
+              <span className="field-label">{t("settings.workspace.generalInfo.workspaceName")}</span>
               <input
                 className="field-input"
                 onChange={(event) => setWorkspaceDraft((current) => ({ ...current, name: event.target.value }))}
@@ -836,10 +833,10 @@ export const WorkspaceSettingsPage = () => {
               />
             </label>
             <label className="field-block">
-              <span className="field-label">Accent color</span>
+              <span className="field-label">{t("settings.workspace.generalInfo.accentColor")}</span>
               <span className="workspace-color-picker-row">
                 <input
-                  aria-label="Accent color picker"
+                  aria-label={t("settings.workspace.generalInfo.accentColor")}
                   className="workspace-color-input"
                   onChange={(event) => handleWorkspaceAccentColorPreview(event.target.value)}
                   type="color"
@@ -871,7 +868,7 @@ export const WorkspaceSettingsPage = () => {
                 type="button"
               >
                 <X size={13} />
-                <span>Cancel</span>
+                <span>{t("common.cancel")}</span>
               </button>
               <button
                 className="action-primary-button"
@@ -880,17 +877,17 @@ export const WorkspaceSettingsPage = () => {
                 type="button"
               >
                 <Save size={13} />
-                <span>{isSavingWorkspace ? "Saving…" : "Save changes"}</span>
+                <span>{isSavingWorkspace ? t("common.saving") : t("common.saveChanges")}</span>
               </button>
             </div>
           </div>
         ) : (
           <div className="workspace-details-groups">
             <div className="workspace-details-group">
-              <span className="workspace-details-group-label">Workspace</span>
+              <span className="workspace-details-group-label">{t("settings.workspace.generalInfo.workspaceLabel")}</span>
               <div className="workspace-identity-row">
                 <button
-                  aria-label="Change workspace avatar"
+                  aria-label={t("settings.workspace.generalInfo.uploadAvatar")}
                   className="workspace-avatar workspace-avatar-lg workspace-avatar-inline-button"
                   disabled={isLocalFallback || isUploadingWorkspaceAvatar}
                   onClick={() => workspaceAvatarInputRef.current?.click()}
@@ -913,16 +910,16 @@ export const WorkspaceSettingsPage = () => {
               </div>
               <div className="summary-grid compact-summary-grid">
                 <div className="summary-row">
-                  <span className="summary-label">Short name</span>
+                  <span className="summary-label">{t("settings.workspace.generalInfo.shortName")}</span>
                   <span className="summary-value">{workspaceProfile?.slug ?? "—"}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Workspace ID</span>
+                  <span className="summary-label">{t("settings.workspace.generalInfo.workspaceId")}</span>
                   <span className="summary-value workspace-id-copy-row">
                     <code className="workspace-details-id">{activeWorkspaceId}</code>
                     <button
                       className={`icon-ghost-control workspace-id-copy-button${copiedWorkspaceId ? " is-copied" : ""}`}
-                      data-tooltip={copiedWorkspaceId ? "Copied" : "Copy workspace ID"}
+                      data-tooltip={copiedWorkspaceId ? t("settings.workspace.generalInfo.copied") : t("settings.workspace.generalInfo.copyId")}
                       onClick={() => void handleCopyWorkspaceId()}
                       type="button"
                     >
@@ -931,13 +928,13 @@ export const WorkspaceSettingsPage = () => {
                   </span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Accent color</span>
+                  <span className="summary-label">{t("settings.workspace.generalInfo.accentColor")}</span>
                   <span className="summary-value">
                     <label className="workspace-color-chip workspace-color-chip-button">
                       <span style={{ background: workspaceProfile?.iconColor ?? "#d6b37a" }} />
                       <code>{workspaceProfile?.iconColor ?? "Default"}</code>
                       <input
-                        aria-label="Change workspace accent color"
+                        aria-label={t("settings.workspace.generalInfo.accentColor")}
                         disabled={isLocalFallback}
                         onBlur={(event) => void handleWorkspaceAccentColorCommit(event.target.value)}
                         onChange={(event) => handleWorkspaceAccentColorPreview(event.target.value)}
@@ -948,25 +945,25 @@ export const WorkspaceSettingsPage = () => {
                   </span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Base currency</span>
+                  <span className="summary-label">{t("settings.workspace.generalInfo.baseCurrency")}</span>
                   <span className="summary-value">{workspaceProfile?.baseCurrency ?? "USD"}</span>
                 </div>
               </div>
             </div>
 
             <div className="workspace-details-group">
-              <span className="workspace-details-group-label">Your access</span>
+              <span className="workspace-details-group-label">{t("settings.workspace.generalInfo.yourAccess")}</span>
               <div className="summary-grid compact-summary-grid">
                 <div className="summary-row">
-                  <span className="summary-label">Role</span>
-                  <span className="summary-value">{activeMembership?.roleName ?? "Member"}</span>
+                  <span className="summary-label">{t("settings.account.role")}</span>
+                  <span className="summary-value">{activeMembership?.roleName ?? t("settings.account.member")}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Permissions</span>
+                  <span className="summary-label">{t("settings.workspace.members.column.permissions")}</span>
                   <span className="summary-value">
                     {activeMembership?.permissions.length
-                      ? `${activeMembership.permissions.length} permissions granted`
-                      : "Pending — refresh the workspace if this stays empty"}
+                      ? t("settings.workspace.generalInfo.permissionsGranted", { count: activeMembership.permissions.length })
+                      : t("settings.workspace.generalInfo.permissionsPending")}
                   </span>
                 </div>
               </div>
@@ -975,19 +972,25 @@ export const WorkspaceSettingsPage = () => {
         )}
       </SurfaceCard>
 
-      <WorkspaceDisclosure title="Members" summary={`${teamMembers.length} member${teamMembers.length === 1 ? "" : "s"} · ${teamMembers.filter((member) => member.membershipStatus === "active").length} active`}>
+      <WorkspaceDisclosure
+        title={t("settings.workspace.sections.members")}
+        summary={t("settings.workspace.summaries.membersCount", {
+          count: teamMembers.length,
+          active: teamMembers.filter((member) => member.membershipStatus === "active").length,
+        })}
+      >
         <SurfaceCard
-          title="Members"
+          title={t("settings.workspace.sections.members")}
           aside={
             <button
               className="action-primary-button"
               disabled={isLocalFallback || !inviteRolesForDialog.length}
-              data-tooltip={isLocalFallback ? "Sign in to send invites" : undefined}
+              data-tooltip={isLocalFallback ? t("settings.workspace.members.inviteDisabledTooltip") : undefined}
               onClick={() => setInviteOpen(true)}
               type="button"
             >
               <Send size={14} />
-              <span>Invite member</span>
+              <span>{t("settings.workspace.members.invite")}</span>
             </button>
           }
         >
@@ -998,22 +1001,22 @@ export const WorkspaceSettingsPage = () => {
             columns={[
               {
                 key: "person",
-                label: "Member",
+                label: t("settings.workspace.members.column.member"),
                 render: (row) => (
                   <div className="identity-cell">
                     <span className="identity-title">{row.fullName}</span>
-                    <span className="identity-meta">{row.email || "Email pending"}</span>
+                    <span className="identity-meta">{row.email || t("settings.workspace.members.emailPending")}</span>
                   </div>
                 ),
               },
               {
                 key: "role",
-                label: "Role",
+                label: t("settings.workspace.members.column.role"),
                 render: (row) => {
                   const isSelf = row.id === sessionUser?.id;
                   const canEdit = !isLocalFallback && Boolean(supabase) && !isSelf;
                   if (!canEdit) {
-                    return <span>{row.roleName ?? "Member"}</span>;
+                    return <span>{row.roleName ?? t("settings.account.member")}</span>;
                   }
                   return (
                     <select
@@ -1033,22 +1036,22 @@ export const WorkspaceSettingsPage = () => {
               },
               {
                 key: "status",
-                label: "Membership",
+                label: t("settings.workspace.members.column.membership"),
                 render: (row) => (
                   <StatusBadge tone={resolveMembershipTone(row.membershipStatus)}>
-                    {resolveMembershipLabel(row.membershipStatus)}
+                    {t(`settings.workspace.members.membership.${membershipLabelKey(row.membershipStatus)}`)}
                   </StatusBadge>
                 ),
               },
               {
                 key: "permissions",
-                label: "Permissions",
+                label: t("settings.workspace.members.column.permissions"),
                 align: "right",
                 render: (row) => row.permissionKeys.length,
               },
               {
                 key: "actions",
-                label: "Actions",
+                label: t("settings.workspace.members.column.actions"),
                 align: "right",
                 render: (row) => {
                   const isSelf = row.id === sessionUser?.id;
@@ -1065,39 +1068,47 @@ export const WorkspaceSettingsPage = () => {
                       }}
                       type="button"
                     >
-                      {isActive ? "Suspend" : "Reactivate"}
+                      {isActive ? t("settings.workspace.members.suspend") : t("settings.workspace.members.reactivate")}
                     </button>
                   );
                 },
               },
             ]}
             rows={teamMembers}
-            emptyMessage="No members yet."
+            emptyMessage={t("settings.workspace.members.empty")}
           />
         </SurfaceCard>
       </WorkspaceDisclosure>
 
-      <WorkspaceDisclosure title="Pending invites" summary={pendingInvites.length ? `${pendingInvites.length} waiting` : "No pending invites"}>
-        <SurfaceCard title="Pending invites">
+      <WorkspaceDisclosure
+        title={t("settings.workspace.sections.pendingInvites")}
+        summary={
+          pendingInvites.length
+            ? t("settings.workspace.summaries.pending", { count: pendingInvites.length })
+            : t("settings.workspace.summaries.noPending")
+        }
+      >
+        <SurfaceCard title={t("settings.workspace.sections.pendingInvites")}>
           {pendingInvites.length === 0 ? (
             <p className="surface-card-subtitle">
-              No invitations waiting. New teammates get a magic link by email.
+              {t("settings.workspace.invites.empty")}
             </p>
           ) : (
             <DataTable
               getRowId={(row) => row.id}
               persistKey="workspace-settings-pending-invites"
               columns={[
-                { key: "email", label: "Email", render: (row) => row.email },
-                { key: "role", label: "Role", render: (row) => row.roleName },
+                { key: "email", label: t("settings.workspace.invites.column.email"), render: (row) => row.email },
+                { key: "role", label: t("settings.workspace.invites.column.role"), render: (row) => row.roleName },
                 {
                   key: "invitedAt",
-                  label: "Invited",
-                  render: (row) => (row.invitedAt ? formatDate(row.invitedAt) : "Pending"),
+                  label: t("settings.workspace.invites.column.invited"),
+                  render: (row) =>
+                    row.invitedAt ? formatDate(row.invitedAt) : t("settings.workspace.invites.pendingFallback"),
                 },
                 {
                   key: "actions",
-                  label: "Actions",
+                  label: t("settings.workspace.invites.column.actions"),
                   align: "right",
                   render: (row) => (
                     <div className="surface-card-actions" style={{ justifyContent: "flex-end" }}>
@@ -1107,21 +1118,21 @@ export const WorkspaceSettingsPage = () => {
                         onClick={() => void handleResendInvite(row)}
                         type="button"
                       >
-                        Resend
+                        {t("settings.workspace.invites.resend")}
                       </button>
                       <button
                         className="ghost-control is-danger"
                         onClick={() => void handleRevokeInvite(row)}
                         type="button"
                       >
-                        Revoke
+                        {t("settings.workspace.invites.revoke")}
                       </button>
                     </div>
                   ),
                 },
               ]}
               rows={pendingInvites}
-              emptyMessage="No pending invites."
+              emptyMessage={t("settings.workspace.invites.emptyTable")}
             />
           )}
         </SurfaceCard>
@@ -1129,16 +1140,16 @@ export const WorkspaceSettingsPage = () => {
 
       {supabase && !isLocalFallback ? (
         <WorkspaceDisclosure
-          title="System actors"
+          title={t("settings.workspace.sections.systemActors")}
           summary={
             systemActors.length
-              ? `${systemActors.length} automation identity${systemActors.length === 1 ? "" : "ies"}`
-              : "No automation identities yet"
+              ? t("settings.workspace.summaries.actorsCount", { count: systemActors.length })
+              : t("settings.workspace.summaries.noActors")
           }
         >
-          <SurfaceCard title="Automation identities">
+          <SurfaceCard title={t("settings.workspace.systemActors.title")}>
             <p className="surface-card-subtitle">
-              System actors audit assistant-driven actions without creating fake human accounts or invite emails.
+              {t("settings.workspace.systemActors.subtitle")}
             </p>
             <DataTable
               getRowId={(row) => row.id}
@@ -1146,7 +1157,7 @@ export const WorkspaceSettingsPage = () => {
               columns={[
                 {
                   key: "actor",
-                  label: "Actor",
+                  label: t("settings.workspace.systemActors.column.actor"),
                   minWidth: 220,
                   render: (row) => (
                     <div className="identity-cell">
@@ -1154,67 +1165,86 @@ export const WorkspaceSettingsPage = () => {
                         <Bot size={14} aria-hidden="true" />
                         {row.name}
                       </span>
-                      <span className="identity-meta">{row.email ?? row.description ?? "Managed by bukowskiOS"}</span>
+                      <span className="identity-meta">{row.email ?? row.description ?? t("settings.workspace.systemActors.managedBy")}</span>
                     </div>
                   ),
                 },
                 {
                   key: "kind",
-                  label: "Type",
+                  label: t("settings.workspace.systemActors.column.type"),
                   render: (row) => row.kind,
                 },
                 {
                   key: "status",
-                  label: "Status",
+                  label: t("settings.workspace.systemActors.column.status"),
                   render: (row) => <StatusBadge tone={resolveSystemActorTone(row.status)}>{row.status}</StatusBadge>,
                 },
                 {
                   key: "permissions",
-                  label: "Permissions",
+                  label: t("settings.workspace.systemActors.column.permissions"),
                   align: "right",
                   render: (row) => row.permissionKeys.length,
                 },
               ]}
               rows={systemActors}
-              emptyMessage="Run the system actors migration to create the AI Agent identity for this workspace."
+              emptyMessage={t("settings.workspace.systemActors.empty")}
             />
           </SurfaceCard>
         </WorkspaceDisclosure>
       ) : null}
 
       {supabase && !isLocalFallback ? (
-        <WorkspaceDisclosure title="Roles" summary={`${usersSnapshot.roles.length} role${usersSnapshot.roles.length === 1 ? "" : "s"} available`}>
+        <WorkspaceDisclosure
+          title={t("settings.workspace.sections.roles")}
+          summary={t("settings.workspace.summaries.rolesCount", { count: usersSnapshot.roles.length })}
+        >
           <CustomRolesEditor supabase={supabase} workspaceId={activeWorkspaceId} />
         </WorkspaceDisclosure>
       ) : null}
 
-      <WorkspaceDisclosure title="Branding" summary="Logo and document assets">
+      <WorkspaceDisclosure
+        title={t("settings.workspace.sections.branding")}
+        summary={t("settings.workspace.summaries.branding")}
+      >
         <WorkspaceBrandingCard />
       </WorkspaceDisclosure>
 
-      <WorkspaceDisclosure title="Currency" summary={`Base currency and exchange rates${workspaceProfile?.baseCurrency ? ` · ${workspaceProfile.baseCurrency}` : ""}`}>
+      <WorkspaceDisclosure
+        title={t("settings.workspace.sections.currency")}
+        summary={
+          workspaceProfile?.baseCurrency
+            ? t("settings.workspace.summaries.currencyWith", { currency: workspaceProfile.baseCurrency })
+            : t("settings.workspace.summaries.currency")
+        }
+      >
         <CurrencySettingsCard />
       </WorkspaceDisclosure>
 
-      <WorkspaceDisclosure title="Channels" summary="Messaging access for workspace members">
+      <WorkspaceDisclosure
+        title={t("settings.workspace.sections.channels")}
+        summary={t("settings.workspace.summaries.channels")}
+      >
         <SurfaceCard
-          title="Channel access"
+          title={t("settings.workspace.channels.channelAccess")}
           aside={
             <button className="action-primary-button" onClick={() => navigate("/agents/connectors")} type="button">
               <Send size={13} />
-              <span>Manage channels</span>
+              <span>{t("settings.workspace.channels.manage")}</span>
             </button>
           }
         >
           <p className="surface-card-subtitle">
-            Connect members to the messaging channels they use with the assistant.
+            {t("settings.workspace.channels.subtitle")}
           </p>
         </SurfaceCard>
       </WorkspaceDisclosure>
 
       {memberships.length > 1 ? (
-        <WorkspaceDisclosure title="Other workspaces" summary={`${memberships.length} workspaces connected`}>
-          <SurfaceCard title="Other workspaces">
+        <WorkspaceDisclosure
+          title={t("settings.workspace.sections.otherWorkspaces")}
+          summary={t("settings.workspace.summaries.workspacesConnected", { count: memberships.length })}
+        >
+          <SurfaceCard title={t("settings.workspace.sections.otherWorkspaces")}>
             <ul className="confirm-dialog-list" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
               {memberships.map((membership) => (
                 <li key={membership.workspaceId}>

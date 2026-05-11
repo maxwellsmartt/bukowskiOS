@@ -73,7 +73,7 @@ type UserEditorDraft = {
 };
 
 import { GeneralSettingsCard } from "./GeneralSettingsCard";
-import { SettingsLayout, settingsNavEntries, useActiveSettingsSection } from "./SettingsLayout";
+import { SettingsLayout, useActiveSettingsSection, useSettingsNavLabels } from "./SettingsLayout";
 import { UserChannelDots } from "./UserChannelDots";
 import { UserAccountSettings } from "./UserAccountSettings";
 
@@ -298,7 +298,8 @@ export const SettingsPage = () => {
   const [supportSnapshot, setSupportSnapshot] = useState<AppSupportSnapshot>(emptySupportSnapshot);
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
   const activeSection = useActiveSettingsSection();
-  const activeSectionTitle = settingsNavEntries.find((entry) => entry.id === activeSection)?.label ?? "General";
+  const navLabelsFor = useSettingsNavLabels();
+  const activeSectionTitle = navLabelsFor(activeSection).label;
   const [roleDirectoryId, setRoleDirectoryId] = useState<string>("");
   const [selectedUserId, setSelectedUserId] = useState<string>("new");
   const [userDraft, setUserDraft] = useState<UserEditorDraft>(buildUserDraft(null, []));

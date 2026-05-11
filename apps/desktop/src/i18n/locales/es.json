@@ -11,9 +11,19 @@
     "close": "Cerrar",
     "ok": "OK",
     "confirm": "Confirmar",
-    "search": "Buscar"
+    "search": "Buscar",
+    "tryAgain": "Inténtalo de nuevo en un momento.",
+    "couldNotSave": "No se pudo guardar"
   },
   "settings": {
+    "nav": {
+      "general": { "label": "General", "description": "Perfil y preferencias" },
+      "workspace": { "label": "Workspace", "description": "Configuración de la empresa" },
+      "team": { "label": "Equipo", "description": "Usuarios y accesos" },
+      "data": { "label": "Datos", "description": "Copias y exportaciones" },
+      "sync": { "label": "Sincronización", "description": "Estado en la nube" },
+      "advanced": { "label": "Avanzado", "description": "Herramientas de soporte" }
+    },
     "general": {
       "title": "General",
       "language": {
@@ -44,6 +54,139 @@
         "minutes_one": "{{count}} min",
         "minutes_other": "{{count}} min",
         "hour": "1 hora"
+      }
+    },
+    "account": {
+      "title": "Cuenta",
+      "profile": "Perfil",
+      "fullNameLabel": "Nombre completo",
+      "fullNamePlaceholder": "Tu nombre visible",
+      "emailLabel": "Correo electrónico",
+      "setYourName": "Define tu nombre",
+      "changeAvatar": "Cambiar foto",
+      "removePhoto": "Quitar foto",
+      "saveProfile": "Guardar perfil",
+      "avatarHelper": "Haz clic en tu foto para subir una imagen. PNG, JPEG o WebP, hasta 2 MB.",
+      "accessTitle": "Acceso",
+      "signedInAs": "Sesión iniciada como",
+      "activeWorkspace": "Workspace activo",
+      "role": "Rol",
+      "member": "Miembro",
+      "signOut": "Cerrar sesión",
+      "signingOut": "Cerrando sesión…",
+      "signInRequiredTitle": "Tu cuenta",
+      "signInRequiredSubtitle": "Inicia sesión para gestionar tu perfil.",
+      "localFallbackHelp": "Estás en modo local. Conéctate a Supabase para gestionar tu cuenta.",
+      "noSession": "No hay una sesión activa.",
+      "toasts": {
+        "cannotSave": "No se puede guardar",
+        "supabaseUnavailable": "Supabase no está configurado en este dispositivo.",
+        "accountSaved": "Cuenta guardada",
+        "nameAppears": "Tu nombre ya aparece en toda la app.",
+        "couldNotSaveBody": "Inténtalo de nuevo en un momento.",
+        "fileTooLargeTitle": "Archivo demasiado grande",
+        "fileTooLargeBody": "Elige una imagen de menos de 2 MB.",
+        "unsupportedFormatTitle": "Formato no admitido",
+        "unsupportedFormatBody": "Solo PNG, JPEG o WebP.",
+        "uploadFailedTitle": "La carga falló",
+        "uploadFailedBody": "Inténtalo con una imagen más pequeña.",
+        "avatarUpdatedTitle": "Foto actualizada",
+        "avatarUpdatedBody": "Tu foto ya aparece en toda la app.",
+        "avatarRemovedTitle": "Foto eliminada",
+        "avatarRemovedBody": "Volvieron tus iniciales.",
+        "couldNotRemove": "No se pudo quitar",
+        "signedOutTitle": "Sesión cerrada",
+        "signedOutBody": "¡Hasta pronto!",
+        "signOutFailed": "No se pudo cerrar sesión"
+      }
+    },
+    "workspace": {
+      "title": "Workspace",
+      "sections": {
+        "generalInfo": "Información general",
+        "members": "Miembros",
+        "pendingInvites": "Invitaciones pendientes",
+        "systemActors": "Actores del sistema",
+        "roles": "Roles",
+        "branding": "Identidad visual",
+        "currency": "Moneda",
+        "channels": "Canales",
+        "otherWorkspaces": "Otros workspaces"
+      },
+      "summaries": {
+        "membersCount_one": "{{count}} miembro · {{active}} activo",
+        "membersCount_other": "{{count}} miembros · {{active}} activos",
+        "pending_one": "{{count}} pendiente",
+        "pending_other": "{{count}} pendientes",
+        "noPending": "Sin invitaciones pendientes",
+        "rolesCount_one": "{{count}} rol disponible",
+        "rolesCount_other": "{{count}} roles disponibles",
+        "actorsCount_one": "{{count}} identidad de automatización",
+        "actorsCount_other": "{{count}} identidades de automatización",
+        "noActors": "Aún no hay identidades de automatización",
+        "workspacesConnected_one": "{{count}} workspace conectado",
+        "workspacesConnected_other": "{{count}} workspaces conectados",
+        "currency": "Moneda base y tipos de cambio",
+        "currencyWith": "Moneda base y tipos de cambio · {{currency}}",
+        "branding": "Logotipo y recursos para documentos",
+        "channels": "Acceso de mensajería para los miembros"
+      },
+      "generalInfo": {
+        "workspaceLabel": "Workspace",
+        "shortName": "Nombre corto",
+        "workspaceId": "ID del workspace",
+        "copyId": "Copiar ID del workspace",
+        "copied": "Copiado",
+        "accentColor": "Color de acento",
+        "baseCurrency": "Moneda base",
+        "yourAccess": "Tu acceso",
+        "permissionsGranted_one": "{{count}} permiso otorgado",
+        "permissionsGranted_other": "{{count}} permisos otorgados",
+        "permissionsPending": "Pendiente — recarga el workspace si sigue vacío",
+        "workspaceName": "Nombre del workspace",
+        "workspaceAvatar": "Avatar del workspace",
+        "workspaceAvatarHelp": "Aparece en el selector de workspaces, el switcher y la navegación.",
+        "uploadAvatar": "Subir avatar del workspace"
+      },
+      "members": {
+        "invite": "Invitar miembro",
+        "inviteDisabledTooltip": "Inicia sesión para enviar invitaciones",
+        "column": {
+          "member": "Miembro",
+          "role": "Rol",
+          "membership": "Estado",
+          "permissions": "Permisos",
+          "actions": "Acciones"
+        },
+        "emailPending": "Correo pendiente",
+        "membership": {
+          "active": "Activo",
+          "inactive": "Inactivo",
+          "missing": "Fuera del workspace"
+        },
+        "suspend": "Suspender",
+        "reactivate": "Reactivar",
+        "empty": "Aún no hay miembros."
+      },
+      "invites": {
+        "column": { "email": "Correo", "role": "Rol", "invited": "Invitado el", "actions": "Acciones" },
+        "pendingFallback": "Pendiente",
+        "empty": "No hay invitaciones esperando. Los nuevos miembros reciben un enlace mágico por correo.",
+        "emptyTable": "Sin invitaciones pendientes.",
+        "resend": "Reenviar",
+        "revoke": "Revocar"
+      },
+      "systemActors": {
+        "title": "Identidades de automatización",
+        "subtitle": "Los actores del sistema auditan las acciones del asistente sin crear cuentas humanas falsas ni correos de invitación.",
+        "column": { "actor": "Actor", "type": "Tipo", "status": "Estado", "permissions": "Permisos" },
+        "managedBy": "Gestionado por bukowskiOS",
+        "empty": "Ejecuta la migración de actores del sistema para crear la identidad del agente en este workspace."
+      },
+      "channels": {
+        "manage": "Gestionar canales",
+        "channelAccess": "Acceso a canales",
+        "subtitle": "Conecta a los miembros con los canales de mensajería que usan con el asistente."
       }
     }
   }
