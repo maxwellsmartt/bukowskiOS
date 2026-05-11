@@ -12,6 +12,7 @@ import { HelpHint } from "@shared/components/HelpHint";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
+import { useLocale } from "@shared/hooks/useLocale";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import {
@@ -69,19 +70,14 @@ const sumEntriesByType = (rows: Array<{ type: string; amountValue?: number }>) =
   return { income, expense };
 };
 
-const formatCurrency = (value: number, currency = "USD") => {
-  try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
-  } catch {
-    return `${currency} ${value.toFixed(0)}`;
-  }
-};
-
 export const ProjectBudgetPage = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const { supabase, isLocalFallback } = useSession();
   const { activeWorkspaceId } = useWorkspace();
+  const { formatMoney } = useLocale();
+  const formatCurrency = (value: number, code = "USD") =>
+    formatMoney(value, code, { maximumFractionDigits: 0 });
   const { projectId } = useProjectMode();
   const { data, error, isLoading } = useProjectDetail(projectId);
   const { data: financeEntries, error: financeError } = useFinanceEntries({

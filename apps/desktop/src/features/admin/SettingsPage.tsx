@@ -18,6 +18,7 @@ import { useCatalogData } from "@features/projects/useProjectsData";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useLocale } from "@shared/hooks/useLocale";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
@@ -115,14 +116,9 @@ const formatBytes = (value: number) => {
   return `${value} B`;
 };
 
-const formatDateLabel = (value: string | null) => {
-  if (!value) {
-    return "Never";
-  }
-
-  const parsedDate = new Date(value);
-  return Number.isNaN(parsedDate.getTime()) ? value : parsedDate.toLocaleString();
-};
+// `formatDateLabel` is now created inside the SettingsPage component so it
+// can use the user's synced locale via `useLocale()`. See the call site
+// below for the closure.
 
 const resolveIntegrityLabel = (status: AppDiagnosticsSnapshot["lastIntegrityCheckStatus"]) => {
   if (status === "healthy") {
@@ -293,6 +289,11 @@ export const SettingsPage = () => {
   });
   const navigate = useNavigate();
   const toast = useToast();
+  const { formatDateTime } = useLocale();
+  const formatDateLabel = (value: string | null) => {
+    if (!value) return "Never";
+    return formatDateTime(value) || value;
+  };
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
   const [supportSnapshot, setSupportSnapshot] = useState<AppSupportSnapshot>(emptySupportSnapshot);
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
@@ -835,7 +836,7 @@ export const SettingsPage = () => {
                     <span className="agent-detail-kicker">Telegram</span>
                     <p>
                       {selectedUser.telegramUsername ? `@${selectedUser.telegramUsername}` : selectedUser.telegramDisplayName ?? selectedUser.fullName}
-                      {selectedUser.telegramLastSeenAt ? ` · last seen ${new Date(selectedUser.telegramLastSeenAt).toLocaleString()}` : ""}
+                      {selectedUser.telegramLastSeenAt ? ` · last seen ${formatDateTime(selectedUser.telegramLastSeenAt)}` : ""}
                     </p>
                   </div>
                 ) : null}

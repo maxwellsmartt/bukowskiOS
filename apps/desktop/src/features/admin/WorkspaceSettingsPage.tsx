@@ -10,6 +10,7 @@ import { DataTable } from "@shared/components/DataTable";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useLocale } from "@shared/hooks/useLocale";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { CurrencySettingsCard } from "./CurrencySettingsCard";
@@ -295,6 +296,7 @@ export const WorkspaceSettingsPage = () => {
   const navigate = useNavigate();
   const { supabase, isLocalFallback, user: sessionUser } = useSession();
   const { activeWorkspaceId, activeWorkspaceName, activeMembership, memberships, refreshWorkspaces } = useWorkspace();
+  const { formatDate } = useLocale();
   const workspaceAvatarInputRef = useRef<HTMLInputElement | null>(null);
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
   const [usersSnapshot, setUsersSnapshot] = useState<AppUsersSnapshot>(emptyUsersSnapshot);
@@ -1091,7 +1093,7 @@ export const WorkspaceSettingsPage = () => {
                 {
                   key: "invitedAt",
                   label: "Invited",
-                  render: (row) => (row.invitedAt ? new Date(row.invitedAt).toLocaleDateString() : "Pending"),
+                  render: (row) => (row.invitedAt ? formatDate(row.invitedAt) : "Pending"),
                 },
                 {
                   key: "actions",

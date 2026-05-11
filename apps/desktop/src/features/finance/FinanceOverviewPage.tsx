@@ -31,6 +31,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
+import { useLocale } from "@shared/hooks/useLocale";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import bancoCentralLogo from "@shared/assets/inbox/logos/banco-central-logo.png";
 import bancoPopularLogo from "@shared/assets/inbox/logos/banco popular dominicano-logo.jpg";
@@ -69,23 +70,14 @@ const formatAxisCurrency = (value: number) => {
 
 const formatRateValue = (value: number | null) => (typeof value === "number" ? value.toFixed(2) : "—");
 
-const formatRateTimestamp = (value: string | null | undefined) => {
-  if (!value) return "Not refreshed yet";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+const RATE_TIMESTAMP_FORMAT: Intl.DateTimeFormatOptions = {
+  dateStyle: "medium",
+  timeStyle: "short",
 };
 
-const formatRateTrendTime = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
+const RATE_TREND_FORMAT: Intl.DateTimeFormatOptions = {
+  hour: "numeric",
+  minute: "2-digit",
 };
 
 const minuteBucketIso = (value: number) => new Date(Math.floor(value / 60_000) * 60_000).toISOString();
@@ -137,6 +129,24 @@ const rateSourceColor = (source: CurrencyRateSource) => {
   if (source === "banco_central") return "#d6b37a";
   if (source === "banco_santa_cruz") return "#92a7c1";
   return "#c88d7f";
+};
+
+const getRateDisplayCopy = (source: CurrencyRateSource, baseCurrency: "USD" | "EUR") => {
+  if (source === "banco_central" && baseCurrency === "EUR") {
+    return {
+      buyLabel: "Reference",
+      sellLabel: "Sell",
+      missingSellLabel: "Not published",
+      meta: "Banco Central EUR feed is buy/reference only in the current source.",
+    };
+  }
+
+  return {
+    buyLabel: "Buy",
+    sellLabel: "Sell",
+    missingSellLabel: "—",
+    meta: null,
+  };
 };
 
 const RateChartTooltip = ({
@@ -195,6 +205,12 @@ const ChartTooltip = ({
 export const FinanceOverviewPage = () => {
   const { activeWorkspaceId } = useWorkspace();
   const toast = useToast();
+  const { formatDate } = useLocale();
+  const formatRateTimestamp = (value: string | null | undefined) => {
+    if (!value) return "Not refreshed yet";
+    return formatDate(value, RATE_TIMESTAMP_FORMAT) || value;
+  };
+  const formatRateTrendTime = (value: string) => formatDate(value, RATE_TREND_FORMAT) || value;
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [period, setPeriod] = useState<FinanceOverviewPeriodPreset>("month");
   const [customStartDate, setCustomStartDate] = useState("");
@@ -539,6 +555,10 @@ export const FinanceOverviewPage = () => {
         <div className="finance-fx-grid">
           {exchangeRateRows.map((row) => (
             <div className={`finance-fx-provider-card${row.isBest ? " is-best" : ""}`} key={row.source}>
+              {(() => {
+                const rateCopy = getRateDisplayCopy(row.source, selectedFxCurrency);
+                return (
+                  <>
               <div className="finance-fx-provider-header">
                 <span className="finance-fx-logo" aria-hidden="true">
                   <img alt="" src={row.logo} />
@@ -559,12 +579,12 @@ export const FinanceOverviewPage = () => {
               </div>
               <div className="finance-fx-rate-row">
                 <span className="finance-fx-rate-buy">
-                  <small>Buy</small>
+                  <small>{rateCopy.buyLabel}</small>
                   <strong>{formatRateValue(row.decisionRate?.rate ?? null)}</strong>
                 </span>
                 <span className="finance-fx-rate-sell">
-                  <small>Sell</small>
-                  <strong>{formatRateValue(row.sellRate?.rate ?? null)}</strong>
+                  <small>{rateCopy.sellLabel}</small>
+                  <strong>{row.sellRate ? formatRateValue(row.sellRate.rate) : rateCopy.missingSellLabel}</strong>
                 </span>
                 <span className="finance-fx-rate-diff">
                   <small>Diff</small>
@@ -585,6 +605,10 @@ export const FinanceOverviewPage = () => {
                   <span>{row.decisionRate?.sourceLabel ?? row.decisionRate?.source ?? "Ready to refresh"}</span>
                 )}
               </div>
+              {rateCopy.meta && row.decisionRate && !row.sellRate ? <div className="finance-fx-source-note">{rateCopy.meta}</div> : null}
+                  </>
+                );
+              })()}
             </div>
           ))}
         </div>

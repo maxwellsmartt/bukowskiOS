@@ -16,6 +16,7 @@ import { NumberStepper } from "@shared/components/NumberStepper";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useLocale } from "@shared/hooks/useLocale";
 import { useRecentValues } from "@shared/hooks/useRecentValues";
 
 import {
@@ -121,6 +122,7 @@ export const QuoteEditorPage = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
+  const { language } = useLocale();
   const { data: currencySettings } = useCurrencySettings(activeWorkspaceId);
   const { data: existingQuote, isLoading: isLoadingQuote, refresh } = useQuoteDetail(
     activeWorkspaceId,
@@ -566,7 +568,7 @@ export const QuoteEditorPage = () => {
             {versions.map((version) => {
               const total =
                 typeof version.snapshot.total === "number"
-                  ? formatCurrency(version.snapshot.total, String(version.snapshot.currency ?? draft.currency))
+                  ? formatCurrency(version.snapshot.total, String(version.snapshot.currency ?? draft.currency), language)
                   : "—";
               return (
                 <div className="quote-versions-row" key={version.id}>
@@ -1060,7 +1062,7 @@ export const QuoteEditorPage = () => {
                   ))}
                 </select>
                 <span className="quote-items-cell-total">
-                  {breakdown ? formatCurrency(breakdown.lineTotal, draft.currency) : "—"}
+                  {breakdown ? formatCurrency(breakdown.lineTotal, draft.currency, language) : "—"}
                 </span>
                 <button
                   aria-label={`Remove line ${index + 1}`}
@@ -1092,13 +1094,13 @@ export const QuoteEditorPage = () => {
           <div className="totals-row">
             <span className="totals-label">Subtotal</span>
             <span className="totals-value">
-              {preview ? formatCurrency(preview.subtotal, draft.currency) : "—"}
+              {preview ? formatCurrency(preview.subtotal, draft.currency, language) : "—"}
             </span>
           </div>
           {preview && preview.discountAmount > 0 ? (
             <div className="totals-row totals-row-discount">
               <span className="totals-label">Discount</span>
-              <span className="totals-value">−{formatCurrency(preview.discountAmount, draft.currency)}</span>
+              <span className="totals-value">−{formatCurrency(preview.discountAmount, draft.currency, language)}</span>
             </div>
           ) : null}
           <div className="totals-row">
@@ -1114,14 +1116,14 @@ export const QuoteEditorPage = () => {
             <span
               className={`totals-value${draft.taxAddedToTotal ? "" : " totals-value-muted"}`}
             >
-              {preview ? formatCurrency(preview.taxAmount, draft.currency) : "—"}
+              {preview ? formatCurrency(preview.taxAmount, draft.currency, language) : "—"}
               {draft.taxAddedToTotal ? null : <small className="totals-tag">not added</small>}
             </span>
           </div>
           <div className="totals-row totals-row-grand">
             <span className="totals-label">Total</span>
             <span className="totals-value">
-              {preview ? formatCurrency(preview.total, draft.currency) : "—"}
+              {preview ? formatCurrency(preview.total, draft.currency, language) : "—"}
             </span>
           </div>
           {preview && draft.currency !== draft.baseCurrency ? (
@@ -1134,7 +1136,7 @@ export const QuoteEditorPage = () => {
                 />
               </span>
               <span className="totals-value">
-                {formatCurrency(preview.baseCurrencyTotal, draft.baseCurrency)}
+                {formatCurrency(preview.baseCurrencyTotal, draft.baseCurrency, language)}
               </span>
             </div>
           ) : null}

@@ -27,6 +27,7 @@ import type {
 } from "@contracts";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useLocale } from "@shared/hooks/useLocale";
 import { readJsonPreference, uiPreferenceKeys, writeJsonPreference } from "@shared/lib/preferences";
 
 const dayInMilliseconds = 1000 * 60 * 60 * 24;
@@ -190,21 +191,40 @@ type DragState = {
   target: HTMLDivElement | null;
 };
 
-const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
+const SHORT_DATE_OPTS: Intl.DateTimeFormatOptions = {
   month: "short",
   day: "numeric",
   timeZone: "UTC",
-});
+};
 
-const monthLabelFormatter = new Intl.DateTimeFormat("en-US", {
+const MONTH_LABEL_OPTS: Intl.DateTimeFormatOptions = {
   month: "short",
   timeZone: "UTC",
-});
+};
 
-const dayLabelFormatter = new Intl.DateTimeFormat("en-US", {
+const DAY_LABEL_OPTS: Intl.DateTimeFormatOptions = {
   day: "numeric",
   timeZone: "UTC",
-});
+};
+
+// Cached locale-aware formatters. Keyed by `${language}|${opts}` so each
+// (locale, option) pair builds exactly one `Intl.DateTimeFormat`.
+const timelineFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const getTimelineFormatter = (language: string, opts: Intl.DateTimeFormatOptions) => {
+  const key = `${language}|${JSON.stringify(opts)}`;
+  let f = timelineFormatterCache.get(key);
+  if (!f) {
+    f = new Intl.DateTimeFormat(language, opts);
+    timelineFormatterCache.set(key, f);
+  }
+  return f;
+};
+const formatShortDate = (date: Date, language: string) =>
+  getTimelineFormatter(language, SHORT_DATE_OPTS).format(date);
+const formatMonthLabel = (date: Date, language: string) =>
+  getTimelineFormatter(language, MONTH_LABEL_OPTS).format(date);
+const formatDayLabel = (date: Date, language: string) =>
+  getTimelineFormatter(language, DAY_LABEL_OPTS).format(date);
 
 const getIsoWeekNumber = (value: string) => {
   const date = parseDateOnly(value);
@@ -300,24 +320,26 @@ const clampDate = (value: string, min: string, max: string) => {
   return value;
 };
 
-const formatRangeLabel = (startDate: string | null, endDate: string | null) => {
+const formatRangeLabel = (startDate: string | null, endDate: string | null, language: string) => {
   if (!startDate && !endDate) {
     return "Dates pending";
   }
 
   if (startDate && endDate) {
-    return `${shortDateFormatter.format(parseDateOnly(startDate))} – ${shortDateFormatter.format(parseDateOnly(endDate))}`;
+    return `${formatShortDate(parseDateOnly(startDate), language)} – ${formatShortDate(parseDateOnly(endDate), language)}`;
   }
 
   if (startDate) {
-    return `From ${shortDateFormatter.format(parseDateOnly(startDate))}`;
+    return `From ${formatShortDate(parseDateOnly(startDate), language)}`;
   }
 
-  return `Until ${shortDateFormatter.format(parseDateOnly(endDate ?? ""))}`;
+  return `Until ${formatShortDate(parseDateOnly(endDate ?? ""), language)}`;
 };
 
-const formatPlayheadDisplayLabel = (value: string) =>
-  value === todayDateOnly() ? `Today · ${shortDateFormatter.format(parseDateOnly(value))}` : shortDateFormatter.format(parseDateOnly(value));
+const formatPlayheadDisplayLabel = (value: string, language: string) =>
+  value === todayDateOnly()
+    ? `Today · ${formatShortDate(parseDateOnly(value), language)}`
+    : formatShortDate(parseDateOnly(value), language);
 
 const extractRgb = (color: string) => {
   const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
@@ -459,8 +481,8 @@ const resolveWindowSegments = (segments: ScheduleTimelineSegment[]) =>
       return leftStart.localeCompare(rightStart);
     });
 
-const formatWindowSegmentChip = (segment: ScheduleTimelineSegment) => {
-  const baseLabel = formatRangeLabel(segment.startDate, segment.endDate);
+const formatWindowSegmentChip = (segment: ScheduleTimelineSegment, language: string) => {
+  const baseLabel = formatRangeLabel(segment.startDate, segment.endDate, language);
   return segment.kind === "preproduction" ? `Pre · ${baseLabel}` : baseLabel;
 };
 
@@ -564,7 +586,7 @@ const resolveBand = (startDate: string, endDate: string, rangeStart: string, ran
   };
 };
 
-const buildMonthBands = (rangeStart: string, rangeEnd: string) => {
+const buildMonthBands = (rangeStart: string, rangeEnd: string, language: string) => {
   const bands: TimelineBand[] = [];
   let cursor = startOfMonth(rangeStart);
 
@@ -573,7 +595,15 @@ const buildMonthBands = (rangeStart: string, rangeEnd: string) => {
     const monthEnd = addDays(nextCursor, -1);
 
     if (monthEnd >= rangeStart) {
-      bands.push(resolveBand(cursor, monthEnd, rangeStart, rangeEnd, monthLabelFormatter.format(parseDateOnly(cursor)).toUpperCase()));
+      bands.push(
+        resolveBand(
+          cursor,
+          monthEnd,
+          rangeStart,
+          rangeEnd,
+          formatMonthLabel(parseDateOnly(cursor), language).toUpperCase(),
+        ),
+      );
     }
 
     cursor = nextCursor;
@@ -599,12 +629,12 @@ const buildWeekBands = (rangeStart: string, rangeEnd: string) => {
   return bands;
 };
 
-const buildDayBands = (rangeStart: string, rangeEnd: string) => {
+const buildDayBands = (rangeStart: string, rangeEnd: string, language: string) => {
   const totalDays = diffDaysInclusive(rangeStart, rangeEnd);
 
   return Array.from({ length: totalDays }, (_, index) => {
     const date = addDays(rangeStart, index);
-    return resolveBand(date, date, rangeStart, rangeEnd, dayLabelFormatter.format(parseDateOnly(date)));
+    return resolveBand(date, date, rangeStart, rangeEnd, formatDayLabel(parseDateOnly(date), language));
   });
 };
 
@@ -636,10 +666,16 @@ const buildSparseHeaderBands = (
   });
 };
 
-const buildTimelineBands = (rangeStart: string, rangeEnd: string, scale: ScheduleTimelineScale, density: TimelineGridDensity) => {
-  const months = buildMonthBands(rangeStart, rangeEnd);
+const buildTimelineBands = (
+  rangeStart: string,
+  rangeEnd: string,
+  scale: ScheduleTimelineScale,
+  density: TimelineGridDensity,
+  language: string,
+) => {
+  const months = buildMonthBands(rangeStart, rangeEnd, language);
   const weeks = buildWeekBands(rangeStart, rangeEnd);
-  const days = buildDayBands(rangeStart, rangeEnd);
+  const days = buildDayBands(rangeStart, rangeEnd, language);
 
   if (scale === "day") {
     const baseDayStride = days.length > 150 ? 6 : days.length > 120 ? 5 : days.length > 90 ? 3 : days.length > 60 ? 2 : 1;
@@ -813,8 +849,10 @@ const TimelineSignalRow = ({
 
 const TimelineWindowPills = ({
   segments,
+  language,
 }: {
   segments: ScheduleTimelineSegment[];
+  language: string;
 }) => {
   const visibleSegments = resolveWindowSegments(segments);
 
@@ -838,7 +876,7 @@ const TimelineWindowPills = ({
                 } as CSSProperties)
           }
         >
-          {formatWindowSegmentChip(segment)}
+          {formatWindowSegmentChip(segment, language)}
         </span>
       ))}
     </div>
@@ -886,6 +924,7 @@ const TimelineLane = ({
   rangeStart,
   density,
   scale,
+  language,
 }: {
   bands: ReturnType<typeof buildTimelineBands>;
   interactionHandlers: TimelineInteractionHandlers;
@@ -909,6 +948,7 @@ const TimelineLane = ({
   rangeStart: string;
   density: TimelineGridDensity;
   scale: ScheduleTimelineScale;
+  language: string;
 }) => {
   const projectPalette = resolveTimelinePalette(project.colorKey);
   const projectBars = resolveSegmentGeometries(project, rangeStart, rangeEnd, projectPalette);
@@ -934,7 +974,7 @@ const TimelineLane = ({
                       </span>
                     </div>
                     <div className="timeline-lane-subtitle-group">
-                      <TimelineWindowPills segments={project.segments} />
+                      <TimelineWindowPills segments={project.segments} language={language} />
                       {project.units.length ? <span className="timeline-lane-subtitle-accent">{project.units.length} units</span> : null}
                     </div>
                     <TimelineSignalRow
@@ -1054,7 +1094,7 @@ const TimelineLane = ({
                       <StatusBadge tone={resolveStatusTone(unit.status)}>{unit.status}</StatusBadge>
                     </div>
                     <div className="timeline-lane-subtitle-group">
-                      <TimelineWindowPills segments={unit.segments} />
+                      <TimelineWindowPills segments={unit.segments} language={language} />
                     </div>
                     <TimelineSignalRow
                       assets={unit.assignedAssetCount}
@@ -1172,6 +1212,7 @@ export const OverviewScheduleTimeline = ({
   scale,
   snapshot,
 }: OverviewScheduleTimelineProps) => {
+  const { language } = useLocale();
   const timelineRootRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<DragState>({
     anchorDate,
@@ -1278,14 +1319,14 @@ export const OverviewScheduleTimeline = ({
       ? resolveDateLeft(clampedPlayheadDate, visibleWindow.start, visibleWindow.end)
       : 0;
   const renderedPlayheadLeft = Math.min(99.2, Math.max(0.8, playheadLeft));
-  const playheadLabel = formatPlayheadDisplayLabel(currentDate);
+  const playheadLabel = formatPlayheadDisplayLabel(currentDate, language);
   const bands = useMemo(() => {
     if (!visibleWindow.start || !visibleWindow.end) {
       return emptyBands;
     }
 
-    return buildTimelineBands(visibleWindow.start, visibleWindow.end, scale, gridDensity);
-  }, [gridDensity, scale, visibleWindow.end, visibleWindow.start]);
+    return buildTimelineBands(visibleWindow.start, visibleWindow.end, scale, gridDensity, language);
+  }, [gridDensity, scale, visibleWindow.end, visibleWindow.start, language]);
   const visibleMonthBands = useMemo(
     () => filterHeaderBandsForDisplay(bands.months, gridDensity, "month", scale),
     [bands.months, gridDensity, scale],
@@ -1339,7 +1380,7 @@ export const OverviewScheduleTimeline = ({
       label: title,
       left: event.clientX - containerRect.left + 14,
       status: row.status,
-      subtitle: formatRangeLabel(row.startDate, row.endDate),
+      subtitle: formatRangeLabel(row.startDate, row.endDate, language),
       top: event.clientY - containerRect.top - 18,
     });
   };
@@ -1644,6 +1685,7 @@ export const OverviewScheduleTimeline = ({
                 rangeStart={visibleWindow.start}
                 density={gridDensity}
                 scale={scale}
+                language={language}
               />
             ))}
           </div>

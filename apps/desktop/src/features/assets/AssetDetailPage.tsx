@@ -11,6 +11,7 @@ import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLay
 import { ScannableCodePanel } from "@shared/components/ScannableCodePanel";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useLocale } from "@shared/hooks/useLocale";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { resolveAssetAvailability } from "@shared/lib/assetAvailability";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
@@ -21,11 +22,11 @@ import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
 import { archiveAsset, deleteAssetFile, openAssetFile, updateAsset, uploadAssetFiles, uploadAssetImages, useAssetDetail } from "./useAssetsData";
 
-const fileDateFormatter = new Intl.DateTimeFormat("en-US", {
+const FILE_DATE_FORMAT: Intl.DateTimeFormatOptions = {
   month: "short",
   day: "2-digit",
   year: "numeric",
-});
+};
 
 const formatByteSize = (byteSize: number) => {
   if (!byteSize) {
@@ -62,6 +63,7 @@ export const AssetDetailPage = () => {
   const [searchParams] = useSearchParams();
   const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
+  const { formatDate } = useLocale();
   const { data, reload } = useAssetDetail(assetId);
   const { projects, refreshProjects } = useShellContext();
   const { data: catalog, error: catalogError } = useCatalogData({
@@ -618,7 +620,7 @@ export const AssetDetailPage = () => {
                           <div className="entity-file-meta">
                             <span>{file.fileType}</span>
                             <span>{formatByteSize(file.byteSize)}</span>
-                            <span>{fileDateFormatter.format(new Date(file.createdAt))}</span>
+                            <span>{formatDate(file.createdAt, FILE_DATE_FORMAT)}</span>
                           </div>
                         </div>
                         <div className="entity-file-actions">

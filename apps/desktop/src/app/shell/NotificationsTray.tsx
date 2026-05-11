@@ -3,13 +3,14 @@ import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useNotifications } from "@app/providers/NotificationsProvider";
+import { useLocale } from "@shared/hooks/useLocale";
 
-const formatter = new Intl.DateTimeFormat(undefined, {
+const TRAY_FORMAT: Intl.DateTimeFormatOptions = {
   month: "short",
   day: "numeric",
   hour: "numeric",
   minute: "2-digit",
-});
+};
 
 const kindLabel = (kind: string) => {
   switch (kind) {
@@ -51,6 +52,7 @@ export const NotificationsTray = () => {
   const navigate = useNavigate();
   const trayRef = useRef<HTMLElement | null>(null);
   const { closeTray, isLoading, isTrayOpen, items, markAllRead, markRead, trayAnchor, unreadCount } = useNotifications();
+  const { formatDate } = useLocale();
 
   const groupedItems = useMemo(() => {
     const groups = new Map<string, typeof items>();
@@ -61,10 +63,13 @@ export const NotificationsTray = () => {
     });
     return Array.from(groups.entries()).map(([key, rows]) => ({
       key,
-      label: key === new Date().toDateString() ? "Today" : formatter.format(new Date(rows[0]?.createdAt ?? Date.now())).split(",")[0],
+      label:
+        key === new Date().toDateString()
+          ? "Today"
+          : formatDate(rows[0]?.createdAt ?? Date.now(), { month: "short", day: "numeric" }),
       rows,
     }));
-  }, [items]);
+  }, [items, formatDate]);
 
   useEffect(() => {
     if (!isTrayOpen) {
@@ -169,7 +174,7 @@ export const NotificationsTray = () => {
                   <span className="notification-row-dot" />
                   <span className="notification-row-copy">
                     <span className="notification-row-meta">
-                      {kindLabel(item.kind)} · {formatter.format(new Date(item.createdAt))}
+                      {kindLabel(item.kind)} · {formatDate(item.createdAt, TRAY_FORMAT)}
                     </span>
                     <strong>{item.title}</strong>
                     {item.body ? <span>{item.body}</span> : null}

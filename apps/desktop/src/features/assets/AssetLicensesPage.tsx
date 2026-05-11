@@ -8,6 +8,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useLocale } from "@shared/hooks/useLocale";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 type SoftwareLicenseRow = {
@@ -144,12 +145,6 @@ const buildDraftFromLicense = (license: SoftwareLicenseRow): LicenseDraft => ({
   notes: license.notes ?? "",
 });
 
-const formatDate = (value: string | null) => {
-  if (!value) return "No expiry";
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isFinite(date.getTime()) ? date.toLocaleDateString() : value;
-};
-
 const buildLicenseReminderTitle = (softwareName: string) => `License renewal: ${softwareName}`;
 
 const buildLicenseReminderTime = (expiresAt: string, reminderDaysBefore: number) => {
@@ -170,6 +165,11 @@ export const AssetLicensesPage = () => {
   const { createReminder, deleteReminder, reminders, updateReminder } = useNotifications();
   const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
+  const { formatDate: formatDateLocale } = useLocale();
+  const formatDate = (value: string | null) => {
+    if (!value) return "No expiry";
+    return formatDateLocale(`${value}T00:00:00`) || value;
+  };
   const [rows, setRows] = useState<SoftwareLicenseRow[]>([]);
   const [draft, setDraft] = useState<LicenseDraft>(emptyDraft);
   const [editingLicenseId, setEditingLicenseId] = useState<string | null>(null);

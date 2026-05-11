@@ -5,6 +5,7 @@ import type { AssetListRow, FinanceEntryRow, FinancialDocumentRow, IncidentListR
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useLocale } from "@shared/hooks/useLocale";
 
 export type FinanceEntryEditorDraft = {
   entryType: string;
@@ -76,6 +77,7 @@ export const FinanceEntryEditorPanel = ({
   onOpenDocument,
   onSubmit,
 }: FinanceEntryEditorPanelProps) => {
+  const { formatDateTime } = useLocale();
   const [entryType, setEntryType] = useState("reserve");
   const [category, setCategory] = useState("");
   const [amount, setAmount] = useState("");
@@ -324,7 +326,7 @@ export const FinanceEntryEditorPanel = ({
                       <div className="finance-document-row-copy">
                         <span className="finance-document-row-title">{selectedDocument.originalName}</span>
                         <span className="finance-document-row-meta">
-                          {selectedDocument.mimeType} · {new Date(selectedDocument.createdAt).toLocaleString()}
+                          {selectedDocument.mimeType} · {formatDateTime(selectedDocument.createdAt)}
                         </span>
                       </div>
                       <button

@@ -4,21 +4,22 @@ import { useNavigate } from "react-router-dom";
 
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { AgentCreatedBadge } from "@shared/components/AgentCreatedBadge";
+import { useLocale } from "@shared/hooks/useLocale";
 
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
+const LONG_DATE_FORMAT: Intl.DateTimeFormatOptions = {
   weekday: "short",
   month: "short",
   day: "numeric",
   hour: "numeric",
   minute: "2-digit",
-});
+};
 
-const shortDateFormatter = new Intl.DateTimeFormat(undefined, {
+const SHORT_DATE_FORMAT: Intl.DateTimeFormatOptions = {
   month: "short",
   day: "numeric",
   hour: "numeric",
   minute: "2-digit",
-});
+};
 
 const recurrenceOptions = [
   { label: "One time", value: "" },
@@ -58,6 +59,7 @@ const toDateTimeLocalValue = (value: string | null) => {
 
 export const InboxPage = () => {
   const navigate = useNavigate();
+  const { formatDate } = useLocale();
   const {
     createReminder,
     createTodo,
@@ -221,7 +223,7 @@ export const InboxPage = () => {
         </article>
         <article>
           <span>Next reminder</span>
-          <strong>{nextReminder ? shortDateFormatter.format(new Date(nextReminder.remindAt)) : "None"}</strong>
+          <strong>{nextReminder ? formatDate(nextReminder.remindAt, SHORT_DATE_FORMAT) : "None"}</strong>
           <small>{pendingReminders.length} scheduled</small>
         </article>
       </div>
@@ -278,7 +280,7 @@ export const InboxPage = () => {
                   <Bell size={14} />
                 </span>
                 <span className="inbox-row-copy">
-                  <span>{dateFormatter.format(new Date(item.createdAt))}</span>
+                  <span>{formatDate(item.createdAt, LONG_DATE_FORMAT)}</span>
                   <strong className="inbox-copy-title">
                     <span>{item.title}</span>
                   </strong>
@@ -325,7 +327,7 @@ export const InboxPage = () => {
                           <ListTodo size={14} />
                         </span>
                         <span className={`inbox-meta-pill tone-${getDueTone(todo.dueAt)}`}>
-                          {todo.dueAt ? `Due ${shortDateFormatter.format(new Date(todo.dueAt))}` : "No due date"}
+                          {todo.dueAt ? `Due ${formatDate(todo.dueAt, SHORT_DATE_FORMAT)}` : "No due date"}
                         </span>
                         {todo.recurrenceRule ? <span className="inbox-meta-pill tone-info">{getRecurrenceLabel(todo.recurrenceRule)}</span> : null}
                       </div>
@@ -422,8 +424,8 @@ export const InboxPage = () => {
                   const reminderMeta = reminder.completedAt
                     ? "Delivered"
                     : reminder.snoozedUntil
-                      ? `Snoozed until ${shortDateFormatter.format(new Date(reminder.snoozedUntil))}`
-                      : `Reminds ${shortDateFormatter.format(new Date(reminder.remindAt))}`;
+                      ? `Snoozed until ${formatDate(reminder.snoozedUntil, SHORT_DATE_FORMAT)}`
+                      : `Reminds ${formatDate(reminder.remindAt, SHORT_DATE_FORMAT)}`;
                   return (
                     <article
                       key={reminder.id}

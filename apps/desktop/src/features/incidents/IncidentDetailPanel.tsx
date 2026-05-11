@@ -6,6 +6,7 @@ import { useToast } from "@app/providers/ToastProvider";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useLocale } from "@shared/hooks/useLocale";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { openIncidentFile, uploadIncidentFiles } from "./useIncidentsData";
 
@@ -58,11 +59,11 @@ const resolveStatusTone = (status: string) => {
   return "warning" as const;
 };
 
-const fileDateFormatter = new Intl.DateTimeFormat("en-US", {
+const FILE_DATE_FORMAT: Intl.DateTimeFormatOptions = {
   month: "short",
   day: "2-digit",
   year: "numeric",
-});
+};
 
 const formatByteSize = (byteSize: number) => {
   if (!byteSize) {
@@ -106,6 +107,7 @@ export const IncidentDetailPanel = ({
   onUpdate,
 }: IncidentDetailPanelProps) => {
   const toast = useToast();
+  const { formatDate } = useLocale();
   const incident = detail.incident;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -362,7 +364,7 @@ export const IncidentDetailPanel = ({
                     <div className="entity-file-meta">
                       <span>{file.fileType}</span>
                       <span>{formatByteSize(file.byteSize)}</span>
-                      <span>{fileDateFormatter.format(new Date(file.createdAt))}</span>
+                      <span>{formatDate(file.createdAt, FILE_DATE_FORMAT)}</span>
                     </div>
                   </div>
                   <div className="entity-file-actions">

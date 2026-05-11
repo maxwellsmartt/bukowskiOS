@@ -13,6 +13,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
+import { useLocale } from "@shared/hooks/useLocale";
 
 import {
   formatCurrency,
@@ -41,6 +42,7 @@ export const QuotesPage = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
+  const { language } = useLocale();
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [pendingDelete, setPendingDelete] = useState<QuoteRow | null>(null);
@@ -184,11 +186,11 @@ export const QuotesPage = () => {
         render: (row: QuoteRow) => (
           <div className="cell-stack" style={{ alignItems: "flex-end" }}>
             <strong style={{ fontVariantNumeric: "tabular-nums" }}>
-              {formatCurrency(row.totalAmount, row.currency)}
+              {formatCurrency(row.totalAmount, row.currency, language)}
             </strong>
             {row.currency !== row.baseCurrency ? (
               <small className="text-muted">
-                ≈ {formatCurrency(row.baseCurrencyTotalAmount, row.baseCurrency)}
+                ≈ {formatCurrency(row.baseCurrencyTotalAmount, row.baseCurrency, language)}
               </small>
             ) : null}
           </div>

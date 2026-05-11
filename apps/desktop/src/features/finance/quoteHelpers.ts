@@ -14,14 +14,30 @@ export const currencySymbol = (code: string): string => {
   }
 };
 
-export const formatCurrency = (value: number, currency: string): string => {
-  const symbol = currencySymbol(currency);
+/**
+ * Locale-aware currency formatter. Pass the user's language (from
+ * `useLocale()`) so decimal/thousands separators match the user's
+ * locale. Falls back to `en` when omitted — kept for non-render
+ * contexts that don't have access to the hook.
+ */
+export const formatCurrency = (value: number, currency: string, language: string = "en"): string => {
   const safe = Number.isFinite(value) ? value : 0;
-  const formatted = safe.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return `${symbol}${formatted}`;
+  const normalizedCurrency = /^[A-Z]{3}$/.test(currency) ? currency : "USD";
+  try {
+    return new Intl.NumberFormat(language, {
+      style: "currency",
+      currency: normalizedCurrency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(safe);
+  } catch {
+    // Defensive fallback if `currency` is unknown to Intl.
+    const formatted = safe.toLocaleString(language, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return `${currencySymbol(currency)}${formatted}`;
+  }
 };
 
 export const statusLabel = (status: QuoteStatus): string => {

@@ -10,6 +10,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useToast } from "@app/providers/ToastProvider";
+import { useLocale } from "@shared/hooks/useLocale";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { getSyncOutboxStatusLabel } from "@shared/labels/statusLabels";
@@ -89,14 +90,8 @@ const inboundCoverage = [
   { entityType: "rma_cases", label: "RMAs", detail: "Manufacturer repair cases and linked assets", status: "active" },
 ] as const;
 
-const formatDateLabel = (value: string | null) => {
-  if (!value) {
-    return "Never";
-  }
-
-  const parsedDate = new Date(value);
-  return Number.isNaN(parsedDate.getTime()) ? value : parsedDate.toLocaleString();
-};
+// `formatDateLabel` is now built inside the component (see below) so it
+// can read the user's synced locale via `useLocale()`.
 
 const formatEntityLabel = (value: string) =>
   value
@@ -217,6 +212,11 @@ export const SyncOutboxPage = () => {
   const navigate = useNavigate();
   const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const toast = useToast();
+  const { formatDateTime } = useLocale();
+  const formatDateLabel = (value: string | null) => {
+    if (!value) return "Never";
+    return formatDateTime(value) || value;
+  };
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
   const [rows, setRows] = useState<AppSyncOutboxRow[]>([]);
   const [pullCursors, setPullCursors] = useState<AppSyncPullCursorRow[]>([]);
