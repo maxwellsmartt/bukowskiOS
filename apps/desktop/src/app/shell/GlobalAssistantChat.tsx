@@ -89,6 +89,12 @@ const maxImageAttachmentBytes = 6 * 1024 * 1024;
 const maxVoiceRecordingMs = 90_000;
 const voiceWaveformBarCount = 42;
 const silentVoiceLevels = Array.from({ length: voiceWaveformBarCount }, () => 0.08);
+const transientVoiceErrorMs = 4_500;
+
+const isNoSpeechVoiceError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /no speech was detected|no se detect[oó] voz|no speech detected/i.test(message);
+};
 
 const readBlobAsDataUrl = (blob: Blob) =>
   new Promise<string>((resolve, reject) => {
@@ -613,6 +619,7 @@ export const GlobalAssistantChat = () => {
   const voiceStopTimeoutRef = useRef<number | null>(null);
   const voiceMeterFrameRef = useRef<number | null>(null);
   const voiceTimerRef = useRef<number | null>(null);
+  const transientVoiceErrorTimeoutRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const previousIsOpenRef = useRef(isOpen);
   const previousThreadSignatureRef = useRef("");
@@ -806,6 +813,9 @@ export const GlobalAssistantChat = () => {
       if (voiceStopTimeoutRef.current) {
         window.clearTimeout(voiceStopTimeoutRef.current);
       }
+      if (transientVoiceErrorTimeoutRef.current) {
+        window.clearTimeout(transientVoiceErrorTimeoutRef.current);
+      }
       if (voiceTimerRef.current) {
         window.clearInterval(voiceTimerRef.current);
       }
@@ -818,6 +828,19 @@ export const GlobalAssistantChat = () => {
     },
     [],
   );
+
+  const setTransientVoiceError = (message: string) => {
+    if (transientVoiceErrorTimeoutRef.current) {
+      window.clearTimeout(transientVoiceErrorTimeoutRef.current);
+      transientVoiceErrorTimeoutRef.current = null;
+    }
+
+    setAttachmentError(message);
+    transientVoiceErrorTimeoutRef.current = window.setTimeout(() => {
+      setAttachmentError((current) => (current === message ? null : current));
+      transientVoiceErrorTimeoutRef.current = null;
+    }, transientVoiceErrorMs);
+  };
 
   const stopVoiceMeter = () => {
     if (voiceMeterFrameRef.current) {
@@ -895,7 +918,9 @@ export const GlobalAssistantChat = () => {
       appendVoiceTranscript(result.text);
       window.requestAnimationFrame(() => textareaRef.current?.focus());
     } catch (error) {
-      setAttachmentError(getUserFacingErrorMessage(error, "Voice transcription is unavailable right now."));
+      if (!isNoSpeechVoiceError(error)) {
+        setTransientVoiceError(getUserFacingErrorMessage(error, "Voice transcription is unavailable right now."));
+      }
     } finally {
       setVoiceState("idle");
       setVoiceElapsedMs(0);
@@ -918,7 +943,7 @@ export const GlobalAssistantChat = () => {
     }
 
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setAttachmentError("Voice recording is not available on this device.");
+      setTransientVoiceError("Voice recording is not available on this device.");
       return;
     }
 
@@ -945,7 +970,7 @@ export const GlobalAssistantChat = () => {
 
       recorder.onerror = () => {
         stopVoiceMeter();
-        setAttachmentError("The microphone stopped unexpectedly. Try recording again.");
+        setTransientVoiceError("The microphone stopped unexpectedly. Try recording again.");
         setVoiceState("idle");
         setVoiceElapsedMs(0);
         setVoiceLevels(silentVoiceLevels);
@@ -966,7 +991,7 @@ export const GlobalAssistantChat = () => {
         stream.getTracks().forEach((track) => track.stop());
 
         if (!audioBlob.size) {
-          setAttachmentError("No audio was captured. Try recording again.");
+          setTransientVoiceError("No audio was captured. Try recording again.");
           setVoiceState("idle");
           setVoiceElapsedMs(0);
           setVoiceLevels(silentVoiceLevels);
@@ -987,7 +1012,7 @@ export const GlobalAssistantChat = () => {
       setVoiceState("idle");
       setVoiceElapsedMs(0);
       setVoiceLevels(silentVoiceLevels);
-      setAttachmentError(getUserFacingErrorMessage(error, "Microphone access was blocked. Allow microphone access and try again."));
+      setTransientVoiceError(getUserFacingErrorMessage(error, "Microphone access was blocked. Allow microphone access and try again."));
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
       mediaRecorderRef.current = null;

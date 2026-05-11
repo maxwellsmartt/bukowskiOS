@@ -52,6 +52,10 @@ const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, message: 
 const formatTelegramVoiceError = (error: unknown) => {
   const message = error instanceof Error ? error.message : "";
 
+  if (/no speech was detected|no se detect[oó] voz|no speech detected/i.test(message)) {
+    return null;
+  }
+
   if (/openai api key/i.test(message)) {
     return "No pude transcribir esa nota de voz porque falta configurar el API key de OpenAI en Settings > AI Models.";
   }
@@ -289,7 +293,10 @@ export const createTelegramConnectorService = (
         return;
       }
     } catch (error) {
-      await sendTelegramReply(message.chat.id, formatTelegramVoiceError(error));
+      const replyText = formatTelegramVoiceError(error);
+      if (replyText) {
+        await sendTelegramReply(message.chat.id, replyText);
+      }
       return;
     }
 
