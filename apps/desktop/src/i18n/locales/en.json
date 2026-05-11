@@ -1,0 +1,50 @@
+{
+  "common": {
+    "save": "Save",
+    "saveChanges": "Save changes",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "remove": "Remove",
+    "delete": "Delete",
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "close": "Close",
+    "ok": "OK",
+    "confirm": "Confirm",
+    "search": "Search"
+  },
+  "settings": {
+    "general": {
+      "title": "General",
+      "language": {
+        "label": "Language",
+        "helper": "Used for dates, numbers and UI text."
+      },
+      "dateFormat": {
+        "label": "Date format",
+        "helper": "Choose how dates are rendered across the app.",
+        "modes": {
+          "locale": "Match language",
+          "iso": "ISO (2026-05-11)",
+          "us": "US (5/11/2026)",
+          "eu": "EU (11/05/2026)"
+        },
+        "preview": "Today: {{value}}"
+      },
+      "defaultCurrency": {
+        "label": "Default currency",
+        "helper": "Pre-selected when picking a currency. Workspace accounting stays in {{workspaceCurrency}}.",
+        "useWorkspace": "Use workspace currency ({{workspaceCurrency}})",
+        "preview": "Sample: {{value}}"
+      },
+      "autoLogout": {
+        "label": "Auto sign-out",
+        "helper": "Synced across your devices. The timer resets when you use the app.",
+        "off": "Off",
+        "minutes_one": "{{count}} min",
+        "minutes_other": "{{count}} min",
+        "hour": "1 hour"
+      }
+    }
+  }
+}

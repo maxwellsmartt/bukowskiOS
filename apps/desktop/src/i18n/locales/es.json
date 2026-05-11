@@ -1,0 +1,50 @@
+{
+  "common": {
+    "save": "Guardar",
+    "saveChanges": "Guardar cambios",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "remove": "Quitar",
+    "delete": "Eliminar",
+    "loading": "Cargando…",
+    "saving": "Guardando…",
+    "close": "Cerrar",
+    "ok": "OK",
+    "confirm": "Confirmar",
+    "search": "Buscar"
+  },
+  "settings": {
+    "general": {
+      "title": "General",
+      "language": {
+        "label": "Idioma",
+        "helper": "Se usa para fechas, números y textos de la interfaz."
+      },
+      "dateFormat": {
+        "label": "Formato de fecha",
+        "helper": "Elige cómo se muestran las fechas en la aplicación.",
+        "modes": {
+          "locale": "Según el idioma",
+          "iso": "ISO (2026-05-11)",
+          "us": "EE. UU. (5/11/2026)",
+          "eu": "Europa (11/05/2026)"
+        },
+        "preview": "Hoy: {{value}}"
+      },
+      "defaultCurrency": {
+        "label": "Moneda predeterminada",
+        "helper": "Se preselecciona en los selectores de moneda. La contabilidad del workspace sigue en {{workspaceCurrency}}.",
+        "useWorkspace": "Usar la moneda del workspace ({{workspaceCurrency}})",
+        "preview": "Ejemplo: {{value}}"
+      },
+      "autoLogout": {
+        "label": "Cierre de sesión automático",
+        "helper": "Se sincroniza entre tus dispositivos. El temporizador se reinicia al usar la app.",
+        "off": "Desactivado",
+        "minutes_one": "{{count}} min",
+        "minutes_other": "{{count}} min",
+        "hour": "1 hora"
+      }
+    }
+  }
+}

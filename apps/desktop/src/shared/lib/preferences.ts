@@ -69,6 +69,29 @@ export const readJsonPreference = <T>(key: string, fallback: T) => {
   }
 };
 
+export const PREFERENCE_CHANGE_EVENT = "bukowski:preference-changed";
+
+export type PreferenceChangeDetail = {
+  key: string;
+  value: string | null;
+};
+
+const dispatchPreferenceChange = (key: string, value: string | null) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.dispatchEvent(
+      new CustomEvent<PreferenceChangeDetail>(PREFERENCE_CHANGE_EVENT, {
+        detail: { key, value },
+      }),
+    );
+  } catch {
+    // Some environments (older WebViews) may not support CustomEvent — ignore.
+  }
+};
+
 export const writePreference = (key: string, value: string | null) => {
   if (typeof window === "undefined") {
     return;
@@ -79,13 +102,51 @@ export const writePreference = (key: string, value: string | null) => {
   try {
     if (value === null) {
       window.localStorage.removeItem(storageKey);
-      return;
+    } else {
+      window.localStorage.setItem(storageKey, value);
     }
-
-    window.localStorage.setItem(storageKey, value);
   } catch {
     // Keep UI resilient even if localStorage is unavailable.
   }
+
+  dispatchPreferenceChange(key, value);
+};
+
+/**
+ * Subscribe to preference changes. The handler fires for in-tab updates
+ * (via `writePreference`) and for cross-tab updates (via the native
+ * `storage` event). Pass a specific `key` to only react to that preference.
+ */
+export const subscribeToPreferenceChange = (
+  key: string,
+  handler: (detail: PreferenceChangeDetail) => void,
+): (() => void) => {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const storageKey = buildPreferenceKey(key);
+
+  const onCustom = (event: Event) => {
+    const detail = (event as CustomEvent<PreferenceChangeDetail>).detail;
+    if (detail && detail.key === key) {
+      handler(detail);
+    }
+  };
+
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === storageKey) {
+      handler({ key, value: event.newValue });
+    }
+  };
+
+  window.addEventListener(PREFERENCE_CHANGE_EVENT, onCustom);
+  window.addEventListener("storage", onStorage);
+
+  return () => {
+    window.removeEventListener(PREFERENCE_CHANGE_EVENT, onCustom);
+    window.removeEventListener("storage", onStorage);
+  };
 };
 
 export const writeJsonPreference = (key: string, value: unknown) => {

@@ -973,14 +973,6 @@ export const WorkspaceSettingsPage = () => {
         )}
       </SurfaceCard>
 
-      <WorkspaceDisclosure title="Currency" summary={`Base currency and exchange rates${workspaceProfile?.baseCurrency ? ` · ${workspaceProfile.baseCurrency}` : ""}`}>
-        <CurrencySettingsCard />
-      </WorkspaceDisclosure>
-
-      <WorkspaceDisclosure title="Branding" summary="Logo and document assets">
-        <WorkspaceBrandingCard />
-      </WorkspaceDisclosure>
-
       <WorkspaceDisclosure title="Members" summary={`${teamMembers.length} member${teamMembers.length === 1 ? "" : "s"} · ${teamMembers.filter((member) => member.membershipStatus === "active").length} active`}>
         <SurfaceCard
           title="Members"
@@ -1083,6 +1075,56 @@ export const WorkspaceSettingsPage = () => {
         </SurfaceCard>
       </WorkspaceDisclosure>
 
+      <WorkspaceDisclosure title="Pending invites" summary={pendingInvites.length ? `${pendingInvites.length} waiting` : "No pending invites"}>
+        <SurfaceCard title="Pending invites">
+          {pendingInvites.length === 0 ? (
+            <p className="surface-card-subtitle">
+              No invitations waiting. New teammates get a magic link by email.
+            </p>
+          ) : (
+            <DataTable
+              getRowId={(row) => row.id}
+              persistKey="workspace-settings-pending-invites"
+              columns={[
+                { key: "email", label: "Email", render: (row) => row.email },
+                { key: "role", label: "Role", render: (row) => row.roleName },
+                {
+                  key: "invitedAt",
+                  label: "Invited",
+                  render: (row) => (row.invitedAt ? new Date(row.invitedAt).toLocaleDateString() : "Pending"),
+                },
+                {
+                  key: "actions",
+                  label: "Actions",
+                  align: "right",
+                  render: (row) => (
+                    <div className="surface-card-actions" style={{ justifyContent: "flex-end" }}>
+                      <button
+                        className="ghost-control"
+                        disabled={!row.roleId}
+                        onClick={() => void handleResendInvite(row)}
+                        type="button"
+                      >
+                        Resend
+                      </button>
+                      <button
+                        className="ghost-control is-danger"
+                        onClick={() => void handleRevokeInvite(row)}
+                        type="button"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  ),
+                },
+              ]}
+              rows={pendingInvites}
+              emptyMessage="No pending invites."
+            />
+          )}
+        </SurfaceCard>
+      </WorkspaceDisclosure>
+
       {supabase && !isLocalFallback ? (
         <WorkspaceDisclosure
           title="System actors"
@@ -1138,61 +1180,19 @@ export const WorkspaceSettingsPage = () => {
         </WorkspaceDisclosure>
       ) : null}
 
-      <WorkspaceDisclosure title="Pending invites" summary={pendingInvites.length ? `${pendingInvites.length} waiting` : "No pending invites"}>
-        <SurfaceCard title="Pending invites">
-          {pendingInvites.length === 0 ? (
-            <p className="surface-card-subtitle">
-              No invitations waiting. New teammates get a magic link by email.
-            </p>
-          ) : (
-            <DataTable
-              getRowId={(row) => row.id}
-              persistKey="workspace-settings-pending-invites"
-              columns={[
-                { key: "email", label: "Email", render: (row) => row.email },
-                { key: "role", label: "Role", render: (row) => row.roleName },
-                {
-                  key: "invitedAt",
-                  label: "Invited",
-                  render: (row) => (row.invitedAt ? new Date(row.invitedAt).toLocaleDateString() : "Pending"),
-                },
-                {
-                  key: "actions",
-                  label: "Actions",
-                  align: "right",
-                  render: (row) => (
-                    <div className="surface-card-actions" style={{ justifyContent: "flex-end" }}>
-                      <button
-                        className="ghost-control"
-                        disabled={!row.roleId}
-                        onClick={() => void handleResendInvite(row)}
-                        type="button"
-                      >
-                        Resend
-                      </button>
-                      <button
-                        className="ghost-control is-danger"
-                        onClick={() => void handleRevokeInvite(row)}
-                        type="button"
-                      >
-                        Revoke
-                      </button>
-                    </div>
-                  ),
-                },
-              ]}
-              rows={pendingInvites}
-              emptyMessage="No pending invites."
-            />
-          )}
-        </SurfaceCard>
-      </WorkspaceDisclosure>
-
       {supabase && !isLocalFallback ? (
         <WorkspaceDisclosure title="Roles" summary={`${usersSnapshot.roles.length} role${usersSnapshot.roles.length === 1 ? "" : "s"} available`}>
           <CustomRolesEditor supabase={supabase} workspaceId={activeWorkspaceId} />
         </WorkspaceDisclosure>
       ) : null}
+
+      <WorkspaceDisclosure title="Branding" summary="Logo and document assets">
+        <WorkspaceBrandingCard />
+      </WorkspaceDisclosure>
+
+      <WorkspaceDisclosure title="Currency" summary={`Base currency and exchange rates${workspaceProfile?.baseCurrency ? ` · ${workspaceProfile.baseCurrency}` : ""}`}>
+        <CurrencySettingsCard />
+      </WorkspaceDisclosure>
 
       <WorkspaceDisclosure title="Channels" summary="Messaging access for workspace members">
         <SurfaceCard

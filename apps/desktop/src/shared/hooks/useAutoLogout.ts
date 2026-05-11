@@ -1,34 +1,35 @@
 import { useEffect, useRef } from "react";
 
 import { useSession } from "@app/providers/SessionProvider";
-import { readNumberPreference, uiPreferenceKeys } from "@shared/lib/preferences";
+import { useUserSetting } from "@shared/hooks/useUserSetting";
+import { userSettingKeys } from "@shared/lib/userSettings";
 
 const ACTIVITY_EVENTS: Array<keyof DocumentEventMap> = ["mousedown", "keydown", "wheel", "touchstart"];
 
 export const AUTO_LOGOUT_DISABLED = 0;
 export const AUTO_LOGOUT_DEFAULT_MINUTES = AUTO_LOGOUT_DISABLED;
 
-const readInactivityMinutes = (): number => {
-  const value = readNumberPreference(uiPreferenceKeys.autoLogoutInactivityMinutes, AUTO_LOGOUT_DEFAULT_MINUTES);
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : AUTO_LOGOUT_DISABLED;
-};
+const normalize = (value: number | undefined): number =>
+  Number.isFinite(value) && (value ?? 0) > 0 ? Math.floor(value as number) : AUTO_LOGOUT_DISABLED;
 
 /**
  * Auto-logout the current session after N minutes of user inactivity.
- * N is read from `uiPreferenceKeys.autoLogoutInactivityMinutes`. A value of 0
- * (or unset) disables the timer entirely. Resets on any pointer / keyboard
- * activity inside the document.
+ *
+ * The threshold is read from the synced `userSettings` store, so changes
+ * made in Settings (or on another device, once realtime is wired up) take
+ * effect immediately — no sign-out + sign-in required.
  */
 export const useAutoLogout = () => {
   const { status, signOut } = useSession();
   const timerRef = useRef<number | null>(null);
+  const [rawMinutes] = useUserSetting(userSettingKeys.autoLogoutInactivityMinutes);
+  const minutes = normalize(rawMinutes);
 
   useEffect(() => {
     if (status !== "authenticated") {
       return undefined;
     }
 
-    const minutes = readInactivityMinutes();
     if (minutes === AUTO_LOGOUT_DISABLED) {
       return undefined;
     }
@@ -63,5 +64,5 @@ export const useAutoLogout = () => {
         document.removeEventListener(eventName, handleActivity);
       }
     };
-  }, [signOut, status]);
+  }, [minutes, signOut, status]);
 };

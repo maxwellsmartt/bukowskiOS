@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { HashRouter } from "react-router-dom";
 
 import { App } from "@app/App";
+import "./i18n";
 import "@shared/styles/tokens.css";
 import "@shared/styles/global.css";
 

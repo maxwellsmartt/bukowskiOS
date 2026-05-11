@@ -11,6 +11,8 @@ export type WorkspaceMembership = {
   workspaceName: string;
   avatarUrl?: string | null;
   iconColor?: string | null;
+  /** ISO-4217 accounting currency of the workspace. Falls back to "USD". */
+  baseCurrency: string;
   roleKey: string | null;
   roleName: string;
   status: "active" | "invited" | "inactive";
@@ -62,6 +64,7 @@ const localMembership: WorkspaceMembership = {
   workspaceName: "Metadata Cine",
   avatarUrl: null,
   iconColor: null,
+  baseCurrency: "USD",
   roleKey: "admin",
   roleName: "Local admin",
   status: "active",
@@ -71,11 +74,13 @@ const localMembership: WorkspaceMembership = {
 const toCachedMembership = (workspace: {
   id: string;
   name: string;
+  baseCurrency?: string | null;
 }): WorkspaceMembership => ({
   workspaceId: workspace.id,
   workspaceName: workspace.name,
   avatarUrl: null,
   iconColor: null,
+  baseCurrency: (workspace.baseCurrency ?? "USD").toUpperCase(),
   roleKey: "admin",
   roleName: "Cached access",
   status: "active",
@@ -177,6 +182,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
           workspaceName: typedRow.workspaces?.name ?? "Workspace",
           avatarUrl: typedRow.workspaces?.avatar_url ?? null,
           iconColor: typedRow.workspaces?.icon_color ?? null,
+          baseCurrency: (typedRow.workspaces?.base_currency ?? "USD").toUpperCase(),
           roleKey: typedRow.roles?.key ?? null,
           roleName: typedRow.roles?.name ?? "Member",
           status: typedRow.status,
