@@ -71,7 +71,7 @@ type UserEditorDraft = {
   linkedCrewMemberId: string;
 };
 
-import { AutoLogoutSetting } from "./AutoLogoutSetting";
+import { GeneralSettingsCard } from "./GeneralSettingsCard";
 import { SettingsLayout, settingsNavEntries, useActiveSettingsSection } from "./SettingsLayout";
 import { UserChannelDots } from "./UserChannelDots";
 import { UserAccountSettings } from "./UserAccountSettings";
@@ -675,9 +675,7 @@ export const SettingsPage = () => {
       {activeSection === "general" ? (
         <div className="page-stack">
           <UserAccountSettings showHeader={false} />
-          <SurfaceCard title="Preferences">
-            <AutoLogoutSetting />
-          </SurfaceCard>
+          <GeneralSettingsCard />
         </div>
       ) : null}
 

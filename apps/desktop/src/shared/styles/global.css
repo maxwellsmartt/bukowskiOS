@@ -15612,3 +15612,182 @@ input[type="number"] {
   line-height: 1.45;
   margin: 4px 0 0;
 }
+
+/* --- Currency picker (User Settings → General) --- */
+.currency-picker {
+  position: relative;
+  width: 100%;
+}
+
+.currency-picker-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  padding-right: 12px;
+}
+
+.currency-picker-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.currency-picker-trigger-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.currency-picker-panel {
+  /* Rendered via React portal at <body>, so `position: fixed` and the
+     positional offsets (top/bottom/left/width) are set inline by the
+     component. We only provide visuals + stacking here. */
+  z-index: 9000;
+  background: var(--surface-elevated, rgba(20, 24, 32, 0.96));
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.32);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(8px);
+}
+
+.currency-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.currency-picker-search svg {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+
+.currency-picker-search-input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text-primary);
+  font-size: var(--font-sm, 13px);
+}
+
+.currency-picker-listbox {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.currency-picker-group-label {
+  font-size: var(--font-2xs, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 8px 14px 4px;
+  pointer-events: none;
+}
+
+.currency-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.currency-picker-option.is-active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.currency-picker-option.is-selected {
+  color: var(--text-primary);
+}
+
+.currency-picker-option-code {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: var(--font-xs, 12px);
+  min-width: 42px;
+  color: var(--text-primary);
+}
+
+.currency-picker-option-name {
+  flex: 1;
+  font-size: var(--font-sm, 13px);
+  color: var(--text-muted);
+}
+
+.currency-picker-option.is-selected .currency-picker-option-name,
+.currency-picker-option.is-active .currency-picker-option-name {
+  color: var(--text-primary);
+}
+
+.currency-picker-option-placeholder .currency-picker-option-name {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.currency-picker-empty {
+  padding: 14px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-sm, 13px);
+}
+
+/* --- General settings card layout --- */
+.general-settings-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.general-settings-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .general-settings-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+.general-settings-row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.general-settings-row-label strong {
+  font-size: var(--font-sm, 13px);
+  color: var(--text-primary);
+}
+
+.general-settings-row-label small {
+  font-size: var(--font-2xs, 11px);
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.general-settings-row-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.general-settings-preview {
+  font-size: var(--font-2xs, 11px);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

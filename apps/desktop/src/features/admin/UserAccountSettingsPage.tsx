@@ -1,8 +1,12 @@
+import { GeneralSettingsCard } from "./GeneralSettingsCard";
 import { SettingsLayout } from "./SettingsLayout";
 import { UserAccountSettings } from "./UserAccountSettings";
 
 export const UserAccountSettingsPage = () => (
   <SettingsLayout>
-    <UserAccountSettings />
+    <div className="page-stack">
+      <UserAccountSettings />
+      <GeneralSettingsCard />
+    </div>
   </SettingsLayout>
 );
