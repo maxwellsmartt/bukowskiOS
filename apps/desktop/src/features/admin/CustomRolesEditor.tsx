@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { useTranslation } from "react-i18next";
 import { Lock, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { useToast } from "@app/providers/ToastProvider";
@@ -31,19 +32,31 @@ const slugify = (value: string) =>
     .replace(/^_+|_+$/g, "")
     .slice(0, 32);
 
-const groupForKey = (key: string) => {
-  if (key.startsWith("projects.")) return "Projects";
-  if (key.startsWith("assets.")) return "Assets";
-  if (key.startsWith("licenses.")) return "Assets";
-  if (key.startsWith("incidents.")) return "Incidents";
-  if (key.startsWith("packing-slips.")) return "Packing";
-  if (key.startsWith("finance.")) return "Finance";
-  if (key.startsWith("rma.")) return "RMA";
-  if (key.startsWith("users.")) return "Team";
-  return "Other";
+const PERMISSION_GROUP_KEYS = [
+  "projects",
+  "assets",
+  "incidents",
+  "packing",
+  "finance",
+  "rma",
+  "team",
+  "other",
+] as const;
+type PermissionGroupKey = (typeof PERMISSION_GROUP_KEYS)[number];
+
+const groupKeyForPermission = (permissionKey: string): PermissionGroupKey => {
+  if (permissionKey.startsWith("projects.")) return "projects";
+  if (permissionKey.startsWith("assets.") || permissionKey.startsWith("licenses.")) return "assets";
+  if (permissionKey.startsWith("incidents.")) return "incidents";
+  if (permissionKey.startsWith("packing-slips.")) return "packing";
+  if (permissionKey.startsWith("finance.")) return "finance";
+  if (permissionKey.startsWith("rma.")) return "rma";
+  if (permissionKey.startsWith("users.")) return "team";
+  return "other";
 };
 
 export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorProps) => {
+  const { t } = useTranslation();
   const toast = useToast();
   const [roles, setRoles] = useState<RolePermissionRow[]>([]);
   const [allPermissions, setAllPermissions] = useState<PermissionDefinition[]>([]);
@@ -70,11 +83,11 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
       setAllPermissions(nextPermissions);
       setError(null);
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "Could not load roles."));
+      setError(getUserFacingErrorMessage(nextError, t("settings.workspace.rolesEditor.toasts.couldNotLoad")));
     } finally {
       setIsLoading(false);
     }
-  }, [supabase, workspaceId]);
+  }, [supabase, workspaceId, t]);
 
   useEffect(() => {
     void refresh();
@@ -82,10 +95,10 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
 
   const sortedPermissions = useMemo(() => {
     return [...allPermissions].sort((a, b) => {
-      const groupA = groupForKey(a.key);
-      const groupB = groupForKey(b.key);
+      const groupA = groupKeyForPermission(a.key);
+      const groupB = groupKeyForPermission(b.key);
       if (groupA !== groupB) {
-        return groupA.localeCompare(groupB);
+        return PERMISSION_GROUP_KEYS.indexOf(groupA) - PERMISSION_GROUP_KEYS.indexOf(groupB);
       }
       return a.key.localeCompare(b.key);
     });
@@ -93,7 +106,10 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
 
   const handleToggle = async (role: RolePermissionRow, permission: PermissionDefinition) => {
     if (role.isSystemRole) {
-      toast.info("System role", "System roles can't be edited. Create a custom role to define your own permissions.");
+      toast.info(
+        t("settings.workspace.rolesEditor.toasts.systemRoleTitle"),
+        t("settings.workspace.rolesEditor.toasts.systemRoleBody"),
+      );
       return;
     }
 
@@ -111,7 +127,10 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
       }
       await refresh();
     } catch (nextError) {
-      toast.error("Could not save", getUserFacingErrorMessage(nextError, "Permission change rejected."));
+      toast.error(
+        t("settings.workspace.rolesEditor.toasts.couldNotSave"),
+        getUserFacingErrorMessage(nextError, t("settings.workspace.rolesEditor.toasts.permissionRejected")),
+      );
     } finally {
       setPendingCellKey(null);
     }
@@ -120,16 +139,25 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
   const handleCreate = async () => {
     const name = createDraft.name.trim();
     if (!name) {
-      toast.error("Name required", "Pick a short, descriptive name for the role.");
+      toast.error(
+        t("settings.workspace.rolesEditor.toasts.nameRequiredTitle"),
+        t("settings.workspace.rolesEditor.toasts.nameRequiredBody"),
+      );
       return;
     }
     const key = slugify(name);
     if (!key) {
-      toast.error("Invalid name", "Use letters, numbers or spaces.");
+      toast.error(
+        t("settings.workspace.rolesEditor.toasts.invalidNameTitle"),
+        t("settings.workspace.rolesEditor.toasts.invalidNameBody"),
+      );
       return;
     }
     if (roles.some((role) => role.key === key)) {
-      toast.error("Already exists", "A role with that key already exists in this workspace.");
+      toast.error(
+        t("settings.workspace.rolesEditor.toasts.alreadyExistsTitle"),
+        t("settings.workspace.rolesEditor.toasts.alreadyExistsKey"),
+      );
       return;
     }
 
@@ -141,12 +169,18 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
         name,
         description: createDraft.description.trim(),
       });
-      toast.success("Role created", `Toggle permissions on the row for "${name}" to grant access.`);
+      toast.success(
+        t("settings.workspace.rolesEditor.toasts.createdTitle"),
+        t("settings.workspace.rolesEditor.toasts.createdBody", { name }),
+      );
       setCreateDialogOpen(false);
       setCreateDraft({ name: "", description: "" });
       await refresh();
     } catch (nextError) {
-      toast.error("Could not create role", getUserFacingErrorMessage(nextError, "Try a different name."));
+      toast.error(
+        t("settings.workspace.rolesEditor.toasts.couldNotCreate"),
+        getUserFacingErrorMessage(nextError, t("settings.workspace.rolesEditor.toasts.couldNotCreateBody")),
+      );
     } finally {
       setIsCreating(false);
     }
@@ -156,13 +190,19 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
     if (!editingRole) return;
     const name = editDraft.name.trim();
     if (!name) {
-      toast.error("Name required", "Pick a short, descriptive name for the role.");
+      toast.error(
+        t("settings.workspace.rolesEditor.toasts.nameRequiredTitle"),
+        t("settings.workspace.rolesEditor.toasts.nameRequiredBody"),
+      );
       return;
     }
     if (
       roles.some((role) => role.id !== editingRole.id && role.name.toLowerCase() === name.toLowerCase())
     ) {
-      toast.error("Already exists", "Another role in this workspace already uses that name.");
+      toast.error(
+        t("settings.workspace.rolesEditor.toasts.alreadyExistsTitle"),
+        t("settings.workspace.rolesEditor.toasts.alreadyExistsName"),
+      );
       return;
     }
 
@@ -173,11 +213,17 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
         name,
         description: editDraft.description.trim(),
       });
-      toast.success("Role updated", `Renamed to "${name}".`);
+      toast.success(
+        t("settings.workspace.rolesEditor.toasts.updatedTitle"),
+        t("settings.workspace.rolesEditor.toasts.updatedBody", { name }),
+      );
       setEditingRole(null);
       await refresh();
     } catch (nextError) {
-      toast.error("Could not update role", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+      toast.error(
+        t("settings.workspace.rolesEditor.toasts.couldNotUpdate"),
+        getUserFacingErrorMessage(nextError, t("common.tryAgain")),
+      );
     } finally {
       setIsSavingEdit(false);
     }
@@ -188,25 +234,28 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
     setIsDeletingRole(true);
     try {
       await deleteCustomRole(supabase, pendingDeleteRole.id);
-      toast.success("Role deleted", `${pendingDeleteRole.name} is gone. Members assigned to it lose access.`);
+      toast.success(
+        t("settings.workspace.rolesEditor.toasts.deletedTitle"),
+        t("settings.workspace.rolesEditor.toasts.deletedBody", { name: pendingDeleteRole.name }),
+      );
       setPendingDeleteRole(null);
       await refresh();
     } catch (nextError) {
       toast.error(
-        "Could not delete role",
-        getUserFacingErrorMessage(nextError, "Members might still be assigned to this role."),
+        t("settings.workspace.rolesEditor.toasts.couldNotDelete"),
+        getUserFacingErrorMessage(nextError, t("settings.workspace.rolesEditor.toasts.couldNotDeleteBody")),
       );
     } finally {
       setIsDeletingRole(false);
     }
   };
 
-  let lastGroup = "";
+  let lastGroup: PermissionGroupKey | "" = "";
 
   return (
     <SurfaceCard
-      title="Custom roles"
-      subtitle="Build roles tailored to your studio. System roles stay locked for safety."
+      title={t("settings.workspace.rolesEditor.cardTitle")}
+      subtitle={t("settings.workspace.rolesEditor.cardSubtitle")}
       aside={
         <button
           className="action-primary-button"
@@ -215,33 +264,37 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
           type="button"
         >
           <Plus size={13} />
-          <span>New role</span>
+          <span>{t("settings.workspace.rolesEditor.newRole")}</span>
         </button>
       }
     >
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
       {isLoading ? (
-        <p className="surface-card-subtitle">Loading roles…</p>
+        <p className="surface-card-subtitle">{t("settings.workspace.rolesEditor.loading")}</p>
       ) : !roles.length ? (
-        <p className="surface-card-subtitle">No roles yet. Click "New role" to start.</p>
+        <p className="surface-card-subtitle">{t("settings.workspace.rolesEditor.empty")}</p>
       ) : (
         <div className="permission-matrix-wrapper">
           <table className="permission-matrix">
             <thead>
               <tr>
-                <th className="permission-matrix-corner">Permission</th>
+                <th className="permission-matrix-corner">{t("settings.workspace.rolesEditor.permissionColumn")}</th>
                 {roles.map((role) => (
                   <th key={role.id} className="permission-matrix-role">
                     <div className="permission-matrix-role-head">
                       <span>{role.name}</span>
                       {role.isSystemRole ? (
-                        <Lock aria-label="System role" data-tooltip="System role — locked" size={10} />
+                        <Lock
+                          aria-label={t("settings.workspace.rolesEditor.tooltips.systemRole")}
+                          data-tooltip={t("settings.workspace.rolesEditor.systemRoleLocked")}
+                          size={10}
+                        />
                       ) : (
                         <span className="permission-matrix-role-actions">
                           <button
-                            aria-label={`Edit ${role.name}`}
+                            aria-label={t("settings.workspace.rolesEditor.tooltips.edit", { name: role.name })}
                             className="permission-matrix-role-edit"
-                            data-tooltip={`Edit ${role.name}`}
+                            data-tooltip={t("settings.workspace.rolesEditor.tooltips.edit", { name: role.name })}
                             onClick={() => {
                               setEditingRole(role);
                               setEditDraft({ name: role.name, description: role.description ?? "" });
@@ -251,9 +304,9 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
                             <Pencil size={11} />
                           </button>
                           <button
-                            aria-label={`Delete ${role.name}`}
+                            aria-label={t("settings.workspace.rolesEditor.tooltips.delete", { name: role.name })}
                             className="permission-matrix-role-delete"
-                            data-tooltip={`Delete ${role.name}`}
+                            data-tooltip={t("settings.workspace.rolesEditor.tooltips.delete", { name: role.name })}
                             onClick={() => setPendingDeleteRole(role)}
                             type="button"
                           >
@@ -268,13 +321,17 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
             </thead>
             <tbody>
               {sortedPermissions.map((permission) => {
-                const group = groupForKey(permission.key);
+                const group = groupKeyForPermission(permission.key);
                 const showGroup = group !== lastGroup;
                 lastGroup = group;
                 return (
                   <tr key={permission.id}>
                     <td className="permission-matrix-permission">
-                      {showGroup ? <span className="permission-matrix-group">{group}</span> : null}
+                      {showGroup ? (
+                        <span className="permission-matrix-group">
+                          {t(`settings.workspace.rolesEditor.groups.${group}`)}
+                        </span>
+                      ) : null}
                       <span className="permission-matrix-permission-label">{permission.label}</span>
                       <span className="permission-matrix-permission-key">{permission.key}</span>
                     </td>
@@ -282,19 +339,27 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
                       const has = role.permissionIds.includes(permission.id);
                       const cellKey = `${role.id}:${permission.id}`;
                       const isPending = pendingCellKey === cellKey;
+                      const ariaLabel = role.isSystemRole
+                        ? has
+                          ? t("settings.workspace.rolesEditor.aria.systemHas", { role: role.name, permission: permission.key })
+                          : t("settings.workspace.rolesEditor.aria.systemMissing", { role: role.name, permission: permission.key })
+                        : has
+                          ? t("settings.workspace.rolesEditor.aria.revoke", { role: role.name, permission: permission.key })
+                          : t("settings.workspace.rolesEditor.aria.grant", { role: role.name, permission: permission.key });
+                      const tooltip = role.isSystemRole
+                        ? t("settings.workspace.rolesEditor.systemRoleLocked")
+                        : has
+                          ? t("settings.workspace.rolesEditor.tooltips.revoke")
+                          : t("settings.workspace.rolesEditor.tooltips.grant");
                       return (
                         <td
                           key={role.id}
                           className={`permission-matrix-cell${has ? " is-allowed" : " is-denied"}${role.isSystemRole ? " is-locked" : " is-editable"}`}
                         >
                           <button
-                            aria-label={
-                              role.isSystemRole
-                                ? `${role.name} ${has ? "has" : "does not have"} ${permission.key}`
-                                : `${has ? "Revoke" : "Grant"} ${permission.key} for ${role.name}`
-                            }
+                            aria-label={ariaLabel}
                             className="permission-matrix-cell-button"
-                            data-tooltip={role.isSystemRole ? "System role — locked" : has ? "Click to revoke" : "Click to grant"}
+                            data-tooltip={tooltip}
                             disabled={isPending || role.isSystemRole}
                             onClick={() => void handleToggle(role, permission)}
                             type="button"
@@ -317,28 +382,28 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
           <div className="confirm-dialog">
             <div className="confirm-dialog-header">
               <div className="confirm-dialog-copy">
-                <strong>New custom role</strong>
-                <p>Once created, toggle the permissions you want this role to have.</p>
+                <strong>{t("settings.workspace.rolesEditor.create.title")}</strong>
+                <p>{t("settings.workspace.rolesEditor.create.subtitle")}</p>
               </div>
             </div>
 
             <div className="agent-form-grid">
               <label className="field-block">
-                <span className="field-label">Role name</span>
+                <span className="field-label">{t("settings.workspace.rolesEditor.create.nameLabel")}</span>
                 <input
                   autoFocus
                   className="field-input"
                   onChange={(event) => setCreateDraft((current) => ({ ...current, name: event.target.value }))}
-                  placeholder="Production assistant"
+                  placeholder={t("settings.workspace.rolesEditor.create.namePlaceholder")}
                   value={createDraft.name}
                 />
               </label>
               <label className="field-block">
-                <span className="field-label">Description (optional)</span>
+                <span className="field-label">{t("settings.workspace.rolesEditor.create.descriptionLabel")}</span>
                 <input
                   className="field-input"
                   onChange={(event) => setCreateDraft((current) => ({ ...current, description: event.target.value }))}
-                  placeholder="Daily on-set helper. Read access only."
+                  placeholder={t("settings.workspace.rolesEditor.create.descriptionPlaceholder")}
                   value={createDraft.description}
                 />
               </label>
@@ -354,10 +419,12 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
                 }}
                 type="button"
               >
-                Cancel
+                {t("settings.workspace.rolesEditor.create.cancel")}
               </button>
               <button className="action-primary-button" disabled={isCreating} onClick={() => void handleCreate()} type="button">
-                {isCreating ? "Creating…" : "Create role"}
+                {isCreating
+                  ? t("settings.workspace.rolesEditor.create.submitting")
+                  : t("settings.workspace.rolesEditor.create.submit")}
               </button>
             </div>
           </div>
@@ -369,14 +436,14 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
           <div className="confirm-dialog">
             <div className="confirm-dialog-header">
               <div className="confirm-dialog-copy">
-                <strong>Edit role</strong>
-                <p>Rename the role and refine its description. Permissions stay as they are.</p>
+                <strong>{t("settings.workspace.rolesEditor.edit.title")}</strong>
+                <p>{t("settings.workspace.rolesEditor.edit.subtitle")}</p>
               </div>
             </div>
 
             <div className="agent-form-grid">
               <label className="field-block">
-                <span className="field-label">Role name</span>
+                <span className="field-label">{t("settings.workspace.rolesEditor.edit.nameLabel")}</span>
                 <input
                   autoFocus
                   className="field-input"
@@ -385,7 +452,7 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
                 />
               </label>
               <label className="field-block">
-                <span className="field-label">Description (optional)</span>
+                <span className="field-label">{t("settings.workspace.rolesEditor.edit.descriptionLabel")}</span>
                 <input
                   className="field-input"
                   onChange={(event) =>
@@ -403,7 +470,7 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
                 onClick={() => setEditingRole(null)}
                 type="button"
               >
-                Cancel
+                {t("settings.workspace.rolesEditor.edit.cancel")}
               </button>
               <button
                 className="action-primary-button"
@@ -411,7 +478,9 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
                 onClick={() => void handleSaveEdit()}
                 type="button"
               >
-                {isSavingEdit ? "Saving…" : "Save changes"}
+                {isSavingEdit
+                  ? t("settings.workspace.rolesEditor.edit.submitting")
+                  : t("settings.workspace.rolesEditor.edit.submit")}
               </button>
             </div>
           </div>
@@ -421,10 +490,10 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
       <ConfirmDialog
         isOpen={Boolean(pendingDeleteRole)}
         tone="danger"
-        title={`Delete role "${pendingDeleteRole?.name ?? ""}"?`}
-        body="Members currently assigned to this role lose its access. Other roles are not affected."
-        confirmLabel="Delete role"
-        cancelLabel="Keep role"
+        title={t("settings.workspace.rolesEditor.deleteDialog.title", { name: pendingDeleteRole?.name ?? "" })}
+        body={t("settings.workspace.rolesEditor.deleteDialog.body")}
+        confirmLabel={t("settings.workspace.rolesEditor.deleteDialog.confirm")}
+        cancelLabel={t("settings.workspace.rolesEditor.deleteDialog.cancel")}
         isSubmitting={isDeletingRole}
         onConfirm={handleDelete}
         onCancel={() => setPendingDeleteRole(null)}

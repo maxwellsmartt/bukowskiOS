@@ -1,5 +1,6 @@
 import { RefreshCw, Save } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { CurrencyRateSource, CurrencyRateType } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
@@ -17,21 +18,11 @@ import {
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 const enabledCurrencyOptions = ["DOP", "USD", "EUR"];
-const rateSourceOptions: Array<{ label: string; value: CurrencyRateSource }> = [
-  { label: "Manual", value: "manual" },
-  { label: "Banco Popular", value: "banco_popular" },
-  { label: "Banco Central", value: "banco_central" },
-  { label: "Banco Santa Cruz", value: "banco_santa_cruz" },
-  { label: "Other", value: "custom" },
-];
-const rateTypeOptions: Array<{ label: string; value: CurrencyRateType }> = [
-  { label: "Buy", value: "buy" },
-  { label: "Sell", value: "sell" },
-  { label: "Average", value: "average" },
-  { label: "Manual", value: "manual" },
-];
+const RATE_SOURCE_VALUES: CurrencyRateSource[] = ["manual", "banco_popular", "banco_central", "banco_santa_cruz", "custom"];
+const RATE_TYPE_VALUES: CurrencyRateType[] = ["buy", "sell", "average", "manual"];
 
 export const CurrencySettingsCard = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const { data: settings, refresh } = useCurrencySettings(activeWorkspaceId);
@@ -71,7 +62,10 @@ export const CurrencySettingsCard = () => {
   const handleSave = async () => {
     if (!window.bukowskiCurrency || !settings) return;
     if (!enabled.includes(baseCurrency)) {
-      toast.error("Base currency missing", "Make sure your base currency is in the enabled list.");
+      toast.error(
+        t("settings.workspace.currencyCard.toasts.baseMissingTitle"),
+        t("settings.workspace.currencyCard.toasts.baseMissingBody"),
+      );
       return;
     }
     setIsSaving(true);
@@ -93,10 +87,13 @@ export const CurrencySettingsCard = () => {
         workspaceSealUrl: settings.workspaceSealUrl,
         workspaceSignatureUrl: settings.workspaceSignatureUrl,
       });
-      toast.success("Currency settings saved", "These defaults apply to every new quote.");
+      toast.success(
+        t("settings.workspace.currencyCard.toasts.savedTitle"),
+        t("settings.workspace.currencyCard.toasts.savedBody"),
+      );
       refresh();
     } catch (error) {
-      toast.error("Could not save", getUserFacingErrorMessage(error, "Try again in a moment."));
+      toast.error(t("common.couldNotSave"), getUserFacingErrorMessage(error, t("common.tryAgain")));
     } finally {
       setIsSaving(false);
     }
@@ -106,11 +103,17 @@ export const CurrencySettingsCard = () => {
     if (!window.bukowskiCurrency) return;
     const rate = Number(newRateValue);
     if (!rate || rate <= 0) {
-      toast.error("Rate required", "Enter a positive number.");
+      toast.error(
+        t("settings.workspace.currencyCard.toasts.rateRequiredTitle"),
+        t("settings.workspace.currencyCard.toasts.rateRequiredBody"),
+      );
       return;
     }
     if (newRateBase === newRateQuote) {
-      toast.error("Currencies match", "Base and quote currencies must differ.");
+      toast.error(
+        t("settings.workspace.currencyCard.toasts.currenciesMatchTitle"),
+        t("settings.workspace.currencyCard.toasts.currenciesMatchBody"),
+      );
       return;
     }
     setIsAddingRate(true);
@@ -125,14 +128,26 @@ export const CurrencySettingsCard = () => {
         rate,
         rateType: newRateType,
         source: newRateSource,
-        sourceLabel: rateSourceOptions.find((option) => option.value === newRateSource)?.label ?? null,
+        sourceLabel: t(`settings.workspace.currencyCard.rateSources.${newRateSource}`),
         effectiveDate: newRateDate,
       });
       setNewRateValue("");
       refreshRates();
-      toast.success("Rate added", `${newRateBase}→${newRateQuote} = ${rate} · ${newRateType} · ${newRateDate}.`);
+      toast.success(
+        t("settings.workspace.currencyCard.toasts.rateAddedTitle"),
+        t("settings.workspace.currencyCard.toasts.rateAddedBody", {
+          base: newRateBase,
+          quote: newRateQuote,
+          rate,
+          type: t(`settings.workspace.currencyCard.rateTypes.${newRateType}`),
+          date: newRateDate,
+        }),
+      );
     } catch (error) {
-      toast.error("Could not add rate", getUserFacingErrorMessage(error, "Try again in a moment."));
+      toast.error(
+        t("settings.workspace.currencyCard.toasts.couldNotAddRate"),
+        getUserFacingErrorMessage(error, t("common.tryAgain")),
+      );
     } finally {
       setIsAddingRate(false);
     }
@@ -149,9 +164,15 @@ export const CurrencySettingsCard = () => {
         rateId,
       });
       refreshRates();
-      toast.success("Rate removed", "Older quotes keep their snapshot.");
+      toast.success(
+        t("settings.workspace.currencyCard.toasts.rateRemovedTitle"),
+        t("settings.workspace.currencyCard.toasts.rateRemovedBody"),
+      );
     } catch (error) {
-      toast.error("Could not remove", getUserFacingErrorMessage(error, "Try again in a moment."));
+      toast.error(
+        t("settings.workspace.currencyCard.toasts.couldNotRemove"),
+        getUserFacingErrorMessage(error, t("common.tryAgain")),
+      );
     }
   };
 
@@ -165,9 +186,12 @@ export const CurrencySettingsCard = () => {
       });
       setProviderApiKey("");
       refreshProviderStatus();
-      toast.success("Exchange API connected", result.summary);
+      toast.success(t("settings.workspace.currencyCard.toasts.providerConnectedTitle"), result.summary);
     } catch (error) {
-      toast.error("Could not save API key", getUserFacingErrorMessage(error, "Check the key and try again."));
+      toast.error(
+        t("settings.workspace.currencyCard.toasts.couldNotSaveKey"),
+        getUserFacingErrorMessage(error, t("settings.workspace.currencyCard.toasts.couldNotSaveKeyBody")),
+      );
     } finally {
       setIsSavingProvider(false);
     }
@@ -182,9 +206,12 @@ export const CurrencySettingsCard = () => {
         clearApiKey: true,
       });
       refreshProviderStatus();
-      toast.success("Exchange API disconnected", result.summary);
+      toast.success(t("settings.workspace.currencyCard.toasts.providerDisconnectedTitle"), result.summary);
     } catch (error) {
-      toast.error("Could not disconnect", getUserFacingErrorMessage(error, "Try again in a moment."));
+      toast.error(
+        t("settings.workspace.currencyCard.toasts.couldNotDisconnect"),
+        getUserFacingErrorMessage(error, t("common.tryAgain")),
+      );
     } finally {
       setIsSavingProvider(false);
     }
@@ -201,9 +228,12 @@ export const CurrencySettingsCard = () => {
       });
       refreshRates();
       refreshProviderStatus();
-      toast.success("Rates refreshed", result.summary);
+      toast.success(t("settings.workspace.currencyCard.toasts.ratesRefreshedTitle"), result.summary);
     } catch (error) {
-      toast.error("Could not refresh rates", getUserFacingErrorMessage(error, "Check the API connection and try again."));
+      toast.error(
+        t("settings.workspace.currencyCard.toasts.couldNotRefresh"),
+        getUserFacingErrorMessage(error, t("settings.workspace.currencyCard.toasts.couldNotRefreshBody")),
+      );
     } finally {
       setIsRefreshingProvider(false);
     }
@@ -212,10 +242,13 @@ export const CurrencySettingsCard = () => {
   if (!settings) return null;
 
   return (
-    <SurfaceCard title="Currency & rates" subtitle="Base currency, ITBIS default and exchange rates for quotes.">
+    <SurfaceCard
+      title={t("settings.workspace.currencyCard.cardTitle")}
+      subtitle={t("settings.workspace.currencyCard.cardSubtitle")}
+    >
       <div className="agent-form-grid">
         <label className="field-block">
-          <span className="field-label">Base currency</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.baseCurrency")}</span>
           <select
             className="field-input"
             onChange={(e) => setBaseCurrency(e.target.value)}
@@ -229,7 +262,7 @@ export const CurrencySettingsCard = () => {
           </select>
         </label>
         <label className="field-block">
-          <span className="field-label">Default quote currency</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.defaultQuoteCurrency")}</span>
           <select
             className="field-input"
             onChange={(e) => setDefaultQuoteCurrency(e.target.value)}
@@ -243,10 +276,10 @@ export const CurrencySettingsCard = () => {
           </select>
         </label>
         <label className="field-block">
-          <span className="field-label">Default ITBIS</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.defaultItbis")}</span>
           <NumberStepper
             align="left"
-            ariaLabel="Default ITBIS"
+            ariaLabel={t("settings.workspace.currencyCard.defaultItbis")}
             max={100}
             min={0}
             onChange={(next) => setDefaultItbisRate(next / 100)}
@@ -257,10 +290,10 @@ export const CurrencySettingsCard = () => {
           />
         </label>
         <label className="field-block">
-          <span className="field-label">Default validity (days)</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.defaultValidity")}</span>
           <NumberStepper
             align="left"
-            ariaLabel="Default validity"
+            ariaLabel={t("settings.workspace.currencyCard.defaultValidity")}
             max={365}
             min={1}
             onChange={(next) => setDefaultQuoteValidityDays(next)}
@@ -268,7 +301,7 @@ export const CurrencySettingsCard = () => {
           />
         </label>
         <label className="field-block field-block-span-2">
-          <span className="field-label">Sirecine number</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.sirecineNumber")}</span>
           <input
             className="field-input"
             onChange={(e) => setSirecineNumber(e.target.value)}
@@ -277,7 +310,7 @@ export const CurrencySettingsCard = () => {
           />
         </label>
         <label className="field-block field-block-span-2">
-          <span className="field-label">Enabled currencies</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.enabledCurrencies")}</span>
           <div className="filter-pill-row">
             {enabledCurrencyOptions.map((code) => {
               const isOn = enabled.includes(code);
@@ -306,7 +339,7 @@ export const CurrencySettingsCard = () => {
           type="button"
         >
           <Save size={13} />
-          <span>{isSaving ? "Saving…" : "Save defaults"}</span>
+          <span>{isSaving ? t("common.saving") : t("settings.workspace.currencyCard.saveDefaults")}</span>
         </button>
       </div>
 
@@ -314,14 +347,18 @@ export const CurrencySettingsCard = () => {
 
       <div className="currency-provider-card">
         <div className="currency-provider-copy">
-          <strong>TasaReal API</strong>
-          <span>{providerStatus?.summary ?? "Connect an API key to refresh Dominican bank rates."}</span>
+          <strong>{t("settings.workspace.currencyCard.provider.title")}</strong>
+          <span>{providerStatus?.summary ?? t("settings.workspace.currencyCard.provider.fallback")}</span>
         </div>
         <div className="currency-provider-controls">
           <input
             className="field-input currency-provider-key-input"
             onChange={(e) => setProviderApiKey(e.target.value)}
-            placeholder={providerStatus?.hasApiKey ? "API key stored" : "Paste API key"}
+            placeholder={
+              providerStatus?.hasApiKey
+                ? t("settings.workspace.currencyCard.provider.stored")
+                : t("settings.workspace.currencyCard.provider.paste")
+            }
             type="password"
             value={providerApiKey}
           />
@@ -331,22 +368,30 @@ export const CurrencySettingsCard = () => {
             onClick={() => void handleSaveProvider()}
             type="button"
           >
-            <span>{providerStatus?.hasApiKey ? "Update key" : "Connect"}</span>
+            <span>
+              {providerStatus?.hasApiKey
+                ? t("settings.workspace.currencyCard.provider.update")
+                : t("settings.workspace.currencyCard.provider.connect")}
+            </span>
           </button>
           <button
-            aria-label="Refresh rates from TasaReal"
+            aria-label={t("settings.workspace.currencyCard.provider.refreshTooltip")}
             className="ghost-control"
             disabled={isRefreshingProvider || !providerStatus?.hasApiKey}
             onClick={() => void handleRefreshProvider()}
-            title="Refresh rates from TasaReal"
+            title={t("settings.workspace.currencyCard.provider.refreshTooltip")}
             type="button"
           >
             <RefreshCw size={13} />
-            <span>{isRefreshingProvider ? "Refreshing…" : "Refresh"}</span>
+            <span>
+              {isRefreshingProvider
+                ? t("settings.workspace.currencyCard.provider.refreshing")
+                : t("settings.workspace.currencyCard.provider.refresh")}
+            </span>
           </button>
           {providerStatus?.hasApiKey ? (
             <button className="ghost-control is-danger" disabled={isSavingProvider} onClick={() => void handleClearProvider()} type="button">
-              Disconnect
+              {t("settings.workspace.currencyCard.provider.disconnect")}
             </button>
           ) : null}
         </div>
@@ -355,13 +400,13 @@ export const CurrencySettingsCard = () => {
       <div className="surface-card-divider" />
 
       <div className="page-stack-row" style={{ marginBottom: 8 }}>
-        <strong>Exchange rates</strong>
-        <small className="text-muted">Older quotes keep the rate that was active when they were created.</small>
+        <strong>{t("settings.workspace.currencyCard.rates.title")}</strong>
+        <small className="text-muted">{t("settings.workspace.currencyCard.rates.subtitle")}</small>
       </div>
 
       <div className="agent-form-grid">
         <label className="field-block">
-          <span className="field-label">From</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.rates.from")}</span>
           <select className="field-input" onChange={(e) => setNewRateBase(e.target.value)} value={newRateBase}>
             {enabledCurrencyOptions.map((code) => (
               <option key={code} value={code}>
@@ -371,7 +416,7 @@ export const CurrencySettingsCard = () => {
           </select>
         </label>
         <label className="field-block">
-          <span className="field-label">To</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.rates.to")}</span>
           <select className="field-input" onChange={(e) => setNewRateQuote(e.target.value)} value={newRateQuote}>
             {enabledCurrencyOptions.map((code) => (
               <option key={code} value={code}>
@@ -381,10 +426,10 @@ export const CurrencySettingsCard = () => {
           </select>
         </label>
         <label className="field-block">
-          <span className="field-label">Rate</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.rates.rate")}</span>
           <NumberStepper
             align="left"
-            ariaLabel="New exchange rate"
+            ariaLabel={t("settings.workspace.currencyCard.rates.rate")}
             min={0}
             onChange={(next) => setNewRateValue(String(next))}
             placeholder="60.25"
@@ -394,31 +439,31 @@ export const CurrencySettingsCard = () => {
           />
         </label>
         <label className="field-block">
-          <span className="field-label">Institution</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.rates.institution")}</span>
           <select
             className="field-input"
             onChange={(e) => setNewRateSource(e.target.value as CurrencyRateSource)}
             value={newRateSource}
           >
-            {rateSourceOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+            {RATE_SOURCE_VALUES.map((value) => (
+              <option key={value} value={value}>
+                {t(`settings.workspace.currencyCard.rateSources.${value}`)}
               </option>
             ))}
           </select>
         </label>
         <label className="field-block">
-          <span className="field-label">Rate type</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.rates.rateType")}</span>
           <select className="field-input" onChange={(e) => setNewRateType(e.target.value as CurrencyRateType)} value={newRateType}>
-            {rateTypeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+            {RATE_TYPE_VALUES.map((value) => (
+              <option key={value} value={value}>
+                {t(`settings.workspace.currencyCard.rateTypes.${value}`)}
               </option>
             ))}
           </select>
         </label>
         <label className="field-block">
-          <span className="field-label">Effective date</span>
+          <span className="field-label">{t("settings.workspace.currencyCard.rates.effectiveDate")}</span>
           <input
             className="field-input"
             onChange={(e) => setNewRateDate(e.target.value)}
@@ -435,7 +480,9 @@ export const CurrencySettingsCard = () => {
           onClick={() => void handleAddRate()}
           type="button"
         >
-          {isAddingRate ? "Adding…" : "Add rate"}
+          {isAddingRate
+            ? t("settings.workspace.currencyCard.rates.addingRate")
+            : t("settings.workspace.currencyCard.rates.addRate")}
         </button>
       </div>
 
@@ -443,11 +490,11 @@ export const CurrencySettingsCard = () => {
         <table className="data-table-mini" style={{ marginTop: 12 }}>
           <thead>
             <tr>
-              <th>Pair</th>
-              <th>Rate</th>
-              <th>Type</th>
-              <th>Effective</th>
-              <th>Source</th>
+              <th>{t("settings.workspace.currencyCard.rates.column.pair")}</th>
+              <th>{t("settings.workspace.currencyCard.rates.column.rate")}</th>
+              <th>{t("settings.workspace.currencyCard.rates.column.type")}</th>
+              <th>{t("settings.workspace.currencyCard.rates.column.effective")}</th>
+              <th>{t("settings.workspace.currencyCard.rates.column.source")}</th>
               <th></th>
             </tr>
           </thead>
@@ -459,7 +506,11 @@ export const CurrencySettingsCard = () => {
                 </td>
                 <td style={{ fontVariantNumeric: "tabular-nums" }}>{rate.rate}</td>
                 <td>
-                  <small className="text-muted">{rate.rateType}</small>
+                  <small className="text-muted">
+                    {RATE_TYPE_VALUES.includes(rate.rateType as CurrencyRateType)
+                      ? t(`settings.workspace.currencyCard.rateTypes.${rate.rateType}`)
+                      : rate.rateType}
+                  </small>
                 </td>
                 <td>{rate.effectiveDate}</td>
                 <td>
@@ -471,7 +522,7 @@ export const CurrencySettingsCard = () => {
                     onClick={() => void handleDeleteRate(rate.id)}
                     type="button"
                   >
-                    Remove
+                    {t("settings.workspace.currencyCard.rates.remove")}
                   </button>
                 </td>
               </tr>

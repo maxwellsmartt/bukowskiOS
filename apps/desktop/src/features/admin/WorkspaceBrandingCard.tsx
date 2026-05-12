@@ -1,5 +1,6 @@
 import { Camera, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useSession } from "@app/providers/SessionProvider";
 import { useToast } from "@app/providers/ToastProvider";
@@ -11,20 +12,26 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 type AssetKey = "logo" | "seal" | "signature";
 
-const labelMap: Record<AssetKey, { title: string; help: string; column: keyof BrandingUrls }> = {
+type AssetMeta = {
+  titleKey: string;
+  helpKey: string;
+  column: keyof BrandingUrls;
+};
+
+const ASSET_META: Record<AssetKey, AssetMeta> = {
   logo: {
-    title: "Workspace logo",
-    help: "Square or stacked. PNG, JPEG, WebP or SVG up to 4 MB. Appears in the top-left of every quote PDF.",
+    titleKey: "settings.workspace.branding.assets.logoTitle",
+    helpKey: "settings.workspace.branding.assets.logoHelp",
     column: "workspaceLogoUrl",
   },
   seal: {
-    title: "Sello (stamp)",
-    help: "Round official stamp scanned as PNG with transparency. Appears next to the signature.",
+    titleKey: "settings.workspace.branding.assets.sealTitle",
+    helpKey: "settings.workspace.branding.assets.sealHelp",
     column: "workspaceSealUrl",
   },
   signature: {
-    title: "Signature",
-    help: "Scanned signature on transparent background. Appears above the signatory name.",
+    titleKey: "settings.workspace.branding.assets.signatureTitle",
+    helpKey: "settings.workspace.branding.assets.signatureHelp",
     column: "workspaceSignatureUrl",
   },
 };
@@ -39,6 +46,7 @@ const acceptedTypes = /^image\/(png|jpeg|webp|svg\+xml)$/;
 const maxSizeBytes = 4 * 1024 * 1024;
 
 export const WorkspaceBrandingCard = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const { supabase } = useSession();
   const { activeWorkspaceId } = useWorkspace();
@@ -93,15 +101,24 @@ export const WorkspaceBrandingCard = () => {
     event.target.value = "";
     if (!file) return;
     if (!supabase) {
-      toast.error("Sign in required", "You need to be signed in to upload workspace assets.");
+      toast.error(
+        t("settings.workspace.branding.toasts.signInRequiredTitle"),
+        t("settings.workspace.branding.toasts.signInRequiredBody"),
+      );
       return;
     }
     if (!acceptedTypes.test(file.type)) {
-      toast.error("Unsupported format", "PNG, JPEG, WebP or SVG only.");
+      toast.error(
+        t("settings.workspace.branding.toasts.unsupportedFormatTitle"),
+        t("settings.workspace.branding.toasts.unsupportedFormatBody"),
+      );
       return;
     }
     if (file.size > maxSizeBytes) {
-      toast.error("File too large", "Pick an image under 4 MB.");
+      toast.error(
+        t("settings.workspace.branding.toasts.fileTooLargeTitle"),
+        t("settings.workspace.branding.toasts.fileTooLargeBody"),
+      );
       return;
     }
 
@@ -117,14 +134,17 @@ export const WorkspaceBrandingCard = () => {
       const { data: publicUrlData } = supabase.storage.from("workspace-assets").getPublicUrl(path);
       const publicUrl = publicUrlData.publicUrl;
 
-      const next: BrandingUrls = { ...urls, [labelMap[key].column]: publicUrl };
+      const next: BrandingUrls = { ...urls, [ASSET_META[key].column]: publicUrl };
       await persistUrls(next);
       setUrls(next);
-      toast.success("Branding updated", `${labelMap[key].title} now appears on every quote PDF.`);
+      toast.success(
+        t("settings.workspace.branding.toasts.updatedTitle"),
+        t("settings.workspace.branding.toasts.updatedBody", { asset: t(ASSET_META[key].titleKey) }),
+      );
     } catch (error) {
       toast.error(
-        "Upload failed",
-        getUserFacingErrorMessage(error, "Try again with a smaller file."),
+        t("settings.workspace.branding.toasts.uploadFailedTitle"),
+        getUserFacingErrorMessage(error, t("settings.workspace.branding.toasts.uploadFailedBody")),
       );
     } finally {
       setUploadingKey(null);
@@ -134,22 +154,33 @@ export const WorkspaceBrandingCard = () => {
   const handleRemove = async (key: AssetKey) => {
     setUploadingKey(key);
     try {
-      const next: BrandingUrls = { ...urls, [labelMap[key].column]: null };
+      const next: BrandingUrls = { ...urls, [ASSET_META[key].column]: null };
       await persistUrls(next);
       setUrls(next);
-      toast.success("Branding cleared", `${labelMap[key].title} removed from quote PDFs.`);
+      toast.success(
+        t("settings.workspace.branding.toasts.clearedTitle"),
+        t("settings.workspace.branding.toasts.clearedBody", { asset: t(ASSET_META[key].titleKey) }),
+      );
     } catch (error) {
-      toast.error("Could not clear", getUserFacingErrorMessage(error, "Try again in a moment."));
+      toast.error(
+        t("settings.workspace.branding.toasts.couldNotClear"),
+        getUserFacingErrorMessage(error, t("common.tryAgain")),
+      );
     } finally {
       setUploadingKey(null);
     }
   };
 
   return (
-    <SurfaceCard title="Quote branding" subtitle="Logo, sello and signature embedded in every quote PDF.">
+    <SurfaceCard
+      title={t("settings.workspace.branding.cardTitle")}
+      subtitle={t("settings.workspace.branding.cardSubtitle")}
+    >
       <div className="branding-grid">
-        {(Object.keys(labelMap) as AssetKey[]).map((key) => {
-          const meta = labelMap[key];
+        {(Object.keys(ASSET_META) as AssetKey[]).map((key) => {
+          const meta = ASSET_META[key];
+          const title = t(meta.titleKey);
+          const help = t(meta.helpKey);
           const url = urls[meta.column];
           const isUploading = uploadingKey === key;
           return (
@@ -157,14 +188,14 @@ export const WorkspaceBrandingCard = () => {
               <div className="branding-tile-preview">
                 {url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img alt={meta.title} className="branding-tile-image" src={url} />
+                  <img alt={title} className="branding-tile-image" src={url} />
                 ) : (
-                  <span className="branding-tile-placeholder">{meta.title}</span>
+                  <span className="branding-tile-placeholder">{title}</span>
                 )}
               </div>
               <div className="branding-tile-copy">
-                <strong>{meta.title}</strong>
-                <small>{meta.help}</small>
+                <strong>{title}</strong>
+                <small>{help}</small>
               </div>
               <div className="branding-tile-actions">
                 <input
@@ -183,7 +214,7 @@ export const WorkspaceBrandingCard = () => {
                   type="button"
                 >
                   <Camera size={13} />
-                  <span>{url ? "Replace" : "Upload"}</span>
+                  <span>{url ? t("settings.workspace.branding.replace") : t("settings.workspace.branding.upload")}</span>
                 </button>
                 {url ? (
                   <button
@@ -193,7 +224,7 @@ export const WorkspaceBrandingCard = () => {
                     type="button"
                   >
                     <Trash2 size={13} />
-                    <span>Remove</span>
+                    <span>{t("settings.workspace.branding.remove")}</span>
                   </button>
                 ) : null}
               </div>

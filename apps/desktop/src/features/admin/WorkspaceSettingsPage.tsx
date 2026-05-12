@@ -545,12 +545,12 @@ export const WorkspaceSettingsPage = () => {
     const nextAvatarUrl = workspaceDraft.avatarUrl.trim() || null;
 
     if (!nextName || !nextBaseCurrency) {
-      toast.error("Cannot save", "Name and currency are required.");
+      toast.error(t("settings.workspace.toasts.cannotSave"), t("settings.workspace.toasts.requireNameCurrency"));
       return;
     }
 
     if (nextIconColor && !workspaceAccentColorPattern.test(nextIconColor)) {
-      toast.error("Cannot save", "Accent color must be a hex color like #d6b37a.");
+      toast.error(t("settings.workspace.toasts.cannotSave"), t("settings.workspace.toasts.invalidAccent"));
       return;
     }
 
@@ -578,11 +578,11 @@ export const WorkspaceSettingsPage = () => {
         throw updateError;
       }
 
-      toast.success("Workspace updated", "Identity changes apply right away across the app.");
+      toast.success(t("settings.workspace.toasts.updatedTitle"), t("settings.workspace.toasts.updatedBody"));
       setIsEditingWorkspace(false);
       await Promise.all([loadWorkspaceProfile(), refreshWorkspaces()]);
     } catch (nextError) {
-      toast.error("Could not save", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+      toast.error(t("common.couldNotSave"), getUserFacingErrorMessage(nextError, t("common.tryAgain")));
     } finally {
       setIsSavingWorkspace(false);
     }
@@ -597,7 +597,7 @@ export const WorkspaceSettingsPage = () => {
     }
 
     if (!supabase) {
-      toast.error("Sign in required", "You need to be signed in to update the workspace avatar.");
+      toast.error(t("settings.workspace.toasts.signInRequiredTitle"), t("settings.workspace.toasts.signInRequiredBody"));
       return;
     }
 
@@ -606,12 +606,12 @@ export const WorkspaceSettingsPage = () => {
     const hasSupportedExtension = workspaceAvatarAcceptedExtensions.has(ext);
 
     if (!hasSupportedMime && !hasSupportedExtension) {
-      toast.error("Unsupported format", "Use a PNG, JPEG, WebP or SVG image.");
+      toast.error(t("settings.workspace.toasts.unsupportedFormatTitle"), t("settings.workspace.toasts.unsupportedFormatBody"));
       return;
     }
 
     if (file.size > workspaceAvatarMaxBytes) {
-      toast.error("File too large", "Pick an image under 8 MB.");
+      toast.error(t("settings.workspace.toasts.fileTooLargeTitle"), t("settings.workspace.toasts.fileTooLargeBody"));
       return;
     }
 
@@ -630,13 +630,13 @@ export const WorkspaceSettingsPage = () => {
       const { data: publicUrlData } = supabase.storage.from("workspace-assets").getPublicUrl(path);
       if (isEditingWorkspace) {
         setWorkspaceDraft((current) => ({ ...current, avatarUrl: publicUrlData.publicUrl }));
-        toast.success("Avatar ready", "Save changes to apply it across the app.");
+        toast.success(t("settings.workspace.toasts.avatarReadyTitle"), t("settings.workspace.toasts.avatarReadyBody"));
       } else {
         await persistWorkspaceIdentity({ avatarUrl: publicUrlData.publicUrl });
-        toast.success("Workspace avatar updated", "The new avatar is now visible across the app.");
+        toast.success(t("settings.workspace.toasts.avatarUpdatedTitle"), t("settings.workspace.toasts.avatarUpdatedBody"));
       }
     } catch (nextError) {
-      toast.error("Upload failed", getUserFacingErrorMessage(nextError, "Try again with a smaller image."));
+      toast.error(t("settings.workspace.toasts.uploadFailedTitle"), getUserFacingErrorMessage(nextError, t("settings.workspace.toasts.uploadFailedBody")));
     } finally {
       setIsUploadingWorkspaceAvatar(false);
     }
@@ -650,9 +650,9 @@ export const WorkspaceSettingsPage = () => {
 
     try {
       await persistWorkspaceIdentity({ avatarUrl: null });
-      toast.success("Workspace avatar removed", "The workspace now uses its initial.");
+      toast.success(t("settings.workspace.toasts.avatarRemovedTitle"), t("settings.workspace.toasts.avatarRemovedBody"));
     } catch (nextError) {
-      toast.error("Could not remove avatar", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+      toast.error(t("settings.workspace.toasts.couldNotRemoveAvatar"), getUserFacingErrorMessage(nextError, t("common.tryAgain")));
     }
   };
 
@@ -671,7 +671,7 @@ export const WorkspaceSettingsPage = () => {
     try {
       await persistWorkspaceIdentity({ iconColor: nextColor });
     } catch (nextError) {
-      toast.error("Could not update color", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+      toast.error(t("settings.workspace.toasts.couldNotUpdateColor"), getUserFacingErrorMessage(nextError, t("common.tryAgain")));
       await loadWorkspaceProfile();
     }
   };
@@ -685,7 +685,7 @@ export const WorkspaceSettingsPage = () => {
       }
       copyFeedbackTimeoutRef.current = window.setTimeout(() => setCopiedWorkspaceId(false), 1800);
     } catch (nextError) {
-      toast.error("Could not copy", getUserFacingErrorMessage(nextError, "Copy the ID manually."));
+      toast.error(t("settings.workspace.toasts.couldNotCopy"), getUserFacingErrorMessage(nextError, t("settings.workspace.toasts.copyIdManually")));
     }
   };
 
@@ -702,10 +702,13 @@ export const WorkspaceSettingsPage = () => {
         userId: member.id,
         roleId: nextRoleId,
       });
-      toast.success("Role updated", `${member.fullName || member.email} has a new role.`);
+      toast.success(
+        t("settings.workspace.toasts.roleUpdatedTitle"),
+        t("settings.workspace.toasts.roleUpdatedBody", { user: member.fullName || member.email }),
+      );
       await loadMembers();
     } catch (nextError) {
-      toast.error("Could not change role", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+      toast.error(t("settings.workspace.toasts.couldNotChangeRole"), getUserFacingErrorMessage(nextError, t("common.tryAgain")));
     }
   };
 
@@ -719,18 +722,22 @@ export const WorkspaceSettingsPage = () => {
         status: nextStatus,
       });
       toast.success(
-        nextStatus === "inactive" ? "Member suspended" : "Member reactivated",
-        `${member.fullName || member.email} is now ${nextStatus === "inactive" ? "suspended" : "active"}.`,
+        nextStatus === "inactive"
+          ? t("settings.workspace.toasts.memberSuspendedTitle")
+          : t("settings.workspace.toasts.memberReactivatedTitle"),
+        t(`settings.workspace.toasts.memberStatusBody_${nextStatus === "inactive" ? "suspended" : "active"}`, {
+          user: member.fullName || member.email,
+        }),
       );
       await loadMembers();
     } catch (nextError) {
-      toast.error("Could not change status", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+      toast.error(t("settings.workspace.toasts.couldNotChangeStatus"), getUserFacingErrorMessage(nextError, t("common.tryAgain")));
     }
   };
 
   const handleResendInvite = async (invite: PendingInviteRow) => {
     if (!supabase || !invite.roleId) {
-      toast.error("Cannot resend", "This invite is missing role information.");
+      toast.error(t("settings.workspace.toasts.cannotResendTitle"), t("settings.workspace.toasts.cannotResendBody"));
       return;
     }
 
@@ -740,10 +747,13 @@ export const WorkspaceSettingsPage = () => {
         email: invite.email,
         roleId: invite.roleId,
       });
-      toast.success("Invite resent", `${invite.email} got a fresh magic link.`);
+      toast.success(
+        t("settings.workspace.toasts.inviteResentTitle"),
+        t("settings.workspace.toasts.inviteResentBody", { email: invite.email }),
+      );
       await loadPendingInvites();
     } catch (nextError) {
-      toast.error("Could not resend", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+      toast.error(t("settings.workspace.toasts.couldNotResend"), getUserFacingErrorMessage(nextError, t("common.tryAgain")));
     }
   };
 
@@ -754,10 +764,13 @@ export const WorkspaceSettingsPage = () => {
 
     try {
       await revokeWorkspaceInvite(supabase, { membershipId: invite.id });
-      toast.success("Invite revoked", `${invite.email} can no longer join with the previous link.`);
+      toast.success(
+        t("settings.workspace.toasts.inviteRevokedTitle"),
+        t("settings.workspace.toasts.inviteRevokedBody", { email: invite.email }),
+      );
       await loadPendingInvites();
     } catch (nextError) {
-      toast.error("Could not revoke", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+      toast.error(t("settings.workspace.toasts.couldNotRevoke"), getUserFacingErrorMessage(nextError, t("common.tryAgain")));
     }
   };
 
@@ -1266,7 +1279,10 @@ export const WorkspaceSettingsPage = () => {
         pendingInviteEmails={pendingInvites.map((invite) => invite.email).filter((value) => value !== "Pending")}
         onClose={() => setInviteOpen(false)}
         onSent={async (email) => {
-          toast.success("Invite sent", `${email} will receive a magic link to join this workspace.`);
+          toast.success(
+            t("settings.workspace.toasts.inviteSentTitle"),
+            t("settings.workspace.toasts.inviteSentBody", { email }),
+          );
           await Promise.all([loadMembers(), loadPendingInvites()]);
         }}
       />

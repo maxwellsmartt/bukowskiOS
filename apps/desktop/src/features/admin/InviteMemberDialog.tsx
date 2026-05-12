@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, RefreshCw, Send, UserRoundPlus, X } from "lucide-react";
 
 import type { AppUserRoleRow } from "@contracts";
@@ -21,19 +22,19 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const isValidEmail = (value: string) => emailPattern.test(value.trim());
 
-const roleHintMap: Record<string, string> = {
-  admin: "Full control: members, roles, invites, billing, settings.",
-  supervisor: "Operational lead: projects, assets, packing, incidents and RMAs.",
-  crew: "Daily crew: assigned gear, packing context, report incidents.",
-  finance_viewer: "Finance visibility without edit access.",
-  maintenance: "Repair and RMA access for damaged equipment follow-up.",
+const ROLE_HINT_KEYS: Record<string, string> = {
+  admin: "settings.workspace.inviteDialog.roleHints.admin",
+  supervisor: "settings.workspace.inviteDialog.roleHints.supervisor",
+  crew: "settings.workspace.inviteDialog.roleHints.crew",
+  finance_viewer: "settings.workspace.inviteDialog.roleHints.finance_viewer",
+  maintenance: "settings.workspace.inviteDialog.roleHints.maintenance",
 };
 
 type EmailStatus =
   | { tone: "idle" }
-  | { tone: "invalid"; message: string }
-  | { tone: "duplicate-member"; message: string }
-  | { tone: "duplicate-invite"; message: string }
+  | { tone: "invalid" }
+  | { tone: "duplicate-member" }
+  | { tone: "duplicate-invite" }
   | { tone: "valid" };
 
 const resolveEmailStatus = (
@@ -46,27 +47,15 @@ const resolveEmailStatus = (
     return { tone: "idle" };
   }
   if (!isValidEmail(value)) {
-    return { tone: "invalid", message: "That doesn't look like a valid email address." };
+    return { tone: "invalid" };
   }
   if (existingEmails.some((email) => email.toLowerCase() === value)) {
-    return { tone: "duplicate-member", message: "This teammate already has access. You can update their role from here." };
+    return { tone: "duplicate-member" };
   }
   if (pendingEmails.some((email) => email.toLowerCase() === value)) {
-    return { tone: "duplicate-invite", message: "An invite is already pending. You can resend it or adjust the role." };
+    return { tone: "duplicate-invite" };
   }
   return { tone: "valid" };
-};
-
-const submitCopyForStatus = (status: EmailStatus["tone"]) => {
-  if (status === "duplicate-member") {
-    return "Update access";
-  }
-
-  if (status === "duplicate-invite") {
-    return "Resend invite";
-  }
-
-  return "Send invite";
 };
 
 export const InviteMemberDialog = ({
@@ -77,6 +66,7 @@ export const InviteMemberDialog = ({
   onClose,
   onSent,
 }: InviteMemberDialogProps) => {
+  const { t } = useTranslation();
   const { supabase, isLocalFallback } = useSession();
   const { activeWorkspaceId } = useWorkspace();
   const [email, setEmail] = useState("");
@@ -107,11 +97,23 @@ export const InviteMemberDialog = ({
   );
 
   const selectedRole = useMemo(() => roles.find((role) => role.id === roleId) ?? null, [roleId, roles]);
-  const roleHint = selectedRole ? roleHintMap[selectedRole.key] ?? selectedRole.description : null;
+  const roleHint = selectedRole
+    ? ROLE_HINT_KEYS[selectedRole.key]
+      ? t(ROLE_HINT_KEYS[selectedRole.key]!)
+      : selectedRole.description
+    : null;
 
   if (!isOpen) {
     return null;
   }
+
+  const submitCopy = (() => {
+    if (justSent) return t("settings.workspace.inviteDialog.submit.done");
+    if (isSending) return t("settings.workspace.inviteDialog.submit.working");
+    if (emailStatus.tone === "duplicate-member") return t("settings.workspace.inviteDialog.submit.update");
+    if (emailStatus.tone === "duplicate-invite") return t("settings.workspace.inviteDialog.submit.resend");
+    return t("settings.workspace.inviteDialog.submit.send");
+  })();
 
   const canSubmit =
     (emailStatus.tone === "valid" || emailStatus.tone === "duplicate-member" || emailStatus.tone === "duplicate-invite") &&
@@ -121,7 +123,7 @@ export const InviteMemberDialog = ({
 
   const handleSubmit = async () => {
     if (!supabase) {
-      setError("Workspace invites require a connected Supabase session.");
+      setError(t("settings.workspace.inviteDialog.supabaseRequired"));
       return;
     }
 
@@ -141,7 +143,7 @@ export const InviteMemberDialog = ({
       });
 
       if (result.warning) {
-        setError(`Access was updated, but the magic link could not be sent: ${result.warning}`);
+        setError(t("settings.workspace.inviteDialog.magicLinkWarning", { warning: result.warning }));
         setIsSending(false);
         await onSent(email.trim());
         return;
@@ -154,7 +156,7 @@ export const InviteMemberDialog = ({
         onClose();
       }, 700);
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "Could not send the invite."));
+      setError(getUserFacingErrorMessage(nextError, t("settings.workspace.inviteDialog.couldNotSend")));
       setIsSending(false);
     }
   };
@@ -167,11 +169,11 @@ export const InviteMemberDialog = ({
             <UserRoundPlus size={16} />
           </span>
           <div className="confirm-dialog-copy">
-            <strong>Invite or grant access</strong>
-            <p>Add a teammate to this workspace, resend a pending invite, or update access for someone already registered.</p>
+            <strong>{t("settings.workspace.inviteDialog.title")}</strong>
+            <p>{t("settings.workspace.inviteDialog.subtitle")}</p>
           </div>
           <button
-            aria-label="Close invite dialog"
+            aria-label={t("settings.workspace.inviteDialog.close")}
             className="surface-card-action"
             onClick={onClose}
             type="button"
@@ -183,43 +185,45 @@ export const InviteMemberDialog = ({
 
         <div className="invite-member-grid">
           <label className="field-block invite-member-email">
-            <span className="field-label">Email</span>
+            <span className="field-label">{t("settings.workspace.inviteDialog.emailLabel")}</span>
             <input
               autoFocus
               className={`field-input invite-member-input${emailStatus.tone === "invalid" ? " is-invalid" : ""}`}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="teammate@studio.com"
+              placeholder={t("settings.workspace.inviteDialog.emailPlaceholder")}
               type="email"
               value={email}
             />
             {emailStatus.tone === "valid" ? (
               <span className="field-hint field-hint-success">
-                <Check size={11} /> Looks good — ready to send.
+                <Check size={11} /> {t("settings.workspace.inviteDialog.emailValid")}
               </span>
             ) : null}
             {emailStatus.tone === "invalid" ? (
-              <span className="field-hint field-hint-error">{emailStatus.message}</span>
+              <span className="field-hint field-hint-error">
+                {t("settings.workspace.inviteDialog.emailInvalid")}
+              </span>
             ) : null}
             {emailStatus.tone === "duplicate-member" ? (
               <span className="field-hint field-hint-info">
-                <RefreshCw size={11} /> {emailStatus.message}
+                <RefreshCw size={11} /> {t("settings.workspace.inviteDialog.duplicateMember")}
               </span>
             ) : null}
             {emailStatus.tone === "duplicate-invite" ? (
               <span className="field-hint field-hint-warning">
-                <RefreshCw size={11} /> {emailStatus.message}
+                <RefreshCw size={11} /> {t("settings.workspace.inviteDialog.duplicateInvite")}
               </span>
             ) : null}
           </label>
 
           <label className="field-block invite-member-role">
-            <span className="field-label">Role</span>
+            <span className="field-label">{t("settings.workspace.inviteDialog.roleLabel")}</span>
             <select
               className="field-input"
               onChange={(event) => setRoleId(event.target.value)}
               value={roleId}
             >
-              <option value="">Select a role</option>
+              <option value="">{t("settings.workspace.inviteDialog.rolePlaceholder")}</option>
               {roles.map((role) => (
                 <option key={role.id} value={role.id}>
                   {role.name}
@@ -230,11 +234,11 @@ export const InviteMemberDialog = ({
           </label>
 
           <label className="field-block invite-member-note">
-            <span className="field-label">Optional note</span>
+            <span className="field-label">{t("settings.workspace.inviteDialog.noteLabel")}</span>
             <textarea
               className="field-input invite-member-textarea"
               onChange={(event) => setMessage(event.target.value)}
-              placeholder="Add a short message they will see in the email."
+              placeholder={t("settings.workspace.inviteDialog.notePlaceholder")}
               rows={3}
               value={message}
             />
@@ -243,7 +247,7 @@ export const InviteMemberDialog = ({
 
         {isLocalFallback ? (
           <div className="action-feedback action-feedback-warning">
-            Invites are only available when connected to Supabase. You are currently in local fallback mode.
+            {t("settings.workspace.inviteDialog.localFallback")}
           </div>
         ) : null}
 
@@ -251,7 +255,7 @@ export const InviteMemberDialog = ({
 
         <div className="confirm-dialog-actions invite-member-actions">
           <button className="ghost-control cancel-control" disabled={isSending || justSent} onClick={onClose} type="button">
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             className="action-primary-button"
@@ -261,14 +265,14 @@ export const InviteMemberDialog = ({
           >
             {justSent ? (
               <>
-                <Check size={14} /> <span>Access updated</span>
+                <Check size={14} /> <span>{submitCopy}</span>
               </>
             ) : isSending ? (
-              "Working…"
+              submitCopy
             ) : (
               <>
                 <Send size={14} />
-                <span>{submitCopyForStatus(emailStatus.tone)}</span>
+                <span>{submitCopy}</span>
               </>
             )}
           </button>
