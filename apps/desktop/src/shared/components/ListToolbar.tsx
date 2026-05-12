@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 
 import type { ListSortDirection } from "@contracts";
 
@@ -76,6 +77,7 @@ export const ListToolbar = <TSort extends string,>({
   activeSortLabel,
   rightActions,
 }: ListToolbarProps<TSort>) => {
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<{ top: number; left: number; placement: "bottom" | "top" } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -133,7 +135,7 @@ export const ListToolbar = <TSort extends string,>({
 
   return (
     <div className="list-toolbar">
-      <label className="list-toolbar-search" aria-label="Search current view">
+      <label className="list-toolbar-search" aria-label={t("common.listToolbar.searchAria")}>
         <Search aria-hidden size={14} />
         <input
           className="list-toolbar-search-input"
@@ -150,9 +152,11 @@ export const ListToolbar = <TSort extends string,>({
           <button
             aria-expanded={menuOpen}
             aria-haspopup="menu"
-            aria-label={`Sort by ${activeSortLabel ?? activeOption?.label ?? "selected option"}`}
+            aria-label={t("common.listToolbar.sortByAria", {
+              label: activeSortLabel ?? activeOption?.label ?? t("common.listToolbar.selectedOption"),
+            })}
             className={`ghost-control list-toolbar-menu-trigger${menuOpen ? " is-open" : ""}`}
-            data-tooltip="Sort"
+            data-tooltip={t("common.listToolbar.sort")}
             onClick={() => setMenuOpen((current) => !current)}
             ref={triggerRef}
             type="button"
@@ -169,7 +173,7 @@ export const ListToolbar = <TSort extends string,>({
                   style={{ top: menuStyle.top, left: menuStyle.left }}
                 >
                   <div className="list-toolbar-menu-section">
-                    <span className="list-toolbar-menu-label">Sort by</span>
+                    <span className="list-toolbar-menu-label">{t("common.listToolbar.sortBy")}</span>
                     {sortOptions.map((option) => {
                       const Icon = resolveSortOptionIcon(String(option.value), option.label);
                       const active = option.value === sortBy;
@@ -197,7 +201,7 @@ export const ListToolbar = <TSort extends string,>({
                   <div className="list-toolbar-menu-divider" />
 
                   <div className="list-toolbar-menu-section">
-                    <span className="list-toolbar-menu-label">Direction</span>
+                    <span className="list-toolbar-menu-label">{t("common.listToolbar.direction")}</span>
                     <button
                       className={`list-toolbar-menu-item${sortDirection === "asc" ? " is-active" : ""}`}
                       onClick={() => {
@@ -211,7 +215,7 @@ export const ListToolbar = <TSort extends string,>({
                     >
                       <span className="list-toolbar-menu-item-copy">
                         <ArrowUp aria-hidden size={14} />
-                        <span>Ascending</span>
+                        <span>{t("common.listToolbar.ascending")}</span>
                       </span>
                       {sortDirection === "asc" ? <Check aria-hidden size={14} /> : null}
                     </button>
@@ -229,7 +233,7 @@ export const ListToolbar = <TSort extends string,>({
                     >
                       <span className="list-toolbar-menu-item-copy">
                         <ArrowDown aria-hidden size={14} />
-                        <span>Descending</span>
+                        <span>{t("common.listToolbar.descending")}</span>
                       </span>
                       {sortDirection === "desc" ? <Check aria-hidden size={14} /> : null}
                     </button>

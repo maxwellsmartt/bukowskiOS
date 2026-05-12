@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ClipboardList, FileUp, Plus, SquarePen, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import type { AssetListQuery, AssetListRow, AssetSortField } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
@@ -43,21 +44,26 @@ type AssetsPageProps = {
   projectName?: string | null;
 };
 
+/**
+ * Sort options for the asset list. `label` here is an i18n key —
+ * `ListToolbar` and any consumer renders it through `t()` so the
+ * displayed string follows the user's language setting.
+ */
 const assetSortOptions: Array<ListSortOption<AssetSortField>> = [
-  { value: "name", label: "Name", columnKey: "asset" },
-  { value: "code", label: "Code" },
-  { value: "category", label: "Category", columnKey: "category" },
-  { value: "status", label: "Status", columnKey: "status" },
-  { value: "condition", label: "Condition", columnKey: "condition" },
-  { value: "location", label: "Location", columnKey: "location" },
-  { value: "project", label: "Project", columnKey: "project" },
-  { value: "projectUnit", label: "Unit", columnKey: "projectUnit" },
-  { value: "responsible", label: "Responsible", columnKey: "responsible" },
-  { value: "serialNumber", label: "Serial", columnKey: "serialNumber" },
-  { value: "qrCode", label: "QR", columnKey: "qrCode" },
-  { value: "incidentsOpen", label: "Open issues", columnKey: "incidents" },
-  { value: "updatedAt", label: "Updated" },
-  { value: "createdAt", label: "Created" },
+  { value: "name", label: "assets.sort.name", columnKey: "asset" },
+  { value: "code", label: "assets.sort.code" },
+  { value: "category", label: "assets.sort.category", columnKey: "category" },
+  { value: "status", label: "assets.sort.status", columnKey: "status" },
+  { value: "condition", label: "assets.sort.condition", columnKey: "condition" },
+  { value: "location", label: "assets.sort.location", columnKey: "location" },
+  { value: "project", label: "assets.sort.project", columnKey: "project" },
+  { value: "projectUnit", label: "assets.sort.projectUnit", columnKey: "projectUnit" },
+  { value: "responsible", label: "assets.sort.responsible", columnKey: "responsible" },
+  { value: "serialNumber", label: "assets.sort.serialNumber", columnKey: "serialNumber" },
+  { value: "qrCode", label: "assets.sort.qrCode", columnKey: "qrCode" },
+  { value: "incidentsOpen", label: "assets.sort.incidentsOpen", columnKey: "incidents" },
+  { value: "updatedAt", label: "assets.sort.updatedAt" },
+  { value: "createdAt", label: "assets.sort.createdAt" },
 ];
 
 const assetDefaultColumnKeys = ["asset", "category", "quantity", "status", "condition", "location", "project", "responsible"];
@@ -368,6 +374,8 @@ const AssetOperationCart = ({
   onQuantityChange,
   onRemove,
 }: AssetOperationCartProps) => {
+  const { t } = useTranslation();
+
   if (!items.length) {
     return null;
   }
@@ -383,35 +391,35 @@ const AssetOperationCart = ({
     <div className="asset-operation-cart">
       <div className="asset-operation-cart-header">
         <div className="asset-operation-cart-copy">
-          <span className="asset-operation-cart-kicker">Operation cart</span>
-          <strong>{items.length === 1 ? "1 asset selected" : `${items.length} assets selected`}</strong>
-          <span>{totalUnits === 1 ? "1 unit queued" : `${totalUnits} units queued`}</span>
+          <span className="asset-operation-cart-kicker">{t("assets.cart.kicker")}</span>
+          <strong>{t(items.length === 1 ? "assets.cart.oneSelected" : "assets.cart.manySelected", { count: items.length })}</strong>
+          <span>{t(totalUnits === 1 ? "assets.cart.oneUnit" : "assets.cart.manyUnits", { count: totalUnits })}</span>
         </div>
-        <button aria-label="Clear operation cart" className="icon-ghost-control is-danger" data-tooltip="Clear cart" onClick={onClear} type="button">
+        <button aria-label={t("assets.cart.clearAria")} className="icon-ghost-control is-danger" data-tooltip={t("assets.cart.clearTooltip")} onClick={onClear} type="button">
           <Trash2 size={14} />
         </button>
       </div>
       <div className="asset-operation-cart-actions">
         <button className="ghost-control action-row-button" onClick={onAddToCompare} type="button">
-          Add to compare
+          {t("assets.cart.addToCompare")}
         </button>
         <button
           className="ghost-control action-row-button"
-          data-tooltip={singleAsset ? "Open asset detail to report an issue" : "Select one asset to report an issue"}
+          data-tooltip={singleAsset ? t("assets.cart.reportIssueSingleTip") : t("assets.cart.reportIssueMultiTip")}
           disabled={!singleAsset}
           onClick={() => singleAsset && onOpenAssetDetail(singleAsset.id)}
           type="button"
         >
-          Report issue
+          {t("assets.cart.reportIssue")}
         </button>
         <button
           className="ghost-control action-row-button"
-          data-tooltip={singleAsset ? "Open RMA workspace" : "Select one asset to prepare an RMA"}
+          data-tooltip={singleAsset ? t("assets.cart.createRmaSingleTip") : t("assets.cart.createRmaMultiTip")}
           disabled={!singleAsset}
           onClick={onCreateRma}
           type="button"
         >
-          Create RMA
+          {t("assets.cart.createRma")}
         </button>
         <button
           className="ghost-control action-row-button"
@@ -419,7 +427,7 @@ const AssetOperationCart = ({
           onClick={onCreatePackingSlip}
           type="button"
         >
-          Create packing slip
+          {t("assets.cart.createPackingSlip")}
         </button>
         <button
           className="action-primary-button action-row-button"
@@ -427,24 +435,24 @@ const AssetOperationCart = ({
           onClick={onOpenAssignMove}
           type="button"
         >
-          Assign / move
+          {t("assets.cart.assignMove")}
         </button>
         {onOpenProjectReturns ? (
           <button
             className="ghost-control action-row-button"
-            data-tooltip={checkedOutUnits ? "Open project packing slips to process returns" : "No selected units are checked out yet"}
+            data-tooltip={checkedOutUnits ? t("assets.cart.returnAvailableTip") : t("assets.cart.returnUnavailableTip")}
             disabled={!checkedOutUnits}
             onClick={onOpenProjectReturns}
             type="button"
           >
-            Return
+            {t("assets.cart.return")}
           </button>
         ) : null}
       </div>
 
       {lockedItems.length || unavailableItems.length ? (
         <div className="asset-operation-cart-warning">
-          {lockedItems.length ? `${lockedItems.length} asset${lockedItems.length === 1 ? "" : "s"} locked by active kit.` : null}
+          {lockedItems.length ? t("assets.cart.lockedSummary", { count: lockedItems.length }) : null}
           {lockedItems.length && unavailableItems.length ? " " : ""}
           {unavailableItems.length ? summarizeUnavailableAssets(unavailableItems) : null}
         </div>
@@ -466,7 +474,7 @@ const AssetOperationCart = ({
                 </span>
               </div>
               <label className="asset-operation-cart-quantity">
-                <span className="action-field-label">Qty</span>
+                <span className="action-field-label">{t("assets.cart.qty")}</span>
                 <input
                   className="action-field-control"
                   disabled={isUnavailable}
@@ -478,9 +486,9 @@ const AssetOperationCart = ({
                 />
               </label>
               <button
-                aria-label={`Remove ${asset.name} from operation cart`}
+                aria-label={t("assets.cart.removeAria", { name: asset.name })}
                 className="icon-ghost-control"
-                data-tooltip="Remove"
+                data-tooltip={t("assets.cart.removeTooltip")}
                 onClick={() => onRemove(asset.id)}
                 type="button"
               >
@@ -847,10 +855,16 @@ export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageP
 );
 
 const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
+  const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
   const { projects, refreshProjects } = useShellContext();
   const { addItems } = useCompareTray();
   const isProjectMode = Boolean(projectId);
+  const translatedSortOptions = useMemo(
+    () => assetSortOptions.map((option) => ({ ...option, label: t(option.label) })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t],
+  );
   const assetControls = useListControls<AssetSortField, AssetListQuery>({
     viewKey: isProjectMode ? "project-assets-list" : "assets-list",
     defaults: {
@@ -902,6 +916,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [csvShowAllRows, setCsvShowAllRows] = useState(false);
   const [csvReportCopied, setCsvReportCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const assetEmptyTips = (key: string) => t(key, { returnObjects: true }) as string[];
 
   const editorAssetId = editorMode === "edit" ? selectedAssetId ?? undefined : undefined;
   const { data: editorDetail, reload: reloadEditorDetail } = useAssetDetail(editorAssetId);
@@ -1061,22 +1076,22 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       await Promise.all([reload(), refreshProjects()]);
       setActionError(null);
-      toast.success("Done", result.summary);
+      toast.success(t("assets.toasts.doneTitle"), result.summary);
       if (result.warningSummary) {
-        toast.warning("Review assignment", result.warningSummary);
+        toast.warning(t("assets.toasts.reviewAssignTitle"), result.warningSummary);
       }
       setActionPanelOpen(false);
       if (formValue.mode === "assign" && formValue.projectId) {
         const assignedProject = projects.find((project) => project.id === formValue.projectId);
         setAssignNextStep({
           projectId: formValue.projectId,
-          projectName: assignedProject?.name ?? "this project",
+          projectName: assignedProject?.name ?? t("assets.selection.thisProject"),
         });
       } else {
         clearOperationCart();
       }
     } catch (nextError) {
-      setActionError(getUserFacingErrorMessage(nextError, "Unable to apply assign or move."));
+      setActionError(getUserFacingErrorMessage(nextError, t("assets.toasts.unableAssignMove")));
     } finally {
       setIsSubmittingAction(false);
     }
@@ -1103,13 +1118,13 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       await Promise.all([reload(), refreshProjects()]);
       writePreference(uiPreferenceKeys.activePackingSlipId, result.packingSlipId);
       setPackingError(null);
-      toast.success("Done", result.summary);
+      toast.success(t("assets.toasts.doneTitle"), result.summary);
       setAssignNextStep(null);
       setPackingPanelOpen(false);
       clearOperationCart();
       navigate("/packing-slips");
     } catch (nextError) {
-      setPackingError(getUserFacingErrorMessage(nextError, "Unable to issue packing slip."));
+      setPackingError(getUserFacingErrorMessage(nextError, t("assets.toasts.unableIssueSlip")));
     } finally {
       setIsSubmittingPacking(false);
     }
@@ -1131,7 +1146,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         });
 
         await Promise.all([reload(), refreshProjects(), reloadEditorDetail()]);
-        toast.success("Done", result.summary);
+        toast.success(t("assets.toasts.doneTitle"), result.summary);
       } else {
         const result = await createAsset({
           commandId: crypto.randomUUID(),
@@ -1144,13 +1159,13 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
         await Promise.all([reload(), refreshProjects()]);
         setSelectedAssetId(result.assetId);
-        toast.success("Done", result.summary);
+        toast.success(t("assets.toasts.doneTitle"), result.summary);
       }
 
       setEditorError(null);
       setEditorMode(null);
     } catch (nextError) {
-      setEditorError(getUserFacingErrorMessage(nextError, "Unable to save asset changes."));
+      setEditorError(getUserFacingErrorMessage(nextError, t("assets.toasts.unableSaveAsset")));
     } finally {
       setIsSubmittingEditor(false);
     }
@@ -1175,9 +1190,9 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setEditorMode(null);
       setSelectedAssetId(null);
       setEditorError(null);
-      toast.success("Done", result.summary);
+      toast.success(t("assets.toasts.doneTitle"), result.summary);
     } catch (nextError) {
-      setEditorError(getUserFacingErrorMessage(nextError, "Unable to archive asset."));
+      setEditorError(getUserFacingErrorMessage(nextError, t("assets.toasts.unableArchive")));
     } finally {
       setIsArchivingAsset(false);
     }
@@ -1196,7 +1211,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       setCsvShowAllRows(false);
     } catch (error) {
       setCsvImportPreview(null);
-      setEditorError(getUserFacingErrorMessage(error, "Asset CSV import failed."));
+      setEditorError(getUserFacingErrorMessage(error, t("assets.csv.importFailed")));
     } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -1255,9 +1270,10 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           }
 
           throw new Error(
-            `CSV row ${importRowNumber} could not be imported: ${
-              getErrorMessage(error) || "Unknown asset import error."
-            }`,
+            t("assets.csv.rowImportFailed", {
+              row: importRowNumber,
+              message: getErrorMessage(error) || t("assets.csv.unknownImportError"),
+            }),
           );
         }
       }
@@ -1278,21 +1294,21 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         setCsvShowAllRows(false);
       }
       toast.success(
-        "CSV imported",
-        `Imported ${importedCount} asset${importedCount === 1 ? "" : "s"} from ${csvImportPreview.fileName}.${
+        t("assets.csv.importedTitle"),
+        [
+          t("assets.csv.importedSummary", {
+            count: importedCount,
+            fileName: csvImportPreview.fileName,
+          }),
           csvImportPreview.summary.duplicateRows
-            ? ` Merged ${csvImportPreview.summary.duplicateRows} duplicate CSV row${
-                csvImportPreview.summary.duplicateRows === 1 ? "" : "s"
-              }.`
-            : ""
-        }${
-          skippedDuplicateCount ? ` Skipped ${skippedDuplicateCount} existing code${skippedDuplicateCount === 1 ? "" : "s"}.` : ""
-        }${
-          skippedReviewCount ? ` Left ${skippedReviewCount} row${skippedReviewCount === 1 ? "" : "s"} for review.` : ""
-        }`,
+            ? t("assets.csv.mergedRows", { count: csvImportPreview.summary.duplicateRows })
+            : "",
+          skippedDuplicateCount ? t("assets.csv.skippedExisting", { count: skippedDuplicateCount }) : "",
+          skippedReviewCount ? t("assets.csv.leftForReview", { count: skippedReviewCount }) : "",
+        ].filter(Boolean).join(" "),
       );
     } catch (error) {
-      setEditorError(getUserFacingErrorMessage(error, "Asset CSV import failed."));
+      setEditorError(getUserFacingErrorMessage(error, t("assets.csv.importFailed")));
     } finally {
       setIsImportingAssets(false);
     }
@@ -1400,7 +1416,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     () => [
       {
         key: "asset",
-        label: "Asset",
+        label: t("assets.columns.asset"),
         width: 280,
         minWidth: 220,
         render: (row: (typeof assets)[number]) => (
@@ -1409,16 +1425,16 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             <span className="identity-meta">{row.code}</span>
             {row.linkedKitCount ? (
               <span className="identity-meta asset-kit-membership-inline">
-                In kit {row.linkedKitCodes.join(", ")}
+                {t("assets.inKit", { codes: row.linkedKitCodes.join(", ") })}
               </span>
             ) : null}
           </div>
         ),
       },
-      { key: "category", label: "Category", width: 160, minWidth: 132, render: (row: (typeof assets)[number]) => row.category },
+      { key: "category", label: t("assets.columns.category"), width: 160, minWidth: 132, render: (row: (typeof assets)[number]) => row.category },
       {
         key: "quantity",
-        label: "Stock",
+        label: t("assets.columns.stock"),
         width: 188,
         minWidth: 164,
         render: (row: (typeof assets)[number]) => (
@@ -1431,52 +1447,53 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           </span>
         ),
       },
-      { key: "tracking", label: "Tracking", width: 110, minWidth: 96, render: (row: (typeof assets)[number]) => row.tracking },
-      { key: "status", label: "Status", width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.status },
-      { key: "condition", label: "Condition", width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.condition },
-      { key: "custody", label: "Custody", width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.custody },
-      { key: "location", label: "Location", width: 190, minWidth: 150, render: (row: (typeof assets)[number]) => row.location },
-      { key: "project", label: "Project", width: 170, minWidth: 140, render: (row: (typeof assets)[number]) => row.project },
-      { key: "projectUnit", label: "Unit", width: 150, minWidth: 124, render: (row: (typeof assets)[number]) => row.projectUnit },
-      { key: "responsible", label: "Responsible", width: 160, minWidth: 132, render: (row: (typeof assets)[number]) => row.responsible },
-      { key: "serialNumber", label: "Serial", width: 150, minWidth: 120, render: (row: (typeof assets)[number]) => row.serialNumber },
-      { key: "qrCode", label: "QR", width: 130, minWidth: 108, render: (row: (typeof assets)[number]) => row.qrCode },
-      { key: "purchasePrice", label: "Purchase price", align: "right" as const, width: 132, minWidth: 112, render: (row: (typeof assets)[number]) => row.purchasePrice },
-      { key: "additionalCosts", label: "Additional costs", align: "right" as const, width: 140, minWidth: 120, render: (row: (typeof assets)[number]) => row.additionalCosts },
-      { key: "currentBookValue", label: "Current value", align: "right" as const, width: 132, minWidth: 112, render: (row: (typeof assets)[number]) => row.currentBookValue },
-      { key: "replacementValue", label: "Replacement value", align: "right" as const, width: 148, minWidth: 124, render: (row: (typeof assets)[number]) => row.replacementValue },
-      { key: "warehouseSlot", label: "Warehouse", width: 126, minWidth: 108, render: (row: (typeof assets)[number]) => row.warehouseSlot },
-      { key: "folderPath", label: "Folder path", width: 250, minWidth: 200, render: (row: (typeof assets)[number]) => row.folderPath },
-      { key: "hasAccessories", label: "Accessories", width: 110, minWidth: 96, render: (row: (typeof assets)[number]) => row.hasAccessories },
-      { key: "source", label: "Source", width: 176, minWidth: 150, render: (row: (typeof assets)[number]) => row.source },
-      { key: "incidents", label: "Open issues", align: "right" as const, width: 96, minWidth: 84, render: (row: (typeof assets)[number]) => row.incidentsOpen },
+      { key: "tracking", label: t("assets.columns.tracking"), width: 110, minWidth: 96, render: (row: (typeof assets)[number]) => row.tracking },
+      { key: "status", label: t("assets.columns.status"), width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.status },
+      { key: "condition", label: t("assets.columns.condition"), width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.condition },
+      { key: "custody", label: t("assets.columns.custody"), width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.custody },
+      { key: "location", label: t("assets.columns.location"), width: 190, minWidth: 150, render: (row: (typeof assets)[number]) => row.location },
+      { key: "project", label: t("assets.columns.project"), width: 170, minWidth: 140, render: (row: (typeof assets)[number]) => row.project },
+      { key: "projectUnit", label: t("assets.columns.unit"), width: 150, minWidth: 124, render: (row: (typeof assets)[number]) => row.projectUnit },
+      { key: "responsible", label: t("assets.columns.responsible"), width: 160, minWidth: 132, render: (row: (typeof assets)[number]) => row.responsible },
+      { key: "serialNumber", label: t("assets.columns.serial"), width: 150, minWidth: 120, render: (row: (typeof assets)[number]) => row.serialNumber },
+      { key: "qrCode", label: t("assets.columns.qr"), width: 130, minWidth: 108, render: (row: (typeof assets)[number]) => row.qrCode },
+      { key: "purchasePrice", label: t("assets.columns.purchasePrice"), align: "right" as const, width: 132, minWidth: 112, render: (row: (typeof assets)[number]) => row.purchasePrice },
+      { key: "additionalCosts", label: t("assets.columns.additionalCosts"), align: "right" as const, width: 140, minWidth: 120, render: (row: (typeof assets)[number]) => row.additionalCosts },
+      { key: "currentBookValue", label: t("assets.columns.currentValue"), align: "right" as const, width: 132, minWidth: 112, render: (row: (typeof assets)[number]) => row.currentBookValue },
+      { key: "replacementValue", label: t("assets.columns.replacementValue"), align: "right" as const, width: 148, minWidth: 124, render: (row: (typeof assets)[number]) => row.replacementValue },
+      { key: "warehouseSlot", label: t("assets.columns.warehouse"), width: 126, minWidth: 108, render: (row: (typeof assets)[number]) => row.warehouseSlot },
+      { key: "folderPath", label: t("assets.columns.folderPath"), width: 250, minWidth: 200, render: (row: (typeof assets)[number]) => row.folderPath },
+      { key: "hasAccessories", label: t("assets.columns.accessories"), width: 110, minWidth: 96, render: (row: (typeof assets)[number]) => row.hasAccessories },
+      { key: "source", label: t("assets.columns.source"), width: 176, minWidth: 150, render: (row: (typeof assets)[number]) => row.source },
+      { key: "incidents", label: t("assets.columns.openIssues"), align: "right" as const, width: 96, minWidth: 84, render: (row: (typeof assets)[number]) => row.incidentsOpen },
     ],
-    [assets],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [assets, t],
   );
 
   return (
     <div className="page-stack assets-page-stack">
       <SectionHeader
-        title={isProjectMode ? "Project assets" : "Assets"}
+        title={isProjectMode ? t("assets.titleProject") : t("assets.title")}
       />
 
-      {error ? <div className="empty-state">Assets unavailable: {error}</div> : null}
+      {error ? <div className="empty-state">{t("assets.unavailable", { message: error })}</div> : null}
       {!error && isLoading ? (
-        <SurfaceCard title={isProjectMode ? "Project Assets" : "Assets"}>
+        <SurfaceCard title={isProjectMode ? t("assets.titleProject") : t("assets.cardTitle")}>
           <TableSkeleton
-            body={isProjectMode ? "Loading assets linked to this project." : "Loading assets."}
+            body={isProjectMode ? t("assets.loadingProject") : t("assets.loadingGlobal")}
             columns={6}
           />
         </SurfaceCard>
       ) : null}
 
-      {catalogError ? <div className="action-feedback action-feedback-error">Catalog unavailable: {catalogError}</div> : null}
+      {catalogError ? <div className="action-feedback action-feedback-error">{t("assets.catalogUnavailable", { message: catalogError })}</div> : null}
       {assignNextStep && selectedRowIds.length ? (
         <div className="selection-action-bar asset-next-step-bar">
           <div className="selection-action-copy">
-            <span className="selection-action-title">Ready for checkout</span>
+            <span className="selection-action-title">{t("assets.selection.readyTitle")}</span>
             <span className="selection-action-subtitle">
-              These assets are reserved for {assignNextStep.projectName}. Create the packing slip when the gear is physically leaving.
+              {t("assets.selection.readyBody", { project: assignNextStep.projectName })}
             </span>
           </div>
           <div className="selection-action-buttons">
@@ -1490,14 +1507,14 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               type="button"
             >
               <ClipboardList size={14} />
-              <span>Create packing slip for this project</span>
+              <span>{t("assets.selection.createSlip")}</span>
             </button>
             <button
               className="ghost-control action-row-button"
               onClick={() => navigate(`/projects/${assignNextStep.projectId}/assets`)}
               type="button"
             >
-              Open Project Assets
+              {t("assets.selection.openProjectAssets")}
             </button>
           </div>
         </div>
@@ -1505,24 +1522,16 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       {editorError && !editorMode ? <div className="action-feedback action-feedback-error">{editorError}</div> : null}
       {selectedKitLockSummary ? (
         <div className="action-feedback action-feedback-warning">
-          These assets are part of active kits and cannot be assigned or moved individually: {selectedKitLockSummary}. Remove them from the kit first if you need to operate them as standalone items.
+          {t("assets.selection.kitLocked", { summary: selectedKitLockSummary })}
         </div>
       ) : null}
 
       {!error && !isLoading && assets.length === 0 ? (
         <GuidedEmptyState
-          title={isProjectMode ? "No assets are assigned to this project yet" : "Your asset registry is still empty"}
-          body={
-            isProjectMode
-              ? "This project does not have assets yet."
-              : "Create the first asset once your catalog is ready."
-          }
-          tips={
-            isProjectMode
-              ? ["Assign existing assets into this project", "Use bulk assign or move when you are ready"]
-              : ["Set locations and categories in Catalog first", "Then create assets with code, status and custody"]
-          }
-          actionLabel={isProjectMode ? "Open global assets" : "Create first asset"}
+          title={isProjectMode ? t("assets.empty.projectTitle") : t("assets.empty.globalTitle")}
+          body={isProjectMode ? t("assets.empty.projectBody") : t("assets.empty.globalBody")}
+          tips={isProjectMode ? assetEmptyTips("assets.empty.tipsProject") : assetEmptyTips("assets.empty.tipsGlobal")}
+          actionLabel={isProjectMode ? t("assets.empty.projectAction") : t("assets.empty.globalAction")}
           onAction={() => {
             if (isProjectMode) {
               navigate("/assets");
@@ -1532,7 +1541,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             setEditorMode("create");
             setEditorError(null);
           }}
-          secondaryActionLabel="Open Catalog"
+          secondaryActionLabel={t("assets.empty.openCatalog")}
           onSecondaryAction={() => navigate("/catalog")}
         />
       ) : null}
@@ -1608,7 +1617,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       >
         <SurfaceCard
           className="asset-registry-card"
-          title={isProjectMode ? "Assets" : "Assets"}
+          title={t("assets.cardTitle")}
           aside={
             <div className="asset-registry-header-actions">
               <button
@@ -1620,7 +1629,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 type="button"
               >
                 <Plus size={14} />
-                <span>New asset</span>
+                <span>{t("assets.newAsset")}</span>
               </button>
               <button
                 className="ghost-control action-row-button"
@@ -1629,7 +1638,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 type="button"
               >
                 <FileUp size={14} />
-                <span>{isImportingAssets ? "Importing..." : "Import CSV"}</span>
+                <span>{isImportingAssets ? t("assets.importing") : t("assets.importCsv")}</span>
               </button>
               <input
                 ref={fileInputRef}
@@ -1642,26 +1651,34 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           }
         >
           <ListToolbar
-            activeSortLabel={assetControls.activeSortOption?.label}
+            activeSortLabel={
+              assetControls.activeSortOption ? t(assetControls.activeSortOption.label) : undefined
+            }
             onSearchValueChange={assetControls.setSearchValue}
             onSortByChange={assetControls.setSortField}
             onToggleSortDirection={assetControls.toggleSortDirection}
             resultCount={assets.length}
-            resultLabel="assets"
-            searchPlaceholder={isProjectMode ? "Search assets, codes, units or QR" : "Search assets, codes, locations or QR"}
+            resultLabel={t("assets.resultLabel")}
+            searchPlaceholder={
+              isProjectMode
+                ? t("assets.toolbar.searchPlaceholderProject")
+                : t("assets.toolbar.searchPlaceholder")
+            }
             searchValue={assetControls.searchValue}
             sortBy={assetControls.sortBy}
             sortDirection={assetControls.sortDirection}
-            sortOptions={assetSortOptions}
+            sortOptions={translatedSortOptions}
           />
           {csvImportPreview ? (
             <div className={`asset-import-preview${csvImportPreview.errors.length ? " has-errors" : ""}`}>
               <div className="asset-import-preview-header">
                 <div className="asset-import-preview-copy">
-                  <span className="asset-import-preview-kicker">CSV preview</span>
+                  <span className="asset-import-preview-kicker">{t("assets.csv.preview")}</span>
                   <strong>{csvImportPreview.fileName}</strong>
                   <span>
-                    Stock uses {csvImportPreview.summary.stockSource === "declaredQuantity" ? "declared quantities" : "row count"} with duplicate checks.
+                    {csvImportPreview.summary.stockSource === "declaredQuantity"
+                      ? t("assets.csv.stockUsesDeclared")
+                      : t("assets.csv.stockUsesRows")}
                   </span>
                 </div>
                 <div className="asset-import-preview-actions">
@@ -1672,7 +1689,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       type="button"
                     >
                       <ClipboardList size={14} />
-                      <span>{csvReportCopied ? "Copied" : "Copy report"}</span>
+                      <span>{csvReportCopied ? t("common.copied") : t("assets.csv.copyReport")}</span>
                     </button>
                   ) : null}
                   <button
@@ -1684,7 +1701,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     }}
                     type="button"
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </button>
                   {csvDerivedSummary?.validationIssues.length && csvDerivedSummary.readyDrafts.length ? (
                     <button
@@ -1693,7 +1710,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       onClick={() => void handleConfirmCsvImport("ready")}
                       type="button"
                     >
-                      Import ready rows
+                      {t("assets.csv.importReadyRows")}
                     </button>
                   ) : null}
                   <button
@@ -1702,21 +1719,21 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     onClick={() => void handleConfirmCsvImport("all")}
                     type="button"
                   >
-                    {isImportingAssets ? "Importing..." : "Import assets"}
+                    {isImportingAssets ? t("assets.importing") : t("assets.csv.importAssets")}
                   </button>
                 </div>
               </div>
 
               <div className="asset-import-preview-stats">
                 {[
-                  ["Rows", csvImportPreview.summary.totalRows],
-                  ["Unique assets", csvImportPreview.summary.uniqueCodes],
-                  ["To import", csvDerivedSummary?.importableCount ?? csvImportPreview.summary.importableCount],
-                  ["Ready", csvDerivedSummary?.readyDrafts.length ?? 0],
-                  ["Needs review", csvDerivedSummary?.needsReviewDrafts.length ?? 0],
-                  ["Total units", csvDerivedSummary?.importableStock ?? csvImportPreview.summary.importableStock],
-                  ["Existing", csvDerivedSummary?.existingCount ?? csvImportPreview.summary.existingCodes],
-                  ["Merged rows", csvImportPreview.summary.duplicateRows],
+                  [t("assets.csv.stats.rows"), csvImportPreview.summary.totalRows],
+                  [t("assets.csv.stats.uniqueAssets"), csvImportPreview.summary.uniqueCodes],
+                  [t("assets.csv.stats.toImport"), csvDerivedSummary?.importableCount ?? csvImportPreview.summary.importableCount],
+                  [t("assets.csv.stats.ready"), csvDerivedSummary?.readyDrafts.length ?? 0],
+                  [t("assets.csv.stats.needsReview"), csvDerivedSummary?.needsReviewDrafts.length ?? 0],
+                  [t("assets.csv.stats.totalUnits"), csvDerivedSummary?.importableStock ?? csvImportPreview.summary.importableStock],
+                  [t("assets.csv.stats.existing"), csvDerivedSummary?.existingCount ?? csvImportPreview.summary.existingCodes],
+                  [t("assets.csv.stats.mergedRows"), csvImportPreview.summary.duplicateRows],
                 ].map(([label, value]) => (
                   <span key={label}>
                     <strong>{value}</strong>
@@ -1725,11 +1742,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 ))}
                 <span className={csvImportPreview.summary.warnings.length ? "asset-import-stat-warning" : undefined}>
                   <strong>{csvImportPreview.summary.warnings.length}</strong>
-                  warnings
+                  {t("assets.csv.stats.warnings")}
                 </span>
                 <span className={csvImportPreview.errors.length ? "asset-import-stat-error" : undefined}>
                   <strong>{csvImportPreview.errors.length}</strong>
-                  errors
+                  {t("assets.csv.stats.errors")}
                 </span>
               </div>
 
@@ -1737,35 +1754,35 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 <div className="asset-import-review">
                   <div className="asset-import-review-header">
                     <div>
-                      <strong>Review rows before importing</strong>
-                      <span>Edit operational and insurance fields here instead of going back to the CSV.</span>
+                      <strong>{t("assets.csv.reviewTitle")}</strong>
+                      <span>{t("assets.csv.reviewBody")}</span>
                     </div>
                     <div className="asset-import-review-header-actions">
-                      {csvHiddenReviewCount ? <span>{csvHiddenReviewCount} more row(s) hidden.</span> : null}
+                      {csvHiddenReviewCount ? <span>{t("assets.csv.moreRowsHidden", { count: csvHiddenReviewCount })}</span> : null}
                       {(csvDerivedSummary?.importableDrafts.length ?? 0) > 8 ? (
                         <button
                           className="ghost-control action-row-button"
                           onClick={() => setCsvShowAllRows((current) => !current)}
                           type="button"
                         >
-                          {csvShowAllRows ? "Show less" : "Show all"}
+                          {csvShowAllRows ? t("assets.csv.showLess") : t("assets.csv.showAll")}
                         </button>
                       ) : null}
                     </div>
                   </div>
                   <div className="asset-import-review-table">
                     <div className="asset-import-review-row is-header">
-                      <span>Row</span>
-                      <span>Status</span>
-                      <span>Asset</span>
-                      <span>Code</span>
-                      <span>Category</span>
-                      <span>Location</span>
-                      <span>Qty</span>
-                      <span>Serial</span>
-                      <span>Purchase</span>
-                      <span>Add. costs</span>
-                      <span>Current</span>
+                      <span>{t("assets.csv.reviewColumns.row")}</span>
+                      <span>{t("assets.csv.reviewColumns.status")}</span>
+                      <span>{t("assets.csv.reviewColumns.asset")}</span>
+                      <span>{t("assets.csv.reviewColumns.code")}</span>
+                      <span>{t("assets.csv.reviewColumns.category")}</span>
+                      <span>{t("assets.csv.reviewColumns.location")}</span>
+                      <span>{t("assets.csv.reviewColumns.qty")}</span>
+                      <span>{t("assets.csv.reviewColumns.serial")}</span>
+                      <span>{t("assets.csv.reviewColumns.purchase")}</span>
+                      <span>{t("assets.csv.reviewColumns.additionalCosts")}</span>
+                      <span>{t("assets.csv.reviewColumns.current")}</span>
                     </div>
                     {csvReviewDrafts.map((draft) => (
                       <Fragment key={draft.importRowNumber}>
@@ -1781,25 +1798,25 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                             }`}
                           >
                             {csvDerivedSummary?.issueCountByRow[draft.importRowNumber]
-                              ? "Needs review"
+                              ? t("assets.csv.status.needsReview")
                               : draft.importWarnings?.length
-                                ? "Review"
-                                : "Ready"}
+                                ? t("assets.csv.status.review")
+                                : t("assets.csv.status.ready")}
                           </span>
                           <input
-                            aria-label={`Asset name for CSV row ${draft.importRowNumber}`}
+                            aria-label={t("assets.csv.aria.assetName", { row: draft.importRowNumber })}
                             className="asset-import-review-input"
                             onChange={handleCsvTextEdit(draft.importRowNumber, "name")}
                             value={draft.name}
                           />
                           <input
-                            aria-label={`Asset code for CSV row ${draft.importRowNumber}`}
+                            aria-label={t("assets.csv.aria.assetCode", { row: draft.importRowNumber })}
                             className="asset-import-review-input asset-import-review-code"
                             onChange={handleCsvTextEdit(draft.importRowNumber, "internalCode")}
                             value={draft.internalCode}
                           />
                           <select
-                            aria-label={`Category for CSV row ${draft.importRowNumber}`}
+                            aria-label={t("assets.csv.aria.category", { row: draft.importRowNumber })}
                             className="asset-import-review-input"
                             onChange={handleCsvSelectEdit(draft.importRowNumber, "categoryId")}
                             value={draft.categoryId}
@@ -1811,12 +1828,12 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                             ))}
                           </select>
                           <select
-                            aria-label={`Location for CSV row ${draft.importRowNumber}`}
+                            aria-label={t("assets.csv.aria.location", { row: draft.importRowNumber })}
                             className="asset-import-review-input"
                             onChange={handleCsvSelectEdit(draft.importRowNumber, "defaultLocationId")}
                             value={draft.defaultLocationId ?? ""}
                           >
-                            <option value="">No location</option>
+                            <option value="">{t("assets.csv.noLocation")}</option>
                             {catalog.locations.map((location) => (
                               <option key={location.id} value={location.id}>
                                 {location.code} · {location.name}
@@ -1824,7 +1841,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                             ))}
                           </select>
                           <input
-                            aria-label={`Quantity for CSV row ${draft.importRowNumber}`}
+                            aria-label={t("assets.csv.aria.quantity", { row: draft.importRowNumber })}
                             className="asset-import-review-input asset-import-review-quantity"
                             min={0}
                             onChange={handleCsvQuantityEdit(draft.importRowNumber)}
@@ -1832,13 +1849,13 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                             value={draft.totalQuantity}
                           />
                           <input
-                            aria-label={`Serial number for CSV row ${draft.importRowNumber}`}
+                            aria-label={t("assets.csv.aria.serial", { row: draft.importRowNumber })}
                             className="asset-import-review-input"
                             onChange={handleCsvTextEdit(draft.importRowNumber, "serialNumber")}
                             value={draft.serialNumber}
                           />
                           <input
-                            aria-label={`Purchase price for CSV row ${draft.importRowNumber}`}
+                            aria-label={t("assets.csv.aria.purchasePrice", { row: draft.importRowNumber })}
                             className="asset-import-review-input asset-import-review-quantity"
                             min={0}
                             onChange={handleCsvOptionalMoneyEdit(draft.importRowNumber, "purchasePrice")}
@@ -1846,7 +1863,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                             value={draft.purchasePrice ?? ""}
                           />
                           <input
-                            aria-label={`Additional costs for CSV row ${draft.importRowNumber}`}
+                            aria-label={t("assets.csv.aria.additionalCosts", { row: draft.importRowNumber })}
                             className="asset-import-review-input asset-import-review-quantity"
                             min={0}
                             onChange={handleCsvOptionalMoneyEdit(draft.importRowNumber, "additionalCosts")}
@@ -1854,7 +1871,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                             value={draft.additionalCosts ?? ""}
                           />
                           <input
-                            aria-label={`Current value for CSV row ${draft.importRowNumber}`}
+                            aria-label={t("assets.csv.aria.currentValue", { row: draft.importRowNumber })}
                             className="asset-import-review-input asset-import-review-quantity"
                             min={0}
                             onChange={handleCsvOptionalMoneyEdit(draft.importRowNumber, "currentBookValue")}
@@ -1863,16 +1880,16 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                           />
                         </div>
                         <textarea
-                          aria-label={`Notes for CSV row ${draft.importRowNumber}`}
+                          aria-label={t("assets.csv.aria.notes", { row: draft.importRowNumber })}
                           className="asset-import-review-notes"
                           onChange={handleCsvNotesEdit(draft.importRowNumber)}
-                          placeholder="Notes"
+                          placeholder={t("assets.csv.notes")}
                           rows={2}
                           value={draft.notes}
                         />
                         {draft.importWarnings?.length ? (
                           <div className="asset-import-review-row-note">
-                            Row {draft.importRowNumber}: {draft.importWarnings.join(" ")}
+                            {t("assets.csv.rowNote", { row: draft.importRowNumber, message: draft.importWarnings.join(" ") })}
                           </div>
                         ) : null}
                       </Fragment>
@@ -1885,23 +1902,27 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 <div className="asset-import-preview-issues">
                   {csvImportPreview.summary.allRowsExist ? (
                     <div className="asset-import-preview-issue-card info">
-                      <strong>Nothing new to import</strong>
-                      <span>All assets in this CSV already exist in this workspace.</span>
-                      <span>Import is disabled to avoid duplicate asset records.</span>
+                      <strong>{t("assets.csv.nothingNewTitle")}</strong>
+                      <span>{t("assets.csv.nothingNewBody")}</span>
+                      <span>{t("assets.csv.nothingNewFootnote")}</span>
                     </div>
                   ) : null}
 
                   {csvImportPreview.existingMatches.length ? (
                     <div className="asset-import-preview-issue-card neutral">
-                      <strong>{csvImportPreview.existingMatches.length} existing match(es)</strong>
+                      <strong>{t("assets.csv.existingMatches", { count: csvImportPreview.existingMatches.length })}</strong>
                       {csvImportPreview.existingMatches.slice(0, 5).map((match) => (
                         <span key={match.code}>
-                          {match.code}: {match.existingName} · {match.existingStock} unit{match.existingStock === 1 ? "" : "s"}
+                          {t("assets.csv.existingMatchLine", {
+                            code: match.code,
+                            name: match.existingName,
+                            count: match.existingStock,
+                          })}
                         </span>
                       ))}
                       {csvImportPreview.existingMatches.length > 5 ? (
                         <span className="asset-import-more-matches">
-                          {csvImportPreview.existingMatches.length - 5} more match(es). Copy report for the full list.
+                          {t("assets.csv.moreMatches", { count: csvImportPreview.existingMatches.length - 5 })}
                         </span>
                       ) : null}
                     </div>
@@ -1909,40 +1930,40 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
                   {csvImportPreview.summary.warnings.length ? (
                     <div className="asset-import-preview-issue-card warning">
-                      <strong>Review before importing</strong>
+                      <strong>{t("assets.csv.reviewBeforeImporting")}</strong>
                       {csvImportPreview.summary.warnings.slice(0, 4).map((warning) => (
                         <span key={warning}>{warning}</span>
                       ))}
                       {csvImportPreview.summary.warnings.length > 4 ? (
-                        <span>{csvImportPreview.summary.warnings.length - 4} more warning(s).</span>
+                        <span>{t("assets.csv.moreWarnings", { count: csvImportPreview.summary.warnings.length - 4 })}</span>
                       ) : null}
                     </div>
                   ) : null}
 
                   {csvImportPreview.errors.length ? (
                     <div className="asset-import-preview-issue-card error">
-                      <strong>Fix these rows first</strong>
+                      <strong>{t("assets.csv.fixRowsTitle")}</strong>
                       {csvImportPreview.errors.slice(0, 6).map((error) => (
                         <span key={`${error.rowNumber}-${error.message}`}>
-                          Row {error.rowNumber}: {error.message}
+                          {t("assets.csv.rowNote", { row: error.rowNumber, message: error.message })}
                         </span>
                       ))}
                       {csvImportPreview.errors.length > 6 ? (
-                        <span>{csvImportPreview.errors.length - 6} more row error(s).</span>
+                        <span>{t("assets.csv.moreRowErrors", { count: csvImportPreview.errors.length - 6 })}</span>
                       ) : null}
                     </div>
                   ) : null}
 
                   {csvDerivedSummary?.validationIssues.length ? (
                     <div className="asset-import-preview-issue-card error">
-                      <strong>Review row edits</strong>
+                      <strong>{t("assets.csv.reviewEditsTitle")}</strong>
                       {csvDerivedSummary.validationIssues.slice(0, 6).map((issue) => (
                         <span key={`${issue.rowNumber}-${issue.message}`}>
-                          Row {issue.rowNumber}: {issue.message}
+                          {t("assets.csv.rowNote", { row: issue.rowNumber, message: issue.message })}
                         </span>
                       ))}
                       {csvDerivedSummary.validationIssues.length > 6 ? (
-                        <span>{csvDerivedSummary.validationIssues.length - 6} more row issue(s).</span>
+                        <span>{t("assets.csv.moreRowIssues", { count: csvDerivedSummary.validationIssues.length - 6 })}</span>
                       ) : null}
                     </div>
                   ) : null}
@@ -1959,27 +1980,27 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               <GuidedEmptyState
                 title={
                   assetControls.searchValue
-                    ? "No matches"
+                    ? t("assets.empty.tableNoMatches")
                     : isProjectMode
-                      ? "No assets on this project yet"
-                      : "No assets yet"
+                      ? t("assets.empty.tableNoneProjectTitle")
+                      : t("assets.empty.tableNoneTitle")
                 }
                 body={
                   assetControls.searchValue
-                    ? "Try a different search, or clear it to see every asset."
+                    ? t("assets.empty.tableNoMatchesBody")
                     : isProjectMode
-                      ? "Assign gear from the global catalog so this project's crew can pull and return it."
-                      : "Add the first piece of equipment to your catalog. You can also import from a CSV if you already have a list."
+                      ? t("assets.empty.tableNoneBodyProject")
+                      : t("assets.empty.tableNoneBody")
                 }
                 tone="subtle"
-                actionLabel={assetControls.searchValue ? "Clear search" : undefined}
+                actionLabel={assetControls.searchValue ? t("assets.empty.clearSearch") : undefined}
                 onAction={assetControls.searchValue ? () => assetControls.setSearchValue("") : undefined}
                 tips={
                   assetControls.searchValue
                     ? undefined
                     : isProjectMode
-                      ? ["Use the assign action from the asset detail page.", "Filter the global catalog by category to find gear faster."]
-                      : ["Categories and locations live in the Catalog section.", "QR labels print straight from the asset detail page."]
+                      ? assetEmptyTips("assets.empty.tipsTableProject")
+                      : assetEmptyTips("assets.empty.tipsTable")
                 }
               />
             }
@@ -2017,7 +2038,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     entityType: "asset" as const,
                     label: `${asset.code} · ${asset.name}`,
                     subtitle: `${asset.location} · ${asset.project}`,
-                    meta: asset.projectUnit && asset.projectUnit !== "—" ? `Unit · ${asset.projectUnit}` : undefined,
+                    meta: asset.projectUnit && asset.projectUnit !== "—" ? t("assets.cart.unitMeta", { unit: asset.projectUnit }) : undefined,
                   })),
                 )
               }
@@ -2045,7 +2066,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               <SurfaceCard
                 aside={
                   <button
-                    aria-label="Close quick preview"
+                    aria-label={t("assets.quickPreview.closeAria")}
                     className="surface-card-action"
                     onClick={() => setSelectedAssetId(null)}
                     type="button"
@@ -2059,11 +2080,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 <>
                   <div className="summary-grid">
                     <div className="summary-row">
-                      <span className="summary-label">Asset code</span>
+                      <span className="summary-label">{t("assets.quickPreview.assetCode")}</span>
                       <span className="summary-value">{activeAsset.code}</span>
                     </div>
                     <div className="summary-row">
-                      <span className="summary-label">Location</span>
+                      <span className="summary-label">{t("assets.quickPreview.location")}</span>
                       <span className="summary-value">{activeAsset.location}</span>
                     </div>
                     {formatAssetStockDetailRows({
@@ -2078,27 +2099,27 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       </div>
                     ))}
                     <div className="summary-row">
-                      <span className="summary-label">Project / responsible</span>
+                      <span className="summary-label">{t("assets.quickPreview.projectResponsible")}</span>
                       <span className="summary-value">
                         {activeAsset.project} · {activeAsset.responsible}
                       </span>
                     </div>
                     <div className="summary-row">
-                      <span className="summary-label">Serial</span>
+                      <span className="summary-label">{t("assets.quickPreview.serial")}</span>
                       <span className="summary-value">
                         {activeAsset.serialNumber}
                       </span>
                     </div>
                     <div className="summary-row">
-                      <span className="summary-label">Condition / custody</span>
+                      <span className="summary-label">{t("assets.quickPreview.conditionCustody")}</span>
                       <span className="summary-value">
                         {activeAsset.condition} · {activeAsset.custody}
                       </span>
                     </div>
                     <div className="summary-row">
-                      <span className="summary-label">Kit membership</span>
+                      <span className="summary-label">{t("assets.quickPreview.kitMembership")}</span>
                       <span className="summary-value">
-                        {activeAsset.linkedKitCount ? activeAsset.linkedKitCodes.join(" · ") : "Standalone"}
+                        {activeAsset.linkedKitCount ? activeAsset.linkedKitCodes.join(" · ") : t("assets.quickPreview.standalone")}
                       </span>
                     </div>
                   </div>
@@ -2117,7 +2138,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                                 setOpeningPreviewImageId(file.id);
                                 await openAssetFile(file.id);
                               } catch (nextError) {
-                                setActionError(getUserFacingErrorMessage(nextError, "Unable to open that asset image."));
+                                setActionError(getUserFacingErrorMessage(nextError, t("assets.toasts.unableOpenImage")));
                                 await reloadSelectedAssetDetail();
                               } finally {
                                 setOpeningPreviewImageId(null);
@@ -2129,12 +2150,12 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                           {file.previewDataUrl ? (
                             <img alt={file.originalName} src={file.previewDataUrl} />
                           ) : (
-                            <span>Preview unavailable</span>
+                            <span>{t("assets.quickPreview.previewUnavailable")}</span>
                           )}
                         </button>
                       ))
                     ) : (
-                      <div className="asset-preview-image-empty">No images yet.</div>
+                      <div className="asset-preview-image-empty">{t("assets.quickPreview.noImages")}</div>
                     )}
                   </div>
 
@@ -2150,9 +2171,9 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                             setIsUploadingPreviewImages(true);
                             const result = await uploadAssetImages(activeAsset.id);
                             await Promise.all([reloadSelectedAssetDetail(), reload()]);
-                            toast.success("Done", result.summary);
+                            toast.success(t("assets.toasts.doneTitle"), result.summary);
                           } catch (nextError) {
-                            setActionError(getUserFacingErrorMessage(nextError, "Unable to add images to this asset."));
+                            setActionError(getUserFacingErrorMessage(nextError, t("assets.toasts.unableAddImages")));
                           } finally {
                             setIsUploadingPreviewImages(false);
                           }
@@ -2161,7 +2182,13 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       type="button"
                     >
                       <FileUp size={14} />
-                      <span>{isUploadingPreviewImages ? "Adding..." : activeAssetImageSlots <= 0 ? "2 images max" : "Add images"}</span>
+                      <span>
+                        {isUploadingPreviewImages
+                          ? t("assets.quickPreview.adding")
+                          : activeAssetImageSlots <= 0
+                            ? t("assets.quickPreview.twoImagesMax")
+                            : t("assets.quickPreview.addImages")}
+                      </span>
                     </button>
                     <button
                       className="ghost-control"
@@ -2172,10 +2199,10 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       type="button"
                     >
                       <SquarePen size={14} />
-                      <span>Edit asset</span>
+                      <span>{t("assets.quickPreview.editAsset")}</span>
                     </button>
                     <button className="action-primary-button" onClick={() => navigate(`/assets/${activeAsset.id}`)} type="button">
-                      Open detail
+                      {t("assets.quickPreview.openDetail")}
                     </button>
                   </div>
                 </>
@@ -2189,16 +2216,17 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 };
 
 const GlobalAssetsMetrics = () => {
+  const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
   const { data: assetsOverview, error } = useAssetsOverview({ workspaceId: activeWorkspaceId });
   const overviewCards = [
     {
-      label: "Total units",
+      label: t("assets.metrics.totalUnits"),
       value: assetsOverview.totalAssets,
       tone: "info" as const,
     },
     {
-      label: "Reserved / out units",
+      label: t("assets.metrics.reservedOut"),
       value: assetsOverview.assignedAssets,
       tone: "info" as const,
     },
@@ -2210,7 +2238,7 @@ const GlobalAssetsMetrics = () => {
 
   return (
     <>
-      {error ? <div className="action-feedback action-feedback-error">Asset metrics unavailable: {error}</div> : null}
+      {error ? <div className="action-feedback action-feedback-error">{t("assets.metricsUnavailable", { message: error })}</div> : null}
       <div className="overview-operational-grid overview-operational-grid-assets">
         {overviewCards.map((card) => (
           <SurfaceCard key={card.label} className="overview-operational-card" title={card.label}>
