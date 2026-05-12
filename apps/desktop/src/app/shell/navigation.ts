@@ -4,7 +4,6 @@ import {
   Boxes,
   BriefcaseBusiness,
   FileText,
-  Building2,
   CalendarDays,
   ClipboardList,
   FolderCog,
@@ -22,6 +21,12 @@ import type { LucideIcon } from "lucide-react";
 
 import type { ProjectRouteSection } from "@app/routing/route-meta";
 
+/**
+ * Nav entry. `label` is an i18n key (e.g. `"shell.nav.primary.projects"`).
+ * Consumers must wrap it in `t(item.label)` — we keep keys here rather
+ * than localized strings so the structure stays a static const and
+ * locale switches reflect on the next render.
+ */
 export type NavItem = {
   label: string;
   path: string;
@@ -30,47 +35,47 @@ export type NavItem = {
 };
 
 export const primaryNav: NavItem[] = [
-  { label: "Projects", path: "/projects/schedule", icon: FolderOpenDot },
-  { label: "Assets", path: "/assets", icon: Boxes },
-  { label: "Finance", path: "/finance", icon: BriefcaseBusiness },
-  { label: "Inbox", path: "/inbox", icon: Inbox },
-  { label: "Automation", path: "/agents/mission-control", icon: Bot },
+  { label: "shell.nav.primary.projects", path: "/projects/schedule", icon: FolderOpenDot },
+  { label: "shell.nav.primary.assets", path: "/assets", icon: Boxes },
+  { label: "shell.nav.primary.finance", path: "/finance", icon: BriefcaseBusiness },
+  { label: "shell.nav.primary.inbox", path: "/inbox", icon: Inbox },
+  { label: "shell.nav.primary.automation", path: "/agents/mission-control", icon: Bot },
 ];
 
 export const projectsSubnav: NavItem[] = [
-  { label: "Schedule Overview", path: "/projects/schedule", icon: CalendarDays },
-  { label: "Projects", path: "/projects", icon: FolderOpenDot },
+  { label: "shell.nav.projects.schedule", path: "/projects/schedule", icon: CalendarDays },
+  { label: "shell.nav.projects.projects", path: "/projects", icon: FolderOpenDot },
 ];
 
 export const assetsSubnav: NavItem[] = [
-  { label: "Assets", path: "/assets", icon: PackageSearch },
-  { label: "Licenses", path: "/assets/licenses", icon: KeyRound },
-  { label: "Packing Slips", path: "/packing-slips", icon: ScrollText },
-  { label: "Incidents", path: "/incidents", icon: ClipboardList },
+  { label: "shell.nav.assets.assets", path: "/assets", icon: PackageSearch },
+  { label: "shell.nav.assets.licenses", path: "/assets/licenses", icon: KeyRound },
+  { label: "shell.nav.assets.packingSlips", path: "/packing-slips", icon: ScrollText },
+  { label: "shell.nav.assets.incidents", path: "/incidents", icon: ClipboardList },
 ];
 
 export const financeSubnav: NavItem[] = [
-  { label: "Overview", path: "/finance", icon: BarChart3 },
-  { label: "Quotes", path: "/finance/quotes", icon: FileText },
-  { label: "Entries", path: "/finance/entries", icon: ScrollText },
-  { label: "Review Queue", path: "/finance/cost-links", icon: ClipboardList },
+  { label: "shell.nav.finance.overview", path: "/finance", icon: BarChart3 },
+  { label: "shell.nav.finance.quotes", path: "/finance/quotes", icon: FileText },
+  { label: "shell.nav.finance.entries", path: "/finance/entries", icon: ScrollText },
+  { label: "shell.nav.finance.reviewQueue", path: "/finance/cost-links", icon: ClipboardList },
 ];
 
 export const agentsSubnav: NavItem[] = [
-  { label: "Overview", path: "/agents/mission-control", icon: Bot },
-  { label: "Team", path: "/agents", icon: Boxes },
-  { label: "Activity", path: "/agents/runs", icon: ScrollText },
-  { label: "AI Models", path: "/agents/models", icon: FolderCog },
-  { label: "Channels", path: "/agents/connectors", icon: ClipboardList },
+  { label: "shell.nav.agents.overview", path: "/agents/mission-control", icon: Bot },
+  { label: "shell.nav.agents.team", path: "/agents", icon: Boxes },
+  { label: "shell.nav.agents.activity", path: "/agents/runs", icon: ScrollText },
+  { label: "shell.nav.agents.models", path: "/agents/models", icon: FolderCog },
+  { label: "shell.nav.agents.channels", path: "/agents/connectors", icon: ClipboardList },
 ];
 
 const projectSectionMeta: Record<ProjectRouteSection, Omit<NavItem, "path">> = {
-  overview: { label: "Overview", icon: BarChart3 },
-  assets: { label: "Assets", icon: PackageSearch },
-  packing: { label: "Packing", icon: ScrollText },
-  incidents: { label: "Incidents", icon: ClipboardList },
-  budget: { label: "Budget", icon: Wallet },
-  info: { label: "Details", icon: Info },
+  overview: { label: "shell.nav.project.overview", icon: BarChart3 },
+  assets: { label: "shell.nav.project.assets", icon: PackageSearch },
+  packing: { label: "shell.nav.project.packing", icon: ScrollText },
+  incidents: { label: "shell.nav.project.incidents", icon: ClipboardList },
+  budget: { label: "shell.nav.project.budget", icon: Wallet },
+  info: { label: "shell.nav.project.info", icon: Info },
 };
 
 const projectSectionOrder: ProjectRouteSection[] = ["info", "overview", "assets", "packing", "incidents", "budget"];
@@ -82,6 +87,6 @@ export const buildProjectSubnav = (projectId: string): NavItem[] =>
   }));
 
 export const utilityNav: NavItem[] = [
-  { label: "Catalog", path: "/catalog", icon: SwatchBook },
-  { label: "Settings", path: "/settings", icon: Settings },
+  { label: "shell.nav.utility.catalog", path: "/catalog", icon: SwatchBook },
+  { label: "shell.nav.utility.settings", path: "/settings", icon: Settings },
 ];

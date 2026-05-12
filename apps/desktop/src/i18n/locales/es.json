@@ -1,4 +1,126 @@
 {
+  "shell": {
+    "nav": {
+      "primary": {
+        "projects": "Proyectos",
+        "assets": "Equipos",
+        "finance": "Finanzas",
+        "inbox": "Inbox",
+        "automation": "Automatización"
+      },
+      "utility": {
+        "catalog": "Catálogo",
+        "settings": "Ajustes"
+      },
+      "project": {
+        "info": "Detalles",
+        "overview": "Resumen",
+        "assets": "Equipos",
+        "packing": "Packing",
+        "incidents": "Incidentes",
+        "budget": "Presupuesto"
+      },
+      "projects": {
+        "schedule": "Calendario general",
+        "projects": "Proyectos"
+      },
+      "assets": {
+        "assets": "Equipos",
+        "licenses": "Licencias",
+        "packingSlips": "Packing slips",
+        "incidents": "Incidentes"
+      },
+      "finance": {
+        "overview": "Resumen",
+        "quotes": "Cotizaciones",
+        "entries": "Movimientos",
+        "reviewQueue": "Cola de revisión"
+      },
+      "agents": {
+        "overview": "Resumen",
+        "team": "Equipo",
+        "activity": "Actividad",
+        "models": "Modelos de IA",
+        "channels": "Canales"
+      }
+    },
+    "topBar": {
+      "search": "Buscar",
+      "syncIdle": "Sincronización",
+      "syncFailed": "La sincronización necesita atención",
+      "syncFailedWithCount": "Sincronización con errores · {{count}} fallidos",
+      "syncing": "Sincronizando · {{count}} en cola",
+      "upToDate": "Al día"
+    },
+    "userMenu": {
+      "closeMenu": "Cerrar menú de usuario",
+      "openMenu": "Abrir menú de usuario",
+      "signIn": "Iniciar sesión",
+      "localFallback": "Modo local",
+      "setYourName": "Define tu nombre",
+      "noRemoteAuth": "Sin autenticación remota",
+      "tapToAuth": "Toca para autenticarte",
+      "yourAccount": "Tu cuenta",
+      "workspaceSettings": "Ajustes del workspace",
+      "signOut": "Cerrar sesión",
+      "signedOut": "Sesión cerrada",
+      "signedOutBody": "¡Hasta pronto!",
+      "signOutFailed": "No se pudo cerrar sesión",
+      "member": "Miembro"
+    },
+    "workspaceSwitcher": {
+      "switchAria": "Cambiar workspace · actual: {{name}}",
+      "createWorkspace": "Crear workspace",
+      "settings": "Ajustes"
+    },
+    "notifications": {
+      "title": "Notificaciones",
+      "ariaLabel": "Notificaciones",
+      "ariaUnread": "{{count}} notificaciones sin leer",
+      "unreadTooltip": "{{count}} sin leer",
+      "markAllRead": "Marcar todo como leído",
+      "close": "Cerrar",
+      "loading": "Cargando notificaciones…",
+      "empty": "Todo al día",
+      "emptyBody": "Aquí aparecerán las novedades de los agentes, recordatorios y eventos del sistema.",
+      "today": "Hoy",
+      "kind": {
+        "agent_completion": "Agente",
+        "archive_done": "Archivo",
+        "reminder": "Recordatorio",
+        "invite": "Invitación",
+        "sync": "Sincronización",
+        "system": "Sistema"
+      }
+    },
+    "search": {
+      "ariaLabel": "Búsqueda global",
+      "placeholder": "Busca equipos, proyectos, unidades e incidentes",
+      "close": "Cerrar búsqueda",
+      "recent": "Reciente",
+      "escToClose": "Esc para cerrar",
+      "moveHint": "↑↓ para moverte",
+      "openHint": "para abrir",
+      "emptyHint": "Busca equipos, proyectos, unidades, incidentes, packing slips o agentes. Prueba con un código, QR, cliente o nombre de unidad.",
+      "searching": "Buscando en tu workspace local…",
+      "noMatches": "Sin resultados para “{{query}}”. Prueba con un código de equipo, nombre de proyecto, cliente o unidad."
+    },
+    "compareTray": {
+      "title": "Bandeja de comparación",
+      "clearAria": "Vaciar bandeja de comparación",
+      "clearTooltip": "Vaciar bandeja",
+      "compare": "Comparar {{type}} ({{count}})",
+      "compareUnavailable": "Comparación no disponible",
+      "compareTooltipFallback": "La vista de comparación aún no está disponible.",
+      "footnoteFallback": "La comparación se habilita al elegir elementos compatibles.",
+      "removeTooltip": "Quitar {{name}}",
+      "types": {
+        "asset": "Equipos",
+        "project": "Proyectos",
+        "financial_entry": "Finanzas"
+      }
+    }
+  },
   "common": {
     "save": "Guardar",
     "saveChanges": "Guardar cambios",

@@ -1,6 +1,7 @@
 import { CloudCog, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { HelpMenu } from "@features/onboarding/HelpMenu";
 import { useShellContext } from "@shared/hooks/useShellContext";
@@ -16,6 +17,7 @@ type TopContextBarProps = {
 export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { scopeChipLabel } = useShellContext();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot | null>(null);
   const isMountedRef = useRef(true);
 
@@ -49,7 +51,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const syncState = useMemo(() => {
     if (!diagnostics) {
       return {
-        label: "Sync",
+        label: t("shell.topBar.syncIdle"),
         className: "sync-control-idle",
         badge: null as number | null,
       };
@@ -57,7 +59,10 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
     if (diagnostics.syncOutboxFailedCount > 0 || diagnostics.lastSyncStatus === "failed") {
       return {
-        label: diagnostics.syncOutboxFailedCount > 0 ? `Sync needs attention · ${diagnostics.syncOutboxFailedCount} failed` : "Sync needs attention",
+        label:
+          diagnostics.syncOutboxFailedCount > 0
+            ? t("shell.topBar.syncFailedWithCount", { count: diagnostics.syncOutboxFailedCount })
+            : t("shell.topBar.syncFailed"),
         className: "sync-control-failed",
         badge: diagnostics.syncOutboxFailedCount,
       };
@@ -67,18 +72,18 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
 
     if (queuedCount > 0) {
       return {
-        label: `Syncing · ${queuedCount} queued`,
+        label: t("shell.topBar.syncing", { count: queuedCount }),
         className: "sync-control-active",
         badge: queuedCount,
       };
     }
 
     return {
-      label: "Up to date",
+      label: t("shell.topBar.upToDate"),
       className: "sync-control-healthy",
       badge: null as number | null,
     };
-  }, [diagnostics]);
+  }, [diagnostics, t]);
 
   return (
     <div className="top-context-bar">
@@ -97,7 +102,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
       <div className="top-context-group top-context-group-end">
         <button className="ghost-control search-control" onClick={onOpenSearch} type="button">
           <Search size={13} />
-          <span>Search</span>
+          <span>{t("shell.topBar.search")}</span>
           <kbd>⌘K</kbd>
         </button>
         <NotificationsButton />

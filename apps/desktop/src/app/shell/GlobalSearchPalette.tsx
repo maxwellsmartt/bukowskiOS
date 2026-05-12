@@ -2,6 +2,7 @@ import type { GlobalSearchGroup, GlobalSearchResult } from "@contracts";
 import { Command, CornerDownLeft, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useDebouncedValue } from "@shared/hooks/useDebouncedValue";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
@@ -17,6 +18,7 @@ const emptyGroups: GlobalSearchGroup[] = [];
 
 export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState("");
@@ -132,7 +134,7 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
       role="presentation"
     >
       <section
-        aria-label="Global search"
+        aria-label={t("shell.search.ariaLabel")}
         className="command-palette"
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
@@ -171,13 +173,13 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
               ref={inputRef}
               className="command-palette-input"
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search assets, projects, units and incidents"
+              placeholder={t("shell.search.placeholder")}
               type="search"
               value={query}
             />
           </div>
 
-          <button aria-label="Close search" className="surface-card-action" onClick={onClose} type="button">
+          <button aria-label={t("shell.search.close")} className="surface-card-action" onClick={onClose} type="button">
             <X size={14} />
           </button>
         </div>
@@ -186,14 +188,14 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
           {!query.trim() ? (
             <div className="command-palette-empty">
               <Command size={16} />
-              <span>Search assets, projects, units, incidents, packing slips or agents. Try a code, QR, client or unit name.</span>
+              <span>{t("shell.search.emptyHint")}</span>
             </div>
           ) : null}
 
-          {isLoading ? <div className="command-palette-empty">Searching your local workspace…</div> : null}
+          {isLoading ? <div className="command-palette-empty">{t("shell.search.searching")}</div> : null}
           {error ? <div className="command-palette-empty">{error}</div> : null}
           {!isLoading && !error && query.trim() && !flattenedResults.length ? (
-            <div className="command-palette-empty">No matches for “{query.trim()}”. Try an asset code, project name, client or unit.</div>
+            <div className="command-palette-empty">{t("shell.search.noMatches", { query: query.trim() })}</div>
           ) : null}
 
           {!isLoading && !error && flattenedResults.length ? (
@@ -219,7 +221,7 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
                           </div>
                           <div className="command-palette-result-meta">
                             {result.meta ? <span className="command-palette-meta-chip">{result.meta}</span> : null}
-                            {result.recent ? <span className="command-palette-meta-chip">Recent</span> : null}
+                            {result.recent ? <span className="command-palette-meta-chip">{t("shell.search.recent")}</span> : null}
                           </div>
                         </button>
                       );
@@ -232,11 +234,11 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
         </div>
 
         <div className="command-palette-footer">
-          <span>↑↓ to move</span>
+          <span>{t("shell.search.moveHint")}</span>
           <span>
-            <CornerDownLeft size={12} /> to open
+            <CornerDownLeft size={12} /> {t("shell.search.openHint")}
           </span>
-          <span>Esc to close</span>
+          <span>{t("shell.search.escToClose")}</span>
         </div>
       </section>
     </div>

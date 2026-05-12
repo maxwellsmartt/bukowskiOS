@@ -1,6 +1,7 @@
 import { Check, ChevronDown, Plus, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 
@@ -12,6 +13,7 @@ const WorkspaceAvatar = ({ color, name, url }: { color?: string | null; name: st
 
 export const WorkspaceSwitcher = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { activeMembership, activeWorkspaceId, activeWorkspaceName, memberships, switchWorkspace } = useWorkspace();
   const [open, setOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement | null>(null);
@@ -38,7 +40,7 @@ export const WorkspaceSwitcher = () => {
     <div className="workspace-switcher" ref={switcherRef}>
       <button
         aria-expanded={open}
-        aria-label={`Switch workspace · current: ${activeWorkspaceName}`}
+        aria-label={t("shell.workspaceSwitcher.switchAria", { name: activeWorkspaceName })}
         className="workspace-switcher-trigger"
         onClick={() => setOpen((current) => !current)}
         type="button"
@@ -78,7 +80,7 @@ export const WorkspaceSwitcher = () => {
               type="button"
             >
               <Plus size={14} />
-              <span>Create workspace</span>
+              <span>{t("shell.workspaceSwitcher.createWorkspace")}</span>
             </button>
             <button
               onClick={() => {
@@ -88,7 +90,7 @@ export const WorkspaceSwitcher = () => {
               type="button"
             >
               <Settings size={14} />
-              <span>Settings</span>
+              <span>{t("shell.workspaceSwitcher.settings")}</span>
             </button>
           </div>
         </div>

@@ -1,34 +1,34 @@
 import { Scale, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 
-const typeLabelMap = {
-  asset: "Assets",
-  project: "Projects",
-  financial_entry: "Finance",
-} as const;
+type CompareEntityType = "asset" | "project" | "financial_entry";
 
 export const CompareTrayBar = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { clear, compatibleItems, compatibleType, groups, items, reasonDisabled, removeItem } = useCompareTray();
 
   if (!items.length) {
     return null;
   }
 
+  const typeLabel = (type: CompareEntityType) => t(`shell.compareTray.types.${type}`);
+
   return (
     <aside className="compare-tray">
       <div className="compare-tray-header">
         <div>
-          <h3 className="compare-tray-title">Compare tray</h3>
+          <h3 className="compare-tray-title">{t("shell.compareTray.title")}</h3>
         </div>
 
         <div className="compare-tray-actions">
           <button
             className="ghost-control"
             disabled={!compatibleType || compatibleItems.length < 2}
-            data-tooltip={reasonDisabled ?? "Comparison view is not available yet."}
+            data-tooltip={reasonDisabled ?? t("shell.compareTray.compareTooltipFallback")}
             onClick={() => {
               if (!compatibleType || compatibleItems.length < 2) {
                 return;
@@ -41,14 +41,17 @@ export const CompareTrayBar = () => {
             <Scale size={14} />
             <span>
               {compatibleType && compatibleItems.length >= 2
-                ? `Compare ${typeLabelMap[compatibleType]} (${compatibleItems.length})`
-                : "Compare unavailable"}
+                ? t("shell.compareTray.compare", {
+                    type: typeLabel(compatibleType),
+                    count: compatibleItems.length,
+                  })
+                : t("shell.compareTray.compareUnavailable")}
             </span>
           </button>
           <button
-            aria-label="Clear compare tray"
+            aria-label={t("shell.compareTray.clearAria")}
             className="icon-ghost-control is-danger"
-            data-tooltip="Clear tray"
+            data-tooltip={t("shell.compareTray.clearTooltip")}
             onClick={clear}
             type="button"
           >
@@ -61,7 +64,7 @@ export const CompareTrayBar = () => {
         {groups.map((group) => (
           <div key={group.entityType} className="compare-tray-group">
             <div className="compare-tray-group-header">
-              <span className="compare-tray-group-label">{typeLabelMap[group.entityType]}</span>
+              <span className="compare-tray-group-label">{typeLabel(group.entityType)}</span>
               <span className="compare-tray-group-count">{group.count}</span>
             </div>
 
@@ -72,7 +75,7 @@ export const CompareTrayBar = () => {
                 <button
                   key={`${item.entityType}:${item.id}`}
                   className="compare-tray-chip"
-                  data-tooltip={`Remove ${item.label}`}
+                  data-tooltip={t("shell.compareTray.removeTooltip", { name: item.label })}
                   onClick={() => removeItem(item.entityType, item.id)}
                   type="button"
                 >
@@ -86,7 +89,7 @@ export const CompareTrayBar = () => {
       </div>
 
       <p className="compare-tray-footnote">
-        {reasonDisabled ?? "Compare becomes available when you pick matching items."}
+        {reasonDisabled ?? t("shell.compareTray.footnoteFallback")}
       </p>
     </aside>
   );

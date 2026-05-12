@@ -7,16 +7,34 @@ import { isSubnavItemActive } from "@app/shell/SubnavTabs";
 
 describe("foundation navigation shell", () => {
   it("keeps the approved primary domains visible", () => {
-    expect(primaryNav.map((item) => item.label)).toEqual(["Projects", "Assets", "Finance", "Inbox", "Automation"]);
+    // Labels are i18n keys; the human strings live in src/i18n/locales/*.json.
+    expect(primaryNav.map((item) => item.label)).toEqual([
+      "shell.nav.primary.projects",
+      "shell.nav.primary.assets",
+      "shell.nav.primary.finance",
+      "shell.nav.primary.inbox",
+      "shell.nav.primary.automation",
+    ]);
   });
 
   it("keeps finance shell structurally real", () => {
-    expect(financeSubnav.map((item) => item.label)).toEqual(["Overview", "Quotes", "Entries", "Review Queue"]);
+    expect(financeSubnav.map((item) => item.label)).toEqual([
+      "shell.nav.finance.overview",
+      "shell.nav.finance.quotes",
+      "shell.nav.finance.entries",
+      "shell.nav.finance.reviewQueue",
+    ]);
     expect(appRoutes.some((route) => route.path === "/finance/entries")).toBe(true);
   });
 
   it("adds an agents control plane without breaking the rest of the shell", () => {
-    expect(agentsSubnav.map((item) => item.label)).toEqual(["Overview", "Team", "Activity", "AI Models", "Channels"]);
+    expect(agentsSubnav.map((item) => item.label)).toEqual([
+      "shell.nav.agents.overview",
+      "shell.nav.agents.team",
+      "shell.nav.agents.activity",
+      "shell.nav.agents.models",
+      "shell.nav.agents.channels",
+    ]);
     expect(resolveActiveRoute("/agents/mission-control").domain).toBe("agents");
   });
 
@@ -30,13 +48,21 @@ describe("foundation navigation shell", () => {
   });
 
   it("preserves the full asset operations sub-navigation", () => {
-    expect(assetsSubnav.map((item) => item.label)).toEqual(["Assets", "Licenses", "Packing Slips", "Incidents"]);
+    expect(assetsSubnav.map((item) => item.label)).toEqual([
+      "shell.nav.assets.assets",
+      "shell.nav.assets.licenses",
+      "shell.nav.assets.packingSlips",
+      "shell.nav.assets.incidents",
+    ]);
     expect(isSubnavItemActive("/assets/licenses", "/assets/licenses")).toBe(true);
     expect(isSubnavItemActive("/assets/licenses", "/assets")).toBe(false);
   });
 
   it("adds the global project schedule to projects navigation", () => {
-    expect(projectsSubnav.map((item) => item.label)).toEqual(["Schedule Overview", "Projects"]);
+    expect(projectsSubnav.map((item) => item.label)).toEqual([
+      "shell.nav.projects.schedule",
+      "shell.nav.projects.projects",
+    ]);
     expect(resolveActiveRoute("/projects/schedule").domain).toBe("projects");
   });
 

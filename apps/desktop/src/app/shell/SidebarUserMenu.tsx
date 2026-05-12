@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronUp, LogOut, Settings as SettingsIcon, UserCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useSession } from "@app/providers/SessionProvider";
 import { useToast } from "@app/providers/ToastProvider";
@@ -20,6 +21,7 @@ const initialsFor = (value: string): string => {
 export const SidebarUserMenu = () => {
   const navigate = useNavigate();
   const toast = useToast();
+  const { t } = useTranslation();
   const { user, status, signOut, isLocalFallback } = useSession();
   const { activeMembership } = useWorkspace();
   const [open, setOpen] = useState(false);
@@ -49,26 +51,33 @@ export const SidebarUserMenu = () => {
   }, [open]);
 
   const isAuthenticated = status === "authenticated" && user;
-  const rawDisplayName = isAuthenticated ? user.displayName : isLocalFallback ? "Local fallback" : "Sign in";
+  const rawDisplayName = isAuthenticated
+    ? user.displayName
+    : isLocalFallback
+      ? t("shell.userMenu.localFallback")
+      : t("shell.userMenu.signIn");
   const userEmail = isAuthenticated ? user.email ?? null : null;
   // When the user has not set a real name, displayName falls back to email — show
   // a friendly "Set your name" prompt instead of duplicating the email.
   const displayNameMatchesEmail = Boolean(userEmail && rawDisplayName === userEmail);
-  const displayName = displayNameMatchesEmail ? "Set your name" : rawDisplayName;
+  const displayName = displayNameMatchesEmail ? t("shell.userMenu.setYourName") : rawDisplayName;
   const subtitle = isAuthenticated
-    ? userEmail ?? activeMembership?.roleName ?? "Member"
+    ? userEmail ?? activeMembership?.roleName ?? t("shell.userMenu.member")
     : isLocalFallback
-      ? "No remote auth"
-      : "Tap to authenticate";
+      ? t("shell.userMenu.noRemoteAuth")
+      : t("shell.userMenu.tapToAuth");
   const initials = initialsFor(displayNameMatchesEmail ? userEmail ?? "?" : rawDisplayName);
 
   const handleSignOut = async () => {
     setOpen(false);
     try {
       await signOut();
-      toast.success("Signed out", "See you soon.");
+      toast.success(t("shell.userMenu.signedOut"), t("shell.userMenu.signedOutBody"));
     } catch (error) {
-      toast.error("Sign out failed", getUserFacingErrorMessage(error, "Try again in a moment."));
+      toast.error(
+        t("shell.userMenu.signOutFailed"),
+        getUserFacingErrorMessage(error, t("common.tryAgain")),
+      );
     }
   };
 
@@ -76,7 +85,7 @@ export const SidebarUserMenu = () => {
     <div className="sidebar-user-menu" ref={containerRef}>
       <button
         aria-expanded={open}
-        aria-label={open ? "Close user menu" : "Open user menu"}
+        aria-label={open ? t("shell.userMenu.closeMenu") : t("shell.userMenu.openMenu")}
         className={`sidebar-user-trigger${open ? " is-open" : ""}`}
         onClick={() => setOpen((current) => !current)}
         type="button"
@@ -127,7 +136,7 @@ export const SidebarUserMenu = () => {
               type="button"
             >
               <UserCircle2 size={14} />
-              <span>Your account</span>
+              <span>{t("shell.userMenu.yourAccount")}</span>
             </button>
             <button
               className="sidebar-user-action"
@@ -138,12 +147,12 @@ export const SidebarUserMenu = () => {
               type="button"
             >
               <SettingsIcon size={14} />
-              <span>Workspace settings</span>
+              <span>{t("shell.userMenu.workspaceSettings")}</span>
             </button>
             {isAuthenticated ? (
               <button className="sidebar-user-action sidebar-user-action-danger" onClick={() => void handleSignOut()} type="button">
                 <LogOut size={14} />
-                <span>Sign out</span>
+                <span>{t("shell.userMenu.signOut")}</span>
               </button>
             ) : null}
           </div>

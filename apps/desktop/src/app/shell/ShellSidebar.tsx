@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { resolveActiveRoute, resolvePrimaryNavKey } from "@app/routing/route-meta";
 import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.png";
@@ -10,6 +11,7 @@ import { primaryNav, utilityNav } from "./navigation";
 
 export const ShellSidebar = () => {
   const location = useLocation();
+  const { t } = useTranslation();
   const primaryNavKey = resolvePrimaryNavKey(location.pathname);
   const activeRoute = resolveActiveRoute(location.pathname);
 
@@ -42,7 +44,7 @@ export const ShellSidebar = () => {
             return (
               <NavLink key={item.path} to={item.path} className={() => `shell-nav-link${isActive ? " active" : ""}`}>
                 {Icon ? <Icon size={16} /> : null}
-                <span>{item.label}</span>
+                <span>{t(item.label)}</span>
               </NavLink>
             );
           })}
@@ -62,7 +64,7 @@ export const ShellSidebar = () => {
             return (
               <NavLink key={item.path} to={item.path} className={() => `shell-nav-link${isActive ? " active" : ""}`}>
                 {Icon ? <Icon size={16} /> : null}
-                <span>{item.label}</span>
+                <span>{t(item.label)}</span>
               </NavLink>
             );
           })}

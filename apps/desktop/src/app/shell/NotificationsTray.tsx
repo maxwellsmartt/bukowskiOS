@@ -1,6 +1,7 @@
 import { Bell, CheckCheck, ExternalLink, Inbox, X } from "lucide-react";
 import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useLocale } from "@shared/hooks/useLocale";
@@ -12,33 +13,33 @@ const TRAY_FORMAT: Intl.DateTimeFormatOptions = {
   minute: "2-digit",
 };
 
-const kindLabel = (kind: string) => {
-  switch (kind) {
-    case "agent_completion":
-      return "Agent";
-    case "archive_done":
-      return "Archive";
-    case "reminder":
-      return "Reminder";
-    case "invite":
-      return "Invite";
-    case "sync":
-      return "Sync";
-    default:
-      return "System";
-  }
+const KIND_TRANSLATION_KEYS: Record<string, string> = {
+  agent_completion: "shell.notifications.kind.agent_completion",
+  archive_done: "shell.notifications.kind.archive_done",
+  reminder: "shell.notifications.kind.reminder",
+  invite: "shell.notifications.kind.invite",
+  sync: "shell.notifications.kind.sync",
 };
+const kindLabelKey = (kind: string) => KIND_TRANSLATION_KEYS[kind] ?? "shell.notifications.kind.system";
 
 export const NotificationsButton = () => {
+  const { t } = useTranslation();
   const { unreadCount, toggleTray } = useNotifications();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  const ariaLabel = unreadCount > 0
+    ? t("shell.notifications.ariaUnread", { count: unreadCount })
+    : t("shell.notifications.ariaLabel");
+  const tooltip = unreadCount > 0
+    ? t("shell.notifications.unreadTooltip", { count: unreadCount })
+    : t("shell.notifications.ariaLabel");
 
   return (
     <button
       ref={buttonRef}
-      aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
+      aria-label={ariaLabel}
       className={`icon-ghost-control notifications-trigger${unreadCount > 0 ? " has-unread" : ""}`}
-      data-tooltip={unreadCount > 0 ? `${unreadCount} unread` : "Notifications"}
+      data-tooltip={tooltip}
       onClick={() => toggleTray(buttonRef.current?.getBoundingClientRect() ?? null)}
       type="button"
     >
@@ -53,6 +54,7 @@ export const NotificationsTray = () => {
   const trayRef = useRef<HTMLElement | null>(null);
   const { closeTray, isLoading, isTrayOpen, items, markAllRead, markRead, trayAnchor, unreadCount } = useNotifications();
   const { formatDate } = useLocale();
+  const { t } = useTranslation();
 
   const groupedItems = useMemo(() => {
     const groups = new Map<string, typeof items>();
@@ -65,11 +67,11 @@ export const NotificationsTray = () => {
       key,
       label:
         key === new Date().toDateString()
-          ? "Today"
+          ? t("shell.notifications.today")
           : formatDate(rows[0]?.createdAt ?? Date.now(), { month: "short", day: "numeric" }),
       rows,
     }));
-  }, [items, formatDate]);
+  }, [items, formatDate, t]);
 
   useEffect(() => {
     if (!isTrayOpen) {
@@ -127,22 +129,22 @@ export const NotificationsTray = () => {
     : undefined;
 
   return (
-    <aside ref={trayRef} className="notifications-tray" style={trayStyle} aria-label="Notifications">
+    <aside ref={trayRef} className="notifications-tray" style={trayStyle} aria-label={t("shell.notifications.ariaLabel")}>
       <div className="notifications-tray-header">
         <div>
-          <h2>Notifications</h2>
+          <h2>{t("shell.notifications.title")}</h2>
         </div>
         <div className="notifications-tray-actions">
           <button
             className="icon-ghost-control"
-            data-tooltip="Mark all read"
+            data-tooltip={t("shell.notifications.markAllRead")}
             disabled={unreadCount === 0}
             onClick={() => void markAllRead()}
             type="button"
           >
             <CheckCheck size={15} />
           </button>
-          <button className="icon-ghost-control" data-tooltip="Close" onClick={closeTray} type="button">
+          <button className="icon-ghost-control" data-tooltip={t("shell.notifications.close")} onClick={closeTray} type="button">
             <X size={15} />
           </button>
         </div>
@@ -152,13 +154,13 @@ export const NotificationsTray = () => {
         {isLoading ? (
           <div className="notifications-empty">
             <Inbox size={18} />
-            <span>Loading notifications…</span>
+            <span>{t("shell.notifications.loading")}</span>
           </div>
         ) : groupedItems.length === 0 ? (
           <div className="notifications-empty">
             <Inbox size={18} />
-            <strong>All clear</strong>
-            <span>New agent updates, reminders and system events will land here.</span>
+            <strong>{t("shell.notifications.empty")}</strong>
+            <span>{t("shell.notifications.emptyBody")}</span>
           </div>
         ) : (
           groupedItems.map((group) => (
@@ -174,7 +176,7 @@ export const NotificationsTray = () => {
                   <span className="notification-row-dot" />
                   <span className="notification-row-copy">
                     <span className="notification-row-meta">
-                      {kindLabel(item.kind)} · {formatDate(item.createdAt, TRAY_FORMAT)}
+                      {t(kindLabelKey(item.kind))} · {formatDate(item.createdAt, TRAY_FORMAT)}
                     </span>
                     <strong>{item.title}</strong>
                     {item.body ? <span>{item.body}</span> : null}

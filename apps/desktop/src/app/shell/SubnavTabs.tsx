@@ -1,4 +1,5 @@
 import { matchPath, NavLink, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import type { NavItem } from "./navigation";
 
@@ -24,6 +25,7 @@ export const isSubnavItemActive = (pathname: string, path: string) => {
 
 export const SubnavTabs = ({ items }: SubnavTabsProps) => {
   const location = useLocation();
+  const { t } = useTranslation();
   const activePath = items.find((item) => isSubnavItemActive(location.pathname, item.path))?.path ?? null;
 
   return (
@@ -41,7 +43,7 @@ export const SubnavTabs = ({ items }: SubnavTabsProps) => {
             end
             draggable={false}
           >
-            {item.label}
+            {t(item.label)}
           </NavLink>
         );
       })}

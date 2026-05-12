@@ -1,4 +1,126 @@
 {
+  "shell": {
+    "nav": {
+      "primary": {
+        "projects": "Projects",
+        "assets": "Assets",
+        "finance": "Finance",
+        "inbox": "Inbox",
+        "automation": "Automation"
+      },
+      "utility": {
+        "catalog": "Catalog",
+        "settings": "Settings"
+      },
+      "project": {
+        "info": "Details",
+        "overview": "Overview",
+        "assets": "Assets",
+        "packing": "Packing",
+        "incidents": "Incidents",
+        "budget": "Budget"
+      },
+      "projects": {
+        "schedule": "Schedule Overview",
+        "projects": "Projects"
+      },
+      "assets": {
+        "assets": "Assets",
+        "licenses": "Licenses",
+        "packingSlips": "Packing Slips",
+        "incidents": "Incidents"
+      },
+      "finance": {
+        "overview": "Overview",
+        "quotes": "Quotes",
+        "entries": "Entries",
+        "reviewQueue": "Review Queue"
+      },
+      "agents": {
+        "overview": "Overview",
+        "team": "Team",
+        "activity": "Activity",
+        "models": "AI Models",
+        "channels": "Channels"
+      }
+    },
+    "topBar": {
+      "search": "Search",
+      "syncIdle": "Sync",
+      "syncFailed": "Sync needs attention",
+      "syncFailedWithCount": "Sync needs attention · {{count}} failed",
+      "syncing": "Syncing · {{count}} queued",
+      "upToDate": "Up to date"
+    },
+    "userMenu": {
+      "closeMenu": "Close user menu",
+      "openMenu": "Open user menu",
+      "signIn": "Sign in",
+      "localFallback": "Local fallback",
+      "setYourName": "Set your name",
+      "noRemoteAuth": "No remote auth",
+      "tapToAuth": "Tap to authenticate",
+      "yourAccount": "Your account",
+      "workspaceSettings": "Workspace settings",
+      "signOut": "Sign out",
+      "signedOut": "Signed out",
+      "signedOutBody": "See you soon.",
+      "signOutFailed": "Sign out failed",
+      "member": "Member"
+    },
+    "workspaceSwitcher": {
+      "switchAria": "Switch workspace · current: {{name}}",
+      "createWorkspace": "Create workspace",
+      "settings": "Settings"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "ariaLabel": "Notifications",
+      "ariaUnread": "{{count}} unread notifications",
+      "unreadTooltip": "{{count}} unread",
+      "markAllRead": "Mark all read",
+      "close": "Close",
+      "loading": "Loading notifications…",
+      "empty": "All clear",
+      "emptyBody": "New agent updates, reminders and system events will land here.",
+      "today": "Today",
+      "kind": {
+        "agent_completion": "Agent",
+        "archive_done": "Archive",
+        "reminder": "Reminder",
+        "invite": "Invite",
+        "sync": "Sync",
+        "system": "System"
+      }
+    },
+    "search": {
+      "ariaLabel": "Global search",
+      "placeholder": "Search assets, projects, units and incidents",
+      "close": "Close search",
+      "recent": "Recent",
+      "escToClose": "Esc to close",
+      "moveHint": "↑↓ to move",
+      "openHint": "to open",
+      "emptyHint": "Search assets, projects, units, incidents, packing slips or agents. Try a code, QR, client or unit name.",
+      "searching": "Searching your local workspace…",
+      "noMatches": "No matches for “{{query}}”. Try an asset code, project name, client or unit."
+    },
+    "compareTray": {
+      "title": "Compare tray",
+      "clearAria": "Clear compare tray",
+      "clearTooltip": "Clear tray",
+      "compare": "Compare {{type}} ({{count}})",
+      "compareUnavailable": "Compare unavailable",
+      "compareTooltipFallback": "Comparison view is not available yet.",
+      "footnoteFallback": "Compare becomes available when you pick matching items.",
+      "removeTooltip": "Remove {{name}}",
+      "types": {
+        "asset": "Assets",
+        "project": "Projects",
+        "financial_entry": "Finance"
+      }
+    }
+  },
   "common": {
     "save": "Save",
     "saveChanges": "Save changes",
