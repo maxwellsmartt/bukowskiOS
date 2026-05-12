@@ -1,5 +1,6 @@
 import { Mail, Save, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { RmaCaseAssetInput, RmaCaseDetailSnapshot, RmaCaseStatus, RmaManufacturerRow, RmaMaintenanceAssetRow } from "@contracts";
 import { SelectField } from "@shared/components/SelectField";
@@ -96,6 +97,7 @@ export const RmaCaseEditorPanel = ({
   onOpenCatalog,
   onSubmit,
 }: RmaCaseEditorPanelProps) => {
+  const { t } = useTranslation();
   const [manufacturerId, setManufacturerId] = useState(initialValue?.caseRecord?.manufacturerId ?? initialDraft?.manufacturerId ?? manufacturers[0]?.id ?? "");
   const [supportEmail, setSupportEmail] = useState(initialValue?.caseRecord?.supportEmail ?? initialDraft?.supportEmail ?? "");
   const [title, setTitle] = useState(initialValue?.caseRecord?.title ?? initialDraft?.title ?? "");
@@ -113,7 +115,7 @@ export const RmaCaseEditorPanel = ({
   );
 
   const selectedAssetIds = Object.keys(selectedAssets);
-  const selectedCountLabel = selectedAssetIds.length === 1 ? "1 asset selected" : `${selectedAssetIds.length} assets selected`;
+  const selectedCountLabel = t("rma.editor.selectedCount", { count: selectedAssetIds.length });
 
   const handleToggleAsset = (asset: AvailableRmaAsset, checked: boolean) => {
     setSelectedAssets((current) => {
@@ -135,20 +137,22 @@ export const RmaCaseEditorPanel = ({
   return (
     <SurfaceCard
       aside={
-        <button aria-label="Close repair case editor" className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("rma.editor.close")} className="surface-card-action" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }
-      title={mode === "create" ? "New repair case" : "Edit repair case"}
+      title={mode === "create" ? t("rma.editor.newTitle") : t("rma.editor.editTitle")}
     >
       <div className="action-panel-summary">
         <span>{selectedCountLabel}</span>
-        {mode === "edit" && initialValue?.caseRecord ? <StatusBadge>{initialValue.caseRecord.status}</StatusBadge> : null}
+        {mode === "edit" && initialValue?.caseRecord ? (
+          <StatusBadge>{t(`rma.statuses.${initialValue.caseRecord.status}`, { defaultValue: initialValue.caseRecord.status })}</StatusBadge>
+        ) : null}
       </div>
 
       <div className="action-form-grid">
         <label className="action-field">
-          <span className="action-field-label">Manufacturer</span>
+          <span className="action-field-label">{t("rma.editor.manufacturer")}</span>
           <SelectField
             onChange={(event) => {
               const nextId = event.target.value;
@@ -158,7 +162,7 @@ export const RmaCaseEditorPanel = ({
             }}
             value={manufacturerId}
           >
-            <option value="">Choose manufacturer</option>
+            <option value="">{t("rma.editor.chooseManufacturer")}</option>
             {manufacturers.map((manufacturer) => (
               <option key={manufacturer.id} value={manufacturer.id}>
                 {manufacturer.name}
@@ -168,32 +172,32 @@ export const RmaCaseEditorPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Support email</span>
+          <span className="action-field-label">{t("rma.editor.supportEmail")}</span>
           <input
             className="action-field-control"
             onChange={(event) => setSupportEmail(event.target.value)}
-            placeholder={manufacturerEmail || "support@manufacturer.com"}
+            placeholder={manufacturerEmail || t("rma.editor.supportEmailPlaceholder")}
             type="email"
             value={supportEmail}
           />
         </label>
 
         <label className="action-field action-field-wide">
-          <span className="action-field-label">Case title</span>
+          <span className="action-field-label">{t("rma.editor.caseTitle")}</span>
           <input
             className="action-field-control"
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="Ex: Bench review for damaged wireless kit"
+            placeholder={t("rma.editor.caseTitlePlaceholder")}
             value={title}
           />
         </label>
 
         <label className="action-field action-field-wide">
-          <span className="action-field-label">Problem summary</span>
+          <span className="action-field-label">{t("rma.editor.problemSummary")}</span>
           <textarea
             className="action-field-control action-textarea"
             onChange={(event) => setProblemSummary(event.target.value)}
-            placeholder="Describe what support should review."
+            placeholder={t("rma.editor.problemSummaryPlaceholder")}
             rows={3}
             value={problemSummary}
           />
@@ -201,15 +205,15 @@ export const RmaCaseEditorPanel = ({
       </div>
 
       <details className="detail-disclosure">
-        <summary className="detail-disclosure-summary">More details</summary>
+        <summary className="detail-disclosure-summary">{t("rma.editor.moreDetails")}</summary>
         <div className="detail-disclosure-content">
           <div className="action-form-grid">
             <label className="action-field action-field-wide">
-              <span className="action-field-label">Notes</span>
+              <span className="action-field-label">{t("rma.editor.notes")}</span>
               <textarea
                 className="action-field-control action-textarea"
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Shipping, warranty or follow-up notes"
+                placeholder={t("rma.editor.notesPlaceholder")}
                 rows={3}
                 value={notes}
               />
@@ -217,11 +221,11 @@ export const RmaCaseEditorPanel = ({
 
             {mode === "edit" ? (
               <label className="action-field">
-                <span className="action-field-label">Status</span>
+                <span className="action-field-label">{t("rma.editor.status")}</span>
                 <SelectField onChange={(event) => setStatus(event.target.value as RmaCaseStatus)} value={status}>
                   {statusOptions.map((option) => (
                     <option key={option} value={option}>
-                      {option}
+                      {t(`rma.statuses.${option}`, { defaultValue: option })}
                     </option>
                   ))}
                 </SelectField>
@@ -233,12 +237,12 @@ export const RmaCaseEditorPanel = ({
 
       <div className="surface-card-header rma-editor-assets-header">
         <div>
-          <h3 className="surface-card-title">Assets in maintenance</h3>
+          <h3 className="surface-card-title">{t("rma.editor.assetsInMaintenance")}</h3>
         </div>
         {onOpenCatalog ? (
           <button className="ghost-control" onClick={onOpenCatalog} type="button">
             <Mail size={14} />
-            <span>Manufacturers</span>
+            <span>{t("rma.editor.manufacturers")}</span>
           </button>
         ) : null}
       </div>
@@ -260,20 +264,20 @@ export const RmaCaseEditorPanel = ({
                 <div className="rma-asset-copy">
                   <strong>{asset.name}</strong>
                   <span>
-                    {[asset.brand, asset.model].filter(Boolean).join(" · ") || "Model pending"} · {asset.location}
+                    {[asset.brand, asset.model].filter(Boolean).join(" · ") || t("rma.fallbacks.modelPending")} · {asset.location}
                   </span>
                 </div>
               </div>
 
               <div className="rma-asset-card-meta">
-                <span>Serial: {asset.serialNumber || "Pending"}</span>
-                <span>{asset.latestIssue || "Needs review."}</span>
+                <span>{t("rma.editor.serial", { value: asset.serialNumber || t("rma.fallbacks.pending") })}</span>
+                <span>{asset.latestIssue || t("rma.statuses.Needs review")}</span>
               </div>
 
               {selection ? (
                 <div className="rma-asset-card-fields">
                   <label className="action-field">
-                    <span className="action-field-label">Equipment year</span>
+                    <span className="action-field-label">{t("rma.editor.equipmentYear")}</span>
                     <input
                       className="action-field-control"
                       inputMode="numeric"
@@ -286,13 +290,13 @@ export const RmaCaseEditorPanel = ({
                           },
                         }))
                       }
-                      placeholder="Optional"
+                      placeholder={t("common.optional")}
                       value={selection.equipmentYear}
                     />
                   </label>
 
                   <label className="action-field action-field-wide">
-                    <span className="action-field-label">Issue summary</span>
+                    <span className="action-field-label">{t("rma.editor.issueSummary")}</span>
                     <textarea
                       className="action-field-control action-textarea"
                       onChange={(event) =>
@@ -319,7 +323,7 @@ export const RmaCaseEditorPanel = ({
 
       <div className="action-panel-actions">
         <button className="ghost-control cancel-control" onClick={onClose} type="button">
-          Cancel
+          {t("common.cancel")}
         </button>
 
         <button
@@ -343,7 +347,7 @@ export const RmaCaseEditorPanel = ({
           type="button"
         >
           <Save size={14} />
-          <span>{isSubmitting ? "Saving..." : mode === "create" ? "Create case" : "Save case"}</span>
+          <span>{isSubmitting ? t("common.saving") : mode === "create" ? t("rma.editor.createCase") : t("rma.editor.saveCase")}</span>
         </button>
       </div>
     </SurfaceCard>
@@ -353,6 +357,7 @@ export const RmaCaseEditorPanel = ({
 export const buildAvailableRmaAssets = (
   maintenanceAssets: RmaMaintenanceAssetRow[],
   detail: RmaCaseDetailSnapshot | null,
+  linkedLocationLabel = "Already linked to case",
 ): AvailableRmaAsset[] => {
   const maintenanceMap = new Map(
     maintenanceAssets.map((asset) => [
@@ -377,7 +382,7 @@ export const buildAvailableRmaAssets = (
         brand: asset.brand,
         model: asset.model,
         serialNumber: asset.serialNumber,
-        location: "Already linked to case",
+        location: linkedLocationLabel,
         latestIssue: asset.issueSummary,
       });
     }

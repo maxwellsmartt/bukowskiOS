@@ -1,5 +1,6 @@
 import { Mail, Plus, SquarePen } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import type { RmaCaseStatus } from "@contracts";
@@ -23,6 +24,7 @@ import { buildRmaMailtoUrl, resolveRmaStatusTone, rmaStatusActions } from "./rma
 import { createRmaCase, updateRmaCase, useRmaCaseDetail, useRmaSnapshot } from "./useRmaData";
 
 export const RmaPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
   const { data: snapshot, error: snapshotError, reload: reloadSnapshot } = useRmaSnapshot({
@@ -72,8 +74,8 @@ export const RmaPage = () => {
   }, [pendingRmaCaseId, snapshot.cases]);
 
   const availableAssets = useMemo(
-    () => buildAvailableRmaAssets(snapshot.maintenanceAssets, editorMode === "edit" ? detail : null),
-    [detail, editorMode, snapshot.maintenanceAssets],
+    () => buildAvailableRmaAssets(snapshot.maintenanceAssets, editorMode === "edit" ? detail : null, t("rma.editor.alreadyLinked")),
+    [detail, editorMode, snapshot.maintenanceAssets, t],
   );
 
   const handleSubmit = async (draft: RmaCaseEditorDraft) => {
@@ -97,7 +99,7 @@ export const RmaPage = () => {
         });
 
         await Promise.all([reloadSnapshot(), reloadDetail()]);
-        toast.success("Updated", result.summary);
+        toast.success(t("rma.toasts.updated"), result.summary);
       } else {
         const result = await createRmaCase({
           commandId: crypto.randomUUID(),
@@ -115,14 +117,14 @@ export const RmaPage = () => {
         await reloadSnapshot();
         setPendingRmaCaseId(result.rmaCaseId);
         setActiveRmaCaseId(result.rmaCaseId);
-        toast.success("Updated", result.summary);
+        toast.success(t("rma.toasts.updated"), result.summary);
       }
 
       setEditorError(null);
       setInitialDraft(null);
       setEditorMode(null);
     } catch (nextError) {
-      setEditorError(getUserFacingErrorMessage(nextError, "Unable to save repair case."));
+      setEditorError(getUserFacingErrorMessage(nextError, t("rma.toasts.saveFailed")));
     } finally {
       setIsSubmitting(false);
     }
@@ -155,10 +157,10 @@ export const RmaPage = () => {
       });
 
       await Promise.all([reloadSnapshot(), reloadDetail()]);
-      toast.success("Updated", result.summary);
+      toast.success(t("rma.toasts.updated"), result.summary);
       setEditorError(null);
     } catch (nextError) {
-      setEditorError(getUserFacingErrorMessage(nextError, "Unable to update repair status."));
+      setEditorError(getUserFacingErrorMessage(nextError, t("rma.toasts.statusFailed")));
     } finally {
       setIsSubmitting(false);
     }
@@ -176,8 +178,8 @@ export const RmaPage = () => {
   return (
     <div className="page-stack">
       <SectionHeader
-        title="Repair cases"
-        body="Manufacturer RMAs, warranty claims and repair workflows."
+        title={t("rma.title")}
+        body={t("rma.body")}
         titleTone="accent"
       />
 
@@ -185,18 +187,18 @@ export const RmaPage = () => {
 
       {isEmpty ? (
         <GuidedEmptyState
-          title="No repair cases yet"
-          body="Open an RMA when you need to send equipment to a manufacturer for warranty work or paid repair. You can always start one from an incident as well."
-          actionLabel="New repair case"
+          title={t("rma.empty.title")}
+          body={t("rma.empty.body")}
+          actionLabel={t("rma.empty.action")}
           onAction={beginCreate}
           tips={[
-            "Each case groups one or more assets sent to the same manufacturer.",
-            "Status moves from Needs review → Sent to repair → Repaired/Returned.",
-            "You can draft a support email straight from the case detail.",
+            t("rma.empty.tipOne"),
+            t("rma.empty.tipTwo"),
+            t("rma.empty.tipThree"),
           ]}
         />
       ) : (
-        <SurfaceCard title="Maintenance watch">
+        <SurfaceCard title={t("rma.maintenance.title")}>
           <DataTable
             getRowId={(row) => row.id}
             maxHeight="min(28vh, 240px)"
@@ -204,20 +206,20 @@ export const RmaPage = () => {
             columns={[
               {
                 key: "asset",
-                label: "Asset",
+                label: t("rma.columns.asset"),
                 render: (row) => (
                   <div className="identity-cell">
                     <span className="identity-title">{row.name}</span>
-                    <span className="identity-meta">{[row.brand, row.model].filter(Boolean).join(" · ") || "Model pending"}</span>
+                    <span className="identity-meta">{[row.brand, row.model].filter(Boolean).join(" · ") || t("rma.fallbacks.modelPending")}</span>
                   </div>
                 ),
               },
-              { key: "serial", label: "Serial", render: (row) => row.serialNumber || "Pending" },
-              { key: "location", label: "Location", render: (row) => row.location },
-              { key: "issue", label: "Latest issue", render: (row) => row.latestIssue },
+              { key: "serial", label: t("rma.columns.serial"), render: (row) => row.serialNumber || t("rma.fallbacks.pending") },
+              { key: "location", label: t("rma.columns.location"), render: (row) => row.location },
+              { key: "issue", label: t("rma.columns.latestIssue"), render: (row) => row.latestIssue },
             ]}
             rows={snapshot.maintenanceAssets}
-            emptyMessage="No assets currently flagged for maintenance."
+            emptyMessage={t("rma.maintenance.empty")}
           />
         </SurfaceCard>
       )}
@@ -234,10 +236,10 @@ export const RmaPage = () => {
             aside={
               <button className="action-primary-button" onClick={beginCreate} type="button">
                 <Plus size={14} />
-                <span>New repair case</span>
+                <span>{t("rma.newCase")}</span>
               </button>
             }
-            title="Cases"
+            title={t("rma.cases.title")}
           >
             <DataTable
               activeRowId={activeRmaCaseId}
@@ -248,7 +250,7 @@ export const RmaPage = () => {
               columns={[
                 {
                   key: "title",
-                  label: "Case",
+                  label: t("rma.columns.case"),
                   render: (row) => (
                     <div className="identity-cell">
                       <span className="identity-title">{row.title}</span>
@@ -256,15 +258,19 @@ export const RmaPage = () => {
                     </div>
                   ),
                 },
-                { key: "support", label: "Support", render: (row) => row.supportEmail || "Pending" },
+                { key: "support", label: t("rma.columns.support"), render: (row) => row.supportEmail || t("rma.fallbacks.pending") },
                 {
                   key: "status",
-                  label: "Status",
-                  render: (row) => <StatusBadge tone={resolveRmaStatusTone(row.status)}>{row.status}</StatusBadge>,
+                  label: t("rma.columns.status"),
+                  render: (row) => (
+                    <StatusBadge tone={resolveRmaStatusTone(row.status)}>
+                      {t(`rma.statuses.${row.status}`, { defaultValue: row.status })}
+                    </StatusBadge>
+                  ),
                 },
-                { key: "assets", label: "Assets", align: "right", render: (row) => row.assetCount },
+                { key: "assets", label: t("rma.columns.assets"), align: "right", render: (row) => row.assetCount },
               ]}
-              emptyMessage="No repair cases yet."
+              emptyMessage={t("rma.cases.empty")}
               onRowClick={(row) => {
                 setActiveRmaCaseId(row.id);
                 setEditorMode(null);
@@ -306,7 +312,7 @@ export const RmaPage = () => {
                       type="button"
                     >
                       <SquarePen size={14} />
-                      <span>Edit</span>
+                      <span>{t("common.edit")}</span>
                     </button>
                     <button
                       className="ghost-control"
@@ -320,40 +326,42 @@ export const RmaPage = () => {
                       type="button"
                     >
                       <Mail size={14} />
-                      <span>Open draft email</span>
+                      <span>{t("rma.actions.openDraftEmail")}</span>
                     </button>
                   </div>
                 ) : null
               }
-              title={detail.caseRecord ? detail.caseRecord.title : "Case details"}
+              title={detail.caseRecord ? detail.caseRecord.title : t("rma.detail.title")}
             >
               {detailError ? <div className="action-feedback action-feedback-error">{detailError}</div> : null}
               {editorError && !editorMode ? <div className="action-feedback action-feedback-error">{editorError}</div> : null}
-              {!detail.caseRecord && !detailLoading ? <div className="empty-state">Select a case to see its details.</div> : null}
+              {!detail.caseRecord && !detailLoading ? <div className="empty-state">{t("rma.detail.empty")}</div> : null}
 
               {detail.caseRecord ? (
                 <div className="page-stack">
                   <div className="summary-grid compact-summary-grid">
                     <div className="summary-row">
-                      <span className="summary-label">Manufacturer</span>
+                      <span className="summary-label">{t("rma.detail.manufacturer")}</span>
                       <span className="summary-value">{detail.caseRecord.manufacturerName}</span>
                     </div>
                     <div className="summary-row">
-                      <span className="summary-label">Support email</span>
-                      <span className="summary-value">{detail.caseRecord.supportEmail || "Pending"}</span>
+                      <span className="summary-label">{t("rma.detail.supportEmail")}</span>
+                      <span className="summary-value">{detail.caseRecord.supportEmail || t("rma.fallbacks.pending")}</span>
                     </div>
                     <div className="summary-row">
-                      <span className="summary-label">Contact</span>
-                      <span className="summary-value">{detail.caseRecord.contactName || "Pending"}</span>
+                      <span className="summary-label">{t("rma.detail.contact")}</span>
+                      <span className="summary-value">{detail.caseRecord.contactName || t("rma.fallbacks.pending")}</span>
                     </div>
                     <div className="summary-row">
-                      <span className="summary-label">Phone</span>
-                      <span className="summary-value">{detail.caseRecord.phone || "Pending"}</span>
+                      <span className="summary-label">{t("rma.detail.phone")}</span>
+                      <span className="summary-value">{detail.caseRecord.phone || t("rma.fallbacks.pending")}</span>
                     </div>
                   </div>
 
                   <div className="chip-row">
-                    <StatusBadge tone={resolveRmaStatusTone(detail.caseRecord.status)}>{detail.caseRecord.status}</StatusBadge>
+                    <StatusBadge tone={resolveRmaStatusTone(detail.caseRecord.status)}>
+                      {t(`rma.statuses.${detail.caseRecord.status}`, { defaultValue: detail.caseRecord.status })}
+                    </StatusBadge>
                     {rmaStatusActions
                       .filter((action) => action.status !== detail.caseRecord?.status)
                       .map((action) => (
@@ -364,19 +372,19 @@ export const RmaPage = () => {
                           onClick={() => void handleUpdateStatus(action.status)}
                           type="button"
                         >
-                          {action.label}
+                          {t(action.labelKey, { defaultValue: action.label })}
                         </button>
                       ))}
                   </div>
 
                   <div className="summary-row">
-                    <span className="summary-label">Problem summary</span>
+                    <span className="summary-label">{t("rma.detail.problemSummary")}</span>
                     <span className="summary-value">{detail.caseRecord.problemSummary}</span>
                   </div>
 
                   {detail.caseRecord.notes ? (
                     <div className="summary-row">
-                      <span className="summary-label">Internal notes</span>
+                      <span className="summary-label">{t("rma.detail.internalNotes")}</span>
                       <span className="summary-value">{detail.caseRecord.notes}</span>
                     </div>
                   ) : null}
@@ -385,17 +393,17 @@ export const RmaPage = () => {
                     columns={[
                       {
                         key: "asset",
-                        label: "Asset",
+                        label: t("rma.columns.asset"),
                         render: (row) => (
                           <div className="identity-cell">
                             <span className="identity-title">{row.assetName}</span>
-                            <span className="identity-meta">{[row.brand, row.model].filter(Boolean).join(" · ") || "Model pending"}</span>
+                            <span className="identity-meta">{[row.brand, row.model].filter(Boolean).join(" · ") || t("rma.fallbacks.modelPending")}</span>
                           </div>
                         ),
                       },
-                      { key: "serial", label: "Serial", render: (row) => row.serialNumber || "Pending" },
-                      { key: "year", label: "Year", render: (row) => row.equipmentYear || "Pending" },
-                      { key: "issue", label: "Issue", render: (row) => row.issueSummary },
+                      { key: "serial", label: t("rma.columns.serial"), render: (row) => row.serialNumber || t("rma.fallbacks.pending") },
+                      { key: "year", label: t("rma.columns.year"), render: (row) => row.equipmentYear || t("rma.fallbacks.pending") },
+                      { key: "issue", label: t("rma.columns.issue"), render: (row) => row.issueSummary },
                     ]}
                     maxHeight="min(34vh, 300px)"
                     persistKey="rma-page-case-assets"

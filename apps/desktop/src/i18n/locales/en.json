@@ -525,6 +525,7 @@
     "couldNotSave": "Could not save",
     "never": "Never",
     "none": "None",
+    "optional": "Optional",
     "listToolbar": {
       "searchAria": "Search current view",
       "sort": "Sort",
@@ -534,6 +535,247 @@
       "direction": "Direction",
       "ascending": "Ascending",
       "descending": "Descending"
+    }
+  },
+  "incidents": {
+    "title": "Incidents",
+    "cardTitle": "Incidents",
+    "resultLabel": "incidents",
+    "unavailable": "Incidents unavailable: {{message}}",
+    "catalogUnavailable": "Incident catalog unavailable: {{message}}",
+    "repairUnavailable": "Repair cases unavailable: {{message}}",
+    "loading": "Loading incidents…",
+    "sort": {
+      "reportedAt": "Reported date",
+      "title": "Title",
+      "asset": "Asset",
+      "project": "Project",
+      "responsible": "Responsible",
+      "severity": "Severity",
+      "costEstimate": "Cost estimate",
+      "status": "Status"
+    },
+    "toolbar": {
+      "searchPlaceholder": "Search incidents, projects or crew",
+      "searchPlaceholderProject": "Search incidents, assets or crew"
+    },
+    "columns": {
+      "incident": "Incident",
+      "project": "Project",
+      "responsible": "Responsible",
+      "severity": "Severity",
+      "costEstimate": "Cost estimate",
+      "status": "Status"
+    },
+    "actionBar": {
+      "title": "Report an issue",
+      "subtitle": "Track open issues and repair follow-up.",
+      "thisProject": "This project",
+      "report": "Report incident"
+    },
+    "severity": {
+      "Low": "Low",
+      "Medium": "Medium",
+      "High": "High"
+    },
+    "statuses": {
+      "Open": "Open",
+      "In review": "In review",
+      "Resolved": "Resolved"
+    },
+    "types": {
+      "damage": "Damage",
+      "loss": "Loss",
+      "malfunction": "Malfunction",
+      "missing_part": "Missing part",
+      "other": "Other"
+    },
+    "report": {
+      "title": "Report incident",
+      "close": "Close incident panel",
+      "noAssetLinked": "No asset linked",
+      "projectSelected": "Project selected",
+      "asset": "Asset",
+      "noAsset": "No asset",
+      "project": "Project",
+      "noProject": "No project",
+      "incidentType": "Incident type",
+      "severity": "Severity",
+      "incidentTitle": "Title",
+      "titlePlaceholder": "Short title",
+      "description": "Description",
+      "descriptionPlaceholder": "What happened?",
+      "moreDetails": "More details",
+      "unit": "Unit",
+      "noSpecificUnit": "No specific unit",
+      "chooseProjectFirst": "Choose project first",
+      "department": "Department",
+      "noDepartment": "No department",
+      "responsible": "Responsible",
+      "autoUnassigned": "Auto / unassigned",
+      "costEstimate": "Cost estimate",
+      "notes": "Notes",
+      "optionalNote": "Optional note",
+      "create": "Create incident"
+    },
+    "detail": {
+      "emptyTitle": "Incident Details",
+      "emptyBody": "No incident selected.",
+      "close": "Close incident detail",
+      "repairLinked": "Repair case linked",
+      "repairFollowUp": "Repair follow-up",
+      "repairFollowUpBody": "Create a repair case from this incident and remove the asset from availability while it is reviewed.",
+      "openRepairCase": "Open repair case",
+      "createRepairCase": "Create repair case",
+      "asset": "Asset",
+      "project": "Project",
+      "department": "Department",
+      "reported": "Reported",
+      "resolved": "Resolved",
+      "stillOpen": "Still open",
+      "title": "Title",
+      "description": "Description",
+      "severity": "Severity",
+      "status": "Status",
+      "responsible": "Responsible",
+      "unassigned": "Unassigned",
+      "resolutionNotes": "Resolution notes",
+      "resolutionPlaceholder": "What was fixed, who handled it, and what follow-up remains?",
+      "noRepairPossible": "No repair possible",
+      "noRepairBody": "Keep the asset in history, but remove it from assignment and packing availability.",
+      "moreDetails": "More details",
+      "costEstimate": "Cost estimate",
+      "financialStatus": "Financial status",
+      "notes": "Notes",
+      "update": "Update incident",
+      "applying": "Applying…",
+      "alreadyResolved": "Already resolved",
+      "resolve": "Resolve incident"
+    },
+    "files": {
+      "title": "Files",
+      "attached": "Files attached",
+      "attachFailed": "Unable to attach files to this incident.",
+      "uploading": "Uploading…",
+      "attach": "Attach files",
+      "openFailed": "Unable to open that incident file.",
+      "opening": "Opening…",
+      "open": "Open",
+      "empty": "No files attached.",
+      "statuses": {
+        "available": "Available",
+        "missing": "Missing",
+        "deleted": "Deleted"
+      }
+    },
+    "repair": {
+      "cardTitle": "Repair cases",
+      "cardSubtitle": "Manufacturer RMAs and warranty claims now live on their own page.",
+      "open": "Open repair cases",
+      "body": "From an incident detail, use “Open repair case” to jump straight there with the asset pre-selected."
+    },
+    "toasts": {
+      "reported": "Incident reported",
+      "createFailed": "Unable to create incident.",
+      "resolved": "Incident resolved",
+      "resolveFailed": "Unable to resolve incident.",
+      "updated": "Incident updated",
+      "updateFailed": "Unable to update incident."
+    }
+  },
+  "rma": {
+    "title": "Repair cases",
+    "body": "Manufacturer RMAs, warranty claims and repair workflows.",
+    "newCase": "New repair case",
+    "fallbacks": {
+      "pending": "Pending",
+      "modelPending": "Model pending"
+    },
+    "columns": {
+      "asset": "Asset",
+      "serial": "Serial",
+      "location": "Location",
+      "latestIssue": "Latest issue",
+      "case": "Case",
+      "support": "Support",
+      "status": "Status",
+      "assets": "Assets",
+      "year": "Year",
+      "issue": "Issue"
+    },
+    "statuses": {
+      "Needs review": "Needs review",
+      "Sent to repair": "Sent to repair",
+      "Waiting parts": "Waiting parts",
+      "Repaired": "Repaired",
+      "No repair / retired": "No repair / retired",
+      "Returned to inventory": "Returned to inventory"
+    },
+    "actions": {
+      "sendToRepair": "Send to repair",
+      "waitingParts": "Waiting parts",
+      "markRepaired": "Mark repaired",
+      "noRepair": "No repair",
+      "returnToInventory": "Return to inventory",
+      "openDraftEmail": "Open draft email"
+    },
+    "empty": {
+      "title": "No repair cases yet",
+      "body": "Open an RMA when you need to send equipment to a manufacturer for warranty work or paid repair. You can always start one from an incident as well.",
+      "action": "New repair case",
+      "tipOne": "Each case groups one or more assets sent to the same manufacturer.",
+      "tipTwo": "Status moves from Needs review → Sent to repair → Repaired/Returned.",
+      "tipThree": "You can draft a support email straight from the case detail."
+    },
+    "maintenance": {
+      "title": "Maintenance watch",
+      "empty": "No assets currently flagged for maintenance."
+    },
+    "cases": {
+      "title": "Cases",
+      "empty": "No repair cases yet."
+    },
+    "detail": {
+      "title": "Case details",
+      "empty": "Select a case to see its details.",
+      "manufacturer": "Manufacturer",
+      "supportEmail": "Support email",
+      "contact": "Contact",
+      "phone": "Phone",
+      "problemSummary": "Problem summary",
+      "internalNotes": "Internal notes"
+    },
+    "editor": {
+      "selectedCount_one": "{{count}} asset selected",
+      "selectedCount_other": "{{count}} assets selected",
+      "close": "Close repair case editor",
+      "newTitle": "New repair case",
+      "editTitle": "Edit repair case",
+      "manufacturer": "Manufacturer",
+      "chooseManufacturer": "Choose manufacturer",
+      "supportEmail": "Support email",
+      "supportEmailPlaceholder": "support@manufacturer.com",
+      "caseTitle": "Case title",
+      "caseTitlePlaceholder": "Ex: Bench review for damaged wireless kit",
+      "problemSummary": "Problem summary",
+      "problemSummaryPlaceholder": "Describe what support should review.",
+      "moreDetails": "More details",
+      "notes": "Notes",
+      "notesPlaceholder": "Shipping, warranty or follow-up notes",
+      "status": "Status",
+      "assetsInMaintenance": "Assets in maintenance",
+      "manufacturers": "Manufacturers",
+      "alreadyLinked": "Already linked to case",
+      "serial": "Serial: {{value}}",
+      "equipmentYear": "Equipment year",
+      "issueSummary": "Issue summary",
+      "createCase": "Create case",
+      "saveCase": "Save case"
+    },
+    "toasts": {
+      "updated": "Updated",
+      "saveFailed": "Unable to save repair case.",
+      "statusFailed": "Unable to update repair status."
     }
   },
   "settings": {

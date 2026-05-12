@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { CatalogSnapshot, IncidentDetailSnapshot } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
@@ -106,6 +107,7 @@ export const IncidentDetailPanel = ({
   onResolve,
   onUpdate,
 }: IncidentDetailPanelProps) => {
+  const { t } = useTranslation();
   const toast = useToast();
   const { formatDate } = useLocale();
   const incident = detail.incident;
@@ -142,8 +144,8 @@ export const IncidentDetailPanel = ({
 
   if (!incident) {
     return (
-      <SurfaceCard title="Incident Details">
-        <div className="empty-state">No incident selected.</div>
+      <SurfaceCard title={t("incidents.detail.emptyTitle")}>
+        <div className="empty-state">{t("incidents.detail.emptyBody")}</div>
       </SurfaceCard>
     );
   }
@@ -151,7 +153,7 @@ export const IncidentDetailPanel = ({
   return (
     <SurfaceCard
       aside={
-        <button aria-label="Close incident detail" className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("incidents.detail.close")} className="surface-card-action" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }
@@ -159,29 +161,31 @@ export const IncidentDetailPanel = ({
     >
       <div className="page-stack">
         <div className="entity-detail-status-row">
-          <StatusBadge tone={resolveStatusTone(incident.status)}>{incident.status}</StatusBadge>
+          <StatusBadge tone={resolveStatusTone(incident.status)}>
+            {t(`incidents.statuses.${incident.status}`, { defaultValue: incident.status })}
+          </StatusBadge>
           <StatusBadge tone={incident.severity === "High" ? "critical" : incident.severity === "Medium" ? "warning" : "neutral"}>
-            {incident.severity}
+            {t(`incidents.severity.${incident.severity}`, { defaultValue: incident.severity })}
           </StatusBadge>
         </div>
 
         {incident.assetId ? (
           <div className="incident-repair-handoff">
             <div className="incident-repair-handoff-copy">
-              <strong>{repairCase ? "Repair case linked" : "Repair follow-up"}</strong>
+              <strong>{repairCase ? t("incidents.detail.repairLinked") : t("incidents.detail.repairFollowUp")}</strong>
               <span>
                 {repairCase
-                  ? `${repairCase.title} · ${repairCase.status}`
-                  : "Create a repair case from this incident and remove the asset from availability while it is reviewed."}
+                  ? `${repairCase.title} · ${t(`rma.statuses.${repairCase.status}`, { defaultValue: repairCase.status })}`
+                  : t("incidents.detail.repairFollowUpBody")}
               </span>
             </div>
             {repairCase && onOpenRepairCase ? (
               <button className="ghost-control" onClick={() => onOpenRepairCase?.(repairCase.id)} type="button">
-                Open repair case
+                {t("incidents.detail.openRepairCase")}
               </button>
             ) : incident.status !== "Resolved" && onCreateRepairCase ? (
               <button className="ghost-control" onClick={onCreateRepairCase} type="button">
-                Create repair case
+                {t("incidents.detail.createRepairCase")}
               </button>
             ) : null}
           </div>
@@ -189,35 +193,35 @@ export const IncidentDetailPanel = ({
 
         <div className="summary-grid compact-summary-grid">
           <div className="summary-row">
-            <span className="summary-label">Asset</span>
+            <span className="summary-label">{t("incidents.detail.asset")}</span>
             <span className="summary-value">{incident.asset}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Project</span>
+            <span className="summary-label">{t("incidents.detail.project")}</span>
             <span className="summary-value">{incident.project}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Department</span>
+            <span className="summary-label">{t("incidents.detail.department")}</span>
             <span className="summary-value">{incident.department}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Reported</span>
+            <span className="summary-label">{t("incidents.detail.reported")}</span>
             <span className="summary-value">{incident.reportedAt}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Resolved</span>
-            <span className="summary-value">{incident.resolvedAt ?? "Still open"}</span>
+            <span className="summary-label">{t("incidents.detail.resolved")}</span>
+            <span className="summary-value">{incident.resolvedAt ?? t("incidents.detail.stillOpen")}</span>
           </div>
         </div>
 
         <div className="action-form-grid">
           <label className="action-field action-field-wide">
-            <span className="action-field-label">Title</span>
+            <span className="action-field-label">{t("incidents.detail.title")}</span>
             <input className="action-field-control" onChange={(event) => setTitle(event.target.value)} value={title} />
           </label>
 
           <label className="action-field action-field-wide">
-            <span className="action-field-label">Description</span>
+            <span className="action-field-label">{t("incidents.detail.description")}</span>
             <textarea
               className="action-field-control action-textarea"
               onChange={(event) => setDescription(event.target.value)}
@@ -227,31 +231,31 @@ export const IncidentDetailPanel = ({
           </label>
 
           <label className="action-field">
-            <span className="action-field-label">Severity</span>
+            <span className="action-field-label">{t("incidents.detail.severity")}</span>
             <SelectField onChange={(event) => setSeverity(event.target.value)} value={severity}>
               {severityOptions.map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {t(`incidents.severity.${option}`, { defaultValue: option })}
                 </option>
               ))}
             </SelectField>
           </label>
 
           <label className="action-field">
-            <span className="action-field-label">Status</span>
+            <span className="action-field-label">{t("incidents.detail.status")}</span>
             <SelectField onChange={(event) => setStatus(event.target.value)} value={status}>
               {statusOptions.map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {t(`incidents.statuses.${option}`, { defaultValue: option })}
                 </option>
               ))}
             </SelectField>
           </label>
 
           <label className="action-field">
-            <span className="action-field-label">Responsible</span>
+            <span className="action-field-label">{t("incidents.detail.responsible")}</span>
             <SelectField onChange={(event) => setResponsibleUserId(event.target.value)} value={responsibleUserId}>
-              <option value="">Unassigned</option>
+              <option value="">{t("incidents.detail.unassigned")}</option>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.fullName}
@@ -261,11 +265,11 @@ export const IncidentDetailPanel = ({
           </label>
 
           <label className="action-field action-field-wide">
-            <span className="action-field-label">Resolution notes</span>
+            <span className="action-field-label">{t("incidents.detail.resolutionNotes")}</span>
             <textarea
               className="action-field-control action-textarea"
               onChange={(event) => setResolutionNotes(event.target.value)}
-              placeholder="What was fixed, who handled it, and what follow-up remains?"
+              placeholder={t("incidents.detail.resolutionPlaceholder")}
               rows={3}
               value={resolutionNotes}
             />
@@ -280,40 +284,40 @@ export const IncidentDetailPanel = ({
                 type="checkbox"
               />
               <span className="incident-retire-option-copy">
-                <strong>No repair possible</strong>
-                <span>Keep the asset in history, but remove it from assignment and packing availability.</span>
+                <strong>{t("incidents.detail.noRepairPossible")}</strong>
+                <span>{t("incidents.detail.noRepairBody")}</span>
               </span>
             </label>
           ) : null}
         </div>
 
         <details className="detail-disclosure">
-          <summary className="detail-disclosure-summary">More details</summary>
+          <summary className="detail-disclosure-summary">{t("incidents.detail.moreDetails")}</summary>
           <div className="detail-disclosure-content">
             <div className="action-form-grid">
               <label className="action-field">
-                <span className="action-field-label">Cost estimate</span>
+                  <span className="action-field-label">{t("incidents.detail.costEstimate")}</span>
                 <input
                   className="action-field-control"
                   inputMode="decimal"
                   onChange={(event) => setCostEstimate(event.target.value)}
-                  placeholder="Optional"
+                  placeholder={t("common.optional")}
                   value={costEstimate}
                 />
               </label>
 
               <label className="action-field">
-                <span className="action-field-label">Financial status</span>
+                  <span className="action-field-label">{t("incidents.detail.financialStatus")}</span>
                 <input
                   className="action-field-control"
                   onChange={(event) => setFinancialStatus(event.target.value)}
-                  placeholder="Optional"
+                  placeholder={t("common.optional")}
                   value={financialStatus}
                 />
               </label>
 
               <label className="action-field action-field-wide">
-                <span className="action-field-label">Notes</span>
+                  <span className="action-field-label">{t("incidents.detail.notes")}</span>
                 <textarea
                   className="action-field-control action-textarea"
                   onChange={(event) => setNotes(event.target.value)}
@@ -326,7 +330,7 @@ export const IncidentDetailPanel = ({
         </details>
 
         <SurfaceCard
-          title="Files"
+          title={t("incidents.files.title")}
           aside={
             <button
               className="surface-card-action-text"
@@ -337,10 +341,10 @@ export const IncidentDetailPanel = ({
                   try {
                     setIsUploadingFiles(true);
                     const result = await uploadIncidentFiles(incident.id);
-                    toast.success("Files attached", result.summary);
+                    toast.success(t("incidents.files.attached"), result.summary);
                     await onRefresh();
                   } catch (nextError) {
-                    setFilesError(getUserFacingErrorMessage(nextError, "Unable to attach files to this incident."));
+                    setFilesError(getUserFacingErrorMessage(nextError, t("incidents.files.attachFailed")));
                   } finally {
                     setIsUploadingFiles(false);
                   }
@@ -348,7 +352,7 @@ export const IncidentDetailPanel = ({
               }}
               type="button"
             >
-              {isUploadingFiles ? "Uploading..." : "Attach files"}
+              {isUploadingFiles ? t("incidents.files.uploading") : t("incidents.files.attach")}
             </button>
           }
         >
@@ -359,7 +363,9 @@ export const IncidentDetailPanel = ({
                   <div className="entity-file-main">
                     <div className="entity-file-head">
                       <span className="entity-file-name">{file.originalName}</span>
-                      <StatusBadge tone={resolveFileTone(file.status)}>{file.status}</StatusBadge>
+                      <StatusBadge tone={resolveFileTone(file.status)}>
+                        {t(`incidents.files.statuses.${file.status}`, { defaultValue: file.status })}
+                      </StatusBadge>
                     </div>
                     <div className="entity-file-meta">
                       <span>{file.fileType}</span>
@@ -378,7 +384,7 @@ export const IncidentDetailPanel = ({
                             setOpeningFileId(file.id);
                             await openIncidentFile(file.id);
                           } catch (nextError) {
-                            setFilesError(getUserFacingErrorMessage(nextError, "Unable to open that incident file."));
+                            setFilesError(getUserFacingErrorMessage(nextError, t("incidents.files.openFailed")));
                             await onRefresh();
                           } finally {
                             setOpeningFileId(null);
@@ -387,14 +393,14 @@ export const IncidentDetailPanel = ({
                       }}
                       type="button"
                     >
-                      {openingFileId === file.id ? "Opening..." : "Open"}
+                      {openingFileId === file.id ? t("incidents.files.opening") : t("incidents.files.open")}
                     </button>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="empty-state">No files attached.</div>
+            <div className="empty-state">{t("incidents.files.empty")}</div>
           )}
         </SurfaceCard>
 
@@ -420,7 +426,7 @@ export const IncidentDetailPanel = ({
             }
             type="button"
           >
-            {isSubmitting ? "Saving..." : "Update incident"}
+            {isSubmitting ? t("common.saving") : t("incidents.detail.update")}
           </button>
           <button
             className="action-primary-button"
@@ -436,7 +442,11 @@ export const IncidentDetailPanel = ({
             }
             type="button"
           >
-            {isSubmitting ? "Applying..." : status === "Resolved" ? "Already resolved" : "Resolve incident"}
+            {isSubmitting
+              ? t("incidents.detail.applying")
+              : status === "Resolved"
+                ? t("incidents.detail.alreadyResolved")
+                : t("incidents.detail.resolve")}
           </button>
         </div>
       </div>

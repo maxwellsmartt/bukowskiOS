@@ -21,6 +21,11 @@ Actualización 2026-05-05:
 - Se implementa primer corte de sync para Projects, Packing Slips, Incidents y RMA vía snapshots operativos en Supabase. La migración remota fue aplicada y ahora existe backfill idempotente desde Sync Activity; queda pendiente ejecutarlo en data real y validar pull/push con dos dispositivos/usuarios.
 - Se extiende `workspaceAccess` fuera de inventario a Finance, Currency y Quotes. Agents queda como deuda separada porque todavía usa `DEFAULT_WORKSPACE_ID` internamente y requiere refactor de runtime, no sólo guard de IPC.
 
+Actualización 2026-05-12:
+- Se cerró una unidad de localización visible para **Incidents + RMA**: listas, panel de reporte, detalle de incidente, archivos, handoff a reparación, RMA list/detail/editor, estados, severidades, columnas, placeholders, toasts y empty states ahora consumen `i18n`.
+- Se mantuvieron intactos los valores internos (`Open`, `Resolved`, `Needs review`, `No repair / retired`, etc.) para no romper contratos, sync snapshots ni tests de mutación.
+- Queda como deuda menor traducir/parametrizar el cuerpo generado del mailto de RMA; no bloquea UI ni flujo operativo.
+
 ## Decisión de foco
 
 - Pausamos momentaneamente Finance/Agents como siguiente slice principal.
@@ -263,7 +268,7 @@ Que reportar un problema lleve naturalmente a seguimiento, evidencia, costo/RMA 
 
 Incluye:
 
-- Incident report más corto y menos técnico.
+- Done — Incident report más corto y menos técnico.
 - Done — Incident detail expone acciones de repair/RMA y retiro cuando aplica.
 - Done — Resolución de incident puede retirar assets sin perder historial.
 - Done — RMA desde incident/asset mueve assets a maintenance y los saca de disponibilidad.
@@ -271,7 +276,9 @@ Incluye:
 - Done — RMA puede marcar `No repair / retired` y retirar assets.
 - Done — RMA list/detail con workspace guard, estados claros y archivos base.
 - Done — Asset availability refleja repair/retired en Assets, Assign/Move, Packing y Catalog.
-- Evitar duplicar info entre Incident Detail, Asset Detail y RMA Detail.
+- Done — Localización 2026-05-12 de Incidents/RMA visible sin cambiar valores internos.
+- Doing — Evitar duplicar info entre Incident Detail, Asset Detail y RMA Detail.
+- Deferred — Traducir/templatar mailto de soporte RMA por idioma del usuario.
 
 Pruebas:
 
@@ -280,6 +287,7 @@ Pruebas:
 - Done — Tests de incident mutation cubren resolución y retiro de asset.
 - Done — Tests de RMA mutation cubren crear repair case, repaired y no repair/retired.
 - Done — Verificación 2026-04-29 incluida en suite de 29 archivos/125 tests.
+- Done — Verificación 2026-05-12: JSON i18n válido, `corepack pnpm --filter @bukowski/desktop typecheck` y `corepack pnpm --filter @bukowski/desktop build`.
 - Todo — Smoke manual: reportar incident desde project y desde asset.
 - Todo — Smoke manual: adjuntar evidencia.
 - Todo — Smoke manual: crear RMA desde asset/incidente.

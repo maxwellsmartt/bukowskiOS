@@ -525,6 +525,7 @@
     "couldNotSave": "No se pudo guardar",
     "never": "Nunca",
     "none": "Ninguno",
+    "optional": "Opcional",
     "listToolbar": {
       "searchAria": "Buscar en la vista actual",
       "sort": "Ordenar",
@@ -534,6 +535,247 @@
       "direction": "Dirección",
       "ascending": "Ascendente",
       "descending": "Descendente"
+    }
+  },
+  "incidents": {
+    "title": "Incidentes",
+    "cardTitle": "Incidentes",
+    "resultLabel": "incidentes",
+    "unavailable": "Incidentes no disponibles: {{message}}",
+    "catalogUnavailable": "Catálogo de incidentes no disponible: {{message}}",
+    "repairUnavailable": "Casos de reparación no disponibles: {{message}}",
+    "loading": "Cargando incidentes…",
+    "sort": {
+      "reportedAt": "Fecha de reporte",
+      "title": "Título",
+      "asset": "Equipo",
+      "project": "Proyecto",
+      "responsible": "Responsable",
+      "severity": "Severidad",
+      "costEstimate": "Costo estimado",
+      "status": "Estado"
+    },
+    "toolbar": {
+      "searchPlaceholder": "Buscar incidentes, proyectos o crew",
+      "searchPlaceholderProject": "Buscar incidentes, equipos o crew"
+    },
+    "columns": {
+      "incident": "Incidente",
+      "project": "Proyecto",
+      "responsible": "Responsable",
+      "severity": "Severidad",
+      "costEstimate": "Costo estimado",
+      "status": "Estado"
+    },
+    "actionBar": {
+      "title": "Reportar un problema",
+      "subtitle": "Da seguimiento a problemas abiertos y reparaciones.",
+      "thisProject": "Este proyecto",
+      "report": "Reportar incidente"
+    },
+    "severity": {
+      "Low": "Baja",
+      "Medium": "Media",
+      "High": "Alta"
+    },
+    "statuses": {
+      "Open": "Abierto",
+      "In review": "En revisión",
+      "Resolved": "Resuelto"
+    },
+    "types": {
+      "damage": "Daño",
+      "loss": "Pérdida",
+      "malfunction": "Fallo",
+      "missing_part": "Pieza faltante",
+      "other": "Otro"
+    },
+    "report": {
+      "title": "Reportar incidente",
+      "close": "Cerrar panel de incidente",
+      "noAssetLinked": "Sin equipo vinculado",
+      "projectSelected": "Proyecto seleccionado",
+      "asset": "Equipo",
+      "noAsset": "Sin equipo",
+      "project": "Proyecto",
+      "noProject": "Sin proyecto",
+      "incidentType": "Tipo de incidente",
+      "severity": "Severidad",
+      "incidentTitle": "Título",
+      "titlePlaceholder": "Título corto",
+      "description": "Descripción",
+      "descriptionPlaceholder": "¿Qué ocurrió?",
+      "moreDetails": "Más detalles",
+      "unit": "Unidad",
+      "noSpecificUnit": "Sin unidad específica",
+      "chooseProjectFirst": "Elige un proyecto primero",
+      "department": "Departamento",
+      "noDepartment": "Sin departamento",
+      "responsible": "Responsable",
+      "autoUnassigned": "Automático / sin asignar",
+      "costEstimate": "Costo estimado",
+      "notes": "Notas",
+      "optionalNote": "Nota opcional",
+      "create": "Crear incidente"
+    },
+    "detail": {
+      "emptyTitle": "Detalle del incidente",
+      "emptyBody": "No hay incidente seleccionado.",
+      "close": "Cerrar detalle del incidente",
+      "repairLinked": "Caso de reparación vinculado",
+      "repairFollowUp": "Seguimiento de reparación",
+      "repairFollowUpBody": "Crea un caso de reparación desde este incidente y retira el equipo de disponibilidad mientras se revisa.",
+      "openRepairCase": "Abrir caso de reparación",
+      "createRepairCase": "Crear caso de reparación",
+      "asset": "Equipo",
+      "project": "Proyecto",
+      "department": "Departamento",
+      "reported": "Reportado",
+      "resolved": "Resuelto",
+      "stillOpen": "Sigue abierto",
+      "title": "Título",
+      "description": "Descripción",
+      "severity": "Severidad",
+      "status": "Estado",
+      "responsible": "Responsable",
+      "unassigned": "Sin asignar",
+      "resolutionNotes": "Notas de resolución",
+      "resolutionPlaceholder": "¿Qué se arregló, quién lo manejó y qué seguimiento queda?",
+      "noRepairPossible": "No es posible reparar",
+      "noRepairBody": "Mantiene el equipo en el historial, pero lo quita de asignaciones y disponibilidad para packing.",
+      "moreDetails": "Más detalles",
+      "costEstimate": "Costo estimado",
+      "financialStatus": "Estado financiero",
+      "notes": "Notas",
+      "update": "Actualizar incidente",
+      "applying": "Aplicando…",
+      "alreadyResolved": "Ya está resuelto",
+      "resolve": "Resolver incidente"
+    },
+    "files": {
+      "title": "Archivos",
+      "attached": "Archivos adjuntos",
+      "attachFailed": "No se pudieron adjuntar archivos a este incidente.",
+      "uploading": "Subiendo…",
+      "attach": "Adjuntar archivos",
+      "openFailed": "No se pudo abrir ese archivo del incidente.",
+      "opening": "Abriendo…",
+      "open": "Abrir",
+      "empty": "No hay archivos adjuntos.",
+      "statuses": {
+        "available": "Disponible",
+        "missing": "Faltante",
+        "deleted": "Eliminado"
+      }
+    },
+    "repair": {
+      "cardTitle": "Casos de reparación",
+      "cardSubtitle": "Los RMAs y garantías del fabricante ahora viven en su propia pantalla.",
+      "open": "Abrir casos de reparación",
+      "body": "Desde el detalle de un incidente, usa “Abrir caso de reparación” para ir directo con el equipo preseleccionado."
+    },
+    "toasts": {
+      "reported": "Incidente reportado",
+      "createFailed": "No se pudo crear el incidente.",
+      "resolved": "Incidente resuelto",
+      "resolveFailed": "No se pudo resolver el incidente.",
+      "updated": "Incidente actualizado",
+      "updateFailed": "No se pudo actualizar el incidente."
+    }
+  },
+  "rma": {
+    "title": "Casos de reparación",
+    "body": "RMAs de fabricante, garantías y flujos de reparación.",
+    "newCase": "Nuevo caso de reparación",
+    "fallbacks": {
+      "pending": "Pendiente",
+      "modelPending": "Modelo pendiente"
+    },
+    "columns": {
+      "asset": "Equipo",
+      "serial": "Serial",
+      "location": "Ubicación",
+      "latestIssue": "Último problema",
+      "case": "Caso",
+      "support": "Soporte",
+      "status": "Estado",
+      "assets": "Equipos",
+      "year": "Año",
+      "issue": "Problema"
+    },
+    "statuses": {
+      "Needs review": "Necesita revisión",
+      "Sent to repair": "Enviado a reparación",
+      "Waiting parts": "Esperando piezas",
+      "Repaired": "Reparado",
+      "No repair / retired": "Sin reparación / retirado",
+      "Returned to inventory": "Devuelto a inventario"
+    },
+    "actions": {
+      "sendToRepair": "Enviar a reparación",
+      "waitingParts": "Esperando piezas",
+      "markRepaired": "Marcar reparado",
+      "noRepair": "Sin reparación",
+      "returnToInventory": "Devolver a inventario",
+      "openDraftEmail": "Abrir email borrador"
+    },
+    "empty": {
+      "title": "Aún no hay casos de reparación",
+      "body": "Abre un RMA cuando necesites enviar un equipo al fabricante por garantía o reparación pagada. También puedes iniciar uno desde un incidente.",
+      "action": "Nuevo caso de reparación",
+      "tipOne": "Cada caso agrupa uno o más equipos enviados al mismo fabricante.",
+      "tipTwo": "El estado avanza de Necesita revisión → Enviado a reparación → Reparado/Devuelto.",
+      "tipThree": "Puedes preparar un email de soporte desde el detalle del caso."
+    },
+    "maintenance": {
+      "title": "Seguimiento de mantenimiento",
+      "empty": "No hay equipos marcados para mantenimiento."
+    },
+    "cases": {
+      "title": "Casos",
+      "empty": "Aún no hay casos de reparación."
+    },
+    "detail": {
+      "title": "Detalle del caso",
+      "empty": "Selecciona un caso para ver sus detalles.",
+      "manufacturer": "Fabricante",
+      "supportEmail": "Correo de soporte",
+      "contact": "Contacto",
+      "phone": "Teléfono",
+      "problemSummary": "Resumen del problema",
+      "internalNotes": "Notas internas"
+    },
+    "editor": {
+      "selectedCount_one": "{{count}} equipo seleccionado",
+      "selectedCount_other": "{{count}} equipos seleccionados",
+      "close": "Cerrar editor de caso de reparación",
+      "newTitle": "Nuevo caso de reparación",
+      "editTitle": "Editar caso de reparación",
+      "manufacturer": "Fabricante",
+      "chooseManufacturer": "Elegir fabricante",
+      "supportEmail": "Correo de soporte",
+      "supportEmailPlaceholder": "soporte@fabricante.com",
+      "caseTitle": "Título del caso",
+      "caseTitlePlaceholder": "Ej: Revisión de banco para kit inalámbrico dañado",
+      "problemSummary": "Resumen del problema",
+      "problemSummaryPlaceholder": "Describe qué debe revisar soporte.",
+      "moreDetails": "Más detalles",
+      "notes": "Notas",
+      "notesPlaceholder": "Notas de envío, garantía o seguimiento",
+      "status": "Estado",
+      "assetsInMaintenance": "Equipos en mantenimiento",
+      "manufacturers": "Fabricantes",
+      "alreadyLinked": "Ya vinculado al caso",
+      "serial": "Serial: {{value}}",
+      "equipmentYear": "Año del equipo",
+      "issueSummary": "Resumen del problema",
+      "createCase": "Crear caso",
+      "saveCase": "Guardar caso"
+    },
+    "toasts": {
+      "updated": "Actualizado",
+      "saveFailed": "No se pudo guardar el caso de reparación.",
+      "statusFailed": "No se pudo actualizar el estado de reparación."
     }
   },
   "settings": {

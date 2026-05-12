@@ -16,12 +16,12 @@ export const resolveRmaStatusTone = (status: RmaCaseStatus) => {
   return "warning" as const;
 };
 
-export const rmaStatusActions: Array<{ status: RmaCaseStatus; label: string }> = [
-  { status: "Sent to repair", label: "Send to repair" },
-  { status: "Waiting parts", label: "Waiting parts" },
-  { status: "Repaired", label: "Mark repaired" },
-  { status: "No repair / retired", label: "No repair" },
-  { status: "Returned to inventory", label: "Return to inventory" },
+export const rmaStatusActions: Array<{ status: RmaCaseStatus; label: string; labelKey: string }> = [
+  { status: "Sent to repair", label: "Send to repair", labelKey: "rma.actions.sendToRepair" },
+  { status: "Waiting parts", label: "Waiting parts", labelKey: "rma.actions.waitingParts" },
+  { status: "Repaired", label: "Mark repaired", labelKey: "rma.actions.markRepaired" },
+  { status: "No repair / retired", label: "No repair", labelKey: "rma.actions.noRepair" },
+  { status: "Returned to inventory", label: "Return to inventory", labelKey: "rma.actions.returnToInventory" },
 ];
 
 export const buildRmaMailtoUrl = (detail: RmaCaseDetailSnapshot) => {

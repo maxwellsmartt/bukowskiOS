@@ -1,5 +1,6 @@
 import { AlertTriangle, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
 import { useProjectDetail } from "@features/projects/useProjectsData";
@@ -42,11 +43,11 @@ type IncidentReportPanelProps = {
 };
 
 const incidentTypeOptions = [
-  { value: "damage", label: "Damage" },
-  { value: "loss", label: "Loss" },
-  { value: "malfunction", label: "Malfunction" },
-  { value: "missing_part", label: "Missing part" },
-  { value: "other", label: "Other" },
+  { value: "damage", labelKey: "incidents.types.damage", fallback: "Damage" },
+  { value: "loss", labelKey: "incidents.types.loss", fallback: "Loss" },
+  { value: "malfunction", labelKey: "incidents.types.malfunction", fallback: "Malfunction" },
+  { value: "missing_part", labelKey: "incidents.types.missing_part", fallback: "Missing part" },
+  { value: "other", labelKey: "incidents.types.other", fallback: "Other" },
 ] as const;
 
 const severityOptions = ["Low", "Medium", "High"] as const;
@@ -67,9 +68,10 @@ export const IncidentReportPanel = ({
   onSubmit,
   projectLocked = false,
   projects,
-  title = "Report incident",
+  title,
   users,
 }: IncidentReportPanelProps) => {
+  const { t } = useTranslation();
   const [assetId, setAssetId] = useState(initialValue?.assetId ?? "");
   const [projectId, setProjectId] = useState(initialValue?.projectId ?? "");
   const [projectUnitId, setProjectUnitId] = useState(initialValue?.projectUnitId ?? "");
@@ -93,8 +95,8 @@ export const IncidentReportPanel = ({
 
   const selectedAssetLabel = useMemo(() => {
     const selectedAsset = assetOptions.find((option) => option.id === assetId);
-    return selectedAsset ? `${selectedAsset.code} · ${selectedAsset.name}` : "No asset linked";
-  }, [assetId, assetOptions]);
+    return selectedAsset ? `${selectedAsset.code} · ${selectedAsset.name}` : t("incidents.report.noAssetLinked");
+  }, [assetId, assetOptions, t]);
 
   const handleSubmit = async () => {
     await onSubmit({
@@ -115,24 +117,24 @@ export const IncidentReportPanel = ({
   return (
     <SurfaceCard
       aside={
-        <button aria-label="Close incident panel" className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("incidents.report.close")} className="surface-card-action" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }
-      title={title}
+      title={title ?? t("incidents.report.title")}
     >
       {assetLocked || projectLocked ? (
         <div className="action-panel-summary">
           {assetLocked ? <span>{selectedAssetLabel}</span> : null}
-          {projectLocked ? <span>Project selected</span> : null}
+          {projectLocked ? <span>{t("incidents.report.projectSelected")}</span> : null}
         </div>
       ) : null}
 
       <div className="action-form-grid">
         <label className="action-field">
-          <span className="action-field-label">Asset</span>
+          <span className="action-field-label">{t("incidents.report.asset")}</span>
           <SelectField disabled={assetLocked} onChange={(event) => setAssetId(event.target.value)} value={assetId}>
-            <option value="">No asset</option>
+            <option value="">{t("incidents.report.noAsset")}</option>
             {assetOptions.map((asset) => (
               <option key={asset.id} value={asset.id}>
                 {asset.code} · {asset.name}
@@ -142,9 +144,9 @@ export const IncidentReportPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Project</span>
+          <span className="action-field-label">{t("incidents.report.project")}</span>
           <SelectField disabled={projectLocked} onChange={(event) => setProjectId(event.target.value)} value={projectId}>
-            <option value="">No project</option>
+            <option value="">{t("incidents.report.noProject")}</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.code} · {project.name}
@@ -154,43 +156,43 @@ export const IncidentReportPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Incident type</span>
+          <span className="action-field-label">{t("incidents.report.incidentType")}</span>
           <SelectField onChange={(event) => setIncidentType(event.target.value)} value={incidentType}>
             {incidentTypeOptions.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey, { defaultValue: option.fallback })}
               </option>
             ))}
           </SelectField>
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Severity</span>
+          <span className="action-field-label">{t("incidents.report.severity")}</span>
           <SelectField onChange={(event) => setSeverity(event.target.value)} value={severity}>
             {severityOptions.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {t(`incidents.severity.${option}`, { defaultValue: option })}
               </option>
             ))}
           </SelectField>
         </label>
 
         <label className="action-field action-field-wide">
-          <span className="action-field-label">Title</span>
+          <span className="action-field-label">{t("incidents.report.incidentTitle")}</span>
           <input
             className="action-field-control"
             onChange={(event) => setIncidentTitle(event.target.value)}
-            placeholder="Short title"
+            placeholder={t("incidents.report.titlePlaceholder")}
             value={incidentTitle}
           />
         </label>
 
         <label className="action-field action-field-wide">
-          <span className="action-field-label">Description</span>
+          <span className="action-field-label">{t("incidents.report.description")}</span>
           <textarea
             className="action-field-control action-textarea"
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="What happened?"
+            placeholder={t("incidents.report.descriptionPlaceholder")}
             rows={4}
             value={description}
           />
@@ -198,13 +200,13 @@ export const IncidentReportPanel = ({
       </div>
 
       <details className="detail-disclosure">
-        <summary className="detail-disclosure-summary">More details</summary>
+        <summary className="detail-disclosure-summary">{t("incidents.report.moreDetails")}</summary>
         <div className="detail-disclosure-content">
           <div className="action-form-grid">
             <label className="action-field">
-              <span className="action-field-label">Unit</span>
+              <span className="action-field-label">{t("incidents.report.unit")}</span>
               <SelectField disabled={!projectId} onChange={(event) => setProjectUnitId(event.target.value)} value={projectUnitId}>
-                <option value="">{projectId ? "No specific unit" : "Choose project first"}</option>
+                <option value="">{projectId ? t("incidents.report.noSpecificUnit") : t("incidents.report.chooseProjectFirst")}</option>
                 {projectDetail.units.map((unit) => (
                   <option key={unit.id} value={unit.id}>
                     {unit.code} · {unit.name}
@@ -214,9 +216,9 @@ export const IncidentReportPanel = ({
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Department</span>
+              <span className="action-field-label">{t("incidents.report.department")}</span>
               <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
-                <option value="">No department</option>
+                <option value="">{t("incidents.report.noDepartment")}</option>
                 {departments.map((department) => (
                   <option key={department.id} value={department.id}>
                     {department.code} · {department.name}
@@ -226,9 +228,9 @@ export const IncidentReportPanel = ({
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Responsible</span>
+              <span className="action-field-label">{t("incidents.report.responsible")}</span>
               <SelectField onChange={(event) => setResponsibleUserId(event.target.value)} value={responsibleUserId}>
-                <option value="">Auto / unassigned</option>
+                <option value="">{t("incidents.report.autoUnassigned")}</option>
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.fullName}
@@ -238,22 +240,22 @@ export const IncidentReportPanel = ({
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Cost estimate</span>
+              <span className="action-field-label">{t("incidents.report.costEstimate")}</span>
               <input
                 className="action-field-control"
                 inputMode="decimal"
                 onChange={(event) => setCostEstimate(event.target.value)}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 value={costEstimate}
               />
             </label>
 
             <label className="action-field action-field-wide">
-              <span className="action-field-label">Notes</span>
+              <span className="action-field-label">{t("incidents.report.notes")}</span>
               <input
                 className="action-field-control"
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional note"
+                placeholder={t("incidents.report.optionalNote")}
                 value={notes}
               />
             </label>
@@ -270,10 +272,10 @@ export const IncidentReportPanel = ({
 
       <div className="action-panel-actions">
         <button className="ghost-control cancel-control" onClick={onClose} type="button">
-          Cancel
+          {t("common.cancel")}
         </button>
         <button className="action-primary-button" disabled={isSubmitting} onClick={() => void handleSubmit()} type="button">
-          {isSubmitting ? "Saving..." : "Create incident"}
+          {isSubmitting ? t("common.saving") : t("incidents.report.create")}
         </button>
       </div>
     </SurfaceCard>

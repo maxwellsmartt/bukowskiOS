@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import type { AssetListQuery, IncidentListQuery, IncidentSortField } from "@contracts";
@@ -26,15 +27,15 @@ type IncidentsPageProps = {
   projectName?: string | null;
 };
 
-const incidentSortOptions: Array<ListSortOption<IncidentSortField>> = [
-  { value: "reportedAt", label: "Reported date" },
-  { value: "title", label: "Title", columnKey: "title" },
-  { value: "asset", label: "Asset", columnKey: "title" },
-  { value: "project", label: "Project", columnKey: "project" },
-  { value: "responsible", label: "Responsible", columnKey: "responsible" },
-  { value: "severity", label: "Severity", columnKey: "severity" },
-  { value: "costEstimate", label: "Cost estimate", columnKey: "cost" },
-  { value: "status", label: "Status", columnKey: "status" },
+const incidentSortOptions: Array<ListSortOption<IncidentSortField> & { labelKey: string }> = [
+  { value: "reportedAt", label: "Reported date", labelKey: "incidents.sort.reportedAt" },
+  { value: "title", label: "Title", labelKey: "incidents.sort.title", columnKey: "title" },
+  { value: "asset", label: "Asset", labelKey: "incidents.sort.asset", columnKey: "title" },
+  { value: "project", label: "Project", labelKey: "incidents.sort.project", columnKey: "project" },
+  { value: "responsible", label: "Responsible", labelKey: "incidents.sort.responsible", columnKey: "responsible" },
+  { value: "severity", label: "Severity", labelKey: "incidents.sort.severity", columnKey: "severity" },
+  { value: "costEstimate", label: "Cost estimate", labelKey: "incidents.sort.costEstimate", columnKey: "cost" },
+  { value: "status", label: "Status", labelKey: "incidents.sort.status", columnKey: "status" },
 ];
 
 const resolveIncidentStatusTone = (status: string) => {
@@ -50,6 +51,7 @@ const resolveIncidentStatusTone = (status: string) => {
 };
 
 export const IncidentsPage = ({ projectId = null, projectName = null }: IncidentsPageProps) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
   const { activeProject, projects, refreshProjects } = useShellContext();
@@ -135,19 +137,19 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Incidents" />
+      <SectionHeader title={t("incidents.title")} />
 
-      {error ? <div className="empty-state">Incidents unavailable: {error}</div> : null}
-      {catalogError ? <div className="empty-state">Incident catalog unavailable: {catalogError}</div> : null}
-      {!isProjectMode && rmaError ? <div className="empty-state">Repair cases unavailable: {rmaError}</div> : null}
+      {error ? <div className="empty-state">{t("incidents.unavailable", { message: error })}</div> : null}
+      {catalogError ? <div className="empty-state">{t("incidents.catalogUnavailable", { message: catalogError })}</div> : null}
+      {!isProjectMode && rmaError ? <div className="empty-state">{t("incidents.repairUnavailable", { message: rmaError })}</div> : null}
 
       <div className="selection-action-bar">
         <div className="selection-action-copy">
-          <span className="selection-action-title">Report an issue</span>
+          <span className="selection-action-title">{t("incidents.actionBar.title")}</span>
           <span className="selection-action-subtitle">
             {isProjectMode
-              ? effectiveProjectName ?? "This project"
-              : "Track open issues and repair follow-up."}
+              ? effectiveProjectName ?? t("incidents.actionBar.thisProject")
+              : t("incidents.actionBar.subtitle")}
           </span>
         </div>
         <button
@@ -159,7 +161,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           }}
           type="button"
         >
-          Report incident
+          {t("incidents.actionBar.report")}
         </button>
       </div>
 
@@ -203,9 +205,9 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
               await Promise.all([reload(), refreshProjects()]);
               setReportOpen(false);
               setReportError(null);
-              toast.success("Incident reported", result.summary);
+              toast.success(t("incidents.toasts.reported"), result.summary);
             } catch (nextError) {
-              setReportError(getUserFacingErrorMessage(nextError, "Unable to create incident."));
+              setReportError(getUserFacingErrorMessage(nextError, t("incidents.toasts.createFailed")));
             } finally {
               setIsSubmittingIncident(false);
             }
@@ -215,22 +217,33 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
         />
       ) : null}
 
-      <SurfaceCard title="Incidents">
+      <SurfaceCard title={t("incidents.cardTitle")}>
         <ListToolbar
-          activeSortLabel={incidentControls.activeSortOption?.label}
+          activeSortLabel={
+            incidentControls.activeSortOption
+              ? t(
+                  (incidentControls.activeSortOption as ListSortOption<IncidentSortField> & { labelKey?: string }).labelKey ??
+                    incidentControls.activeSortOption.label,
+                  { defaultValue: incidentControls.activeSortOption.label },
+                )
+              : undefined
+          }
           onSearchValueChange={incidentControls.setSearchValue}
           onSortByChange={incidentControls.setSortField}
           onToggleSortDirection={incidentControls.toggleSortDirection}
           resultCount={data.length}
-          resultLabel="incidents"
-          searchPlaceholder={isProjectMode ? "Search incidents, assets or crew" : "Search incidents, projects or crew"}
+          resultLabel={t("incidents.resultLabel")}
+          searchPlaceholder={isProjectMode ? t("incidents.toolbar.searchPlaceholderProject") : t("incidents.toolbar.searchPlaceholder")}
           searchValue={incidentControls.searchValue}
           sortBy={incidentControls.sortBy}
           sortDirection={incidentControls.sortDirection}
-          sortOptions={incidentSortOptions}
+          sortOptions={incidentSortOptions.map((option) => ({
+            ...option,
+            label: t(option.labelKey, { defaultValue: option.label }),
+          }))}
         />
         {isLoading && data.length === 0 ? (
-          <TableSkeleton body="Loading incidents…" columns={6} />
+          <TableSkeleton body={t("incidents.loading")} columns={6} />
         ) : null}
         <DataTable
           activeRowId={activeIncidentId}
@@ -246,7 +259,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           columns={[
             {
               key: "title",
-              label: "Incident",
+              label: t("incidents.columns.incident"),
               render: (row) => (
                 <div className="identity-cell">
                   <span className="identity-title">{row.title}</span>
@@ -254,22 +267,26 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
                 </div>
               ),
             },
-            { key: "project", label: "Project", render: (row) => row.project },
-            { key: "responsible", label: "Responsible", render: (row) => row.responsible },
+            { key: "project", label: t("incidents.columns.project"), render: (row) => row.project },
+            { key: "responsible", label: t("incidents.columns.responsible"), render: (row) => row.responsible },
             {
               key: "severity",
-              label: "Severity",
+              label: t("incidents.columns.severity"),
               render: (row) => (
                 <StatusBadge tone={row.severity === "High" ? "critical" : row.severity === "Medium" ? "warning" : "neutral"}>
-                  {row.severity}
+                  {t(`incidents.severity.${row.severity}`, { defaultValue: row.severity })}
                 </StatusBadge>
               ),
             },
-            { key: "cost", label: "Cost estimate", render: (row) => row.costEstimate },
+            { key: "cost", label: t("incidents.columns.costEstimate"), render: (row) => row.costEstimate },
             {
               key: "status",
-              label: "Status",
-              render: (row) => <StatusBadge tone={resolveIncidentStatusTone(row.status)}>{row.status}</StatusBadge>,
+              label: t("incidents.columns.status"),
+              render: (row) => (
+                <StatusBadge tone={resolveIncidentStatusTone(row.status)}>
+                  {t(`incidents.statuses.${row.status}`, { defaultValue: row.status })}
+                </StatusBadge>
+              ),
             },
           ]}
           rows={data}
@@ -329,9 +346,9 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
 
             await Promise.all([reload(), refreshProjects(), reloadIncidentDetail()]);
             setIncidentDetailError(null);
-            toast.success("Incident resolved", result.summary);
+            toast.success(t("incidents.toasts.resolved"), result.summary);
           } catch (nextError) {
-            setIncidentDetailError(getUserFacingErrorMessage(nextError, "Unable to resolve incident."));
+            setIncidentDetailError(getUserFacingErrorMessage(nextError, t("incidents.toasts.resolveFailed")));
           } finally {
             setIsSubmittingIncidentDetail(false);
           }
@@ -361,9 +378,9 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
 
             await Promise.all([reload(), refreshProjects(), reloadIncidentDetail()]);
             setIncidentDetailError(null);
-            toast.success("Incident updated", result.summary);
+            toast.success(t("incidents.toasts.updated"), result.summary);
           } catch (nextError) {
-            setIncidentDetailError(getUserFacingErrorMessage(nextError, "Unable to update incident."));
+            setIncidentDetailError(getUserFacingErrorMessage(nextError, t("incidents.toasts.updateFailed")));
           } finally {
             setIsSubmittingIncidentDetail(false);
           }
@@ -373,16 +390,16 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
 
       {!isProjectMode ? (
         <SurfaceCard
-          title="Repair cases"
-          subtitle="Manufacturer RMAs and warranty claims now live on their own page."
+          title={t("incidents.repair.cardTitle")}
+          subtitle={t("incidents.repair.cardSubtitle")}
           aside={
             <button className="action-primary-button" onClick={() => navigate("/rma")} type="button">
-              Open repair cases
+              {t("incidents.repair.open")}
             </button>
           }
         >
           <p className="surface-card-subtitle">
-            From an incident detail, use “Open repair case” to jump straight there with the asset pre-selected.
+            {t("incidents.repair.body")}
           </p>
         </SurfaceCard>
       ) : null}
