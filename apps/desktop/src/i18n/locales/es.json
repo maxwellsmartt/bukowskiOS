@@ -135,7 +135,9 @@
     "confirm": "Confirmar",
     "search": "Buscar",
     "tryAgain": "Inténtalo de nuevo en un momento.",
-    "couldNotSave": "No se pudo guardar"
+    "couldNotSave": "No se pudo guardar",
+    "never": "Nunca",
+    "none": "Ninguno"
   },
   "settings": {
     "nav": {
@@ -176,6 +178,321 @@
         "minutes_one": "{{count}} min",
         "minutes_other": "{{count}} min",
         "hour": "1 hora"
+      }
+    },
+    "actions": {
+      "completeTitle": "Acción de ajustes completada",
+      "couldNotComplete": "La app no pudo completar esa acción de ajustes.",
+      "usersUpdatedTitle": "Usuarios actualizados",
+      "couldNotUpdateUsers": "La app no pudo actualizar los usuarios.",
+      "copiedTitle": "Copiado",
+      "diagnosticsCopiedBody": "Resumen de diagnóstico copiado.",
+      "couldNotCopyDiagnostics": "La app no pudo copiar el resumen de diagnóstico."
+    },
+    "integrity": {
+      "healthy": "Saludable",
+      "failed": "Falló",
+      "stale": "Desactualizado",
+      "pending": "Pendiente",
+      "unknown": "Desconocido"
+    },
+    "roleCoverage": {
+      "assets": "Equipos",
+      "incidents": "Incidentes",
+      "rma": "RMA",
+      "packing": "Packing",
+      "finance": "Finanzas"
+    },
+    "roleUseCase": {
+      "admin": "Control total para dueños del workspace y operadores de confianza.",
+      "crew": "Acceso diario del equipo: equipos asignados, contexto de packing y reportes de incidentes.",
+      "supervisor": "Acceso operativo a proyectos, equipos, incidentes, RMAs y packing slips.",
+      "finance_viewer": "Visibilidad financiera sin permiso de edición.",
+      "maintenance": "Acceso a reparaciones y RMAs para seguimiento de equipos dañados."
+    },
+    "team": {
+      "metrics": {
+        "activeUsers": "Usuarios activos",
+        "activeUsersDetail": "{{count}} en total",
+        "telegramLinked": "Telegram vinculados",
+        "telegramLinkedDetail": "{{count}} listos",
+        "rolesLabel": "Roles",
+        "rolesDetail": "Plantillas de acceso"
+      },
+      "usersDisclosure": {
+        "title": "Usuarios",
+        "summary_one": "{{count}} usuario · {{active}} activo",
+        "summary_other": "{{count}} usuarios · {{active}} activos"
+      },
+      "usersCardTitle": "Usuarios",
+      "createUser": "Crear usuario",
+      "createUserBadge": "Dar acceso",
+      "createUserHelp": "Nombre, rol y acceso opcional a canales.",
+      "noRole": "Sin rol",
+      "activeStatus": "Activo",
+      "inactiveStatus": "Inactivo",
+      "newBadge": "Nuevo",
+      "editor": {
+        "fullName": "Nombre completo",
+        "fullNamePlaceholder": "Nombre completo",
+        "role": "Rol",
+        "rolePlaceholder": "Elige un rol",
+        "email": "Correo",
+        "emailPlaceholder": "nombre@estudio.com",
+        "phone": "Teléfono",
+        "phonePlaceholder": "Teléfono opcional",
+        "crewMember": "Miembro del crew",
+        "noLinkedCrew": "Sin crew vinculado",
+        "access": "Acceso",
+        "chooseRole": "Elige un rol",
+        "telegram": "Telegram",
+        "telegramPending": "Vinculación pendiente",
+        "telegramRevoked": "Revocado",
+        "telegramNotLinked": "Sin vincular",
+        "telegramCreateFirst": "Crea el usuario primero",
+        "lastSeen": " · vist@ por última vez {{value}}",
+        "saving": "Guardando…",
+        "saveUser": "Guardar usuario",
+        "addUser": "Agregar usuario",
+        "updating": "Actualizando…",
+        "deactivate": "Desactivar",
+        "activate": "Activar",
+        "revoking": "Revocando…",
+        "revokeTelegram": "Revocar Telegram",
+        "removeUser": "Quitar usuario",
+        "channels": "Canales"
+      },
+      "deleteDialog": {
+        "title": "¿Quitar a este usuario?",
+        "bodyWithName": "{{name}} será removido de este workspace. Si aún tiene equipos activos, packing slips o incidentes abiertos, o acceso a Telegram, la app detendrá la eliminación y te dirá qué resolver antes.",
+        "bodyFallback": "Este usuario será removido de este workspace.",
+        "confirm": "Quitar usuario"
+      },
+      "rolesDisclosure": {
+        "title": "Roles",
+        "summary_one": "{{count}} rol · plantillas de acceso",
+        "summary_other": "{{count}} roles · plantillas de acceso"
+      },
+      "rolesCardTitle": "Roles",
+      "rolesCardUsers_one": "{{count}} usuario",
+      "rolesCardUsers_other": "{{count}} usuarios",
+      "rolesCardNoAccess": "Sin acceso",
+      "permissionMatrixTitle": "Matriz de permisos",
+      "permissionMatrixSummary": "Acceso detallado por rol"
+    },
+    "data": {
+      "healthTitle": "Salud de los datos",
+      "syncTitle": "Actividad de sincronización",
+      "rows": {
+        "localData": "Datos locales",
+        "notCreated": "Aún no se ha creado",
+        "latestBackup": "Último respaldo",
+        "noBackup": "Aún no hay respaldos disponibles",
+        "lastBackup": "Último respaldo",
+        "dataCheck": "Chequeo de datos",
+        "lastIntegrityCheck": "Último chequeo de integridad",
+        "deviceSecurity": "Seguridad del dispositivo",
+        "deviceSecAvailable": "Disponible",
+        "deviceSecUnavailable": "No disponible en este dispositivo",
+        "maintenance": "Mantenimiento",
+        "maintenanceResult": "Resultado del mantenimiento",
+        "maintenanceNotRun": "Aún no ejecutado",
+        "lastUpload": "Última subida",
+        "uploadStatus": "Estado de la subida",
+        "uploadStatusHealthy": "Saludable",
+        "uploadStatusFailed": "Falló",
+        "uploadStatusIdle": "Inactivo",
+        "uploadResult": "Resultado de la subida",
+        "uploadResultNone": "Aún sin sincronizaciones",
+        "waiting": "En espera",
+        "uploading": "Subiendo",
+        "needsAttention": "Necesita atención",
+        "visibleQueue": "Filas visibles en la cola"
+      },
+      "actions": {
+        "runningIntegrity": "Ejecutando chequeo de integridad…",
+        "runIntegrity": "Ejecutar chequeo de integridad",
+        "creatingBackup": "Creando respaldo…",
+        "createBackup": "Crear respaldo ahora",
+        "syncing": "Sincronizando…",
+        "runSync": "Sincronizar ahora",
+        "openSync": "Abrir actividad de sincronización",
+        "retryFailed": "Reintentar todos los fallidos"
+      }
+    },
+    "sync": {
+      "title": "Actividad de sincronización",
+      "couldNotLoad": "La app no pudo cargar la actividad de sincronización.",
+      "couldNotCompleteAction": "La app no pudo completar esa acción de sincronización local.",
+      "couldNotRetryRow": "La app no pudo reintentar esa fila de sincronización.",
+      "couldNotRetryVisible": "La app no pudo reintentar las filas visibles.",
+      "couldNotBackfill": "La app no pudo hacer el backfill de los snapshots operativos.",
+      "toasts": {
+        "actionComplete": "Acción de sincronización completada",
+        "rowQueued": "Fila reencolada",
+        "rowsQueuedTitle": "Filas reencoladas",
+        "rowsQueuedBody": "{{count}} filas visibles se reencolaron.",
+        "backfillComplete": "Backfill completado"
+      },
+      "filters": {
+        "all": "Todas",
+        "pending": "Pendiente",
+        "processing": "Procesando",
+        "failed": "Falló",
+        "sent": "Enviado",
+        "allEntities": "Todas las entidades"
+      },
+      "outbound": {
+        "cardTitle": "Subida a la nube",
+        "needsAttention": "Necesita atención",
+        "needsAttentionDetail_one": "{{count}} subida falló.",
+        "needsAttentionDetail_other": "{{count}} subidas fallaron.",
+        "uploading": "Subiendo",
+        "uploadingDetail_one": "{{count}} cambio en curso.",
+        "uploadingDetail_other": "{{count}} cambios en curso.",
+        "waiting": "Esperando para subir",
+        "waitingDetail_one": "{{count}} cambio en cola.",
+        "waitingDetail_other": "{{count}} cambios en cola.",
+        "upToDate": "Al día",
+        "upToDateDetail": "No hay cambios locales esperando subida a la nube.",
+        "metrics": {
+          "pending": "pendientes",
+          "uploading": "subiendo",
+          "failed": "fallidos"
+        },
+        "lastPass": "Última subida: {{value}}"
+      },
+      "inbound": {
+        "cardTitle": "Bajada desde la nube",
+        "needsAttention": "La bajada necesita atención",
+        "needsAttentionDetail_one": "{{count}} fuente entrante reportó un error.",
+        "needsAttentionDetail_other": "{{count}} fuentes entrantes reportaron un error.",
+        "active": "Bajadas activas",
+        "activeDetail_one": "{{count}} fuente entrante revisada.",
+        "activeDetail_other": "{{count}} fuentes entrantes revisadas.",
+        "waiting": "Esperando la primera bajada",
+        "waitingDetail": "Abre un workspace remoto y la app empezará a traer los datos soportados.",
+        "metrics": {
+          "sources": "fuentes",
+          "latest": "filas recientes",
+          "errors": "errores"
+        },
+        "lastCheck": "Última verificación: {{value}}"
+      },
+      "actionsDisclosure": {
+        "title": "Acciones",
+        "summaryDefault": "Herramientas de sincronización y reparación manual",
+        "summaryWithFailed_one": "{{count}} subida fallida se puede reintentar",
+        "summaryWithFailed_other": "{{count}} subidas fallidas se pueden reintentar"
+      },
+      "actions": {
+        "running": "Sincronizando…",
+        "runUpload": "Ejecutar subida",
+        "retryingFailed": "Reintentando fallidas…",
+        "retryFailed": "Reintentar subidas fallidas",
+        "retryingVisible": "Reintentando visibles…",
+        "retryVisible": "Reintentar visibles ({{count}})",
+        "backfilling": "Procesando backfill…",
+        "backfill": "Hacer backfill de datos operativos"
+      },
+      "coverageDisclosure": {
+        "title": "Cobertura de bajada",
+        "summary_one": "{{count}} área de datos · {{errors}} errores",
+        "summary_other": "{{count}} áreas de datos · {{errors}} errores"
+      },
+      "coverageCard": "Cobertura de bajada",
+      "coverage": {
+        "asset_snapshots": { "label": "Equipos", "detail": "Inventario y estado actual" },
+        "asset_categories": { "label": "Categorías", "detail": "Categorías de equipos" },
+        "locations": { "label": "Ubicaciones", "detail": "Almacenes y ubicaciones operativas" },
+        "clients": { "label": "Clientes", "detail": "Catálogo de clientes" },
+        "manufacturers": { "label": "Fabricantes", "detail": "Catálogo de fabricantes" },
+        "production_companies": { "label": "Productoras", "detail": "Catálogo de productoras" },
+        "projects": { "label": "Proyectos", "detail": "Proyectos, unidades y asignaciones de crew" },
+        "packing_slips": { "label": "Packing slips", "detail": "Slips emitidos, ítems y devoluciones" },
+        "incidents": { "label": "Incidentes", "detail": "Reportes de incidentes y evidencia" },
+        "rma_cases": { "label": "RMAs", "detail": "Casos de reparación de fabricante y equipos vinculados" }
+      },
+      "coverageRowsLatest": "{{count}} filas en la última bajada",
+      "coverageBadge": {
+        "error": "Error",
+        "active": "Activa",
+        "planned": "Planeada"
+      },
+      "queueDisclosure": {
+        "title": "Cola de subida",
+        "summary": "{{visible}} visibles · {{total}} en total"
+      },
+      "queueCardTitle": "Cola de subida",
+      "queueToolbar": {
+        "statusLabel": "Estado",
+        "entityLabel": "Entidad",
+        "searchAria": "Buscar en la cola de subida",
+        "searchPlaceholder": "Busca por subida, operación, payload o error"
+      },
+      "queueColumns": {
+        "status": "Estado",
+        "entity": "Entidad",
+        "entityId": "ID de entidad",
+        "operation": "Operación",
+        "attempts": "Intentos",
+        "updated": "Actualizado"
+      },
+      "queueEmpty": "Ninguna subida coincide con el filtro actual.",
+      "detailCardTitle": "Detalle de subida",
+      "detailSelectPrompt": "Selecciona una fila para inspeccionarla.",
+      "detailEmpty": "Selecciona una fila de subida para inspeccionarla.",
+      "detail": {
+        "status": "Estado",
+        "entity": "Entidad",
+        "entityId": "ID de entidad",
+        "operation": "Operación",
+        "attempts": "Intentos",
+        "nextRetry": "Próximo reintento",
+        "lastError": "Último error: {{message}}",
+        "retrying": "Reintentando fila…",
+        "retry": "Reintentar fila",
+        "openEntity": "Abrir entidad",
+        "payload": "Payload"
+      }
+    },
+    "advanced": {
+      "support": {
+        "cardTitle": "Soporte",
+        "lastCrash": "Último crash",
+        "lastError": "Último error",
+        "lastLoadIssue": "Último problema de carga",
+        "logLocation": "Ubicación de logs",
+        "recentLogFiles": "Archivos de log recientes",
+        "criticalEventsTracked": "Eventos críticos registrados",
+        "noneCaptured": "Aún sin registros",
+        "noLoadIssues": "Sin problemas de carga registrados",
+        "noLogFiles": "Aún no hay archivos de log",
+        "exporting": "Exportando bundle de soporte…",
+        "exportBundle": "Exportar bundle de soporte",
+        "exportingLogs": "Exportando logs…",
+        "exportLogs": "Exportar logs recientes",
+        "copyDiagnostics": "Copiar resumen de diagnóstico"
+      },
+      "dataExport": {
+        "cardTitle": "Exportar datos",
+        "format": "Formato",
+        "scope": "Alcance",
+        "buildFiles": "Archivos del build",
+        "notPackaged": "Aún sin empaquetar",
+        "exporting": "Exportando…",
+        "exportJson": "Exportar workspace en JSON"
+      },
+      "appInfo": {
+        "cardTitle": "Información de la app",
+        "app": "App",
+        "version": "Versión",
+        "build": "Build",
+        "platform": "Plataforma",
+        "mode": "Modo",
+        "packaged": "Empaquetado",
+        "development": "Desarrollo",
+        "unknown": "Desconocido"
       }
     },
     "account": {

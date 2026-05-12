@@ -11,6 +11,7 @@ import type {
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useToast } from "@app/providers/ToastProvider";
@@ -77,24 +78,32 @@ import { SettingsLayout, useActiveSettingsSection, useSettingsNavLabels } from "
 import { UserChannelDots } from "./UserChannelDots";
 import { UserAccountSettings } from "./UserAccountSettings";
 
+/**
+ * Each role-coverage group ships a stable id; the human label lives in
+ * the `settings.roleCoverage.*` catalog and is resolved at render time.
+ */
 const roleCoverageGroups = [
-  { label: "Assets", keys: ["assets.read", "assets.manage", "licenses.manage"] },
-  { label: "Incidents", keys: ["incidents.read", "incidents.create"] },
-  { label: "RMA", keys: ["rma.read", "rma.create"] },
-  { label: "Packing", keys: ["packing-slips.read", "packing-slips.create"] },
-  { label: "Finance", keys: ["finance.read"] },
+  { id: "assets", keys: ["assets.read", "assets.manage", "licenses.manage"] },
+  { id: "incidents", keys: ["incidents.read", "incidents.create"] },
+  { id: "rma", keys: ["rma.read", "rma.create"] },
+  { id: "packing", keys: ["packing-slips.read", "packing-slips.create"] },
+  { id: "finance", keys: ["finance.read"] },
 ] as const;
 
-const roleUseCaseMap: Record<string, string> = {
-  admin: "Full control for workspace owners and trusted operators.",
-  crew: "Daily crew access for assigned equipment, packing context and incident reports.",
-  supervisor: "Operational lead access for projects, assets, incidents, RMAs and packing slips.",
-  finance_viewer: "Finance visibility without edit access.",
-  maintenance: "Repair and RMA access for damaged equipment follow-up.",
+type RoleCoverageId = (typeof roleCoverageGroups)[number]["id"];
+
+const ROLE_USE_CASE_KEYS: Record<string, string> = {
+  admin: "settings.roleUseCase.admin",
+  crew: "settings.roleUseCase.crew",
+  supervisor: "settings.roleUseCase.supervisor",
+  finance_viewer: "settings.roleUseCase.finance_viewer",
+  maintenance: "settings.roleUseCase.maintenance",
 };
 
-const getRoleCoverageLabels = (permissionKeys: string[]) =>
-  roleCoverageGroups.filter((group) => group.keys.some((key) => permissionKeys.includes(key))).map((group) => group.label);
+const getRoleCoverageIds = (permissionKeys: string[]): RoleCoverageId[] =>
+  roleCoverageGroups
+    .filter((group) => group.keys.some((key) => permissionKeys.includes(key)))
+    .map((group) => group.id);
 
 const formatBytes = (value: number) => {
   if (!value) {
@@ -120,16 +129,13 @@ const formatBytes = (value: number) => {
 // can use the user's synced locale via `useLocale()`. See the call site
 // below for the closure.
 
-const resolveIntegrityLabel = (status: AppDiagnosticsSnapshot["lastIntegrityCheckStatus"]) => {
-  if (status === "healthy") {
-    return "Healthy";
-  }
-
-  if (status === "failed") {
-    return "Failed";
-  }
-
-  return "Not run yet";
+/** Returns an i18n key suffix (`healthy` / `failed` / …) — translate at call site. */
+const integrityLabelKey = (
+  status: AppDiagnosticsSnapshot["lastIntegrityCheckStatus"],
+): "healthy" | "failed" | "pending" => {
+  if (status === "healthy") return "healthy";
+  if (status === "failed") return "failed";
+  return "pending";
 };
 
 const buildUserDraft = (user: AppUserAdminRow | null, roles: AppUsersSnapshot["roles"]): UserEditorDraft => ({
@@ -289,9 +295,10 @@ export const SettingsPage = () => {
   });
   const navigate = useNavigate();
   const toast = useToast();
+  const { t } = useTranslation();
   const { formatDateTime } = useLocale();
   const formatDateLabel = (value: string | null) => {
-    if (!value) return "Never";
+    if (!value) return t("common.never");
     return formatDateTime(value) || value;
   };
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
@@ -362,7 +369,7 @@ export const SettingsPage = () => {
     try {
       stateSetter(true);
       const result = await action();
-      toast.success("Settings action complete", result.summary);
+      toast.success(t("settings.actions.completeTitle"), result.summary);
       setError(null);
 
       if ("diagnostics" in result) {
@@ -381,7 +388,7 @@ export const SettingsPage = () => {
         await loadDiagnostics();
       }
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "The app could not complete that settings action."));
+      setError(getUserFacingErrorMessage(nextError, t("settings.actions.couldNotComplete")));
     } finally {
       stateSetter(false);
     }
@@ -390,74 +397,78 @@ export const SettingsPage = () => {
   const dataHealthRows = useMemo(
     () => [
       {
-        label: "Local data",
-        value: diagnostics.databaseExists ? formatBytes(diagnostics.databaseSizeBytes) : "Not created yet",
+        label: t("settings.data.rows.localData"),
+        value: diagnostics.databaseExists ? formatBytes(diagnostics.databaseSizeBytes) : t("settings.data.rows.notCreated"),
       },
       {
-        label: "Latest backup",
-        value: diagnostics.backupExists ? formatBytes(diagnostics.backupSizeBytes) : "No backup available yet",
+        label: t("settings.data.rows.latestBackup"),
+        value: diagnostics.backupExists ? formatBytes(diagnostics.backupSizeBytes) : t("settings.data.rows.noBackup"),
       },
       {
-        label: "Last backup",
+        label: t("settings.data.rows.lastBackup"),
         value: formatDateLabel(diagnostics.lastBackupAt),
       },
       {
-        label: "Data check",
-        value: resolveIntegrityLabel(diagnostics.lastIntegrityCheckStatus),
+        label: t("settings.data.rows.dataCheck"),
+        value: t(`settings.integrity.${integrityLabelKey(diagnostics.lastIntegrityCheckStatus)}`),
       },
       {
-        label: "Last integrity check",
+        label: t("settings.data.rows.lastIntegrityCheck"),
         value: formatDateLabel(diagnostics.lastIntegrityCheckAt),
       },
       {
-        label: "Device security",
-        value: diagnostics.encryptionAvailable ? "Available" : "Unavailable on this device",
+        label: t("settings.data.rows.deviceSecurity"),
+        value: diagnostics.encryptionAvailable
+          ? t("settings.data.rows.deviceSecAvailable")
+          : t("settings.data.rows.deviceSecUnavailable"),
       },
     ],
-    [diagnostics],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [diagnostics, t],
   );
 
   const syncHealthRows = useMemo(
     () => [
       {
-        label: "Maintenance",
+        label: t("settings.data.rows.maintenance"),
         value: formatDateLabel(diagnostics.lastRetentionRunAt),
       },
       {
-        label: "Maintenance result",
-        value: diagnostics.lastRetentionSummary ?? "Not run yet",
+        label: t("settings.data.rows.maintenanceResult"),
+        value: diagnostics.lastRetentionSummary ?? t("settings.data.rows.maintenanceNotRun"),
       },
       {
-        label: "Last upload",
+        label: t("settings.data.rows.lastUpload"),
         value: formatDateLabel(diagnostics.lastSyncRunAt),
       },
       {
-        label: "Upload status",
+        label: t("settings.data.rows.uploadStatus"),
         value:
           diagnostics.lastSyncStatus === "healthy"
-            ? "Healthy"
+            ? t("settings.data.rows.uploadStatusHealthy")
             : diagnostics.lastSyncStatus === "failed"
-              ? "Failed"
-              : "Idle",
+              ? t("settings.data.rows.uploadStatusFailed")
+              : t("settings.data.rows.uploadStatusIdle"),
       },
       {
-        label: "Upload result",
-        value: diagnostics.lastSyncSummary ?? "No sync run yet",
+        label: t("settings.data.rows.uploadResult"),
+        value: diagnostics.lastSyncSummary ?? t("settings.data.rows.uploadResultNone"),
       },
       {
-        label: "Waiting",
+        label: t("settings.data.rows.waiting"),
         value: String(diagnostics.syncOutboxPendingCount),
       },
       {
-        label: "Uploading",
+        label: t("settings.data.rows.uploading"),
         value: String(diagnostics.syncOutboxProcessingCount),
       },
       {
-        label: "Needs attention",
+        label: t("settings.data.rows.needsAttention"),
         value: String(diagnostics.syncOutboxFailedCount),
       },
     ],
-    [diagnostics],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [diagnostics, t],
   );
 
   const formatSupportEvent = (event: AppSupportEventSummary | null, emptyLabel: string) =>
@@ -466,15 +477,16 @@ export const SettingsPage = () => {
   const supportSummaryText = useMemo(
     () =>
       [
-        `App: ${supportSnapshot.appInfo.appName} ${supportSnapshot.appInfo.version}`,
-        `Platform: ${supportSnapshot.appInfo.platform}`,
-        `Build: ${supportSnapshot.appInfo.isPackaged ? "Packaged build" : "Development build"}`,
-        `Last crash: ${formatSupportEvent(supportSnapshot.lastCrash, "None captured yet")}`,
-        `Last error: ${formatSupportEvent(supportSnapshot.lastError, "None captured yet")}`,
-        `Last load failure: ${formatSupportEvent(supportSnapshot.lastLoadFailure, "None captured yet")}`,
-        `Recent log files: ${supportSnapshot.recentLogFiles.map((file) => file.name).join(", ") || "None"}`,
+        `${t("settings.advanced.appInfo.app")}: ${supportSnapshot.appInfo.appName} ${supportSnapshot.appInfo.version}`,
+        `${t("settings.advanced.appInfo.platform")}: ${supportSnapshot.appInfo.platform}`,
+        `${t("settings.advanced.appInfo.build")}: ${supportSnapshot.appInfo.isPackaged ? t("settings.advanced.appInfo.packaged") : t("settings.advanced.appInfo.development")}`,
+        `${t("settings.advanced.support.lastCrash")}: ${formatSupportEvent(supportSnapshot.lastCrash, t("settings.advanced.support.noneCaptured"))}`,
+        `${t("settings.advanced.support.lastError")}: ${formatSupportEvent(supportSnapshot.lastError, t("settings.advanced.support.noneCaptured"))}`,
+        `${t("settings.advanced.support.lastLoadIssue")}: ${formatSupportEvent(supportSnapshot.lastLoadFailure, t("settings.advanced.support.noneCaptured"))}`,
+        `${t("settings.advanced.support.recentLogFiles")}: ${supportSnapshot.recentLogFiles.map((file) => file.name).join(", ") || t("common.none")}`,
       ].join("\n"),
-    [supportSnapshot],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [supportSnapshot, t],
   );
 
   const selectedUser = useMemo(
@@ -488,8 +500,12 @@ export const SettingsPage = () => {
   );
 
   const selectedRoleCoverage = useMemo(
-    () => (selectedRole ? getRoleCoverageLabels(selectedRole.permissionKeys) : []),
-    [selectedRole],
+    () =>
+      selectedRole
+        ? getRoleCoverageIds(selectedRole.permissionKeys).map((id) => t(`settings.roleCoverage.${id}`))
+        : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedRole, t],
   );
 
   const handleCrewMemberChange = (crewMemberId: string) => {
@@ -507,22 +523,25 @@ export const SettingsPage = () => {
   const teamSummaryRows = useMemo(
     () => [
       {
-        label: "Active users",
+        label: t("settings.team.metrics.activeUsers"),
         value: usersSnapshot.users.filter((user) => user.isActive).length,
-        detail: `${usersSnapshot.users.length} total`,
+        detail: t("settings.team.metrics.activeUsersDetail", { count: usersSnapshot.users.length }),
       },
       {
-        label: "Telegram linked",
+        label: t("settings.team.metrics.telegramLinked"),
         value: usersSnapshot.users.filter((user) => user.telegramLinkStatus === "linked").length,
-        detail: `${usersSnapshot.users.filter((user) => user.readyForTelegram).length} ready`,
+        detail: t("settings.team.metrics.telegramLinkedDetail", {
+          count: usersSnapshot.users.filter((user) => user.readyForTelegram).length,
+        }),
       },
       {
-        label: "Roles",
+        label: t("settings.team.metrics.rolesLabel"),
         value: usersSnapshot.roles.length,
-        detail: "Access presets",
+        detail: t("settings.team.metrics.rolesDetail"),
       },
     ],
-    [usersSnapshot.roles.length, usersSnapshot.users],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [usersSnapshot.roles.length, usersSnapshot.users, t],
   );
 
   useEffect(() => {
@@ -555,11 +574,11 @@ export const SettingsPage = () => {
     try {
       const result = await action();
       setUsersSnapshot(result.snapshot);
-      toast.success("Users updated", result.summary);
+      toast.success(t("settings.actions.usersUpdatedTitle"), result.summary);
       setError(null);
       setSelectedUserId(result.userId ?? "new");
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "The app could not update users."));
+      setError(getUserFacingErrorMessage(nextError, t("settings.actions.couldNotUpdateUsers")));
     }
   };
 
@@ -694,19 +713,22 @@ export const SettingsPage = () => {
           </div>
 
           <SettingsDisclosure
-            title="Users"
-            summary={`${usersSnapshot.users.length} user${usersSnapshot.users.length === 1 ? "" : "s"} · ${usersSnapshot.users.filter((user) => user.isActive).length} active`}
+            title={t("settings.team.usersDisclosure.title")}
+            summary={t("settings.team.usersDisclosure.summary", {
+              count: usersSnapshot.users.length,
+              active: usersSnapshot.users.filter((user) => user.isActive).length,
+            })}
           >
             <div className="settings-team-layout">
-              <SurfaceCard title="Users">
+              <SurfaceCard title={t("settings.team.usersCardTitle")}>
                 <button className={`settings-user-row${selectedUserId === "new" ? " is-selected" : ""}`} onClick={() => setSelectedUserId("new")} type="button">
                   <span className="settings-user-create-mark">+</span>
                   <span className="settings-user-row-copy">
                     <span className="settings-user-row-topline">
-                      <strong>Create user</strong>
-                      <span>Add access</span>
+                      <strong>{t("settings.team.createUser")}</strong>
+                      <span>{t("settings.team.createUserBadge")}</span>
                     </span>
-                    <span className="settings-user-row-meta">Name, role and optional channel access.</span>
+                    <span className="settings-user-row-meta">{t("settings.team.createUserHelp")}</span>
                   </span>
                 </button>
 
@@ -719,16 +741,16 @@ export const SettingsPage = () => {
                       type="button"
                     >
                       <span
-                        aria-label={user.isActive ? "active" : "inactive"}
+                        aria-label={user.isActive ? t("settings.team.activeStatus") : t("settings.team.inactiveStatus")}
                         className={`settings-user-status-dot settings-user-status-dot-${user.isActive ? "active" : "inactive"}`}
                       />
                       <span className="settings-user-row-copy">
                         <span className="settings-user-row-topline">
                           <strong>{user.fullName}</strong>
-                          <span>{user.roleName ?? "No role"}</span>
+                          <span>{user.roleName ?? t("settings.team.noRole")}</span>
                         </span>
                         <span className="settings-user-row-meta">
-                          {user.isActive ? "Active" : "Inactive"}
+                          {user.isActive ? t("settings.team.activeStatus") : t("settings.team.inactiveStatus")}
                           {user.linkedCrewLabel ? ` · ${user.linkedCrewLabel}` : ""}
                         </span>
                         <UserChannelDots user={user} />
@@ -739,25 +761,29 @@ export const SettingsPage = () => {
               </SurfaceCard>
 
               <SurfaceCard
-                title={selectedUser ? selectedUser.fullName : "Create user"}
+                title={selectedUser ? selectedUser.fullName : t("settings.team.createUser")}
                 aside={
                   <span className={`run-status-pill run-status-pill-${selectedUser?.isActive ? "configured" : "disabled"}`}>
-                    {selectedUser ? (selectedUser.isActive ? "Active" : "Inactive") : "New"}
+                    {selectedUser
+                      ? selectedUser.isActive
+                        ? t("settings.team.activeStatus")
+                        : t("settings.team.inactiveStatus")
+                      : t("settings.team.newBadge")}
                   </span>
                 }
               >
                 <div className="agent-form-grid">
                   <label className="field-block">
-                    <span className="field-label">Full name</span>
+                    <span className="field-label">{t("settings.team.editor.fullName")}</span>
                     <input
                       className="field-input"
                       onChange={(event) => setUserDraft((current) => ({ ...current, fullName: event.target.value }))}
-                      placeholder="Full name"
+                      placeholder={t("settings.team.editor.fullNamePlaceholder")}
                       value={userDraft.fullName}
                     />
                   </label>
                   <label className="field-block">
-                    <span className="field-label">Role</span>
+                    <span className="field-label">{t("settings.team.editor.role")}</span>
                     <select
                       className="field-input"
                       onChange={(event) => {
@@ -767,7 +793,7 @@ export const SettingsPage = () => {
                       }}
                       value={userDraft.roleId}
                     >
-                      <option value="">Select a role</option>
+                      <option value="">{t("settings.team.editor.rolePlaceholder")}</option>
                       {usersSnapshot.roles.map((role) => (
                         <option key={role.id} value={role.id}>
                           {role.name}
@@ -776,31 +802,31 @@ export const SettingsPage = () => {
                     </select>
                   </label>
                   <label className="field-block">
-                    <span className="field-label">Email</span>
+                    <span className="field-label">{t("settings.team.editor.email")}</span>
                     <input
                       className="field-input"
                       onChange={(event) => setUserDraft((current) => ({ ...current, email: event.target.value }))}
-                      placeholder="name@studio.com"
+                      placeholder={t("settings.team.editor.emailPlaceholder")}
                       value={userDraft.email}
                     />
                   </label>
                   <label className="field-block">
-                    <span className="field-label">Phone</span>
+                    <span className="field-label">{t("settings.team.editor.phone")}</span>
                     <input
                       className="field-input"
                       onChange={(event) => setUserDraft((current) => ({ ...current, phone: event.target.value }))}
-                      placeholder="Optional phone"
+                      placeholder={t("settings.team.editor.phonePlaceholder")}
                       value={userDraft.phone}
                     />
                   </label>
                   <label className="field-block field-block-span-2">
-                    <span className="field-label">Crew member</span>
+                    <span className="field-label">{t("settings.team.editor.crewMember")}</span>
                     <select
                       className="field-input"
                       onChange={(event) => handleCrewMemberChange(event.target.value)}
                       value={userDraft.linkedCrewMemberId}
                     >
-                      <option value="">No linked crew</option>
+                      <option value="">{t("settings.team.editor.noLinkedCrew")}</option>
                       {catalog.crewMembers.map((crewMember) => (
                         <option key={crewMember.id} value={crewMember.id}>
                           {crewMember.fullName}
@@ -813,31 +839,33 @@ export const SettingsPage = () => {
 
                 <div className="settings-user-context-grid">
                   <div className="summary-row">
-                    <span className="summary-label">Access</span>
-                    <span className="summary-value">{selectedRoleCoverage.length ? selectedRoleCoverage.join(", ") : "Choose a role"}</span>
+                    <span className="summary-label">{t("settings.team.editor.access")}</span>
+                    <span className="summary-value">{selectedRoleCoverage.length ? selectedRoleCoverage.join(", ") : t("settings.team.editor.chooseRole")}</span>
                   </div>
                   <div className="summary-row">
-                    <span className="summary-label">Telegram</span>
+                    <span className="summary-label">{t("settings.team.editor.telegram")}</span>
                     <span className="summary-value">
                       {selectedUser
                         ? selectedUser.telegramLinkStatus === "linked"
                           ? `${selectedUser.telegramDisplayName ?? selectedUser.fullName}`
                           : selectedUser.telegramLinkStatus === "pending"
-                            ? "Pending link"
+                            ? t("settings.team.editor.telegramPending")
                             : selectedUser.telegramLinkStatus === "revoked"
-                              ? "Revoked"
-                              : "Not linked"
-                        : "Create user first"}
+                              ? t("settings.team.editor.telegramRevoked")
+                              : t("settings.team.editor.telegramNotLinked")
+                        : t("settings.team.editor.telegramCreateFirst")}
                     </span>
                   </div>
                 </div>
 
                 {selectedUser?.telegramExternalUserId ? (
                   <div className="models-provider-diagnostic">
-                    <span className="agent-detail-kicker">Telegram</span>
+                    <span className="agent-detail-kicker">{t("settings.team.editor.telegram")}</span>
                     <p>
                       {selectedUser.telegramUsername ? `@${selectedUser.telegramUsername}` : selectedUser.telegramDisplayName ?? selectedUser.fullName}
-                      {selectedUser.telegramLastSeenAt ? ` · last seen ${formatDateTime(selectedUser.telegramLastSeenAt)}` : ""}
+                      {selectedUser.telegramLastSeenAt
+                        ? t("settings.team.editor.lastSeen", { value: formatDateTime(selectedUser.telegramLastSeenAt) })
+                        : ""}
                     </p>
                   </div>
                 ) : null}
@@ -849,16 +877,26 @@ export const SettingsPage = () => {
                     onClick={() => void handleSaveUser()}
                     type="button"
                   >
-                    {isSavingUser ? "Saving..." : selectedUser ? "Save user" : "Add user"}
+                    {isSavingUser
+                      ? t("settings.team.editor.saving")
+                      : selectedUser
+                        ? t("settings.team.editor.saveUser")
+                        : t("settings.team.editor.addUser")}
                   </button>
                   {selectedUser ? (
                     <button className="ghost-control" disabled={isTogglingUser} onClick={() => void handleToggleUser()} type="button">
-                      {isTogglingUser ? "Updating..." : selectedUser.isActive ? "Deactivate" : "Activate"}
+                      {isTogglingUser
+                        ? t("settings.team.editor.updating")
+                        : selectedUser.isActive
+                          ? t("settings.team.editor.deactivate")
+                          : t("settings.team.editor.activate")}
                     </button>
                   ) : null}
                   {selectedUser?.telegramLinkStatus === "linked" ? (
                     <button className="ghost-control" disabled={isRevokingTelegram} onClick={() => void handleRevokeTelegram()} type="button">
-                      {isRevokingTelegram ? "Revoking..." : "Revoke Telegram"}
+                      {isRevokingTelegram
+                        ? t("settings.team.editor.revoking")
+                        : t("settings.team.editor.revokeTelegram")}
                     </button>
                   ) : null}
                   {selectedUser && canRequestUserDelete ? (
@@ -868,11 +906,11 @@ export const SettingsPage = () => {
                       onClick={() => setIsDeleteUserConfirmOpen(true)}
                       type="button"
                     >
-                      Remove user
+                      {t("settings.team.editor.removeUser")}
                     </button>
                   ) : null}
                   <button className="ghost-control" onClick={() => navigate("/agents/connectors")} type="button">
-                    Channels
+                    {t("settings.team.editor.channels")}
                   </button>
                 </div>
               </SurfaceCard>
@@ -880,13 +918,16 @@ export const SettingsPage = () => {
           </SettingsDisclosure>
 
           <SettingsDisclosure
-            title="Roles"
-            summary={`${usersSnapshot.roles.length} role${usersSnapshot.roles.length === 1 ? "" : "s"} · access presets`}
+            title={t("settings.team.rolesDisclosure.title")}
+            summary={t("settings.team.rolesDisclosure.summary", { count: usersSnapshot.roles.length })}
           >
-            <SurfaceCard title="Roles">
+            <SurfaceCard title={t("settings.team.rolesCardTitle")}>
               <div className="settings-role-grid">
                 {usersSnapshot.roles.map((role) => {
-                  const coverageLabels = getRoleCoverageLabels(role.permissionKeys);
+                  const coverageLabels = getRoleCoverageIds(role.permissionKeys).map((id) =>
+                    t(`settings.roleCoverage.${id}`),
+                  );
+                  const useCase = ROLE_USE_CASE_KEYS[role.key] ? t(ROLE_USE_CASE_KEYS[role.key]!) : role.description;
 
                   return (
                     <button
@@ -897,10 +938,12 @@ export const SettingsPage = () => {
                     >
                       <span className="settings-role-card-head">
                         <strong>{role.name}</strong>
-                        <span>{role.assignedUserCount} user{role.assignedUserCount === 1 ? "" : "s"}</span>
+                        <span>{t("settings.team.rolesCardUsers", { count: role.assignedUserCount })}</span>
                       </span>
-                      <span className="settings-role-card-copy">{roleUseCaseMap[role.key] ?? role.description}</span>
-                      <span className="settings-role-access">{coverageLabels.length ? coverageLabels.join(" · ") : "No access"}</span>
+                      <span className="settings-role-card-copy">{useCase}</span>
+                      <span className="settings-role-access">
+                        {coverageLabels.length ? coverageLabels.join(" · ") : t("settings.team.rolesCardNoAccess")}
+                      </span>
                     </button>
                   );
                 })}
@@ -908,8 +951,11 @@ export const SettingsPage = () => {
             </SurfaceCard>
           </SettingsDisclosure>
 
-          <SettingsDisclosure title="Permission matrix" summary="Detailed access by role">
-            <SurfaceCard title="Permission matrix">
+          <SettingsDisclosure
+            title={t("settings.team.permissionMatrixTitle")}
+            summary={t("settings.team.permissionMatrixSummary")}
+          >
+            <SurfaceCard title={t("settings.team.permissionMatrixTitle")}>
               <RolesPermissionMatrix roles={usersSnapshot.roles} />
             </SurfaceCard>
           </SettingsDisclosure>
@@ -918,7 +964,7 @@ export const SettingsPage = () => {
 
       {activeSection === "data" ? (
         <div className="settings-data-stack">
-          <SurfaceCard title="Data health">
+          <SurfaceCard title={t("settings.data.healthTitle")}>
             <div className="summary-grid">
               {dataHealthRows.map((row) => (
                 <div key={row.label} className="summary-row">
@@ -935,7 +981,7 @@ export const SettingsPage = () => {
                 onClick={() => void runAction(() => window.bukowskiApp!.runIntegrityCheck(), setIsCheckingIntegrity)}
                 type="button"
               >
-                {isCheckingIntegrity ? "Running integrity check..." : "Run integrity check"}
+                {isCheckingIntegrity ? t("settings.data.actions.runningIntegrity") : t("settings.data.actions.runIntegrity")}
               </button>
               <button
                 className="ghost-control"
@@ -943,7 +989,7 @@ export const SettingsPage = () => {
                 onClick={() => void runAction(() => window.bukowskiApp!.createBackup(), setIsCreatingBackup)}
                 type="button"
               >
-                {isCreatingBackup ? "Creating backup..." : "Create backup now"}
+                {isCreatingBackup ? t("settings.data.actions.creatingBackup") : t("settings.data.actions.createBackup")}
               </button>
               <button
                 className="ghost-control"
@@ -951,12 +997,12 @@ export const SettingsPage = () => {
                 onClick={() => void runAction(() => window.bukowskiApp!.runLocalSync(), setIsRunningLocalSync)}
                 type="button"
               >
-                {isRunningLocalSync ? "Syncing..." : "Run sync now"}
+                {isRunningLocalSync ? t("settings.data.actions.syncing") : t("settings.data.actions.runSync")}
               </button>
             </div>
           </SurfaceCard>
 
-          <SurfaceCard title="Sync activity">
+          <SurfaceCard title={t("settings.data.syncTitle")}>
             <div className="summary-grid">
               {syncHealthRows.map((row) => (
                 <div key={row.label} className="summary-row">
@@ -965,14 +1011,14 @@ export const SettingsPage = () => {
                 </div>
               ))}
               <div className="summary-row">
-                <span className="summary-label">Visible queue rows</span>
+                <span className="summary-label">{t("settings.data.rows.visibleQueue")}</span>
                 <span className="summary-value">{syncRows.length}</span>
               </div>
             </div>
 
             <div className="action-panel-actions action-panel-actions-start">
               <button className="action-primary-button" onClick={() => navigate("/settings/sync")} type="button">
-                Open sync activity
+                {t("settings.data.actions.openSync")}
               </button>
               <button
                 className="ghost-control"
@@ -986,7 +1032,7 @@ export const SettingsPage = () => {
                 }}
                 type="button"
               >
-                Retry all failed
+                {t("settings.data.actions.retryFailed")}
               </button>
             </div>
           </SurfaceCard>
@@ -995,38 +1041,38 @@ export const SettingsPage = () => {
 
       {activeSection === "advanced" ? (
         <div className="settings-advanced-layout">
-          <SurfaceCard className="settings-advanced-card settings-advanced-card-wide" title="Support">
+          <SurfaceCard className="settings-advanced-card settings-advanced-card-wide" title={t("settings.advanced.support.cardTitle")}>
             <div className="summary-grid">
               <div className="summary-row">
-                <span className="summary-label">Last crash</span>
-                <span className="summary-value">{formatSupportEvent(supportSnapshot.lastCrash, "None captured yet")}</span>
+                <span className="summary-label">{t("settings.advanced.support.lastCrash")}</span>
+                <span className="summary-value">{formatSupportEvent(supportSnapshot.lastCrash, t("settings.advanced.support.noneCaptured"))}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Last error</span>
-                <span className="summary-value">{formatSupportEvent(supportSnapshot.lastError, "None captured yet")}</span>
+                <span className="summary-label">{t("settings.advanced.support.lastError")}</span>
+                <span className="summary-value">{formatSupportEvent(supportSnapshot.lastError, t("settings.advanced.support.noneCaptured"))}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Last load issue</span>
+                <span className="summary-label">{t("settings.advanced.support.lastLoadIssue")}</span>
                 <span className="summary-value">
-                  {formatSupportEvent(supportSnapshot.lastLoadFailure, "No load issues captured")}
+                  {formatSupportEvent(supportSnapshot.lastLoadFailure, t("settings.advanced.support.noLoadIssues"))}
                 </span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Log location</span>
+                <span className="summary-label">{t("settings.advanced.support.logLocation")}</span>
                 <span className="summary-value">{supportSnapshot.logStorageLabel}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Recent log files</span>
+                <span className="summary-label">{t("settings.advanced.support.recentLogFiles")}</span>
                 <span className="summary-value">
                   {supportSnapshot.recentLogFiles.length
                     ? supportSnapshot.recentLogFiles
                         .map((file) => `${file.name} (${formatBytes(file.sizeBytes)})`)
                         .join(", ")
-                    : "No log files yet"}
+                    : t("settings.advanced.support.noLogFiles")}
                 </span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Critical events tracked</span>
+                <span className="summary-label">{t("settings.advanced.support.criticalEventsTracked")}</span>
                 <span className="summary-value">{supportSnapshot.recentCriticalEvents.length}</span>
               </div>
             </div>
@@ -1038,7 +1084,7 @@ export const SettingsPage = () => {
                 onClick={() => void runAction(() => window.bukowskiApp!.exportSupportBundle(), setIsExportingSupportBundle)}
                 type="button"
               >
-                {isExportingSupportBundle ? "Exporting support bundle..." : "Export support bundle"}
+                {isExportingSupportBundle ? t("settings.advanced.support.exporting") : t("settings.advanced.support.exportBundle")}
               </button>
               <button
                 className="ghost-control"
@@ -1046,40 +1092,40 @@ export const SettingsPage = () => {
                 onClick={() => void runAction(() => window.bukowskiApp!.exportRecentLogs(), setIsExportingLogs)}
                 type="button"
               >
-                {isExportingLogs ? "Exporting logs..." : "Export recent logs"}
+                {isExportingLogs ? t("settings.advanced.support.exportingLogs") : t("settings.advanced.support.exportLogs")}
               </button>
               <button
                 className="ghost-control"
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(supportSummaryText);
-                    toast.success("Copied", "Diagnostics summary copied.");
+                    toast.success(t("settings.actions.copiedTitle"), t("settings.actions.diagnosticsCopiedBody"));
                     setError(null);
                   } catch (copyError) {
-                    setError(getUserFacingErrorMessage(copyError, "The app could not copy the diagnostics summary."));
+                    setError(getUserFacingErrorMessage(copyError, t("settings.actions.couldNotCopyDiagnostics")));
                   }
                 }}
                 type="button"
               >
-                Copy diagnostics summary
+                {t("settings.advanced.support.copyDiagnostics")}
               </button>
             </div>
           </SurfaceCard>
 
-          <SurfaceCard className="settings-advanced-card" title="Data export">
+          <SurfaceCard className="settings-advanced-card" title={t("settings.advanced.dataExport.cardTitle")}>
             <div className="summary-grid">
               <div className="summary-row">
-                <span className="summary-label">Format</span>
+                <span className="summary-label">{t("settings.advanced.dataExport.format")}</span>
                 <span className="summary-value">JSON</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Scope</span>
+                <span className="summary-label">{t("settings.advanced.dataExport.scope")}</span>
                 <span className="summary-value">{activeWorkspaceName}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Build files</span>
+                <span className="summary-label">{t("settings.advanced.dataExport.buildFiles")}</span>
                 <span className="summary-value">
-                  {diagnostics.internalBuildArtifacts.length ? diagnostics.internalBuildArtifacts.join(", ") : "Not packaged yet"}
+                  {diagnostics.internalBuildArtifacts.length ? diagnostics.internalBuildArtifacts.join(", ") : t("settings.advanced.dataExport.notPackaged")}
                 </span>
               </div>
             </div>
@@ -1091,32 +1137,32 @@ export const SettingsPage = () => {
                 onClick={() => void runAction(() => window.bukowskiApp!.exportWorkspaceData(), setIsExporting)}
                 type="button"
               >
-                {isExporting ? "Exporting..." : "Export workspace JSON"}
+                {isExporting ? t("settings.advanced.dataExport.exporting") : t("settings.advanced.dataExport.exportJson")}
               </button>
             </div>
           </SurfaceCard>
 
-          <SurfaceCard className="settings-advanced-card" title="App info">
+          <SurfaceCard className="settings-advanced-card" title={t("settings.advanced.appInfo.cardTitle")}>
             <div className="summary-grid">
               <div className="summary-row">
-                <span className="summary-label">App</span>
+                <span className="summary-label">{t("settings.advanced.appInfo.app")}</span>
                 <span className="summary-value">{appInfo?.appName ?? "bukowskiOS"}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Version</span>
-                <span className="summary-value">{appInfo?.version ?? "Unknown"}</span>
+                <span className="summary-label">{t("settings.advanced.appInfo.version")}</span>
+                <span className="summary-value">{appInfo?.version ?? t("settings.advanced.appInfo.unknown")}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Build</span>
-                <span className="summary-value">{appInfo?.shellVersion ?? "Unknown"}</span>
+                <span className="summary-label">{t("settings.advanced.appInfo.build")}</span>
+                <span className="summary-value">{appInfo?.shellVersion ?? t("settings.advanced.appInfo.unknown")}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Platform</span>
-                <span className="summary-value">{appInfo?.platform ?? "Unknown"}</span>
+                <span className="summary-label">{t("settings.advanced.appInfo.platform")}</span>
+                <span className="summary-value">{appInfo?.platform ?? t("settings.advanced.appInfo.unknown")}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Mode</span>
-                <span className="summary-value">{appInfo?.isPackaged ? "Packaged" : "Development"}</span>
+                <span className="summary-label">{t("settings.advanced.appInfo.mode")}</span>
+                <span className="summary-value">{appInfo?.isPackaged ? t("settings.advanced.appInfo.packaged") : t("settings.advanced.appInfo.development")}</span>
               </div>
             </div>
           </SurfaceCard>
@@ -1127,15 +1173,15 @@ export const SettingsPage = () => {
       <ConfirmDialog
         body={
           selectedUser
-            ? `${selectedUser.fullName} will be removed from this workspace. If they still own active assets, open packing slips, open incidents or Telegram access, the app will stop the removal and explain what to fix first.`
-            : "This user will be removed from this workspace."
+            ? t("settings.team.deleteDialog.bodyWithName", { name: selectedUser.fullName })
+            : t("settings.team.deleteDialog.bodyFallback")
         }
-        confirmLabel="Remove user"
+        confirmLabel={t("settings.team.deleteDialog.confirm")}
         isOpen={isDeleteUserConfirmOpen}
         isSubmitting={isDeletingUser}
         onCancel={() => setIsDeleteUserConfirmOpen(false)}
         onConfirm={handleDeleteUser}
-        title="Remove this user?"
+        title={t("settings.team.deleteDialog.title")}
         tone="danger"
       />
     </div>

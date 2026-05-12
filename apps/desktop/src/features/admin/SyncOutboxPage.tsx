@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, CloudDownload, CloudUpload, R
 import type { AppActionResult, AppDiagnosticsSnapshot, AppSyncOutboxRow, AppSyncPullCursorRow } from "@contracts";
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { DataTable } from "@shared/components/DataTable";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
@@ -69,65 +70,57 @@ const SyncDisclosure = ({ children, defaultOpen = false, summary, title }: SyncD
   );
 };
 
-const syncFilters: Array<{ value: SyncFilter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "processing", label: "Processing" },
-  { value: "failed", label: "Failed" },
-  { value: "sent", label: "Sent" },
-];
+const SYNC_FILTER_VALUES: SyncFilter[] = ["all", "pending", "processing", "failed", "sent"];
 
-const inboundCoverage = [
-  { entityType: "asset_snapshots", label: "Assets", detail: "Inventory and current stock state", status: "active" },
-  { entityType: "asset_categories", label: "Categories", detail: "Asset categories", status: "active" },
-  { entityType: "locations", label: "Locations", detail: "Warehouses and operational locations", status: "active" },
-  { entityType: "clients", label: "Clients", detail: "Client catalog", status: "active" },
-  { entityType: "manufacturers", label: "Manufacturers", detail: "Manufacturer catalog", status: "active" },
-  { entityType: "production_companies", label: "Production companies", detail: "Production company catalog", status: "active" },
-  { entityType: "projects", label: "Projects", detail: "Project shells, units and crew assignments", status: "active" },
-  { entityType: "packing_slips", label: "Packing slips", detail: "Issued slips, items and returns", status: "active" },
-  { entityType: "incidents", label: "Incidents", detail: "Incident reports and evidence metadata", status: "active" },
-  { entityType: "rma_cases", label: "RMAs", detail: "Manufacturer repair cases and linked assets", status: "active" },
+const INBOUND_COVERAGE = [
+  "asset_snapshots",
+  "asset_categories",
+  "locations",
+  "clients",
+  "manufacturers",
+  "production_companies",
+  "projects",
+  "packing_slips",
+  "incidents",
+  "rma_cases",
 ] as const;
 
-// `formatDateLabel` is now built inside the component (see below) so it
-// can read the user's synced locale via `useLocale()`.
+type InboundCoverageId = (typeof INBOUND_COVERAGE)[number];
 
-const formatEntityLabel = (value: string) =>
-  value
-    .split("_")
-    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
-    .join(" ");
-
+/** Returns a stable status descriptor with i18n keys. Translation happens at render time. */
 const resolveOutboundStatus = (diagnostics: AppDiagnosticsSnapshot) => {
   if (diagnostics.syncOutboxFailedCount > 0) {
     return {
       tone: "critical" as const,
-      label: "Needs attention",
-      detail: `${diagnostics.syncOutboxFailedCount} upload${diagnostics.syncOutboxFailedCount === 1 ? "" : "s"} failed.`,
+      labelKey: "settings.sync.outbound.needsAttention",
+      detailKey: "settings.sync.outbound.needsAttentionDetail",
+      detailCount: diagnostics.syncOutboxFailedCount,
     };
   }
 
   if (diagnostics.syncOutboxProcessingCount > 0) {
     return {
       tone: "info" as const,
-      label: "Uploading",
-      detail: `${diagnostics.syncOutboxProcessingCount} change${diagnostics.syncOutboxProcessingCount === 1 ? "" : "s"} in progress.`,
+      labelKey: "settings.sync.outbound.uploading",
+      detailKey: "settings.sync.outbound.uploadingDetail",
+      detailCount: diagnostics.syncOutboxProcessingCount,
     };
   }
 
   if (diagnostics.syncOutboxPendingCount > 0) {
     return {
       tone: "warning" as const,
-      label: "Waiting to upload",
-      detail: `${diagnostics.syncOutboxPendingCount} change${diagnostics.syncOutboxPendingCount === 1 ? "" : "s"} queued.`,
+      labelKey: "settings.sync.outbound.waiting",
+      detailKey: "settings.sync.outbound.waitingDetail",
+      detailCount: diagnostics.syncOutboxPendingCount,
     };
   }
 
   return {
     tone: "success" as const,
-    label: "Up to date",
-    detail: "No local changes waiting for cloud upload.",
+    labelKey: "settings.sync.outbound.upToDate",
+    detailKey: "settings.sync.outbound.upToDateDetail",
+    detailCount: 0,
   };
 };
 
@@ -139,8 +132,9 @@ const resolveInboundStatus = (pullCursors: AppSyncPullCursorRow[]) => {
   if (failed.length > 0) {
     return {
       tone: "critical" as const,
-      label: "Download needs attention",
-      detail: `${failed.length} inbound source${failed.length === 1 ? "" : "s"} reported an error.`,
+      labelKey: "settings.sync.inbound.needsAttention",
+      detailKey: "settings.sync.inbound.needsAttentionDetail",
+      detailCount: failed.length,
       latest,
     };
   }
@@ -148,73 +142,53 @@ const resolveInboundStatus = (pullCursors: AppSyncPullCursorRow[]) => {
   if (pullCursors.length > 0) {
     return {
       tone: "success" as const,
-      label: "Downloads active",
-      detail: `${pullCursors.length} inbound source${pullCursors.length === 1 ? "" : "s"} checked.`,
+      labelKey: "settings.sync.inbound.active",
+      detailKey: "settings.sync.inbound.activeDetail",
+      detailCount: pullCursors.length,
       latest,
     };
   }
 
   return {
     tone: "warning" as const,
-    label: "Waiting for first download",
-    detail: "Open a remote workspace and the app will start pulling supported data.",
-    latest: null,
+    labelKey: "settings.sync.inbound.waiting",
+    detailKey: "settings.sync.inbound.waitingDetail",
+    detailCount: 0,
+    latest: null as string | null,
   };
 };
 
 const formatSyncStatusTone = (status: AppSyncOutboxRow["status"]) => {
-  if (status === "sent") {
-    return "success" as const;
-  }
-
-  if (status === "failed") {
-    return "critical" as const;
-  }
-
-  if (status === "processing") {
-    return "info" as const;
-  }
-
+  if (status === "sent") return "success" as const;
+  if (status === "failed") return "critical" as const;
+  if (status === "processing") return "info" as const;
   return "warning" as const;
 };
 
 const normalizeText = (value: string) => value.trim().toLowerCase();
 
 const resolveEntityNavigationPath = (row: AppSyncOutboxRow) => {
-  if (row.entityType === "asset_event") {
-    return `/assets/${row.entityId}`;
-  }
-
-  if (row.entityType === "packing_slip") {
-    return `/packing-slips?focus=${row.entityId}`;
-  }
-
-  if (row.entityType === "incident") {
-    return `/incidents?focus=${row.entityId}`;
-  }
-
-  if (row.entityType === "financial_entry") {
-    return `/finance/entries?focus=${row.entityId}`;
-  }
-
+  if (row.entityType === "asset_event") return `/assets/${row.entityId}`;
+  if (row.entityType === "packing_slip") return `/packing-slips?focus=${row.entityId}`;
+  if (row.entityType === "incident") return `/incidents?focus=${row.entityId}`;
+  if (row.entityType === "financial_entry") return `/finance/entries?focus=${row.entityId}`;
   return null;
 };
 
-const summarizeSelection = (row: AppSyncOutboxRow | null) => {
-  if (!row) {
-    return "Select a row to inspect it.";
-  }
-
-  return `${row.entityType} · ${row.operationType}`;
-};
+const formatEntityLabel = (value: string) =>
+  value
+    .split("_")
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(" ");
 
 export const SyncOutboxPage = () => {
   const navigate = useNavigate();
   const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const toast = useToast();
+  const { t } = useTranslation();
   const { formatDateTime } = useLocale();
   const formatDateLabel = (value: string | null) => {
-    if (!value) return "Never";
+    if (!value) return t("common.never");
     return formatDateTime(value) || value;
   };
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot>(emptyDiagnostics);
@@ -248,7 +222,7 @@ export const SyncOutboxPage = () => {
       setPullCursors(nextPullCursors);
       setError(null);
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "The app could not load sync activity."));
+      setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotLoad")));
     }
   };
 
@@ -312,17 +286,22 @@ export const SyncOutboxPage = () => {
     [visibleRows],
   );
 
+  const summarizeSelection = (row: AppSyncOutboxRow | null) => {
+    if (!row) return t("settings.sync.detailSelectPrompt");
+    return `${row.entityType} · ${row.operationType}`;
+  };
+
   const runAction = async (action: () => Promise<AppActionResult>, setPending: (value: boolean) => void) => {
     try {
       setPending(true);
       const result = await action();
-      toast.success("Sync action complete", result.summary);
+      toast.success(t("settings.sync.toasts.actionComplete"), result.summary);
       setDiagnostics(result.diagnostics);
       setError(null);
       const nextRows = await window.bukowskiApp!.getSyncOutboxRows();
       setRows(nextRows);
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "The app could not complete that local sync action."));
+      setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotCompleteAction")));
     } finally {
       setPending(false);
     }
@@ -336,13 +315,13 @@ export const SyncOutboxPage = () => {
     try {
       setRetryingRowId(rowId);
       const result = await window.bukowskiApp.retrySyncOutboxRow(rowId);
-      toast.success("Sync row queued", result.summary);
+      toast.success(t("settings.sync.toasts.rowQueued"), result.summary);
       setDiagnostics(result.diagnostics);
       setError(null);
       const nextRows = await window.bukowskiApp.getSyncOutboxRows();
       setRows(nextRows);
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "The app could not retry that local sync row."));
+      setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotRetryRow")));
     } finally {
       setRetryingRowId(null);
     }
@@ -362,14 +341,17 @@ export const SyncOutboxPage = () => {
       }
 
       if (lastResult) {
-        toast.success("Sync rows queued", `${visibleRetryableRows.length} visible rows queued again.`);
+        toast.success(
+          t("settings.sync.toasts.rowsQueuedTitle"),
+          t("settings.sync.toasts.rowsQueuedBody", { count: visibleRetryableRows.length }),
+        );
         setDiagnostics(lastResult.diagnostics);
       }
       setError(null);
       const nextRows = await window.bukowskiApp.getSyncOutboxRows();
       setRows(nextRows);
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "The app could not retry the visible local sync rows."));
+      setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotRetryVisible")));
     } finally {
       setIsRetryingVisible(false);
     }
@@ -385,7 +367,7 @@ export const SyncOutboxPage = () => {
       const result = await window.bukowskiApp.backfillOperationalSnapshots({
         workspaceId: activeWorkspaceId,
       });
-      toast.success("Backfill complete", result.summary);
+      toast.success(t("settings.sync.toasts.backfillComplete"), result.summary);
       setDiagnostics(result.diagnostics);
       setError(null);
       const [nextRows, nextPullCursors] = await Promise.all([
@@ -395,60 +377,67 @@ export const SyncOutboxPage = () => {
       setRows(nextRows);
       setPullCursors(nextPullCursors);
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "The app could not backfill operational sync snapshots."));
+      setError(getUserFacingErrorMessage(nextError, t("settings.sync.couldNotBackfill")));
     } finally {
       setIsBackfillingOperational(false);
     }
   };
 
+  const isInboundCoverageId = (value: string): value is InboundCoverageId =>
+    (INBOUND_COVERAGE as readonly string[]).includes(value);
+
   return (
     <div className="page-stack settings-page">
-      <SectionHeader title="Sync activity" />
+      <SectionHeader title={t("settings.sync.title")} />
 
       {error ? <div className="form-inline-error">{error}</div> : null}
 
       <SettingsLayout>
       <div className="sync-overview-grid">
-        <SurfaceCard className="sync-direction-card" title="Upload to cloud">
+        <SurfaceCard className="sync-direction-card" title={t("settings.sync.outbound.cardTitle")}>
           <div className="sync-direction-head">
             <span className={`sync-direction-icon sync-direction-icon-${outboundStatus.tone}`}>
               <CloudUpload size={18} />
             </span>
             <div>
-              <StatusBadge tone={outboundStatus.tone}>{outboundStatus.label}</StatusBadge>
-              <p>{outboundStatus.detail}</p>
+              <StatusBadge tone={outboundStatus.tone}>{t(outboundStatus.labelKey)}</StatusBadge>
+              <p>{t(outboundStatus.detailKey, { count: outboundStatus.detailCount })}</p>
             </div>
           </div>
           <div className="sync-metric-row">
-            <span><strong>{diagnostics.syncOutboxPendingCount}</strong> pending</span>
-            <span><strong>{diagnostics.syncOutboxProcessingCount}</strong> uploading</span>
-            <span><strong>{diagnostics.syncOutboxFailedCount}</strong> failed</span>
+            <span><strong>{diagnostics.syncOutboxPendingCount}</strong> {t("settings.sync.outbound.metrics.pending")}</span>
+            <span><strong>{diagnostics.syncOutboxProcessingCount}</strong> {t("settings.sync.outbound.metrics.uploading")}</span>
+            <span><strong>{diagnostics.syncOutboxFailedCount}</strong> {t("settings.sync.outbound.metrics.failed")}</span>
           </div>
-          <small>Last upload pass: {formatDateLabel(diagnostics.lastSyncRunAt)}</small>
+          <small>{t("settings.sync.outbound.lastPass", { value: formatDateLabel(diagnostics.lastSyncRunAt) })}</small>
         </SurfaceCard>
 
-        <SurfaceCard className="sync-direction-card" title="Download from cloud">
+        <SurfaceCard className="sync-direction-card" title={t("settings.sync.inbound.cardTitle")}>
           <div className="sync-direction-head">
             <span className={`sync-direction-icon sync-direction-icon-${inboundStatus.tone}`}>
               <CloudDownload size={18} />
             </span>
             <div>
-              <StatusBadge tone={inboundStatus.tone}>{inboundStatus.label}</StatusBadge>
-              <p>{inboundStatus.detail}</p>
+              <StatusBadge tone={inboundStatus.tone}>{t(inboundStatus.labelKey)}</StatusBadge>
+              <p>{t(inboundStatus.detailKey, { count: inboundStatus.detailCount })}</p>
             </div>
           </div>
           <div className="sync-metric-row">
-            <span><strong>{pullCursors.length}</strong> sources</span>
-            <span><strong>{pullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0)}</strong> latest rows</span>
-            <span><strong>{pullCursors.filter((row) => row.lastError).length}</strong> errors</span>
+            <span><strong>{pullCursors.length}</strong> {t("settings.sync.inbound.metrics.sources")}</span>
+            <span><strong>{pullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0)}</strong> {t("settings.sync.inbound.metrics.latest")}</span>
+            <span><strong>{pullCursors.filter((row) => row.lastError).length}</strong> {t("settings.sync.inbound.metrics.errors")}</span>
           </div>
-          <small>Last download check: {formatDateLabel(inboundStatus.latest)}</small>
+          <small>{t("settings.sync.inbound.lastCheck", { value: formatDateLabel(inboundStatus.latest) })}</small>
         </SurfaceCard>
       </div>
 
       <SyncDisclosure
-        title="Actions"
-        summary={diagnostics.syncOutboxFailedCount ? `${diagnostics.syncOutboxFailedCount} failed upload${diagnostics.syncOutboxFailedCount === 1 ? "" : "s"} can be retried` : "Manual sync and repair tools"}
+        title={t("settings.sync.actionsDisclosure.title")}
+        summary={
+          diagnostics.syncOutboxFailedCount
+            ? t("settings.sync.actionsDisclosure.summaryWithFailed", { count: diagnostics.syncOutboxFailedCount })
+            : t("settings.sync.actionsDisclosure.summaryDefault")
+        }
       >
         <div className="sync-action-row">
           <button
@@ -458,7 +447,7 @@ export const SyncOutboxPage = () => {
             type="button"
           >
             <RefreshCw size={14} />
-            <span>{isRunningLocalSync ? "Syncing..." : "Run upload sync"}</span>
+            <span>{isRunningLocalSync ? t("settings.sync.actions.running") : t("settings.sync.actions.runUpload")}</span>
           </button>
           <button
             className="ghost-control"
@@ -466,7 +455,7 @@ export const SyncOutboxPage = () => {
             onClick={() => void runAction(() => window.bukowskiApp!.retryAllFailedSyncOutboxRows(), setIsRetryingAllFailed)}
             type="button"
           >
-            {isRetryingAllFailed ? "Retrying failed..." : "Retry failed uploads"}
+            {isRetryingAllFailed ? t("settings.sync.actions.retryingFailed") : t("settings.sync.actions.retryFailed")}
           </button>
           <button
             className="ghost-control"
@@ -474,7 +463,9 @@ export const SyncOutboxPage = () => {
             onClick={() => void retryVisibleRows()}
             type="button"
           >
-            {isRetryingVisible ? "Retrying visible..." : `Retry visible (${visibleRetryableRows.length})`}
+            {isRetryingVisible
+              ? t("settings.sync.actions.retryingVisible")
+              : t("settings.sync.actions.retryVisible", { count: visibleRetryableRows.length })}
           </button>
           <button
             className="ghost-control"
@@ -482,29 +473,47 @@ export const SyncOutboxPage = () => {
             onClick={() => void backfillOperationalSnapshots()}
             type="button"
           >
-            {isBackfillingOperational ? "Backfilling operational..." : "Backfill operational data"}
+            {isBackfillingOperational ? t("settings.sync.actions.backfilling") : t("settings.sync.actions.backfill")}
           </button>
         </div>
       </SyncDisclosure>
 
-      <SyncDisclosure title="Download coverage" summary={`${inboundCoverage.length} data areas · ${pullCursors.filter((row) => row.lastError).length} errors`}>
-        <SurfaceCard title="Download coverage">
+      <SyncDisclosure
+        title={t("settings.sync.coverageDisclosure.title")}
+        summary={t("settings.sync.coverageDisclosure.summary", {
+          count: INBOUND_COVERAGE.length,
+          errors: pullCursors.filter((row) => row.lastError).length,
+        })}
+      >
+        <SurfaceCard title={t("settings.sync.coverageCard")}>
           <div className="sync-coverage-grid">
-            {inboundCoverage.map((item) => {
-              const cursor = pullCursorByEntity.get(item.entityType);
-              const isActive = item.status === "active";
+            {INBOUND_COVERAGE.map((entityType) => {
+              const cursor = pullCursorByEntity.get(entityType);
+              const isActive = true;
               const hasError = Boolean(cursor?.lastError);
+              const label = t(`settings.sync.coverage.${entityType}.label`);
+              const detail = t(`settings.sync.coverage.${entityType}.detail`);
               return (
-                <div className={`sync-coverage-item${isActive ? "" : " is-planned"}`} key={item.entityType}>
+                <div className="sync-coverage-item" key={entityType}>
                   <span className={`sync-coverage-icon${hasError ? " is-error" : isActive ? " is-active" : ""}`}>
                     {hasError ? <AlertTriangle size={14} /> : isActive ? <CheckCircle2 size={14} /> : <CloudDownload size={14} />}
                   </span>
                   <div>
-                    <strong>{item.label}</strong>
-                    <small>{hasError ? cursor?.lastError : cursor ? `${cursor.lastPulledCount} rows in latest pull` : item.detail}</small>
+                    <strong>{label}</strong>
+                    <small>
+                      {hasError
+                        ? cursor?.lastError
+                        : cursor
+                          ? t("settings.sync.coverageRowsLatest", { count: cursor.lastPulledCount })
+                          : detail}
+                    </small>
                   </div>
                   <StatusBadge tone={hasError ? "critical" : isActive ? "success" : "neutral"}>
-                    {hasError ? "Error" : isActive ? "Active" : "Planned"}
+                    {hasError
+                      ? t("settings.sync.coverageBadge.error")
+                      : isActive
+                        ? t("settings.sync.coverageBadge.active")
+                        : t("settings.sync.coverageBadge.planned")}
                   </StatusBadge>
                 </div>
               );
@@ -513,27 +522,30 @@ export const SyncOutboxPage = () => {
         </SurfaceCard>
       </SyncDisclosure>
 
-      <SyncDisclosure title="Upload queue" summary={`${visibleRows.length} visible · ${rows.length} total`}>
+      <SyncDisclosure
+        title={t("settings.sync.queueDisclosure.title")}
+        summary={t("settings.sync.queueDisclosure.summary", { visible: visibleRows.length, total: rows.length })}
+      >
         <ResizableSideRailLayout className="split-layout" defaultWidth={420} maxWidth={680} minWidth={320} storageKey="sync-outbox-side-rail-width">
-          <SurfaceCard title="Upload queue">
+          <SurfaceCard title={t("settings.sync.queueCardTitle")}>
             <div className="sync-outbox-toolbar">
               <div className="sync-outbox-filter-grid">
                 <label className="compact-filter-field">
-                  <span>Status</span>
+                  <span>{t("settings.sync.queueToolbar.statusLabel")}</span>
                   <select
                     className="compact-filter-select"
                     onChange={(event) => setFilter(event.target.value as SyncFilter)}
                     value={filter}
                   >
-                    {syncFilters.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
+                    {SYNC_FILTER_VALUES.map((value) => (
+                      <option key={value} value={value}>
+                        {t(`settings.sync.filters.${value}`)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="compact-filter-field">
-                  <span>Entity</span>
+                  <span>{t("settings.sync.queueToolbar.entityLabel")}</span>
                   <select
                     className="compact-filter-select"
                     onChange={(event) => setEntityFilter(event.target.value)}
@@ -541,18 +553,22 @@ export const SyncOutboxPage = () => {
                   >
                     {entityFilters.map((item) => (
                       <option key={item} value={item}>
-                        {item === "all" ? "All entities" : formatEntityLabel(item)}
+                        {item === "all"
+                          ? t("settings.sync.filters.allEntities")
+                          : isInboundCoverageId(item)
+                            ? t(`settings.sync.coverage.${item}.label`)
+                            : formatEntityLabel(item)}
                       </option>
                     ))}
                   </select>
                 </label>
               </div>
-              <label className="list-toolbar-search sync-outbox-search" aria-label="Search upload queue">
+              <label className="list-toolbar-search sync-outbox-search" aria-label={t("settings.sync.queueToolbar.searchAria")}>
                 <Search aria-hidden size={14} />
                 <input
                   className="list-toolbar-search-input"
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search upload, operation, payload or error"
+                  placeholder={t("settings.sync.queueToolbar.searchPlaceholder")}
                   type="search"
                   value={search}
                 />
@@ -568,54 +584,54 @@ export const SyncOutboxPage = () => {
               columns={[
                 {
                   key: "status",
-                  label: "Status",
+                  label: t("settings.sync.queueColumns.status"),
                   render: (row) => <StatusBadge tone={formatSyncStatusTone(row.status)}>{getSyncOutboxStatusLabel(row.status)}</StatusBadge>,
                 },
-                { key: "entityType", label: "Entity", render: (row) => row.entityType },
-                { key: "entityId", label: "Entity ID", render: (row) => row.entityId },
-                { key: "operationType", label: "Operation", render: (row) => row.operationType },
-                { key: "attemptCount", label: "Attempts", align: "right", render: (row) => row.attemptCount },
-                { key: "updatedAt", label: "Updated", render: (row) => formatDateLabel(row.updatedAt) },
+                { key: "entityType", label: t("settings.sync.queueColumns.entity"), render: (row) => row.entityType },
+                { key: "entityId", label: t("settings.sync.queueColumns.entityId"), render: (row) => row.entityId },
+                { key: "operationType", label: t("settings.sync.queueColumns.operation"), render: (row) => row.operationType },
+                { key: "attemptCount", label: t("settings.sync.queueColumns.attempts"), align: "right", render: (row) => row.attemptCount },
+                { key: "updatedAt", label: t("settings.sync.queueColumns.updated"), render: (row) => formatDateLabel(row.updatedAt) },
               ]}
-              emptyMessage="No upload rows match the current filter."
+              emptyMessage={t("settings.sync.queueEmpty")}
               rows={visibleRows}
             />
           </SurfaceCard>
 
-          <SurfaceCard title="Upload detail" subtitle={summarizeSelection(activeRow)}>
+          <SurfaceCard title={t("settings.sync.detailCardTitle")} subtitle={summarizeSelection(activeRow)}>
             {!activeRow ? (
-              <div className="empty-state">Select an upload row to inspect it.</div>
+              <div className="empty-state">{t("settings.sync.detailEmpty")}</div>
             ) : (
               <div className="sync-outbox-detail-stack">
                 <div className="summary-grid">
                   <div className="summary-row">
-                    <span className="summary-label">Status</span>
+                    <span className="summary-label">{t("settings.sync.detail.status")}</span>
                     <span className="summary-value">{getSyncOutboxStatusLabel(activeRow.status)}</span>
                   </div>
                   <div className="summary-row">
-                    <span className="summary-label">Entity</span>
+                    <span className="summary-label">{t("settings.sync.detail.entity")}</span>
                     <span className="summary-value">{activeRow.entityType}</span>
                   </div>
                   <div className="summary-row">
-                    <span className="summary-label">Entity ID</span>
+                    <span className="summary-label">{t("settings.sync.detail.entityId")}</span>
                     <span className="summary-value">{activeRow.entityId}</span>
                   </div>
                   <div className="summary-row">
-                    <span className="summary-label">Operation</span>
+                    <span className="summary-label">{t("settings.sync.detail.operation")}</span>
                     <span className="summary-value">{activeRow.operationType}</span>
                   </div>
                   <div className="summary-row">
-                    <span className="summary-label">Attempts</span>
+                    <span className="summary-label">{t("settings.sync.detail.attempts")}</span>
                     <span className="summary-value">{activeRow.attemptCount}</span>
                   </div>
                   <div className="summary-row">
-                    <span className="summary-label">Next retry</span>
+                    <span className="summary-label">{t("settings.sync.detail.nextRetry")}</span>
                     <span className="summary-value">{formatDateLabel(activeRow.nextRetryAt)}</span>
                   </div>
                 </div>
 
                 {activeRow.lastError ? (
-                  <div className="form-inline-error">Last error: {activeRow.lastError}</div>
+                  <div className="form-inline-error">{t("settings.sync.detail.lastError", { message: activeRow.lastError })}</div>
                 ) : null}
 
                 <div className="action-panel-actions action-panel-actions-start">
@@ -625,7 +641,7 @@ export const SyncOutboxPage = () => {
                     onClick={() => void retrySingleRow(activeRow.id)}
                     type="button"
                   >
-                    {retryingRowId === activeRow.id ? "Retrying row..." : "Retry row"}
+                    {retryingRowId === activeRow.id ? t("settings.sync.detail.retrying") : t("settings.sync.detail.retry")}
                   </button>
                   {resolveEntityNavigationPath(activeRow) ? (
                     <button
@@ -633,13 +649,13 @@ export const SyncOutboxPage = () => {
                       onClick={() => navigate(resolveEntityNavigationPath(activeRow)!)}
                       type="button"
                     >
-                      Open entity
+                      {t("settings.sync.detail.openEntity")}
                     </button>
                   ) : null}
                 </div>
 
                 <div className="sync-outbox-payload-block">
-                  <span className="summary-label">Payload</span>
+                  <span className="summary-label">{t("settings.sync.detail.payload")}</span>
                   <pre className="sync-outbox-payload">{activeRow.payloadJson}</pre>
                 </div>
               </div>

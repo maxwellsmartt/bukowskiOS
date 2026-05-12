@@ -135,7 +135,9 @@
     "confirm": "Confirm",
     "search": "Search",
     "tryAgain": "Try again in a moment.",
-    "couldNotSave": "Could not save"
+    "couldNotSave": "Could not save",
+    "never": "Never",
+    "none": "None"
   },
   "settings": {
     "nav": {
@@ -176,6 +178,321 @@
         "minutes_one": "{{count}} min",
         "minutes_other": "{{count}} min",
         "hour": "1 hour"
+      }
+    },
+    "actions": {
+      "completeTitle": "Settings action complete",
+      "couldNotComplete": "The app could not complete that settings action.",
+      "usersUpdatedTitle": "Users updated",
+      "couldNotUpdateUsers": "The app could not update users.",
+      "copiedTitle": "Copied",
+      "diagnosticsCopiedBody": "Diagnostics summary copied.",
+      "couldNotCopyDiagnostics": "The app could not copy the diagnostics summary."
+    },
+    "integrity": {
+      "healthy": "Healthy",
+      "failed": "Failed",
+      "stale": "Stale",
+      "pending": "Pending",
+      "unknown": "Unknown"
+    },
+    "roleCoverage": {
+      "assets": "Assets",
+      "incidents": "Incidents",
+      "rma": "RMA",
+      "packing": "Packing",
+      "finance": "Finance"
+    },
+    "roleUseCase": {
+      "admin": "Full control for workspace owners and trusted operators.",
+      "crew": "Daily crew access for assigned equipment, packing context and incident reports.",
+      "supervisor": "Operational lead access for projects, assets, incidents, RMAs and packing slips.",
+      "finance_viewer": "Finance visibility without edit access.",
+      "maintenance": "Repair and RMA access for damaged equipment follow-up."
+    },
+    "team": {
+      "metrics": {
+        "activeUsers": "Active users",
+        "activeUsersDetail": "{{count}} total",
+        "telegramLinked": "Telegram linked",
+        "telegramLinkedDetail": "{{count}} ready",
+        "rolesLabel": "Roles",
+        "rolesDetail": "Access presets"
+      },
+      "usersDisclosure": {
+        "title": "Users",
+        "summary_one": "{{count}} user · {{active}} active",
+        "summary_other": "{{count}} users · {{active}} active"
+      },
+      "usersCardTitle": "Users",
+      "createUser": "Create user",
+      "createUserBadge": "Add access",
+      "createUserHelp": "Name, role and optional channel access.",
+      "noRole": "No role",
+      "activeStatus": "Active",
+      "inactiveStatus": "Inactive",
+      "newBadge": "New",
+      "editor": {
+        "fullName": "Full name",
+        "fullNamePlaceholder": "Full name",
+        "role": "Role",
+        "rolePlaceholder": "Select a role",
+        "email": "Email",
+        "emailPlaceholder": "name@studio.com",
+        "phone": "Phone",
+        "phonePlaceholder": "Optional phone",
+        "crewMember": "Crew member",
+        "noLinkedCrew": "No linked crew",
+        "access": "Access",
+        "chooseRole": "Choose a role",
+        "telegram": "Telegram",
+        "telegramPending": "Pending link",
+        "telegramRevoked": "Revoked",
+        "telegramNotLinked": "Not linked",
+        "telegramCreateFirst": "Create user first",
+        "lastSeen": " · last seen {{value}}",
+        "saving": "Saving…",
+        "saveUser": "Save user",
+        "addUser": "Add user",
+        "updating": "Updating…",
+        "deactivate": "Deactivate",
+        "activate": "Activate",
+        "revoking": "Revoking…",
+        "revokeTelegram": "Revoke Telegram",
+        "removeUser": "Remove user",
+        "channels": "Channels"
+      },
+      "deleteDialog": {
+        "title": "Remove this user?",
+        "bodyWithName": "{{name}} will be removed from this workspace. If they still own active assets, open packing slips, open incidents or Telegram access, the app will stop the removal and explain what to fix first.",
+        "bodyFallback": "This user will be removed from this workspace.",
+        "confirm": "Remove user"
+      },
+      "rolesDisclosure": {
+        "title": "Roles",
+        "summary_one": "{{count}} role · access presets",
+        "summary_other": "{{count}} roles · access presets"
+      },
+      "rolesCardTitle": "Roles",
+      "rolesCardUsers_one": "{{count}} user",
+      "rolesCardUsers_other": "{{count}} users",
+      "rolesCardNoAccess": "No access",
+      "permissionMatrixTitle": "Permission matrix",
+      "permissionMatrixSummary": "Detailed access by role"
+    },
+    "data": {
+      "healthTitle": "Data health",
+      "syncTitle": "Sync activity",
+      "rows": {
+        "localData": "Local data",
+        "notCreated": "Not created yet",
+        "latestBackup": "Latest backup",
+        "noBackup": "No backup available yet",
+        "lastBackup": "Last backup",
+        "dataCheck": "Data check",
+        "lastIntegrityCheck": "Last integrity check",
+        "deviceSecurity": "Device security",
+        "deviceSecAvailable": "Available",
+        "deviceSecUnavailable": "Unavailable on this device",
+        "maintenance": "Maintenance",
+        "maintenanceResult": "Maintenance result",
+        "maintenanceNotRun": "Not run yet",
+        "lastUpload": "Last upload",
+        "uploadStatus": "Upload status",
+        "uploadStatusHealthy": "Healthy",
+        "uploadStatusFailed": "Failed",
+        "uploadStatusIdle": "Idle",
+        "uploadResult": "Upload result",
+        "uploadResultNone": "No sync run yet",
+        "waiting": "Waiting",
+        "uploading": "Uploading",
+        "needsAttention": "Needs attention",
+        "visibleQueue": "Visible queue rows"
+      },
+      "actions": {
+        "runningIntegrity": "Running integrity check…",
+        "runIntegrity": "Run integrity check",
+        "creatingBackup": "Creating backup…",
+        "createBackup": "Create backup now",
+        "syncing": "Syncing…",
+        "runSync": "Run sync now",
+        "openSync": "Open sync activity",
+        "retryFailed": "Retry all failed"
+      }
+    },
+    "sync": {
+      "title": "Sync activity",
+      "couldNotLoad": "The app could not load sync activity.",
+      "couldNotCompleteAction": "The app could not complete that local sync action.",
+      "couldNotRetryRow": "The app could not retry that local sync row.",
+      "couldNotRetryVisible": "The app could not retry the visible local sync rows.",
+      "couldNotBackfill": "The app could not backfill operational sync snapshots.",
+      "toasts": {
+        "actionComplete": "Sync action complete",
+        "rowQueued": "Sync row queued",
+        "rowsQueuedTitle": "Sync rows queued",
+        "rowsQueuedBody": "{{count}} visible rows queued again.",
+        "backfillComplete": "Backfill complete"
+      },
+      "filters": {
+        "all": "All",
+        "pending": "Pending",
+        "processing": "Processing",
+        "failed": "Failed",
+        "sent": "Sent",
+        "allEntities": "All entities"
+      },
+      "outbound": {
+        "cardTitle": "Upload to cloud",
+        "needsAttention": "Needs attention",
+        "needsAttentionDetail_one": "{{count}} upload failed.",
+        "needsAttentionDetail_other": "{{count}} uploads failed.",
+        "uploading": "Uploading",
+        "uploadingDetail_one": "{{count}} change in progress.",
+        "uploadingDetail_other": "{{count}} changes in progress.",
+        "waiting": "Waiting to upload",
+        "waitingDetail_one": "{{count}} change queued.",
+        "waitingDetail_other": "{{count}} changes queued.",
+        "upToDate": "Up to date",
+        "upToDateDetail": "No local changes waiting for cloud upload.",
+        "metrics": {
+          "pending": "pending",
+          "uploading": "uploading",
+          "failed": "failed"
+        },
+        "lastPass": "Last upload pass: {{value}}"
+      },
+      "inbound": {
+        "cardTitle": "Download from cloud",
+        "needsAttention": "Download needs attention",
+        "needsAttentionDetail_one": "{{count}} inbound source reported an error.",
+        "needsAttentionDetail_other": "{{count}} inbound sources reported an error.",
+        "active": "Downloads active",
+        "activeDetail_one": "{{count}} inbound source checked.",
+        "activeDetail_other": "{{count}} inbound sources checked.",
+        "waiting": "Waiting for first download",
+        "waitingDetail": "Open a remote workspace and the app will start pulling supported data.",
+        "metrics": {
+          "sources": "sources",
+          "latest": "latest rows",
+          "errors": "errors"
+        },
+        "lastCheck": "Last download check: {{value}}"
+      },
+      "actionsDisclosure": {
+        "title": "Actions",
+        "summaryDefault": "Manual sync and repair tools",
+        "summaryWithFailed_one": "{{count}} failed upload can be retried",
+        "summaryWithFailed_other": "{{count}} failed uploads can be retried"
+      },
+      "actions": {
+        "running": "Syncing…",
+        "runUpload": "Run upload sync",
+        "retryingFailed": "Retrying failed…",
+        "retryFailed": "Retry failed uploads",
+        "retryingVisible": "Retrying visible…",
+        "retryVisible": "Retry visible ({{count}})",
+        "backfilling": "Backfilling operational…",
+        "backfill": "Backfill operational data"
+      },
+      "coverageDisclosure": {
+        "title": "Download coverage",
+        "summary_one": "{{count}} data area · {{errors}} errors",
+        "summary_other": "{{count}} data areas · {{errors}} errors"
+      },
+      "coverageCard": "Download coverage",
+      "coverage": {
+        "asset_snapshots": { "label": "Assets", "detail": "Inventory and current stock state" },
+        "asset_categories": { "label": "Categories", "detail": "Asset categories" },
+        "locations": { "label": "Locations", "detail": "Warehouses and operational locations" },
+        "clients": { "label": "Clients", "detail": "Client catalog" },
+        "manufacturers": { "label": "Manufacturers", "detail": "Manufacturer catalog" },
+        "production_companies": { "label": "Production companies", "detail": "Production company catalog" },
+        "projects": { "label": "Projects", "detail": "Project shells, units and crew assignments" },
+        "packing_slips": { "label": "Packing slips", "detail": "Issued slips, items and returns" },
+        "incidents": { "label": "Incidents", "detail": "Incident reports and evidence metadata" },
+        "rma_cases": { "label": "RMAs", "detail": "Manufacturer repair cases and linked assets" }
+      },
+      "coverageRowsLatest": "{{count}} rows in latest pull",
+      "coverageBadge": {
+        "error": "Error",
+        "active": "Active",
+        "planned": "Planned"
+      },
+      "queueDisclosure": {
+        "title": "Upload queue",
+        "summary": "{{visible}} visible · {{total}} total"
+      },
+      "queueCardTitle": "Upload queue",
+      "queueToolbar": {
+        "statusLabel": "Status",
+        "entityLabel": "Entity",
+        "searchAria": "Search upload queue",
+        "searchPlaceholder": "Search upload, operation, payload or error"
+      },
+      "queueColumns": {
+        "status": "Status",
+        "entity": "Entity",
+        "entityId": "Entity ID",
+        "operation": "Operation",
+        "attempts": "Attempts",
+        "updated": "Updated"
+      },
+      "queueEmpty": "No upload rows match the current filter.",
+      "detailCardTitle": "Upload detail",
+      "detailSelectPrompt": "Select a row to inspect it.",
+      "detailEmpty": "Select an upload row to inspect it.",
+      "detail": {
+        "status": "Status",
+        "entity": "Entity",
+        "entityId": "Entity ID",
+        "operation": "Operation",
+        "attempts": "Attempts",
+        "nextRetry": "Next retry",
+        "lastError": "Last error: {{message}}",
+        "retrying": "Retrying row…",
+        "retry": "Retry row",
+        "openEntity": "Open entity",
+        "payload": "Payload"
+      }
+    },
+    "advanced": {
+      "support": {
+        "cardTitle": "Support",
+        "lastCrash": "Last crash",
+        "lastError": "Last error",
+        "lastLoadIssue": "Last load issue",
+        "logLocation": "Log location",
+        "recentLogFiles": "Recent log files",
+        "criticalEventsTracked": "Critical events tracked",
+        "noneCaptured": "None captured yet",
+        "noLoadIssues": "No load issues captured",
+        "noLogFiles": "No log files yet",
+        "exporting": "Exporting support bundle…",
+        "exportBundle": "Export support bundle",
+        "exportingLogs": "Exporting logs…",
+        "exportLogs": "Export recent logs",
+        "copyDiagnostics": "Copy diagnostics summary"
+      },
+      "dataExport": {
+        "cardTitle": "Data export",
+        "format": "Format",
+        "scope": "Scope",
+        "buildFiles": "Build files",
+        "notPackaged": "Not packaged yet",
+        "exporting": "Exporting…",
+        "exportJson": "Export workspace JSON"
+      },
+      "appInfo": {
+        "cardTitle": "App info",
+        "app": "App",
+        "version": "Version",
+        "build": "Build",
+        "platform": "Platform",
+        "mode": "Mode",
+        "packaged": "Packaged",
+        "development": "Development",
+        "unknown": "Unknown"
       }
     },
     "account": {
