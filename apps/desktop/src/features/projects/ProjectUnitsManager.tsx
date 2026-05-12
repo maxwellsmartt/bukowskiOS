@@ -1,5 +1,6 @@
 import { Check, Pencil, RotateCcw, Trash2, WrapText, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { CatalogSnapshot, ProjectDetailSnapshot } from "@contracts";
 import { projectColorPalette } from "@contracts";
@@ -85,6 +86,7 @@ const statusToneMap = {
 } as const;
 
 export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChanged, projectId, units }: ProjectUnitsManagerProps) => {
+  const { t } = useTranslation();
   const unitListRef = useRef<HTMLDivElement | null>(null);
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
@@ -174,11 +176,11 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       }
 
       await Promise.resolve(onChanged());
-      const nextFeedback = editorMode === "create" ? "Unit created." : "Unit updated.";
+      const nextFeedback = editorMode === "create" ? t("projects.units.toasts.createdBody") : t("projects.units.toasts.updatedBody");
       resetEditor();
-      toast.success("Done", nextFeedback);
+      toast.success(t("projects.units.toasts.done"), nextFeedback);
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "Unable to save project unit."));
+      setError(getUserFacingErrorMessage(nextError, t("projects.units.toasts.saveFailed")));
     } finally {
       setIsSubmitting(false);
     }
@@ -215,10 +217,13 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       }
 
       setError(null);
-      toast.success(action === "delete" ? "Unit deleted" : "Unit updated", action === "delete" ? "The unit and its assignments are gone." : "Changes are now live for the project crew.");
+      toast.success(
+        action === "delete" ? t("projects.units.toasts.deletedTitle") : t("projects.units.toasts.updatedTitle"),
+        action === "delete" ? t("projects.units.toasts.deletedBody") : t("projects.units.toasts.updatedLiveBody"),
+      );
       setWarning(null);
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "Unable to update unit."));
+      setError(getUserFacingErrorMessage(nextError, t("projects.units.toasts.updateFailed")));
     } finally {
       setIsSubmitting(false);
     }
@@ -241,10 +246,10 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       await Promise.resolve(onChanged());
       setCrewDrafts((current) => ({ ...current, [unitId]: emptyCrewDraft }));
       setError(null);
-      toast.success("Crew linked", "Member is now assigned to this unit.");
+      toast.success(t("projects.units.toasts.crewLinkedTitle"), t("projects.units.toasts.crewLinkedBody"));
       setWarning(nextSnapshot.units.find((unit) => unit.id === unitId)?.conflictSummary ?? null);
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "Unable to assign crew member to unit."));
+      setError(getUserFacingErrorMessage(nextError, t("projects.units.toasts.assignCrewFailed")));
     } finally {
       setIsSubmitting(false);
     }
@@ -260,10 +265,10 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
       });
       await Promise.resolve(onChanged());
       setError(null);
-      toast.success("Crew removed", "Member is no longer assigned to this unit.");
+      toast.success(t("projects.units.toasts.crewRemovedTitle"), t("projects.units.toasts.crewRemovedBody"));
       setWarning(null);
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "Unable to remove crew assignment."));
+      setError(getUserFacingErrorMessage(nextError, t("projects.units.toasts.removeCrewFailed")));
     } finally {
       setIsSubmitting(false);
     }
@@ -272,11 +277,11 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
   return (
     <>
     <SurfaceCard
-      title="Units"
+      title={t("projects.units.title")}
       aside={
         <button className="action-primary-button" onClick={beginCreate} type="button">
           <Check size={14} />
-          <span>New unit</span>
+          <span>{t("projects.units.newUnit")}</span>
         </button>
       }
     >
@@ -299,50 +304,54 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                   <div className="project-unit-title-row">
                     <span className="shell-project-code-badge">{unit.code}</span>
                     <span className="identity-title">{unit.name}</span>
-                    <StatusBadge tone={statusTone}>{unit.status}</StatusBadge>
+                    <StatusBadge tone={statusTone}>{t(`projects.unitStatuses.${unit.status}`, { defaultValue: unit.status })}</StatusBadge>
                   </div>
                   <span className="identity-meta">
-                    Order {unit.sortOrder} · {unit.startDate ?? "No start"} - {unit.endDate ?? "Open"}
+                    {t("projects.units.order", { order: unit.sortOrder })} · {unit.startDate ?? t("projects.fallbacks.noStart")} - {unit.endDate ?? t("projects.fallbacks.open")}
                   </span>
                   <span className="identity-meta">
-                    {unit.crewAssignments.length} crew linked
-                    {unit.statusSource === "manual_override" ? " · Manual status" : ""}
-                    {unit.conflictCount ? ` · ${unit.conflictCount} conflicts` : ""}
+                    {t("projects.units.crewLinked", { count: unit.crewAssignments.length })}
+                    {unit.statusSource === "manual_override" ? ` · ${t("projects.units.manualStatus")}` : ""}
+                    {unit.conflictCount ? ` · ${t("projects.units.conflicts", { count: unit.conflictCount })}` : ""}
                   </span>
                 </div>
 
                 <div className="shell-project-item-actions">
                   <button
-                    aria-label={`Edit ${unit.name}`}
+                    aria-label={t("projects.units.actions.editAria", { name: unit.name })}
                     className="shell-project-action"
-                    data-tooltip="Edit unit"
+                    data-tooltip={t("projects.units.actions.edit")}
                     onClick={() => beginEdit(unit)}
                     type="button"
                   >
                     <Pencil size={12} />
                   </button>
                   <button
-                    aria-label={`Wrap ${unit.name}`}
+                    aria-label={t("projects.units.actions.wrapAria", { name: unit.name })}
                     className="shell-project-action"
-                    data-tooltip="Mark wrapped"
+                    data-tooltip={t("projects.units.actions.markWrapped")}
                     onClick={() => setPendingUnitAction({ unit, action: "mark_wrapped" })}
                     type="button"
                   >
                     <WrapText size={12} />
                   </button>
                   <button
-                    aria-label={unit.status === "cancelled" ? `Reactivate ${unit.name}` : `Cancel ${unit.name}`}
+                    aria-label={
+                      unit.status === "cancelled"
+                        ? t("projects.units.actions.reactivateAria", { name: unit.name })
+                        : t("projects.units.actions.cancelAria", { name: unit.name })
+                    }
                     className="shell-project-action"
-                    data-tooltip={unit.status === "cancelled" ? "Reactivate unit" : "Cancel unit"}
+                    data-tooltip={unit.status === "cancelled" ? t("projects.units.actions.reactivate") : t("projects.units.actions.cancel")}
                     onClick={() => void runUnitAction(unit, unit.status === "cancelled" ? "reactivate" : "cancel")}
                     type="button"
                   >
                     <RotateCcw size={12} />
                   </button>
                   <button
-                    aria-label={`Delete ${unit.name}`}
+                    aria-label={t("projects.units.actions.deleteAria", { name: unit.name })}
                     className="shell-project-action is-danger"
-                    data-tooltip="Delete unit"
+                    data-tooltip={t("projects.units.actions.delete")}
                     onClick={() => setPendingUnitAction({ unit, action: "delete" })}
                     type="button"
                   >
@@ -362,7 +371,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                       <div className="identity-cell">
                         <span className="identity-title">{assignment.fullName}</span>
                         <span className="identity-meta">
-                          {assignment.roleLabel} · {assignment.startDate ?? "No start"} - {assignment.endDate ?? "Open"}
+                          {assignment.roleLabel} · {assignment.startDate ?? t("projects.fallbacks.noStart")} - {assignment.endDate ?? t("projects.fallbacks.open")}
                         </span>
                       </div>
 
@@ -377,12 +386,12 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                   ))}
                 </div>
               ) : (
-                <div className="empty-state">No crew assigned to this unit yet.</div>
+                <div className="empty-state">{t("projects.units.noCrewAssigned")}</div>
               )}
 
               <div className="action-form-grid project-unit-crew-form">
                 <label className="action-field">
-                  <span className="action-field-label">Crew</span>
+                  <span className="action-field-label">{t("projects.units.fields.crew")}</span>
                   <SelectField
                     onChange={(event) =>
                       setCrewDrafts((current) => ({
@@ -392,7 +401,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                     }
                     value={crewDraft.crewMemberId}
                   >
-                    <option value="">Choose crew</option>
+                    <option value="">{t("projects.units.fields.chooseCrew")}</option>
                     {crewMembers.map((crewMember) => (
                       <option key={crewMember.id} value={crewMember.id}>
                         {crewMember.fullName}
@@ -403,11 +412,11 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
               </div>
 
               <details className="detail-disclosure">
-                <summary className="detail-disclosure-summary">More details</summary>
+                <summary className="detail-disclosure-summary">{t("projects.units.moreDetails")}</summary>
                 <div className="detail-disclosure-content">
                   <div className="action-form-grid project-unit-crew-form">
                     <label className="action-field">
-                      <span className="action-field-label">Role</span>
+                      <span className="action-field-label">{t("projects.units.fields.role")}</span>
                       <input
                         className="action-field-control"
                         onChange={(event) =>
@@ -421,7 +430,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                     </label>
 
                     <label className="action-field">
-                      <span className="action-field-label">Start</span>
+                      <span className="action-field-label">{t("projects.units.fields.start")}</span>
                       <input
                         className="action-field-control"
                         onChange={(event) =>
@@ -436,7 +445,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                     </label>
 
                     <label className="action-field">
-                      <span className="action-field-label">End</span>
+                      <span className="action-field-label">{t("projects.units.fields.end")}</span>
                       <input
                         className="action-field-control"
                         onChange={(event) =>
@@ -451,7 +460,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                     </label>
 
                     <label className="action-field action-field-wide">
-                      <span className="action-field-label">Notes</span>
+                      <span className="action-field-label">{t("projects.units.fields.notes")}</span>
                       <input
                         className="action-field-control"
                         onChange={(event) =>
@@ -474,27 +483,27 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                   onClick={() => void handleAssignCrew(unit.id)}
                   type="button"
                 >
-                  Link crew to unit
+                  {t("projects.units.linkCrew")}
                 </button>
               </div>
             </div>
           );
         })}
 
-        {!units.length ? <div className="empty-state">No units defined yet. Create the first operational unit for this project.</div> : null}
+        {!units.length ? <div className="empty-state">{t("projects.units.empty")}</div> : null}
       </div>
 
       {editorMode ? (
         <div className="project-unit-editor">
           <div className="surface-card-header">
             <div>
-              <h3 className="surface-card-title">{editorMode === "create" ? "New unit" : "Edit unit"}</h3>
+              <h3 className="surface-card-title">{editorMode === "create" ? t("projects.units.editor.newTitle") : t("projects.units.editor.editTitle")}</h3>
             </div>
           </div>
 
           <div className="action-form-grid">
             <label className="action-field">
-              <span className="action-field-label">Code</span>
+              <span className="action-field-label">{t("projects.units.fields.code")}</span>
               <input
                 className="action-field-control"
                 onChange={(event) => setUnitDraft((current) => ({ ...current, code: event.target.value.toUpperCase() }))}
@@ -503,7 +512,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Name</span>
+              <span className="action-field-label">{t("projects.units.fields.name")}</span>
               <input
                 className="action-field-control"
                 onChange={(event) => setUnitDraft((current) => ({ ...current, name: event.target.value }))}
@@ -512,7 +521,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Start date</span>
+              <span className="action-field-label">{t("projects.units.fields.startDate")}</span>
               <input
                 className="action-field-control"
                 onChange={(event) => setUnitDraft((current) => ({ ...current, startDate: event.target.value }))}
@@ -522,7 +531,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">End date</span>
+              <span className="action-field-label">{t("projects.units.fields.endDate")}</span>
               <input
                 className="action-field-control"
                 onChange={(event) => setUnitDraft((current) => ({ ...current, endDate: event.target.value }))}
@@ -533,11 +542,11 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
           </div>
 
           <details className="detail-disclosure">
-            <summary className="detail-disclosure-summary">More details</summary>
+            <summary className="detail-disclosure-summary">{t("projects.units.moreDetails")}</summary>
             <div className="detail-disclosure-content">
               <div className="action-form-grid">
                 <label className="action-field">
-                  <span className="action-field-label">Order</span>
+                  <span className="action-field-label">{t("projects.units.fields.order")}</span>
                   <input
                     className="action-field-control"
                     inputMode="numeric"
@@ -547,12 +556,12 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                 </label>
 
                 <label className="action-field">
-                  <span className="action-field-label">Color</span>
+                  <span className="action-field-label">{t("projects.units.fields.color")}</span>
                   <SelectField
                     onChange={(event) => setUnitDraft((current) => ({ ...current, colorKey: event.target.value }))}
                     value={unitDraft.colorKey}
                   >
-                    <option value="">Use project color</option>
+                    <option value="">{t("projects.units.fields.useProjectColor")}</option>
                     {projectColorPalette.map((color) => (
                       <option key={color.key} value={color.key}>
                         {color.label}
@@ -562,7 +571,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
                 </label>
 
                 <label className="action-field action-field-wide">
-                  <span className="action-field-label">Notes</span>
+                  <span className="action-field-label">{t("projects.units.fields.notes")}</span>
                   <textarea
                     className="action-field-control action-textarea"
                     onChange={(event) => setUnitDraft((current) => ({ ...current, notes: event.target.value }))}
@@ -576,10 +585,10 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
 
           <div className="action-panel-actions">
             <button className="ghost-control cancel-control" onClick={resetEditor} type="button">
-              Cancel
+              {t("common.cancel")}
             </button>
             <button className="action-primary-button" disabled={isSubmitting} onClick={() => void handleSave()} type="button">
-              {isSubmitting ? "Saving..." : editorMode === "create" ? "Create unit" : "Save unit"}
+              {isSubmitting ? t("common.saving") : editorMode === "create" ? t("projects.units.editor.create") : t("projects.units.editor.save")}
             </button>
           </div>
         </div>
@@ -592,16 +601,16 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
         tone={pendingUnitAction.action === "delete" ? "danger" : "default"}
         title={
           pendingUnitAction.action === "delete"
-            ? `Delete unit "${pendingUnitAction.unit.name}"?`
-            : `Mark "${pendingUnitAction.unit.name}" as wrapped?`
+            ? t("projects.units.confirm.deleteTitle", { name: pendingUnitAction.unit.name })
+            : t("projects.units.confirm.wrapTitle", { name: pendingUnitAction.unit.name })
         }
         body={
           pendingUnitAction.action === "delete"
-            ? "This only works if the unit has no linked operational records. Action cannot be undone."
-            : "The unit's end date will be set to today."
+            ? t("projects.units.confirm.deleteBody")
+            : t("projects.units.confirm.wrapBody")
         }
-        confirmLabel={pendingUnitAction.action === "delete" ? "Delete unit" : "Mark wrapped"}
-        cancelLabel="Cancel"
+        confirmLabel={pendingUnitAction.action === "delete" ? t("projects.units.confirm.deleteConfirm") : t("projects.units.confirm.wrapConfirm")}
+        cancelLabel={t("common.cancel")}
         isSubmitting={isSubmitting}
         onConfirm={async () => {
           const next = pendingUnitAction;

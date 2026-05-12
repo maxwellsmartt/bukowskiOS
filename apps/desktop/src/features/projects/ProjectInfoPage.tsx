@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
 import { projectColorPalette } from "@contracts";
@@ -22,6 +23,7 @@ const normalizeOptional = (value: string) => {
 };
 
 export const ProjectInfoPage = () => {
+  const { t } = useTranslation();
   const { project, projectId } = useProjectMode();
   const [searchParams] = useSearchParams();
   const toast = useToast();
@@ -65,15 +67,15 @@ export const ProjectInfoPage = () => {
   }, [data.project]);
 
   if (error) {
-    return <div className="empty-state">Project details unavailable: {error}</div>;
+    return <div className="empty-state">{t("projects.info.unavailable", { message: error })}</div>;
   }
 
   if (isLoading) {
-    return <div className="empty-state">Loading project details…</div>;
+    return <div className="empty-state">{t("projects.info.loading")}</div>;
   }
 
   if (!data.project) {
-    return <div className="empty-state">Select a project to review its details.</div>;
+    return <div className="empty-state">{t("projects.info.empty")}</div>;
   }
 
   const currentProject = data.project;
@@ -98,9 +100,9 @@ export const ProjectInfoPage = () => {
       });
       await Promise.all([reload(), refreshProjects()]);
       setSaveError(null);
-      toast.success("Project saved", "Project details updated.");
+      toast.success(t("projects.info.toasts.savedTitle"), t("projects.info.toasts.savedBody"));
     } catch (nextError) {
-      setSaveError(getUserFacingErrorMessage(nextError, "Unable to update project details."));
+      setSaveError(getUserFacingErrorMessage(nextError, t("projects.info.toasts.updateFailed")));
     } finally {
       setIsSubmitting(false);
     }
@@ -108,7 +110,7 @@ export const ProjectInfoPage = () => {
 
   return (
     <div className="page-stack page-stack-project">
-      <SectionHeader title="Details" />
+      <SectionHeader title={t("projects.info.title")} />
 
       <div className="project-workspace-scroll">
         {saveError ? <div className="action-feedback action-feedback-error">{saveError}</div> : null}
@@ -116,35 +118,35 @@ export const ProjectInfoPage = () => {
         <div className="project-detail-support-grid">
           <SurfaceCard
             className="project-scroll-card"
-            title="Project Details"
-            aside={<StatusBadge>{currentProject.status}</StatusBadge>}
+            title={t("projects.info.cardTitle")}
+            aside={<StatusBadge>{t(`projects.statuses.${currentProject.status}`, { defaultValue: currentProject.status })}</StatusBadge>}
           >
             <div className="action-form-grid">
               <label className="action-field">
-                <span className="action-field-label">Code</span>
+                <span className="action-field-label">{t("projects.info.fields.code")}</span>
                 <input className="action-field-control" onChange={(event) => setCode(event.target.value.toUpperCase())} value={code} />
               </label>
 
               <label className="action-field">
-                <span className="action-field-label">Name</span>
+                <span className="action-field-label">{t("projects.info.fields.name")}</span>
                 <input className="action-field-control" onChange={(event) => setName(event.target.value)} value={name} />
               </label>
 
               <label className="action-field">
-                <span className="action-field-label">Status</span>
+                <span className="action-field-label">{t("projects.info.fields.status")}</span>
                 <SelectField onChange={(event) => setStatus(event.target.value)} value={status}>
                   {projectStatusOptions.map((option) => (
                     <option key={option} value={option}>
-                      {option}
+                      {t(`projects.statuses.${option}`, { defaultValue: option })}
                     </option>
                   ))}
                 </SelectField>
               </label>
 
               <label className="action-field">
-                <span className="action-field-label">Client</span>
+                <span className="action-field-label">{t("projects.info.fields.client")}</span>
                 <SelectField onChange={(event) => setClientId(event.target.value)} value={clientId}>
-                  <option value="">No client linked</option>
+                  <option value="">{t("projects.info.fields.noClient")}</option>
                   {catalog.clients.map((client) => (
                     <option key={client.id} value={client.id}>
                       {client.name}
@@ -154,9 +156,9 @@ export const ProjectInfoPage = () => {
               </label>
 
               <label className="action-field">
-                <span className="action-field-label">Production company</span>
+                <span className="action-field-label">{t("projects.info.fields.productionCompany")}</span>
                 <SelectField onChange={(event) => setProductionCompanyId(event.target.value)} value={productionCompanyId}>
-                  <option value="">No production company linked</option>
+                  <option value="">{t("projects.info.fields.noProductionCompany")}</option>
                   {catalog.productionCompanies.map((company) => (
                     <option key={company.id} value={company.id}>
                       {company.name}
@@ -167,7 +169,7 @@ export const ProjectInfoPage = () => {
 
               <div className="action-field-pair">
                 <label className="action-field">
-                  <span className="action-field-label">Start date</span>
+                  <span className="action-field-label">{t("projects.info.fields.startDate")}</span>
                   <input
                     className="action-field-control"
                     onChange={(event) => setStartDate(event.target.value)}
@@ -177,14 +179,14 @@ export const ProjectInfoPage = () => {
                 </label>
 
                 <label className="action-field">
-                  <span className="action-field-label">End date</span>
+                  <span className="action-field-label">{t("projects.info.fields.endDate")}</span>
                   <input className="action-field-control" onChange={(event) => setEndDate(event.target.value)} type="date" value={endDate} />
                 </label>
               </div>
 
               <label className="project-setup-toggle">
                 <input checked={hasPreproduction} onChange={(event) => setHasPreproduction(event.target.checked)} type="checkbox" />
-                <span>Includes pre-production window</span>
+                <span>{t("projects.info.fields.hasPreproduction")}</span>
               </label>
 
               <div />
@@ -192,7 +194,7 @@ export const ProjectInfoPage = () => {
               {hasPreproduction ? (
                 <div className="action-field-pair">
                   <label className="action-field">
-                    <span className="action-field-label">Pre-production start</span>
+                    <span className="action-field-label">{t("projects.info.fields.preproductionStart")}</span>
                     <input
                       className="action-field-control"
                       onChange={(event) => setPreproductionStartDate(event.target.value)}
@@ -202,7 +204,7 @@ export const ProjectInfoPage = () => {
                   </label>
 
                   <label className="action-field">
-                    <span className="action-field-label">Pre-production end</span>
+                    <span className="action-field-label">{t("projects.info.fields.preproductionEnd")}</span>
                     <input
                       className="action-field-control"
                       onChange={(event) => setPreproductionEndDate(event.target.value)}
@@ -214,9 +216,9 @@ export const ProjectInfoPage = () => {
               ) : null}
 
               <label className="action-field">
-                <span className="action-field-label">Timeline color</span>
+                <span className="action-field-label">{t("projects.info.fields.timelineColor")}</span>
                 <SelectField onChange={(event) => setColorKey(event.target.value)} value={colorKey}>
-                  <option value="">Default system tone</option>
+                  <option value="">{t("projects.info.fields.defaultSystemTone")}</option>
                   {projectColorPalette.map((color) => (
                     <option key={color.key} value={color.key}>
                       {color.label}
@@ -226,7 +228,7 @@ export const ProjectInfoPage = () => {
               </label>
 
               <label className="action-field action-field-wide">
-                <span className="action-field-label">Description</span>
+                <span className="action-field-label">{t("projects.info.fields.description")}</span>
                 <textarea
                   className="action-field-control action-textarea"
                   onChange={(event) => setDescription(event.target.value)}
@@ -238,54 +240,54 @@ export const ProjectInfoPage = () => {
 
             <div className="action-panel-actions">
               <button className="action-primary-button" disabled={isSubmitting} onClick={() => void handleSave()} type="button">
-                {isSubmitting ? "Saving..." : "Save changes"}
+                {isSubmitting ? t("common.saving") : t("projects.info.saveChanges")}
               </button>
             </div>
           </SurfaceCard>
 
-          <SurfaceCard className="project-scroll-card" title="Schedule">
+          <SurfaceCard className="project-scroll-card" title={t("projects.info.schedule.title")}>
             <div className="summary-grid">
               <div className="summary-row">
-                <span className="summary-label">Window</span>
-                <span className="summary-value">{data.schedule?.windowLabel ?? "Unscheduled"}</span>
+                <span className="summary-label">{t("projects.info.schedule.window")}</span>
+                <span className="summary-value">{data.schedule?.windowLabel ?? t("projects.fallbacks.unscheduled")}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Active units</span>
+                <span className="summary-label">{t("projects.info.schedule.activeUnits")}</span>
                 <span className="summary-value">{data.timelineSummary?.activeUnits ?? 0}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Planned units</span>
+                <span className="summary-label">{t("projects.info.schedule.plannedUnits")}</span>
                 <span className="summary-value">{data.timelineSummary?.plannedUnits ?? 0}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Wrapped units</span>
+                <span className="summary-label">{t("projects.info.schedule.wrappedUnits")}</span>
                 <span className="summary-value">{data.timelineSummary?.wrappedUnits ?? 0}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Cancelled units</span>
+                <span className="summary-label">{t("projects.info.schedule.cancelledUnits")}</span>
                 <span className="summary-value">{data.timelineSummary?.cancelledUnits ?? 0}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Start</span>
-                <span className="summary-value">{data.schedule?.startDate ?? "No start date"}</span>
+                <span className="summary-label">{t("projects.info.schedule.start")}</span>
+                <span className="summary-value">{data.schedule?.startDate ?? t("projects.info.schedule.noStartDate")}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">End</span>
-                <span className="summary-value">{data.schedule?.endDate ?? "Open-ended"}</span>
+                <span className="summary-label">{t("projects.info.schedule.end")}</span>
+                <span className="summary-value">{data.schedule?.endDate ?? t("projects.info.schedule.openEnded")}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Timeline color</span>
-                <span className="summary-value">{data.schedule?.colorKey ?? "Default"}</span>
+                <span className="summary-label">{t("projects.info.schedule.timelineColor")}</span>
+                <span className="summary-value">{data.schedule?.colorKey ?? t("projects.fallbacks.default")}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Production company</span>
-                <span className="summary-value">{currentProject.productionCompany !== "—" ? currentProject.productionCompany : "Not linked"}</span>
+                <span className="summary-label">{t("projects.info.schedule.productionCompany")}</span>
+                <span className="summary-value">{currentProject.productionCompany !== "—" ? currentProject.productionCompany : t("projects.info.schedule.notLinked")}</span>
               </div>
               {currentProject.hasPreproduction ? (
                 <div className="summary-row">
-                  <span className="summary-label">Pre-production</span>
+                  <span className="summary-label">{t("projects.info.schedule.preproduction")}</span>
                   <span className="summary-value">
-                    {currentProject.preproductionStartDate ?? "Open"} - {currentProject.preproductionEndDate ?? "Open"}
+                    {currentProject.preproductionStartDate ?? t("projects.fallbacks.open")} - {currentProject.preproductionEndDate ?? t("projects.fallbacks.open")}
                   </span>
                 </div>
               ) : null}

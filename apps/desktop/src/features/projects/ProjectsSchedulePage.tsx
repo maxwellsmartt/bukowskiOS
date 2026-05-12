@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { ScheduleTimelineRange, ScheduleTimelineScale } from "@contracts";
 import { OverviewScheduleTimeline } from "@features/overview/OverviewScheduleTimeline";
@@ -24,6 +25,7 @@ const isTimelineScale = (value: string | null): value is ScheduleTimelineScale =
   value === "day" || value === "week" || value === "month";
 
 export const ProjectsSchedulePage = () => {
+  const { t } = useTranslation();
   const { activeWorkspaceId, projectDataVersion } = useShellContext();
   const [timelineRange, setTimelineRange] = useState<ScheduleTimelineRange>(() => {
     const storedValue = readStringPreference(uiPreferenceKeys.overviewTimelineRange, "90d");
@@ -67,7 +69,7 @@ export const ProjectsSchedulePage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Schedule Overview" />
+      <SectionHeader title={t("projects.schedule.title")} />
 
       <OverviewScheduleTimeline
         anchorDate={timelineAnchorDate}

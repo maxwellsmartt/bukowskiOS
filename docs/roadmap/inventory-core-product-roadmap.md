@@ -25,6 +25,7 @@ Actualización 2026-05-12:
 - Se cerró una unidad de localización visible para **Incidents + RMA**: listas, panel de reporte, detalle de incidente, archivos, handoff a reparación, RMA list/detail/editor, estados, severidades, columnas, placeholders, toasts y empty states ahora consumen `i18n`.
 - Se mantuvieron intactos los valores internos (`Open`, `Resolved`, `Needs review`, `No repair / retired`, etc.) para no romper contratos, sync snapshots ni tests de mutación.
 - Queda como deuda menor traducir/parametrizar el cuerpo generado del mailto de RMA; no bloquea UI ni flujo operativo.
+- Se inicia el **UI Spanish Completion Pass** en Projects: registry, overview/detail, schedule, info, budget, units manager y breadcrumbs quedan localizados con verificación incremental de JSON/typecheck. Pendiente dentro de Projects: Catalog y Project Setup Wizard.
 
 ## Decisión de foco
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import type { ProjectDetailSnapshot } from "@contracts";
@@ -38,6 +39,7 @@ const toneForStatus = (status: string) => {
 };
 
 export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }: ProjectDetailPanelProps) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
   const { projects, refreshProjects } = useShellContext();
@@ -50,13 +52,13 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   const toast = useToast();
 
   if (error) {
-    return <div className="empty-state">Project detail unavailable: {error}</div>;
+    return <div className="empty-state">{t("projects.detail.unavailable", { message: error })}</div>;
   }
 
   if (isLoading) {
     return (
-      <SurfaceCard title="Project Overview">
-        <TableSkeleton body="Loading the latest project details." columns={5} />
+      <SurfaceCard title={t("projects.detail.title")}>
+        <TableSkeleton body={t("projects.detail.loading")} columns={5} />
       </SurfaceCard>
     );
   }
@@ -64,10 +66,10 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   if (!data.project) {
     return (
       <GuidedEmptyState
-        title="Choose a project"
-        body="Open a project to review inventory, issues, schedule and ownership."
-        tips={["Open a project to review units and inventory", "Use Details when you need to update project information"]}
-        actionLabel="Open projects"
+        title={t("projects.detail.empty.title")}
+        body={t("projects.detail.empty.body")}
+        tips={[t("projects.detail.empty.tipInventory"), t("projects.detail.empty.tipDetails")]}
+        actionLabel={t("projects.detail.empty.action")}
         onAction={() => navigate("/projects")}
       />
     );
@@ -81,14 +83,14 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         title={
           <span className="project-detail-title-group">
             <span>{`${project.code} · ${project.name}`}</span>
-            <StatusBadge tone={toneForStatus(project.status)}>{project.status}</StatusBadge>
+            <StatusBadge tone={toneForStatus(project.status)}>{t(`projects.statuses.${project.status}`, { defaultValue: project.status })}</StatusBadge>
           </span>
         }
         subtitle={project.description}
         aside={
           <div className="project-detail-header-actions">
             <button className="ghost-control" onClick={() => navigate(`/projects/${project.id}/info`)} type="button">
-              Edit project
+              {t("projects.detail.editProject")}
             </button>
             <button
               className="action-primary-button"
@@ -99,7 +101,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               }}
               type="button"
             >
-              Report incident
+              {t("projects.detail.reportIncident")}
             </button>
           </div>
         }
@@ -107,29 +109,29 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
       >
         <div className="compact-summary-grid project-overview-summary">
           <div className="summary-row">
-            <span className="summary-label">Assigned assets</span>
+            <span className="summary-label">{t("projects.detail.summary.assignedAssets")}</span>
             <span className="summary-value">{project.assetCount}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Open incidents</span>
+            <span className="summary-label">{t("projects.detail.summary.openIncidents")}</span>
             <span className="summary-value">{project.incidentCount}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Client</span>
+            <span className="summary-label">{t("projects.detail.summary.client")}</span>
             <span className="summary-value">{project.client}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Exposure</span>
+            <span className="summary-label">{t("projects.detail.summary.exposure")}</span>
             <span className="summary-value">{project.exposure}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Timeline</span>
-            <span className="summary-value">{data.schedule?.windowLabel ?? "Unscheduled"}</span>
+            <span className="summary-label">{t("projects.detail.summary.timeline")}</span>
+            <span className="summary-value">{data.schedule?.windowLabel ?? t("projects.fallbacks.unscheduled")}</span>
           </div>
         </div>
       </SurfaceCard>
 
-      {catalogError ? <div className="empty-state">Incident catalog unavailable: {catalogError}</div> : null}
+      {catalogError ? <div className="empty-state">{t("incidents.catalogUnavailable", { message: catalogError })}</div> : null}
 
       {reportOpen ? (
         <IncidentReportPanel
@@ -173,9 +175,9 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               await Promise.all([Promise.resolve(onIncidentCreated()), refreshProjects()]);
               setReportOpen(false);
               setReportError(null);
-              toast.success("Incident reported", result.summary);
+              toast.success(t("incidents.toasts.reported"), result.summary);
             } catch (nextError) {
-              setReportError(getUserFacingErrorMessage(nextError, "Unable to create incident."));
+              setReportError(getUserFacingErrorMessage(nextError, t("incidents.toasts.createFailed")));
             } finally {
               setIsSubmitting(false);
             }
@@ -196,7 +198,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
       </div>
 
       <div className="project-detail-support-grid">
-        <SurfaceCard className="project-scroll-card" title="Units">
+        <SurfaceCard className="project-scroll-card" title={t("projects.detail.units.title")}>
           {data.units.length ? (
             <div className="queue-list">
               {data.units.map((unit) => (
@@ -206,21 +208,22 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
                       {unit.code} · {unit.name}
                     </span>
                     <span className="identity-meta">
-                      {unit.startDate ?? "No start"} - {unit.endDate ?? "Open"} · {unit.crewAssignments.length} crew linked
+                      {unit.startDate ?? t("projects.fallbacks.noStart")} - {unit.endDate ?? t("projects.fallbacks.open")} ·{" "}
+                      {t("projects.detail.units.crewLinked", { count: unit.crewAssignments.length })}
                     </span>
                   </div>
                   <StatusBadge tone={unit.status === "active" ? "info" : unit.status === "planned" ? "warning" : unit.status === "wrapped" ? "success" : "critical"}>
-                    {unit.status}
+                    {t(`projects.unitStatuses.${unit.status}`, { defaultValue: unit.status })}
                   </StatusBadge>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="empty-state">No units yet. Open Details to add the first one.</div>
+            <div className="empty-state">{t("projects.detail.units.empty")}</div>
           )}
         </SurfaceCard>
 
-        <SurfaceCard className="project-scroll-card" title="Responsibility">
+        <SurfaceCard className="project-scroll-card" title={t("projects.detail.responsibility.title")}>
           {data.responsibles.length ? (
             <div className="queue-list project-scroll-list">
               {data.responsibles.map((row) => (
@@ -228,27 +231,27 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
                   <div className="identity-cell">
                     <span className="identity-title">{row.name}</span>
                     <span className="identity-meta">
-                      {row.assetCount} assets · {row.incidentCount} open incidents
+                      {t("projects.detail.responsibility.meta", { assets: row.assetCount, incidents: row.incidentCount })}
                     </span>
                   </div>
                   <StatusBadge tone={row.incidentCount ? "critical" : "info"}>
-                    {row.incidentCount ? "Needs follow-up" : "Stable"}
+                    {row.incidentCount ? t("projects.detail.responsibility.needsFollowUp") : t("projects.detail.responsibility.stable")}
                   </StatusBadge>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="empty-state">No owners assigned yet.</div>
+            <div className="empty-state">{t("projects.detail.responsibility.empty")}</div>
           )}
         </SurfaceCard>
       </div>
 
-      <SurfaceCard className="project-scroll-card" title="Assets">
+      <SurfaceCard className="project-scroll-card" title={t("projects.detail.assets.title")}>
         <DataTable
           columns={[
             {
               key: "asset",
-              label: "Asset",
+              label: t("projects.detail.assets.columns.asset"),
               width: 230,
               minWidth: 180,
               render: (row) => (
@@ -258,10 +261,10 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
                 </div>
               ),
             },
-            { key: "status", label: "Status", width: 110, minWidth: 92, render: (row) => row.status },
+            { key: "status", label: t("projects.detail.assets.columns.status"), width: 110, minWidth: 92, render: (row) => row.status },
             {
               key: "stock",
-              label: "Stock",
+              label: t("projects.detail.assets.columns.stock"),
               width: 176,
               minWidth: 150,
               render: (row) => (
@@ -274,13 +277,13 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
                 </span>
               ),
             },
-            { key: "location", label: "Location", width: 180, minWidth: 140, render: (row) => row.location },
-            { key: "unit", label: "Unit", width: 150, minWidth: 124, render: (row) => row.projectUnit },
-            { key: "responsible", label: "Responsible", width: 160, minWidth: 132, render: (row) => row.responsible },
-            { key: "condition", label: "Condition", width: 110, minWidth: 94, render: (row) => row.condition },
+            { key: "location", label: t("projects.detail.assets.columns.location"), width: 180, minWidth: 140, render: (row) => row.location },
+            { key: "unit", label: t("projects.detail.assets.columns.unit"), width: 150, minWidth: 124, render: (row) => row.projectUnit },
+            { key: "responsible", label: t("projects.detail.assets.columns.responsible"), width: 160, minWidth: 132, render: (row) => row.responsible },
+            { key: "condition", label: t("projects.detail.assets.columns.condition"), width: 110, minWidth: 94, render: (row) => row.condition },
             {
               key: "replacementValue",
-              label: "Replacement",
+              label: t("projects.detail.assets.columns.replacement"),
               align: "right",
               width: 124,
               minWidth: 108,
@@ -288,7 +291,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             },
           ]}
           getRowId={(row) => row.id}
-          emptyMessage="No assets assigned yet. Add inventory from Assets to keep this project moving."
+          emptyMessage={t("projects.detail.assets.empty")}
           onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
           persistKey="project-detail-assets"
           rows={data.assets}
@@ -299,12 +302,12 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         />
       </SurfaceCard>
 
-      <SurfaceCard className="project-scroll-card" title="Incidents">
+      <SurfaceCard className="project-scroll-card" title={t("projects.detail.incidents.title")}>
         <DataTable
           columns={[
             {
               key: "incident",
-              label: "Incident",
+              label: t("projects.detail.incidents.columns.incident"),
               width: 250,
               minWidth: 190,
               render: (row) => (
@@ -314,14 +317,26 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
                 </div>
               ),
             },
-            { key: "responsible", label: "Responsible", width: 160, minWidth: 132, render: (row) => row.responsible },
-            { key: "unit", label: "Unit", width: 150, minWidth: 124, render: (row) => row.projectUnit },
-            { key: "severity", label: "Severity", width: 100, minWidth: 90, render: (row) => row.severity },
-            { key: "costEstimate", label: "Cost", align: "right", width: 110, minWidth: 96, render: (row) => row.costEstimate },
-            { key: "status", label: "Status", width: 108, minWidth: 92, render: (row) => row.status },
+            { key: "responsible", label: t("projects.detail.incidents.columns.responsible"), width: 160, minWidth: 132, render: (row) => row.responsible },
+            { key: "unit", label: t("projects.detail.incidents.columns.unit"), width: 150, minWidth: 124, render: (row) => row.projectUnit },
+            {
+              key: "severity",
+              label: t("projects.detail.incidents.columns.severity"),
+              width: 100,
+              minWidth: 90,
+              render: (row) => t(`incidents.severity.${row.severity}`, { defaultValue: row.severity }),
+            },
+            { key: "costEstimate", label: t("projects.detail.incidents.columns.cost"), align: "right", width: 110, minWidth: 96, render: (row) => row.costEstimate },
+            {
+              key: "status",
+              label: t("projects.detail.incidents.columns.status"),
+              width: 108,
+              minWidth: 92,
+              render: (row) => t(`incidents.statuses.${row.status}`, { defaultValue: row.status }),
+            },
           ]}
           getRowId={(row) => row.id}
-          emptyMessage="No incidents linked yet. Use the action above to report the first project incident."
+          emptyMessage={t("projects.detail.incidents.empty")}
           persistKey="project-detail-incidents"
           rows={data.incidents}
           shellClassName="table-shell-natural"

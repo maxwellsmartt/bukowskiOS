@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, Pencil, Plus, Save, X } from "lucide-react";
 
@@ -71,6 +72,7 @@ const sumEntriesByType = (rows: Array<{ type: string; amountValue?: number }>) =
 };
 
 export const ProjectBudgetPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   const { supabase, isLocalFallback } = useSession();
@@ -141,9 +143,9 @@ export const ProjectBudgetPage = () => {
         writeBudgetTarget(projectId, null);
         setBudgetTarget(null);
         setIsEditingTarget(false);
-        toast.success("Target cleared", "This project no longer has a budget target.");
+        toast.success(t("projects.budget.toasts.targetClearedTitle"), t("projects.budget.toasts.targetClearedBody"));
       } catch (nextError) {
-        toast.error("Could not clear target", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+        toast.error(t("projects.budget.toasts.clearFailed"), getUserFacingErrorMessage(nextError, t("common.tryAgain")));
       } finally {
         setIsSavingTarget(false);
       }
@@ -152,7 +154,7 @@ export const ProjectBudgetPage = () => {
 
     const parsed = Number.parseFloat(trimmed);
     if (!Number.isFinite(parsed) || parsed < 0) {
-      toast.error("Invalid number", "Enter a positive amount or leave the field empty to clear the target.");
+      toast.error(t("projects.budget.toasts.invalidNumberTitle"), t("projects.budget.toasts.invalidNumberBody"));
       return;
     }
 
@@ -170,8 +172,8 @@ export const ProjectBudgetPage = () => {
       setBudgetTarget(parsed);
       setIsEditingTarget(false);
       toast.success(
-        "Budget target saved",
-        cloudEnabled ? "Synced to the cloud — visible to teammates." : "Saved locally; cloud sync resumes when you reconnect.",
+        t("projects.budget.toasts.targetSavedTitle"),
+        cloudEnabled ? t("projects.budget.toasts.targetSavedCloud") : t("projects.budget.toasts.targetSavedLocal"),
       );
     } catch (nextError) {
       // If cloud failed, still keep local copy.
@@ -179,8 +181,8 @@ export const ProjectBudgetPage = () => {
       setBudgetTarget(parsed);
       setIsEditingTarget(false);
       toast.error(
-        "Saved locally — cloud failed",
-        getUserFacingErrorMessage(nextError, "We kept your value on this device. We'll retry on next sync."),
+        t("projects.budget.toasts.cloudFailedTitle"),
+        getUserFacingErrorMessage(nextError, t("projects.budget.toasts.cloudFailedBody")),
       );
     } finally {
       setIsSavingTarget(false);
@@ -197,19 +199,19 @@ export const ProjectBudgetPage = () => {
   const currency = projectEntries[0]?.currency ?? "USD";
 
   if (error) {
-    return <div className="empty-state">Project budget unavailable: {error}</div>;
+    return <div className="empty-state">{t("projects.budget.unavailable", { message: error })}</div>;
   }
 
   if (isLoading) {
     return (
-      <SurfaceCard title="Budget">
-        <TableSkeleton body="Loading budget details." columns={4} />
+      <SurfaceCard title={t("projects.budget.title")}>
+        <TableSkeleton body={t("projects.budget.loading")} columns={4} />
       </SurfaceCard>
     );
   }
 
   if (!data.project) {
-    return <div className="empty-state">Select a project to review its budget.</div>;
+    return <div className="empty-state">{t("projects.budget.emptyProject")}</div>;
   }
 
   const showEntriesEmpty = !financeError && projectEntries.length === 0;
@@ -220,25 +222,25 @@ export const ProjectBudgetPage = () => {
 
   return (
     <div className="page-stack page-stack-project">
-      <SectionHeader title="Budget" />
+      <SectionHeader title={t("projects.budget.title")} />
 
       <div className="project-workspace-scroll">
         <SurfaceCard
           className="project-scroll-card"
-          title="Budget target"
+          title={t("projects.budget.target.title")}
           aside={
             !isEditingTarget ? (
               <div className="surface-card-actions">
                 <HelpHint
                   body={
                     cloudEnabled
-                      ? "Synced to the cloud and visible to teammates with project access. Track how close you are to your planned spend."
-                      : "Saved on this device while offline. Will sync to the cloud automatically when you reconnect."
+                      ? t("projects.budget.target.cloudHelp")
+                      : t("projects.budget.target.localHelp")
                   }
                 />
                 <button className="ghost-control" onClick={() => setIsEditingTarget(true)} type="button">
                   <Pencil size={13} />
-                  <span>{budgetTarget != null ? "Update target" : "Set target"}</span>
+                  <span>{budgetTarget != null ? t("projects.budget.target.update") : t("projects.budget.target.set")}</span>
                 </button>
               </div>
             ) : null
@@ -247,7 +249,7 @@ export const ProjectBudgetPage = () => {
           {isEditingTarget ? (
             <div className="agent-form-grid">
               <label className="field-block">
-                <span className="field-label">Target amount ({currency})</span>
+                <span className="field-label">{t("projects.budget.target.amount", { currency })}</span>
                 <input
                   className="field-input"
                   inputMode="decimal"
@@ -267,7 +269,7 @@ export const ProjectBudgetPage = () => {
                   type="button"
                 >
                   <X size={13} />
-                  <span>Cancel</span>
+                  <span>{t("common.cancel")}</span>
                 </button>
                 <button
                   className="action-primary-button"
@@ -276,7 +278,7 @@ export const ProjectBudgetPage = () => {
                   type="button"
                 >
                   <Save size={13} />
-                  <span>{isSavingTarget ? "Saving…" : "Save target"}</span>
+                  <span>{isSavingTarget ? t("common.saving") : t("projects.budget.target.save")}</span>
                 </button>
               </div>
             </div>
@@ -284,22 +286,22 @@ export const ProjectBudgetPage = () => {
             <>
               <div className="project-budget-grid">
                 <div className="summary-row">
-                  <span className="summary-label">Target</span>
+                  <span className="summary-label">{t("projects.budget.target.target")}</span>
                   <span className="summary-value">{formatCurrency(budgetTarget, currency)}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Spent</span>
+                  <span className="summary-label">{t("projects.budget.target.spent")}</span>
                   <span className="summary-value">{formatCurrency(totals.expense, currency)}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">{overTarget ? "Over by" : "Remaining"}</span>
+                  <span className="summary-label">{overTarget ? t("projects.budget.target.overBy") : t("projects.budget.target.remaining")}</span>
                   <span className="summary-value">
                     {formatCurrency(Math.abs(remainingTarget), currency)}
                   </span>
                 </div>
               </div>
               <div
-                aria-label={`Budget usage ${(targetUsage * 100).toFixed(0)} percent`}
+                aria-label={t("projects.budget.target.usageAria", { percent: (targetUsage * 100).toFixed(0) })}
                 className={`budget-progress${overTarget ? " is-over" : ""}`}
                 role="progressbar"
                 aria-valuenow={Math.round(targetUsage * 100)}
@@ -311,50 +313,50 @@ export const ProjectBudgetPage = () => {
             </>
           ) : (
             <p className="surface-card-subtitle">
-              No target set yet. Click <strong>Set target</strong> to declare what this project should cap at.
+              {t("projects.budget.target.noTargetPrefix")} <strong>{t("projects.budget.target.set")}</strong> {t("projects.budget.target.noTargetSuffix")}
             </p>
           )}
         </SurfaceCard>
 
         <div className="project-detail-support-grid">
-          <SurfaceCard className="project-scroll-card" title="Budget summary">
+          <SurfaceCard className="project-scroll-card" title={t("projects.budget.summary.title")}>
             <div className="project-budget-grid">
               <div className="summary-row">
-                <span className="summary-label">Total entries</span>
+                <span className="summary-label">{t("projects.budget.summary.totalEntries")}</span>
                 <span className="summary-value">{data.budget.totalEntries}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Reserve</span>
+                <span className="summary-label">{t("projects.budget.summary.reserve")}</span>
                 <span className="summary-value">{data.budget.reserve}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Exposure</span>
+                <span className="summary-label">{t("projects.budget.summary.exposure")}</span>
                 <span className="summary-value">{data.budget.exposure}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Status</span>
+                <span className="summary-label">{t("projects.budget.summary.status")}</span>
                 <span className="summary-value">{data.budget.status}</span>
               </div>
             </div>
             <p className="surface-card-subtitle project-budget-note">{data.budget.note}</p>
           </SurfaceCard>
 
-          <SurfaceCard className="project-scroll-card" title="Spend breakdown">
+          <SurfaceCard className="project-scroll-card" title={t("projects.budget.spend.title")}>
             <div className="project-budget-grid">
               <div className="summary-row">
-                <span className="summary-label">Logged income</span>
+                <span className="summary-label">{t("projects.budget.spend.loggedIncome")}</span>
                 <span className="summary-value">{formatCurrency(totals.income, currency)}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Logged expense</span>
+                <span className="summary-label">{t("projects.budget.spend.loggedExpense")}</span>
                 <span className="summary-value">{formatCurrency(totals.expense, currency)}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Net</span>
+                <span className="summary-label">{t("projects.budget.spend.net")}</span>
                 <span className="summary-value">{formatCurrency(netExposure, currency)}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Entries on this project</span>
+                <span className="summary-label">{t("projects.budget.spend.entriesOnProject")}</span>
                 <span className="summary-value">{projectEntries.length}</span>
               </div>
             </div>
@@ -367,34 +369,34 @@ export const ProjectBudgetPage = () => {
             <div className="surface-card-actions">
               <button className="ghost-control" onClick={() => navigate("/finance/entries")} type="button">
                 <ArrowUpRight size={14} />
-                <span>Open finance</span>
+                <span>{t("projects.budget.finance.open")}</span>
               </button>
               <button className="action-primary-button" onClick={() => navigate("/finance/entries")} type="button">
                 <Plus size={14} />
-                <span>Add entry</span>
+                <span>{t("projects.budget.finance.addEntry")}</span>
               </button>
             </div>
           }
-          title="Finance entries"
+          title={t("projects.budget.finance.title")}
         >
           {financeError ? <div className="action-feedback action-feedback-error">{financeError}</div> : null}
           {showEntriesEmpty ? (
             <GuidedEmptyState
-              title="No finance entries yet"
-              body="Once you log purchases, rentals or invoices against this project they appear here. Add the first one from the Finance section."
-              actionLabel="Add finance entry"
+              title={t("projects.budget.finance.emptyTitle")}
+              body={t("projects.budget.finance.emptyBody")}
+              actionLabel={t("projects.budget.finance.addFinanceEntry")}
               onAction={() => navigate("/finance/entries")}
               tone="subtle"
             />
           ) : (
             <DataTable
               columns={[
-                { key: "date", label: "Date", render: (row) => row.date },
-                { key: "type", label: "Type", render: (row) => row.type },
-                { key: "category", label: "Category", render: (row) => row.category },
-                { key: "reference", label: "Reference", render: (row) => row.reference },
-                { key: "amount", label: "Amount", align: "right", render: (row) => row.amount },
-                { key: "status", label: "Status", render: (row) => row.status },
+                { key: "date", label: t("projects.budget.finance.columns.date"), render: (row) => row.date },
+                { key: "type", label: t("projects.budget.finance.columns.type"), render: (row) => row.type },
+                { key: "category", label: t("projects.budget.finance.columns.category"), render: (row) => row.category },
+                { key: "reference", label: t("projects.budget.finance.columns.reference"), render: (row) => row.reference },
+                { key: "amount", label: t("projects.budget.finance.columns.amount"), align: "right", render: (row) => row.amount },
+                { key: "status", label: t("projects.budget.finance.columns.status"), render: (row) => row.status },
               ]}
               getRowId={(row) => row.id}
               maxHeight="min(40vh, 360px)"
@@ -405,12 +407,12 @@ export const ProjectBudgetPage = () => {
           )}
         </SurfaceCard>
 
-        <SurfaceCard className="project-scroll-card" title="Cost-bearing incidents">
+        <SurfaceCard className="project-scroll-card" title={t("projects.budget.incidents.title")}>
           <DataTable
             columns={[
               {
                 key: "incident",
-                label: "Incident",
+                label: t("projects.budget.incidents.columns.incident"),
                 width: 260,
                 minWidth: 190,
                 render: (row) => (
@@ -420,16 +422,28 @@ export const ProjectBudgetPage = () => {
                   </div>
                 ),
               },
-              { key: "responsible", label: "Responsible", width: 160, minWidth: 128, render: (row) => row.responsible },
-              { key: "severity", label: "Severity", width: 100, minWidth: 88, render: (row) => row.severity },
-              { key: "costEstimate", label: "Estimate", align: "right", width: 120, minWidth: 100, render: (row) => row.costEstimate },
-              { key: "status", label: "Status", width: 110, minWidth: 92, render: (row) => row.status },
+              { key: "responsible", label: t("projects.budget.incidents.columns.responsible"), width: 160, minWidth: 128, render: (row) => row.responsible },
+              {
+                key: "severity",
+                label: t("projects.budget.incidents.columns.severity"),
+                width: 100,
+                minWidth: 88,
+                render: (row) => t(`incidents.severity.${row.severity}`, { defaultValue: row.severity }),
+              },
+              { key: "costEstimate", label: t("projects.budget.incidents.columns.estimate"), align: "right", width: 120, minWidth: 100, render: (row) => row.costEstimate },
+              {
+                key: "status",
+                label: t("projects.budget.incidents.columns.status"),
+                width: 110,
+                minWidth: 92,
+                render: (row) => t(`incidents.statuses.${row.status}`, { defaultValue: row.status }),
+              },
             ]}
             getRowId={(row) => row.id}
             maxHeight="min(40vh, 360px)"
             persistKey="project-budget-incidents"
             rows={data.incidents}
-            emptyMessage="No cost-bearing incidents yet."
+            emptyMessage={t("projects.budget.incidents.empty")}
           />
         </SurfaceCard>
       </div>

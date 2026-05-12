@@ -178,6 +178,9 @@
       "source": "Source",
       "openIssues": "Open issues"
     },
+    "detail": {
+      "title": "Asset detail"
+    },
     "inKit": "In kit {{codes}}",
     "metrics": {
       "totalUnits": "Total units",
@@ -367,6 +370,11 @@
       "unableAddImages": "Unable to add images to this asset."
     }
   },
+  "finance": {
+    "quotes": {
+      "newQuote": "New quote"
+    }
+  },
   "packing": {
     "title": "Packing slips",
     "titleProject": "Project packing",
@@ -526,6 +534,7 @@
     "never": "Never",
     "none": "None",
     "optional": "Optional",
+    "workspace": "Workspace",
     "listToolbar": {
       "searchAria": "Search current view",
       "sort": "Sort",
@@ -776,6 +785,341 @@
       "updated": "Updated",
       "saveFailed": "Unable to save repair case.",
       "statusFailed": "Unable to update repair status."
+    }
+  },
+  "projects": {
+    "fallbacks": {
+      "open": "Open",
+      "noStart": "No start",
+      "default": "Default",
+      "unscheduled": "Unscheduled"
+    },
+    "statuses": {
+      "Prep": "Prep",
+      "Active": "Active",
+      "Wrapped": "Wrapped",
+      "On hold": "On hold",
+      "Archived": "Archived",
+      "Open": "Open",
+      "In review": "In review"
+    },
+    "unitStatuses": {
+      "active": "Active",
+      "planned": "Planned",
+      "wrapped": "Wrapped",
+      "cancelled": "Cancelled"
+    },
+    "overview": {
+      "title": "Project Overview"
+    },
+    "schedule": {
+      "title": "Schedule Overview"
+    },
+    "registry": {
+      "title": "Projects",
+      "cardTitle": "Projects",
+      "resultLabel": "projects",
+      "unavailable": "Projects unavailable: {{message}}",
+      "selected_one": "{{count}} selected",
+      "selected_other": "{{count}} selected",
+      "projectsSelected_one": "{{count}} project selected",
+      "projectsSelected_other": "{{count}} projects selected",
+      "compareSubtitle": "Add them to compare.",
+      "addToCompare": "Add to compare",
+      "searchPlaceholder": "Search projects, clients or departments",
+      "loading": "Loading projects…",
+      "showArchived": "Show archived projects",
+      "hideArchived": "Hide archived projects",
+      "sort": {
+        "name": "Project name",
+        "code": "Code",
+        "client": "Client",
+        "status": "Status",
+        "startDate": "Start date",
+        "endDate": "End date",
+        "activeUnitCount": "Units",
+        "assetCount": "Asset count",
+        "incidentCount": "Incident count",
+        "exposure": "Exposure",
+        "updatedAt": "Updated",
+        "createdAt": "Created"
+      },
+      "columns": {
+        "project": "Project",
+        "status": "Status",
+        "start": "Start",
+        "end": "End",
+        "color": "Color",
+        "units": "Units",
+        "assets": "Assets",
+        "incidents": "Incidents",
+        "departments": "Departments",
+        "exposure": "Exposure",
+        "description": "Description"
+      },
+      "empty": {
+        "noMatchesTitle": "No matches",
+        "noMatchesBody": "Try a different search term, or clear it to see every project in this workspace.",
+        "noProjectsTitle": "No projects yet",
+        "noProjectsBody": "A project groups your shoot, its units, crew and gear. Create the first one to start tracking assets and incidents against it.",
+        "clearSearch": "Clear search",
+        "tipCreate": "You can create new projects from the sidebar.",
+        "tipUnits": "Use units to split a long shoot into blocks.",
+        "tipArchive": "Archive a project when it wraps — you can always restore it."
+      }
+    },
+    "detail": {
+      "title": "Project Overview",
+      "unavailable": "Project detail unavailable: {{message}}",
+      "loading": "Loading the latest project details.",
+      "editProject": "Edit project",
+      "reportIncident": "Report incident",
+      "empty": {
+        "title": "Choose a project",
+        "body": "Open a project to review inventory, issues, schedule and ownership.",
+        "tipInventory": "Open a project to review units and inventory",
+        "tipDetails": "Use Details when you need to update project information",
+        "action": "Open projects"
+      },
+      "summary": {
+        "assignedAssets": "Assigned assets",
+        "openIncidents": "Open incidents",
+        "client": "Client",
+        "exposure": "Exposure",
+        "timeline": "Timeline"
+      },
+      "units": {
+        "title": "Units",
+        "crewLinked_one": "{{count}} crew linked",
+        "crewLinked_other": "{{count}} crew linked",
+        "empty": "No units yet. Open Details to add the first one."
+      },
+      "responsibility": {
+        "title": "Responsibility",
+        "meta": "{{assets}} assets · {{incidents}} open incidents",
+        "needsFollowUp": "Needs follow-up",
+        "stable": "Stable",
+        "empty": "No owners assigned yet."
+      },
+      "assets": {
+        "title": "Assets",
+        "empty": "No assets assigned yet. Add inventory from Assets to keep this project moving.",
+        "columns": {
+          "asset": "Asset",
+          "status": "Status",
+          "stock": "Stock",
+          "location": "Location",
+          "unit": "Unit",
+          "responsible": "Responsible",
+          "condition": "Condition",
+          "replacement": "Replacement"
+        }
+      },
+      "incidents": {
+        "title": "Incidents",
+        "empty": "No incidents linked yet. Use the action above to report the first project incident.",
+        "columns": {
+          "incident": "Incident",
+          "responsible": "Responsible",
+          "unit": "Unit",
+          "severity": "Severity",
+          "cost": "Cost",
+          "status": "Status"
+        }
+      }
+    },
+    "info": {
+      "title": "Details",
+      "cardTitle": "Project Details",
+      "unavailable": "Project details unavailable: {{message}}",
+      "loading": "Loading project details…",
+      "empty": "Select a project to review its details.",
+      "saveChanges": "Save changes",
+      "fields": {
+        "code": "Code",
+        "name": "Name",
+        "status": "Status",
+        "client": "Client",
+        "noClient": "No client linked",
+        "productionCompany": "Production company",
+        "noProductionCompany": "No production company linked",
+        "startDate": "Start date",
+        "endDate": "End date",
+        "hasPreproduction": "Includes pre-production window",
+        "preproductionStart": "Pre-production start",
+        "preproductionEnd": "Pre-production end",
+        "timelineColor": "Timeline color",
+        "defaultSystemTone": "Default system tone",
+        "description": "Description"
+      },
+      "schedule": {
+        "title": "Schedule",
+        "window": "Window",
+        "activeUnits": "Active units",
+        "plannedUnits": "Planned units",
+        "wrappedUnits": "Wrapped units",
+        "cancelledUnits": "Cancelled units",
+        "start": "Start",
+        "end": "End",
+        "noStartDate": "No start date",
+        "openEnded": "Open-ended",
+        "timelineColor": "Timeline color",
+        "productionCompany": "Production company",
+        "notLinked": "Not linked",
+        "preproduction": "Pre-production"
+      },
+      "toasts": {
+        "savedTitle": "Project saved",
+        "savedBody": "Project details updated.",
+        "updateFailed": "Unable to update project details."
+      }
+    },
+    "budget": {
+      "title": "Budget",
+      "unavailable": "Project budget unavailable: {{message}}",
+      "loading": "Loading budget details.",
+      "emptyProject": "Select a project to review its budget.",
+      "toasts": {
+        "targetClearedTitle": "Target cleared",
+        "targetClearedBody": "This project no longer has a budget target.",
+        "clearFailed": "Could not clear target",
+        "invalidNumberTitle": "Invalid number",
+        "invalidNumberBody": "Enter a positive amount or leave the field empty to clear the target.",
+        "targetSavedTitle": "Budget target saved",
+        "targetSavedCloud": "Synced to the cloud — visible to teammates.",
+        "targetSavedLocal": "Saved locally; cloud sync resumes when you reconnect.",
+        "cloudFailedTitle": "Saved locally — cloud failed",
+        "cloudFailedBody": "We kept your value on this device. We'll retry on next sync."
+      },
+      "target": {
+        "title": "Budget target",
+        "cloudHelp": "Synced to the cloud and visible to teammates with project access. Track how close you are to your planned spend.",
+        "localHelp": "Saved on this device while offline. Will sync to the cloud automatically when you reconnect.",
+        "set": "Set target",
+        "update": "Update target",
+        "amount": "Target amount ({{currency}})",
+        "save": "Save target",
+        "target": "Target",
+        "spent": "Spent",
+        "overBy": "Over by",
+        "remaining": "Remaining",
+        "usageAria": "Budget usage {{percent}} percent",
+        "noTargetPrefix": "No target set yet. Click",
+        "noTargetSuffix": "to declare what this project should cap at."
+      },
+      "summary": {
+        "title": "Budget summary",
+        "totalEntries": "Total entries",
+        "reserve": "Reserve",
+        "exposure": "Exposure",
+        "status": "Status"
+      },
+      "spend": {
+        "title": "Spend breakdown",
+        "loggedIncome": "Logged income",
+        "loggedExpense": "Logged expense",
+        "net": "Net",
+        "entriesOnProject": "Entries on this project"
+      },
+      "finance": {
+        "title": "Finance entries",
+        "open": "Open finance",
+        "addEntry": "Add entry",
+        "emptyTitle": "No finance entries yet",
+        "emptyBody": "Once you log purchases, rentals or invoices against this project they appear here. Add the first one from the Finance section.",
+        "addFinanceEntry": "Add finance entry",
+        "columns": {
+          "date": "Date",
+          "type": "Type",
+          "category": "Category",
+          "reference": "Reference",
+          "amount": "Amount",
+          "status": "Status"
+        }
+      },
+      "incidents": {
+        "title": "Cost-bearing incidents",
+        "empty": "No cost-bearing incidents yet.",
+        "columns": {
+          "incident": "Incident",
+          "responsible": "Responsible",
+          "severity": "Severity",
+          "estimate": "Estimate",
+          "status": "Status"
+        }
+      }
+    },
+    "units": {
+      "title": "Units",
+      "newUnit": "New unit",
+      "order": "Order {{order}}",
+      "crewLinked_one": "{{count}} crew linked",
+      "crewLinked_other": "{{count}} crew linked",
+      "manualStatus": "Manual status",
+      "conflicts_one": "{{count}} conflict",
+      "conflicts_other": "{{count}} conflicts",
+      "noCrewAssigned": "No crew assigned to this unit yet.",
+      "moreDetails": "More details",
+      "linkCrew": "Link crew to unit",
+      "empty": "No units defined yet. Create the first operational unit for this project.",
+      "actions": {
+        "edit": "Edit unit",
+        "editAria": "Edit {{name}}",
+        "markWrapped": "Mark wrapped",
+        "wrapAria": "Wrap {{name}}",
+        "reactivate": "Reactivate unit",
+        "reactivateAria": "Reactivate {{name}}",
+        "cancel": "Cancel unit",
+        "cancelAria": "Cancel {{name}}",
+        "delete": "Delete unit",
+        "deleteAria": "Delete {{name}}"
+      },
+      "fields": {
+        "crew": "Crew",
+        "chooseCrew": "Choose crew",
+        "role": "Role",
+        "start": "Start",
+        "end": "End",
+        "notes": "Notes",
+        "code": "Code",
+        "name": "Name",
+        "startDate": "Start date",
+        "endDate": "End date",
+        "order": "Order",
+        "color": "Color",
+        "useProjectColor": "Use project color"
+      },
+      "editor": {
+        "newTitle": "New unit",
+        "editTitle": "Edit unit",
+        "create": "Create unit",
+        "save": "Save unit"
+      },
+      "confirm": {
+        "deleteTitle": "Delete unit \"{{name}}\"?",
+        "wrapTitle": "Mark \"{{name}}\" as wrapped?",
+        "deleteBody": "This only works if the unit has no linked operational records. Action cannot be undone.",
+        "wrapBody": "The unit's end date will be set to today.",
+        "deleteConfirm": "Delete unit",
+        "wrapConfirm": "Mark wrapped"
+      },
+      "toasts": {
+        "done": "Done",
+        "createdBody": "Unit created.",
+        "updatedBody": "Unit updated.",
+        "saveFailed": "Unable to save project unit.",
+        "deletedTitle": "Unit deleted",
+        "updatedTitle": "Unit updated",
+        "deletedBody": "The unit and its assignments are gone.",
+        "updatedLiveBody": "Changes are now live for the project crew.",
+        "updateFailed": "Unable to update unit.",
+        "crewLinkedTitle": "Crew linked",
+        "crewLinkedBody": "Member is now assigned to this unit.",
+        "assignCrewFailed": "Unable to assign crew member to unit.",
+        "crewRemovedTitle": "Crew removed",
+        "crewRemovedBody": "Member is no longer assigned to this unit.",
+        "removeCrewFailed": "Unable to remove crew assignment."
+      }
     }
   },
   "settings": {

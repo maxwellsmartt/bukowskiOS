@@ -178,6 +178,9 @@
       "source": "Origen",
       "openIssues": "Incidencias abiertas"
     },
+    "detail": {
+      "title": "Detalle del equipo"
+    },
     "inKit": "En kit {{codes}}",
     "metrics": {
       "totalUnits": "Unidades totales",
@@ -367,6 +370,11 @@
       "unableAddImages": "No se pudieron agregar imágenes a este equipo."
     }
   },
+  "finance": {
+    "quotes": {
+      "newQuote": "Nueva cotización"
+    }
+  },
   "packing": {
     "title": "Packing slips",
     "titleProject": "Packing del proyecto",
@@ -526,6 +534,7 @@
     "never": "Nunca",
     "none": "Ninguno",
     "optional": "Opcional",
+    "workspace": "Workspace",
     "listToolbar": {
       "searchAria": "Buscar en la vista actual",
       "sort": "Ordenar",
@@ -776,6 +785,341 @@
       "updated": "Actualizado",
       "saveFailed": "No se pudo guardar el caso de reparación.",
       "statusFailed": "No se pudo actualizar el estado de reparación."
+    }
+  },
+  "projects": {
+    "fallbacks": {
+      "open": "Abierto",
+      "noStart": "Sin inicio",
+      "default": "Predeterminado",
+      "unscheduled": "Sin agenda"
+    },
+    "statuses": {
+      "Prep": "Preparación",
+      "Active": "Activo",
+      "Wrapped": "Cerrado",
+      "On hold": "En pausa",
+      "Archived": "Archivado",
+      "Open": "Abierto",
+      "In review": "En revisión"
+    },
+    "unitStatuses": {
+      "active": "Activa",
+      "planned": "Planificada",
+      "wrapped": "Cerrada",
+      "cancelled": "Cancelada"
+    },
+    "overview": {
+      "title": "Resumen del proyecto"
+    },
+    "schedule": {
+      "title": "Agenda de proyectos"
+    },
+    "registry": {
+      "title": "Proyectos",
+      "cardTitle": "Proyectos",
+      "resultLabel": "proyectos",
+      "unavailable": "Proyectos no disponibles: {{message}}",
+      "selected_one": "{{count}} seleccionado",
+      "selected_other": "{{count}} seleccionados",
+      "projectsSelected_one": "{{count}} proyecto seleccionado",
+      "projectsSelected_other": "{{count}} proyectos seleccionados",
+      "compareSubtitle": "Agrégalos para comparar.",
+      "addToCompare": "Agregar a comparar",
+      "searchPlaceholder": "Buscar proyectos, clientes o departamentos",
+      "loading": "Cargando proyectos…",
+      "showArchived": "Mostrar proyectos archivados",
+      "hideArchived": "Ocultar proyectos archivados",
+      "sort": {
+        "name": "Nombre del proyecto",
+        "code": "Código",
+        "client": "Cliente",
+        "status": "Estado",
+        "startDate": "Fecha de inicio",
+        "endDate": "Fecha de cierre",
+        "activeUnitCount": "Unidades",
+        "assetCount": "Cantidad de equipos",
+        "incidentCount": "Cantidad de incidentes",
+        "exposure": "Exposición",
+        "updatedAt": "Actualizado",
+        "createdAt": "Creado"
+      },
+      "columns": {
+        "project": "Proyecto",
+        "status": "Estado",
+        "start": "Inicio",
+        "end": "Cierre",
+        "color": "Color",
+        "units": "Unidades",
+        "assets": "Equipos",
+        "incidents": "Incidentes",
+        "departments": "Departamentos",
+        "exposure": "Exposición",
+        "description": "Descripción"
+      },
+      "empty": {
+        "noMatchesTitle": "Sin resultados",
+        "noMatchesBody": "Prueba otro término o limpia la búsqueda para ver todos los proyectos de este workspace.",
+        "noProjectsTitle": "Aún no hay proyectos",
+        "noProjectsBody": "Un proyecto agrupa el rodaje, sus unidades, crew y equipos. Crea el primero para empezar a seguir activos e incidentes.",
+        "clearSearch": "Limpiar búsqueda",
+        "tipCreate": "Puedes crear proyectos nuevos desde el sidebar.",
+        "tipUnits": "Usa unidades para dividir un rodaje largo en bloques.",
+        "tipArchive": "Archiva un proyecto cuando cierre; siempre puedes restaurarlo."
+      }
+    },
+    "detail": {
+      "title": "Resumen del proyecto",
+      "unavailable": "Detalle del proyecto no disponible: {{message}}",
+      "loading": "Cargando los detalles más recientes del proyecto.",
+      "editProject": "Editar proyecto",
+      "reportIncident": "Reportar incidente",
+      "empty": {
+        "title": "Elige un proyecto",
+        "body": "Abre un proyecto para revisar inventario, problemas, agenda y responsables.",
+        "tipInventory": "Abre un proyecto para revisar unidades e inventario",
+        "tipDetails": "Usa Detalles cuando necesites actualizar información del proyecto",
+        "action": "Abrir proyectos"
+      },
+      "summary": {
+        "assignedAssets": "Equipos asignados",
+        "openIncidents": "Incidentes abiertos",
+        "client": "Cliente",
+        "exposure": "Exposición",
+        "timeline": "Cronograma"
+      },
+      "units": {
+        "title": "Unidades",
+        "crewLinked_one": "{{count}} crew vinculado",
+        "crewLinked_other": "{{count}} crew vinculados",
+        "empty": "Aún no hay unidades. Abre Detalles para agregar la primera."
+      },
+      "responsibility": {
+        "title": "Responsabilidad",
+        "meta": "{{assets}} equipos · {{incidents}} incidentes abiertos",
+        "needsFollowUp": "Requiere seguimiento",
+        "stable": "Estable",
+        "empty": "Aún no hay responsables asignados."
+      },
+      "assets": {
+        "title": "Equipos",
+        "empty": "Aún no hay equipos asignados. Agrega inventario desde Equipos para mantener este proyecto en movimiento.",
+        "columns": {
+          "asset": "Equipo",
+          "status": "Estado",
+          "stock": "Stock",
+          "location": "Ubicación",
+          "unit": "Unidad",
+          "responsible": "Responsable",
+          "condition": "Condición",
+          "replacement": "Reposición"
+        }
+      },
+      "incidents": {
+        "title": "Incidentes",
+        "empty": "Aún no hay incidentes vinculados. Usa la acción superior para reportar el primer incidente del proyecto.",
+        "columns": {
+          "incident": "Incidente",
+          "responsible": "Responsable",
+          "unit": "Unidad",
+          "severity": "Severidad",
+          "cost": "Costo",
+          "status": "Estado"
+        }
+      }
+    },
+    "info": {
+      "title": "Detalles",
+      "cardTitle": "Detalles del proyecto",
+      "unavailable": "Detalles del proyecto no disponibles: {{message}}",
+      "loading": "Cargando detalles del proyecto…",
+      "empty": "Selecciona un proyecto para revisar sus detalles.",
+      "saveChanges": "Guardar cambios",
+      "fields": {
+        "code": "Código",
+        "name": "Nombre",
+        "status": "Estado",
+        "client": "Cliente",
+        "noClient": "Sin cliente vinculado",
+        "productionCompany": "Productora",
+        "noProductionCompany": "Sin productora vinculada",
+        "startDate": "Fecha de inicio",
+        "endDate": "Fecha de cierre",
+        "hasPreproduction": "Incluye ventana de preproducción",
+        "preproductionStart": "Inicio de preproducción",
+        "preproductionEnd": "Cierre de preproducción",
+        "timelineColor": "Color del cronograma",
+        "defaultSystemTone": "Tono predeterminado del sistema",
+        "description": "Descripción"
+      },
+      "schedule": {
+        "title": "Agenda",
+        "window": "Ventana",
+        "activeUnits": "Unidades activas",
+        "plannedUnits": "Unidades planificadas",
+        "wrappedUnits": "Unidades cerradas",
+        "cancelledUnits": "Unidades canceladas",
+        "start": "Inicio",
+        "end": "Cierre",
+        "noStartDate": "Sin fecha de inicio",
+        "openEnded": "Sin fecha de cierre",
+        "timelineColor": "Color del cronograma",
+        "productionCompany": "Productora",
+        "notLinked": "Sin vincular",
+        "preproduction": "Preproducción"
+      },
+      "toasts": {
+        "savedTitle": "Proyecto guardado",
+        "savedBody": "Detalles del proyecto actualizados.",
+        "updateFailed": "No se pudieron actualizar los detalles del proyecto."
+      }
+    },
+    "budget": {
+      "title": "Presupuesto",
+      "unavailable": "Presupuesto del proyecto no disponible: {{message}}",
+      "loading": "Cargando detalles del presupuesto.",
+      "emptyProject": "Selecciona un proyecto para revisar su presupuesto.",
+      "toasts": {
+        "targetClearedTitle": "Meta eliminada",
+        "targetClearedBody": "Este proyecto ya no tiene una meta de presupuesto.",
+        "clearFailed": "No se pudo eliminar la meta",
+        "invalidNumberTitle": "Número inválido",
+        "invalidNumberBody": "Ingresa un monto positivo o deja el campo vacío para limpiar la meta.",
+        "targetSavedTitle": "Meta de presupuesto guardada",
+        "targetSavedCloud": "Sincronizada en la nube y visible para el equipo.",
+        "targetSavedLocal": "Guardada localmente; la nube se sincroniza cuando vuelvas a conectar.",
+        "cloudFailedTitle": "Guardado local — falló la nube",
+        "cloudFailedBody": "Mantuvimos el valor en este dispositivo. Lo reintentaremos en la próxima sincronización."
+      },
+      "target": {
+        "title": "Meta de presupuesto",
+        "cloudHelp": "Sincronizada en la nube y visible para quienes tengan acceso al proyecto. Ayuda a medir qué tan cerca estás del gasto planificado.",
+        "localHelp": "Guardada en este dispositivo mientras estás offline. Se sincronizará automáticamente cuando vuelvas a conectar.",
+        "set": "Definir meta",
+        "update": "Actualizar meta",
+        "amount": "Monto meta ({{currency}})",
+        "save": "Guardar meta",
+        "target": "Meta",
+        "spent": "Gastado",
+        "overBy": "Excedido por",
+        "remaining": "Restante",
+        "usageAria": "Uso de presupuesto {{percent}} por ciento",
+        "noTargetPrefix": "Aún no hay meta. Haz click en",
+        "noTargetSuffix": "para definir el límite de este proyecto."
+      },
+      "summary": {
+        "title": "Resumen de presupuesto",
+        "totalEntries": "Entradas totales",
+        "reserve": "Reserva",
+        "exposure": "Exposición",
+        "status": "Estado"
+      },
+      "spend": {
+        "title": "Desglose de gasto",
+        "loggedIncome": "Ingresos registrados",
+        "loggedExpense": "Gastos registrados",
+        "net": "Neto",
+        "entriesOnProject": "Entradas en este proyecto"
+      },
+      "finance": {
+        "title": "Entradas financieras",
+        "open": "Abrir finanzas",
+        "addEntry": "Agregar entrada",
+        "emptyTitle": "Aún no hay entradas financieras",
+        "emptyBody": "Cuando registres compras, rentas o facturas contra este proyecto, aparecerán aquí. Agrega la primera desde Finanzas.",
+        "addFinanceEntry": "Agregar entrada financiera",
+        "columns": {
+          "date": "Fecha",
+          "type": "Tipo",
+          "category": "Categoría",
+          "reference": "Referencia",
+          "amount": "Monto",
+          "status": "Estado"
+        }
+      },
+      "incidents": {
+        "title": "Incidentes con costo",
+        "empty": "Aún no hay incidentes con costo.",
+        "columns": {
+          "incident": "Incidente",
+          "responsible": "Responsable",
+          "severity": "Severidad",
+          "estimate": "Estimado",
+          "status": "Estado"
+        }
+      }
+    },
+    "units": {
+      "title": "Unidades",
+      "newUnit": "Nueva unidad",
+      "order": "Orden {{order}}",
+      "crewLinked_one": "{{count}} crew vinculado",
+      "crewLinked_other": "{{count}} crew vinculados",
+      "manualStatus": "Estado manual",
+      "conflicts_one": "{{count}} conflicto",
+      "conflicts_other": "{{count}} conflictos",
+      "noCrewAssigned": "Aún no hay crew asignado a esta unidad.",
+      "moreDetails": "Más detalles",
+      "linkCrew": "Vincular crew a unidad",
+      "empty": "Aún no hay unidades definidas. Crea la primera unidad operativa de este proyecto.",
+      "actions": {
+        "edit": "Editar unidad",
+        "editAria": "Editar {{name}}",
+        "markWrapped": "Marcar cerrada",
+        "wrapAria": "Cerrar {{name}}",
+        "reactivate": "Reactivar unidad",
+        "reactivateAria": "Reactivar {{name}}",
+        "cancel": "Cancelar unidad",
+        "cancelAria": "Cancelar {{name}}",
+        "delete": "Eliminar unidad",
+        "deleteAria": "Eliminar {{name}}"
+      },
+      "fields": {
+        "crew": "Crew",
+        "chooseCrew": "Elegir crew",
+        "role": "Rol",
+        "start": "Inicio",
+        "end": "Cierre",
+        "notes": "Notas",
+        "code": "Código",
+        "name": "Nombre",
+        "startDate": "Fecha de inicio",
+        "endDate": "Fecha de cierre",
+        "order": "Orden",
+        "color": "Color",
+        "useProjectColor": "Usar color del proyecto"
+      },
+      "editor": {
+        "newTitle": "Nueva unidad",
+        "editTitle": "Editar unidad",
+        "create": "Crear unidad",
+        "save": "Guardar unidad"
+      },
+      "confirm": {
+        "deleteTitle": "¿Eliminar la unidad \"{{name}}\"?",
+        "wrapTitle": "¿Marcar \"{{name}}\" como cerrada?",
+        "deleteBody": "Solo funciona si la unidad no tiene registros operativos vinculados. Esta acción no se puede deshacer.",
+        "wrapBody": "La fecha de cierre de la unidad se pondrá en hoy.",
+        "deleteConfirm": "Eliminar unidad",
+        "wrapConfirm": "Marcar cerrada"
+      },
+      "toasts": {
+        "done": "Listo",
+        "createdBody": "Unidad creada.",
+        "updatedBody": "Unidad actualizada.",
+        "saveFailed": "No se pudo guardar la unidad del proyecto.",
+        "deletedTitle": "Unidad eliminada",
+        "updatedTitle": "Unidad actualizada",
+        "deletedBody": "La unidad y sus asignaciones fueron eliminadas.",
+        "updatedLiveBody": "Los cambios ya están activos para el crew del proyecto.",
+        "updateFailed": "No se pudo actualizar la unidad.",
+        "crewLinkedTitle": "Crew vinculado",
+        "crewLinkedBody": "La persona ya está asignada a esta unidad.",
+        "assignCrewFailed": "No se pudo asignar el crew a la unidad.",
+        "crewRemovedTitle": "Crew removido",
+        "crewRemovedBody": "La persona ya no está asignada a esta unidad.",
+        "removeCrewFailed": "No se pudo remover la asignación del crew."
+      }
     }
   },
   "settings": {
