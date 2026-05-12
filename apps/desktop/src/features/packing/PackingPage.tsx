@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
 import type { PackingSlipListQuery, PackingSlipSortField } from "@contracts";
@@ -29,18 +30,19 @@ type PackingPageProps = {
 };
 
 const packingSortOptions: Array<ListSortOption<PackingSlipSortField>> = [
-  { value: "issuedDate", label: "Issued date", columnKey: "issuedDate" },
-  { value: "dueDate", label: "Due date", columnKey: "dueDate" },
-  { value: "number", label: "Slip number", columnKey: "number" },
-  { value: "project", label: "Project", columnKey: "project" },
-  { value: "department", label: "Department", columnKey: "department" },
-  { value: "responsible", label: "Responsible", columnKey: "responsible" },
-  { value: "status", label: "Status", columnKey: "status" },
-  { value: "itemCount", label: "Unit count", columnKey: "itemCount" },
-  { value: "returnedCount", label: "Returned count", columnKey: "returnedCount" },
+  { value: "issuedDate", label: "packing.sort.issuedDate", columnKey: "issuedDate" },
+  { value: "dueDate", label: "packing.sort.dueDate", columnKey: "dueDate" },
+  { value: "number", label: "packing.sort.number", columnKey: "number" },
+  { value: "project", label: "packing.sort.project", columnKey: "project" },
+  { value: "department", label: "packing.sort.department", columnKey: "department" },
+  { value: "responsible", label: "packing.sort.responsible", columnKey: "responsible" },
+  { value: "status", label: "packing.sort.status", columnKey: "status" },
+  { value: "itemCount", label: "packing.sort.itemCount", columnKey: "itemCount" },
+  { value: "returnedCount", label: "packing.sort.returnedCount", columnKey: "returnedCount" },
 ];
 
 export const PackingPage = ({ projectId = null, projectName = null }: PackingPageProps) => {
+  const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
   const isProjectMode = Boolean(projectId);
   const [searchParams] = useSearchParams();
@@ -78,6 +80,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const [isExportingInsurancePdf, setIsExportingInsurancePdf] = useState(false);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = usePackingDetail(activePackingSlipId);
   const focusedPackingSlipId = searchParams.get("focus");
+  const translatedSortOptions = packingSortOptions.map((option) => ({ ...option, label: t(option.label) }));
 
   useEffect(() => {
     if (!data.length) {
@@ -105,10 +108,10 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   return (
     <div className="page-stack packing-page-stack">
       <SectionHeader
-        title={isProjectMode ? "Project packing" : "Packing slips"}
+        title={isProjectMode ? t("packing.titleProject") : t("packing.title")}
       />
 
-      {error ? <div className="empty-state">Packing slips unavailable: {error}</div> : null}
+      {error ? <div className="empty-state">{t("packing.unavailable", { message: error })}</div> : null}
       {returnError ? <div className="action-feedback action-feedback-error">{returnError}</div> : null}
 
       <ResizableSideRailLayout
@@ -118,19 +121,19 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
         minWidth={320}
         storageKey={uiPreferenceKeys.splitSideRailWidth}
       >
-        <SurfaceCard title="Packing Slips">
+        <SurfaceCard title={t("packing.cardTitle")}>
           <ListToolbar
-            activeSortLabel={packingControls.activeSortOption?.label}
+            activeSortLabel={packingControls.activeSortOption ? t(packingControls.activeSortOption.label) : undefined}
             onSearchValueChange={packingControls.setSearchValue}
             onSortByChange={packingControls.setSortField}
             onToggleSortDirection={packingControls.toggleSortDirection}
             resultCount={data.length}
-            resultLabel="slips"
-            searchPlaceholder={isProjectMode ? "Search slips, departments or crew" : "Search slips, projects or crew"}
+            resultLabel={t("packing.resultLabel")}
+            searchPlaceholder={isProjectMode ? t("packing.toolbar.searchPlaceholderProject") : t("packing.toolbar.searchPlaceholder")}
             searchValue={packingControls.searchValue}
             sortBy={packingControls.sortBy}
             sortDirection={packingControls.sortDirection}
-            sortOptions={packingSortOptions}
+            sortOptions={translatedSortOptions}
           />
           <DataTable
             activeRowId={activePackingSlipId}
@@ -140,23 +143,26 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             onSortRequest={packingControls.handleColumnSortRequest}
             persistKey="packing-slips"
             columns={[
-              { key: "number", label: "Slip", width: 92, minWidth: 82, render: (row) => row.number },
-              { key: "project", label: "Project", width: 180, minWidth: 144, render: (row) => row.project },
-              { key: "department", label: "Department", width: 140, minWidth: 116, render: (row) => row.department },
-              { key: "responsible", label: "Responsible", width: 150, minWidth: 126, render: (row) => row.responsible },
-              { key: "issuedDate", label: "Issued", width: 90, minWidth: 80, render: (row) => row.issuedDate },
-              { key: "dueDate", label: "Due", width: 90, minWidth: 80, render: (row) => row.dueDate },
-              { key: "itemCount", label: "Units", align: "right", width: 74, minWidth: 62, render: (row) => row.itemCount },
+              { key: "number", label: t("packing.columns.slip"), width: 92, minWidth: 82, render: (row) => row.number },
+              { key: "project", label: t("packing.columns.project"), width: 180, minWidth: 144, render: (row) => row.project },
+              { key: "department", label: t("packing.columns.department"), width: 140, minWidth: 116, render: (row) => row.department },
+              { key: "responsible", label: t("packing.columns.responsible"), width: 150, minWidth: 126, render: (row) => row.responsible },
+              { key: "issuedDate", label: t("packing.columns.issued"), width: 90, minWidth: 80, render: (row) => row.issuedDate },
+              { key: "dueDate", label: t("packing.columns.due"), width: 90, minWidth: 80, render: (row) => row.dueDate },
+              { key: "itemCount", label: t("packing.columns.units"), align: "right", width: 74, minWidth: 62, render: (row) => row.itemCount },
               {
                 key: "progress",
-                label: "Progress",
+                label: t("packing.columns.progress"),
                 width: 156,
                 minWidth: 132,
-                render: (row) => `${row.returnedCount} returned · ${Math.max(0, row.itemCount - row.returnedCount)} pending`,
+                render: (row) => t("packing.progress", {
+                  returned: row.returnedCount,
+                  pending: Math.max(0, row.itemCount - row.returnedCount),
+                }),
               },
               {
                 key: "status",
-                label: "Status",
+                label: t("packing.columns.status"),
                 width: 116,
                 minWidth: 96,
                 render: (row) => (
@@ -171,7 +177,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
                             : "warning"
                     }
                   >
-                    {row.status}
+                    {t(`packing.statuses.${row.status}`, { defaultValue: row.status })}
                   </StatusBadge>
                 ),
               },
@@ -211,9 +217,9 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               setIsExportingInsurancePdf(true);
               const result = await exportPackingSlipInsurancePdf(activePackingSlipId);
               setReturnError(null);
-              toast.success("Done", result.summary);
+              toast.success(t("packing.toasts.doneTitle"), result.summary);
             } catch (nextError) {
-              setReturnError(getUserFacingErrorMessage(nextError, "Unable to export insurance list PDF."));
+              setReturnError(getUserFacingErrorMessage(nextError, t("packing.toasts.unableExportInsurance")));
             } finally {
               setIsExportingInsurancePdf(false);
             }
@@ -227,9 +233,9 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               setIsExportingPdf(true);
               const result = await exportPackingSlipPdf(activePackingSlipId);
               setReturnError(null);
-              toast.success("Done", result.summary);
+              toast.success(t("packing.toasts.doneTitle"), result.summary);
             } catch (nextError) {
-              setReturnError(getUserFacingErrorMessage(nextError, "Unable to export packing slip PDF."));
+              setReturnError(getUserFacingErrorMessage(nextError, t("packing.toasts.unableExportSlip")));
             } finally {
               setIsExportingPdf(false);
             }
@@ -254,9 +260,9 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
 
               await Promise.all([reload(), reloadDetail()]);
               setReturnError(null);
-              toast.success("Done", result.summary);
+              toast.success(t("packing.toasts.doneTitle"), result.summary);
             } catch (nextError) {
-              setReturnError(getUserFacingErrorMessage(nextError, "Unable to register packing return."));
+              setReturnError(getUserFacingErrorMessage(nextError, t("packing.toasts.unableReturn")));
             } finally {
               setIsSubmittingReturn(false);
             }

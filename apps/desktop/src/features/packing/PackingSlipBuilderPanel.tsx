@@ -1,5 +1,6 @@
 import { PackageCheck, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { AssetListRow, CatalogSnapshot, PackingSlipAssetSelection, ProjectCardRow } from "@contracts";
 import { useProjectDetail } from "@features/projects/useProjectsData";
@@ -50,6 +51,7 @@ export const PackingSlipBuilderPanel = ({
   selectedCount,
   users,
 }: PackingSlipBuilderPanelProps) => {
+  const { t } = useTranslation();
   const [projectId, setProjectId] = useState(defaultProjectId ?? "");
   const [projectUnitId, setProjectUnitId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
@@ -82,7 +84,7 @@ export const PackingSlipBuilderPanel = ({
     );
   }, [projectDetail.units, projectId]);
 
-  const selectedLabel = selectedCount === 1 ? "1 asset selected" : `${selectedCount} assets selected`;
+  const selectedLabel = t("packing.builder.assetSelected", { count: selectedCount });
   const selectedAssetDetails = useMemo(
     () =>
       selectedAssets.map((asset) => {
@@ -95,73 +97,73 @@ export const PackingSlipBuilderPanel = ({
     [quantityByAssetId, selectedAssets],
   );
   const totalIssueQuantity = selectedAssetDetails.reduce((sum, asset) => sum + asset.requestedQuantity, 0);
-  const issueQuantityLabel = totalIssueQuantity === 1 ? "1 item" : `${totalIssueQuantity} items`;
+  const issueQuantityLabel = t("packing.builder.itemCount", { count: totalIssueQuantity });
   const hasVariableQuantityAssets = selectedAssetDetails.some((asset) => asset.quantity > 1);
   const kitLockedAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount > 0);
   const unavailableAssets = selectedAssetDetails.filter((asset) => asset.linkedKitCount <= 0 && !resolveAssetAvailability(asset).isAvailable);
   const kitLockSummary = kitLockedAssets.map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`).join(", ");
   const availableSummaryLabel = unavailableAssets.length
-    ? `${unavailableAssets.length} blocked`
+    ? t("packing.builder.blocked", { count: unavailableAssets.length })
     : kitLockedAssets.length
-      ? `${kitLockedAssets.length} kit locked`
-      : "Ready to issue";
+      ? t("packing.builder.kitLocked", { count: kitLockedAssets.length })
+      : t("packing.builder.readyToIssue");
 
   return (
     <SurfaceCard
       aside={
-        <button aria-label="Close packing slip builder" className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("packing.builder.closeAria")} className="surface-card-action" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }
-      title="Create packing slip"
+      title={t("packing.builder.title")}
     >
       <div className="packing-builder-summary-grid">
         <div className="summary-row">
-          <span className="summary-label">Selection</span>
+          <span className="summary-label">{t("packing.builder.selection")}</span>
           <span className="summary-value">{selectedLabel}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Operational qty</span>
+          <span className="summary-label">{t("packing.builder.operationalQty")}</span>
           <span className="summary-value">{issueQuantityLabel}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Variable qty</span>
-          <span className="summary-value">{hasVariableQuantityAssets ? "From cart" : "Fixed"}</span>
+          <span className="summary-label">{t("packing.builder.variableQty")}</span>
+          <span className="summary-value">{hasVariableQuantityAssets ? t("packing.builder.fromCart") : t("packing.builder.fixed")}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Availability</span>
+          <span className="summary-label">{t("packing.builder.availability")}</span>
           <span className="summary-value">{availableSummaryLabel}</span>
         </div>
       </div>
 
       <div className="packing-builder-context-summary">
-        <strong>Items come from the operation cart.</strong>
-        <span>Adjust asset quantities in the cart before issuing. This step only confirms project, unit, responsible and document details.</span>
+        <strong>{t("packing.builder.cartContextTitle")}</strong>
+        <span>{t("packing.builder.cartContextBody")}</span>
       </div>
 
       {hasVariableQuantityAssets ? (
         <div className="action-feedback action-feedback-warning">
-          Bulk quantities are locked to the current cart selection for this slip.
+          {t("packing.builder.bulkLocked")}
         </div>
       ) : null}
 
       {kitLockedAssets.length ? (
         <div className="action-feedback action-feedback-warning">
-          These assets are part of active kits and cannot be issued individually: {kitLockSummary}.
+          {t("packing.builder.kitLockedWarning", { summary: kitLockSummary })}
         </div>
       ) : null}
 
       {unavailableAssets.length ? (
         <div className="action-feedback action-feedback-warning">
-          Cannot issue: {summarizeUnavailableAssets(unavailableAssets)}.
+          {t("packing.builder.cannotIssue", { summary: summarizeUnavailableAssets(unavailableAssets) })}
         </div>
       ) : null}
 
       <div className="action-form-grid">
         <label className="action-field">
-          <span className="action-field-label">Project</span>
+          <span className="action-field-label">{t("packing.builder.project")}</span>
           <SelectField onChange={(event) => setProjectId(event.target.value)} value={projectId}>
-            <option value="">Choose project</option>
+            <option value="">{t("packing.builder.chooseProject")}</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.code} · {project.name}
@@ -171,9 +173,9 @@ export const PackingSlipBuilderPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Responsible</span>
+          <span className="action-field-label">{t("packing.builder.responsible")}</span>
           <SelectField onChange={(event) => setResponsibleUserId(event.target.value)} value={responsibleUserId}>
-            <option value="">Auto / current owner</option>
+            <option value="">{t("packing.builder.autoOwner")}</option>
             {users.map((user) => (
               <option key={user.id} value={user.id}>
                 {user.fullName}
@@ -183,9 +185,9 @@ export const PackingSlipBuilderPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Unit</span>
+          <span className="action-field-label">{t("packing.builder.unit")}</span>
           <SelectField disabled={!projectId} onChange={(event) => setProjectUnitId(event.target.value)} value={projectUnitId}>
-            <option value="">{projectId ? "No specific unit" : "Choose project first"}</option>
+            <option value="">{projectId ? t("packing.builder.noSpecificUnit") : t("packing.builder.chooseProjectFirst")}</option>
             {projectDetail.units.map((unit) => (
               <option key={unit.id} value={unit.id}>
                 {unit.code} · {unit.name}
@@ -195,7 +197,7 @@ export const PackingSlipBuilderPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Return due</span>
+          <span className="action-field-label">{t("packing.builder.returnDue")}</span>
           <input
             className="action-field-control"
             onChange={(event) => setReturnDueAt(event.target.value)}
@@ -206,13 +208,13 @@ export const PackingSlipBuilderPanel = ({
       </div>
 
       <details className="detail-disclosure">
-        <summary className="detail-disclosure-summary">More details</summary>
+        <summary className="detail-disclosure-summary">{t("packing.builder.moreDetails")}</summary>
         <div className="detail-disclosure-content">
           <div className="action-form-grid">
             <label className="action-field">
-              <span className="action-field-label">Department</span>
+              <span className="action-field-label">{t("packing.builder.department")}</span>
               <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
-                <option value="">No department</option>
+                <option value="">{t("packing.builder.noDepartment")}</option>
                 {departments.map((department) => (
                   <option key={department.id} value={department.id}>
                     {department.code} · {department.name}
@@ -222,11 +224,11 @@ export const PackingSlipBuilderPanel = ({
             </label>
 
             <label className="action-field action-field-wide">
-              <span className="action-field-label">Notes</span>
+              <span className="action-field-label">{t("packing.builder.notes")}</span>
               <textarea
                 className="action-field-control action-textarea"
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional note"
+                placeholder={t("packing.builder.optionalNote")}
                 rows={3}
                 value={notes}
               />
@@ -239,7 +241,7 @@ export const PackingSlipBuilderPanel = ({
 
       <div className="action-panel-actions">
         <button className="ghost-control cancel-control" onClick={onClose} type="button">
-          Cancel
+          {t("common.cancel")}
         </button>
         <button
           className="action-primary-button"
@@ -261,7 +263,7 @@ export const PackingSlipBuilderPanel = ({
           type="button"
         >
           <PackageCheck size={14} />
-          <span>{isSubmitting ? "Issuing..." : "Issue packing slip"}</span>
+          <span>{isSubmitting ? t("packing.builder.issuing") : t("packing.builder.issueSlip")}</span>
         </button>
       </div>
     </SurfaceCard>

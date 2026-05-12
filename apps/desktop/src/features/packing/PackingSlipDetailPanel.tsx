@@ -1,5 +1,6 @@
 import { Download, FileText, RotateCcw, ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { PackingSlipDetailSnapshot } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
@@ -34,6 +35,7 @@ export const PackingSlipDetailPanel = ({
   onExportPdf,
   onExportInsurancePdf,
 }: PackingSlipDetailPanelProps) => {
+  const { t } = useTranslation();
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [conditionIn, setConditionIn] = useState("Good");
   const [notes, setNotes] = useState("");
@@ -44,24 +46,24 @@ export const PackingSlipDetailPanel = ({
 
   if (isLoading) {
     return (
-      <SurfaceCard className="packing-detail-card" title="Packing Details">
-        <TableSkeleton body="Loading slip details." columns={5} />
+      <SurfaceCard className="packing-detail-card" title={t("packing.detail.title")}>
+        <TableSkeleton body={t("packing.detail.loading")} columns={5} />
       </SurfaceCard>
     );
   }
 
   if (error) {
     return (
-      <SurfaceCard className="packing-detail-card" title="Packing Details">
-        <div className="empty-state">Unable to load this slip. Try again.</div>
+      <SurfaceCard className="packing-detail-card" title={t("packing.detail.title")}>
+        <div className="empty-state">{t("packing.detail.unableLoad")}</div>
       </SurfaceCard>
     );
   }
 
   if (!data.slip) {
     return (
-      <SurfaceCard className="packing-detail-card" title="Packing Details">
-        <div className="empty-state">Choose a packing slip to see details.</div>
+      <SurfaceCard className="packing-detail-card" title={t("packing.detail.title")}>
+        <div className="empty-state">{t("packing.detail.chooseSlip")}</div>
       </SurfaceCard>
     );
   }
@@ -72,11 +74,13 @@ export const PackingSlipDetailPanel = ({
   const operationalQuantity = data.items.reduce((total, item) => total + item.quantity, 0);
   const missingInsuranceItems = data.items.filter((item) => item.unitInsuredValueAmount === null).slice(0, 4);
   const returnLabel = selectedPendingAssetIds.length
-    ? `Return ${selectedPendingAssetIds.length} selected`
-    : `Return all pending (${pendingAssetIds.length})`;
+    ? t("packing.detail.returnSelected", { count: selectedPendingAssetIds.length })
+    : t("packing.detail.returnAllPending", { count: pendingAssetIds.length });
   const headerActions = (
     <div className="packing-detail-header-actions">
-      <StatusBadge tone={data.slip.status === "Overdue" ? "critical" : data.slip.status === "Closed" ? "success" : "info"}>{data.slip.status}</StatusBadge>
+      <StatusBadge tone={data.slip.status === "Overdue" ? "critical" : data.slip.status === "Closed" ? "success" : "info"}>
+        {t(`packing.statuses.${data.slip.status}`, { defaultValue: data.slip.status })}
+      </StatusBadge>
       <button
         className="ghost-control action-row-button"
         disabled={isExportingPdf}
@@ -84,7 +88,7 @@ export const PackingSlipDetailPanel = ({
         type="button"
       >
         <Download size={14} />
-        <span>{isExportingPdf ? "Exporting..." : "Export slip"}</span>
+        <span>{isExportingPdf ? t("packing.detail.exporting") : t("packing.detail.exportSlip")}</span>
       </button>
       <button
         className="action-primary-button action-row-button"
@@ -93,7 +97,7 @@ export const PackingSlipDetailPanel = ({
         type="button"
       >
         <RotateCcw size={14} />
-        <span>{isSubmittingReturn ? "Returning..." : returnLabel}</span>
+        <span>{isSubmittingReturn ? t("packing.detail.returning") : returnLabel}</span>
       </button>
       <button
         className="ghost-control action-row-button"
@@ -102,7 +106,7 @@ export const PackingSlipDetailPanel = ({
         type="button"
       >
         <FileText size={14} />
-        <span>{isExportingInsurancePdf ? "Exporting..." : "Export insurance"}</span>
+        <span>{isExportingInsurancePdf ? t("packing.detail.exporting") : t("packing.detail.exportInsurance")}</span>
       </button>
     </div>
   );
@@ -115,60 +119,60 @@ export const PackingSlipDetailPanel = ({
     >
       <div className="summary-grid">
         <div className="summary-row">
-          <span className="summary-label">Project</span>
+          <span className="summary-label">{t("packing.detail.project")}</span>
           <span className="summary-value">{data.slip.project}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Responsible</span>
+          <span className="summary-label">{t("packing.detail.responsible")}</span>
           <span className="summary-value">{data.slip.responsible}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Prepared by</span>
+          <span className="summary-label">{t("packing.detail.preparedBy")}</span>
           <span className="summary-value">{data.slip.preparedBy}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Issued / due</span>
+          <span className="summary-label">{t("packing.detail.issuedDue")}</span>
           <span className="summary-value">
             {data.slip.issueDate} · {data.slip.dueDate}
           </span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Units on slip</span>
+          <span className="summary-label">{t("packing.detail.unitsOnSlip")}</span>
           <span className="summary-value">{data.slip.itemCount}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Return progress</span>
+          <span className="summary-label">{t("packing.detail.returnProgress")}</span>
           <span className="summary-value">
-            {data.slip.returnedCount} returned · {data.slip.pendingCount} pending
+            {t("packing.progress", { returned: data.slip.returnedCount, pending: data.slip.pendingCount })}
           </span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">QR ready</span>
+          <span className="summary-label">{t("packing.detail.qrReady")}</span>
           <span className="summary-value">{data.slip.primaryCodeValue}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Notes</span>
+          <span className="summary-label">{t("packing.detail.notes")}</span>
           <span className="summary-value">{data.slip.notes}</span>
         </div>
       </div>
 
       <div className="packing-detail-summary-grid">
         <div className="summary-row">
-          <span className="summary-label">Items</span>
+          <span className="summary-label">{t("packing.detail.items")}</span>
           <span className="summary-value">{data.items.length}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Operational qty</span>
+          <span className="summary-label">{t("packing.detail.operationalQty")}</span>
           <span className="summary-value">{operationalQuantity}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Insured total</span>
+          <span className="summary-label">{t("packing.detail.insuredTotal")}</span>
           <span className="summary-value">{data.slip.insuredTotal}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">Insurance values</span>
+          <span className="summary-label">{t("packing.detail.insuranceValues")}</span>
           <span className="summary-value">
-            {insuredItemsCount} ready · {missingInsuranceValueCount} pending
+            {t("packing.detail.insuranceValuesProgress", { ready: insuredItemsCount, pending: missingInsuranceValueCount })}
           </span>
         </div>
       </div>
@@ -176,10 +180,10 @@ export const PackingSlipDetailPanel = ({
       {data.slip.primaryCodeValue ? (
         <ScannableCodePanel
           codeValue={data.slip.primaryCodeValue}
-          subtitle="Slip code"
+          subtitle={t("packing.detail.slipCode")}
           title={data.slip.number}
-          qrLabel="Slip QR"
-          barcodeLabel="Slip barcode"
+          qrLabel={t("packing.detail.slipQr")}
+          barcodeLabel={t("packing.detail.slipBarcode")}
         />
       ) : null}
 
@@ -187,14 +191,16 @@ export const PackingSlipDetailPanel = ({
         <div className="packing-insurance-warning">
           <ShieldAlert size={16} />
           <div>
-            <strong>{missingInsuranceValueCount} item{missingInsuranceValueCount === 1 ? "" : "s"} need insurance values</strong>
+            <strong>{t("packing.detail.missingInsuranceTitle", { count: missingInsuranceValueCount })}</strong>
             <span>
-              Add current value, replacement value, or purchase price plus additional costs before exporting the insurance list.
+              {t("packing.detail.missingInsuranceBody")}
             </span>
             {missingInsuranceItems.length ? (
               <span>
-                Pending: {missingInsuranceItems.map((item) => `${item.code} ${item.asset}`).join(", ")}
-                {missingInsuranceValueCount > missingInsuranceItems.length ? `, +${missingInsuranceValueCount - missingInsuranceItems.length} more` : ""}.
+                {t("packing.detail.pendingInsurance", {
+                  items: missingInsuranceItems.map((item) => `${item.code} ${item.asset}`).join(", "),
+                  more: missingInsuranceValueCount > missingInsuranceItems.length ? t("packing.detail.moreItems", { count: missingInsuranceValueCount - missingInsuranceItems.length }) : "",
+                })}
               </span>
             ) : null}
           </div>
@@ -203,22 +209,22 @@ export const PackingSlipDetailPanel = ({
 
       <div className="action-form-grid">
         <label className="action-field">
-          <span className="action-field-label">Condition in</span>
+          <span className="action-field-label">{t("packing.detail.conditionIn")}</span>
           <SelectField onChange={(event) => setConditionIn(event.target.value)} value={conditionIn}>
             {conditionOptions.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {t(`packing.conditions.${option}`)}
               </option>
             ))}
           </SelectField>
         </label>
 
         <label className="action-field action-field-wide">
-          <span className="action-field-label">Return note</span>
+          <span className="action-field-label">{t("packing.detail.returnNote")}</span>
           <input
             className="action-field-control"
             onChange={(event) => setNotes(event.target.value)}
-            placeholder="Optional note"
+            placeholder={t("packing.builder.optionalNote")}
             value={notes}
           />
         </label>
@@ -231,7 +237,7 @@ export const PackingSlipDetailPanel = ({
         columns={[
           {
             key: "asset",
-            label: "Asset",
+            label: t("packing.detail.columns.asset"),
             width: 240,
             minWidth: 180,
             render: (row) => (
@@ -241,21 +247,23 @@ export const PackingSlipDetailPanel = ({
               </div>
             ),
           },
-          { key: "quantity", label: "Units", align: "right", width: 72, minWidth: 60, render: (row) => row.quantity },
-          { key: "conditionOut", label: "Condition out", width: 116, minWidth: 100, render: (row) => row.conditionOut },
-          { key: "conditionIn", label: "Condition in", width: 116, minWidth: 100, render: (row) => row.conditionIn },
-          { key: "location", label: "Location", width: 170, minWidth: 136, render: (row) => row.location },
-          { key: "responsible", label: "Responsible", width: 150, minWidth: 124, render: (row) => row.responsible },
+          { key: "quantity", label: t("packing.detail.columns.units"), align: "right", width: 72, minWidth: 60, render: (row) => row.quantity },
+          { key: "conditionOut", label: t("packing.detail.columns.conditionOut"), width: 116, minWidth: 100, render: (row) => t(`packing.conditions.${row.conditionOut}`, { defaultValue: row.conditionOut }) },
+          { key: "conditionIn", label: t("packing.detail.columns.conditionIn"), width: 116, minWidth: 100, render: (row) => t(`packing.conditions.${row.conditionIn}`, { defaultValue: row.conditionIn }) },
+          { key: "location", label: t("packing.detail.columns.location"), width: 170, minWidth: 136, render: (row) => row.location },
+          { key: "responsible", label: t("packing.detail.columns.responsible"), width: 150, minWidth: 124, render: (row) => row.responsible },
           {
             key: "status",
-            label: "Status",
+            label: t("packing.detail.columns.status"),
             width: 100,
             minWidth: 88,
             render: (row) => (
-              <StatusBadge tone={row.status === "Returned" ? "success" : "info"}>{row.status}</StatusBadge>
+              <StatusBadge tone={row.status === "Returned" ? "success" : "info"}>
+                {t(`packing.itemStatuses.${row.status}`, { defaultValue: row.status })}
+              </StatusBadge>
             ),
           },
-          { key: "returnedAt", label: "Returned at", width: 140, minWidth: 120, render: (row) => row.returnedAt },
+          { key: "returnedAt", label: t("packing.detail.columns.returnedAt"), width: 140, minWidth: 120, render: (row) => row.returnedAt },
         ]}
         rows={data.items}
         selectable
