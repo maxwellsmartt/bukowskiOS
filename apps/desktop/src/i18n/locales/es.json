@@ -1184,6 +1184,54 @@
         "testProvider": "No se pudo probar la conexión del provider.",
         "updateAssignment": "No se pudo actualizar la asignación del agente."
       }
+    },
+    "runs": {
+      "title": "Actividad",
+      "recentActivity": "Actividad reciente",
+      "supervisorAgent": "Agente supervisor",
+      "summary": {
+        "needsAttention": "Requiere atención",
+        "needsApproval": "Requiere aprobación",
+        "running": "En ejecución",
+        "done": "Completado"
+      },
+      "filters": {
+        "status": "Estado",
+        "agent": "Agente",
+        "all": "Todos",
+        "allAgents": "Todos los agentes",
+        "clear": "Limpiar filtros"
+      },
+      "status": {
+        "queued": "En cola",
+        "routing": "Asignando",
+        "running": "En progreso",
+        "needs_approval": "Esperando aprobación",
+        "approved": "Aprobado",
+        "denied": "Denegado",
+        "done": "Completo",
+        "failed": "Fallido",
+        "paused": "Pausado"
+      },
+      "approvalDecision": {
+        "pending": "Esperando aprobación",
+        "approved": "Aprobado",
+        "approve_for_session": "Aprobado por sesión",
+        "denied": "Denegado"
+      },
+      "unavailable": "Runs no disponibles: {{message}}",
+      "emptyFiltered": "Aún no hay runs con estos filtros.",
+      "operationalReceipt": "Recibo operativo",
+      "nextStep": "Siguiente: {{step}}",
+      "continueInChat": "Continuar en el chat",
+      "approvalRequired": "Aprobación requerida",
+      "approvalFallback": "Revisa este borrador supervisado antes de que avance.",
+      "approve": "Aprobar",
+      "approveForSession": "Aprobar por esta sesión",
+      "deny": "Denegar",
+      "errors": {
+        "reviewDecision": "No pude registrar esa decisión."
+      }
     }
   },
   "catalog": {

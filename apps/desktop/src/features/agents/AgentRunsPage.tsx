@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ExternalLink, MessageSquareText } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { useAssistantChat } from "@app/providers/AssistantChatContext";
@@ -12,6 +13,7 @@ import { getAgentApprovalDecisionLabel, getAgentRunStatusLabel } from "@shared/l
 import { reviewAgentRun, useAgentRuns } from "./useAgentsData";
 
 export const AgentRunsPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { activeWorkspaceId: workspaceId, isWorkspaceReady } = useWorkspace();
   const { selectSession } = useAssistantChat();
@@ -24,23 +26,23 @@ export const AgentRunsPage = () => {
   const summaryCards = useMemo(
     () => [
       {
-        label: "Needs attention",
+        label: t("agents.runs.summary.needsAttention"),
         value: data.filter((run) => run.operationalReceipt?.blocked.length || run.status === "failed").length,
         filter: "needs_attention" as const,
       },
       {
-        label: "Needs approval",
+        label: t("agents.runs.summary.needsApproval"),
         value: data.filter((run) => run.status === "needs_approval").length,
         filter: "needs_approval" as const,
       },
       {
-        label: "Running",
+        label: t("agents.runs.summary.running"),
         value: data.filter((run) => run.status === "running" || run.status === "routing").length,
         filter: "running" as const,
       },
-      { label: "Done", value: data.filter((run) => run.status === "done").length, filter: "done" as const },
+      { label: t("agents.runs.summary.done"), value: data.filter((run) => run.status === "done").length, filter: "done" as const },
     ],
-    [data],
+    [data, t],
   );
 
   const agentOptions = useMemo(() => {
@@ -50,10 +52,10 @@ export const AgentRunsPage = () => {
       const id = run.agentId ?? "supervisor";
       if (seen.has(id)) continue;
       seen.add(id);
-      list.push({ id, label: run.agentDisplayName || "Supervisor Agent" });
+      list.push({ id, label: run.agentDisplayName || t("agents.runs.supervisorAgent") });
     }
     return list.sort((left, right) => left.label.localeCompare(right.label));
-  }, [data]);
+  }, [data, t]);
 
   const filteredRuns = useMemo(() => {
     return data.filter((run) => {
@@ -97,7 +99,7 @@ export const AgentRunsPage = () => {
       });
       setFeedback(result.summary);
     } catch (nextError) {
-      setFeedback(getUserFacingErrorMessage(nextError, "I could not record that decision."));
+      setFeedback(getUserFacingErrorMessage(nextError, t("agents.runs.errors.reviewDecision")));
     } finally {
       setProcessingRunId(null);
     }
@@ -105,7 +107,7 @@ export const AgentRunsPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Activity" titleTone="accent" />
+      <SectionHeader title={t("agents.runs.title")} titleTone="accent" />
 
       <div className="agents-health-grid">
         {summaryCards.map((card) => {
@@ -125,26 +127,26 @@ export const AgentRunsPage = () => {
         })}
       </div>
 
-      <SurfaceCard title="Recent Activity">
+      <SurfaceCard title={t("agents.runs.recentActivity")}>
         <div className="agent-runs-filter-row">
           <label className="agent-runs-filter">
-            <span>Status</span>
+            <span>{t("agents.runs.filters.status")}</span>
             <select
               onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
               value={statusFilter}
             >
-              <option value="all">All</option>
-              <option value="needs_attention">Needs attention</option>
-              <option value="needs_approval">Needs approval</option>
-              <option value="queued">Queued</option>
-              <option value="running">Running</option>
-              <option value="done">Done</option>
+              <option value="all">{t("agents.runs.filters.all")}</option>
+              <option value="needs_attention">{t("agents.runs.summary.needsAttention")}</option>
+              <option value="needs_approval">{t("agents.runs.summary.needsApproval")}</option>
+              <option value="queued">{t("agents.runs.status.queued")}</option>
+              <option value="running">{t("agents.runs.summary.running")}</option>
+              <option value="done">{t("agents.runs.summary.done")}</option>
             </select>
           </label>
           <label className="agent-runs-filter">
-            <span>Agent</span>
+            <span>{t("agents.runs.filters.agent")}</span>
             <select onChange={(event) => setAgentFilter(event.target.value)} value={agentFilter}>
-              <option value="all">All agents</option>
+              <option value="all">{t("agents.runs.filters.allAgents")}</option>
               {agentOptions.map((option) => (
                 <option key={option.id} value={option.id}>
                   {option.label}
@@ -161,17 +163,17 @@ export const AgentRunsPage = () => {
               }}
               type="button"
             >
-              Clear filters
+              {t("agents.runs.filters.clear")}
             </button>
           ) : null}
         </div>
 
-        {error ? <div className="empty-state">Runs unavailable: {error}</div> : null}
+        {error ? <div className="empty-state">{t("agents.runs.unavailable", { message: error })}</div> : null}
         {feedback ? <div className="form-inline-error">{feedback}</div> : null}
 
         <div className="agent-support-list">
           {filteredRuns.length === 0 && !error ? (
-            <div className="empty-state">No runs match these filters yet.</div>
+            <div className="empty-state">{t("agents.runs.emptyFiltered")}</div>
           ) : null}
           {filteredRuns.map((run) => (
             <div key={run.id} className="agent-run-row">
@@ -179,12 +181,12 @@ export const AgentRunsPage = () => {
                 <strong>{run.title}</strong>
                 <p>{run.summary}</p>
                 <p className="agent-run-note">
-                  {run.agentDisplayName || "Supervisor Agent"} · {run.updatedAtLabel}
+                  {run.agentDisplayName || t("agents.runs.supervisorAgent")} · {run.updatedAtLabel}
                 </p>
                 {run.operationalReceipt ? (
                   <div className="agent-run-receipt">
                     <div className="agent-run-receipt-header">
-                      <span>Operational receipt</span>
+                      <span>{t("agents.runs.operationalReceipt")}</span>
                       <strong>{run.operationalReceipt.summary}</strong>
                     </div>
                     {[...run.operationalReceipt.blocked, ...run.operationalReceipt.pending, ...run.operationalReceipt.completed]
@@ -199,7 +201,7 @@ export const AgentRunsPage = () => {
                         </div>
                       ))}
                     {run.operationalReceipt.nextSteps[0] ? (
-                      <p className="agent-run-receipt-next">Next: {run.operationalReceipt.nextSteps[0]}</p>
+                      <p className="agent-run-receipt-next">{t("agents.runs.nextStep", { step: run.operationalReceipt.nextSteps[0] })}</p>
                     ) : null}
                   </div>
                 ) : null}
@@ -212,7 +214,7 @@ export const AgentRunsPage = () => {
                         type="button"
                       >
                         <MessageSquareText size={14} />
-                        Continue in chat
+                        {t("agents.runs.continueInChat")}
                       </button>
                     ) : null}
                     {run.actionLinks.map((link) => (
@@ -231,8 +233,8 @@ export const AgentRunsPage = () => {
                 {run.status === "needs_approval" ? (
                   <div className="agent-run-approval-panel">
                     <div className="agent-run-approval-copy">
-                      <strong>Approval required</strong>
-                      <p>{run.approvalReason ?? "Review this supervised draft here before anything moves forward."}</p>
+                      <strong>{t("agents.runs.approvalRequired")}</strong>
+                      <p>{run.approvalReason ?? t("agents.runs.approvalFallback")}</p>
                     </div>
                     <div className="agent-run-approval-actions">
                       <button
@@ -241,7 +243,7 @@ export const AgentRunsPage = () => {
                         onClick={() => void handleReview(run.id, "approve")}
                         type="button"
                       >
-                        Approve
+                        {t("agents.runs.approve")}
                       </button>
                       {run.threadId ? (
                         <button
@@ -250,7 +252,7 @@ export const AgentRunsPage = () => {
                           onClick={() => void handleReview(run.id, "approve_for_session")}
                           type="button"
                         >
-                          Approve for this session
+                          {t("agents.runs.approveForSession")}
                         </button>
                       ) : null}
                       <button
@@ -259,17 +261,21 @@ export const AgentRunsPage = () => {
                         onClick={() => void handleReview(run.id, "deny")}
                         type="button"
                       >
-                        Deny
+                        {t("agents.runs.deny")}
                       </button>
                     </div>
                   </div>
                 ) : null}
               </div>
               <div className="agent-run-row-meta">
-                <span className={`run-status-pill run-status-pill-${run.status}`}>{getAgentRunStatusLabel(run.status)}</span>
+                <span className={`run-status-pill run-status-pill-${run.status}`}>
+                  {t(`agents.runs.status.${run.status}`, { defaultValue: getAgentRunStatusLabel(run.status) })}
+                </span>
                 {run.approvalDecision && run.approvalDecision !== "pending" ? (
                   <span className={`run-status-pill run-status-pill-${run.approvalDecision}`}>
-                    {getAgentApprovalDecisionLabel(run.approvalDecision)}
+                    {t(`agents.runs.approvalDecision.${run.approvalDecision}`, {
+                      defaultValue: getAgentApprovalDecisionLabel(run.approvalDecision),
+                    })}
                   </span>
                 ) : null}
                 <span className="agent-run-time">{run.updatedAtLabel}</span>

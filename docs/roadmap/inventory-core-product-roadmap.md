@@ -31,6 +31,8 @@ Actualización 2026-05-13:
 - Se completa el pase visible de **Catalog**: tabs, tablas, preview lateral, import/export CSV, editor lateral, documentos de crew, cuentas bancarias, kits y acciones principales ahora consumen `i18n`.
 - Project Setup Wizard queda localizado por secciones: header/tabs, General Info, Assets, Crew, Units, Summary/Conflicts, footer, validaciones visibles y diálogo de draft.
 - Verificación: JSON i18n válido, `corepack pnpm --filter @bukowski/desktop typecheck` y `corepack pnpm --filter @bukowski/desktop build` pasan después del wizard completo.
+- Se avanza el pase transversal de traducción visible en Agents: Auth, Inbox, labels compartidos, AI Models y Agent Runs/Activity quedan conectados a `i18n`, manteniendo intactas las keys técnicas de modelos/providers/status.
+- Pendiente menor: auditar labels compartidos que todavía viven fuera de componentes traducidos (`statusLabels.ts`, receipts generados por runtime, links dinámicos de actions) para decidir si se parametrizan globalmente o se mantienen como datos operativos.
 
 ## Decisión de foco
 

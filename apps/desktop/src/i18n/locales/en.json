@@ -1184,6 +1184,54 @@
         "testProvider": "Unable to test the provider connection.",
         "updateAssignment": "Unable to update the agent assignment."
       }
+    },
+    "runs": {
+      "title": "Activity",
+      "recentActivity": "Recent Activity",
+      "supervisorAgent": "Supervisor Agent",
+      "summary": {
+        "needsAttention": "Needs attention",
+        "needsApproval": "Needs approval",
+        "running": "Running",
+        "done": "Done"
+      },
+      "filters": {
+        "status": "Status",
+        "agent": "Agent",
+        "all": "All",
+        "allAgents": "All agents",
+        "clear": "Clear filters"
+      },
+      "status": {
+        "queued": "Queued",
+        "routing": "Assigning",
+        "running": "In progress",
+        "needs_approval": "Awaiting approval",
+        "approved": "Approved",
+        "denied": "Denied",
+        "done": "Complete",
+        "failed": "Failed",
+        "paused": "Paused"
+      },
+      "approvalDecision": {
+        "pending": "Awaiting approval",
+        "approved": "Approved",
+        "approve_for_session": "Approved for session",
+        "denied": "Denied"
+      },
+      "unavailable": "Runs unavailable: {{message}}",
+      "emptyFiltered": "No runs match these filters yet.",
+      "operationalReceipt": "Operational receipt",
+      "nextStep": "Next: {{step}}",
+      "continueInChat": "Continue in chat",
+      "approvalRequired": "Approval required",
+      "approvalFallback": "Review this supervised draft here before anything moves forward.",
+      "approve": "Approve",
+      "approveForSession": "Approve for this session",
+      "deny": "Deny",
+      "errors": {
+        "reviewDecision": "I could not record that decision."
+      }
     }
   },
   "catalog": {
