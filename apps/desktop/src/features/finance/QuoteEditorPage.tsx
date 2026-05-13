@@ -1,5 +1,6 @@
 import { ArrowLeft, Clock, Download, GripVertical, History, Plus, Save, Send, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 
 import type {
@@ -106,17 +107,12 @@ const emptyDraft = (baseCurrency: string, itbisRate: number): Draft => ({
   items: [emptyItem(1)],
 });
 
-const taxBehaviorOptions: Array<{ value: QuoteItemTaxBehavior; label: string }> = [
-  { value: "follows_quote", label: "Follows quote" },
-  { value: "taxable", label: "Taxable" },
-  { value: "exempt", label: "Exempt" },
-  { value: "show_only", label: "Show only" },
-  { value: "included", label: "Tax included" },
-];
+const taxBehaviorOptions: QuoteItemTaxBehavior[] = ["follows_quote", "taxable", "exempt", "show_only", "included"];
 
 const taxProfileOptions: QuoteTaxProfile[] = ["standard_itbis", "film_law_exempt", "mixed", "manual"];
 
 export const QuoteEditorPage = () => {
+  const { t } = useTranslation();
   const { quoteId } = useParams<{ quoteId: string }>();
   const isNew = !quoteId || quoteId === "new";
   const navigate = useNavigate();
@@ -215,6 +211,12 @@ export const QuoteEditorPage = () => {
   // hook order stable across renders (React enforces this).
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const quoteStatusLabel = (status: Parameters<typeof statusLabel>[0]) =>
+    t(`finance.quotes.status.${status}`, { defaultValue: statusLabel(status) });
+  const taxProfileDisplay = (profile: QuoteTaxProfile) =>
+    t(`finance.quotes.editor.taxProfiles.${profile}`, { defaultValue: taxProfileLabel(profile) });
+  const taxBehaviorLabel = (behavior: QuoteItemTaxBehavior) =>
+    t(`finance.quotes.editor.taxBehaviors.${behavior}`, { defaultValue: behavior });
 
   // Whenever the quote currency changes (and isn't equal to base), look up the
   // most recent exchange rate so we can offer a one-click "use this rate" pill.
@@ -268,9 +270,9 @@ export const QuoteEditorPage = () => {
     return (
       <div className="page-stack">
         <SectionHeader
-          eyebrow="Finance"
-          title={isNew ? "New quote" : "Quote"}
-          body={isLoadingQuote ? "Loading quote…" : "Preparing quote draft…"}
+          eyebrow={t("finance.title")}
+          title={isNew ? t("finance.quotes.newQuote") : t("finance.quotes.editor.quote")}
+          body={isLoadingQuote ? t("finance.quotes.editor.loadingQuote") : t("finance.quotes.editor.preparingDraft")}
           titleTone="accent"
         />
       </div>
@@ -331,8 +333,8 @@ export const QuoteEditorPage = () => {
       };
     });
     toast.success(
-      `${template.label} loaded`,
-      "We pre-filled the items — adjust quantities, prices and durations to match this client.",
+      t("finance.quotes.editor.toasts.templateLoaded", { template: template.label }),
+      t("finance.quotes.editor.toasts.templateLoadedBody"),
     );
   };
 
@@ -403,15 +405,15 @@ export const QuoteEditorPage = () => {
     if (!draft) return;
     if (!draft.clientNameSnapshot.trim()) {
       toast.error(
-        "Add the client name to continue",
-        "We use it on the PDF header and in your quote list.",
+        t("finance.quotes.editor.validation.clientRequiredTitle"),
+        t("finance.quotes.editor.validation.clientRequiredBody"),
       );
       return;
     }
     if (draft.items.some((item) => !item.title.trim())) {
       toast.error(
-        "One of your line items has no title",
-        "Give every line a short name (e.g. \"DIT operator\") so the PDF reads cleanly.",
+        t("finance.quotes.editor.validation.itemTitleRequiredTitle"),
+        t("finance.quotes.editor.validation.itemTitleRequiredBody"),
       );
       return;
     }
@@ -461,8 +463,8 @@ export const QuoteEditorPage = () => {
         });
         rememberDraftValues();
         toast.success(
-          `Quote ${result.quoteNumber} is ready`,
-          "Draft saved. Export the PDF or send it when you're done.",
+          t("finance.quotes.editor.toasts.createdTitle", { number: result.quoteNumber }),
+          t("finance.quotes.editor.toasts.createdBody"),
         );
         navigate(`/finance/quotes/${result.quoteId}`);
       } else if (quoteId) {
@@ -476,16 +478,16 @@ export const QuoteEditorPage = () => {
           items: draft.items,
         });
         rememberDraftValues();
-        toast.success("Quote updated", "Your changes were saved as a new version.");
+        toast.success(t("finance.quotes.editor.toasts.updatedTitle"), t("finance.quotes.editor.toasts.updatedBody"));
         refresh();
         refreshVersions();
       }
     } catch (err) {
       toast.error(
-        "We couldn't save the quote",
+        t("finance.quotes.editor.toasts.saveFailed"),
         err instanceof Error
           ? err.message.replace(/^Error invoking remote method.*?Error:\s*/i, "")
-          : "Check your internet and try again.",
+          : t("finance.quotes.editor.toasts.checkConnection"),
       );
     } finally {
       setIsSaving(false);
@@ -497,16 +499,16 @@ export const QuoteEditorPage = () => {
     try {
       const result = await window.bukowskiQuotes.exportPdf(activeWorkspaceId, quoteId);
       if (result.saved) {
-        toast.success("PDF ready", result.summary ?? "We saved your quote PDF.");
+        toast.success(t("finance.quotes.toasts.pdfReady"), result.summary ?? t("finance.quotes.toasts.pdfSaved"));
       } else {
-        toast.info("Export cancelled", "Nothing was saved — try again when you're ready.");
+        toast.info(t("finance.quotes.toasts.exportCancelled"), t("finance.quotes.toasts.exportCancelledBody"));
       }
     } catch (err) {
       toast.error(
-        "We couldn't export the PDF",
+        t("finance.quotes.toasts.exportFailed"),
         err instanceof Error
           ? err.message.replace(/^Error invoking remote method.*?Error:\s*/i, "")
-          : "Try again in a moment.",
+          : t("common.tryAgain"),
       );
     }
   };
@@ -523,14 +525,17 @@ export const QuoteEditorPage = () => {
         status,
         reason: status === "cancelled" ? "Cancelled from editor." : null,
       });
-      toast.success(`Quote moved to ${statusLabel(status)}`, "We logged the change in the quote history.");
+      toast.success(
+        t("finance.quotes.editor.toasts.statusChangedTitle", { status: quoteStatusLabel(status) }),
+        t("finance.quotes.editor.toasts.statusChangedBody"),
+      );
       refresh();
     } catch (err) {
       toast.error(
-        "We couldn't change the status",
+        t("finance.quotes.editor.toasts.statusFailed"),
         err instanceof Error
           ? err.message.replace(/^Error invoking remote method.*?Error:\s*/i, "")
-          : "Try again in a moment.",
+          : t("common.tryAgain"),
       );
     }
   };
@@ -540,7 +545,7 @@ export const QuoteEditorPage = () => {
       <div className="page-stack-row">
         <button className="ghost-control" onClick={() => navigate("/finance/quotes")} type="button">
           <ArrowLeft size={13} />
-          <span>All quotes</span>
+          <span>{t("finance.quotes.editor.allQuotes")}</span>
         </button>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {!isNew && versions.length > 0 ? (
@@ -550,19 +555,19 @@ export const QuoteEditorPage = () => {
               type="button"
             >
               <History size={13} />
-              <span>{versions.length} version{versions.length === 1 ? "" : "s"}</span>
+              <span>{t("finance.quotes.editor.versionCount", { count: versions.length })}</span>
             </button>
           ) : null}
           {existingQuote ? (
-            <StatusBadge tone={statusTone(existingQuote.status)}>{statusLabel(existingQuote.status)}</StatusBadge>
+            <StatusBadge tone={statusTone(existingQuote.status)}>{quoteStatusLabel(existingQuote.status)}</StatusBadge>
           ) : null}
         </div>
       </div>
 
       {isVersionsOpen && !isNew ? (
         <SurfaceCard
-          subtitle="Snapshots saved automatically each time you edit. Older quotes never silently change because we keep these for the audit trail."
-          title="Version history"
+          subtitle={t("finance.quotes.editor.versionHistorySubtitle")}
+          title={t("finance.quotes.editor.versionHistory")}
         >
           <div className="quote-versions-timeline">
             {versions.map((version) => {
@@ -597,18 +602,21 @@ export const QuoteEditorPage = () => {
       ) : null}
 
       <SectionHeader
-        eyebrow={isNew ? "Finance · New" : `Finance · ${existingQuote?.quoteNumber ?? ""}`}
-        title={isNew ? "New quote" : `Quote ${existingQuote?.quoteNumber ?? ""}`}
+        eyebrow={isNew ? t("finance.quotes.editor.newEyebrow") : t("finance.quotes.editor.quoteEyebrow", { number: existingQuote?.quoteNumber ?? "" })}
+        title={isNew ? t("finance.quotes.newQuote") : t("finance.quotes.editor.quoteNumber", { number: existingQuote?.quoteNumber ?? "" })}
         body={
           isNew
-            ? "Client, package, items, exchange rate and tax profile. The PDF stays in Spanish for Iván's clients."
-            : `Created ${existingQuote?.createdAt?.slice(0, 10)} · Updated ${existingQuote?.updatedAt?.slice(0, 10)}`
+            ? t("finance.quotes.editor.headerBodyNew")
+            : t("finance.quotes.editor.headerBodyExisting", {
+                created: existingQuote?.createdAt?.slice(0, 10),
+                updated: existingQuote?.updatedAt?.slice(0, 10),
+              })
         }
         titleTone="accent"
       />
 
       {isNew ? (
-        <SurfaceCard title="Quick start" subtitle="Pick a Metadata template to pre-fill the quote, then tweak.">
+        <SurfaceCard title={t("finance.quotes.editor.quickStart")} subtitle={t("finance.quotes.editor.quickStartSubtitle")}>
           <div className="filter-pill-row">
             {quoteTemplates.map((template) => (
               <button
@@ -625,10 +633,10 @@ export const QuoteEditorPage = () => {
         </SurfaceCard>
       ) : null}
 
-      <SurfaceCard title="Client & production">
+      <SurfaceCard title={t("finance.quotes.editor.clientProduction")}>
         <div className="agent-form-grid">
           <label className="field-block">
-            <span className="field-label">Client name *</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.clientName")}</span>
             <input
               className="field-input"
               list="quote-catalog-clients"
@@ -648,7 +656,7 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">Client RNC</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.clientRnc")}</span>
             <input
               className="field-input"
               list="quote-recent-rncs"
@@ -658,7 +666,7 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">Production company</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.productionCompany")}</span>
             <input
               className="field-input"
               list="quote-catalog-productions"
@@ -676,7 +684,7 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">PUR (Permiso Único de Rodaje)</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.pur")}</span>
             <input
               className="field-input"
               list="quote-recent-purs"
@@ -685,7 +693,7 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">Sirecine number</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.sirecine")}</span>
             <input
               className="field-input"
               list="quote-recent-sirecines"
@@ -694,7 +702,7 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">Attention to</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.attentionTo")}</span>
             <input
               className="field-input"
               list="quote-recent-attention"
@@ -703,7 +711,7 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">Phone</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.phone")}</span>
             <input
               className="field-input"
               list="quote-recent-phones"
@@ -712,22 +720,22 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block field-block-span-2">
-            <span className="field-label">Project / Production</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.projectProduction")}</span>
             <input
               className="field-input"
               list="quote-recent-projects"
               onChange={(e) => updateDraft("projectNameSnapshot", e.target.value)}
-              placeholder="Aurora Series"
+              placeholder={t("finance.quotes.editor.placeholders.project")}
               value={draft.projectNameSnapshot}
             />
           </label>
           <label className="field-block field-block-span-2">
-            <span className="field-label">Package title (eyebrow on PDF)</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.packageTitle")}</span>
             <input
               className="field-input"
               list="quote-recent-packages"
               onChange={(e) => updateDraft("packageTitle", e.target.value)}
-              placeholder="DIT / Data Management"
+              placeholder={t("finance.quotes.editor.placeholders.package")}
               value={draft.packageTitle}
             />
           </label>
@@ -807,11 +815,11 @@ export const QuoteEditorPage = () => {
               ))}
           </datalist>
           <label className="field-block field-block-span-2">
-            <span className="field-label">Description</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.description")}</span>
             <textarea
               className="field-input"
               onChange={(e) => updateDraft("description", e.target.value)}
-              placeholder="Short description shown above the line items."
+              placeholder={t("finance.quotes.editor.placeholders.description")}
               rows={2}
               value={draft.description}
             />
@@ -819,10 +827,10 @@ export const QuoteEditorPage = () => {
         </div>
       </SurfaceCard>
 
-      <SurfaceCard title="Currency & tax">
+      <SurfaceCard title={t("finance.quotes.editor.currencyTax")}>
         <div className="agent-form-grid">
           <label className="field-block">
-            <span className="field-label">Quote date</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.quoteDate")}</span>
             <input
               className="field-input"
               onChange={(e) => updateDraft("quoteDate", e.target.value)}
@@ -831,10 +839,10 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">Validity (days)</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.validityDays")}</span>
             <NumberStepper
               align="left"
-              ariaLabel="Validity in days"
+              ariaLabel={t("finance.quotes.editor.aria.validityDays")}
               max={365}
               min={1}
               onChange={(next) => updateDraft("validityDays", next)}
@@ -842,7 +850,7 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">Currency</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.currency")}</span>
             <select
               className="field-input"
               onChange={(e) => updateDraft("currency", e.target.value)}
@@ -857,11 +865,11 @@ export const QuoteEditorPage = () => {
           </label>
           <label className="field-block">
             <span className="field-label">
-              Exchange rate ({draft.currency} → {draft.baseCurrency})
+              {t("finance.quotes.editor.fields.exchangeRate", { from: draft.currency, to: draft.baseCurrency })}
             </span>
             <NumberStepper
               align="left"
-              ariaLabel="Exchange rate"
+              ariaLabel={t("finance.quotes.editor.aria.exchangeRate")}
               disabled={draft.currency === draft.baseCurrency}
               min={0}
               onChange={(next) => updateDraft("exchangeRate", next || 1)}
@@ -877,15 +885,18 @@ export const QuoteEditorPage = () => {
                   updateDraft("exchangeRateEffectiveDate", rateSuggestion.effectiveDate);
                   setRateSuggestion(null);
                 }}
-                title={`Use latest rate from ${rateSuggestion.effectiveDate}`}
+                title={t("finance.quotes.editor.actions.useLatestRateTitle", { date: rateSuggestion.effectiveDate })}
                 type="button"
               >
-                Use latest: {rateSuggestion.rate} ({rateSuggestion.effectiveDate})
+                {t("finance.quotes.editor.actions.useLatestRate", {
+                  rate: rateSuggestion.rate,
+                  date: rateSuggestion.effectiveDate,
+                })}
               </button>
             ) : null}
           </label>
           <label className="field-block field-block-span-2">
-            <span className="field-label">Tax profile</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.taxProfile")}</span>
             <select
               className="field-input"
               onChange={(event) => updateDraft("taxProfile", event.target.value as typeof draft.taxProfile)}
@@ -893,16 +904,16 @@ export const QuoteEditorPage = () => {
             >
               {taxProfileOptions.map((profile) => (
                 <option key={profile} value={profile}>
-                  {taxProfileLabel(profile)}
+                  {taxProfileDisplay(profile)}
                 </option>
               ))}
             </select>
           </label>
           <label className="field-block">
-            <span className="field-label">ITBIS rate</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.itbisRate")}</span>
             <NumberStepper
               align="left"
-              ariaLabel="ITBIS rate"
+              ariaLabel={t("finance.quotes.editor.aria.itbisRate")}
               max={100}
               min={0}
               onChange={(next) => updateDraft("itbisRate", next / 100)}
@@ -913,37 +924,37 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">Add ITBIS to total</span>
+            <span className="field-label">{t("finance.quotes.editor.fields.addItbis")}</span>
             <select
               className="field-input"
               onChange={(e) => updateDraft("taxAddedToTotal", e.target.value === "yes")}
               value={draft.taxAddedToTotal ? "yes" : "no"}
             >
-              <option value="yes">Yes — add ITBIS to total</option>
-              <option value="no">No — show ITBIS but don't add</option>
+              <option value="yes">{t("finance.quotes.editor.itbisOptions.yes")}</option>
+              <option value="no">{t("finance.quotes.editor.itbisOptions.no")}</option>
             </select>
           </label>
         </div>
       </SurfaceCard>
 
       <SurfaceCard
-        title="Line items"
-        subtitle="Title, quantity, unit price and tax behavior. Drag your eyes — the live preview totals show below."
+        title={t("finance.quotes.editor.lineItems")}
+        subtitle={t("finance.quotes.editor.lineItemsSubtitle")}
       >
         <div className="quote-items-grid">
           <div className="quote-items-header">
             <span aria-hidden="true" />
-            <span>Description</span>
-            <span>Qty</span>
-            <span>Unit price</span>
+            <span>{t("finance.quotes.editor.itemColumns.description")}</span>
+            <span>{t("finance.quotes.editor.itemColumns.qty")}</span>
+            <span>{t("finance.quotes.editor.itemColumns.unitPrice")}</span>
             <span className="quote-items-header-tax">
-              Tax
+              {t("finance.quotes.editor.itemColumns.tax")}
               <HelpHint
-                body="How this line is taxed: Follows quote — uses the quote profile. Taxable — adds ITBIS to the line. Exempt — no ITBIS. Show only — shows ITBIS but doesn't add (Ley de Cine). Included — price already contains ITBIS."
-                label="Tax behavior"
+                body={t("finance.quotes.editor.help.taxBehavior")}
+                label={t("finance.quotes.editor.help.taxBehaviorLabel")}
               />
             </span>
-            <span>Total</span>
+            <span>{t("finance.quotes.editor.itemColumns.total")}</span>
             <span aria-hidden="true" />
           </div>
           {draft.items.map((item, index) => {
@@ -961,11 +972,11 @@ export const QuoteEditorPage = () => {
                 onDrop={handleDrop(index)}
               >
                 <button
-                  aria-label={`Drag to reorder line ${index + 1}`}
+                  aria-label={t("finance.quotes.editor.aria.dragLine", { line: index + 1 })}
                   className="quote-items-drag"
                   draggable
                   onDragStart={handleDragStart(index)}
-                  title="Drag to reorder"
+                  title={t("finance.quotes.editor.actions.dragToReorder")}
                   type="button"
                 >
                   <GripVertical size={14} />
@@ -980,7 +991,7 @@ export const QuoteEditorPage = () => {
                         updateItem(index, { title: e.target.value });
                       }}
                       onFocus={() => setActiveItemSuggestion({ field: "title", index })}
-                      placeholder="DIT operator"
+                      placeholder={t("finance.quotes.editor.placeholders.itemTitle")}
                       value={item.title}
                     />
                     {activeItemSuggestion?.index === index &&
@@ -1009,7 +1020,7 @@ export const QuoteEditorPage = () => {
                         updateItem(index, { description: e.target.value || null });
                       }}
                       onFocus={() => setActiveItemSuggestion({ field: "description", index })}
-                      placeholder="Optional detail (Mac Studio M1, Davinci Resolve…)"
+                      placeholder={t("finance.quotes.editor.placeholders.itemDetail")}
                       value={item.description ?? ""}
                     />
                     {activeItemSuggestion?.index === index &&
@@ -1031,7 +1042,7 @@ export const QuoteEditorPage = () => {
                   </div>
                 </div>
                 <NumberStepper
-                  ariaLabel={`Quantity for line ${index + 1}`}
+                  ariaLabel={t("finance.quotes.editor.aria.quantityLine", { line: index + 1 })}
                   className="quote-items-quantity"
                   min={0}
                   onChange={(next) => updateItem(index, { quantity: next })}
@@ -1040,7 +1051,7 @@ export const QuoteEditorPage = () => {
                   value={item.quantity}
                 />
                 <NumberStepper
-                  ariaLabel={`Unit price for line ${index + 1}`}
+                  ariaLabel={t("finance.quotes.editor.aria.unitPriceLine", { line: index + 1 })}
                   className="quote-items-price"
                   min={0}
                   onChange={(next) => updateItem(index, { unitPrice: next })}
@@ -1056,8 +1067,8 @@ export const QuoteEditorPage = () => {
                   value={item.taxBehavior}
                 >
                   {taxBehaviorOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                    <option key={opt} value={opt}>
+                      {taxBehaviorLabel(opt)}
                     </option>
                   ))}
                 </select>
@@ -1065,11 +1076,11 @@ export const QuoteEditorPage = () => {
                   {breakdown ? formatCurrency(breakdown.lineTotal, draft.currency, language) : "—"}
                 </span>
                 <button
-                  aria-label={`Remove line ${index + 1}`}
+                  aria-label={t("finance.quotes.editor.aria.removeLine", { line: index + 1 })}
                   className="quote-items-remove"
                   disabled={draft.items.length === 1}
                   onClick={() => removeItem(index)}
-                  title="Remove this line"
+                  title={t("finance.quotes.editor.actions.removeLine")}
                   type="button"
                 >
                   <Trash2 size={14} />
@@ -1081,25 +1092,25 @@ export const QuoteEditorPage = () => {
         <div className="surface-card-actions" style={{ justifyContent: "flex-start", marginTop: 12 }}>
           <button className="ghost-control" onClick={addItem} type="button">
             <Plus size={13} />
-            <span>Add line</span>
+            <span>{t("finance.quotes.editor.actions.addLine")}</span>
           </button>
         </div>
       </SurfaceCard>
 
       <SurfaceCard
-        title="Totals"
-        subtitle="Live preview — these are the numbers that will print on the PDF."
+        title={t("finance.quotes.editor.totals")}
+        subtitle={t("finance.quotes.editor.totalsSubtitle")}
       >
         <div className="totals-breakdown">
           <div className="totals-row">
-            <span className="totals-label">Subtotal</span>
+            <span className="totals-label">{t("finance.quotes.editor.totalsLabels.subtotal")}</span>
             <span className="totals-value">
               {preview ? formatCurrency(preview.subtotal, draft.currency, language) : "—"}
             </span>
           </div>
           {preview && preview.discountAmount > 0 ? (
             <div className="totals-row totals-row-discount">
-              <span className="totals-label">Discount</span>
+              <span className="totals-label">{t("finance.quotes.editor.totalsLabels.discount")}</span>
               <span className="totals-value">−{formatCurrency(preview.discountAmount, draft.currency, language)}</span>
             </div>
           ) : null}
@@ -1108,8 +1119,8 @@ export const QuoteEditorPage = () => {
               ITBIS · {(draft.itbisRate * 100).toFixed(2)}%
               {draft.taxAddedToTotal ? null : (
                 <HelpHint
-                  body="Ley de Cine treatment: ITBIS is calculated and shown on the PDF (with ** marker), but it is NOT added to the total. Toggle 'Add ITBIS to total' above if this client pays ITBIS."
-                  label="ITBIS not added"
+                  label={t("finance.quotes.editor.help.itbisNotAddedLabel")}
+                  body={t("finance.quotes.editor.help.itbisNotAdded")}
                 />
               )}
             </span>
@@ -1117,11 +1128,11 @@ export const QuoteEditorPage = () => {
               className={`totals-value${draft.taxAddedToTotal ? "" : " totals-value-muted"}`}
             >
               {preview ? formatCurrency(preview.taxAmount, draft.currency, language) : "—"}
-              {draft.taxAddedToTotal ? null : <small className="totals-tag">not added</small>}
+              {draft.taxAddedToTotal ? null : <small className="totals-tag">{t("finance.quotes.editor.totalsLabels.notAdded")}</small>}
             </span>
           </div>
           <div className="totals-row totals-row-grand">
-            <span className="totals-label">Total</span>
+            <span className="totals-label">{t("finance.quotes.editor.totalsLabels.total")}</span>
             <span className="totals-value">
               {preview ? formatCurrency(preview.total, draft.currency, language) : "—"}
             </span>
@@ -1129,10 +1140,14 @@ export const QuoteEditorPage = () => {
           {preview && draft.currency !== draft.baseCurrency ? (
             <div className="totals-row totals-row-equivalent">
               <span className="totals-label">
-                ≈ in {draft.baseCurrency}
+                {t("finance.quotes.editor.totalsLabels.equivalent", { currency: draft.baseCurrency })}
                 <HelpHint
-                  body={`Snapshot rate ${draft.exchangeRate} ${draft.currency}→${draft.baseCurrency}. This will not change once the quote is saved, even if you update the rate later.`}
-                  label="Equivalent calculation"
+                  body={t("finance.quotes.editor.help.equivalent", {
+                    rate: draft.exchangeRate,
+                    from: draft.currency,
+                    to: draft.baseCurrency,
+                  })}
+                  label={t("finance.quotes.editor.help.equivalentLabel")}
                 />
               </span>
               <span className="totals-value">
@@ -1154,7 +1169,7 @@ export const QuoteEditorPage = () => {
         {!isNew && existingQuote ? (
           <button className="ghost-control" onClick={() => void handleExportPdf()} type="button">
             <Download size={13} />
-            <span>Export PDF</span>
+            <span>{t("finance.quotes.editor.actions.exportPdf")}</span>
           </button>
         ) : null}
         {!isNew && existingQuote?.status === "draft" ? (
@@ -1164,7 +1179,7 @@ export const QuoteEditorPage = () => {
             type="button"
           >
             <Send size={13} />
-            <span>Mark sent</span>
+            <span>{t("finance.quotes.editor.actions.markSent")}</span>
           </button>
         ) : null}
         {!isNew && existingQuote?.status === "sent" ? (
@@ -1174,14 +1189,14 @@ export const QuoteEditorPage = () => {
               onClick={() => void handleSetStatus("approved")}
               type="button"
             >
-              Mark approved
+              {t("finance.quotes.editor.actions.markApproved")}
             </button>
             <button
               className="ghost-control is-danger"
               onClick={() => void handleSetStatus("rejected")}
               type="button"
             >
-              Mark rejected
+              {t("finance.quotes.editor.actions.markRejected")}
             </button>
           </>
         ) : null}
@@ -1192,7 +1207,7 @@ export const QuoteEditorPage = () => {
           type="button"
         >
           <Save size={13} />
-          <span>{isSaving ? "Saving…" : isNew ? "Create draft" : "Save changes"}</span>
+          <span>{isSaving ? t("common.saving") : isNew ? t("finance.quotes.editor.actions.createDraft") : t("common.saveChanges")}</span>
         </button>
       </div>
     </div>

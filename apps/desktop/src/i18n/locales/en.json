@@ -645,6 +645,134 @@
         "keep": "Keep it",
         "deleting": "Deleting...",
         "deletePermanently": "Delete permanently"
+      },
+      "editor": {
+        "quote": "Quote",
+        "loadingQuote": "Loading quote...",
+        "preparingDraft": "Preparing quote draft...",
+        "allQuotes": "All quotes",
+        "versionCount_one": "{{count}} version",
+        "versionCount_other": "{{count}} versions",
+        "versionHistory": "Version history",
+        "versionHistorySubtitle": "Snapshots are saved automatically each time you edit. Older quotes never silently change because we keep these for the audit trail.",
+        "newEyebrow": "Finance · New",
+        "quoteEyebrow": "Finance · {{number}}",
+        "quoteNumber": "Quote {{number}}",
+        "headerBodyNew": "Client, package, items, exchange rate and tax profile. The PDF stays in Spanish for Iván's clients.",
+        "headerBodyExisting": "Created {{created}} · Updated {{updated}}",
+        "quickStart": "Quick start",
+        "quickStartSubtitle": "Pick a Metadata template to pre-fill the quote, then tweak.",
+        "clientProduction": "Client & production",
+        "currencyTax": "Currency & tax",
+        "lineItems": "Line items",
+        "lineItemsSubtitle": "Title, quantity, unit price and tax behavior. The live preview totals show below.",
+        "totals": "Totals",
+        "totalsSubtitle": "Live preview: these are the numbers that will print on the PDF.",
+        "fields": {
+          "clientName": "Client name *",
+          "clientRnc": "Client RNC",
+          "productionCompany": "Production company",
+          "pur": "PUR (Permiso Único de Rodaje)",
+          "sirecine": "Sirecine number",
+          "attentionTo": "Attention to",
+          "phone": "Phone",
+          "projectProduction": "Project / Production",
+          "packageTitle": "Package title (eyebrow on PDF)",
+          "description": "Description",
+          "quoteDate": "Quote date",
+          "validityDays": "Validity (days)",
+          "currency": "Currency",
+          "exchangeRate": "Exchange rate ({{from}} → {{to}})",
+          "taxProfile": "Tax profile",
+          "itbisRate": "ITBIS rate",
+          "addItbis": "Add ITBIS to total"
+        },
+        "placeholders": {
+          "project": "Aurora Series",
+          "package": "DIT / Data Management",
+          "description": "Short description shown above the line items.",
+          "itemTitle": "DIT operator",
+          "itemDetail": "Optional detail (Mac Studio M1, Davinci Resolve...)"
+        },
+        "aria": {
+          "validityDays": "Validity in days",
+          "exchangeRate": "Exchange rate",
+          "itbisRate": "ITBIS rate",
+          "dragLine": "Drag to reorder line {{line}}",
+          "quantityLine": "Quantity for line {{line}}",
+          "unitPriceLine": "Unit price for line {{line}}",
+          "removeLine": "Remove line {{line}}"
+        },
+        "actions": {
+          "useLatestRateTitle": "Use latest rate from {{date}}",
+          "useLatestRate": "Use latest: {{rate}} ({{date}})",
+          "dragToReorder": "Drag to reorder",
+          "removeLine": "Remove this line",
+          "addLine": "Add line",
+          "exportPdf": "Export PDF",
+          "markSent": "Mark sent",
+          "markApproved": "Mark approved",
+          "markRejected": "Mark rejected",
+          "createDraft": "Create draft"
+        },
+        "itbisOptions": {
+          "yes": "Yes: add ITBIS to total",
+          "no": "No: show ITBIS but don't add"
+        },
+        "itemColumns": {
+          "description": "Description",
+          "qty": "Qty",
+          "unitPrice": "Unit price",
+          "tax": "Tax",
+          "total": "Total"
+        },
+        "taxProfiles": {
+          "film_law_exempt": "Film Law (exempt)",
+          "standard_itbis": "Standard ITBIS",
+          "mixed": "Mixed",
+          "manual": "Manual"
+        },
+        "taxBehaviors": {
+          "follows_quote": "Follows quote",
+          "taxable": "Taxable",
+          "exempt": "Exempt",
+          "show_only": "Show only",
+          "included": "Tax included"
+        },
+        "help": {
+          "taxBehaviorLabel": "Tax behavior",
+          "taxBehavior": "How this line is taxed: Follows quote uses the quote profile. Taxable adds ITBIS to the line. Exempt has no ITBIS. Show only shows ITBIS but does not add it (Ley de Cine). Included means the price already contains ITBIS.",
+          "itbisNotAddedLabel": "ITBIS not added",
+          "itbisNotAdded": "Ley de Cine treatment: ITBIS is calculated and shown on the PDF with a marker, but it is NOT added to the total. Toggle Add ITBIS to total above if this client pays ITBIS.",
+          "equivalentLabel": "Equivalent calculation",
+          "equivalent": "Snapshot rate {{rate}} {{from}}→{{to}}. This will not change once the quote is saved, even if you update the rate later."
+        },
+        "totalsLabels": {
+          "subtotal": "Subtotal",
+          "discount": "Discount",
+          "notAdded": "not added",
+          "total": "Total",
+          "equivalent": "≈ in {{currency}}"
+        },
+        "validation": {
+          "clientRequiredTitle": "Add the client name to continue",
+          "clientRequiredBody": "We use it on the PDF header and in your quote list.",
+          "itemTitleRequiredTitle": "One of your line items has no title",
+          "itemTitleRequiredBody": "Give every line a short name, like DIT operator, so the PDF reads cleanly."
+        },
+        "toasts": {
+          "templateLoaded": "{{template}} loaded",
+          "templateLoadedBody": "We pre-filled the items. Adjust quantities, prices and durations to match this client.",
+          "createdTitle": "Quote {{number}} is ready",
+          "createdBody": "Draft saved. Export the PDF or send it when you're done.",
+          "updatedTitle": "Quote updated",
+          "updatedBody": "Your changes were saved as a new version.",
+          "saveFailed": "We couldn't save the quote",
+          "checkConnection": "Check your internet and try again.",
+          "statusChangedTitle": "Quote moved to {{status}}",
+          "statusChangedBody": "We logged the change in the quote history.",
+          "statusFailed": "We couldn't change the status"
+        }
       }
     }
   },

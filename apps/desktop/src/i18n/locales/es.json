@@ -645,6 +645,134 @@
         "keep": "Conservar",
         "deleting": "Eliminando...",
         "deletePermanently": "Eliminar permanentemente"
+      },
+      "editor": {
+        "quote": "Cotización",
+        "loadingQuote": "Cargando cotización...",
+        "preparingDraft": "Preparando borrador de cotización...",
+        "allQuotes": "Todas las cotizaciones",
+        "versionCount_one": "{{count}} versión",
+        "versionCount_other": "{{count}} versiones",
+        "versionHistory": "Historial de versiones",
+        "versionHistorySubtitle": "Los snapshots se guardan automáticamente cada vez que editas. Las cotizaciones anteriores nunca cambian silenciosamente porque se conservan para auditoría.",
+        "newEyebrow": "Finanzas · Nueva",
+        "quoteEyebrow": "Finanzas · {{number}}",
+        "quoteNumber": "Cotización {{number}}",
+        "headerBodyNew": "Cliente, paquete, items, tasa de cambio y perfil fiscal. El PDF se mantiene en español para los clientes de Iván.",
+        "headerBodyExisting": "Creada {{created}} · Actualizada {{updated}}",
+        "quickStart": "Inicio rápido",
+        "quickStartSubtitle": "Elige un template de Metadata para prellenar la cotización y luego ajustarla.",
+        "clientProduction": "Cliente y producción",
+        "currencyTax": "Moneda e impuestos",
+        "lineItems": "Items",
+        "lineItemsSubtitle": "Título, cantidad, precio unitario y tratamiento fiscal. El preview de totales aparece debajo.",
+        "totals": "Totales",
+        "totalsSubtitle": "Preview en vivo: estos son los números que saldrán en el PDF.",
+        "fields": {
+          "clientName": "Nombre del cliente *",
+          "clientRnc": "RNC del cliente",
+          "productionCompany": "Productora",
+          "pur": "PUR (Permiso Único de Rodaje)",
+          "sirecine": "Número Sirecine",
+          "attentionTo": "Atención a",
+          "phone": "Teléfono",
+          "projectProduction": "Proyecto / Producción",
+          "packageTitle": "Título del paquete (eyebrow del PDF)",
+          "description": "Descripción",
+          "quoteDate": "Fecha de cotización",
+          "validityDays": "Validez (días)",
+          "currency": "Moneda",
+          "exchangeRate": "Tasa de cambio ({{from}} → {{to}})",
+          "taxProfile": "Perfil fiscal",
+          "itbisRate": "Tasa ITBIS",
+          "addItbis": "Agregar ITBIS al total"
+        },
+        "placeholders": {
+          "project": "Aurora Series",
+          "package": "DIT / Data Management",
+          "description": "Descripción corta que aparece sobre los items.",
+          "itemTitle": "Operador DIT",
+          "itemDetail": "Detalle opcional (Mac Studio M1, Davinci Resolve...)"
+        },
+        "aria": {
+          "validityDays": "Validez en días",
+          "exchangeRate": "Tasa de cambio",
+          "itbisRate": "Tasa ITBIS",
+          "dragLine": "Arrastrar para reordenar línea {{line}}",
+          "quantityLine": "Cantidad para línea {{line}}",
+          "unitPriceLine": "Precio unitario para línea {{line}}",
+          "removeLine": "Eliminar línea {{line}}"
+        },
+        "actions": {
+          "useLatestRateTitle": "Usar la última tasa de {{date}}",
+          "useLatestRate": "Usar última: {{rate}} ({{date}})",
+          "dragToReorder": "Arrastrar para reordenar",
+          "removeLine": "Eliminar esta línea",
+          "addLine": "Agregar línea",
+          "exportPdf": "Exportar PDF",
+          "markSent": "Marcar enviada",
+          "markApproved": "Marcar aprobada",
+          "markRejected": "Marcar rechazada",
+          "createDraft": "Crear borrador"
+        },
+        "itbisOptions": {
+          "yes": "Sí: agregar ITBIS al total",
+          "no": "No: mostrar ITBIS sin sumarlo"
+        },
+        "itemColumns": {
+          "description": "Descripción",
+          "qty": "Cant.",
+          "unitPrice": "Precio unitario",
+          "tax": "Impuesto",
+          "total": "Total"
+        },
+        "taxProfiles": {
+          "film_law_exempt": "Ley de Cine (exento)",
+          "standard_itbis": "ITBIS estándar",
+          "mixed": "Mixto",
+          "manual": "Manual"
+        },
+        "taxBehaviors": {
+          "follows_quote": "Sigue la cotización",
+          "taxable": "Gravado",
+          "exempt": "Exento",
+          "show_only": "Sólo mostrar",
+          "included": "Impuesto incluido"
+        },
+        "help": {
+          "taxBehaviorLabel": "Tratamiento fiscal",
+          "taxBehavior": "Cómo se grava esta línea: Sigue la cotización usa el perfil fiscal general. Gravado agrega ITBIS a la línea. Exento no aplica ITBIS. Sólo mostrar muestra ITBIS pero no lo suma (Ley de Cine). Impuesto incluido significa que el precio ya contiene ITBIS.",
+          "itbisNotAddedLabel": "ITBIS no sumado",
+          "itbisNotAdded": "Tratamiento Ley de Cine: el ITBIS se calcula y se muestra en el PDF con una marca, pero NO se suma al total. Activa Agregar ITBIS al total arriba si este cliente paga ITBIS.",
+          "equivalentLabel": "Cálculo equivalente",
+          "equivalent": "Tasa snapshot {{rate}} {{from}}→{{to}}. Esto no cambia después de guardar la cotización, aunque actualices la tasa más tarde."
+        },
+        "totalsLabels": {
+          "subtotal": "Subtotal",
+          "discount": "Descuento",
+          "notAdded": "no sumado",
+          "total": "Total",
+          "equivalent": "≈ en {{currency}}"
+        },
+        "validation": {
+          "clientRequiredTitle": "Agrega el nombre del cliente para continuar",
+          "clientRequiredBody": "Lo usamos en el header del PDF y en la lista de cotizaciones.",
+          "itemTitleRequiredTitle": "Uno de los items no tiene título",
+          "itemTitleRequiredBody": "Dale a cada línea un nombre corto, como Operador DIT, para que el PDF se lea limpio."
+        },
+        "toasts": {
+          "templateLoaded": "{{template}} cargado",
+          "templateLoadedBody": "Prellenamos los items. Ajusta cantidades, precios y duraciones según este cliente.",
+          "createdTitle": "Cotización {{number}} lista",
+          "createdBody": "Borrador guardado. Exporta el PDF o envíalo cuando esté listo.",
+          "updatedTitle": "Cotización actualizada",
+          "updatedBody": "Tus cambios se guardaron como una nueva versión.",
+          "saveFailed": "No pudimos guardar la cotización",
+          "checkConnection": "Revisa tu conexión e inténtalo otra vez.",
+          "statusChangedTitle": "Cotización movida a {{status}}",
+          "statusChangedBody": "Registramos el cambio en el historial de la cotización.",
+          "statusFailed": "No pudimos cambiar el estado"
+        }
       }
     }
   },
