@@ -1,4 +1,5 @@
 import { AlertTriangle, ChevronDown, ChevronRight, FileDown, Plus, Trash2, X } from "lucide-react";
+import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -257,31 +258,39 @@ const getWindowsBounds = (windows: Array<{ startDate: string | null; endDate: st
   };
 };
 
-const formatUnitWindowSummary = (unit: ProjectBlueprintUnitDraftInput, fallbackStart?: string | null, fallbackEnd?: string | null) => {
+const formatUnitWindowSummary = (
+  unit: ProjectBlueprintUnitDraftInput,
+  fallbackStart?: string | null,
+  fallbackEnd?: string | null,
+  t?: TFunction,
+) => {
+  const openLabel = t?.("projectSetup.units.openDate") ?? "Open";
+  const noDatesLabel = t?.("projectSetup.units.noDatesSelected") ?? "No dates selected";
   const windows = getUnitWindows(unit).filter((window) => window.startDate || window.endDate);
   if (!windows.length) {
     if (fallbackStart || fallbackEnd) {
-      return `${fallbackStart ?? "Open"} - ${fallbackEnd ?? "Open"}`;
+      return `${fallbackStart ?? openLabel} - ${fallbackEnd ?? openLabel}`;
     }
 
-    return "No dates selected";
+    return noDatesLabel;
   }
 
-  const labels = windows.map((window) => `${window.startDate ?? "Open"} - ${window.endDate ?? "Open"}`);
+  const labels = windows.map((window) => `${window.startDate ?? openLabel} - ${window.endDate ?? openLabel}`);
   if (labels.length === 1) {
-    return labels[0] ?? "No dates selected";
+    return labels[0] ?? noDatesLabel;
   }
 
   const preview = labels.slice(0, 3).join(", ");
-  return `${labels.length} windows · ${preview}${labels.length > 3 ? "…" : ""}`;
+  return t?.("projectSetup.units.windowSummary", { count: labels.length, preview, more: labels.length > 3 ? "…" : "" }) ?? `${labels.length} windows · ${preview}${labels.length > 3 ? "…" : ""}`;
 };
 
-const formatWindowsList = (windows: Array<{ startDate: string | null; endDate: string | null }>) => {
+const formatWindowsList = (windows: Array<{ startDate: string | null; endDate: string | null }>, t?: TFunction) => {
+  const openLabel = t?.("projectSetup.units.openDate") ?? "Open";
   const labels = windows
     .filter((window) => window.startDate || window.endDate)
-    .map((window) => `${window.startDate ?? "Open"} - ${window.endDate ?? "Open"}`);
+    .map((window) => `${window.startDate ?? openLabel} - ${window.endDate ?? openLabel}`);
 
-  return labels.length ? labels : ["No dates selected"];
+  return labels.length ? labels : [t?.("projectSetup.units.noDatesSelected") ?? "No dates selected"];
 };
 
 const getUnitDepartmentNames = (
@@ -333,40 +342,40 @@ const unitConflictCount = (
 
 const isValidDateWindow = (startDate: string, endDate: string) => !startDate || !endDate || startDate <= endDate;
 
-const buildValidationErrors = (draft: ProjectSetupDraft) => {
+const buildValidationErrors = (draft: ProjectSetupDraft, t: TFunction) => {
   const errors: string[] = [];
 
   if (!draft.generalInfo.name.trim()) {
-    errors.push("Project name is required.");
+    errors.push(t("projectSetup.validation.projectNameRequired"));
   }
 
   if (!draft.generalInfo.startDate) {
-    errors.push("Project start date is required.");
+    errors.push(t("projectSetup.validation.startDateRequired"));
   }
 
   if (!draft.generalInfo.endDate) {
-    errors.push("Project end date is required.");
+    errors.push(t("projectSetup.validation.endDateRequired"));
   }
 
   if (!isValidDateWindow(draft.generalInfo.startDate, draft.generalInfo.endDate)) {
-    errors.push("Project end date must be on or after the start date.");
+    errors.push(t("projectSetup.validation.projectEndAfterStart"));
   }
 
   if (!draft.generalInfo.status.trim()) {
-    errors.push("Project status is required.");
+    errors.push(t("projectSetup.validation.statusRequired"));
   }
 
   if (!draft.generalInfo.colorKey.trim()) {
-    errors.push("Timeline color is required.");
+    errors.push(t("projectSetup.validation.timelineColorRequired"));
   }
 
   if (draft.generalInfo.hasPreproduction) {
     if (!draft.generalInfo.preproductionStartDate || !draft.generalInfo.preproductionEndDate) {
-      errors.push("Pre-production requires both start and end dates.");
+      errors.push(t("projectSetup.validation.preproductionDatesRequired"));
     }
 
     if (!isValidDateWindow(draft.generalInfo.preproductionStartDate, draft.generalInfo.preproductionEndDate)) {
-      errors.push("Pre-production end date must be on or after the start date.");
+      errors.push(t("projectSetup.validation.preproductionEndAfterStart"));
     }
 
     if (
@@ -374,24 +383,24 @@ const buildValidationErrors = (draft: ProjectSetupDraft) => {
       draft.generalInfo.preproductionEndDate &&
       draft.generalInfo.preproductionEndDate > draft.generalInfo.startDate
     ) {
-      errors.push("Pre-production must end on or before the main project start date.");
+      errors.push(t("projectSetup.validation.preproductionBeforeMain"));
     }
   }
 
   draft.additionalUnits.forEach((unit, index) => {
     if (!unit.name.trim()) {
-      errors.push(`Additional unit ${index + 1} needs a name.`);
+      errors.push(t("projectSetup.validation.additionalUnitName", { number: index + 1 }));
     }
 
     getUnitWindows(unit).forEach((window, windowIndex) => {
       if (!isValidDateWindow(window.startDate ?? "", window.endDate ?? "")) {
-        errors.push(`Additional unit ${index + 1} window ${windowIndex + 1} has an invalid date window.`);
+        errors.push(t("projectSetup.validation.additionalUnitWindow", { unit: index + 1, window: windowIndex + 1 }));
       }
     });
 
     unit.departmentIds.forEach((departmentId) => {
       if (!draft.generalInfo.departmentIds.includes(departmentId)) {
-        errors.push(`Additional unit ${index + 1} uses a department outside the project pool.`);
+        errors.push(t("projectSetup.validation.additionalUnitDepartment", { number: index + 1 }));
       }
     });
   });
@@ -469,7 +478,7 @@ export const ProjectSetupWizard = ({
   const [crewSelectedDirection, setCrewSelectedDirection] = useState<ListSortDirection>("asc");
   const dirty = isProjectSetupDraftDirty(draft);
 
-  const validationErrors = useMemo(() => buildValidationErrors(draft), [draft]);
+  const validationErrors = useMemo(() => buildValidationErrors(draft, t), [draft, t]);
 
   useEffect(() => {
     if (!open) {
@@ -666,18 +675,18 @@ export const ProjectSetupWizard = ({
   const assignmentUnitOptions = [
     {
       id: "main" as const,
-      label: "Main Unit",
+      label: t("projectSetup.units.mainUnit"),
       dateRange:
         draft.generalInfo.startDate || draft.generalInfo.endDate
-          ? `${draft.generalInfo.startDate || "Open"} - ${draft.generalInfo.endDate || "Open"}`
-          : "No dates selected",
+          ? `${draft.generalInfo.startDate || t("projectSetup.units.openDate")} - ${draft.generalInfo.endDate || t("projectSetup.units.openDate")}`
+          : t("projectSetup.units.noDatesSelected"),
       assetCount: getUnitAssetIds(draft.mainUnit).length,
       crewCount: countAssignedCrewForUnit(draft.mainUnit),
     },
     ...draft.additionalUnits.map((unit, index) => ({
       id: (unit.id ?? `additional-${index}`) as AssignmentUnitId,
-      label: unit.name || `Additional Unit ${index + 1}`,
-      dateRange: formatUnitWindowSummary(unit, draft.generalInfo.startDate, draft.generalInfo.endDate),
+      label: unit.name || t("projectSetup.units.additionalUnitName", { number: index + 1 }),
+      dateRange: formatUnitWindowSummary(unit, draft.generalInfo.startDate, draft.generalInfo.endDate, t),
       assetCount: getUnitAssetIds(unit).length,
       crewCount: countAssignedCrewForUnit(unit),
     })),
@@ -715,13 +724,13 @@ export const ProjectSetupWizard = ({
       <div className="project-setup-window-badges" role="presentation">
         {activeAssignmentWindowEntries.map((window, index) => (
           <span key={`${window.startDate ?? "open"}-${window.endDate ?? "open"}-${index}`} className={`project-setup-window-badge tone-${(index % 4) + 1}`}>
-            <strong>{`${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : index === 2 ? "rd" : "th"} window`}</strong>
-            <span>{`${window.startDate ?? "Open"} - ${window.endDate ?? "Open"}`}</span>
+            <strong>{t("projectSetup.crew.windowNumber", { number: index + 1 })}</strong>
+            <span>{`${window.startDate ?? t("projectSetup.units.openDate")} - ${window.endDate ?? t("projectSetup.units.openDate")}`}</span>
           </span>
         ))}
       </div>
     ) : (
-      <span className="project-setup-field-note">No dates selected for this unit yet.</span>
+      <span className="project-setup-field-note">{t("projectSetup.units.noDatesForUnit")}</span>
     );
 
   const updateAssignmentUnit = (patch: Partial<ProjectBlueprintUnitDraftInput>) => {
@@ -817,13 +826,13 @@ export const ProjectSetupWizard = ({
 
     const otherBuckets = [
       {
-        label: "Main Unit",
+        label: t("projectSetup.units.mainUnit"),
         windows: [{ startDate: draft.generalInfo.startDate || null, endDate: draft.generalInfo.endDate || null }],
         buckets: draft.mainUnit.unitDepartments,
         isActiveUnit: activeAssignmentUnitId === "main",
       },
       ...draft.additionalUnits.map((unit, index) => ({
-        label: unit.name || `Additional Unit ${index + 1}`,
+        label: unit.name || t("projectSetup.units.additionalUnitName", { number: index + 1 }),
         windows: getUnitWindows(unit).map((window) => ({
           startDate: window.startDate ?? draft.generalInfo.startDate ?? null,
           endDate: window.endDate ?? draft.generalInfo.endDate ?? null,
@@ -854,7 +863,7 @@ export const ProjectSetupWizard = ({
     });
 
     return nextMap;
-  }, [activeAssignmentDepartmentId, activeAssignmentUnitId, activeAssignmentWindows, catalog.departments, draft.additionalUnits, draft.generalInfo.endDate, draft.generalInfo.startDate, draft.mainUnit]);
+  }, [activeAssignmentDepartmentId, activeAssignmentUnitId, activeAssignmentWindows, catalog.departments, draft.additionalUnits, draft.generalInfo.endDate, draft.generalInfo.startDate, draft.mainUnit, t]);
 
   const assetAvailableRows = useMemo(() => {
     return [...catalog.assetOptions]
@@ -926,13 +935,13 @@ export const ProjectSetupWizard = ({
 
     const otherUnits = [
       {
-        label: "Main Unit",
+        label: t("projectSetup.units.mainUnit"),
         windows: [{ startDate: draft.generalInfo.startDate || null, endDate: draft.generalInfo.endDate || null }],
         buckets: draft.mainUnit.unitDepartments,
         isActiveUnit: activeAssignmentUnitId === "main",
       },
       ...draft.additionalUnits.map((unit, index) => ({
-        label: unit.name || `Additional Unit ${index + 1}`,
+        label: unit.name || t("projectSetup.units.additionalUnitName", { number: index + 1 }),
         windows: getUnitWindows(unit).map((window) => ({
           startDate: window.startDate ?? draft.generalInfo.startDate ?? null,
           endDate: window.endDate ?? draft.generalInfo.endDate ?? null,
@@ -971,7 +980,7 @@ export const ProjectSetupWizard = ({
     });
 
     return nextMap;
-  }, [activeAssignmentDepartmentId, activeAssignmentUnitId, activeAssignmentWindows, catalog.departments, draft.additionalUnits, draft.generalInfo.endDate, draft.generalInfo.startDate, draft.mainUnit]);
+  }, [activeAssignmentDepartmentId, activeAssignmentUnitId, activeAssignmentWindows, catalog.departments, draft.additionalUnits, draft.generalInfo.endDate, draft.generalInfo.startDate, draft.mainUnit, t]);
 
   const selectedCrewRows = useMemo(() => {
     return (activeAssignmentBucket?.crewAssignments ?? [])
@@ -1064,7 +1073,7 @@ export const ProjectSetupWizard = ({
         openProject(createdProject.id, "info");
       }
     } catch (error) {
-      setSubmitError(getUserFacingErrorMessage(error, "Unable to create project setup."));
+      setSubmitError(getUserFacingErrorMessage(error, t("projectSetup.errors.createProject")));
     } finally {
       setIsSubmitting(false);
     }
@@ -1074,9 +1083,9 @@ export const ProjectSetupWizard = ({
     try {
       setSubmitError(null);
       const result = await exportProjectBlueprintPdf({ ...normalizeDraftForSubmit(draft), workspaceId: activeWorkspaceId });
-      toast.success("Project setup exported", result.summary);
+      toast.success(t("projectSetup.toasts.exported"), result.summary);
     } catch (error) {
-      setSubmitError(getUserFacingErrorMessage(error, "Unable to export project setup summary."));
+      setSubmitError(getUserFacingErrorMessage(error, t("projectSetup.errors.exportSummary")));
     }
   };
 
@@ -1316,17 +1325,22 @@ export const ProjectSetupWizard = ({
                   <div className="project-setup-inline-card">
                     <div className="project-setup-card-heading">
                       <div>
-                        <h3>Assign to unit</h3>
-                        <p>Select which unit receives the assets in this step.</p>
+                        <h3>{t("projectSetup.assets.assignToUnit")}</h3>
+                        <p>{t("projectSetup.assets.assignToUnitHelp")}</p>
                       </div>
                     </div>
 
                     <label className="action-field">
-                      <span className="action-field-label">Target unit</span>
+                      <span className="action-field-label">{t("projectSetup.assets.targetUnit")}</span>
                       <SelectField onChange={(event) => setActiveAssignmentUnitId(event.target.value)} value={activeAssignmentUnitId}>
                         {assignmentUnitOptions.map((unit) => (
                           <option key={unit.id} value={unit.id}>
-                            {unit.label} · {unit.dateRange} · {unit.assetCount} assets · {unit.crewCount} crew
+                            {t("projectSetup.assets.unitOption", {
+                              label: unit.label,
+                              dateRange: unit.dateRange,
+                              assets: unit.assetCount,
+                              crew: unit.crewCount,
+                            })}
                           </option>
                         ))}
                       </SelectField>
@@ -1339,20 +1353,24 @@ export const ProjectSetupWizard = ({
                   <div className="project-setup-inline-card">
                     <div className="project-setup-card-heading">
                       <div>
-                        <h3>Assign to department</h3>
-                        <p>Select which department bucket receives the assets.</p>
+                        <h3>{t("projectSetup.assets.assignToDepartment")}</h3>
+                        <p>{t("projectSetup.assets.assignToDepartmentHelp")}</p>
                       </div>
                     </div>
 
                     <label className="action-field">
-                      <span className="action-field-label">Target department</span>
+                      <span className="action-field-label">{t("projectSetup.assets.targetDepartment")}</span>
                       <SelectField onChange={(event) => setActiveAssignmentDepartmentId(event.target.value)} value={activeAssignmentDepartmentId}>
                         {activeUnitDepartmentIds.map((departmentId) => {
                           const department = catalog.departments.find((row) => row.id === departmentId);
                           const bucket = activeAssignmentUnit.unitDepartments.find((row) => row.departmentId === departmentId);
                           return (
                             <option key={departmentId} value={departmentId}>
-                              {(department?.name ?? departmentId)} · {(bucket?.assetIds.length ?? 0)} assets · {countAssignedCrew(bucket?.crewAssignments ?? [])} crew
+                              {t("projectSetup.assets.departmentOption", {
+                                name: department?.name ?? departmentId,
+                                assets: bucket?.assetIds.length ?? 0,
+                                crew: countAssignedCrew(bucket?.crewAssignments ?? []),
+                              })}
                             </option>
                           );
                         })}
@@ -1366,13 +1384,13 @@ export const ProjectSetupWizard = ({
                   <div className="project-setup-inline-card">
                     <div className="project-setup-card-heading">
                       <div>
-                        <h3>Packing seed</h3>
+                        <h3>{t("projectSetup.assets.packingSeed")}</h3>
                         <p>{activeAssignmentUnitMeta.label}{activeAssignmentDepartment ? ` / ${activeAssignmentDepartment.name}` : ""}</p>
                       </div>
                     </div>
 
                     <label className="action-field">
-                      <span className="action-field-label">Packing source</span>
+                      <span className="action-field-label">{t("projectSetup.assets.packingSource")}</span>
                       <SelectField
                         onChange={(event) => {
                           const nextMode = event.target.value as ProjectBlueprintPackingSeed["mode"];
@@ -1390,15 +1408,15 @@ export const ProjectSetupWizard = ({
                         }}
                         value={activeAssignmentBucket?.packingSeed?.mode ?? "none"}
                       >
-                        <option value="none">No packing source</option>
-                        <option value="existing">Use staging slip</option>
-                        <option value="draft">Draft new staging slip</option>
+                        <option value="none">{t("projectSetup.assets.packingModes.none")}</option>
+                        <option value="existing">{t("projectSetup.assets.packingModes.existing")}</option>
+                        <option value="draft">{t("projectSetup.assets.packingModes.draft")}</option>
                       </SelectField>
                     </label>
 
                     {activeAssignmentBucket?.packingSeed?.mode === "existing" ? (
                       <label className="action-field">
-                        <span className="action-field-label">Staging slip</span>
+                        <span className="action-field-label">{t("projectSetup.assets.stagingSlip")}</span>
                         <SelectField
                           disabled={isLoadingStaging}
                           onChange={(event) => {
@@ -1414,12 +1432,12 @@ export const ProjectSetupWizard = ({
                           }}
                           value={activeAssignmentBucket.packingSeed.packingSlipId}
                         >
-                          <option value="">{isLoadingStaging ? "Loading staging slips..." : "Choose staging slip"}</option>
+                          <option value="">{isLoadingStaging ? t("projectSetup.assets.loadingStaging") : t("projectSetup.assets.chooseStaging")}</option>
                           {stagingSlips
                             .filter((slip) => !activeAssignmentDepartment || slip.department === "—" || slip.department === activeAssignmentDepartment.name)
                             .map((slip) => (
                               <option key={slip.id} value={slip.id}>
-                                {slip.number} · {slip.itemCount} items
+                                {t("projectSetup.assets.stagingOption", { number: slip.number, items: slip.itemCount })}
                               </option>
                             ))}
                         </SelectField>
@@ -1429,7 +1447,7 @@ export const ProjectSetupWizard = ({
                     {activeAssignmentBucket?.packingSeed?.mode === "draft" ? (
                       <div className="project-setup-grid project-setup-grid-compact">
                         <label className="action-field">
-                          <span className="action-field-label">Slip label</span>
+                          <span className="action-field-label">{t("projectSetup.assets.slipLabel")}</span>
                           <input
                             className="action-field-control"
                             onChange={(event) =>
@@ -1445,7 +1463,7 @@ export const ProjectSetupWizard = ({
                         </label>
 
                         <label className="action-field">
-                          <span className="action-field-label">Responsible</span>
+                          <span className="action-field-label">{t("projectSetup.assets.responsible")}</span>
                           <SelectField
                             onChange={(event) =>
                               setAssignmentUnitPackingSeed({
@@ -1457,7 +1475,7 @@ export const ProjectSetupWizard = ({
                             }
                             value={activeAssignmentBucket.packingSeed.responsibleUserId ?? ""}
                           >
-                            <option value="">No responsible</option>
+                            <option value="">{t("projectSetup.assets.noResponsible")}</option>
                             {catalog.users.map((user) => (
                               <option key={user.id} value={user.id}>
                                 {user.fullName}
@@ -1467,7 +1485,7 @@ export const ProjectSetupWizard = ({
                         </label>
 
                         <label className="action-field action-field-wide">
-                          <span className="action-field-label">Notes</span>
+                          <span className="action-field-label">{t("projectSetup.fields.notes")}</span>
                           <textarea
                             className="action-field-control action-textarea"
                             onChange={(event) =>
@@ -1487,8 +1505,8 @@ export const ProjectSetupWizard = ({
                   </div>
                 ) : (
                   <div className="project-setup-empty-panel">
-                    <p>No department selected for this unit.</p>
-                    <span>Pick at least one department first so we can assign assets and optionally seed packing.</span>
+                    <p>{t("projectSetup.assets.noDepartmentTitle")}</p>
+                    <span>{t("projectSetup.assets.noDepartmentBody")}</span>
                   </div>
                 )}
 
@@ -1496,27 +1514,27 @@ export const ProjectSetupWizard = ({
                   <div className="project-setup-inline-card">
                     <div className="project-setup-card-heading">
                       <div>
-                        <h3>Available assets</h3>
+                        <h3>{t("projectSetup.assets.availableAssets")}</h3>
                         <p>{activeAssignmentUnitMeta.label}{activeAssignmentDepartment ? ` / ${activeAssignmentDepartment.name}` : ""}</p>
                       </div>
                     </div>
 
                     <ListToolbar
-                      activeSortLabel={assetAvailableSort}
+                      activeSortLabel={t(`projectSetup.assets.sort.${assetAvailableSort}`)}
                       onSearchValueChange={setAssetAvailableSearch}
                       onSortByChange={setAssetAvailableSort}
                       onToggleSortDirection={() => setAssetAvailableDirection((current) => (current === "asc" ? "desc" : "asc"))}
                       resultCount={assetAvailableRows.length}
-                      resultLabel="assets"
-                      searchPlaceholder="Search available assets"
+                      resultLabel={t("projectSetup.assets.resultLabel")}
+                      searchPlaceholder={t("projectSetup.assets.searchAvailable")}
                       searchValue={assetAvailableSearch}
                       sortBy={assetAvailableSort}
                       sortDirection={assetAvailableDirection}
                       sortOptions={[
-                        { value: "name", label: "Name" },
-                        { value: "code", label: "Code" },
-                        { value: "category", label: "Category" },
-                        { value: "status", label: "Status" },
+                        { value: "name", label: t("projectSetup.assets.sort.name") },
+                        { value: "code", label: t("projectSetup.assets.sort.code") },
+                        { value: "category", label: t("projectSetup.assets.sort.category") },
+                        { value: "status", label: t("projectSetup.assets.sort.status") },
                       ]}
                     />
 
@@ -1532,45 +1550,47 @@ export const ProjectSetupWizard = ({
                               <span>{asset.category} · {asset.status}</span>
                               {isAssetOccupiedForNewProject(asset) ? (
                                 <span>
-                                  In use on {asset.currentProject}
-                                  {asset.currentUnit ? ` / ${asset.currentUnit}` : ""}
-                                  {asset.currentDepartment ? ` / ${asset.currentDepartment}` : ""}
+                                  {t("projectSetup.assets.inUseOn", {
+                                    project: asset.currentProject,
+                                    unit: asset.currentUnit ? ` / ${asset.currentUnit}` : "",
+                                    department: asset.currentDepartment ? ` / ${asset.currentDepartment}` : "",
+                                  })}
                                 </span>
                               ) : null}
                               {!isAssetOccupiedForNewProject(asset) && asset.linkedKitCount ? (
-                                <span>Part of active kit {asset.linkedKitCodes.join(", ")}</span>
+                                <span>{t("projectSetup.assets.partOfKit", { kits: asset.linkedKitCodes.join(", ") })}</span>
                               ) : null}
                             </span>
                             <span className="project-setup-resource-meta">
-                              {isAssetOccupiedForNewProject(asset) ? <StatusBadge tone="critical">Unavailable</StatusBadge> : null}
-                              {!isAssetOccupiedForNewProject(asset) && asset.linkedKitCount ? <StatusBadge tone="warning">In kit</StatusBadge> : null}
+                              {isAssetOccupiedForNewProject(asset) ? <StatusBadge tone="critical">{t("projectSetup.assets.badges.unavailable")}</StatusBadge> : null}
+                              {!isAssetOccupiedForNewProject(asset) && asset.linkedKitCount ? <StatusBadge tone="warning">{t("projectSetup.assets.badges.inKit")}</StatusBadge> : null}
                               {!isAssetOccupiedForNewProject(asset) && sameSetupAssetAssignmentsById.has(asset.id) ? (
-                                <StatusBadge tone="warning">Assigned to another unit</StatusBadge>
+                                <StatusBadge tone="warning">{t("projectSetup.assets.badges.assignedAnotherUnit")}</StatusBadge>
                               ) : !isAssetOccupiedForNewProject(asset) && assignedAssetIdsInOtherUnits.has(asset.id) ? (
-                                <StatusBadge tone="warning">Already assigned in this setup</StatusBadge>
+                                <StatusBadge tone="warning">{t("projectSetup.assets.badges.alreadyAssigned")}</StatusBadge>
                               ) : null}
                               {isAssetOccupiedForNewProject(asset) ? (
                                 <span className="project-setup-resource-occupancy">
-                                  Resolve current assignment first
+                                  {t("projectSetup.assets.resolveCurrentAssignment")}
                                 </span>
                               ) : asset.linkedKitCount ? (
                                 <span className="project-setup-resource-occupancy">
-                                  Remove from kit {asset.linkedKitCodes.join(", ")} first
+                                  {t("projectSetup.assets.removeFromKitFirst", { kits: asset.linkedKitCodes.join(", ") })}
                                 </span>
                               ) : sameSetupAssetAssignmentsById.has(asset.id) ? (
                                 <span className="project-setup-resource-occupancy">
-                                  Assigned in this setup / {sameSetupAssetAssignmentsById.get(asset.id)?.unit}
+                                  {t("projectSetup.assets.assignedInSetup", { unit: sameSetupAssetAssignmentsById.get(asset.id)?.unit })}
                                 </span>
                               ) : (
                                 <button className="ghost-control" onClick={() => handleAddAssetToActiveUnit(asset.id)} type="button">
-                                  Add
+                                  {t("projectSetup.assets.add")}
                                 </button>
                               )}
                             </span>
                           </div>
                         ))
                       ) : (
-                        <p className="project-setup-empty-copy">No assets match the current filters.</p>
+                        <p className="project-setup-empty-copy">{t("projectSetup.assets.noAvailableMatches")}</p>
                       )}
                     </div>
                   </div>
@@ -1578,26 +1598,36 @@ export const ProjectSetupWizard = ({
                     <div className="project-setup-inline-card">
                       <div className="project-setup-card-heading">
                         <div>
-                          <h3>Selected assets</h3>
-                          <p>{(activeAssignmentBucket?.assetIds.length ?? 0)} selected · {(activeAssignmentBucket?.packingSeed?.mode ?? "none") === "none" ? "No packing seed" : activeAssignmentBucket?.packingSeed?.mode === "existing" ? "Using staging slip" : "Draft packing seed"}</p>
+                          <h3>{t("projectSetup.assets.selectedAssets")}</h3>
+                          <p>
+                            {t("projectSetup.assets.selectedSummary", {
+                              count: activeAssignmentBucket?.assetIds.length ?? 0,
+                              packing:
+                                (activeAssignmentBucket?.packingSeed?.mode ?? "none") === "none"
+                                  ? t("projectSetup.assets.packingSummary.none")
+                                  : activeAssignmentBucket?.packingSeed?.mode === "existing"
+                                    ? t("projectSetup.assets.packingSummary.existing")
+                                    : t("projectSetup.assets.packingSummary.draft"),
+                            })}
+                          </p>
                         </div>
                       </div>
 
                     <ListToolbar
-                      activeSortLabel={assetSelectedSort}
+                      activeSortLabel={t(`projectSetup.assets.sort.${assetSelectedSort}`)}
                       onSearchValueChange={setAssetSelectedSearch}
                       onSortByChange={setAssetSelectedSort}
                       onToggleSortDirection={() => setAssetSelectedDirection((current) => (current === "asc" ? "desc" : "asc"))}
                       resultCount={selectedAssetRows.length}
-                      resultLabel="selected assets"
-                      searchPlaceholder="Search selected assets"
+                      resultLabel={t("projectSetup.assets.selectedResultLabel")}
+                      searchPlaceholder={t("projectSetup.assets.searchSelected")}
                       searchValue={assetSelectedSearch}
                       sortBy={assetSelectedSort}
                       sortDirection={assetSelectedDirection}
                       sortOptions={[
-                        { value: "name", label: "Name" },
-                        { value: "code", label: "Code" },
-                        { value: "category", label: "Category" },
+                        { value: "name", label: t("projectSetup.assets.sort.name") },
+                        { value: "code", label: t("projectSetup.assets.sort.code") },
+                        { value: "category", label: t("projectSetup.assets.sort.category") },
                       ]}
                     />
 
@@ -1608,12 +1638,12 @@ export const ProjectSetupWizard = ({
                             <span className="project-setup-resource-copy">
                               <strong>{asset.code} · {asset.name}</strong>
                               <span>{asset.category} · {asset.status}</span>
-                              {asset.linkedKitCount ? <span>Part of active kit {asset.linkedKitCodes.join(", ")}</span> : null}
+                              {asset.linkedKitCount ? <span>{t("projectSetup.assets.partOfKit", { kits: asset.linkedKitCodes.join(", ") })}</span> : null}
                             </span>
                             <button
-                              aria-label={`Remove ${asset.name} from ${activeAssignmentUnitMeta.label}`}
+                              aria-label={t("projectSetup.assets.removeAssetAria", { asset: asset.name, unit: activeAssignmentUnitMeta.label })}
                               className="icon-danger-control"
-                              data-tooltip={`Remove ${asset.name}`}
+                              data-tooltip={t("projectSetup.assets.removeAssetTooltip", { asset: asset.name })}
                               onClick={() => handleRemoveAssetFromActiveUnit(asset.id)}
                               type="button"
                             >
@@ -1622,7 +1652,7 @@ export const ProjectSetupWizard = ({
                           </div>
                         ))
                       ) : (
-                        <p className="project-setup-empty-copy">No assets assigned to this unit yet.</p>
+                        <p className="project-setup-empty-copy">{t("projectSetup.assets.noSelectedAssets")}</p>
                       )}
                     </div>
                   </div>
@@ -1637,17 +1667,22 @@ export const ProjectSetupWizard = ({
                 <div className="project-setup-inline-card">
                   <div className="project-setup-card-heading">
                     <div>
-                      <h3>Assign to unit</h3>
-                      <p>Select which unit receives crew in this step.</p>
+                      <h3>{t("projectSetup.crew.assignToUnit")}</h3>
+                      <p>{t("projectSetup.crew.assignToUnitHelp")}</p>
                     </div>
                   </div>
 
                   <label className="action-field">
-                    <span className="action-field-label">Target unit</span>
+                    <span className="action-field-label">{t("projectSetup.crew.targetUnit")}</span>
                     <SelectField onChange={(event) => setActiveAssignmentUnitId(event.target.value)} value={activeAssignmentUnitId}>
                       {assignmentUnitOptions.map((unit) => (
                         <option key={unit.id} value={unit.id}>
-                          {unit.label} · {unit.dateRange} · {unit.assetCount} assets · {unit.crewCount} crew
+                          {t("projectSetup.assets.unitOption", {
+                            label: unit.label,
+                            dateRange: unit.dateRange,
+                            assets: unit.assetCount,
+                            crew: unit.crewCount,
+                          })}
                         </option>
                       ))}
                     </SelectField>
@@ -1660,20 +1695,24 @@ export const ProjectSetupWizard = ({
                 <div className="project-setup-inline-card">
                   <div className="project-setup-card-heading">
                     <div>
-                      <h3>Assign to department</h3>
-                      <p>Select which department bucket receives crew.</p>
+                      <h3>{t("projectSetup.crew.assignToDepartment")}</h3>
+                      <p>{t("projectSetup.crew.assignToDepartmentHelp")}</p>
                     </div>
                   </div>
 
                   <label className="action-field">
-                    <span className="action-field-label">Target department</span>
+                    <span className="action-field-label">{t("projectSetup.crew.targetDepartment")}</span>
                     <SelectField onChange={(event) => setActiveAssignmentDepartmentId(event.target.value)} value={activeAssignmentDepartmentId}>
                       {activeUnitDepartmentIds.map((departmentId) => {
                         const department = catalog.departments.find((row) => row.id === departmentId);
                         const bucket = activeAssignmentUnit.unitDepartments.find((row) => row.departmentId === departmentId);
                         return (
                           <option key={departmentId} value={departmentId}>
-                            {(department?.name ?? departmentId)} · {(bucket?.assetIds.length ?? 0)} assets · {countAssignedCrew(bucket?.crewAssignments ?? [])} crew
+                            {t("projectSetup.assets.departmentOption", {
+                              name: department?.name ?? departmentId,
+                              assets: bucket?.assetIds.length ?? 0,
+                              crew: countAssignedCrew(bucket?.crewAssignments ?? []),
+                            })}
                           </option>
                         );
                       })}
@@ -1687,25 +1726,25 @@ export const ProjectSetupWizard = ({
                 <div className="project-setup-inline-card">
                   <div className="project-setup-card-heading">
                     <div>
-                      <h3>Available crew</h3>
+                      <h3>{t("projectSetup.crew.availableCrew")}</h3>
                       <p>{activeAssignmentUnitMeta.label}{activeAssignmentDepartment ? ` / ${activeAssignmentDepartment.name}` : ""}</p>
                     </div>
                   </div>
 
                   <ListToolbar
-                    activeSortLabel={crewAvailableSort}
+                    activeSortLabel={t(`projectSetup.crew.sort.${crewAvailableSort}`)}
                     onSearchValueChange={setCrewAvailableSearch}
                     onSortByChange={setCrewAvailableSort}
                     onToggleSortDirection={() => setCrewAvailableDirection((current) => (current === "asc" ? "desc" : "asc"))}
                     resultCount={crewAvailableRows.length}
-                    resultLabel="crew members"
-                    searchPlaceholder="Search available crew"
+                    resultLabel={t("projectSetup.crew.resultLabel")}
+                    searchPlaceholder={t("projectSetup.crew.searchAvailable")}
                     searchValue={crewAvailableSearch}
                     sortBy={crewAvailableSort}
                     sortDirection={crewAvailableDirection}
                     sortOptions={[
-                      { value: "name", label: "Name" },
-                      { value: "role", label: "Role" },
+                      { value: "name", label: t("projectSetup.crew.sort.name") },
+                      { value: "role", label: t("projectSetup.crew.sort.role") },
                     ]}
                   />
 
@@ -1718,36 +1757,38 @@ export const ProjectSetupWizard = ({
                         >
                           <span className="project-setup-resource-copy">
                             <strong>{crewMember.fullName}</strong>
-                            <span>{crewMember.roleLabel || "No default role"}</span>
+                            <span>{crewMember.roleLabel || t("projectSetup.crew.noDefaultRole")}</span>
                             {blockingCrewAssignmentsByMember.has(crewMember.id) ? (
                               <span>
-                                In use on {blockingCrewAssignmentsByMember.get(crewMember.id)?.project}
-                                {blockingCrewAssignmentsByMember.get(crewMember.id)?.unit ? ` / ${blockingCrewAssignmentsByMember.get(crewMember.id)?.unit}` : ""}
-                                {blockingCrewAssignmentsByMember.get(crewMember.id)?.department ? ` / ${blockingCrewAssignmentsByMember.get(crewMember.id)?.department}` : ""}
+                                {t("projectSetup.crew.inUseOn", {
+                                  project: blockingCrewAssignmentsByMember.get(crewMember.id)?.project,
+                                  unit: blockingCrewAssignmentsByMember.get(crewMember.id)?.unit ? ` / ${blockingCrewAssignmentsByMember.get(crewMember.id)?.unit}` : "",
+                                  department: blockingCrewAssignmentsByMember.get(crewMember.id)?.department ? ` / ${blockingCrewAssignmentsByMember.get(crewMember.id)?.department}` : "",
+                                })}
                               </span>
                             ) : null}
                           </span>
                           <span className="project-setup-resource-meta">
-                            {blockingCrewAssignmentsByMember.has(crewMember.id) ? <StatusBadge tone="critical">Unavailable</StatusBadge> : null}
+                            {blockingCrewAssignmentsByMember.has(crewMember.id) ? <StatusBadge tone="critical">{t("projectSetup.assets.badges.unavailable")}</StatusBadge> : null}
                             {!blockingCrewAssignmentsByMember.has(crewMember.id) && sameSetupCrewAssignmentsByMember.has(crewMember.id) ? (
-                              <StatusBadge tone="warning">Assigned to another unit</StatusBadge>
+                              <StatusBadge tone="warning">{t("projectSetup.assets.badges.assignedAnotherUnit")}</StatusBadge>
                             ) : null}
                             {blockingCrewAssignmentsByMember.has(crewMember.id) ? (
-                              <span className="project-setup-resource-occupancy">Resolve current assignment first</span>
+                              <span className="project-setup-resource-occupancy">{t("projectSetup.assets.resolveCurrentAssignment")}</span>
                             ) : sameSetupCrewAssignmentsByMember.has(crewMember.id) ? (
                               <span className="project-setup-resource-occupancy">
-                                Assigned in this setup / {sameSetupCrewAssignmentsByMember.get(crewMember.id)?.unit}
+                                {t("projectSetup.assets.assignedInSetup", { unit: sameSetupCrewAssignmentsByMember.get(crewMember.id)?.unit })}
                               </span>
                             ) : (
                               <button className="ghost-control" onClick={() => handleAddCrewToActiveUnit(crewMember.id)} type="button">
-                                Add
+                                {t("projectSetup.assets.add")}
                               </button>
                             )}
                           </span>
                         </div>
                       ))
                     ) : (
-                      <p className="project-setup-empty-copy">No crew matches the current filters.</p>
+                      <p className="project-setup-empty-copy">{t("projectSetup.crew.noAvailableMatches")}</p>
                     )}
                   </div>
                 </div>
@@ -1755,26 +1796,26 @@ export const ProjectSetupWizard = ({
                 <div className="project-setup-inline-card">
                   <div className="project-setup-card-heading">
                     <div>
-                      <h3>Assigned crew</h3>
-                      <p>{countAssignedCrew(activeAssignmentBucket?.crewAssignments ?? [])} linked</p>
+                      <h3>{t("projectSetup.crew.assignedCrew")}</h3>
+                      <p>{t("projectSetup.crew.linkedCount", { count: countAssignedCrew(activeAssignmentBucket?.crewAssignments ?? []) })}</p>
                     </div>
                   </div>
 
                   <ListToolbar
-                    activeSortLabel={crewSelectedSort}
+                    activeSortLabel={t(`projectSetup.crew.sort.${crewSelectedSort}`)}
                     onSearchValueChange={setCrewSelectedSearch}
                     onSortByChange={setCrewSelectedSort}
                     onToggleSortDirection={() => setCrewSelectedDirection((current) => (current === "asc" ? "desc" : "asc"))}
                     resultCount={selectedCrewRows.length}
-                    resultLabel="assignments"
-                    searchPlaceholder="Search assigned crew"
+                    resultLabel={t("projectSetup.crew.assignmentResultLabel")}
+                    searchPlaceholder={t("projectSetup.crew.searchAssigned")}
                     searchValue={crewSelectedSearch}
                     sortBy={crewSelectedSort}
                     sortDirection={crewSelectedDirection}
                     sortOptions={[
-                      { value: "name", label: "Name" },
-                      { value: "role", label: "Role" },
-                      { value: "startDate", label: "Start date" },
+                      { value: "name", label: t("projectSetup.crew.sort.name") },
+                      { value: "role", label: t("projectSetup.crew.sort.role") },
+                      { value: "startDate", label: t("projectSetup.crew.sort.startDate") },
                     ]}
                   />
 
@@ -1782,20 +1823,25 @@ export const ProjectSetupWizard = ({
                     {selectedCrewRows.length ? (
                       selectedCrewRows.map(({ assignment, sourceIndex }) => {
                         const crewMember = catalog.crewMembers.find((row) => row.id === assignment.crewMemberId);
-                        const activeWindowsList = formatWindowsList(activeAssignmentWindows);
+                        const activeWindowsList = formatWindowsList(activeAssignmentWindows, t);
                         const hasMultipleUnitWindows = activeWindowsList.length > 1;
                         return (
                           <div key={`${assignment.crewMemberId}-${sourceIndex}`} className="project-setup-inline-card is-nested">
                             <div className="project-setup-card-heading">
                               <div>
-                                <h3>{crewMember?.fullName ?? "Crew assignment"}</h3>
-                                <p>{assignment.roleLabel || crewMember?.roleLabel || "Role pending"}</p>
+                                <h3>{crewMember?.fullName ?? t("projectSetup.crew.assignmentFallback")}</h3>
+                                <p>{assignment.roleLabel || crewMember?.roleLabel || t("projectSetup.crew.rolePending")}</p>
                               </div>
 
                               <button
-                                aria-label={`Remove ${crewMember?.fullName ?? "crew assignment"} from ${activeAssignmentUnitMeta.label}`}
+                                aria-label={t("projectSetup.crew.removeAria", {
+                                  crew: crewMember?.fullName ?? t("projectSetup.crew.assignmentFallback"),
+                                  unit: activeAssignmentUnitMeta.label,
+                                })}
                                 className="icon-danger-control"
-                                data-tooltip={`Remove ${crewMember?.fullName ?? "crew assignment"}`}
+                                data-tooltip={t("projectSetup.crew.removeTooltip", {
+                                  crew: crewMember?.fullName ?? t("projectSetup.crew.assignmentFallback"),
+                                })}
                                 onClick={() => removeCrewAssignmentFromActiveUnit(sourceIndex)}
                                 type="button"
                               >
@@ -1805,36 +1851,36 @@ export const ProjectSetupWizard = ({
 
                             {hasMultipleUnitWindows ? (
                               <div className="project-setup-assignment-windows-note">
-                                <strong>{`${activeWindowsList.length} unit windows`}</strong>
-                                <span>The crew member inherits these active windows from the selected unit.</span>
+                                <strong>{t("projectSetup.crew.unitWindows", { count: activeWindowsList.length })}</strong>
+                                <span>{t("projectSetup.crew.inheritsWindows")}</span>
                               </div>
                             ) : null}
 
                             <div className="project-setup-grid project-setup-grid-compact">
                               <label className="action-field">
-                                <span className="action-field-label">Role</span>
+                                <span className="action-field-label">{t("projectSetup.fields.role")}</span>
                                 <input
                                   className="action-field-control"
                                   onChange={(event) => updateCrewAssignmentForActiveUnit(sourceIndex, { roleLabel: event.target.value })}
-                                  placeholder="Optional role"
+                                  placeholder={t("projectSetup.crew.optionalRole")}
                                   value={assignment.roleLabel ?? ""}
                                 />
                               </label>
 
                               {hasMultipleUnitWindows ? (
                                 <div className="action-field action-field-wide">
-                                  <span className="action-field-label">Assigned windows</span>
+                                  <span className="action-field-label">{t("projectSetup.crew.assignedWindows")}</span>
                                   <div className="project-setup-multi-window-fields">
                                     {activeAssignmentWindowEntries.map((window, windowIndex) => (
                                       <div key={`${window.startDate ?? "open"}-${window.endDate ?? "open"}-${windowIndex}`} className={`project-setup-window-fieldset tone-${(windowIndex % 4) + 1}`}>
-                                        <strong>{`${windowIndex + 1}${windowIndex === 0 ? "st" : windowIndex === 1 ? "nd" : windowIndex === 2 ? "rd" : "th"} window`}</strong>
+                                        <strong>{t("projectSetup.crew.windowNumber", { number: windowIndex + 1 })}</strong>
                                         <div className="project-setup-window-fieldset-grid">
                                           <label className="action-field">
-                                            <span className="action-field-label">Start</span>
+                                            <span className="action-field-label">{t("projectSetup.fields.start")}</span>
                                             <input className="action-field-control" readOnly type="date" value={window.startDate ?? ""} />
                                           </label>
                                           <label className="action-field">
-                                            <span className="action-field-label">End</span>
+                                            <span className="action-field-label">{t("projectSetup.fields.end")}</span>
                                             <input className="action-field-control" readOnly type="date" value={window.endDate ?? ""} />
                                           </label>
                                         </div>
@@ -1845,7 +1891,7 @@ export const ProjectSetupWizard = ({
                               ) : (
                                 <>
                                   <label className="action-field">
-                                    <span className="action-field-label">Start</span>
+                                    <span className="action-field-label">{t("projectSetup.fields.start")}</span>
                                     <input
                                       className="action-field-control"
                                       onChange={(event) => updateCrewAssignmentForActiveUnit(sourceIndex, { startDate: event.target.value })}
@@ -1855,7 +1901,7 @@ export const ProjectSetupWizard = ({
                                   </label>
 
                                   <label className="action-field">
-                                    <span className="action-field-label">End</span>
+                                    <span className="action-field-label">{t("projectSetup.fields.end")}</span>
                                     <input
                                       className="action-field-control"
                                       onChange={(event) => updateCrewAssignmentForActiveUnit(sourceIndex, { endDate: event.target.value })}
@@ -1867,11 +1913,11 @@ export const ProjectSetupWizard = ({
                               )}
 
                               <label className="action-field">
-                                <span className="action-field-label">Notes</span>
+                                <span className="action-field-label">{t("projectSetup.fields.notes")}</span>
                                 <input
                                   className="action-field-control"
                                   onChange={(event) => updateCrewAssignmentForActiveUnit(sourceIndex, { notes: event.target.value })}
-                                  placeholder="Optional notes"
+                                  placeholder={t("projectSetup.crew.optionalNotes")}
                                   value={assignment.notes ?? ""}
                                 />
                               </label>
@@ -1880,7 +1926,7 @@ export const ProjectSetupWizard = ({
                         );
                       })
                     ) : (
-                      <p className="project-setup-empty-copy">No crew assigned to this unit yet.</p>
+                      <p className="project-setup-empty-copy">{t("projectSetup.crew.noAssignedCrew")}</p>
                     )}
                   </div>
                 </div>
@@ -1892,13 +1938,13 @@ export const ProjectSetupWizard = ({
             <div className="project-setup-panel">
               <div className="project-setup-toolbar">
                 <div className="project-setup-toolbar-copy">
-                  <strong>Additional units</strong>
-                  <span>Create units from presets or start a custom one.</span>
+                  <strong>{t("projectSetup.units.additionalUnits")}</strong>
+                  <span>{t("projectSetup.units.additionalUnitsHelp")}</span>
                 </div>
 
                 <div className="project-setup-toolbar-actions">
                   <label className="action-field project-setup-unit-preset-field">
-                    <span className="action-field-label">Add unit</span>
+                    <span className="action-field-label">{t("projectSetup.units.addUnit")}</span>
                     <SelectField
                       onChange={(event) => {
                         const value = event.target.value;
@@ -1909,10 +1955,10 @@ export const ProjectSetupWizard = ({
                       }}
                       value={additionalUnitPresetValue}
                     >
-                      <option value="">Choose preset</option>
+                      <option value="">{t("projectSetup.units.choosePreset")}</option>
                       {additionalUnitPresetOptions.map((preset) => (
                         <option key={preset} value={preset}>
-                          {preset}
+                          {t(`projectSetup.units.presets.${preset}`)}
                         </option>
                       ))}
                     </SelectField>
@@ -1934,14 +1980,19 @@ export const ProjectSetupWizard = ({
                           type="button"
                         >
                           <div className="project-setup-unit-header-copy">
-                            <strong>{unit.name || `Additional Unit ${index + 1}`}</strong>
+                            <strong>{unit.name || t("projectSetup.units.additionalUnitName", { number: index + 1 })}</strong>
                             <span>
-                              {formatUnitWindowSummary(unit, draft.generalInfo.startDate, draft.generalInfo.endDate)} · {getUnitDepartmentNames(unit, catalog.departments).join(", ") || "No departments"} · {getUnitAssetIds(unit).length} assets · {countAssignedCrewForUnit(unit)} crew
+                              {t("projectSetup.units.unitSummaryLine", {
+                                window: formatUnitWindowSummary(unit, draft.generalInfo.startDate, draft.generalInfo.endDate, t),
+                                departments: getUnitDepartmentNames(unit, catalog.departments).join(", ") || t("projectSetup.units.noDepartments"),
+                                assets: getUnitAssetIds(unit).length,
+                                crew: countAssignedCrewForUnit(unit),
+                              })}
                             </span>
                           </div>
 
                           <div className="project-setup-unit-header-aside">
-                            {conflictBadgeCount ? <StatusBadge tone="warning">{`${conflictBadgeCount} conflicts`}</StatusBadge> : null}
+                            {conflictBadgeCount ? <StatusBadge tone="warning">{t("projectSetup.badges.conflicts", { count: conflictBadgeCount })}</StatusBadge> : null}
                             {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                           </div>
                         </button>
@@ -1950,7 +2001,7 @@ export const ProjectSetupWizard = ({
                           <div className="project-setup-section-stack">
                             <div className="project-setup-grid project-setup-grid-compact">
                               <label className="action-field">
-                                <span className="action-field-label">Unit name</span>
+                                <span className="action-field-label">{t("projectSetup.units.unitName")}</span>
                                 <input
                                   className="action-field-control"
                                   onChange={(event) => updateAdditionalUnit(unit.id!, { name: event.target.value })}
@@ -1959,7 +2010,7 @@ export const ProjectSetupWizard = ({
                               </label>
 
                               <label className="action-field">
-                                <span className="action-field-label">Code</span>
+                                <span className="action-field-label">{t("projectSetup.fields.projectCode")}</span>
                                 <input
                                   className="action-field-control"
                                   onChange={(event) => updateAdditionalUnit(unit.id!, { code: event.target.value })}
@@ -1968,9 +2019,9 @@ export const ProjectSetupWizard = ({
                               </label>
 
                               <label className="action-field">
-                                <span className="action-field-label">Color</span>
+                                <span className="action-field-label">{t("projectSetup.units.color")}</span>
                                 <SelectField onChange={(event) => updateAdditionalUnit(unit.id!, { colorKey: event.target.value as ProjectColorKey | "" })} value={unit.colorKey ?? ""}>
-                                  <option value="">Derived from project</option>
+                                  <option value="">{t("projectSetup.units.derivedFromProject")}</option>
                                   {projectColorPalette.map((color) => (
                                     <option key={color.key} value={color.key}>
                                       {color.label}
@@ -1980,7 +2031,7 @@ export const ProjectSetupWizard = ({
                               </label>
 
                               <label className="action-field action-field-wide">
-                                <span className="action-field-label">Notes</span>
+                                <span className="action-field-label">{t("projectSetup.fields.notes")}</span>
                                 <textarea
                                   className="action-field-control action-textarea"
                                   onChange={(event) => updateAdditionalUnit(unit.id!, { notes: event.target.value })}
@@ -1990,7 +2041,7 @@ export const ProjectSetupWizard = ({
                               </label>
 
                               <div className="action-field action-field-wide">
-                                <span className="action-field-label">Departments</span>
+                                <span className="action-field-label">{t("projectSetup.fields.projectDepartments")}</span>
                                 <div className="project-setup-checkbox-grid">
                                   {draft.generalInfo.departmentIds.length ? (
                                     catalog.departments
@@ -2016,7 +2067,7 @@ export const ProjectSetupWizard = ({
                                         );
                                       })
                                   ) : (
-                                    <span className="project-setup-field-note">Select project departments in General Info first.</span>
+                                    <span className="project-setup-field-note">{t("projectSetup.units.selectProjectDepartmentsFirst")}</span>
                                   )}
                                 </div>
                               </div>
@@ -2025,12 +2076,12 @@ export const ProjectSetupWizard = ({
                             <div className="project-setup-inline-card project-setup-inline-card-nested">
                               <div className="project-setup-card-heading">
                                 <div>
-                                  <h3>Windows</h3>
-                                  <p>Add one or many active windows for this unit.</p>
+                                  <h3>{t("projectSetup.units.windows")}</h3>
+                                  <p>{t("projectSetup.units.windowsHelp")}</p>
                                 </div>
                                 <button className="ghost-control" onClick={() => addAdditionalUnitWindow(unit.id!)} type="button">
                                   <Plus size={14} />
-                                  <span>Add date window</span>
+                                  <span>{t("projectSetup.units.addDateWindow")}</span>
                                 </button>
                               </div>
 
@@ -2038,7 +2089,7 @@ export const ProjectSetupWizard = ({
                                 {getUnitWindows(unit).map((window, windowIndex) => (
                                   <div key={`${unit.id}-window-${windowIndex}`} className="project-setup-window-row">
                                     <label className="action-field">
-                                      <span className="action-field-label">Start</span>
+                                      <span className="action-field-label">{t("projectSetup.fields.start")}</span>
                                       <input
                                         className="action-field-control"
                                         onChange={(event) => updateAdditionalUnitWindow(unit.id!, windowIndex, { startDate: event.target.value })}
@@ -2048,7 +2099,7 @@ export const ProjectSetupWizard = ({
                                     </label>
 
                                     <label className="action-field">
-                                      <span className="action-field-label">End</span>
+                                      <span className="action-field-label">{t("projectSetup.fields.end")}</span>
                                       <input
                                         className="action-field-control"
                                         onChange={(event) => updateAdditionalUnitWindow(unit.id!, windowIndex, { endDate: event.target.value })}
@@ -2058,9 +2109,12 @@ export const ProjectSetupWizard = ({
                                     </label>
 
                                     <button
-                                      aria-label={`Remove window ${windowIndex + 1} from ${unit.name || `Additional Unit ${index + 1}`}`}
+                                      aria-label={t("projectSetup.units.removeWindowAria", {
+                                        number: windowIndex + 1,
+                                        unit: unit.name || t("projectSetup.units.additionalUnitName", { number: index + 1 }),
+                                      })}
                                       className="icon-danger-control"
-                                      data-tooltip={`Remove window ${windowIndex + 1}`}
+                                      data-tooltip={t("projectSetup.units.removeWindowTooltip", { number: windowIndex + 1 })}
                                       onClick={() => removeAdditionalUnitWindow(unit.id!, windowIndex)}
                                       type="button"
                                     >
@@ -2073,9 +2127,13 @@ export const ProjectSetupWizard = ({
 
                             <div className="project-setup-card-actions">
                               <button
-                                aria-label={`Remove ${unit.name || `Additional Unit ${index + 1}`}`}
+                                aria-label={t("projectSetup.units.removeUnitAria", {
+                                  unit: unit.name || t("projectSetup.units.additionalUnitName", { number: index + 1 }),
+                                })}
                                 className="icon-danger-control"
-                                data-tooltip={`Remove ${unit.name || `Additional Unit ${index + 1}`}`}
+                                data-tooltip={t("projectSetup.units.removeUnitTooltip", {
+                                  unit: unit.name || t("projectSetup.units.additionalUnitName", { number: index + 1 }),
+                                })}
                                 onClick={() => removeAdditionalUnit(unit.id!)}
                                 type="button"
                               >
@@ -2089,8 +2147,8 @@ export const ProjectSetupWizard = ({
                   })
                 ) : (
                   <div className="project-setup-empty-panel">
-                    <p>No additional units configured yet.</p>
-                    <span>Add one only if this project needs simultaneous units beyond the main unit.</span>
+                    <p>{t("projectSetup.units.noAdditionalUnitsTitle")}</p>
+                    <span>{t("projectSetup.units.noAdditionalUnitsBody")}</span>
                   </div>
                 )}
               </div>
@@ -2101,34 +2159,42 @@ export const ProjectSetupWizard = ({
             <div className="project-setup-panel">
               <div className="project-setup-summary-grid">
                 <div className="project-setup-summary-card">
-                  <h3>General info</h3>
-                  <p>{draft.generalInfo.code || "Code auto-generated"} · {draft.generalInfo.name || "No project name"}</p>
-                  <span>{draft.generalInfo.startDate || draft.generalInfo.endDate ? `${draft.generalInfo.startDate ?? "Open"} - ${draft.generalInfo.endDate ?? "Open"}` : "No project window selected"}</span>
+                  <h3>{t("projectSetup.summary.generalInfo")}</h3>
+                  <p>{draft.generalInfo.code || t("projectSetup.summary.codeAutoGenerated")} · {draft.generalInfo.name || t("projectSetup.summary.noProjectName")}</p>
+                  <span>
+                    {draft.generalInfo.startDate || draft.generalInfo.endDate
+                      ? `${draft.generalInfo.startDate ?? t("projectSetup.units.openDate")} - ${draft.generalInfo.endDate ?? t("projectSetup.units.openDate")}`
+                      : t("projectSetup.summary.noProjectWindow")}
+                  </span>
                 </div>
 
                 <div className="project-setup-summary-card">
-                  <h3>Resources</h3>
+                  <h3>{t("projectSetup.summary.resources")}</h3>
                   <p>
-                    {getUnitAssetIds(draft.mainUnit).length + draft.additionalUnits.reduce((count, unit) => count + getUnitAssetIds(unit).length, 0)} assets ·{" "}
-                    {countAssignedCrewForUnit(draft.mainUnit) +
-                      draft.additionalUnits.reduce(
-                        (count, unit) => count + countAssignedCrewForUnit(unit),
-                        0,
-                      )}{" "}
-                    crew
+                    {t("projectSetup.summary.resourceCounts", {
+                      assets: getUnitAssetIds(draft.mainUnit).length + draft.additionalUnits.reduce((count, unit) => count + getUnitAssetIds(unit).length, 0),
+                      crew:
+                        countAssignedCrewForUnit(draft.mainUnit) +
+                        draft.additionalUnits.reduce(
+                          (count, unit) => count + countAssignedCrewForUnit(unit),
+                          0,
+                        ),
+                    })}
                   </p>
-                  <span>{draft.additionalUnits.length} additional units · {draft.generalInfo.departmentIds.length} project departments</span>
+                  <span>{t("projectSetup.summary.unitDepartmentCounts", { units: draft.additionalUnits.length, departments: draft.generalInfo.departmentIds.length })}</span>
                 </div>
 
                 <div className="project-setup-summary-card">
-                  <h3>Packing seed</h3>
+                  <h3>{t("projectSetup.assets.packingSeed")}</h3>
                   <p>
-                    {[
-                      ...draft.mainUnit.unitDepartments,
-                      ...draft.additionalUnits.flatMap((unit) => unit.unitDepartments),
-                    ].filter((bucket) => bucket.packingSeed?.mode && bucket.packingSeed.mode !== "none").length} configured buckets
+                    {t("projectSetup.summary.configuredBuckets", {
+                      count: [
+                        ...draft.mainUnit.unitDepartments,
+                        ...draft.additionalUnits.flatMap((unit) => unit.unitDepartments),
+                      ].filter((bucket) => bucket.packingSeed?.mode && bucket.packingSeed.mode !== "none").length,
+                    })}
                   </p>
-                  <span>Packing is optional and can be completed later.</span>
+                  <span>{t("projectSetup.summary.packingOptional")}</span>
                 </div>
               </div>
 
@@ -2136,23 +2202,33 @@ export const ProjectSetupWizard = ({
                 <div className="project-setup-inline-card">
                   <div className="project-setup-card-heading">
                     <div>
-                      <h3>Main Unit</h3>
-                      <p>Primary project window and operational base.</p>
+                      <h3>{t("projectSetup.units.mainUnit")}</h3>
+                      <p>{t("projectSetup.summary.mainUnitHelp")}</p>
                     </div>
                   </div>
 
                   <div className="project-setup-summary-row">
-                    <strong>Main Unit</strong>
-                    <span>{draft.generalInfo.startDate || draft.generalInfo.endDate ? `${draft.generalInfo.startDate || "Open"} - ${draft.generalInfo.endDate || "Open"}` : "No dates selected"}</span>
-                    <span>{getUnitDepartmentNames(draft.mainUnit, catalog.departments).join(", ") || "No departments"} · {getUnitAssetIds(draft.mainUnit).length} assets · {countAssignedCrewForUnit(draft.mainUnit)} crew</span>
+                    <strong>{t("projectSetup.units.mainUnit")}</strong>
+                    <span>
+                      {draft.generalInfo.startDate || draft.generalInfo.endDate
+                        ? `${draft.generalInfo.startDate || t("projectSetup.units.openDate")} - ${draft.generalInfo.endDate || t("projectSetup.units.openDate")}`
+                        : t("projectSetup.units.noDatesSelected")}
+                    </span>
+                    <span>
+                      {t("projectSetup.summary.unitResourceLine", {
+                        departments: getUnitDepartmentNames(draft.mainUnit, catalog.departments).join(", ") || t("projectSetup.units.noDepartments"),
+                        assets: getUnitAssetIds(draft.mainUnit).length,
+                        crew: countAssignedCrewForUnit(draft.mainUnit),
+                      })}
+                    </span>
                   </div>
                 </div>
 
                 <div className="project-setup-inline-card">
                   <div className="project-setup-card-heading">
                     <div>
-                      <h3>Additional units</h3>
-                      <p>{draft.additionalUnits.length ? "Compact review before creation." : "No extra units in this setup."}</p>
+                      <h3>{t("projectSetup.units.additionalUnits")}</h3>
+                      <p>{draft.additionalUnits.length ? t("projectSetup.summary.compactReview") : t("projectSetup.summary.noExtraUnits")}</p>
                     </div>
                   </div>
 
@@ -2161,24 +2237,30 @@ export const ProjectSetupWizard = ({
                       {draft.additionalUnits.map((unit, index) => (
                         <div key={unit.id ?? `${unit.name}-${index}`} className="project-setup-summary-row">
                           <strong>{unit.name}</strong>
-                          <span>{formatUnitWindowSummary(unit, draft.generalInfo.startDate, draft.generalInfo.endDate)}</span>
-                          <span>{getUnitDepartmentNames(unit, catalog.departments).join(", ") || "No departments"} · {getUnitAssetIds(unit).length} assets · {countAssignedCrewForUnit(unit)} crew</span>
+                          <span>{formatUnitWindowSummary(unit, draft.generalInfo.startDate, draft.generalInfo.endDate, t)}</span>
+                          <span>
+                            {t("projectSetup.summary.unitResourceLine", {
+                              departments: getUnitDepartmentNames(unit, catalog.departments).join(", ") || t("projectSetup.units.noDepartments"),
+                              assets: getUnitAssetIds(unit).length,
+                              crew: countAssignedCrewForUnit(unit),
+                            })}
+                          </span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="project-setup-empty-copy">No additional units configured.</p>
+                    <p className="project-setup-empty-copy">{t("projectSetup.summary.noAdditionalUnits")}</p>
                   )}
                 </div>
 
                 <div className="project-setup-inline-card">
                   <div className="project-setup-card-heading">
                     <div>
-                      <h3>Conflict review</h3>
-                      <p>{conflicts?.hasConflicts ? "Resolve every conflict before creating the project." : "No blocking conflicts detected."}</p>
+                      <h3>{t("projectSetup.summary.conflictReview")}</h3>
+                      <p>{conflicts?.hasConflicts ? t("projectSetup.summary.resolveConflicts") : t("projectSetup.summary.noBlockingConflicts")}</p>
                     </div>
 
-                    {isCheckingConflicts ? <StatusBadge tone="info">Checking...</StatusBadge> : null}
+                    {isCheckingConflicts ? <StatusBadge tone="info">{t("projectSetup.summary.checking")}</StatusBadge> : null}
                   </div>
 
                   {conflictsError ? <div className="action-feedback action-feedback-error">{conflictsError}</div> : null}
@@ -2205,7 +2287,7 @@ export const ProjectSetupWizard = ({
                       )}
                     </div>
                   ) : (
-                    <p className="project-setup-empty-copy">No asset or crew overlaps are blocking this setup right now.</p>
+                    <p className="project-setup-empty-copy">{t("projectSetup.summary.noOverlaps")}</p>
                   )}
                 </div>
               </div>
@@ -2224,13 +2306,13 @@ export const ProjectSetupWizard = ({
           {activeTab === "summary" ? (
             <button className="ghost-control" onClick={() => void handleExportPdf()} type="button">
               <FileDown size={14} />
-              <span>Export PDF</span>
+              <span>{t("projectSetup.actions.exportPdf")}</span>
             </button>
           ) : (
             <div />
           )}
           <button className="action-primary-button" disabled={isSubmitting || !canSubmit} onClick={() => void handleSubmit()} type="button">
-            {isSubmitting ? "Creating..." : "Create project"}
+            {isSubmitting ? t("projectSetup.actions.creating") : t("projectSetup.actions.createProject")}
           </button>
         </footer>
       </section>
@@ -2243,8 +2325,8 @@ export const ProjectSetupWizard = ({
                 <AlertTriangle size={16} />
               </span>
               <div className="confirm-dialog-copy">
-                <strong>Keep this draft?</strong>
-                <p>This setup has unsaved work. You can keep the draft for later, discard it now, or continue editing.</p>
+                <strong>{t("projectSetup.closeDialog.title")}</strong>
+                <p>{t("projectSetup.closeDialog.body")}</p>
               </div>
             </div>
 
@@ -2257,7 +2339,7 @@ export const ProjectSetupWizard = ({
                 }}
                 type="button"
               >
-                Keep draft for later
+                {t("projectSetup.closeDialog.keep")}
               </button>
               <button
                 className="ghost-control"
@@ -2268,10 +2350,10 @@ export const ProjectSetupWizard = ({
                 }}
                 type="button"
               >
-                Discard draft
+                {t("projectSetup.closeDialog.discard")}
               </button>
               <button className="action-primary-button" onClick={() => setCloseConfirmOpen(false)} type="button">
-                Continue editing
+                {t("projectSetup.closeDialog.continue")}
               </button>
             </div>
           </div>

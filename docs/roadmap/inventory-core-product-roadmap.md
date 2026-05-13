@@ -29,8 +29,8 @@ Actualización 2026-05-12:
 
 Actualización 2026-05-13:
 - Se completa el pase visible de **Catalog**: tabs, tablas, preview lateral, import/export CSV, editor lateral, documentos de crew, cuentas bancarias, kits y acciones principales ahora consumen `i18n`.
-- Se inicia Project Setup Wizard con traducción segura de header, tabs y General Info. El resto del wizard queda como deuda explícita porque toca assets, crew, unidades, summary y conflictos en un único archivo grande.
-- Verificación: JSON i18n válido y `corepack pnpm --filter @bukowski/desktop typecheck` pasa después de Catalog + primer corte del wizard.
+- Project Setup Wizard queda localizado por secciones: header/tabs, General Info, Assets, Crew, Units, Summary/Conflicts, footer, validaciones visibles y diálogo de draft.
+- Verificación: JSON i18n válido, `corepack pnpm --filter @bukowski/desktop typecheck` y `corepack pnpm --filter @bukowski/desktop build` pasan después del wizard completo.
 
 ## Decisión de foco
 
