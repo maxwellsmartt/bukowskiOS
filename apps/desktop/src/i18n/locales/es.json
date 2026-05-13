@@ -546,6 +546,245 @@
       "descending": "Descendente"
     }
   },
+  "catalog": {
+    "title": "Catálogo",
+    "unavailable": "Catálogo no disponible: {{message}}",
+    "loading": "Cargando ubicaciones, crew, clientes y categorías.",
+    "searchPlaceholder": "Buscar {{entity}}",
+    "fallbacks": {
+      "record": "Registro de catálogo",
+      "asset": "Equipo de catálogo"
+    },
+    "entities": {
+      "location": { "singular": "ubicación", "plural": "Ubicaciones" },
+      "department": { "singular": "departamento", "plural": "Departamentos" },
+      "crew": { "singular": "miembro de crew", "plural": "Crew" },
+      "client": { "singular": "cliente", "plural": "Clientes" },
+      "production_company": { "singular": "productora", "plural": "Productoras" },
+      "manufacturer": { "singular": "fabricante", "plural": "Fabricantes" },
+      "category": { "singular": "categoría", "plural": "Categorías" },
+      "kit": { "singular": "kit", "plural": "Kits" }
+    },
+    "fields": {
+      "accountHolder": "Titular",
+      "accountNumber": "Número de cuenta",
+      "accountType": "Tipo de cuenta",
+      "bankName": "Banco",
+      "code": "Código",
+      "company": "Empresa",
+      "contact": "Contacto",
+      "crewName": "Nombre de crew",
+      "department": "Departamento",
+      "description": "Descripción",
+      "documentId": "Documento",
+      "email": "Correo",
+      "fullName": "Nombre completo",
+      "itemCount": "Cantidad de items",
+      "linkedUser": "Usuario vinculado",
+      "maskInPreview": "Ocultar en preview",
+      "members": "Miembros",
+      "membership": "Membresía",
+      "name": "Nombre",
+      "notes": "Notas",
+      "package": "Paquete",
+      "phone": "Teléfono",
+      "primaryQr": "QR principal",
+      "qrReady": "QR listo",
+      "qty": "Cant.",
+      "ready": "Listo",
+      "role": "Rol",
+      "roleLabel": "Etiqueta de rol",
+      "routing": "Routing / ABA",
+      "status": "Estado",
+      "supportEmail": "Correo de soporte",
+      "telegram": "Telegram",
+      "type": "Tipo",
+      "unitsInPackage": "Unidades en paquete"
+    },
+    "status": {
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "pending": "Pendiente",
+      "unassigned": "Sin asignar"
+    },
+    "actions": {
+      "allRows": "Todas las filas",
+      "blankTemplate": "Plantilla vacía",
+      "clearMessage": "Limpiar mensaje",
+      "clearSelection": "Limpiar selección",
+      "closePreview": "Cerrar preview de catálogo",
+      "export": "Exportar",
+      "exportCsv": "Exportar CSV",
+      "exportSelected": "Exportar selección ({{count}})",
+      "importCsv": "Importar CSV",
+      "new": "Nuevo",
+      "selectedRows": "Filas seleccionadas ({{count}})"
+    },
+    "empty": {
+      "title": "Empieza con tus registros compartidos",
+      "body": "Agrega ubicaciones, departamentos, crew, clientes y categorías para que el resto de la app se mantenga consistente.",
+      "tipLocations": "Crea ubicaciones antes de mover inventario",
+      "tipCrew": "Agrega departamentos y crew antes de asignar trabajo",
+      "tipCategories": "Define categorías antes de crear equipos",
+      "action": "Crear primera ubicación",
+      "table": "Aún no hay {{entity}}. Crea el primer registro aquí."
+    },
+    "messages": {
+      "update": "Actualización de catálogo"
+    },
+    "selection": {
+      "single": "1 {{entity}} seleccionado",
+      "multiple": "{{count}} {{entity}} seleccionados",
+      "singleHelp": "Edita, exporta o elimina este registro.",
+      "batchHelp": "Eliminar funciona en lote. Editar queda reservado para una sola fila."
+    },
+    "deleteDialog": {
+      "title": "Eliminar {{entity}}",
+      "bodySingle": "¿Eliminar este {{entity}} del Catálogo? Las operaciones existentes que todavía dependan de él podrían bloquear la acción.",
+      "bodyMultiple": "¿Eliminar {{count}} {{entity}} del Catálogo? Las operaciones existentes que todavía dependan de cualquiera de ellos podrían bloquear la acción."
+    },
+    "import": {
+      "title": "Importar CSV de {{entity}}",
+      "merge": "Combinar",
+      "mergeHelp": "Agrega filas nuevas y actualiza coincidencias.",
+      "replace": "Reemplazar",
+      "replaceHelp": "Desactiva filas que no estén en el archivo.",
+      "rows": "Filas",
+      "create": "Crear",
+      "update": "Actualizar",
+      "deactivate": "Desactivar",
+      "invalid": "Inválidas",
+      "skipped": "Omitidas",
+      "fixInvalidRows": "Corrige las filas inválidas abajo y vuelve a elegir el CSV.",
+      "row": "Fila {{row}}",
+      "importing": "Importando…",
+      "importEntity": "Importar {{entity}}"
+    },
+    "preview": {
+      "activeOnCreate": "Activo al crear",
+      "appUser": "Usuario de la app",
+      "availability": "{{available}} disponibles · {{reserved}} reservadas · {{out}} fuera",
+      "availabilityUnavailable": "Disponibilidad no disponible",
+      "bankAccount": "Cuenta bancaria",
+      "createUser": "Crear usuario",
+      "creatingUser": "Creando…",
+      "inMaintenance": "En mantenimiento.",
+      "noAccountHolder": "Sin titular",
+      "noEmail": "Sin correo todavía",
+      "noKitMembers": "Aún no hay miembros vinculados al kit.",
+      "noPhone": "Sin teléfono todavía",
+      "noRoleAssigned": "Sin rol asignado",
+      "packageContents": "Contenido del paquete",
+      "pickRoleFirst": "Elige un rol primero. Puedes refinar permisos luego en Usuarios y acceso.",
+      "reused": "Qué se reutilizará",
+      "rolePreview": "Preview del rol",
+      "selectRole": "Elige un rol"
+    },
+    "telegram": {
+      "linked": "Vinculado",
+      "pending": "Vínculo pendiente",
+      "revoked": "Revocado",
+      "notLinked": "No vinculado",
+      "ready": "Listo para vincular",
+      "needsSetup": "Necesita configuración"
+    },
+    "kit": {
+      "assign": "Asignar kit",
+      "assignedFrom": "Asignado desde kit {{code}} · {{name}}.",
+      "assignTitle": "Asignar kit · {{code}}",
+      "blockedMaintenance": "Este kit está bloqueado porque estos miembros están en mantenimiento:",
+      "memberSummary": "{{members}} miembros · {{units}} unidades",
+      "missingStock": "Falta stock para {{items}}.",
+      "returnReady": "Devuélvelos a estado listo antes de usar el kit completo."
+    },
+    "editor": {
+      "accountNumber": "Cuenta {{number}}",
+      "addAccount": "Agregar cuenta",
+      "appAccess": "Acceso a la app",
+      "attachFiles": "Adjuntar archivos",
+      "attachmentsAfterCreate": "Los adjuntos aparecerán aquí después de crear el perfil de crew.",
+      "bankAccounts": "Cuentas bancarias",
+      "close": "Cerrar editor de catálogo",
+      "create": "Crear",
+      "documents": "Documentos",
+      "editTitle": "Editar {{entity}}",
+      "freeInStock": "Libre en stock",
+      "kitMembers": "Miembros del kit",
+      "linkedTo": "Vinculado a {{user}}.",
+      "liveOn": "Activo en {{project}}{{unit}}",
+      "moreDetails": "Más detalles",
+      "newTitle": "Nuevo {{entity}}",
+      "noAppUser": "Aún no hay usuario de app vinculado.",
+      "noBankAccounts": "Aún no hay cuentas bancarias.",
+      "noCrewDocuments": "Aún no hay documentos adjuntos.",
+      "noLinkedUser": "Sin usuario vinculado",
+      "optionalNote": "Nota opcional",
+      "removeBankAccount": "Quitar cuenta bancaria",
+      "removeBankAccountNumber": "Quitar cuenta bancaria {{number}}",
+      "removeDocumentNamed": "Quitar {{name}}",
+      "removeFile": "Quitar archivo",
+      "saveFirstForFiles": "Guarda este perfil de crew primero para adjuntar archivos.",
+      "uploading": "Subiendo…"
+    },
+    "errors": {
+      "assignKit": "La asignación del kit falló.",
+      "createUser": "No se pudo crear el usuario desde este registro de crew.",
+      "exportCsv": "No se pudo exportar este CSV.",
+      "importCsv": "No se pudo importar este CSV.",
+      "pickRole": "Elige un rol antes de crear el usuario.",
+      "previewCsv": "No se pudo previsualizar este CSV.",
+      "removeDocument": "No se pudo quitar el documento de crew.",
+      "save": "No se pudo guardar este registro de catálogo.",
+      "uploadDocument": "No se pudo subir el documento de crew."
+    }
+  },
+  "projectSetup": {
+    "title": "Crear proyecto",
+    "eyebrow": "Asistente de configuración",
+    "tabs": {
+      "general": "Información general",
+      "units": "Unidades adicionales",
+      "assets": "Asignar equipos",
+      "crew": "Asignar crew",
+      "summary": "Resumen"
+    },
+    "badges": {
+      "draft": "Borrador en progreso",
+      "conflicts": "{{count}} conflictos"
+    },
+    "actions": {
+      "close": "Cerrar configuración del proyecto"
+    },
+    "fields": {
+      "client": "Cliente",
+      "description": "Descripción",
+      "endDate": "Fecha final",
+      "includesPreproduction": "Incluye ventana de preproducción",
+      "mainUnitDepartments": "Departamentos de Main Unit",
+      "preproductionEnd": "Fin de preproducción",
+      "preproductionStart": "Inicio de preproducción",
+      "productionCompany": "Productora",
+      "projectCode": "Código del proyecto",
+      "projectDepartments": "Departamentos del proyecto",
+      "projectName": "Nombre del proyecto",
+      "startDate": "Fecha inicial",
+      "status": "Estado",
+      "timelineColor": "Color de timeline"
+    },
+    "help": {
+      "selectDepartmentsFirst": "Selecciona departamentos del proyecto primero para sembrar Main Unit."
+    },
+    "placeholders": {
+      "autoCode": "Déjalo vacío para autogenerar el código",
+      "defaultTone": "Tono del sistema por defecto",
+      "noClient": "Sin cliente vinculado",
+      "noProductionCompany": "Sin productora vinculada"
+    },
+    "errors": {
+      "checkConflicts": "No se pudieron revisar los conflictos.",
+      "loadStaging": "No se pudieron cargar los packing slips de staging."
+    }
+  },
   "incidents": {
     "title": "Incidentes",
     "cardTitle": "Incidentes",

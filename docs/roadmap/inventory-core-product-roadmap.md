@@ -27,6 +27,11 @@ Actualización 2026-05-12:
 - Queda como deuda menor traducir/parametrizar el cuerpo generado del mailto de RMA; no bloquea UI ni flujo operativo.
 - Se inicia el **UI Spanish Completion Pass** en Projects: registry, overview/detail, schedule, info, budget, units manager y breadcrumbs quedan localizados con verificación incremental de JSON/typecheck. Pendiente dentro de Projects: Catalog y Project Setup Wizard.
 
+Actualización 2026-05-13:
+- Se completa el pase visible de **Catalog**: tabs, tablas, preview lateral, import/export CSV, editor lateral, documentos de crew, cuentas bancarias, kits y acciones principales ahora consumen `i18n`.
+- Se inicia Project Setup Wizard con traducción segura de header, tabs y General Info. El resto del wizard queda como deuda explícita porque toca assets, crew, unidades, summary y conflictos en un único archivo grande.
+- Verificación: JSON i18n válido y `corepack pnpm --filter @bukowski/desktop typecheck` pasa después de Catalog + primer corte del wizard.
+
 ## Decisión de foco
 
 - Pausamos momentaneamente Finance/Agents como siguiente slice principal.

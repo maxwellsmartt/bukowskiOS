@@ -546,6 +546,245 @@
       "descending": "Descending"
     }
   },
+  "catalog": {
+    "title": "Catalog",
+    "unavailable": "Catalog unavailable: {{message}}",
+    "loading": "Loading locations, crew, clients and categories.",
+    "searchPlaceholder": "Search {{entity}}",
+    "fallbacks": {
+      "record": "Catalog record",
+      "asset": "Catalog asset"
+    },
+    "entities": {
+      "location": { "singular": "location", "plural": "Locations" },
+      "department": { "singular": "department", "plural": "Departments" },
+      "crew": { "singular": "crew member", "plural": "Crew" },
+      "client": { "singular": "client", "plural": "Clients" },
+      "production_company": { "singular": "production company", "plural": "Production Companies" },
+      "manufacturer": { "singular": "manufacturer", "plural": "Manufacturers" },
+      "category": { "singular": "category", "plural": "Categories" },
+      "kit": { "singular": "kit", "plural": "Kits" }
+    },
+    "fields": {
+      "accountHolder": "Account holder",
+      "accountNumber": "Account number",
+      "accountType": "Account type",
+      "bankName": "Bank name",
+      "code": "Code",
+      "company": "Company",
+      "contact": "Contact",
+      "crewName": "Crew name",
+      "department": "Department",
+      "description": "Description",
+      "documentId": "Document ID",
+      "email": "Email",
+      "fullName": "Full name",
+      "itemCount": "Item count",
+      "linkedUser": "Linked user",
+      "maskInPreview": "Mask in preview",
+      "members": "Members",
+      "membership": "Membership",
+      "name": "Name",
+      "notes": "Notes",
+      "package": "Package",
+      "phone": "Phone",
+      "primaryQr": "Primary QR",
+      "qrReady": "QR ready",
+      "qty": "Qty",
+      "ready": "Ready",
+      "role": "Role",
+      "roleLabel": "Role label",
+      "routing": "Routing / ABA",
+      "status": "Status",
+      "supportEmail": "Support email",
+      "telegram": "Telegram",
+      "type": "Type",
+      "unitsInPackage": "Units in package"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "pending": "Pending",
+      "unassigned": "Unassigned"
+    },
+    "actions": {
+      "allRows": "All rows",
+      "blankTemplate": "Blank template",
+      "clearMessage": "Clear message",
+      "clearSelection": "Clear selection",
+      "closePreview": "Close catalog preview",
+      "export": "Export",
+      "exportCsv": "Export CSV",
+      "exportSelected": "Export selected ({{count}})",
+      "importCsv": "Import CSV",
+      "new": "New",
+      "selectedRows": "Selected rows ({{count}})"
+    },
+    "empty": {
+      "title": "Start with your shared records",
+      "body": "Add locations, departments, crew, clients and categories here so the rest of the app stays consistent.",
+      "tipLocations": "Create locations before moving inventory",
+      "tipCrew": "Add departments and crew before assigning work",
+      "tipCategories": "Define categories before creating assets",
+      "action": "Create first location",
+      "table": "No {{entity}} yet. Create the first one here."
+    },
+    "messages": {
+      "update": "Catalog update"
+    },
+    "selection": {
+      "single": "1 {{entity}} selected",
+      "multiple": "{{count}} {{entity}} selected",
+      "singleHelp": "Edit, export or delete this record.",
+      "batchHelp": "Delete works in batch. Edit stays for one row."
+    },
+    "deleteDialog": {
+      "title": "Delete {{entity}}",
+      "bodySingle": "Delete this {{entity}} from Catalog? Existing operations that still depend on it may block the action.",
+      "bodyMultiple": "Delete {{count}} {{entity}} from Catalog? Existing operations that still depend on any of them may block the action."
+    },
+    "import": {
+      "title": "Import {{entity}} CSV",
+      "merge": "Merge",
+      "mergeHelp": "Add new rows and update matches.",
+      "replace": "Replace",
+      "replaceHelp": "Deactivate rows missing from the file.",
+      "rows": "Rows",
+      "create": "Create",
+      "update": "Update",
+      "deactivate": "Deactivate",
+      "invalid": "Invalid",
+      "skipped": "Skipped",
+      "fixInvalidRows": "Fix the invalid rows below, then choose the CSV again.",
+      "row": "Row {{row}}",
+      "importing": "Importing…",
+      "importEntity": "Import {{entity}}"
+    },
+    "preview": {
+      "activeOnCreate": "Active on create",
+      "appUser": "App user",
+      "availability": "{{available}} available · {{reserved}} reserved · {{out}} out",
+      "availabilityUnavailable": "Availability unavailable",
+      "bankAccount": "Bank account",
+      "createUser": "Create user",
+      "creatingUser": "Creating…",
+      "inMaintenance": "In maintenance.",
+      "noAccountHolder": "No account holder",
+      "noEmail": "No email yet",
+      "noKitMembers": "No kit members linked yet.",
+      "noPhone": "No phone yet",
+      "noRoleAssigned": "No role assigned",
+      "packageContents": "Package contents",
+      "pickRoleFirst": "Pick a role first. You can refine permissions later in Users & access.",
+      "reused": "What will be reused",
+      "rolePreview": "Role preview",
+      "selectRole": "Select a role"
+    },
+    "telegram": {
+      "linked": "Linked",
+      "pending": "Pending link",
+      "revoked": "Revoked",
+      "notLinked": "Not linked",
+      "ready": "Ready to link",
+      "needsSetup": "Needs setup"
+    },
+    "kit": {
+      "assign": "Assign kit",
+      "assignedFrom": "Assigned from kit {{code}} · {{name}}.",
+      "assignTitle": "Assign kit · {{code}}",
+      "blockedMaintenance": "This kit is blocked because these members are in maintenance:",
+      "memberSummary": "{{members}} members · {{units}} units",
+      "missingStock": "Missing stock for {{items}}.",
+      "returnReady": "Return them to ready state before using the full kit."
+    },
+    "editor": {
+      "accountNumber": "Account {{number}}",
+      "addAccount": "Add account",
+      "appAccess": "App access",
+      "attachFiles": "Attach files",
+      "attachmentsAfterCreate": "Attachments will appear here after the crew member is created.",
+      "bankAccounts": "Bank accounts",
+      "close": "Close catalog editor",
+      "create": "Create",
+      "documents": "Documents",
+      "editTitle": "Edit {{entity}}",
+      "freeInStock": "Free in stock",
+      "kitMembers": "Kit members",
+      "linkedTo": "Linked to {{user}}.",
+      "liveOn": "Live on {{project}}{{unit}}",
+      "moreDetails": "More details",
+      "newTitle": "New {{entity}}",
+      "noAppUser": "No app user linked yet.",
+      "noBankAccounts": "No bank accounts yet.",
+      "noCrewDocuments": "No crew documents attached yet.",
+      "noLinkedUser": "No linked user",
+      "optionalNote": "Optional note",
+      "removeBankAccount": "Remove bank account",
+      "removeBankAccountNumber": "Remove bank account {{number}}",
+      "removeDocumentNamed": "Remove {{name}}",
+      "removeFile": "Remove file",
+      "saveFirstForFiles": "Save this crew profile first to attach files.",
+      "uploading": "Uploading…"
+    },
+    "errors": {
+      "assignKit": "Kit assignment failed.",
+      "createUser": "Could not create the user from this crew record.",
+      "exportCsv": "Could not export this CSV.",
+      "importCsv": "Could not import this CSV.",
+      "pickRole": "Pick a role before creating the user.",
+      "previewCsv": "Could not preview this CSV.",
+      "removeDocument": "Crew document removal failed.",
+      "save": "Could not save this catalog record.",
+      "uploadDocument": "Crew document upload failed."
+    }
+  },
+  "projectSetup": {
+    "title": "Create project",
+    "eyebrow": "Project setup wizard",
+    "tabs": {
+      "general": "General Info",
+      "units": "Set Additional Units",
+      "assets": "Assign Assets",
+      "crew": "Assign Crew",
+      "summary": "Summary"
+    },
+    "badges": {
+      "draft": "Draft in progress",
+      "conflicts": "{{count}} conflicts"
+    },
+    "actions": {
+      "close": "Close project setup"
+    },
+    "fields": {
+      "client": "Client",
+      "description": "Description",
+      "endDate": "End date",
+      "includesPreproduction": "Includes pre-production window",
+      "mainUnitDepartments": "Main Unit departments",
+      "preproductionEnd": "Pre-production end",
+      "preproductionStart": "Pre-production start",
+      "productionCompany": "Production company",
+      "projectCode": "Project code",
+      "projectDepartments": "Project departments",
+      "projectName": "Project name",
+      "startDate": "Start date",
+      "status": "Status",
+      "timelineColor": "Timeline color"
+    },
+    "help": {
+      "selectDepartmentsFirst": "Select project departments first to seed the Main Unit."
+    },
+    "placeholders": {
+      "autoCode": "Leave blank to auto-generate code",
+      "defaultTone": "Default system tone",
+      "noClient": "No client linked",
+      "noProductionCompany": "No production company linked"
+    },
+    "errors": {
+      "checkConflicts": "Unable to check conflicts.",
+      "loadStaging": "Unable to load staging packing slips."
+    }
+  },
   "incidents": {
     "title": "Incidents",
     "cardTitle": "Incidents",

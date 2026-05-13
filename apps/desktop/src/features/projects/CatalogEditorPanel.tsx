@@ -1,5 +1,7 @@
 import { FileText, Plus, Save, Trash2, X } from "lucide-react";
+import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { CatalogEntityType, CatalogSnapshot, CreateCatalogEntityInput, UpdateCatalogEntityInput } from "@contracts";
 import { SelectField } from "@shared/components/SelectField";
@@ -117,19 +119,19 @@ const parseDroppedFilePaths = (dataTransfer: DataTransfer) => {
     .filter(Boolean);
 };
 
-const getPanelTitle = (entityType: CatalogEntityType, mode: "create" | "edit") => {
-  const labelMap: Record<CatalogEntityType, string> = {
-    location: "location",
-    department: "department",
-    crew: "crew member",
-    client: "client",
-    production_company: "production company",
-    manufacturer: "manufacturer",
-    category: "category",
-    kit: "kit",
+const getPanelTitle = (entityType: CatalogEntityType, mode: "create" | "edit", t: TFunction) => {
+  const labelKeyMap: Record<CatalogEntityType, string> = {
+    location: "catalog.entities.location.singular",
+    department: "catalog.entities.department.singular",
+    crew: "catalog.entities.crew.singular",
+    client: "catalog.entities.client.singular",
+    production_company: "catalog.entities.production_company.singular",
+    manufacturer: "catalog.entities.manufacturer.singular",
+    category: "catalog.entities.category.singular",
+    kit: "catalog.entities.kit.singular",
   };
 
-  return mode === "create" ? `New ${labelMap[entityType]}` : `Edit ${labelMap[entityType]}`;
+  return mode === "create" ? t("catalog.editor.newTitle", { entity: t(labelKeyMap[entityType]) }) : t("catalog.editor.editTitle", { entity: t(labelKeyMap[entityType]) });
 };
 
 const createEmptyBankAccount = (): CrewBankAccountDraft => ({
@@ -160,6 +162,7 @@ export const CatalogEditorPanel = ({
   onUploadCrewDocuments,
   onUploadCrewDocumentsFromPaths,
 }: CatalogEditorPanelProps) => {
+  const { t } = useTranslation();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -300,28 +303,28 @@ export const CatalogEditorPanel = ({
   return (
     <SurfaceCard
       aside={
-        <button aria-label="Close catalog editor" className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("catalog.editor.close")} className="surface-card-action" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }
-      title={getPanelTitle(entityType, mode)}
+      title={getPanelTitle(entityType, mode, t)}
     >
       <div className="action-form-grid">
         {entityType === "location" || entityType === "department" || entityType === "category" || entityType === "kit" ? (
           <label className="action-field">
-            <span className="action-field-label">Code</span>
+            <span className="action-field-label">{t("catalog.fields.code")}</span>
             <input className="action-field-control" onChange={(event) => setCode(event.target.value)} value={code} />
           </label>
         ) : null}
 
         <label className="action-field">
-          <span className="action-field-label">{entityType === "crew" ? "Full name" : "Name"}</span>
+          <span className="action-field-label">{entityType === "crew" ? t("catalog.fields.fullName") : t("catalog.fields.name")}</span>
           <input className="action-field-control" onChange={(event) => setName(event.target.value)} value={name} />
         </label>
 
         {entityType === "location" ? (
           <label className="action-field">
-            <span className="action-field-label">Type</span>
+            <span className="action-field-label">{t("catalog.fields.type")}</span>
             <SelectField onChange={(event) => setLocationType(event.target.value)} value={locationType}>
               {locationTypeOptions.map((option) => (
                 <option key={option} value={option}>
@@ -335,9 +338,9 @@ export const CatalogEditorPanel = ({
         {entityType === "crew" ? (
           <>
             <label className="action-field">
-              <span className="action-field-label">Department</span>
+              <span className="action-field-label">{t("catalog.fields.department")}</span>
               <SelectField onChange={(event) => setPrimaryDepartmentId(event.target.value)} value={primaryDepartmentId}>
-                <option value="">Unassigned</option>
+                <option value="">{t("catalog.status.unassigned")}</option>
                 {departmentSelectOptions.map((department) => (
                   <option key={department.id} value={department.id}>
                     {department.code} · {department.name}
@@ -346,15 +349,15 @@ export const CatalogEditorPanel = ({
               </SelectField>
             </label>
             <label className="action-field">
-              <span className="action-field-label">Role label</span>
+              <span className="action-field-label">{t("catalog.fields.roleLabel")}</span>
               <input className="action-field-control" onChange={(event) => setRoleLabel(event.target.value)} value={roleLabel} />
             </label>
             <label className="action-field">
-              <span className="action-field-label">Email</span>
+              <span className="action-field-label">{t("catalog.fields.email")}</span>
               <input className="action-field-control" onChange={(event) => setEmail(event.target.value)} value={email} />
             </label>
             <label className="action-field">
-              <span className="action-field-label">Phone</span>
+              <span className="action-field-label">{t("catalog.fields.phone")}</span>
               <input className="action-field-control" onChange={(event) => setPhone(event.target.value)} value={phone} />
             </label>
           </>
@@ -363,15 +366,15 @@ export const CatalogEditorPanel = ({
         {entityType === "client" || entityType === "production_company" || entityType === "manufacturer" ? (
           <>
             <label className="action-field">
-              <span className="action-field-label">Contact</span>
+              <span className="action-field-label">{t("catalog.fields.contact")}</span>
               <input className="action-field-control" onChange={(event) => setContactName(event.target.value)} value={contactName} />
             </label>
             <label className="action-field">
-              <span className="action-field-label">{entityType === "manufacturer" ? "Support email" : "Email"}</span>
+              <span className="action-field-label">{entityType === "manufacturer" ? t("catalog.fields.supportEmail") : t("catalog.fields.email")}</span>
               <input className="action-field-control" onChange={(event) => setEmail(event.target.value)} value={email} />
             </label>
             <label className="action-field">
-              <span className="action-field-label">Phone</span>
+              <span className="action-field-label">{t("catalog.fields.phone")}</span>
               <input className="action-field-control" onChange={(event) => setPhone(event.target.value)} value={phone} />
             </label>
           </>
@@ -379,18 +382,18 @@ export const CatalogEditorPanel = ({
 
         {entityType !== "crew" && entityType !== "client" ? (
           <label className="action-field action-field-wide">
-            <span className="action-field-label">Description</span>
+            <span className="action-field-label">{t("catalog.fields.description")}</span>
             <textarea className="action-field-control action-textarea" onChange={(event) => setDescription(event.target.value)} rows={3} value={description} />
           </label>
         ) : null}
 
         {entityType === "crew" || entityType === "client" || entityType === "manufacturer" || entityType === "kit" ? (
           <label className="action-field action-field-wide">
-            <span className="action-field-label">Notes</span>
+            <span className="action-field-label">{t("catalog.fields.notes")}</span>
             <textarea
               className="action-field-control action-textarea"
               onChange={(event) => setNotes(event.target.value)}
-              placeholder="Optional note"
+              placeholder={t("catalog.editor.optionalNote")}
               rows={3}
               value={notes}
             />
@@ -400,13 +403,13 @@ export const CatalogEditorPanel = ({
 
       {entityType === "crew" ? (
         <details className="detail-disclosure" open>
-          <summary className="detail-disclosure-summary">More details</summary>
+          <summary className="detail-disclosure-summary">{t("catalog.editor.moreDetails")}</summary>
           <div className="detail-disclosure-content">
             <div className="action-form-grid">
               <label className="action-field">
-                <span className="action-field-label">Linked user</span>
+                <span className="action-field-label">{t("catalog.fields.linkedUser")}</span>
                 <SelectField onChange={(event) => setLinkedUserId(event.target.value)} value={linkedUserId}>
-                  <option value="">No linked user</option>
+                  <option value="">{t("catalog.editor.noLinkedUser")}</option>
                   {linkedUserOptions.map((user) => (
                     <option key={user.id} value={user.id}>
                       {user.fullName}
@@ -415,7 +418,7 @@ export const CatalogEditorPanel = ({
                 </SelectField>
               </label>
               <label className="action-field">
-                <span className="action-field-label">Document ID</span>
+                <span className="action-field-label">{t("catalog.fields.documentId")}</span>
                 <input className="action-field-control" onChange={(event) => setDocumentId(event.target.value)} value={documentId} />
               </label>
             </div>
@@ -428,22 +431,24 @@ export const CatalogEditorPanel = ({
           <div className="catalog-crew-support-card">
             <div className="surface-card-header catalog-kit-assets-header">
               <div>
-                <h3 className="surface-card-title">App access</h3>
+                <h3 className="surface-card-title">{t("catalog.editor.appAccess")}</h3>
               </div>
             </div>
             <div className="catalog-crew-support-empty">
-              {linkedUserId ? `Linked to ${linkedUserOptions.find((user) => user.id === linkedUserId)?.fullName ?? linkedUserId}.` : "No app user linked yet."}
+              {linkedUserId
+                ? t("catalog.editor.linkedTo", { user: linkedUserOptions.find((user) => user.id === linkedUserId)?.fullName ?? linkedUserId })
+                : t("catalog.editor.noAppUser")}
             </div>
           </div>
 
           <div className="catalog-crew-support-card">
             <div className="surface-card-header catalog-kit-assets-header">
               <div>
-                <h3 className="surface-card-title">Bank accounts</h3>
+                <h3 className="surface-card-title">{t("catalog.editor.bankAccounts")}</h3>
               </div>
               <button className="ghost-control catalog-inline-button" onClick={() => setBankAccounts((current) => [...current, createEmptyBankAccount()])} type="button">
                 <Plus size={14} />
-                <span>Add account</span>
+                <span>{t("catalog.editor.addAccount")}</span>
               </button>
             </div>
 
@@ -452,11 +457,11 @@ export const CatalogEditorPanel = ({
                 {bankAccounts.map((entry, index) => (
                   <div key={`bank-account-${index}`} className="catalog-crew-bank-account">
                     <div className="catalog-crew-bank-account-header">
-                      <strong>Account {index + 1}</strong>
+                      <strong>{t("catalog.editor.accountNumber", { number: index + 1 })}</strong>
                       <button
-                        aria-label={`Remove bank account ${index + 1}`}
+                        aria-label={t("catalog.editor.removeBankAccountNumber", { number: index + 1 })}
                         className="icon-danger-control"
-                        data-tooltip="Remove bank account"
+                        data-tooltip={t("catalog.editor.removeBankAccount")}
                         onClick={() => setBankAccounts((current) => current.filter((_currentEntry, currentIndex) => currentIndex !== index))}
                         type="button"
                       >
@@ -465,7 +470,7 @@ export const CatalogEditorPanel = ({
                     </div>
                     <div className="action-form-grid">
                       <label className="action-field">
-                        <span className="action-field-label">Bank name</span>
+                        <span className="action-field-label">{t("catalog.fields.bankName")}</span>
                         <input
                           className="action-field-control"
                           onChange={(event) =>
@@ -479,7 +484,7 @@ export const CatalogEditorPanel = ({
                         />
                       </label>
                       <label className="action-field">
-                        <span className="action-field-label">Account holder</span>
+                        <span className="action-field-label">{t("catalog.fields.accountHolder")}</span>
                         <input
                           className="action-field-control"
                           onChange={(event) =>
@@ -493,7 +498,7 @@ export const CatalogEditorPanel = ({
                         />
                       </label>
                       <label className="action-field">
-                        <span className="action-field-label">Account number</span>
+                        <span className="action-field-label">{t("catalog.fields.accountNumber")}</span>
                         <input
                           className="action-field-control"
                           onChange={(event) =>
@@ -507,7 +512,7 @@ export const CatalogEditorPanel = ({
                         />
                       </label>
                       <label className="action-field">
-                        <span className="action-field-label">Account type</span>
+                        <span className="action-field-label">{t("catalog.fields.accountType")}</span>
                         <input
                           className="action-field-control"
                           onChange={(event) =>
@@ -521,7 +526,7 @@ export const CatalogEditorPanel = ({
                         />
                       </label>
                       <label className="action-field">
-                        <span className="action-field-label">Routing / ABA</span>
+                        <span className="action-field-label">{t("catalog.fields.routing")}</span>
                         <input
                           className="action-field-control"
                           onChange={(event) =>
@@ -547,10 +552,10 @@ export const CatalogEditorPanel = ({
                           }
                           type="checkbox"
                         />
-                        <span className="action-field-label">Mask in preview</span>
+                        <span className="action-field-label">{t("catalog.fields.maskInPreview")}</span>
                       </label>
                       <label className="action-field action-field-wide">
-                        <span className="action-field-label">Notes</span>
+                        <span className="action-field-label">{t("catalog.fields.notes")}</span>
                         <textarea
                           className="action-field-control action-textarea"
                           onChange={(event) =>
@@ -569,7 +574,7 @@ export const CatalogEditorPanel = ({
                 ))}
               </div>
             ) : (
-              <div className="catalog-crew-support-empty">No bank accounts yet.</div>
+              <div className="catalog-crew-support-empty">{t("catalog.editor.noBankAccounts")}</div>
             )}
           </div>
 
@@ -617,8 +622,8 @@ export const CatalogEditorPanel = ({
                 className={`surface-card-header catalog-kit-assets-header catalog-crew-dropzone${canManageCrewDocuments && isCrewDropActive ? " is-drag-active" : ""}`}
               >
                 <div>
-                  <h3 className="surface-card-title">Documents</h3>
-                  {canManageCrewDocuments ? null : <p className="surface-card-subtitle">Save this crew profile first to attach files.</p>}
+                  <h3 className="surface-card-title">{t("catalog.editor.documents")}</h3>
+                  {canManageCrewDocuments ? null : <p className="surface-card-subtitle">{t("catalog.editor.saveFirstForFiles")}</p>}
                 </div>
                 <button
                   className="ghost-control catalog-inline-button"
@@ -627,7 +632,7 @@ export const CatalogEditorPanel = ({
                   type="button"
                 >
                   <Plus size={14} />
-                  <span>{isUploadingCrewDocuments ? "Uploading..." : "Attach files"}</span>
+                  <span>{isUploadingCrewDocuments ? t("catalog.editor.uploading") : t("catalog.editor.attachFiles")}</span>
                 </button>
               </div>
 
@@ -636,9 +641,9 @@ export const CatalogEditorPanel = ({
                   {crewDocuments.map((document) => (
                     <article key={document.id} className="catalog-crew-document-card">
                       <button
-                        aria-label={`Remove ${document.originalName}`}
+                        aria-label={t("catalog.editor.removeDocumentNamed", { name: document.originalName })}
                         className="icon-danger-control catalog-crew-document-delete"
-                        data-tooltip="Remove file"
+                        data-tooltip={t("catalog.editor.removeFile")}
                         onClick={() => void onDeleteCrewDocument?.(document.id)}
                         type="button"
                       >
@@ -674,7 +679,7 @@ export const CatalogEditorPanel = ({
                 </div>
               ) : (
                 <div className="catalog-crew-support-empty">
-                  {canManageCrewDocuments ? "No crew documents attached yet." : "Attachments will appear here after the crew member is created."}
+                  {canManageCrewDocuments ? t("catalog.editor.noCrewDocuments") : t("catalog.editor.attachmentsAfterCreate")}
                 </div>
               )}
             </div>
@@ -686,10 +691,10 @@ export const CatalogEditorPanel = ({
         <div className="catalog-kit-assets">
           <div className="surface-card-header catalog-kit-assets-header">
             <div>
-              <h3 className="surface-card-title">Kit members</h3>
+              <h3 className="surface-card-title">{t("catalog.editor.kitMembers")}</h3>
             </div>
             <span className="section-header-context-pill">
-              {selectedKitMemberCount} members · {selectedKitItemCount} units
+              {t("catalog.kit.memberSummary", { members: selectedKitMemberCount, units: selectedKitItemCount })}
             </span>
           </div>
           <div className="catalog-asset-picker">
@@ -725,12 +730,17 @@ export const CatalogEditorPanel = ({
                       })}
                     </span>
                     <span className="identity-meta catalog-kit-asset-context">
-                      {asset.currentProject ? `Live on ${asset.currentProject}${asset.currentUnit ? ` · ${asset.currentUnit}` : ""}` : "Free in stock"}
+                      {asset.currentProject
+                        ? t("catalog.editor.liveOn", {
+                            project: asset.currentProject,
+                            unit: asset.currentUnit ? ` · ${asset.currentUnit}` : "",
+                          })
+                        : t("catalog.editor.freeInStock")}
                     </span>
                   </div>
                   {checked ? (
                     <div className="catalog-kit-quantity-field">
-                      <span className="action-field-label">Qty</span>
+                      <span className="action-field-label">{t("catalog.fields.qty")}</span>
                       <input
                         className="action-field-control"
                         max={availableQuantity}
@@ -766,11 +776,11 @@ export const CatalogEditorPanel = ({
 
       <div className="action-panel-actions">
         <button className="ghost-control cancel-control" onClick={onClose} type="button">
-          Cancel
+          {t("common.cancel")}
         </button>
         <button className="action-primary-button" disabled={isSubmitting} onClick={() => void submit()} type="button">
           {mode === "create" ? <Plus size={14} /> : <Save size={14} />}
-          <span>{isSubmitting ? "Saving..." : mode === "create" ? "Create" : "Save changes"}</span>
+          <span>{isSubmitting ? t("common.saving") : mode === "create" ? t("catalog.editor.create") : t("common.saveChanges")}</span>
         </button>
       </div>
     </SurfaceCard>

@@ -1,7 +1,9 @@
 import type { ChangeEvent, ReactNode } from "react";
 import { ChevronDown, Download, FileText, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import type { TFunction } from "i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 
 import type {
   AppUsersSnapshot,
@@ -88,15 +90,15 @@ const emptySelectedState: Record<CatalogEntityType, string[]> = {
   kit: [],
 };
 
-const singularLabelMap: Record<CatalogEntityType, string> = {
-  location: "location",
-  department: "department",
-  crew: "crew member",
-  client: "client",
-  production_company: "production company",
-  manufacturer: "manufacturer",
-  category: "category",
-  kit: "kit",
+const singularLabelKeyMap: Record<CatalogEntityType, string> = {
+  location: "catalog.entities.location.singular",
+  department: "catalog.entities.department.singular",
+  crew: "catalog.entities.crew.singular",
+  client: "catalog.entities.client.singular",
+  production_company: "catalog.entities.production_company.singular",
+  manufacturer: "catalog.entities.manufacturer.singular",
+  category: "catalog.entities.category.singular",
+  kit: "catalog.entities.kit.singular",
 };
 
 const formatBytes = (value: number) => {
@@ -115,139 +117,141 @@ const formatBytes = (value: number) => {
   return `${value} B`;
 };
 
-const resolveCatalogPreviewTitle = (entityType: CatalogEntityType, row: Record<string, unknown>) => {
+const resolveCatalogPreviewTitle = (entityType: CatalogEntityType, row: Record<string, unknown>, t: TFunction) => {
   switch (entityType) {
     case "crew":
-      return (row.fullName as string) || "Crew member";
+      return (row.fullName as string) || t("catalog.entities.crew.singular");
     case "client":
-      return (row.name as string) || "Client";
+      return (row.name as string) || t("catalog.entities.client.singular");
     case "production_company":
-      return (row.name as string) || "Production company";
+      return (row.name as string) || t("catalog.entities.production_company.singular");
     case "manufacturer":
-      return (row.name as string) || "Manufacturer";
+      return (row.name as string) || t("catalog.entities.manufacturer.singular");
     case "kit":
-      return (row.name as string) || "Kit";
+      return (row.name as string) || t("catalog.entities.kit.singular");
     case "location":
     case "department":
     case "category":
     default:
-      return (row.name as string) || (row.code as string) || "Catalog record";
+      return (row.name as string) || (row.code as string) || t("catalog.fallbacks.record");
   }
 };
 
-const buildCatalogPreviewRows = (entityType: CatalogEntityType, row: Record<string, unknown>) => {
+const buildCatalogPreviewRows = (entityType: CatalogEntityType, row: Record<string, unknown>, t: TFunction) => {
+  const status = (row.isActive as boolean) ? t("catalog.status.active") : t("catalog.status.inactive");
+
   switch (entityType) {
     case "location":
       return [
-        { label: "Code", value: String(row.code ?? "—") },
-        { label: "Type", value: String(row.type ?? "—") },
-        { label: "Status", value: (row.isActive as boolean) ? "Active" : "Inactive" },
-        { label: "Description", value: String(row.description ?? "—") },
+        { label: t("catalog.fields.code"), value: String(row.code ?? "—") },
+        { label: t("catalog.fields.type"), value: String(row.type ?? "—") },
+        { label: t("catalog.fields.status"), value: status },
+        { label: t("catalog.fields.description"), value: String(row.description ?? "—") },
       ];
     case "department":
       return [
-        { label: "Code", value: String(row.code ?? "—") },
-        { label: "Status", value: (row.isActive as boolean) ? "Active" : "Inactive" },
-        { label: "Description", value: String(row.description ?? "—") },
+        { label: t("catalog.fields.code"), value: String(row.code ?? "—") },
+        { label: t("catalog.fields.status"), value: status },
+        { label: t("catalog.fields.description"), value: String(row.description ?? "—") },
       ];
     case "crew":
       return [
-        { label: "Department", value: String(row.primaryDepartment ?? "—") },
-        { label: "Document ID", value: String(row.documentId ?? "—") },
-        { label: "Role", value: String(row.roleLabel ?? "—") },
-        { label: "Email", value: String(row.email ?? "—") },
-        { label: "Phone", value: String(row.phone ?? "—") },
+        { label: t("catalog.fields.department"), value: String(row.primaryDepartment ?? "—") },
+        { label: t("catalog.fields.documentId"), value: String(row.documentId ?? "—") },
+        { label: t("catalog.fields.role"), value: String(row.roleLabel ?? "—") },
+        { label: t("catalog.fields.email"), value: String(row.email ?? "—") },
+        { label: t("catalog.fields.phone"), value: String(row.phone ?? "—") },
       ];
     case "client":
       return [
-        { label: "Contact", value: String(row.contactName ?? "—") },
-        { label: "Email", value: String(row.email ?? "—") },
-        { label: "Phone", value: String(row.phone ?? "—") },
+        { label: t("catalog.fields.contact"), value: String(row.contactName ?? "—") },
+        { label: t("catalog.fields.email"), value: String(row.email ?? "—") },
+        { label: t("catalog.fields.phone"), value: String(row.phone ?? "—") },
       ];
     case "production_company":
       return [
-        { label: "Contact", value: String(row.contactName ?? "—") },
-        { label: "Email", value: String(row.email ?? "—") },
-        { label: "Phone", value: String(row.phone ?? "—") },
+        { label: t("catalog.fields.contact"), value: String(row.contactName ?? "—") },
+        { label: t("catalog.fields.email"), value: String(row.email ?? "—") },
+        { label: t("catalog.fields.phone"), value: String(row.phone ?? "—") },
       ];
     case "manufacturer":
       return [
-        { label: "Contact", value: String(row.contactName ?? "—") },
-        { label: "Support email", value: String(row.supportEmail ?? "—") },
-        { label: "Phone", value: String(row.phone ?? "—") },
+        { label: t("catalog.fields.contact"), value: String(row.contactName ?? "—") },
+        { label: t("catalog.fields.supportEmail"), value: String(row.supportEmail ?? "—") },
+        { label: t("catalog.fields.phone"), value: String(row.phone ?? "—") },
       ];
     case "kit":
       return [
-        { label: "Code", value: String(row.code ?? "—") },
-        { label: "Members", value: String(Array.isArray(row.assetSelections) ? row.assetSelections.length : 0) },
-        { label: "Units in package", value: String(row.assetCount ?? "0") },
-        { label: "Primary QR", value: String(row.primaryCodeValue ?? "Pending") },
-        { label: "Description", value: String(row.description ?? "—") },
+        { label: t("catalog.fields.code"), value: String(row.code ?? "—") },
+        { label: t("catalog.fields.members"), value: String(Array.isArray(row.assetSelections) ? row.assetSelections.length : 0) },
+        { label: t("catalog.fields.unitsInPackage"), value: String(row.assetCount ?? "0") },
+        { label: t("catalog.fields.primaryQr"), value: String(row.primaryCodeValue ?? t("catalog.status.pending")) },
+        { label: t("catalog.fields.description"), value: String(row.description ?? "—") },
       ];
     case "category":
     default:
       return [
-        { label: "Code", value: String(row.code ?? "—") },
-        { label: "Status", value: (row.isActive as boolean) ? "Active" : "Inactive" },
-        { label: "Description", value: String(row.description ?? "—") },
+        { label: t("catalog.fields.code"), value: String(row.code ?? "—") },
+        { label: t("catalog.fields.status"), value: status },
+        { label: t("catalog.fields.description"), value: String(row.description ?? "—") },
       ];
   }
 };
 
-const catalogSortOptionsByEntityType: Record<CatalogEntityType, Array<ListSortOption<CatalogSortField>>> = {
+const catalogSortOptionsByEntityType: Record<CatalogEntityType, Array<ListSortOption<CatalogSortField> & { labelKey: string }>> = {
   location: [
-    { value: "name", label: "Name", columnKey: "name" },
-    { value: "code", label: "Code", columnKey: "code" },
-    { value: "type", label: "Type", columnKey: "type" },
-    { value: "status", label: "Status", columnKey: "status" },
-    { value: "description", label: "Description", columnKey: "description" },
+    { value: "name", label: "Name", labelKey: "catalog.fields.name", columnKey: "name" },
+    { value: "code", label: "Code", labelKey: "catalog.fields.code", columnKey: "code" },
+    { value: "type", label: "Type", labelKey: "catalog.fields.type", columnKey: "type" },
+    { value: "status", label: "Status", labelKey: "catalog.fields.status", columnKey: "status" },
+    { value: "description", label: "Description", labelKey: "catalog.fields.description", columnKey: "description" },
   ],
   department: [
-    { value: "name", label: "Name", columnKey: "name" },
-    { value: "code", label: "Code", columnKey: "code" },
-    { value: "status", label: "Status", columnKey: "status" },
-    { value: "description", label: "Description", columnKey: "description" },
+    { value: "name", label: "Name", labelKey: "catalog.fields.name", columnKey: "name" },
+    { value: "code", label: "Code", labelKey: "catalog.fields.code", columnKey: "code" },
+    { value: "status", label: "Status", labelKey: "catalog.fields.status", columnKey: "status" },
+    { value: "description", label: "Description", labelKey: "catalog.fields.description", columnKey: "description" },
   ],
   crew: [
-    { value: "fullName", label: "Crew name", columnKey: "fullName" },
-    { value: "roleLabel", label: "Role", columnKey: "roleLabel" },
-    { value: "email", label: "Email", columnKey: "email" },
-    { value: "phone", label: "Phone", columnKey: "phone" },
-    { value: "status", label: "Status" },
+    { value: "fullName", label: "Crew name", labelKey: "catalog.fields.crewName", columnKey: "fullName" },
+    { value: "roleLabel", label: "Role", labelKey: "catalog.fields.role", columnKey: "roleLabel" },
+    { value: "email", label: "Email", labelKey: "catalog.fields.email", columnKey: "email" },
+    { value: "phone", label: "Phone", labelKey: "catalog.fields.phone", columnKey: "phone" },
+    { value: "status", label: "Status", labelKey: "catalog.fields.status" },
   ],
   client: [
-    { value: "name", label: "Client", columnKey: "name" },
-    { value: "contactName", label: "Contact", columnKey: "contactName" },
-    { value: "email", label: "Email", columnKey: "email" },
-    { value: "phone", label: "Phone", columnKey: "phone" },
-    { value: "status", label: "Status" },
+    { value: "name", label: "Client", labelKey: "catalog.entities.client.singular", columnKey: "name" },
+    { value: "contactName", label: "Contact", labelKey: "catalog.fields.contact", columnKey: "contactName" },
+    { value: "email", label: "Email", labelKey: "catalog.fields.email", columnKey: "email" },
+    { value: "phone", label: "Phone", labelKey: "catalog.fields.phone", columnKey: "phone" },
+    { value: "status", label: "Status", labelKey: "catalog.fields.status" },
   ],
   production_company: [
-    { value: "name", label: "Production company", columnKey: "name" },
-    { value: "contactName", label: "Contact", columnKey: "contactName" },
-    { value: "email", label: "Email", columnKey: "email" },
-    { value: "phone", label: "Phone", columnKey: "phone" },
-    { value: "status", label: "Status" },
+    { value: "name", label: "Production company", labelKey: "catalog.entities.production_company.singular", columnKey: "name" },
+    { value: "contactName", label: "Contact", labelKey: "catalog.fields.contact", columnKey: "contactName" },
+    { value: "email", label: "Email", labelKey: "catalog.fields.email", columnKey: "email" },
+    { value: "phone", label: "Phone", labelKey: "catalog.fields.phone", columnKey: "phone" },
+    { value: "status", label: "Status", labelKey: "catalog.fields.status" },
   ],
   manufacturer: [
-    { value: "name", label: "Manufacturer", columnKey: "name" },
-    { value: "contactName", label: "Contact", columnKey: "contactName" },
-    { value: "supportEmail", label: "Support email", columnKey: "supportEmail" },
-    { value: "phone", label: "Phone", columnKey: "phone" },
-    { value: "status", label: "Status" },
+    { value: "name", label: "Manufacturer", labelKey: "catalog.entities.manufacturer.singular", columnKey: "name" },
+    { value: "contactName", label: "Contact", labelKey: "catalog.fields.contact", columnKey: "contactName" },
+    { value: "supportEmail", label: "Support email", labelKey: "catalog.fields.supportEmail", columnKey: "supportEmail" },
+    { value: "phone", label: "Phone", labelKey: "catalog.fields.phone", columnKey: "phone" },
+    { value: "status", label: "Status", labelKey: "catalog.fields.status" },
   ],
   kit: [
-    { value: "name", label: "Kit", columnKey: "name" },
-    { value: "code", label: "Code", columnKey: "code" },
-    { value: "assetCount", label: "Item count", columnKey: "assetCount" },
-    { value: "description", label: "Description", columnKey: "description" },
-    { value: "status", label: "Status" },
+    { value: "name", label: "Kit", labelKey: "catalog.entities.kit.singular", columnKey: "name" },
+    { value: "code", label: "Code", labelKey: "catalog.fields.code", columnKey: "code" },
+    { value: "assetCount", label: "Item count", labelKey: "catalog.fields.itemCount", columnKey: "assetCount" },
+    { value: "description", label: "Description", labelKey: "catalog.fields.description", columnKey: "description" },
+    { value: "status", label: "Status", labelKey: "catalog.fields.status" },
   ],
   category: [
-    { value: "name", label: "Category", columnKey: "name" },
-    { value: "code", label: "Code", columnKey: "code" },
-    { value: "status", label: "Status", columnKey: "status" },
-    { value: "description", label: "Description", columnKey: "description" },
+    { value: "name", label: "Category", labelKey: "catalog.entities.category.singular", columnKey: "name" },
+    { value: "code", label: "Code", labelKey: "catalog.fields.code", columnKey: "code" },
+    { value: "status", label: "Status", labelKey: "catalog.fields.status", columnKey: "status" },
+    { value: "description", label: "Description", labelKey: "catalog.fields.description", columnKey: "description" },
   ],
 };
 
@@ -276,6 +280,7 @@ const CatalogCsvImportDialog = ({
   onStrategyChange,
   onConfirm,
 }: CatalogCsvImportDialogProps) => {
+  const { t } = useTranslation();
   const preview = state.preview;
 
   return (
@@ -286,7 +291,7 @@ const CatalogCsvImportDialog = ({
             <Upload size={16} />
           </span>
           <div className="confirm-dialog-copy">
-            <strong>Import {entityLabel} CSV</strong>
+            <strong>{t("catalog.import.title", { entity: entityLabel })}</strong>
             <p>{state.fileName}</p>
           </div>
         </div>
@@ -299,8 +304,8 @@ const CatalogCsvImportDialog = ({
               onClick={() => onStrategyChange("merge")}
               type="button"
             >
-              <strong>Merge</strong>
-              <span>Add new rows and update matches.</span>
+              <strong>{t("catalog.import.merge")}</strong>
+              <span>{t("catalog.import.mergeHelp")}</span>
             </button>
             <button
               className={`catalog-import-strategy-button${state.strategy === "replace" ? " active" : ""}`}
@@ -308,8 +313,8 @@ const CatalogCsvImportDialog = ({
               onClick={() => onStrategyChange("replace")}
               type="button"
             >
-              <strong>Replace</strong>
-              <span>Deactivate rows missing from the file.</span>
+              <strong>{t("catalog.import.replace")}</strong>
+              <span>{t("catalog.import.replaceHelp")}</span>
             </button>
           </div>
 
@@ -318,27 +323,27 @@ const CatalogCsvImportDialog = ({
           {preview ? (
             <div className="compact-summary-grid">
               <div className="summary-row">
-                <span className="summary-label">Rows</span>
+                <span className="summary-label">{t("catalog.import.rows")}</span>
                 <span className="summary-value">{preview.totalRows}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Create</span>
+                <span className="summary-label">{t("catalog.import.create")}</span>
                 <span className="summary-value">{preview.created}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Update</span>
+                <span className="summary-label">{t("catalog.import.update")}</span>
                 <span className="summary-value">{preview.updated}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Deactivate</span>
+                <span className="summary-label">{t("catalog.import.deactivate")}</span>
                 <span className={`summary-value${preview.deactivated ? " metric-tone-warning" : ""}`}>{preview.deactivated}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Invalid</span>
+                <span className="summary-label">{t("catalog.import.invalid")}</span>
                 <span className={`summary-value${preview.invalid ? " metric-tone-critical" : ""}`}>{preview.invalid}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Skipped</span>
+                <span className="summary-label">{t("catalog.import.skipped")}</span>
                 <span className="summary-value">{preview.skipped}</span>
               </div>
             </div>
@@ -346,7 +351,7 @@ const CatalogCsvImportDialog = ({
 
           {preview?.invalid ? (
             <div className="action-feedback action-feedback-warning">
-              Fix the invalid rows below, then choose the CSV again.
+              {t("catalog.import.fixInvalidRows")}
             </div>
           ) : null}
 
@@ -354,7 +359,7 @@ const CatalogCsvImportDialog = ({
             <div className="catalog-import-errors">
               {preview.errors.slice(0, 6).map((error) => (
                 <div key={`${error.rowNumber}-${error.message}`} className="catalog-import-error-row">
-                  <strong>Row {error.rowNumber}</strong>
+                  <strong>{t("catalog.import.row", { row: error.rowNumber })}</strong>
                   <span>{error.message}</span>
                 </div>
               ))}
@@ -364,7 +369,7 @@ const CatalogCsvImportDialog = ({
 
         <div className="confirm-dialog-actions">
           <button className="ghost-control cancel-control" disabled={isSubmitting} onClick={onClose} type="button">
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             className="action-primary-button"
@@ -372,7 +377,7 @@ const CatalogCsvImportDialog = ({
             onClick={onConfirm}
             type="button"
           >
-            {isSubmitting ? "Importing..." : `Import ${entityLabel}`}
+            {isSubmitting ? t("catalog.import.importing") : t("catalog.import.importEntity", { entity: entityLabel })}
           </button>
         </div>
       </div>
@@ -381,6 +386,7 @@ const CatalogCsvImportDialog = ({
 };
 
 export const CatalogPage = () => {
+  const { t } = useTranslation();
   const { refreshProjects } = useShellContext();
   const { activeWorkspaceId } = useWorkspace();
   const { data: projects } = useProjectsData();
@@ -388,6 +394,10 @@ export const CatalogPage = () => {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const exportTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const activeSortOptions = useMemo(
+    () => catalogSortOptionsByEntityType[activeTab].map((option) => ({ ...option, label: t(option.labelKey) })),
+    [activeTab, t],
+  );
   const catalogControls = useListControls<CatalogSortField, CatalogListQuery>({
     viewKey: `catalog-${activeTab}-list`,
     defaults: {
@@ -395,7 +405,7 @@ export const CatalogPage = () => {
       sortBy: activeTab === "crew" ? "fullName" : "name",
       sortDirection: "asc",
     },
-    sortOptions: catalogSortOptionsByEntityType[activeTab],
+    sortOptions: activeSortOptions,
     defaultDirectionBySort: {
       assetCount: "desc",
     },
@@ -454,143 +464,146 @@ export const CatalogPage = () => {
     () => [
       {
         key: "location",
-        label: "Locations",
-        title: "Locations",
+        label: t("catalog.entities.location.plural"),
+        title: t("catalog.entities.location.plural"),
         rows: data.locations as Array<Record<string, unknown>>,
         columns: [
-          { key: "code", label: "Code", width: 90, minWidth: 76, render: (row) => row.code as string },
-          { key: "name", label: "Name", width: 180, minWidth: 140, render: (row) => row.name as string },
-          { key: "type", label: "Type", width: 120, minWidth: 100, render: (row) => row.type as string },
-          { key: "description", label: "Description", width: 250, minWidth: 180, render: (row) => row.description as string },
+          { key: "code", label: t("catalog.fields.code"), width: 90, minWidth: 76, render: (row) => row.code as string },
+          { key: "name", label: t("catalog.fields.name"), width: 180, minWidth: 140, render: (row) => row.name as string },
+          { key: "type", label: t("catalog.fields.type"), width: 120, minWidth: 100, render: (row) => row.type as string },
+          { key: "description", label: t("catalog.fields.description"), width: 250, minWidth: 180, render: (row) => row.description as string },
           {
             key: "status",
-            label: "Status",
+            label: t("catalog.fields.status"),
             width: 90,
             minWidth: 78,
-            render: (row) => <StatusBadge>{(row.isActive as boolean) ? "Active" : "Inactive"}</StatusBadge>,
+            render: (row) => <StatusBadge>{(row.isActive as boolean) ? t("catalog.status.active") : t("catalog.status.inactive")}</StatusBadge>,
           },
         ],
       },
       {
         key: "department",
-        label: "Departments",
-        title: "Departments",
+        label: t("catalog.entities.department.plural"),
+        title: t("catalog.entities.department.plural"),
         rows: data.departments as Array<Record<string, unknown>>,
         columns: [
-          { key: "code", label: "Code", width: 90, minWidth: 76, render: (row) => row.code as string },
-          { key: "name", label: "Name", width: 180, minWidth: 140, render: (row) => row.name as string },
-          { key: "description", label: "Description", width: 260, minWidth: 180, render: (row) => row.description as string },
+          { key: "code", label: t("catalog.fields.code"), width: 90, minWidth: 76, render: (row) => row.code as string },
+          { key: "name", label: t("catalog.fields.name"), width: 180, minWidth: 140, render: (row) => row.name as string },
+          { key: "description", label: t("catalog.fields.description"), width: 260, minWidth: 180, render: (row) => row.description as string },
           {
             key: "status",
-            label: "Status",
+            label: t("catalog.fields.status"),
             width: 90,
             minWidth: 78,
-            render: (row) => <StatusBadge>{(row.isActive as boolean) ? "Active" : "Inactive"}</StatusBadge>,
+            render: (row) => <StatusBadge>{(row.isActive as boolean) ? t("catalog.status.active") : t("catalog.status.inactive")}</StatusBadge>,
           },
         ],
       },
       {
         key: "crew",
-        label: "Crew",
-        title: "Crew",
+        label: t("catalog.entities.crew.plural"),
+        title: t("catalog.entities.crew.plural"),
         rows: data.crewMembers as Array<Record<string, unknown>>,
         columns: [
-          { key: "fullName", label: "Crew", width: 180, minWidth: 144, render: (row) => row.fullName as string },
+          { key: "fullName", label: t("catalog.entities.crew.plural"), width: 180, minWidth: 144, render: (row) => row.fullName as string },
           {
             key: "primaryDepartment",
-            label: "Department",
+            label: t("catalog.fields.department"),
             width: 160,
             minWidth: 130,
             render: (row) => (row.primaryDepartment as string) || "—",
           },
-          { key: "roleLabel", label: "Role", width: 140, minWidth: 110, render: (row) => (row.roleLabel as string) || "—" },
-          { key: "email", label: "Email", width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
-          { key: "phone", label: "Phone", width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
+          { key: "roleLabel", label: t("catalog.fields.role"), width: 140, minWidth: 110, render: (row) => (row.roleLabel as string) || "—" },
+          { key: "email", label: t("catalog.fields.email"), width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
+          { key: "phone", label: t("catalog.fields.phone"), width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
         ],
       },
       {
         key: "client",
-        label: "Clients",
-        title: "Clients",
+        label: t("catalog.entities.client.plural"),
+        title: t("catalog.entities.client.plural"),
         rows: data.clients as Array<Record<string, unknown>>,
         columns: [
-          { key: "name", label: "Client", width: 180, minWidth: 144, render: (row) => row.name as string },
-          { key: "contactName", label: "Contact", width: 150, minWidth: 120, render: (row) => (row.contactName as string) || "—" },
-          { key: "email", label: "Email", width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
-          { key: "phone", label: "Phone", width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
+          { key: "name", label: t("catalog.entities.client.singular"), width: 180, minWidth: 144, render: (row) => row.name as string },
+          { key: "contactName", label: t("catalog.fields.contact"), width: 150, minWidth: 120, render: (row) => (row.contactName as string) || "—" },
+          { key: "email", label: t("catalog.fields.email"), width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
+          { key: "phone", label: t("catalog.fields.phone"), width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
         ],
       },
       {
         key: "production_company",
-        label: "Production Companies",
-        title: "Production Companies",
+        label: t("catalog.entities.production_company.plural"),
+        title: t("catalog.entities.production_company.plural"),
         rows: data.productionCompanies as Array<Record<string, unknown>>,
         columns: [
-          { key: "name", label: "Company", width: 200, minWidth: 150, render: (row) => row.name as string },
-          { key: "contactName", label: "Contact", width: 160, minWidth: 130, render: (row) => (row.contactName as string) || "—" },
-          { key: "email", label: "Email", width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
-          { key: "phone", label: "Phone", width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
+          { key: "name", label: t("catalog.fields.company"), width: 200, minWidth: 150, render: (row) => row.name as string },
+          { key: "contactName", label: t("catalog.fields.contact"), width: 160, minWidth: 130, render: (row) => (row.contactName as string) || "—" },
+          { key: "email", label: t("catalog.fields.email"), width: 180, minWidth: 150, render: (row) => (row.email as string) || "—" },
+          { key: "phone", label: t("catalog.fields.phone"), width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
           {
             key: "status",
-            label: "Status",
+            label: t("catalog.fields.status"),
             width: 90,
             minWidth: 78,
-            render: (row) => <StatusBadge>{(row.isActive as boolean) ? "Active" : "Inactive"}</StatusBadge>,
+            render: (row) => <StatusBadge>{(row.isActive as boolean) ? t("catalog.status.active") : t("catalog.status.inactive")}</StatusBadge>,
           },
         ],
       },
       {
         key: "manufacturer",
-        label: "Manufacturers",
-        title: "Manufacturers",
+        label: t("catalog.entities.manufacturer.plural"),
+        title: t("catalog.entities.manufacturer.plural"),
         rows: data.manufacturers as Array<Record<string, unknown>>,
         columns: [
-          { key: "name", label: "Manufacturer", width: 180, minWidth: 144, render: (row) => row.name as string },
-          { key: "contactName", label: "Contact", width: 150, minWidth: 120, render: (row) => (row.contactName as string) || "—" },
-          { key: "supportEmail", label: "Support email", width: 200, minWidth: 160, render: (row) => (row.supportEmail as string) || "—" },
-          { key: "phone", label: "Phone", width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
+          { key: "name", label: t("catalog.entities.manufacturer.singular"), width: 180, minWidth: 144, render: (row) => row.name as string },
+          { key: "contactName", label: t("catalog.fields.contact"), width: 150, minWidth: 120, render: (row) => (row.contactName as string) || "—" },
+          { key: "supportEmail", label: t("catalog.fields.supportEmail"), width: 200, minWidth: 160, render: (row) => (row.supportEmail as string) || "—" },
+          { key: "phone", label: t("catalog.fields.phone"), width: 140, minWidth: 120, render: (row) => (row.phone as string) || "—" },
         ],
       },
       {
         key: "kit",
-        label: "Kits",
-        title: "Kits",
+        label: t("catalog.entities.kit.plural"),
+        title: t("catalog.entities.kit.plural"),
         rows: data.kits as Array<Record<string, unknown>>,
         columns: [
-          { key: "code", label: "Code", width: 90, minWidth: 76, render: (row) => row.code as string },
-          { key: "name", label: "Kit", width: 180, minWidth: 144, render: (row) => row.name as string },
+          { key: "code", label: t("catalog.fields.code"), width: 90, minWidth: 76, render: (row) => row.code as string },
+          { key: "name", label: t("catalog.entities.kit.singular"), width: 180, minWidth: 144, render: (row) => row.name as string },
           {
             key: "memberCount",
-            label: "Package",
+            label: t("catalog.fields.package"),
             width: 172,
             minWidth: 148,
             render: (row) =>
-              `${Array.isArray(row.assetSelections) ? row.assetSelections.length : 0} members · ${String(row.assetCount ?? 0)} units`,
+              t("catalog.kit.memberSummary", {
+                members: Array.isArray(row.assetSelections) ? row.assetSelections.length : 0,
+                units: String(row.assetCount ?? 0),
+              }),
           },
-          { key: "primaryCodeValue", label: "QR ready", width: 170, minWidth: 132, render: (row) => row.primaryCodeValue as string },
-          { key: "description", label: "Description", width: 220, minWidth: 170, render: (row) => row.description as string },
+          { key: "primaryCodeValue", label: t("catalog.fields.qrReady"), width: 170, minWidth: 132, render: (row) => row.primaryCodeValue as string },
+          { key: "description", label: t("catalog.fields.description"), width: 220, minWidth: 170, render: (row) => row.description as string },
         ],
       },
       {
         key: "category",
-        label: "Categories",
-        title: "Categories",
+        label: t("catalog.entities.category.plural"),
+        title: t("catalog.entities.category.plural"),
         rows: data.categories as Array<Record<string, unknown>>,
         columns: [
-          { key: "code", label: "Code", width: 90, minWidth: 76, render: (row) => row.code as string },
-          { key: "name", label: "Category", width: 180, minWidth: 144, render: (row) => row.name as string },
-          { key: "description", label: "Description", width: 260, minWidth: 180, render: (row) => row.description as string },
+          { key: "code", label: t("catalog.fields.code"), width: 90, minWidth: 76, render: (row) => row.code as string },
+          { key: "name", label: t("catalog.entities.category.singular"), width: 180, minWidth: 144, render: (row) => row.name as string },
+          { key: "description", label: t("catalog.fields.description"), width: 260, minWidth: 180, render: (row) => row.description as string },
           {
             key: "status",
-            label: "Status",
+            label: t("catalog.fields.status"),
             width: 90,
             minWidth: 78,
-            render: (row) => <StatusBadge>{(row.isActive as boolean) ? "Active" : "Inactive"}</StatusBadge>,
+            render: (row) => <StatusBadge>{(row.isActive as boolean) ? t("catalog.status.active") : t("catalog.status.inactive")}</StatusBadge>,
           },
         ],
       },
     ],
-    [data],
+    [data, t],
   );
 
   const activeTabConfig = tabs.find((tab) => tab.key === activeTab) ?? tabs[0];
@@ -770,7 +783,7 @@ export const CatalogPage = () => {
       setEditorMode(null);
       setEditorError(null);
     } catch (nextError) {
-      setEditorError(getUserFacingErrorMessage(nextError, "Could not save this catalog record."));
+      setEditorError(getUserFacingErrorMessage(nextError, t("catalog.errors.save")));
     } finally {
       setIsSubmittingEditor(false);
     }
@@ -786,7 +799,7 @@ export const CatalogPage = () => {
       });
       setCatalogActionMessage(result.summary);
     } catch (nextError) {
-      setCatalogActionMessage(getUserFacingErrorMessage(nextError, "Could not export this CSV."));
+      setCatalogActionMessage(getUserFacingErrorMessage(nextError, t("catalog.errors.exportCsv")));
     } finally {
       setExportMenuOpen(false);
     }
@@ -808,7 +821,7 @@ export const CatalogPage = () => {
         csvText,
         strategy,
         preview: null,
-        error: getUserFacingErrorMessage(nextError, "Could not preview this CSV."),
+        error: getUserFacingErrorMessage(nextError, t("catalog.errors.previewCsv")),
       });
     }
   };
@@ -820,7 +833,7 @@ export const CatalogPage = () => {
       setCatalogActionMessage(result.summary);
       await reload();
     } catch (nextError) {
-      setEditorError(getUserFacingErrorMessage(nextError, "Crew document upload failed."));
+      setEditorError(getUserFacingErrorMessage(nextError, t("catalog.errors.uploadDocument")));
     } finally {
       setIsUploadingCrewDocuments(false);
     }
@@ -832,7 +845,7 @@ export const CatalogPage = () => {
       setCatalogActionMessage(result.summary);
       await reload();
     } catch (nextError) {
-      setEditorError(getUserFacingErrorMessage(nextError, "Crew document removal failed."));
+      setEditorError(getUserFacingErrorMessage(nextError, t("catalog.errors.removeDocument")));
     }
   };
 
@@ -842,7 +855,7 @@ export const CatalogPage = () => {
     }
 
     if (!createCrewUserRoleId) {
-      setEditorError("Pick a role before creating the user.");
+      setEditorError(t("catalog.errors.pickRole"));
       return;
     }
 
@@ -862,7 +875,7 @@ export const CatalogPage = () => {
       await Promise.all([reload(), loadUsersSnapshot()]);
       notifyCatalogChanged();
     } catch (nextError) {
-      setEditorError(getUserFacingErrorMessage(nextError, "Could not create the user from this crew record."));
+      setEditorError(getUserFacingErrorMessage(nextError, t("catalog.errors.createUser")));
     } finally {
       setIsCreatingCrewUser(false);
     }
@@ -903,7 +916,7 @@ export const CatalogPage = () => {
         current
           ? {
               ...current,
-              error: getUserFacingErrorMessage(nextError, "Could not import this CSV."),
+              error: getUserFacingErrorMessage(nextError, t("catalog.errors.importCsv")),
             }
           : current,
       );
@@ -936,8 +949,8 @@ export const CatalogPage = () => {
         targetLocationId: value.targetLocationId,
         expectedReturnAt: value.expectedReturnAt,
         notes: value.notes
-          ? `Assigned from kit ${activeKitRow.code} · ${activeKitRow.name}. ${value.notes}`
-          : `Assigned from kit ${activeKitRow.code} · ${activeKitRow.name}.`,
+          ? `${t("catalog.kit.assignedFrom", { code: activeKitRow.code, name: activeKitRow.name })} ${value.notes}`
+          : t("catalog.kit.assignedFrom", { code: activeKitRow.code, name: activeKitRow.name }),
         actorType: "user",
         sourceChannel: "desktop",
       });
@@ -947,7 +960,7 @@ export const CatalogPage = () => {
       setKitAssignOpen(false);
       setCatalogActionMessage(result.summary);
     } catch (nextError) {
-      setKitAssignError(getUserFacingErrorMessage(nextError, "Kit assignment failed."));
+      setKitAssignError(getUserFacingErrorMessage(nextError, t("catalog.errors.assignKit")));
     } finally {
       setIsSubmittingKitAssign(false);
     }
@@ -955,25 +968,21 @@ export const CatalogPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Catalog" />
+      <SectionHeader title={t("catalog.title")} />
 
-      {error ? <div className="empty-state">Catalog unavailable: {error}</div> : null}
+      {error ? <div className="empty-state">{t("catalog.unavailable", { message: error })}</div> : null}
       {!error && isLoading ? (
-        <SurfaceCard title="Catalog">
-          <TableSkeleton body="Loading locations, crew, clients and categories." columns={4} />
+        <SurfaceCard title={t("catalog.title")}>
+          <TableSkeleton body={t("catalog.loading")} columns={4} />
         </SurfaceCard>
       ) : null}
 
       {!error && !isLoading && totalCatalogRecords === 0 ? (
         <GuidedEmptyState
-          title="Start with your shared records"
-          body="Add locations, departments, crew, clients and categories here so the rest of the app stays consistent."
-          tips={[
-            "Create locations before moving inventory",
-            "Add departments and crew before assigning work",
-            "Define categories before creating assets",
-          ]}
-          actionLabel="Create first location"
+          title={t("catalog.empty.title")}
+          body={t("catalog.empty.body")}
+          tips={[t("catalog.empty.tipLocations"), t("catalog.empty.tipCrew"), t("catalog.empty.tipCategories")]}
+          actionLabel={t("catalog.empty.action")}
           onAction={() => {
             setActiveTab("location");
             setEditorMode("create");
@@ -1028,7 +1037,7 @@ export const CatalogPage = () => {
                 type="button"
               >
                 <Download size={14} />
-                <span>Import CSV</span>
+                <span>{t("catalog.actions.importCsv")}</span>
               </button>
               <button
                 aria-expanded={exportMenuOpen}
@@ -1039,7 +1048,7 @@ export const CatalogPage = () => {
                 type="button"
               >
                 <Upload size={14} />
-                <span>{selectedCount ? `Export selected (${selectedCount})` : "Export CSV"}</span>
+                <span>{selectedCount ? t("catalog.actions.exportSelected", { count: selectedCount }) : t("catalog.actions.exportCsv")}</span>
                 <ChevronDown size={14} />
               </button>
               <button
@@ -1052,7 +1061,7 @@ export const CatalogPage = () => {
                 type="button"
               >
                 <Pencil size={14} />
-                <span>Edit</span>
+                <span>{t("common.edit")}</span>
               </button>
               <button
                 className="catalog-toolbar-button is-danger"
@@ -1063,7 +1072,7 @@ export const CatalogPage = () => {
                 type="button"
               >
                 <Trash2 size={14} />
-                <span>Delete</span>
+                <span>{t("common.delete")}</span>
               </button>
               <button
                 className="catalog-toolbar-button catalog-toolbar-button-primary"
@@ -1074,7 +1083,7 @@ export const CatalogPage = () => {
                 type="button"
               >
                 <Plus size={14} />
-                <span>New</span>
+                <span>{t("catalog.actions.new")}</span>
               </button>
             </div>
           }
@@ -1083,11 +1092,11 @@ export const CatalogPage = () => {
           {catalogActionMessage ? (
             <div className="selection-action-bar">
               <div className="selection-action-copy">
-                <span className="selection-action-title">Catalog update</span>
+                <span className="selection-action-title">{t("catalog.messages.update")}</span>
                 <span className="selection-action-subtitle">{catalogActionMessage}</span>
               </div>
               <div className="selection-action-buttons">
-                <button className="icon-ghost-control" data-tooltip="Clear message" onClick={() => setCatalogActionMessage(null)} type="button">
+                <button className="icon-ghost-control" data-tooltip={t("catalog.actions.clearMessage")} onClick={() => setCatalogActionMessage(null)} type="button">
                   <X size={14} />
                 </button>
               </div>
@@ -1097,16 +1106,18 @@ export const CatalogPage = () => {
             <div className="selection-action-bar">
               <div className="selection-action-copy">
                 <span className="selection-action-title">
-                  {selectedCount === 1 ? `1 ${singularLabelMap[activeTab]} selected` : `${selectedCount} ${activeTabConfig.label.toLowerCase()} selected`}
+                  {selectedCount === 1
+                    ? t("catalog.selection.single", { entity: t(singularLabelKeyMap[activeTab]) })
+                    : t("catalog.selection.multiple", { count: selectedCount, entity: activeTabConfig.label.toLowerCase() })}
                 </span>
                 <span className="selection-action-subtitle">
-                  {selectedCount === 1 ? "Edit, export or delete this record." : "Delete works in batch. Edit stays for one row."}
+                  {selectedCount === 1 ? t("catalog.selection.singleHelp") : t("catalog.selection.batchHelp")}
                 </span>
               </div>
               <div className="selection-action-buttons">
                 <button
                   className="icon-ghost-control"
-                  data-tooltip="Clear selection"
+                  data-tooltip={t("catalog.actions.clearSelection")}
                   onClick={() => setSelectedIds((current) => ({ ...current, [activeTab]: [] }))}
                   type="button"
                 >
@@ -1122,16 +1133,16 @@ export const CatalogPage = () => {
             onToggleSortDirection={catalogControls.toggleSortDirection}
             resultCount={activeTabConfig.rows.length}
             resultLabel={activeTabConfig.label.toLowerCase()}
-            searchPlaceholder={`Search ${activeTabConfig.label.toLowerCase()}`}
+            searchPlaceholder={t("catalog.searchPlaceholder", { entity: activeTabConfig.label.toLowerCase() })}
             searchValue={catalogControls.searchValue}
             sortBy={catalogControls.sortBy}
             sortDirection={catalogControls.sortDirection}
-            sortOptions={catalogSortOptionsByEntityType[activeTab]}
+            sortOptions={activeSortOptions}
           />
           <DataTable
             activeRowId={activePreviewIds[activeTab]}
             columns={activeTabConfig.columns}
-            emptyMessage={`No ${activeTabConfig.label.toLowerCase()} yet. Create the first one here.`}
+            emptyMessage={t("catalog.empty.table", { entity: activeTabConfig.label.toLowerCase() })}
             getRowId={(row) => String(row.id)}
             maxHeight="min(68vh, 760px)"
             onRowClick={(row) => setActivePreviewIds((current) => ({ ...current, [activeTab]: String(row.id) }))}
@@ -1199,10 +1210,10 @@ export const CatalogPage = () => {
               />
             ) : showPreview && previewRow ? (
               <SurfaceCard
-            title={resolveCatalogPreviewTitle(activeTab, previewRow)}
+            title={resolveCatalogPreviewTitle(activeTab, previewRow, t)}
             aside={
               <button
-                aria-label="Close catalog preview"
+                aria-label={t("catalog.actions.closePreview")}
                 className="surface-card-action"
                 onClick={() => setActivePreviewIds((current) => ({ ...current, [activeTab]: null }))}
                 type="button"
@@ -1213,10 +1224,10 @@ export const CatalogPage = () => {
           >
             <div className="summary-grid">
               <div className="summary-row">
-                <span className="summary-label">Type</span>
+                <span className="summary-label">{t("catalog.fields.type")}</span>
                 <span className="summary-value">{activeTabConfig.label}</span>
               </div>
-              {buildCatalogPreviewRows(activeTab, previewRow).map((row) => (
+              {buildCatalogPreviewRows(activeTab, previewRow, t).map((row) => (
                 <div key={row.label} className="summary-row">
                   <span className="summary-label">{row.label}</span>
                   <span className="summary-value">{row.value}</span>
@@ -1229,48 +1240,48 @@ export const CatalogPage = () => {
                 <div className="catalog-preview-section">
                   <div className="surface-card-header">
                     <div>
-                  <h3 className="surface-card-title">App user</h3>
+                  <h3 className="surface-card-title">{t("catalog.preview.appUser")}</h3>
                     </div>
                   </div>
 
                   {previewLinkedUser ? (
                     <div className="summary-grid">
                       <div className="summary-row">
-                        <span className="summary-label">Linked user</span>
+                        <span className="summary-label">{t("catalog.fields.linkedUser")}</span>
                         <span className="summary-value">{previewLinkedUser.fullName}</span>
                       </div>
                       <div className="summary-row">
-                        <span className="summary-label">Role</span>
-                        <span className="summary-value">{previewLinkedUser.roleName ?? "No role assigned"}</span>
+                        <span className="summary-label">{t("catalog.fields.role")}</span>
+                        <span className="summary-value">{previewLinkedUser.roleName ?? t("catalog.preview.noRoleAssigned")}</span>
                       </div>
                       <div className="summary-row">
-                        <span className="summary-label">Telegram</span>
+                        <span className="summary-label">{t("catalog.fields.telegram")}</span>
                         <span className="summary-value">
                           {previewLinkedUser.telegramLinkStatus === "linked"
-                            ? "Linked"
+                            ? t("catalog.telegram.linked")
                             : previewLinkedUser.telegramLinkStatus === "pending"
-                              ? "Pending link"
+                              ? t("catalog.telegram.pending")
                               : previewLinkedUser.telegramLinkStatus === "revoked"
-                                ? "Revoked"
-                                : "Not linked"}
+                                ? t("catalog.telegram.revoked")
+                                : t("catalog.telegram.notLinked")}
                         </span>
                       </div>
                       <div className="summary-row">
-                        <span className="summary-label">Ready</span>
-                        <span className="summary-value">{previewLinkedUser.readyForTelegram ? "Ready to link" : "Needs setup"}</span>
+                        <span className="summary-label">{t("catalog.fields.ready")}</span>
+                        <span className="summary-value">{previewLinkedUser.readyForTelegram ? t("catalog.telegram.ready") : t("catalog.telegram.needsSetup")}</span>
                       </div>
                     </div>
                   ) : (
                     <>
                       <div className="agent-form-grid">
                         <label className="field-block">
-                          <span className="field-label">Role</span>
+                          <span className="field-label">{t("catalog.fields.role")}</span>
                           <select
                             className="field-input"
                             onChange={(event) => setCreateCrewUserRoleId(event.target.value)}
                             value={createCrewUserRoleId}
                           >
-                            <option value="">Select a role</option>
+                            <option value="">{t("catalog.preview.selectRole")}</option>
                             {usersSnapshot.roles.map((role) => (
                               <option key={role.id} value={role.id}>
                                 {role.name}
@@ -1279,34 +1290,34 @@ export const CatalogPage = () => {
                           </select>
                         </label>
                         <div className="field-block field-block-span-2">
-                          <span className="field-label">What will be reused</span>
+                          <span className="field-label">{t("catalog.preview.reused")}</span>
                           <div className="summary-grid">
                             <div className="summary-row">
-                              <span className="summary-label">Name</span>
+                              <span className="summary-label">{t("catalog.fields.name")}</span>
                               <span className="summary-value">{previewCrewRow?.fullName ?? "—"}</span>
                             </div>
                             <div className="summary-row">
-                              <span className="summary-label">Email</span>
-                              <span className="summary-value">{previewCrewRow?.email || "No email yet"}</span>
+                              <span className="summary-label">{t("catalog.fields.email")}</span>
+                              <span className="summary-value">{previewCrewRow?.email || t("catalog.preview.noEmail")}</span>
                             </div>
                             <div className="summary-row">
-                              <span className="summary-label">Phone</span>
-                              <span className="summary-value">{previewCrewRow?.phone || "No phone yet"}</span>
+                              <span className="summary-label">{t("catalog.fields.phone")}</span>
+                              <span className="summary-value">{previewCrewRow?.phone || t("catalog.preview.noPhone")}</span>
                             </div>
                             <div className="summary-row">
-                              <span className="summary-label">Membership</span>
-                              <span className="summary-value">Active on create</span>
+                              <span className="summary-label">{t("catalog.fields.membership")}</span>
+                              <span className="summary-value">{t("catalog.preview.activeOnCreate")}</span>
                             </div>
                           </div>
                         </div>
                       </div>
 
                       <div className="models-provider-diagnostic">
-                        <span className="agent-detail-kicker">Role preview</span>
+                        <span className="agent-detail-kicker">{t("catalog.preview.rolePreview")}</span>
                         <p>
                           {previewCreateRole
                             ? `${previewCreateRole.name}: ${previewCreateRole.permissionKeys.join(", ")}`
-                            : "Pick a role first. You can refine permissions later in Users & access."}
+                            : t("catalog.preview.pickRoleFirst")}
                         </p>
                       </div>
 
@@ -1317,7 +1328,7 @@ export const CatalogPage = () => {
                           onClick={() => void handleCreateInternalUserFromCrew()}
                           type="button"
                         >
-                          {isCreatingCrewUser ? "Creating..." : "Create user"}
+                          {isCreatingCrewUser ? t("catalog.preview.creatingUser") : t("catalog.preview.createUser")}
                         </button>
                       </div>
                     </>
@@ -1328,14 +1339,14 @@ export const CatalogPage = () => {
                   <div className="catalog-preview-section">
                     <div className="surface-card-header">
                       <div>
-                        <h3 className="surface-card-title">Bank accounts</h3>
+                        <h3 className="surface-card-title">{t("catalog.editor.bankAccounts")}</h3>
                       </div>
                     </div>
                     <div className="catalog-preview-bank-accounts">
                       {(previewRow.bankAccounts as CatalogSnapshot["crewMembers"][number]["bankAccounts"]).map((account) => (
                         <div key={account.id} className="catalog-preview-bank-account">
-                          <strong>{account.bankName || account.accountType || "Bank account"}</strong>
-                          <span>{account.accountHolder || "No account holder"}</span>
+                          <strong>{account.bankName || account.accountType || t("catalog.preview.bankAccount")}</strong>
+                          <span>{account.accountHolder || t("catalog.preview.noAccountHolder")}</span>
                           <span>{account.maskInPreview ? account.maskedAccountNumber : account.accountNumber}</span>
                         </div>
                       ))}
@@ -1347,7 +1358,7 @@ export const CatalogPage = () => {
                   <div className="catalog-preview-section">
                     <div className="surface-card-header">
                       <div>
-                        <h3 className="surface-card-title">Documents</h3>
+                        <h3 className="surface-card-title">{t("catalog.editor.documents")}</h3>
                       </div>
                     </div>
                     {(() => {
@@ -1373,7 +1384,7 @@ export const CatalogPage = () => {
                                 <button
                                   aria-label={`Remove ${document.originalName}`}
                                   className="icon-danger-control catalog-crew-document-delete"
-                                  data-tooltip="Remove file"
+                                  data-tooltip={t("catalog.editor.removeFile")}
                                   onClick={() => void handleDeleteCrewDocument(document.id)}
                                   type="button"
                                 >
@@ -1428,7 +1439,7 @@ export const CatalogPage = () => {
                 <div className="catalog-preview-section">
                   <div className="surface-card-header">
                     <div>
-                      <h3 className="surface-card-title">Package contents</h3>
+                      <h3 className="surface-card-title">{t("catalog.preview.packageContents")}</h3>
                     </div>
                   </div>
 
@@ -1441,23 +1452,27 @@ export const CatalogPage = () => {
                           <div key={selection.assetId} className="catalog-kit-preview-item">
                             <div className="identity-cell">
                               <span className="identity-title">{asset?.name ?? selection.assetId}</span>
-                              <span className="identity-meta">{asset ? `${asset.code} · ${asset.category}` : "Catalog asset"}</span>
+                              <span className="identity-meta">{asset ? `${asset.code} · ${asset.category}` : t("catalog.fallbacks.asset")}</span>
                               <span className="identity-meta">
                                 {asset
-                                  ? `${asset.quantity} available · ${asset.assignedQuantity} reserved · ${asset.checkedOutQuantity} out`
-                                  : "Availability unavailable"}
+                                  ? t("catalog.preview.availability", {
+                                      available: asset.quantity,
+                                      reserved: asset.assignedQuantity,
+                                      out: asset.checkedOutQuantity,
+                                    })
+                                  : t("catalog.preview.availabilityUnavailable")}
                               </span>
                               {asset?.operationalStatus === "maintenance" ? (
-                                <span className="identity-meta">In maintenance.</span>
+                                <span className="identity-meta">{t("catalog.preview.inMaintenance")}</span>
                               ) : null}
                             </div>
-                            <span className="section-header-context-pill">Qty {selection.quantity}</span>
+                            <span className="section-header-context-pill">{t("catalog.fields.qty")} {selection.quantity}</span>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <div className="catalog-crew-support-empty">No kit members linked yet.</div>
+                    <div className="catalog-crew-support-empty">{t("catalog.preview.noKitMembers")}</div>
                   )}
                 </div>
 
@@ -1465,15 +1480,17 @@ export const CatalogPage = () => {
                   <div className="action-feedback action-feedback-warning">
                     {activeKitMaintenanceMembers.length ? (
                       <span>
-                        This kit is blocked because these members are in maintenance:{" "}
+                        {t("catalog.kit.blockedMaintenance")}{" "}
                         {activeKitMaintenanceMembers.map((row) => row.code).join(", ")}.
-                        {" "}Return them to ready state before using the full kit.
+                        {" "}{t("catalog.kit.returnReady")}
                       </span>
                     ) : null}
                     {activeKitMaintenanceMembers.length && activeKitStockMembers.length ? <span> </span> : null}
                     {activeKitStockMembers.length ? (
                       <span>
-                        Missing stock for {activeKitStockMembers.map((row) => `${row.code} (${row.available}/${row.requested})`).join(", ")}.
+                        {t("catalog.kit.missingStock", {
+                          items: activeKitStockMembers.map((row) => `${row.code} (${row.available}/${row.requested})`).join(", "),
+                        })}
                       </span>
                     ) : null}
                   </div>
@@ -1489,7 +1506,7 @@ export const CatalogPage = () => {
                     }}
                     type="button"
                   >
-                    Assign kit
+                    {t("catalog.kit.assign")}
                   </button>
                 </div>
               </>
@@ -1514,7 +1531,7 @@ export const CatalogPage = () => {
             projects={projects}
             selectedAssets={activeKitAssignmentAssets}
             selectedCount={activeKitAssignmentAssets.length}
-            title={`Assign kit · ${activeKitRow.code}`}
+            title={t("catalog.kit.assignTitle", { code: activeKitRow.code })}
             users={data.users}
               />
             ) : null}
@@ -1531,17 +1548,17 @@ export const CatalogPage = () => {
               style={{ top: exportMenuStyle.top, left: exportMenuStyle.left }}
             >
               <div className="list-toolbar-menu-section">
-                <span className="list-toolbar-menu-label">Export</span>
+                <span className="list-toolbar-menu-label">{t("catalog.actions.export")}</span>
                 <button className="list-toolbar-menu-item" onClick={() => void runExport("template")} role="menuitem" type="button">
                   <span className="list-toolbar-menu-item-copy">
                     <Upload size={14} />
-                    <span>Blank template</span>
+                    <span>{t("catalog.actions.blankTemplate")}</span>
                   </span>
                 </button>
                 <button className="list-toolbar-menu-item" onClick={() => void runExport("data")} role="menuitem" type="button">
                   <span className="list-toolbar-menu-item-copy">
                     <Upload size={14} />
-                    <span>{selectedCount ? `Selected rows (${selectedCount})` : "All rows"}</span>
+                    <span>{selectedCount ? t("catalog.actions.selectedRows", { count: selectedCount }) : t("catalog.actions.allRows")}</span>
                   </span>
                 </button>
               </div>
@@ -1574,11 +1591,11 @@ export const CatalogPage = () => {
         body={
           selectedCount
             ? selectedCount === 1
-              ? `Delete this ${singularLabelMap[activeTab]} from Catalog? Existing operations that still depend on it may block the action.`
-              : `Delete ${selectedCount} ${activeTabConfig.label.toLowerCase()} from Catalog? Existing operations that still depend on any of them may block the action.`
+              ? t("catalog.deleteDialog.bodySingle", { entity: t(singularLabelKeyMap[activeTab]) })
+              : t("catalog.deleteDialog.bodyMultiple", { count: selectedCount, entity: activeTabConfig.label.toLowerCase() })
             : ""
         }
-        confirmLabel="Delete"
+        confirmLabel={t("common.delete")}
         isOpen={confirmDeleteOpen && selectedCount > 0}
         onCancel={() => setConfirmDeleteOpen(false)}
         onConfirm={async () => {
@@ -1604,7 +1621,7 @@ export const CatalogPage = () => {
           }, nextSelectedIds);
           setConfirmDeleteOpen(false);
         }}
-        title={`Delete ${singularLabelMap[activeTab]}`}
+        title={t("catalog.deleteDialog.title", { entity: t(singularLabelKeyMap[activeTab]) })}
         tone="danger"
       />
     </div>

@@ -1,6 +1,7 @@
 import { AlertTriangle, ChevronDown, ChevronRight, FileDown, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 
 import type {
   CatalogAssetOptionRow,
@@ -436,6 +437,7 @@ export const ProjectSetupWizard = ({
   onDiscardDraft,
   open,
 }: ProjectSetupWizardProps) => {
+  const { t } = useTranslation();
   const { data: catalog } = useCatalogData();
   const { activeWorkspaceId } = useWorkspace();
   const toast = useToast();
@@ -482,7 +484,7 @@ export const ProjectSetupWizard = ({
       })
       .catch((error) => {
         setStagingSlips([]);
-        setStagingError(getUserFacingErrorMessage(error, "Unable to load staging packing slips."));
+        setStagingError(getUserFacingErrorMessage(error, t("projectSetup.errors.loadStaging")));
       })
       .finally(() => setIsLoadingStaging(false));
   }, [open]);
@@ -511,7 +513,7 @@ export const ProjectSetupWizard = ({
         })
         .catch((error) => {
           setConflicts(null);
-          setConflictsError(getUserFacingErrorMessage(error, "Unable to check conflicts."));
+          setConflictsError(getUserFacingErrorMessage(error, t("projectSetup.errors.checkConflicts")));
         })
         .finally(() => setIsCheckingConflicts(false));
     }, 200);
@@ -1082,11 +1084,11 @@ export const ProjectSetupWizard = ({
   const conflictCount = conflicts?.groups.reduce((count, group) => count + group.items.length, 0) ?? 0;
 
   const tabItems: Array<{ id: WizardTab; label: string }> = [
-    { id: "general", label: "General Info" },
-    { id: "units", label: "Set Additional Units" },
-    { id: "assets", label: "Assign Assets" },
-    { id: "crew", label: "Assign Crew" },
-    { id: "summary", label: "Summary" },
+    { id: "general", label: t("projectSetup.tabs.general") },
+    { id: "units", label: t("projectSetup.tabs.units") },
+    { id: "assets", label: t("projectSetup.tabs.assets") },
+    { id: "crew", label: t("projectSetup.tabs.crew") },
+    { id: "summary", label: t("projectSetup.tabs.summary") },
   ];
 
   return createPortal(
@@ -1094,17 +1096,17 @@ export const ProjectSetupWizard = ({
       <section aria-modal="true" className="project-setup-modal" role="dialog">
         <header className="project-setup-header">
           <div>
-            <span className="project-setup-step-label">Project setup wizard</span>
-            <h2 className="project-setup-title">Create new project</h2>
+            <span className="project-setup-step-label">{t("projectSetup.eyebrow")}</span>
+            <h2 className="project-setup-title">{t("projectSetup.title")}</h2>
           </div>
 
           <div className="project-setup-header-actions">
-            {dirty ? <StatusBadge tone="warning">Draft in progress</StatusBadge> : null}
-            {conflictCount ? <StatusBadge tone="critical">{`${conflictCount} conflicts`}</StatusBadge> : null}
+            {dirty ? <StatusBadge tone="warning">{t("projectSetup.badges.draft")}</StatusBadge> : null}
+            {conflictCount ? <StatusBadge tone="critical">{t("projectSetup.badges.conflicts", { count: conflictCount })}</StatusBadge> : null}
             <button
-              aria-label="Close project setup"
+              aria-label={t("projectSetup.actions.close")}
               className="project-setup-close-button"
-              data-tooltip="Close project setup"
+              data-tooltip={t("projectSetup.actions.close")}
               onClick={handleRequestClose}
               type="button"
             >
@@ -1131,24 +1133,24 @@ export const ProjectSetupWizard = ({
             <div className="project-setup-panel">
               <div className="project-setup-grid">
                 <label className="action-field">
-                  <span className="action-field-label">Project code</span>
+                  <span className="action-field-label">{t("projectSetup.fields.projectCode")}</span>
                   <input
                     className="action-field-control"
                     onChange={(event) => setGeneralInfo("code", event.target.value)}
-                    placeholder="Leave blank to auto-generate code"
+                    placeholder={t("projectSetup.placeholders.autoCode")}
                     value={draft.generalInfo.code}
                   />
                 </label>
 
                 <label className="action-field">
-                  <span className="action-field-label">Project name</span>
+                  <span className="action-field-label">{t("projectSetup.fields.projectName")}</span>
                   <input className="action-field-control" onChange={(event) => setGeneralInfo("name", event.target.value)} value={draft.generalInfo.name} />
                 </label>
 
                 <label className="action-field">
-                  <span className="action-field-label">Production company</span>
+                  <span className="action-field-label">{t("projectSetup.fields.productionCompany")}</span>
                   <SelectField onChange={(event) => setGeneralInfo("productionCompanyId", event.target.value)} value={draft.generalInfo.productionCompanyId}>
-                    <option value="">No production company linked</option>
+                    <option value="">{t("projectSetup.placeholders.noProductionCompany")}</option>
                     {catalog.productionCompanies.map((company) => (
                       <option key={company.id} value={company.id}>
                         {company.name}
@@ -1158,9 +1160,9 @@ export const ProjectSetupWizard = ({
                 </label>
 
                 <label className="action-field">
-                  <span className="action-field-label">Client</span>
+                  <span className="action-field-label">{t("projectSetup.fields.client")}</span>
                   <SelectField onChange={(event) => setGeneralInfo("clientId", event.target.value)} value={draft.generalInfo.clientId}>
-                    <option value="">No client linked</option>
+                    <option value="">{t("projectSetup.placeholders.noClient")}</option>
                     {catalog.clients.map((client) => (
                       <option key={client.id} value={client.id}>
                         {client.name}
@@ -1170,17 +1172,17 @@ export const ProjectSetupWizard = ({
                 </label>
 
                 <label className="action-field">
-                  <span className="action-field-label">Start date</span>
+                  <span className="action-field-label">{t("projectSetup.fields.startDate")}</span>
                   <input className="action-field-control" onChange={(event) => setGeneralInfo("startDate", event.target.value)} type="date" value={draft.generalInfo.startDate} />
                 </label>
 
                 <label className="action-field">
-                  <span className="action-field-label">End date</span>
+                  <span className="action-field-label">{t("projectSetup.fields.endDate")}</span>
                   <input className="action-field-control" onChange={(event) => setGeneralInfo("endDate", event.target.value)} type="date" value={draft.generalInfo.endDate} />
                 </label>
 
                 <div className="action-field action-field-wide">
-                  <span className="action-field-label">Project departments</span>
+                  <span className="action-field-label">{t("projectSetup.fields.projectDepartments")}</span>
                   <div className="project-setup-checkbox-grid">
                     {catalog.departments.map((department) => {
                       const checked = draft.generalInfo.departmentIds.includes(department.id);
@@ -1205,7 +1207,7 @@ export const ProjectSetupWizard = ({
                 </div>
 
                 <div className="action-field action-field-wide">
-                  <span className="action-field-label">Main Unit departments</span>
+                  <span className="action-field-label">{t("projectSetup.fields.mainUnitDepartments")}</span>
                   <div className="project-setup-checkbox-grid">
                     {draft.generalInfo.departmentIds.length ? (
                       catalog.departments
@@ -1231,7 +1233,7 @@ export const ProjectSetupWizard = ({
                           );
                         })
                     ) : (
-                      <span className="project-setup-field-note">Select project departments first to seed the Main Unit.</span>
+                      <span className="project-setup-field-note">{t("projectSetup.help.selectDepartmentsFirst")}</span>
                     )}
                   </div>
                 </div>
@@ -1242,7 +1244,7 @@ export const ProjectSetupWizard = ({
                     onChange={(event) => setGeneralInfo("hasPreproduction", event.target.checked)}
                     type="checkbox"
                   />
-                  <span>Includes pre-production window</span>
+                  <span>{t("projectSetup.fields.includesPreproduction")}</span>
                 </label>
 
                 <div />
@@ -1250,7 +1252,7 @@ export const ProjectSetupWizard = ({
                 {draft.generalInfo.hasPreproduction ? (
                   <>
                     <label className="action-field">
-                      <span className="action-field-label">Pre-production start</span>
+                      <span className="action-field-label">{t("projectSetup.fields.preproductionStart")}</span>
                       <input
                         className="action-field-control"
                         onChange={(event) => setGeneralInfo("preproductionStartDate", event.target.value)}
@@ -1260,7 +1262,7 @@ export const ProjectSetupWizard = ({
                     </label>
 
                     <label className="action-field">
-                      <span className="action-field-label">Pre-production end</span>
+                      <span className="action-field-label">{t("projectSetup.fields.preproductionEnd")}</span>
                       <input
                         className="action-field-control"
                         onChange={(event) => setGeneralInfo("preproductionEndDate", event.target.value)}
@@ -1272,7 +1274,7 @@ export const ProjectSetupWizard = ({
                 ) : null}
 
                 <label className="action-field">
-                  <span className="action-field-label">Status</span>
+                  <span className="action-field-label">{t("projectSetup.fields.status")}</span>
                   <SelectField onChange={(event) => setGeneralInfo("status", event.target.value)} value={draft.generalInfo.status}>
                     {projectStatusOptions.map((option) => (
                       <option key={option} value={option}>
@@ -1283,9 +1285,9 @@ export const ProjectSetupWizard = ({
                 </label>
 
                 <label className="action-field">
-                  <span className="action-field-label">Timeline color</span>
+                  <span className="action-field-label">{t("projectSetup.fields.timelineColor")}</span>
                   <SelectField onChange={(event) => setGeneralInfo("colorKey", event.target.value)} value={draft.generalInfo.colorKey}>
-                    <option value="">Default system tone</option>
+                    <option value="">{t("projectSetup.placeholders.defaultTone")}</option>
                     {projectColorPalette.map((color) => (
                       <option key={color.key} value={color.key}>
                         {color.label}
@@ -1295,7 +1297,7 @@ export const ProjectSetupWizard = ({
                 </label>
 
                 <label className="action-field action-field-wide">
-                  <span className="action-field-label">Description</span>
+                  <span className="action-field-label">{t("projectSetup.fields.description")}</span>
                   <textarea
                     className="action-field-control action-textarea"
                     onChange={(event) => setGeneralInfo("description", event.target.value)}
