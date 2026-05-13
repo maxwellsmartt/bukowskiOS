@@ -471,6 +471,112 @@
         "financeStatus": "Estado financiero"
       }
     },
+    "entries": {
+      "title": "Entradas",
+      "newEntry": "Nueva entrada",
+      "unavailable": "Entradas no disponibles: {{message}}",
+      "selected_one": "{{count}} seleccionada",
+      "selected_other": "{{count}} seleccionadas",
+      "selectionTitle_one": "{{count}} entrada financiera seleccionada",
+      "selectionTitle_other": "{{count}} entradas financieras seleccionadas",
+      "selectionSubtitle": "Agrégalas a comparar.",
+      "addToCompare": "Agregar a comparar",
+      "resultLabel": "entradas",
+      "searchPlaceholder": "Buscar referencias, proyectos o categorías",
+      "loading": "Cargando entradas financieras...",
+      "sort": {
+        "entryDate": "Fecha de entrada",
+        "type": "Tipo",
+        "category": "Categoría",
+        "reference": "Referencia",
+        "project": "Proyecto",
+        "amount": "Monto",
+        "status": "Estado"
+      },
+      "columns": {
+        "date": "Fecha",
+        "type": "Tipo",
+        "category": "Categoría",
+        "reference": "Referencia",
+        "project": "Proyecto",
+        "amount": "Monto",
+        "status": "Estado"
+      },
+      "toasts": {
+        "created": "Entrada creada",
+        "updated": "Entrada actualizada",
+        "documentsAttached": "Documentos adjuntos"
+      },
+      "errors": {
+        "save": "La app no pudo guardar esa entrada financiera.",
+        "attachDocuments": "La app no pudo adjuntar documentos financieros.",
+        "openDocument": "La app no pudo abrir ese documento financiero."
+      },
+      "empty": {
+        "noMatchesTitle": "Sin resultados",
+        "noMatchesBody": "Prueba otra búsqueda o límpiala para ver todas las entradas.",
+        "noEntriesTitle": "Aún no hay entradas financieras",
+        "noEntriesBody": "Registra cada costo, reembolso o factura asociado a tus proyectos. Agrega la primera entrada para iniciar la trazabilidad.",
+        "clearSearch": "Limpiar búsqueda",
+        "addFirst": "Agregar primera entrada",
+        "tipProject": "Las entradas pueden vincularse a un proyecto, equipo o incidente.",
+        "tipDocuments": "Adjunta recibos y facturas en PDF para auditorías limpias.",
+        "tipStatus": "Usa el estado para marcar borradores vs. entradas confirmadas."
+      },
+      "entryTypes": {
+        "reserve": "Reserva",
+        "exposure": "Exposición",
+        "invoice": "Factura",
+        "incident_cost": "Costo de incidente",
+        "estimated_cost": "Costo estimado",
+        "replacement_value": "Valor de reposición"
+      },
+      "status": {
+        "Draft": "Borrador",
+        "Linked": "Vinculada",
+        "Approved": "Aprobada",
+        "Booked": "Registrada",
+        "Paid": "Pagada",
+        "Cancelled": "Cancelada"
+      },
+      "editor": {
+        "closeAria": "Cerrar editor financiero",
+        "titleCreate": "Nueva entrada financiera",
+        "titleEdit": "Editar entrada financiera",
+        "mode": "Modo",
+        "createMode": "Crear",
+        "editMode": "Editar",
+        "entryType": "Tipo de entrada",
+        "status": "Estado",
+        "category": "Categoría",
+        "categoryPlaceholder": "Reparaciones, factura, viaje",
+        "amount": "Monto",
+        "entryDate": "Fecha de entrada",
+        "project": "Proyecto",
+        "currency": "Moneda",
+        "description": "Descripción",
+        "descriptionPlaceholder": "¿Para qué es esto?",
+        "moreDetails": "Más detalles",
+        "asset": "Equipo",
+        "incident": "Incidente",
+        "notes": "Notas",
+        "notesPlaceholder": "Nota opcional",
+        "unlinked": "Sin vincular",
+        "documents": "Documentos",
+        "attaching": "Adjuntando...",
+        "attachDocuments": "Adjuntar documentos",
+        "attached_one": "{{count}} adjunto",
+        "attached_other": "{{count}} adjuntos",
+        "openFile": "Abrir archivo",
+        "previewUnavailableTitle": "Preview no disponible",
+        "previewUnavailableBody": "Abre el archivo para revisarlo fuera de la app.",
+        "noDocumentsYetTitle": "Aún no hay documentos",
+        "noDocumentsYetBody": "Adjunta facturas, recibos o contratos aquí.",
+        "noDocumentsAttachedTitle": "Sin documentos adjuntos",
+        "noDocumentsAttachedBody": "Agrega PDFs o imágenes cuando la entrada esté guardada.",
+        "createEntry": "Crear entrada"
+      }
+    },
     "quotes": {
       "title": "Cotizaciones",
       "newQuote": "Nueva cotización",

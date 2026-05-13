@@ -471,6 +471,112 @@
         "financeStatus": "Finance status"
       }
     },
+    "entries": {
+      "title": "Entries",
+      "newEntry": "New entry",
+      "unavailable": "Entries unavailable: {{message}}",
+      "selected_one": "{{count}} selected",
+      "selected_other": "{{count}} selected",
+      "selectionTitle_one": "{{count}} finance entry selected",
+      "selectionTitle_other": "{{count}} finance entries selected",
+      "selectionSubtitle": "Add them to compare.",
+      "addToCompare": "Add to compare",
+      "resultLabel": "entries",
+      "searchPlaceholder": "Search references, projects or categories",
+      "loading": "Loading finance entries...",
+      "sort": {
+        "entryDate": "Entry date",
+        "type": "Type",
+        "category": "Category",
+        "reference": "Reference",
+        "project": "Project",
+        "amount": "Amount",
+        "status": "Status"
+      },
+      "columns": {
+        "date": "Date",
+        "type": "Type",
+        "category": "Category",
+        "reference": "Reference",
+        "project": "Project",
+        "amount": "Amount",
+        "status": "Status"
+      },
+      "toasts": {
+        "created": "Entry created",
+        "updated": "Entry updated",
+        "documentsAttached": "Documents attached"
+      },
+      "errors": {
+        "save": "The app could not save that finance entry.",
+        "attachDocuments": "The app could not attach finance documents.",
+        "openDocument": "The app could not open that finance document."
+      },
+      "empty": {
+        "noMatchesTitle": "No matches",
+        "noMatchesBody": "Try a different search, or clear it to see every entry.",
+        "noEntriesTitle": "No finance entries yet",
+        "noEntriesBody": "Track every cost, refund or invoice tied to your projects. Add the first entry to start a paper trail.",
+        "clearSearch": "Clear search",
+        "addFirst": "Add first entry",
+        "tipProject": "Entries can be tied to a project, asset or incident.",
+        "tipDocuments": "Attach receipts and invoices as PDF for clean audits.",
+        "tipStatus": "Use status to mark drafts vs confirmed entries."
+      },
+      "entryTypes": {
+        "reserve": "Reserve",
+        "exposure": "Exposure",
+        "invoice": "Invoice",
+        "incident_cost": "Incident cost",
+        "estimated_cost": "Estimated cost",
+        "replacement_value": "Replacement value"
+      },
+      "status": {
+        "Draft": "Draft",
+        "Linked": "Linked",
+        "Approved": "Approved",
+        "Booked": "Booked",
+        "Paid": "Paid",
+        "Cancelled": "Cancelled"
+      },
+      "editor": {
+        "closeAria": "Close finance editor",
+        "titleCreate": "New finance entry",
+        "titleEdit": "Edit finance entry",
+        "mode": "Mode",
+        "createMode": "Create",
+        "editMode": "Edit",
+        "entryType": "Entry type",
+        "status": "Status",
+        "category": "Category",
+        "categoryPlaceholder": "Repairs, invoice, travel",
+        "amount": "Amount",
+        "entryDate": "Entry date",
+        "project": "Project",
+        "currency": "Currency",
+        "description": "Description",
+        "descriptionPlaceholder": "What is this for?",
+        "moreDetails": "More details",
+        "asset": "Asset",
+        "incident": "Incident",
+        "notes": "Notes",
+        "notesPlaceholder": "Optional note",
+        "unlinked": "Unlinked",
+        "documents": "Documents",
+        "attaching": "Attaching...",
+        "attachDocuments": "Attach documents",
+        "attached_one": "{{count}} attached",
+        "attached_other": "{{count}} attached",
+        "openFile": "Open file",
+        "previewUnavailableTitle": "Preview unavailable",
+        "previewUnavailableBody": "Open the file to review it outside the app.",
+        "noDocumentsYetTitle": "No documents yet",
+        "noDocumentsYetBody": "Attach invoices, receipts or contracts here.",
+        "noDocumentsAttachedTitle": "No documents attached",
+        "noDocumentsAttachedBody": "Add PDFs or images once the entry is saved.",
+        "createEntry": "Create entry"
+      }
+    },
     "quotes": {
       "title": "Quotes",
       "newQuote": "New quote",

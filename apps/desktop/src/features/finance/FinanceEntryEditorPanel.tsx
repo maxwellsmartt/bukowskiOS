@@ -1,5 +1,6 @@
 import { Save, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { AssetListRow, FinanceEntryRow, FinancialDocumentRow, IncidentListRow, ProjectCardRow } from "@contracts";
 import { SelectField } from "@shared/components/SelectField";
@@ -77,6 +78,7 @@ export const FinanceEntryEditorPanel = ({
   onOpenDocument,
   onSubmit,
 }: FinanceEntryEditorPanelProps) => {
+  const { t } = useTranslation();
   const { formatDateTime } = useLocale();
   const [entryType, setEntryType] = useState("reserve");
   const [category, setCategory] = useState("");
@@ -147,22 +149,24 @@ export const FinanceEntryEditorPanel = ({
   return (
     <SurfaceCard
       aside={
-        <button aria-label="Close finance editor" className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("finance.entries.editor.closeAria")} className="surface-card-action" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }
-      title={mode === "create" ? "New finance entry" : "Edit finance entry"}
+      title={mode === "create" ? t("finance.entries.editor.titleCreate") : t("finance.entries.editor.titleEdit")}
     >
       <div className="summary-grid compact-summary-grid">
         <div className="summary-row">
-          <span className="summary-label">Mode</span>
+          <span className="summary-label">{t("finance.entries.editor.mode")}</span>
           <span className="summary-value">
-            <StatusBadge tone={mode === "create" ? "success" : "info"}>{mode === "create" ? "Create" : "Edit"}</StatusBadge>
+            <StatusBadge tone={mode === "create" ? "success" : "info"}>
+              {mode === "create" ? t("finance.entries.editor.createMode") : t("finance.entries.editor.editMode")}
+            </StatusBadge>
           </span>
         </div>
         {selectedProjectLabel ? (
           <div className="summary-row">
-            <span className="summary-label">Project</span>
+            <span className="summary-label">{t("finance.entries.editor.project")}</span>
             <span className="summary-value">{selectedProjectLabel}</span>
           </div>
         ) : null}
@@ -172,39 +176,39 @@ export const FinanceEntryEditorPanel = ({
 
       <div className="action-form-grid">
         <label className="action-field">
-          <span className="action-field-label">Entry type</span>
+          <span className="action-field-label">{t("finance.entries.editor.entryType")}</span>
           <SelectField onChange={(event) => setEntryType(event.target.value)} value={entryType}>
             {entryTypeOptions.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {t(`finance.entries.entryTypes.${option}`, { defaultValue: option })}
               </option>
             ))}
           </SelectField>
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Status</span>
+          <span className="action-field-label">{t("finance.entries.editor.status")}</span>
           <SelectField onChange={(event) => setStatus(event.target.value)} value={status}>
             {statusOptions.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {t(`finance.entries.status.${option}`, { defaultValue: option })}
               </option>
             ))}
           </SelectField>
         </label>
 
         <label className="action-field action-field-wide">
-          <span className="action-field-label">Category</span>
+          <span className="action-field-label">{t("finance.entries.editor.category")}</span>
           <input
             className="action-field-control"
             onChange={(event) => setCategory(event.target.value)}
-            placeholder="Repairs, invoice, travel"
+            placeholder={t("finance.entries.editor.categoryPlaceholder")}
             value={category}
           />
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Amount</span>
+          <span className="action-field-label">{t("finance.entries.editor.amount")}</span>
           <input
             className="action-field-control"
             inputMode="decimal"
@@ -215,14 +219,14 @@ export const FinanceEntryEditorPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Entry date</span>
+          <span className="action-field-label">{t("finance.entries.editor.entryDate")}</span>
           <input className="action-field-control" onChange={(event) => setEntryDate(event.target.value)} type="date" value={entryDate} />
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Project</span>
+          <span className="action-field-label">{t("finance.entries.editor.project")}</span>
           <SelectField onChange={(event) => setProjectId(event.target.value)} value={projectId}>
-            <option value="">Unlinked</option>
+            <option value="">{t("finance.entries.editor.unlinked")}</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.code} · {project.name}
@@ -232,16 +236,16 @@ export const FinanceEntryEditorPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Currency</span>
+          <span className="action-field-label">{t("finance.entries.editor.currency")}</span>
           <input className="action-field-control" onChange={(event) => setCurrency(event.target.value)} value={currency} />
         </label>
 
         <label className="action-field action-field-wide">
-          <span className="action-field-label">Description</span>
+          <span className="action-field-label">{t("finance.entries.editor.description")}</span>
           <textarea
             className="action-field-control action-textarea"
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="What is this for?"
+            placeholder={t("finance.entries.editor.descriptionPlaceholder")}
             rows={3}
             value={description}
           />
@@ -249,13 +253,13 @@ export const FinanceEntryEditorPanel = ({
       </div>
 
       <details className="detail-disclosure">
-        <summary className="detail-disclosure-summary">More details</summary>
+        <summary className="detail-disclosure-summary">{t("finance.entries.editor.moreDetails")}</summary>
         <div className="detail-disclosure-content">
           <div className="action-form-grid">
             <label className="action-field">
-              <span className="action-field-label">Asset</span>
+              <span className="action-field-label">{t("finance.entries.editor.asset")}</span>
               <SelectField onChange={(event) => setAssetId(event.target.value)} value={assetId}>
-                <option value="">Unlinked</option>
+                <option value="">{t("finance.entries.editor.unlinked")}</option>
                 {assets.map((asset) => (
                   <option key={asset.id} value={asset.id}>
                     {asset.code} · {asset.name}
@@ -265,9 +269,9 @@ export const FinanceEntryEditorPanel = ({
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Incident</span>
+              <span className="action-field-label">{t("finance.entries.editor.incident")}</span>
               <SelectField onChange={(event) => setIncidentId(event.target.value)} value={incidentId}>
-                <option value="">Unlinked</option>
+                <option value="">{t("finance.entries.editor.unlinked")}</option>
                 {incidents.map((incident) => (
                   <option key={incident.id} value={incident.id}>
                     {incident.title}
@@ -277,11 +281,11 @@ export const FinanceEntryEditorPanel = ({
             </label>
 
             <label className="action-field action-field-wide">
-              <span className="action-field-label">Notes</span>
+              <span className="action-field-label">{t("finance.entries.editor.notes")}</span>
               <textarea
                 className="action-field-control action-textarea"
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional note"
+                placeholder={t("finance.entries.editor.notesPlaceholder")}
                 rows={3}
                 value={notes}
               />
@@ -291,12 +295,12 @@ export const FinanceEntryEditorPanel = ({
       </details>
 
       {mode === "edit" ? (
-        <SurfaceCard title="Documents">
+        <SurfaceCard title={t("finance.entries.editor.documents")}>
           <div className="action-panel-actions action-panel-actions-inline">
             <button className="ghost-control" disabled={isUploadingDocuments} onClick={() => void onAttachDocuments()} type="button">
-              <span>{isUploadingDocuments ? "Attaching..." : "Attach documents"}</span>
+              <span>{isUploadingDocuments ? t("finance.entries.editor.attaching") : t("finance.entries.editor.attachDocuments")}</span>
             </button>
-            {documents.length ? <StatusBadge tone="info">{`${documents.length} attached`}</StatusBadge> : null}
+            {documents.length ? <StatusBadge tone="info">{t("finance.entries.editor.attached", { count: documents.length })}</StatusBadge> : null}
           </div>
 
           {documents.length ? (
@@ -335,7 +339,7 @@ export const FinanceEntryEditorPanel = ({
                         onClick={() => void onOpenDocument(selectedDocument.id)}
                         type="button"
                       >
-                        Open file
+                        {t("finance.entries.editor.openFile")}
                       </button>
                     </div>
 
@@ -352,8 +356,8 @@ export const FinanceEntryEditorPanel = ({
                     ) : (
                       <div className="guided-empty-state guided-empty-state-subtle">
                         <div className="guided-empty-state-copy">
-                          <span className="guided-empty-state-title">Preview unavailable</span>
-                          <p className="guided-empty-state-body">Open the file to review it outside the app.</p>
+                          <span className="guided-empty-state-title">{t("finance.entries.editor.previewUnavailableTitle")}</span>
+                          <p className="guided-empty-state-body">{t("finance.entries.editor.previewUnavailableBody")}</p>
                         </div>
                       </div>
                     )}
@@ -361,8 +365,8 @@ export const FinanceEntryEditorPanel = ({
                 ) : (
                   <div className="guided-empty-state guided-empty-state-subtle">
                     <div className="guided-empty-state-copy">
-                      <span className="guided-empty-state-title">No documents yet</span>
-                      <p className="guided-empty-state-body">Attach invoices, receipts or contracts here.</p>
+                      <span className="guided-empty-state-title">{t("finance.entries.editor.noDocumentsYetTitle")}</span>
+                      <p className="guided-empty-state-body">{t("finance.entries.editor.noDocumentsYetBody")}</p>
                     </div>
                   </div>
                 )}
@@ -371,8 +375,8 @@ export const FinanceEntryEditorPanel = ({
           ) : (
             <div className="guided-empty-state guided-empty-state-subtle">
               <div className="guided-empty-state-copy">
-                <span className="guided-empty-state-title">No documents attached</span>
-                <p className="guided-empty-state-body">Add PDFs or images once the entry is saved.</p>
+                <span className="guided-empty-state-title">{t("finance.entries.editor.noDocumentsAttachedTitle")}</span>
+                <p className="guided-empty-state-body">{t("finance.entries.editor.noDocumentsAttachedBody")}</p>
               </div>
             </div>
           )}
@@ -401,10 +405,16 @@ export const FinanceEntryEditorPanel = ({
           type="button"
         >
           <Save size={14} />
-          <span>{isSubmitting ? "Saving..." : mode === "create" ? "Create entry" : "Save changes"}</span>
+          <span>
+            {isSubmitting
+              ? t("common.saving")
+              : mode === "create"
+                ? t("finance.entries.editor.createEntry")
+                : t("common.saveChanges")}
+          </span>
         </button>
         <button className="ghost-control cancel-control" disabled={isSubmitting} onClick={onClose} type="button">
-          Cancel
+          {t("common.cancel")}
         </button>
       </div>
     </SurfaceCard>

@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
 import type { FinanceEntryListQuery, FinanceEntrySortField } from "@contracts";
@@ -22,20 +23,23 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { FinanceEntryEditorPanel, type FinanceEntryEditorDraft } from "./FinanceEntryEditorPanel";
 import { createFinanceEntry, openFinanceDocument, updateFinanceEntry, uploadFinanceDocuments, useFinanceEntries, useFinanceEntryDocuments } from "./useFinanceData";
 
-const financeEntrySortOptions: Array<ListSortOption<FinanceEntrySortField>> = [
-  { value: "date", label: "Entry date", columnKey: "date" },
-  { value: "type", label: "Type", columnKey: "type" },
-  { value: "category", label: "Category", columnKey: "category" },
-  { value: "reference", label: "Reference", columnKey: "reference" },
-  { value: "project", label: "Project", columnKey: "project" },
-  { value: "amount", label: "Amount", columnKey: "amount" },
-  { value: "status", label: "Status", columnKey: "status" },
-];
-
 export const FinanceEntriesPage = () => {
+  const { t } = useTranslation();
   const { activeWorkspaceId: workspaceId } = useWorkspace();
   const toast = useToast();
   const [searchParams] = useSearchParams();
+  const financeEntrySortOptions = useMemo<Array<ListSortOption<FinanceEntrySortField>>>(
+    () => [
+      { value: "date", label: t("finance.entries.sort.entryDate"), columnKey: "date" },
+      { value: "type", label: t("finance.entries.sort.type"), columnKey: "type" },
+      { value: "category", label: t("finance.entries.sort.category"), columnKey: "category" },
+      { value: "reference", label: t("finance.entries.sort.reference"), columnKey: "reference" },
+      { value: "project", label: t("finance.entries.sort.project"), columnKey: "project" },
+      { value: "amount", label: t("finance.entries.sort.amount"), columnKey: "amount" },
+      { value: "status", label: t("finance.entries.sort.status"), columnKey: "status" },
+    ],
+    [t],
+  );
   const financeControls = useListControls<FinanceEntrySortField, FinanceEntryListQuery>({
     viewKey: "finance-entries-list",
     defaults: {
@@ -101,12 +105,12 @@ export const FinanceEntriesPage = () => {
             ...draft,
           });
 
-      toast.success(editingEntry ? "Entry updated" : "Entry created", result.summary);
+      toast.success(editingEntry ? t("finance.entries.toasts.updated") : t("finance.entries.toasts.created"), result.summary);
       setIsEditorOpen(false);
       setEditingEntryId(null);
       reload();
     } catch (nextError) {
-      setSubmitError(getUserFacingErrorMessage(nextError, "The app could not save that finance entry."));
+      setSubmitError(getUserFacingErrorMessage(nextError, t("finance.entries.errors.save")));
     } finally {
       setIsSubmitting(false);
     }
@@ -114,12 +118,12 @@ export const FinanceEntriesPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Entries" />
+      <SectionHeader title={t("finance.entries.title")} />
 
-      {error ? <div className="empty-state">Entries unavailable: {error}</div> : null}
+      {error ? <div className="empty-state">{t("finance.entries.unavailable", { message: error })}</div> : null}
 
       <div className="chip-row">
-        {selectedRowIds.length ? <StatusBadge>{`${selectedRowIds.length} selected`}</StatusBadge> : null}
+        {selectedRowIds.length ? <StatusBadge>{t("finance.entries.selected", { count: selectedRowIds.length })}</StatusBadge> : null}
       </div>
 
       <div className="action-panel-actions action-panel-actions-start">
@@ -133,7 +137,7 @@ export const FinanceEntriesPage = () => {
           type="button"
         >
           <Plus size={14} />
-          <span>New entry</span>
+          <span>{t("finance.entries.newEntry")}</span>
         </button>
       </div>
 
@@ -141,9 +145,9 @@ export const FinanceEntriesPage = () => {
         <div className="selection-action-bar">
           <div className="selection-action-copy">
             <span className="selection-action-title">
-              {selectedRowIds.length === 1 ? "1 finance entry selected" : `${selectedRowIds.length} finance entries selected`}
+              {t("finance.entries.selectionTitle", { count: selectedRowIds.length })}
             </span>
-            <span className="selection-action-subtitle">Add them to compare.</span>
+            <span className="selection-action-subtitle">{t("finance.entries.selectionSubtitle")}</span>
           </div>
           <div className="selection-action-buttons">
             <button
@@ -163,7 +167,7 @@ export const FinanceEntriesPage = () => {
               }
               type="button"
             >
-              Add to compare
+              {t("finance.entries.addToCompare")}
             </button>
           </div>
         </div>
@@ -187,11 +191,11 @@ export const FinanceEntriesPage = () => {
             try {
               setIsUploadingDocuments(true);
               const result = await uploadFinanceDocuments(editingEntryId);
-              toast.success("Documents attached", result.summary);
+              toast.success(t("finance.entries.toasts.documentsAttached"), result.summary);
               setSubmitError(null);
               await reloadDocuments();
             } catch (nextError) {
-              setSubmitError(getUserFacingErrorMessage(nextError, "The app could not attach finance documents."));
+              setSubmitError(getUserFacingErrorMessage(nextError, t("finance.entries.errors.attachDocuments")));
             } finally {
               setIsUploadingDocuments(false);
             }
@@ -206,7 +210,7 @@ export const FinanceEntriesPage = () => {
               await openFinanceDocument(fileId);
               setSubmitError(null);
             } catch (nextError) {
-              setSubmitError(getUserFacingErrorMessage(nextError, "The app could not open that finance document."));
+              setSubmitError(getUserFacingErrorMessage(nextError, t("finance.entries.errors.openDocument")));
             }
           }}
           onSubmit={handleSubmit}
@@ -214,35 +218,35 @@ export const FinanceEntriesPage = () => {
         />
       ) : null}
 
-      <SurfaceCard title="Entries">
+      <SurfaceCard title={t("finance.entries.title")}>
         <ListToolbar
           activeSortLabel={financeControls.activeSortOption?.label}
           onSearchValueChange={financeControls.setSearchValue}
           onSortByChange={financeControls.setSortField}
           onToggleSortDirection={financeControls.toggleSortDirection}
           resultCount={data.length}
-          resultLabel="entries"
-          searchPlaceholder="Search references, projects or categories"
+          resultLabel={t("finance.entries.resultLabel")}
+          searchPlaceholder={t("finance.entries.searchPlaceholder")}
           searchValue={financeControls.searchValue}
           sortBy={financeControls.sortBy}
           sortDirection={financeControls.sortDirection}
           sortOptions={financeEntrySortOptions}
         />
         {isLoading && data.length === 0 ? (
-          <TableSkeleton body="Loading finance entries…" columns={6} />
+          <TableSkeleton body={t("finance.entries.loading")} columns={6} />
         ) : null}
         <DataTable
           activeRowId={editingEntryId}
           emptyContent={
             <GuidedEmptyState
-              title={financeControls.searchValue ? "No matches" : "No finance entries yet"}
+              title={financeControls.searchValue ? t("finance.entries.empty.noMatchesTitle") : t("finance.entries.empty.noEntriesTitle")}
               body={
                 financeControls.searchValue
-                  ? "Try a different search, or clear it to see every entry."
-                  : "Track every cost, refund or invoice tied to your projects. Add the first entry to start a paper trail."
+                  ? t("finance.entries.empty.noMatchesBody")
+                  : t("finance.entries.empty.noEntriesBody")
               }
               tone="subtle"
-              actionLabel={financeControls.searchValue ? "Clear search" : "Add first entry"}
+              actionLabel={financeControls.searchValue ? t("finance.entries.empty.clearSearch") : t("finance.entries.empty.addFirst")}
               onAction={
                 financeControls.searchValue
                   ? () => financeControls.setSearchValue("")
@@ -256,9 +260,9 @@ export const FinanceEntriesPage = () => {
                 financeControls.searchValue
                   ? undefined
                   : [
-                      "Entries can be tied to a project, asset or incident.",
-                      "Attach receipts and invoices as PDF for clean audits.",
-                      "Use status to mark drafts vs confirmed entries.",
+                      t("finance.entries.empty.tipProject"),
+                      t("finance.entries.empty.tipDocuments"),
+                      t("finance.entries.empty.tipStatus"),
                     ]
               }
             />
@@ -273,15 +277,15 @@ export const FinanceEntriesPage = () => {
           onSortRequest={financeControls.handleColumnSortRequest}
           persistKey="finance-entries"
           columns={[
-            { key: "date", label: "Date", render: (row) => row.date },
-            { key: "type", label: "Type", render: (row) => row.type },
-            { key: "category", label: "Category", render: (row) => row.category },
-            { key: "reference", label: "Reference", render: (row) => row.reference },
-            { key: "project", label: "Project", render: (row) => row.project },
-            { key: "amount", label: "Amount", align: "right", render: (row) => row.amount },
+            { key: "date", label: t("finance.entries.columns.date"), render: (row) => row.date },
+            { key: "type", label: t("finance.entries.columns.type"), render: (row) => row.type },
+            { key: "category", label: t("finance.entries.columns.category"), render: (row) => row.category },
+            { key: "reference", label: t("finance.entries.columns.reference"), render: (row) => row.reference },
+            { key: "project", label: t("finance.entries.columns.project"), render: (row) => row.project },
+            { key: "amount", label: t("finance.entries.columns.amount"), align: "right", render: (row) => row.amount },
             {
               key: "status",
-              label: "Status",
+              label: t("finance.entries.columns.status"),
               render: (row) => (
                 <StatusBadge tone={row.status === "Draft" ? "warning" : "info"}>{row.status}</StatusBadge>
               ),
