@@ -371,8 +371,175 @@
     }
   },
   "finance": {
+    "title": "Finance",
+    "overview": {
+      "title": "Finance",
+      "unavailable": "Finance overview unavailable: {{message}}",
+      "period": "Period",
+      "window": "Window",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "customRangeRequired": "Pick both dates to apply a custom finance window.",
+      "periods": {
+        "month": "Month",
+        "quarter": "Quarter",
+        "year": "Year",
+        "custom": "Custom"
+      },
+      "actions": {
+        "exportPdf": "Export PDF",
+        "exportingPdf": "Exporting PDF..."
+      },
+      "exchange": {
+        "title": "Exchange rates",
+        "currency": "Currency",
+        "refresh": "Refresh exchange rates",
+        "connectTasaReal": "Connect TasaReal in Settings",
+        "limitUntil": "TasaReal limit reached until {{time}}",
+        "statusAria": "Exchange rates {{status}}",
+        "status": {
+          "synced": "Synced",
+          "manual": "Manual",
+          "connected": "Connected",
+          "setupNeeded": "Setup needed"
+        },
+        "notRefreshed": "Not refreshed yet",
+        "manualSnapshot": "Manual snapshot",
+        "noRateYet": "No {{currency}} rate yet",
+        "notConnected": "Not connected",
+        "buy": "Buy",
+        "sell": "Sell",
+        "reference": "Reference",
+        "notPublished": "Not published",
+        "bcrdEurNote": "Banco Central EUR feed is buy/reference only in the current source.",
+        "best": "Best",
+        "diff": "Diff",
+        "effective": "Effective {{date}}",
+        "noRateSaved": "No {{currency}} rate saved",
+        "readyToRefresh": "Ready to refresh",
+        "unavailable": "Exchange rates unavailable: {{message}}",
+        "noSavedRatesWithKey": "No saved {{currency}}/DOP rates yet. Refresh when quota is available or add a manual rate in Settings.",
+        "noSavedRatesNoKey": "Add bank rates in Settings → Workspace → Currency. API connectors can later update this same register automatically.",
+        "rateLimitNotice": "Daily TasaReal limit reached. Showing last saved rates until {{time}}.",
+        "sourceNote": "Source: tasareal.com · Last fetched {{time}} · Stored as a quote-safe snapshot.",
+        "trendTitle": "{{currency}}/DOP 24h trend"
+      },
+      "toasts": {
+        "rateLimitTitle": "Daily exchange-rate limit reached",
+        "rateLimitBody": "Showing saved rates. TasaReal refresh unlocks after {{time}}.",
+        "rateLimitFallback": "Showing saved rates. TasaReal should reset the quota at midnight.",
+        "refreshFailedFallback": "Check the API connection and try again.",
+        "ratesRefreshed": "Rates refreshed",
+        "refreshFailed": "Could not refresh rates",
+        "reportExported": "Report exported",
+        "exportFailed": "Unable to export finance report PDF."
+      },
+      "empty": {
+        "noTrackedSpend": "No tracked spend",
+        "noTrendTitle": "No 24h trend yet",
+        "noTrendBody": "Refresh {{currency}} rates through the day to build a local 24-hour trend from verified TasaReal snapshots.",
+        "noExposureTitle": "No exposure yet",
+        "noExposureBody": "Once incidents and reserves start landing, this chart will show which projects are carrying the most pressure."
+      },
+      "help": {
+        "exposure": "Exposure is the total estimated cost of open incidents and reserves on each project: money you might still owe if everything resolves badly.",
+        "burn": "Burn is how much money flowed out of the workspace each month, summed across all projects."
+      },
+      "exposureByProject": "Exposure by project",
+      "monthlyBurn": "Monthly burn",
+      "categoryMix": "Category mix",
+      "exposureTable": "Exposure table",
+      "reviewQueue": "Review queue",
+      "columns": {
+        "project": "Project",
+        "exposure": "Exposure",
+        "assetsOut": "Assets out",
+        "incidents": "Incidents"
+      }
+    },
+    "costLinks": {
+      "title": "Cost links",
+      "unavailable": "Cost links unavailable: {{message}}",
+      "cardTitle": "Linked cost register",
+      "columns": {
+        "incident": "Incident",
+        "project": "Project",
+        "responsible": "Responsible",
+        "severity": "Severity",
+        "estimate": "Estimate",
+        "replacement": "Replacement",
+        "financeStatus": "Finance status"
+      }
+    },
     "quotes": {
-      "newQuote": "New quote"
+      "title": "Quotes",
+      "newQuote": "New quote",
+      "searchPlaceholder": "Search by number, client, project...",
+      "status": {
+        "draft": "Draft",
+        "sent": "Sent",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "expired": "Expired",
+        "cancelled": "Cancelled"
+      },
+      "summary": {
+        "total": "Total"
+      },
+      "filters": {
+        "all": "All",
+        "status": "Status"
+      },
+      "columns": {
+        "quoteNumber": "Quote #",
+        "client": "Client",
+        "projectProduction": "Project / Production",
+        "date": "Date",
+        "validUntil": "Valid until",
+        "total": "Total",
+        "status": "Status"
+      },
+      "actions": {
+        "edit": "Edit quote",
+        "editAria": "Edit {{number}}",
+        "exportPdf": "Export as PDF",
+        "exportAria": "Export PDF for {{number}}",
+        "duplicate": "Duplicate as a new draft",
+        "duplicateAria": "Duplicate {{number}}",
+        "delete": "Delete permanently",
+        "deleteAria": "Delete {{number}}",
+        "deleteDisabled": "Cancel the quote first (sent or approved quotes can't be deleted directly)"
+      },
+      "toasts": {
+        "pdfReady": "PDF ready",
+        "pdfSaved": "We saved your quote PDF.",
+        "exportCancelled": "Export cancelled",
+        "exportCancelledBody": "Nothing was saved. Try again when you're ready.",
+        "exportFailed": "We couldn't export the PDF",
+        "duplicatedTitle": "Duplicated as {{number}}",
+        "duplicatedBody": "We copied the items into a fresh draft. Adjust and save when ready.",
+        "duplicateFailed": "We couldn't duplicate that quote",
+        "deletedTitle": "Quote {{number}} deleted",
+        "deletedBody": "It's gone; there's no undo. Use Cancel instead next time if you need an audit trail.",
+        "deleteFailed": "We couldn't delete this quote"
+      },
+      "empty": {
+        "createFirst": "Create your first quote",
+        "clearFilters": "Clear filters",
+        "noMatchesTitle": "No quotes match these filters",
+        "noMatchesBody": "Try widening the filter or clearing the search.",
+        "noQuotesTitle": "No quotes yet",
+        "noQuotesBody": "Create a quote in DOP, USD or EUR. The exchange-rate snapshot is captured automatically so older quotes never change."
+      },
+      "deleteDialog": {
+        "title": "Delete this quote?",
+        "bodyPrefix": "Delete quote",
+        "bodyFor": "for",
+        "bodySuffix": "This is permanent. The items and version history will be removed.",
+        "keep": "Keep it",
+        "deleting": "Deleting...",
+        "deletePermanently": "Delete permanently"
+      }
     }
   },
   "packing": {

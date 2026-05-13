@@ -1,5 +1,7 @@
 import { RefreshCw, Upload } from "lucide-react";
+import type { TFunction } from "i18next";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Bar,
   BarChart,
@@ -41,11 +43,11 @@ import { exportFinanceReportPdf, useFinanceOverview } from "./useFinanceData";
 import { refreshCurrencyRates, useCurrencyRateProviderStatus, useExchangeRates } from "./useCurrencyData";
 import { newCommandId } from "./quoteHelpers";
 
-const periodOptions: Array<{ label: string; value: FinanceOverviewPeriodPreset }> = [
-  { label: "Month", value: "month" },
-  { label: "Quarter", value: "quarter" },
-  { label: "Year", value: "year" },
-  { label: "Custom", value: "custom" },
+const periodOptions: Array<{ labelKey: string; value: FinanceOverviewPeriodPreset }> = [
+  { labelKey: "finance.overview.periods.month", value: "month" },
+  { labelKey: "finance.overview.periods.quarter", value: "quarter" },
+  { labelKey: "finance.overview.periods.year", value: "year" },
+  { labelKey: "finance.overview.periods.custom", value: "custom" },
 ];
 
 const chartPalette = ["#d6b37a", "#7eb7b2", "#92a7c1", "#c88d7f", "#a29cd8", "#8ca772"];
@@ -131,19 +133,19 @@ const rateSourceColor = (source: CurrencyRateSource) => {
   return "#c88d7f";
 };
 
-const getRateDisplayCopy = (source: CurrencyRateSource, baseCurrency: "USD" | "EUR") => {
+const getRateDisplayCopy = (source: CurrencyRateSource, baseCurrency: "USD" | "EUR", t: TFunction) => {
   if (source === "banco_central" && baseCurrency === "EUR") {
     return {
-      buyLabel: "Reference",
-      sellLabel: "Sell",
-      missingSellLabel: "Not published",
-      meta: "Banco Central EUR feed is buy/reference only in the current source.",
+      buyLabel: t("finance.overview.exchange.reference"),
+      sellLabel: t("finance.overview.exchange.sell"),
+      missingSellLabel: t("finance.overview.exchange.notPublished"),
+      meta: t("finance.overview.exchange.bcrdEurNote"),
     };
   }
 
   return {
-    buyLabel: "Buy",
-    sellLabel: "Sell",
+    buyLabel: t("finance.overview.exchange.buy"),
+    sellLabel: t("finance.overview.exchange.sell"),
     missingSellLabel: "—",
     meta: null,
   };
@@ -203,11 +205,12 @@ const ChartTooltip = ({
 };
 
 export const FinanceOverviewPage = () => {
+  const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
   const toast = useToast();
   const { formatDate } = useLocale();
   const formatRateTimestamp = (value: string | null | undefined) => {
-    if (!value) return "Not refreshed yet";
+    if (!value) return t("finance.overview.exchange.notRefreshed");
     return formatDate(value, RATE_TIMESTAMP_FORMAT) || value;
   };
   const formatRateTrendTime = (value: string) => formatDate(value, RATE_TREND_FORMAT) || value;
@@ -256,7 +259,7 @@ export const FinanceOverviewPage = () => {
 
   const categoryChartRows = data.categoryBreakdown.length
     ? data.categoryBreakdown
-    : [{ category: "No tracked spend", amount: "$0", amountValue: 0, percentage: 100 }];
+    : [{ category: t("finance.overview.empty.noTrackedSpend"), amount: "$0", amountValue: 0, percentage: 100 }];
 
   const exchangeRateRows = useMemo(() => {
     const rows = exchangeRateInstitutions.map((institution) => {
@@ -314,12 +317,12 @@ export const FinanceOverviewPage = () => {
 
   const hasExchangeRates = exchangeRateRows.some((row) => row.decisionRate);
   const exchangeRateStatus = exchangeRates.some((row) => row.fetchedAt)
-    ? "Synced"
+    ? t("finance.overview.exchange.status.synced")
     : hasExchangeRates
-      ? "Manual"
+      ? t("finance.overview.exchange.status.manual")
       : providerStatus?.hasApiKey
-        ? "Connected"
-        : "Setup needed";
+        ? t("finance.overview.exchange.status.connected")
+        : t("finance.overview.exchange.status.setupNeeded");
   const exchangeRateStatusTone = hasExchangeRates || providerStatus?.hasApiKey ? "success" : "neutral";
   const isRateLimitBlocked = rateLimitBlockedUntil ? Date.now() < new Date(rateLimitBlockedUntil).getTime() : false;
   const latestVisibleRate = exchangeRates.find((row) => row.fetchedAt) ?? exchangeRates[0] ?? null;
@@ -334,8 +337,8 @@ export const FinanceOverviewPage = () => {
       if (isRateLimitBlocked) {
         if (!quiet) {
           toast.warning(
-            "Daily exchange-rate limit reached",
-            `Showing saved rates. TasaReal refresh unlocks after ${formatRateTimestamp(rateLimitBlockedUntil)}.`,
+            t("finance.overview.toasts.rateLimitTitle"),
+            t("finance.overview.toasts.rateLimitBody", { time: formatRateTimestamp(rateLimitBlockedUntil) }),
           );
         }
         return;
@@ -353,7 +356,7 @@ export const FinanceOverviewPage = () => {
         window.localStorage.removeItem(rateLimitStorageKey);
         setRateLimitBlockedUntil(null);
         if (!quiet) {
-          toast.success("Rates refreshed", result.summary);
+          toast.success(t("finance.overview.toasts.ratesRefreshed"), result.summary);
         }
       } catch (nextError) {
         const errorMessage = nextError instanceof Error ? nextError.message : String(nextError);
@@ -364,12 +367,12 @@ export const FinanceOverviewPage = () => {
         }
         if (!quiet) {
           toast.error(
-            errorMessage.includes("429") ? "Daily exchange-rate limit reached" : "Could not refresh rates",
+            errorMessage.includes("429") ? t("finance.overview.toasts.rateLimitTitle") : t("finance.overview.toasts.refreshFailed"),
             getUserFacingErrorMessage(
               nextError,
               errorMessage.includes("429")
-                ? "Showing saved rates. TasaReal should reset the quota at midnight."
-                : "Check the API connection and try again.",
+                ? t("finance.overview.toasts.rateLimitFallback")
+                : t("finance.overview.toasts.refreshFailedFallback"),
             ),
           );
         }
@@ -423,9 +426,9 @@ export const FinanceOverviewPage = () => {
       setIsExportingPdf(true);
       const result = await exportFinanceReportPdf({ ...overviewQuery, workspaceId: activeWorkspaceId });
       setExportError(null);
-      toast.success("Report exported", result.summary);
+      toast.success(t("finance.overview.toasts.reportExported"), result.summary);
     } catch (nextError) {
-      setExportError(getUserFacingErrorMessage(nextError, "Unable to export finance report PDF."));
+      setExportError(getUserFacingErrorMessage(nextError, t("finance.overview.toasts.exportFailed")));
     } finally {
       setIsExportingPdf(false);
     }
@@ -433,26 +436,26 @@ export const FinanceOverviewPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Finance" />
+      <SectionHeader title={t("finance.overview.title")} />
 
-      {error ? <div className="empty-state">Finance overview unavailable: {error}</div> : null}
+      {error ? <div className="empty-state">{t("finance.overview.unavailable", { message: error })}</div> : null}
       {exportError ? <div className="action-feedback action-feedback-error">{exportError}</div> : null}
 
       <SurfaceCard
-        title="Period"
+        title={t("finance.overview.period")}
         aside={
           <div className="finance-overview-aside">
             <span className="finance-period-active-pill">{data.activePeriodLabel}</span>
             <button className="finance-export-button" disabled={isExportingPdf} onClick={() => void handleExportPdf()} type="button">
               <Upload size={15} />
-              <span>{isExportingPdf ? "Exporting PDF..." : "Export PDF"}</span>
+              <span>{isExportingPdf ? t("finance.overview.actions.exportingPdf") : t("finance.overview.actions.exportPdf")}</span>
             </button>
           </div>
         }
       >
         <div className="finance-period-toolbar">
           <label className="compact-filter-field finance-period-select">
-            <span>Window</span>
+            <span>{t("finance.overview.window")}</span>
             <select
               className="compact-filter-select"
               onChange={(event) => setPeriod(event.target.value as FinanceOverviewPeriodPreset)}
@@ -460,7 +463,7 @@ export const FinanceOverviewPage = () => {
             >
               {periodOptions.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.labelKey)}
                 </option>
               ))}
             </select>
@@ -471,7 +474,7 @@ export const FinanceOverviewPage = () => {
           <>
             <div className="action-form-grid finance-period-grid">
               <label className="action-field">
-                <span className="action-field-label">Start date</span>
+                <span className="action-field-label">{t("finance.overview.startDate")}</span>
                 <input
                   className="action-field-control"
                   onChange={(event) => setCustomStartDate(event.target.value)}
@@ -480,7 +483,7 @@ export const FinanceOverviewPage = () => {
                 />
               </label>
               <label className="action-field">
-                <span className="action-field-label">End date</span>
+                <span className="action-field-label">{t("finance.overview.endDate")}</span>
                 <input
                   className="action-field-control"
                   onChange={(event) => setCustomEndDate(event.target.value)}
@@ -491,7 +494,7 @@ export const FinanceOverviewPage = () => {
             </div>
             {!isCustomRangeReady ? (
               <div className="action-feedback action-feedback-warning">
-                Pick both dates to apply a custom finance window.
+                {t("finance.overview.customRangeRequired")}
               </div>
             ) : null}
           </>
@@ -508,10 +511,10 @@ export const FinanceOverviewPage = () => {
       </div>
 
       <SurfaceCard
-        title="Exchange rates"
+        title={t("finance.overview.exchange.title")}
         aside={
           <div className="finance-overview-aside">
-            <div aria-label="Currency" className="finance-fx-currency-toggle" role="group">
+            <div aria-label={t("finance.overview.exchange.currency")} className="finance-fx-currency-toggle" role="group">
               <span aria-hidden="true" className={`finance-fx-currency-thumb is-${selectedFxCurrency.toLowerCase()}`} />
               {(["USD", "EUR"] as const).map((currency) => (
                 <button
@@ -526,7 +529,7 @@ export const FinanceOverviewPage = () => {
               ))}
             </div>
             <span
-              aria-label={`Exchange rates ${exchangeRateStatus}`}
+              aria-label={t("finance.overview.exchange.statusAria", { status: exchangeRateStatus })}
               className={`finance-fx-status-dot finance-fx-status-${exchangeRateStatusTone}`}
               title={exchangeRateStatus}
             >
@@ -534,16 +537,16 @@ export const FinanceOverviewPage = () => {
               <span className="sr-only">{exchangeRateStatus}</span>
             </span>
             <button
-              aria-label="Refresh exchange rates"
+              aria-label={t("finance.overview.exchange.refresh")}
               className="icon-ghost-control"
               disabled={isRefreshingRates || !providerStatus?.hasApiKey || isRateLimitBlocked}
               onClick={() => void handleRefreshRates()}
               title={
                 isRateLimitBlocked
-                  ? `TasaReal limit reached until ${formatRateTimestamp(rateLimitBlockedUntil)}`
+                  ? t("finance.overview.exchange.limitUntil", { time: formatRateTimestamp(rateLimitBlockedUntil) })
                   : providerStatus?.hasApiKey
-                    ? "Refresh exchange rates"
-                    : "Connect TasaReal in Settings"
+                    ? t("finance.overview.exchange.refresh")
+                    : t("finance.overview.exchange.connectTasaReal")
               }
               type="button"
             >
@@ -556,7 +559,7 @@ export const FinanceOverviewPage = () => {
           {exchangeRateRows.map((row) => (
             <div className={`finance-fx-provider-card${row.isBest ? " is-best" : ""}`} key={row.source}>
               {(() => {
-                const rateCopy = getRateDisplayCopy(row.source, selectedFxCurrency);
+                const rateCopy = getRateDisplayCopy(row.source, selectedFxCurrency, t);
                 return (
                   <>
               <div className="finance-fx-provider-header">
@@ -569,13 +572,13 @@ export const FinanceOverviewPage = () => {
                     {row.decisionRate?.fetchedAt
                       ? `TasaReal · ${formatRateTimestamp(row.decisionRate.fetchedAt)}`
                       : row.decisionRate
-                        ? "Manual snapshot"
+                        ? t("finance.overview.exchange.manualSnapshot")
                         : providerStatus?.hasApiKey
-                          ? `No ${selectedFxCurrency} rate yet`
-                          : "Not connected"}
+                          ? t("finance.overview.exchange.noRateYet", { currency: selectedFxCurrency })
+                          : t("finance.overview.exchange.notConnected")}
                   </span>
                 </div>
-                {row.isBest ? <StatusBadge tone="success">Best</StatusBadge> : null}
+                {row.isBest ? <StatusBadge tone="success">{t("finance.overview.exchange.best")}</StatusBadge> : null}
               </div>
               <div className="finance-fx-rate-row">
                 <span className="finance-fx-rate-buy">
@@ -587,22 +590,24 @@ export const FinanceOverviewPage = () => {
                   <strong>{row.sellRate ? formatRateValue(row.sellRate.rate) : rateCopy.missingSellLabel}</strong>
                 </span>
                 <span className="finance-fx-rate-diff">
-                  <small>Diff</small>
+                  <small>{t("finance.overview.exchange.diff")}</small>
                   <strong className={row.differenceFromBest === 0 ? "is-positive" : ""}>
-                    {row.differenceFromBest === null ? "—" : row.differenceFromBest === 0 ? "Best" : row.differenceFromBest.toFixed(2)}
+                    {row.differenceFromBest === null ? "—" : row.differenceFromBest === 0 ? t("finance.overview.exchange.best") : row.differenceFromBest.toFixed(2)}
                   </strong>
                 </span>
               </div>
               <div className="finance-fx-provider-meta">
                 <span>
-                  {row.decisionRate?.effectiveDate ? `Effective ${row.decisionRate.effectiveDate}` : `No ${selectedFxCurrency} rate saved`}
+                  {row.decisionRate?.effectiveDate
+                    ? t("finance.overview.exchange.effective", { date: row.decisionRate.effectiveDate })
+                    : t("finance.overview.exchange.noRateSaved", { currency: selectedFxCurrency })}
                 </span>
                 {row.decisionRate?.fetchedAt ? (
                   <a href="https://tasareal.com" rel="noreferrer" target="_blank">
                     tasareal.com · {formatRateTimestamp(row.decisionRate.fetchedAt)}
                   </a>
                 ) : (
-                  <span>{row.decisionRate?.sourceLabel ?? row.decisionRate?.source ?? "Ready to refresh"}</span>
+                  <span>{row.decisionRate?.sourceLabel ?? row.decisionRate?.source ?? t("finance.overview.exchange.readyToRefresh")}</span>
                 )}
               </div>
               {rateCopy.meta && row.decisionRate && !row.sellRate ? <div className="finance-fx-source-note">{rateCopy.meta}</div> : null}
@@ -613,26 +618,28 @@ export const FinanceOverviewPage = () => {
           ))}
         </div>
         {exchangeRatesError ? (
-          <div className="action-feedback action-feedback-warning">Exchange rates unavailable: {exchangeRatesError}</div>
+          <div className="action-feedback action-feedback-warning">
+            {t("finance.overview.exchange.unavailable", { message: exchangeRatesError })}
+          </div>
         ) : !hasExchangeRates && !isLoadingExchangeRates ? (
           <div className="action-feedback action-feedback-info">
             {providerStatus?.hasApiKey
-              ? `No saved ${selectedFxCurrency}/DOP rates yet. Refresh when quota is available or add a manual rate in Settings.`
-              : "Add bank rates in Settings → Workspace → Currency. API connectors can later update this same register automatically."}
+              ? t("finance.overview.exchange.noSavedRatesWithKey", { currency: selectedFxCurrency })
+              : t("finance.overview.exchange.noSavedRatesNoKey")}
           </div>
         ) : null}
         {isRateLimitBlocked ? (
           <div className="action-feedback action-feedback-warning">
-            Daily TasaReal limit reached. Showing last saved rates until {formatRateTimestamp(rateLimitBlockedUntil)}.
+            {t("finance.overview.exchange.rateLimitNotice", { time: formatRateTimestamp(rateLimitBlockedUntil) })}
           </div>
         ) : latestVisibleRate?.fetchedAt ? (
           <div className="finance-fx-source-note">
-            Source: tasareal.com · Last fetched {formatRateTimestamp(latestVisibleRate.fetchedAt)} · Stored as a quote-safe snapshot.
+            {t("finance.overview.exchange.sourceNote", { time: formatRateTimestamp(latestVisibleRate.fetchedAt) })}
           </div>
         ) : null}
       </SurfaceCard>
 
-      <SurfaceCard title={`${selectedFxCurrency}/DOP 24h trend`}>
+      <SurfaceCard title={t("finance.overview.exchange.trendTitle", { currency: selectedFxCurrency })}>
         {rateTrendRows.length > 0 ? (
           <div className="finance-chart-shell finance-fx-trend-chart">
             <ResponsiveContainer width="100%" height={260}>
@@ -674,18 +681,18 @@ export const FinanceOverviewPage = () => {
           </div>
         ) : (
           <GuidedEmptyState
-            title="No 24h trend yet"
-            body={`Refresh ${selectedFxCurrency} rates through the day to build a local 24-hour trend from verified TasaReal snapshots.`}
+            title={t("finance.overview.empty.noTrendTitle")}
+            body={t("finance.overview.empty.noTrendBody", { currency: selectedFxCurrency })}
           />
         )}
       </SurfaceCard>
 
       <div className="finance-dashboard-grid">
         <SurfaceCard
-          title="Exposure by project"
+          title={t("finance.overview.exposureByProject")}
           aside={
             <HelpHint
-              body="Exposure is the total estimated cost of open incidents and reserves on each project — money you might still owe if everything resolves badly."
+              body={t("finance.overview.help.exposure")}
             />
           }
         >
@@ -711,17 +718,17 @@ export const FinanceOverviewPage = () => {
             </div>
           ) : (
             <GuidedEmptyState
-              title="No exposure yet"
-              body="Once incidents and reserves start landing, this chart will show which projects are carrying the most pressure."
+              title={t("finance.overview.empty.noExposureTitle")}
+              body={t("finance.overview.empty.noExposureBody")}
             />
           )}
         </SurfaceCard>
 
         <SurfaceCard
-          title="Monthly burn"
+          title={t("finance.overview.monthlyBurn")}
           aside={
             <HelpHint
-              body="Burn is how much money flowed out of the workspace each month, summed across all projects."
+              body={t("finance.overview.help.burn")}
             />
           }
         >
@@ -755,7 +762,7 @@ export const FinanceOverviewPage = () => {
           )}
         </SurfaceCard>
 
-        <SurfaceCard title="Category Mix">
+        <SurfaceCard title={t("finance.overview.categoryMix")}>
           {isLoading ? (
             <TableSkeleton rows={5} />
           ) : (
@@ -798,16 +805,16 @@ export const FinanceOverviewPage = () => {
       </div>
 
       <ResizableSideRailLayout className="split-layout" defaultWidth={420} maxWidth={640} minWidth={320} storageKey="finance-overview-side-rail-width">
-        <SurfaceCard title="Exposure Table">
+        <SurfaceCard title={t("finance.overview.exposureTable")}>
           <DataTable
             getRowId={(row) => row.project}
             maxHeight="min(46vh, 520px)"
             persistKey="finance-project-exposure"
             columns={[
-              { key: "project", label: "Project", render: (row) => row.project },
-              { key: "exposure", label: "Exposure", render: (row) => row.exposure },
-              { key: "assetsOut", label: "Assets out", render: (row) => row.assetsOut },
-              { key: "incidentCount", label: "Incidents", align: "right", render: (row) => row.incidentCount },
+              { key: "project", label: t("finance.overview.columns.project"), render: (row) => row.project },
+              { key: "exposure", label: t("finance.overview.columns.exposure"), render: (row) => row.exposure },
+              { key: "assetsOut", label: t("finance.overview.columns.assetsOut"), render: (row) => row.assetsOut },
+              { key: "incidentCount", label: t("finance.overview.columns.incidents"), align: "right", render: (row) => row.incidentCount },
             ]}
             rows={data.exposureByProject}
             selectable
@@ -816,7 +823,7 @@ export const FinanceOverviewPage = () => {
           />
         </SurfaceCard>
 
-        <SurfaceCard title="Review Queue">
+        <SurfaceCard title={t("finance.overview.reviewQueue")}>
           <div className="queue-list">
             {data.costLinks.map((row) => (
               <div key={row.incident} className="queue-item">

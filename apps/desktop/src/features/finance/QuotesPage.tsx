@@ -1,5 +1,6 @@
 import { Copy, Download, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
 import type { QuoteRow, QuoteStatus } from "@contracts";
@@ -33,12 +34,13 @@ const allStatuses: Array<QuoteStatus | "all"> = [
   "cancelled",
 ];
 
-const cleanIpcMessage = (err: unknown) =>
+const cleanIpcMessage = (err: unknown, fallback: string) =>
   err instanceof Error
     ? err.message.replace(/^Error invoking remote method.*?Error:\s*/i, "")
-    : "Try again in a moment.";
+    : fallback;
 
 export const QuotesPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
@@ -80,12 +82,12 @@ export const QuotesPage = () => {
     try {
       const result = await window.bukowskiQuotes.exportPdf(activeWorkspaceId, row.id);
       if (result.saved) {
-        toast.success("PDF ready", result.summary ?? "We saved your quote PDF.");
+        toast.success(t("finance.quotes.toasts.pdfReady"), result.summary ?? t("finance.quotes.toasts.pdfSaved"));
       } else {
-        toast.info("Export cancelled", "Nothing was saved — try again when you're ready.");
+        toast.info(t("finance.quotes.toasts.exportCancelled"), t("finance.quotes.toasts.exportCancelledBody"));
       }
     } catch (err) {
-      toast.error("We couldn't export the PDF", cleanIpcMessage(err));
+      toast.error(t("finance.quotes.toasts.exportFailed"), cleanIpcMessage(err, t("common.tryAgain")));
     }
   };
 
@@ -99,12 +101,12 @@ export const QuotesPage = () => {
         quoteId: row.id,
       });
       toast.success(
-        `Duplicated as ${result.quoteNumber}`,
-        "We copied the items into a fresh draft — adjust and save when ready.",
+        t("finance.quotes.toasts.duplicatedTitle", { number: result.quoteNumber }),
+        t("finance.quotes.toasts.duplicatedBody"),
       );
       navigate(`/finance/quotes/${result.quoteId}`);
     } catch (err) {
-      toast.error("We couldn't duplicate that quote", cleanIpcMessage(err));
+      toast.error(t("finance.quotes.toasts.duplicateFailed"), cleanIpcMessage(err, t("common.tryAgain")));
     }
   };
 
@@ -120,13 +122,13 @@ export const QuotesPage = () => {
         quoteId: pendingDelete.id,
       });
       toast.success(
-        `Quote ${pendingDelete.quoteNumber} deleted`,
-        "It's gone — there's no undo. Use Cancel instead next time if you need an audit trail.",
+        t("finance.quotes.toasts.deletedTitle", { number: pendingDelete.quoteNumber }),
+        t("finance.quotes.toasts.deletedBody"),
       );
       setPendingDelete(null);
       refresh();
     } catch (err) {
-      toast.error("We couldn't delete this quote", cleanIpcMessage(err));
+      toast.error(t("finance.quotes.toasts.deleteFailed"), cleanIpcMessage(err, t("common.tryAgain")));
     } finally {
       setIsDeleting(false);
     }
@@ -134,12 +136,14 @@ export const QuotesPage = () => {
 
   const isDeletable = (row: QuoteRow) =>
     row.status === "draft" || row.status === "cancelled" || row.status === "rejected";
+  const quoteStatusLabel = (status: QuoteStatus | "all") =>
+    status === "all" ? t("finance.quotes.filters.all") : t(`finance.quotes.status.${status}`, { defaultValue: statusLabel(status) });
 
   const columns = useMemo(
     () => [
       {
         key: "number",
-        label: "Quote #",
+        label: t("finance.quotes.columns.quoteNumber"),
         render: (row: QuoteRow) => (
           <span className="quotes-list-number-cell">
             <Link className="quotes-list-number" to={`/finance/quotes/${row.id}`}>
@@ -151,7 +155,7 @@ export const QuotesPage = () => {
       },
       {
         key: "client",
-        label: "Client",
+        label: t("finance.quotes.columns.client"),
         render: (row: QuoteRow) => (
           <div className="cell-stack">
             <span>{row.clientNameSnapshot}</span>
@@ -163,25 +167,25 @@ export const QuotesPage = () => {
       },
       {
         key: "project",
-        label: "Project / Production",
+        label: t("finance.quotes.columns.projectProduction"),
         render: (row: QuoteRow) =>
           row.projectNameSnapshot || row.productionName || row.packageTitle || "—",
       },
       {
         key: "date",
-        label: "Date",
+        label: t("finance.quotes.columns.date"),
         render: (row: QuoteRow) => row.quoteDate,
       },
       {
         key: "validUntil",
-        label: "Valid until",
+        label: t("finance.quotes.columns.validUntil"),
         render: (row: QuoteRow) => (
           <span className={row.status === "expired" ? "text-muted" : ""}>{row.validUntil}</span>
         ),
       },
       {
         key: "total",
-        label: "Total",
+        label: t("finance.quotes.columns.total"),
         align: "right" as const,
         render: (row: QuoteRow) => (
           <div className="cell-stack" style={{ alignItems: "flex-end" }}>
@@ -198,9 +202,9 @@ export const QuotesPage = () => {
       },
       {
         key: "status",
-        label: "Status",
+        label: t("finance.quotes.columns.status"),
         render: (row: QuoteRow) => (
-          <StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>
+          <StatusBadge tone={statusTone(row.status)}>{quoteStatusLabel(row.status)}</StatusBadge>
         ),
       },
       {
@@ -209,46 +213,46 @@ export const QuotesPage = () => {
         render: (row: QuoteRow) => (
           <div className="quotes-list-actions">
             <button
-              aria-label={`Edit ${row.quoteNumber}`}
+              aria-label={t("finance.quotes.actions.editAria", { number: row.quoteNumber })}
               className="row-icon-button"
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
                 navigate(`/finance/quotes/${row.id}`);
               }}
-              title="Edit quote"
+              title={t("finance.quotes.actions.edit")}
               type="button"
             >
               <Pencil size={13} />
             </button>
             <button
-              aria-label={`Export PDF for ${row.quoteNumber}`}
+              aria-label={t("finance.quotes.actions.exportAria", { number: row.quoteNumber })}
               className="row-icon-button"
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
                 void handleExportPdf(row);
               }}
-              title="Export as PDF"
+              title={t("finance.quotes.actions.exportPdf")}
               type="button"
             >
               <Download size={13} />
             </button>
             <button
-              aria-label={`Duplicate ${row.quoteNumber}`}
+              aria-label={t("finance.quotes.actions.duplicateAria", { number: row.quoteNumber })}
               className="row-icon-button"
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
                 void handleDuplicate(row);
               }}
-              title="Duplicate as a new draft"
+              title={t("finance.quotes.actions.duplicate")}
               type="button"
             >
               <Copy size={13} />
             </button>
             <button
-              aria-label={`Delete ${row.quoteNumber}`}
+              aria-label={t("finance.quotes.actions.deleteAria", { number: row.quoteNumber })}
               className="row-icon-button row-icon-button-danger"
               disabled={!isDeletable(row)}
               onClick={(event) => {
@@ -258,8 +262,8 @@ export const QuotesPage = () => {
               }}
               title={
                 isDeletable(row)
-                  ? "Delete permanently"
-                  : "Cancel the quote first (sent or approved quotes can't be deleted directly)"
+                  ? t("finance.quotes.actions.delete")
+                  : t("finance.quotes.actions.deleteDisabled")
               }
               type="button"
             >
@@ -270,7 +274,7 @@ export const QuotesPage = () => {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeWorkspaceId],
+    [activeWorkspaceId, language, t],
   );
 
   const totalShown = data.length;
@@ -279,8 +283,8 @@ export const QuotesPage = () => {
     <div className="page-stack">
       <div className="page-stack-row">
         <SectionHeader
-          eyebrow="Finance"
-          title="Quotes"
+          eyebrow={t("finance.title")}
+          title={t("finance.quotes.title")}
           titleTone="accent"
         />
         <button
@@ -289,7 +293,7 @@ export const QuotesPage = () => {
           type="button"
         >
           <Plus size={13} />
-          <span>New quote</span>
+          <span>{t("finance.quotes.newQuote")}</span>
         </button>
       </div>
 
@@ -301,7 +305,7 @@ export const QuotesPage = () => {
               onClick={() => setStatusFilter("all")}
               type="button"
             >
-              <span className="quotes-summary-tile-label">Total</span>
+              <span className="quotes-summary-tile-label">{t("finance.quotes.summary.total")}</span>
               <strong className="quotes-summary-tile-value">{totalShown}</strong>
             </button>
             {(["draft", "sent", "approved", "rejected", "expired", "cancelled"] as QuoteStatus[]).map(
@@ -314,7 +318,7 @@ export const QuotesPage = () => {
                   onClick={() => setStatusFilter(status)}
                   type="button"
                 >
-                  <span className="quotes-summary-tile-label">{statusLabel(status)}</span>
+                  <span className="quotes-summary-tile-label">{quoteStatusLabel(status)}</span>
                   <strong className="quotes-summary-tile-value">{statusCounts[status]}</strong>
                 </button>
               ),
@@ -326,7 +330,7 @@ export const QuotesPage = () => {
       <SurfaceCard>
         <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap" }}>
           <label className="compact-filter-field quotes-status-filter">
-            <span>Status</span>
+            <span>{t("finance.quotes.filters.status")}</span>
             <select
               className="compact-filter-select"
               onChange={(event) => setStatusFilter(event.target.value as QuoteStatus | "all")}
@@ -334,7 +338,7 @@ export const QuotesPage = () => {
             >
               {allStatuses.map((s) => (
                 <option key={s} value={s}>
-                  {s === "all" ? "All" : statusLabel(s)}
+                  {quoteStatusLabel(s)}
                 </option>
               ))}
             </select>
@@ -342,7 +346,7 @@ export const QuotesPage = () => {
           <input
             className="field-input"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by number, client, project…"
+            placeholder={t("finance.quotes.searchPlaceholder")}
             style={{ minWidth: 240, marginLeft: "auto" }}
             value={search}
           />
@@ -352,9 +356,9 @@ export const QuotesPage = () => {
           <TableSkeleton rows={6} />
         ) : data.length === 0 ? (
           <GuidedEmptyState
-            actionLabel={search || statusFilter !== "all" ? undefined : "Create your first quote"}
+            actionLabel={search || statusFilter !== "all" ? undefined : t("finance.quotes.empty.createFirst")}
             onAction={search || statusFilter !== "all" ? undefined : () => navigate("/finance/quotes/new")}
-            secondaryActionLabel={search || statusFilter !== "all" ? "Clear filters" : undefined}
+            secondaryActionLabel={search || statusFilter !== "all" ? t("finance.quotes.empty.clearFilters") : undefined}
             onSecondaryAction={
               search || statusFilter !== "all"
                 ? () => {
@@ -363,11 +367,11 @@ export const QuotesPage = () => {
                   }
                 : undefined
             }
-            title={search || statusFilter !== "all" ? "No quotes match these filters" : "No quotes yet"}
+            title={search || statusFilter !== "all" ? t("finance.quotes.empty.noMatchesTitle") : t("finance.quotes.empty.noQuotesTitle")}
             body={
               search || statusFilter !== "all"
-                ? "Try widening the filter or clearing the search."
-                : "Create a quote in DOP, USD or EUR. The exchange-rate snapshot is captured automatically so older quotes never change."
+                ? t("finance.quotes.empty.noMatchesBody")
+                : t("finance.quotes.empty.noQuotesBody")
             }
           />
         ) : (
@@ -387,21 +391,21 @@ export const QuotesPage = () => {
         body={
           pendingDelete ? (
             <span>
-              Delete quote <strong>{pendingDelete.quoteNumber}</strong> for{" "}
-              <strong>{pendingDelete.clientNameSnapshot}</strong>? This is permanent — the items and
-              version history will be removed.
+              {t("finance.quotes.deleteDialog.bodyPrefix")} <strong>{pendingDelete.quoteNumber}</strong>{" "}
+              {t("finance.quotes.deleteDialog.bodyFor")} <strong>{pendingDelete.clientNameSnapshot}</strong>?{" "}
+              {t("finance.quotes.deleteDialog.bodySuffix")}
             </span>
           ) : (
             ""
           )
         }
-        cancelLabel="Keep it"
-        confirmLabel={isDeleting ? "Deleting…" : "Delete permanently"}
+        cancelLabel={t("finance.quotes.deleteDialog.keep")}
+        confirmLabel={isDeleting ? t("finance.quotes.deleteDialog.deleting") : t("finance.quotes.deleteDialog.deletePermanently")}
         isOpen={pendingDelete !== null}
         isSubmitting={isDeleting}
         onCancel={() => setPendingDelete(null)}
         onConfirm={() => void confirmDelete()}
-        title="Delete this quote?"
+        title={t("finance.quotes.deleteDialog.title")}
         tone="danger"
       />
     </div>

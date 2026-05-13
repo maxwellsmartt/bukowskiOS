@@ -371,8 +371,175 @@
     }
   },
   "finance": {
+    "title": "Finanzas",
+    "overview": {
+      "title": "Finanzas",
+      "unavailable": "Overview de finanzas no disponible: {{message}}",
+      "period": "Periodo",
+      "window": "Ventana",
+      "startDate": "Fecha inicial",
+      "endDate": "Fecha final",
+      "customRangeRequired": "Elige ambas fechas para aplicar una ventana personalizada.",
+      "periods": {
+        "month": "Mes",
+        "quarter": "Trimestre",
+        "year": "Año",
+        "custom": "Personalizado"
+      },
+      "actions": {
+        "exportPdf": "Exportar PDF",
+        "exportingPdf": "Exportando PDF..."
+      },
+      "exchange": {
+        "title": "Tasas de cambio",
+        "currency": "Moneda",
+        "refresh": "Actualizar tasas",
+        "connectTasaReal": "Conectar TasaReal en Settings",
+        "limitUntil": "Límite de TasaReal alcanzado hasta {{time}}",
+        "statusAria": "Tasas de cambio {{status}}",
+        "status": {
+          "synced": "Sincronizadas",
+          "manual": "Manual",
+          "connected": "Conectado",
+          "setupNeeded": "Requiere setup"
+        },
+        "notRefreshed": "Sin actualizar",
+        "manualSnapshot": "Snapshot manual",
+        "noRateYet": "Sin tasa {{currency}} todavía",
+        "notConnected": "No conectado",
+        "buy": "Compra",
+        "sell": "Venta",
+        "reference": "Referencia",
+        "notPublished": "No publicada",
+        "bcrdEurNote": "La fuente actual de EUR del Banco Central sólo trae compra/referencia.",
+        "best": "Mejor",
+        "diff": "Dif.",
+        "effective": "Vigente {{date}}",
+        "noRateSaved": "Sin tasa {{currency}} guardada",
+        "readyToRefresh": "Listo para actualizar",
+        "unavailable": "Tasas de cambio no disponibles: {{message}}",
+        "noSavedRatesWithKey": "Todavía no hay tasas {{currency}}/DOP guardadas. Actualiza cuando haya cuota disponible o agrega una tasa manual en Settings.",
+        "noSavedRatesNoKey": "Agrega tasas bancarias en Settings → Workspace → Moneda. Los conectores API podrán actualizar este mismo registro automáticamente.",
+        "rateLimitNotice": "Límite diario de TasaReal alcanzado. Mostrando las últimas tasas guardadas hasta {{time}}.",
+        "sourceNote": "Fuente: tasareal.com · Última consulta {{time}} · Guardada como snapshot seguro para cotizaciones.",
+        "trendTitle": "Tendencia 24h {{currency}}/DOP"
+      },
+      "toasts": {
+        "rateLimitTitle": "Límite diario de tasas alcanzado",
+        "rateLimitBody": "Mostrando tasas guardadas. TasaReal vuelve a estar disponible después de {{time}}.",
+        "rateLimitFallback": "Mostrando tasas guardadas. TasaReal debería reiniciar la cuota a medianoche.",
+        "refreshFailedFallback": "Revisa la conexión API e inténtalo otra vez.",
+        "ratesRefreshed": "Tasas actualizadas",
+        "refreshFailed": "No se pudieron actualizar las tasas",
+        "reportExported": "Reporte exportado",
+        "exportFailed": "No se pudo exportar el PDF de finanzas."
+      },
+      "empty": {
+        "noTrackedSpend": "Sin gasto registrado",
+        "noTrendTitle": "Sin tendencia de 24h todavía",
+        "noTrendBody": "Actualiza tasas {{currency}} durante el día para construir una tendencia local de 24 horas desde snapshots verificados de TasaReal.",
+        "noExposureTitle": "Sin exposición todavía",
+        "noExposureBody": "Cuando empiecen a llegar incidentes y reservas, este gráfico mostrará qué proyectos cargan más presión."
+      },
+      "help": {
+        "exposure": "La exposición es el costo estimado total de incidentes abiertos y reservas en cada proyecto: dinero que podrías tener que cubrir si todo se resuelve mal.",
+        "burn": "El burn muestra cuánto dinero salió del workspace cada mes, sumado entre todos los proyectos."
+      },
+      "exposureByProject": "Exposición por proyecto",
+      "monthlyBurn": "Burn mensual",
+      "categoryMix": "Mix por categoría",
+      "exposureTable": "Tabla de exposición",
+      "reviewQueue": "Cola de revisión",
+      "columns": {
+        "project": "Proyecto",
+        "exposure": "Exposición",
+        "assetsOut": "Equipos fuera",
+        "incidents": "Incidentes"
+      }
+    },
+    "costLinks": {
+      "title": "Cost links",
+      "unavailable": "Cost links no disponibles: {{message}}",
+      "cardTitle": "Registro de costos vinculados",
+      "columns": {
+        "incident": "Incidente",
+        "project": "Proyecto",
+        "responsible": "Responsable",
+        "severity": "Severidad",
+        "estimate": "Estimado",
+        "replacement": "Reposición",
+        "financeStatus": "Estado financiero"
+      }
+    },
     "quotes": {
-      "newQuote": "Nueva cotización"
+      "title": "Cotizaciones",
+      "newQuote": "Nueva cotización",
+      "searchPlaceholder": "Buscar por número, cliente, proyecto...",
+      "status": {
+        "draft": "Borrador",
+        "sent": "Enviada",
+        "approved": "Aprobada",
+        "rejected": "Rechazada",
+        "expired": "Vencida",
+        "cancelled": "Cancelada"
+      },
+      "summary": {
+        "total": "Total"
+      },
+      "filters": {
+        "all": "Todas",
+        "status": "Estado"
+      },
+      "columns": {
+        "quoteNumber": "Cotización #",
+        "client": "Cliente",
+        "projectProduction": "Proyecto / Producción",
+        "date": "Fecha",
+        "validUntil": "Válida hasta",
+        "total": "Total",
+        "status": "Estado"
+      },
+      "actions": {
+        "edit": "Editar cotización",
+        "editAria": "Editar {{number}}",
+        "exportPdf": "Exportar como PDF",
+        "exportAria": "Exportar PDF de {{number}}",
+        "duplicate": "Duplicar como borrador nuevo",
+        "duplicateAria": "Duplicar {{number}}",
+        "delete": "Eliminar permanentemente",
+        "deleteAria": "Eliminar {{number}}",
+        "deleteDisabled": "Cancela la cotización primero; las enviadas o aprobadas no se eliminan directamente"
+      },
+      "toasts": {
+        "pdfReady": "PDF listo",
+        "pdfSaved": "Guardamos el PDF de la cotización.",
+        "exportCancelled": "Exportación cancelada",
+        "exportCancelledBody": "No se guardó nada. Inténtalo otra vez cuando estés listo.",
+        "exportFailed": "No pudimos exportar el PDF",
+        "duplicatedTitle": "Duplicada como {{number}}",
+        "duplicatedBody": "Copiamos los items en un borrador nuevo. Ajusta y guarda cuando esté listo.",
+        "duplicateFailed": "No pudimos duplicar esa cotización",
+        "deletedTitle": "Cotización {{number}} eliminada",
+        "deletedBody": "Ya no está; no hay undo. Usa Cancelar la próxima vez si necesitas trazabilidad.",
+        "deleteFailed": "No pudimos eliminar esta cotización"
+      },
+      "empty": {
+        "createFirst": "Crear primera cotización",
+        "clearFilters": "Limpiar filtros",
+        "noMatchesTitle": "No hay cotizaciones con estos filtros",
+        "noMatchesBody": "Amplía el filtro o limpia la búsqueda.",
+        "noQuotesTitle": "Aún no hay cotizaciones",
+        "noQuotesBody": "Crea cotizaciones en DOP, USD o EUR. El snapshot de tasa se guarda automáticamente para que las cotizaciones viejas no cambien."
+      },
+      "deleteDialog": {
+        "title": "¿Eliminar esta cotización?",
+        "bodyPrefix": "Eliminar cotización",
+        "bodyFor": "para",
+        "bodySuffix": "Esto es permanente. Se eliminarán los items y el historial de versiones.",
+        "keep": "Conservar",
+        "deleting": "Eliminando...",
+        "deletePermanently": "Eliminar permanentemente"
+      }
     }
   },
   "packing": {

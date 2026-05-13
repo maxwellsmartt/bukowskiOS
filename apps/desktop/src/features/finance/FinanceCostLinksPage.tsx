@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { DataTable } from "@shared/components/DataTable";
 import { HelpHint } from "@shared/components/HelpHint";
@@ -9,16 +10,17 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useFinanceCostLinks } from "./useFinanceData";
 
 export const FinanceCostLinksPage = () => {
+  const { t } = useTranslation();
   const { data, error } = useFinanceCostLinks();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Cost links" />
+      <SectionHeader title={t("finance.costLinks.title")} />
 
-      {error ? <div className="empty-state">Cost links unavailable: {error}</div> : null}
+      {error ? <div className="empty-state">{t("finance.costLinks.unavailable", { message: error })}</div> : null}
 
-      <SurfaceCard title="Linked cost register">
+      <SurfaceCard title={t("finance.costLinks.cardTitle")}>
         <DataTable
           getRowId={(row) => `${row.incident}-${row.asset}`}
           maxHeight="min(60vh, 640px)"
@@ -26,7 +28,7 @@ export const FinanceCostLinksPage = () => {
           columns={[
             {
               key: "incident",
-              label: "Incident",
+              label: t("finance.costLinks.columns.incident"),
               render: (row) => (
                 <div className="identity-cell">
                   <span className="identity-title">{row.incident}</span>
@@ -34,20 +36,20 @@ export const FinanceCostLinksPage = () => {
                 </div>
               ),
             },
-            { key: "project", label: "Project", render: (row) => row.project },
-            { key: "responsible", label: "Responsible", render: (row) => row.responsible },
+            { key: "project", label: t("finance.costLinks.columns.project"), render: (row) => row.project },
+            { key: "responsible", label: t("finance.costLinks.columns.responsible"), render: (row) => row.responsible },
             {
               key: "severity",
-              label: "Severity",
+              label: t("finance.costLinks.columns.severity"),
               render: (row) => (
                 <StatusBadge tone={row.severity === "High" ? "critical" : row.severity === "Medium" ? "warning" : "neutral"}>
                   {row.severity}
                 </StatusBadge>
               ),
             },
-            { key: "estimate", label: "Estimate", render: (row) => row.costEstimate },
-            { key: "replacement", label: "Replacement", render: (row) => row.replacementValue },
-            { key: "status", label: "Finance status", render: (row) => row.financialStatus },
+            { key: "estimate", label: t("finance.costLinks.columns.estimate"), render: (row) => row.costEstimate },
+            { key: "replacement", label: t("finance.costLinks.columns.replacement"), render: (row) => row.replacementValue },
+            { key: "status", label: t("finance.costLinks.columns.financeStatus"), render: (row) => row.financialStatus },
           ]}
           rows={data}
           selectable
