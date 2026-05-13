@@ -1,5 +1,6 @@
 import { Github, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
@@ -9,16 +10,15 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 type OAuthProvider = "google" | "github";
 
-const providerLabel = (provider: OAuthProvider) => (provider === "google" ? "Google" : "GitHub");
-
 export const LoginScreen = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { authError, isLocalFallback, requestFirstLoginLink, signInWithMagicLink, signInWithOAuth, signInWithPassword } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberLogin, setRememberLogin] = useState(true);
-  const [status, setStatus] = useState<string | null>(isLocalFallback ? "Local dev session is active." : null);
+  const [status, setStatus] = useState<string | null>(isLocalFallback ? t("auth.login.localFallback") : null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingOAuthProvider, setPendingOAuthProvider] = useState<OAuthProvider | null>(null);
 
@@ -41,7 +41,7 @@ export const LoginScreen = () => {
         navigate(from, { replace: true });
       }
     } catch (error) {
-      setStatus(getUserFacingErrorMessage(error, "Authentication failed."));
+      setStatus(getUserFacingErrorMessage(error, t("auth.login.errors.authFailed")));
     } finally {
       setIsSubmitting(false);
     }
@@ -50,14 +50,14 @@ export const LoginScreen = () => {
   const runOAuthAction = async (provider: OAuthProvider) => {
     setPendingOAuthProvider(provider);
     setIsSubmitting(true);
-    setStatus(`Opening ${providerLabel(provider)}. Approve access in your browser and bukowskiOS will continue here.`);
+    setStatus(t("auth.login.oauthOpening", { provider: t(`auth.providers.${provider}`) }));
 
     try {
       await signInWithOAuth(provider);
-      setStatus(`Waiting for ${providerLabel(provider)} approval. You can return here after approving in the browser.`);
+      setStatus(t("auth.login.oauthWaitingStatus", { provider: t(`auth.providers.${provider}`) }));
     } catch (error) {
       setPendingOAuthProvider(null);
-      setStatus(getUserFacingErrorMessage(error, `${providerLabel(provider)} sign in could not start.`));
+      setStatus(getUserFacingErrorMessage(error, t("auth.login.errors.oauthStartFailed", { provider: t(`auth.providers.${provider}`) })));
     } finally {
       setIsSubmitting(false);
     }
@@ -78,7 +78,7 @@ export const LoginScreen = () => {
       </div>
       <section className="auth-panel" aria-labelledby="login-title">
         <div className="auth-brand">
-          <h1 id="login-title">Welcome back</h1>
+          <h1 id="login-title">{t("auth.login.title")}</h1>
         </div>
 
         <form
@@ -92,7 +92,7 @@ export const LoginScreen = () => {
           }}
         >
           <label className="auth-field">
-            <span>Email</span>
+            <span>{t("auth.fields.email")}</span>
             <input
               autoComplete="email"
               className="text-input"
@@ -103,7 +103,7 @@ export const LoginScreen = () => {
             />
           </label>
           <label className="auth-field">
-            <span>Password</span>
+            <span>{t("auth.fields.password")}</span>
             <input
               autoComplete="current-password"
               className="text-input"
@@ -115,8 +115,8 @@ export const LoginScreen = () => {
           </label>
 
           <div className="auth-row">
-            <Link to="/login/recovery">Forgot password?</Link>
-            <Link to="/login/mfa">Use 2FA</Link>
+            <Link to="/login/recovery">{t("auth.login.forgotPassword")}</Link>
+            <Link to="/login/mfa">{t("auth.login.use2fa")}</Link>
           </div>
 
           <label className="auth-check-row">
@@ -125,28 +125,28 @@ export const LoginScreen = () => {
               onChange={(event) => setRememberLogin(event.target.checked)}
               type="checkbox"
             />
-            <span>Keep me signed in on this Mac</span>
+            <span>{t("auth.login.remember")}</span>
           </label>
 
           <button className="auth-primary-button" disabled={isSubmitting || Boolean(pendingOAuthProvider)} type="submit">
-            <span>{isSubmitting ? "Signing in..." : "Sign in"}</span>
+            <span>{isSubmitting ? t("auth.login.signingIn") : t("auth.login.signIn")}</span>
           </button>
         </form>
 
-        <div className="auth-divider">or</div>
+        <div className="auth-divider">{t("auth.login.or")}</div>
 
         <div className="auth-actions">
           <button
             className="auth-secondary-button"
             disabled={isSubmitting || Boolean(pendingOAuthProvider) || !email.trim()}
-            onClick={() => void runAuthAction(() => signInWithMagicLink(email), "Magic link sent. Check your email.")}
+            onClick={() => void runAuthAction(() => signInWithMagicLink(email), t("auth.login.magicLinkSent"))}
             type="button"
           >
             <span className="auth-button-content">
               <span className="auth-button-icon">
                 <Mail size={16} />
               </span>
-              <span>Send magic link</span>
+              <span>{t("auth.login.sendMagicLink")}</span>
             </span>
           </button>
           <button
@@ -159,7 +159,7 @@ export const LoginScreen = () => {
               <span className="auth-button-icon">
                 <span className="auth-provider-dot">G</span>
               </span>
-              <span>Continue with Google</span>
+              <span>{t("auth.login.continueWith", { provider: t("auth.providers.google") })}</span>
             </span>
           </button>
           <button
@@ -172,22 +172,22 @@ export const LoginScreen = () => {
               <span className="auth-button-icon">
                 <Github size={16} />
               </span>
-              <span>Continue with GitHub</span>
+              <span>{t("auth.login.continueWith", { provider: t("auth.providers.github") })}</span>
             </span>
           </button>
         </div>
 
         <div className="auth-first-login">
           <div>
-            <p>First time here?</p>
-            <span>Enter your email and get a secure link to create your password.</span>
+            <p>{t("auth.login.firstTimeTitle")}</p>
+            <span>{t("auth.login.firstTimeBody")}</span>
           </div>
           <button
             disabled={isSubmitting || Boolean(pendingOAuthProvider) || !email.trim()}
-            onClick={() => void runAuthAction(() => requestFirstLoginLink(email), "Setup link sent. Open it to create your password.")}
+            onClick={() => void runAuthAction(() => requestFirstLoginLink(email), t("auth.login.setupLinkSent"))}
             type="button"
           >
-            Set up password
+            {t("auth.login.setupPassword")}
           </button>
         </div>
 
@@ -195,8 +195,8 @@ export const LoginScreen = () => {
           <div className="auth-oauth-waiting" role="status" aria-live="polite">
             <div className="auth-oauth-spinner" aria-hidden="true" />
             <div>
-              <p>Waiting for {providerLabel(pendingOAuthProvider)}</p>
-              <span>Approve access in your browser. This window will continue automatically when the secure callback returns.</span>
+              <p>{t("auth.login.waitingFor", { provider: t(`auth.providers.${pendingOAuthProvider}`) })}</p>
+              <span>{t("auth.login.oauthWaitingBody")}</span>
             </div>
             <button
               onClick={() => {
@@ -205,7 +205,7 @@ export const LoginScreen = () => {
               }}
               type="button"
             >
-              Use another method
+              {t("auth.login.useAnotherMethod")}
             </button>
           </div>
         ) : null}

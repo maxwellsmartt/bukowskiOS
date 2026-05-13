@@ -1,4 +1,5 @@
 import { ArrowLeft, Check, Plus, RefreshCw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
@@ -13,6 +14,7 @@ const WorkspaceAvatar = ({ color, name, url }: { color?: string | null; name: st
 );
 
 export const WorkspacePickerScreen = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { signOut } = useSession();
   const { activeWorkspaceId, isLoadingWorkspaces, memberships, refreshWorkspaces, switchWorkspace, workspaceError } =
@@ -26,7 +28,7 @@ export const WorkspacePickerScreen = () => {
       </div>
       <section className="workspace-picker-panel" aria-labelledby="workspace-picker-title">
         <div className="auth-brand workspace-picker-header">
-          <h1 id="workspace-picker-title">Choose workspace</h1>
+          <h1 id="workspace-picker-title">{t("auth.workspacePicker.title")}</h1>
         </div>
 
         <div className="workspace-picker-list">
@@ -34,8 +36,8 @@ export const WorkspacePickerScreen = () => {
             <div className="workspace-picker-loading">
               <span className="workspace-avatar">B</span>
               <span>
-                <strong>Loading workspaces</strong>
-                <small>Restoring your latest access...</small>
+                <strong>{t("auth.workspacePicker.loadingTitle")}</strong>
+                <small>{t("auth.workspacePicker.loadingBody")}</small>
               </span>
             </div>
           ) : null}
@@ -59,11 +61,11 @@ export const WorkspacePickerScreen = () => {
           ))}
           {hasNoWorkspaceAccess ? (
             <div className="workspace-picker-empty">
-              <strong>No workspace access yet</strong>
-              <p>Ask an admin to invite this email, then refresh once you accept the invite.</p>
+              <strong>{t("auth.workspacePicker.emptyTitle")}</strong>
+              <p>{t("auth.workspacePicker.emptyBody")}</p>
               <button className="auth-secondary-button" onClick={() => void refreshWorkspaces()} type="button">
                 <RefreshCw size={14} />
-                <span>Refresh access</span>
+                <span>{t("auth.workspacePicker.refreshAccess")}</span>
               </button>
             </div>
           ) : null}
@@ -71,7 +73,7 @@ export const WorkspacePickerScreen = () => {
 
         <button className="auth-secondary-button" onClick={() => navigate("/workspaces/create")} type="button">
           <Plus size={16} />
-          <span>Create workspace</span>
+          <span>{t("auth.workspacePicker.createWorkspace")}</span>
         </button>
         {workspaceError ? <p className="auth-status">{workspaceError}</p> : null}
       </section>
@@ -83,7 +85,7 @@ export const WorkspacePickerScreen = () => {
         type="button"
       >
         <ArrowLeft size={15} />
-        <span>Back to login</span>
+        <span>{t("auth.workspacePicker.backToLogin")}</span>
       </button>
     </div>
   );

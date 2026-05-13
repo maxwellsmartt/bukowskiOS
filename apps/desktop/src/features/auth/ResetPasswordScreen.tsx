@@ -1,5 +1,6 @@
 import { KeyRound } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
@@ -8,6 +9,7 @@ import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 export const ResetPasswordScreen = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { authError, isPasswordRecovery, updatePassword } = useSession();
@@ -25,12 +27,12 @@ export const ResetPasswordScreen = () => {
         <img src={brandLogoWhite1x} srcSet={`${brandLogoWhite1x} 1x, ${brandLogoWhite} 2x`} alt="" />
       </div>
       <section className="auth-panel" aria-labelledby="reset-password-title">
-        <p className="auth-eyebrow">{isFirstLogin ? "First login" : "Password reset"}</p>
-        <h1 id="reset-password-title">{isFirstLogin ? "Create your password" : "Set a new password"}</h1>
+        <p className="auth-eyebrow">{isFirstLogin ? t("auth.reset.firstLoginEyebrow") : t("auth.reset.eyebrow")}</p>
+        <h1 id="reset-password-title">{isFirstLogin ? t("auth.reset.firstLoginTitle") : t("auth.reset.title")}</h1>
         <p className="auth-lede">
           {isFirstLogin
-            ? "Add a password so you can sign in quickly next time. You can still use magic links whenever needed."
-            : "Choose a new password for your bukowskiOS account."}
+            ? t("auth.reset.firstLoginBody")
+            : t("auth.reset.body")}
         </p>
         <form
           className="auth-form"
@@ -38,12 +40,12 @@ export const ResetPasswordScreen = () => {
             event.preventDefault();
 
             if (password.length < 8) {
-              setStatus("Use at least 8 characters for the new password.");
+              setStatus(t("auth.reset.minLength"));
               return;
             }
 
             if (password !== confirmPassword) {
-              setStatus("Passwords do not match.");
+              setStatus(t("auth.reset.passwordMismatch"));
               return;
             }
 
@@ -51,20 +53,20 @@ export const ResetPasswordScreen = () => {
             setStatus(null);
             void updatePassword(password)
               .then(() => {
-                setStatus("Password updated. Opening your workspaces…");
+                setStatus(t("auth.reset.updated"));
                 navigate("/workspaces/select", { replace: true });
               })
               .catch((error: unknown) => {
-                setStatus(getUserFacingErrorMessage(error, "Could not update the password."));
+                setStatus(getUserFacingErrorMessage(error, t("auth.reset.updateFailed")));
               })
               .finally(() => setIsSubmitting(false));
           }}
         >
           {!isPasswordRecovery ? (
-            <p className="auth-status">Open the secure email link first, then return here to set the password.</p>
+            <p className="auth-status">{t("auth.reset.openLinkFirst")}</p>
           ) : null}
           <label className="auth-field">
-            <span>New password</span>
+            <span>{t("auth.reset.newPassword")}</span>
             <input
               autoComplete="new-password"
               className="text-input"
@@ -75,7 +77,7 @@ export const ResetPasswordScreen = () => {
             />
           </label>
           <label className="auth-field">
-            <span>Confirm password</span>
+            <span>{t("auth.reset.confirmPassword")}</span>
             <input
               autoComplete="new-password"
               className="text-input"
@@ -87,11 +89,11 @@ export const ResetPasswordScreen = () => {
           </label>
           <button className="auth-primary-button" disabled={isSubmitting || mismatch || !isPasswordRecovery} type="submit">
             <KeyRound size={16} />
-            <span>{isSubmitting ? "Updating..." : "Update password"}</span>
+            <span>{isSubmitting ? t("auth.reset.updating") : t("auth.reset.updatePassword")}</span>
           </button>
         </form>
         {status || authError ? <p className="auth-status">{status ?? authError}</p> : null}
-        <Link className="auth-back-link" to="/login">Back to sign in</Link>
+        <Link className="auth-back-link" to="/login">{t("auth.backToSignIn")}</Link>
       </section>
     </div>
   );

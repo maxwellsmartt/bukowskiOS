@@ -947,6 +947,170 @@
       "descending": "Descendente"
     }
   },
+  "shared": {
+    "agentCreatedBadge": "Creado por agente"
+  },
+  "auth": {
+    "backToSignIn": "Volver al login",
+    "providers": {
+      "google": "Google",
+      "github": "GitHub"
+    },
+    "fields": {
+      "email": "Correo",
+      "password": "Contraseña"
+    },
+    "login": {
+      "title": "Bienvenido de nuevo",
+      "localFallback": "Sesión local de desarrollo activa.",
+      "forgotPassword": "¿Olvidaste tu contraseña?",
+      "use2fa": "Usar 2FA",
+      "remember": "Mantener sesión en esta Mac",
+      "signingIn": "Entrando...",
+      "signIn": "Entrar",
+      "or": "o",
+      "sendMagicLink": "Enviar magic link",
+      "magicLinkSent": "Magic link enviado. Revisa tu correo.",
+      "continueWith": "Continuar con {{provider}}",
+      "firstTimeTitle": "¿Primera vez aquí?",
+      "firstTimeBody": "Escribe tu correo y recibe un link seguro para crear tu contraseña.",
+      "setupPassword": "Configurar contraseña",
+      "setupLinkSent": "Link de setup enviado. Ábrelo para crear tu contraseña.",
+      "oauthOpening": "Abriendo {{provider}}. Aprueba el acceso en tu navegador y bukowskiOS continuará aquí.",
+      "oauthWaitingStatus": "Esperando aprobación de {{provider}}. Puedes volver aquí después de aprobar en el navegador.",
+      "waitingFor": "Esperando {{provider}}",
+      "oauthWaitingBody": "Aprueba el acceso en tu navegador. Esta ventana continuará automáticamente cuando vuelva el callback seguro.",
+      "useAnotherMethod": "Usar otro método",
+      "errors": {
+        "authFailed": "Autenticación fallida.",
+        "oauthStartFailed": "No se pudo iniciar login con {{provider}}."
+      }
+    },
+    "recovery": {
+      "eyebrow": "Recuperación de cuenta",
+      "title": "Recuperar acceso",
+      "sent": "Correo de recuperación enviado. Abre el link en tu correo para definir una contraseña nueva.",
+      "sendFailed": "No se pudo enviar el link de recuperación.",
+      "sending": "Enviando...",
+      "send": "Enviar correo de recuperación"
+    },
+    "reset": {
+      "firstLoginEyebrow": "Primer login",
+      "eyebrow": "Reset de contraseña",
+      "firstLoginTitle": "Crea tu contraseña",
+      "title": "Define una nueva contraseña",
+      "firstLoginBody": "Agrega una contraseña para entrar más rápido la próxima vez. También podrás seguir usando magic links cuando lo necesites.",
+      "body": "Elige una nueva contraseña para tu cuenta de bukowskiOS.",
+      "minLength": "Usa al menos 8 caracteres para la nueva contraseña.",
+      "passwordMismatch": "Las contraseñas no coinciden.",
+      "updated": "Contraseña actualizada. Abriendo tus workspaces...",
+      "updateFailed": "No se pudo actualizar la contraseña.",
+      "openLinkFirst": "Abre primero el link seguro del correo y luego vuelve aquí para definir la contraseña.",
+      "newPassword": "Nueva contraseña",
+      "confirmPassword": "Confirmar contraseña",
+      "updating": "Actualizando...",
+      "updatePassword": "Actualizar contraseña"
+    },
+    "mfa": {
+      "eyebrow": "Autenticación de dos factores",
+      "title": "Desafío 2FA",
+      "placeholder": "La verificación TOTP queda reservada para el wiring de Supabase MFA en este slice."
+    },
+    "workspacePicker": {
+      "title": "Elegir workspace",
+      "loadingTitle": "Cargando workspaces",
+      "loadingBody": "Restaurando tu último acceso...",
+      "emptyTitle": "Aún no tienes acceso a ningún workspace",
+      "emptyBody": "Pide a un admin que invite este correo y refresca cuando aceptes la invitación.",
+      "refreshAccess": "Refrescar acceso",
+      "createWorkspace": "Crear workspace",
+      "backToLogin": "Volver al login"
+    },
+    "workspaceCreate": {
+      "eyebrow": "Setup de workspace",
+      "title": "Crear workspace",
+      "supabaseMissing": "Supabase no está configurado. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY para crear workspaces remotos.",
+      "failed": "No se pudo crear el workspace.",
+      "name": "Nombre",
+      "slug": "Slug",
+      "currency": "Moneda",
+      "color": "Color",
+      "creating": "Creando...",
+      "create": "Crear workspace",
+      "backToWorkspaces": "Volver a workspaces"
+    }
+  },
+  "inbox": {
+    "title": "Inbox",
+    "quickAdd": "Agregar rápido",
+    "noNotes": "Sin notas",
+    "actions": {
+      "markAllRead": "Marcar todo leído",
+      "done": "Listo",
+      "snooze": "Posponer"
+    },
+    "summary": {
+      "unread": "Sin leer",
+      "needsAttention": "Requiere atención",
+      "allCaughtUp": "Todo al día",
+      "openTodos": "Todos abiertos",
+      "totalVisible": "{{count}} visibles en total",
+      "nextReminder": "Próximo reminder",
+      "scheduled": "{{count}} programados"
+    },
+    "tabs": {
+      "notifications": "Notificaciones",
+      "todos": "Todos",
+      "reminders": "Reminders",
+      "unread": "{{count}} sin leer",
+      "open": "{{count}} abiertos",
+      "scheduled": "{{count}} programados"
+    },
+    "notifications": {
+      "loading": "Cargando notificaciones...",
+      "emptyTitle": "Aún no hay notificaciones",
+      "emptyBody": "Cuando un agente termine trabajo, se dispare un reminder o un evento del workspace necesite atención, aparecerá aquí."
+    },
+    "todos": {
+      "titleAria": "Título del todo",
+      "dueDateAria": "Fecha límite del todo",
+      "frequencyAria": "Frecuencia del todo",
+      "placeholder": "¿Qué hay que hacer?",
+      "add": "Agregar todo",
+      "due": "Vence {{date}}",
+      "noDueDate": "Sin fecha",
+      "emptyTitle": "Aún no hay todos",
+      "emptyBody": "Agrega uno arriba o pide a un agente que cree un follow-up."
+    },
+    "reminders": {
+      "titleAria": "Título del reminder",
+      "timeAria": "Hora del reminder",
+      "frequencyAria": "Frecuencia del reminder",
+      "notesAria": "Notas del reminder",
+      "bodyAria": "Cuerpo del reminder",
+      "placeholder": "Recuérdame...",
+      "notesPlaceholder": "Notas opcionales",
+      "add": "Agregar reminder",
+      "delivered": "Entregado",
+      "snoozedUntil": "Pospuesto hasta {{date}}",
+      "reminds": "Recuerda {{date}}",
+      "licenses": "Licencias",
+      "emptyTitle": "Aún no hay reminders",
+      "emptyBody": "Los reminders programados dispararán notificaciones nativas en macOS."
+    },
+    "recurrence": {
+      "oneTime": "Una vez",
+      "everyDay": "Cada día",
+      "weekdays": "Días laborables",
+      "everyWeek": "Cada semana",
+      "everyMonth": "Cada mes",
+      "repeats": "Recurrente"
+    },
+    "errors": {
+      "todoTitle": "Agrega primero un título para el todo.",
+      "reminderTitleTime": "Agrega primero título y hora para el reminder."
+    }
+  },
   "catalog": {
     "title": "Catálogo",
     "unavailable": "Catálogo no disponible: {{message}}",

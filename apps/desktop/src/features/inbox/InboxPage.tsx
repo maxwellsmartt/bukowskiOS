@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Bell, CalendarClock, Check, CheckCheck, Clock3, ExternalLink, Inbox as InboxIcon, ListTodo, Pencil, Plus, Trash2, X } from "lucide-react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { useNotifications } from "@app/providers/NotificationsProvider";
@@ -22,16 +24,17 @@ const SHORT_DATE_FORMAT: Intl.DateTimeFormatOptions = {
 };
 
 const recurrenceOptions = [
-  { label: "One time", value: "" },
-  { label: "Every day", value: "FREQ=DAILY" },
-  { label: "Weekdays", value: "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR" },
-  { label: "Every week", value: "FREQ=WEEKLY" },
-  { label: "Every month", value: "FREQ=MONTHLY" },
+  { labelKey: "inbox.recurrence.oneTime", value: "" },
+  { labelKey: "inbox.recurrence.everyDay", value: "FREQ=DAILY" },
+  { labelKey: "inbox.recurrence.weekdays", value: "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR" },
+  { labelKey: "inbox.recurrence.everyWeek", value: "FREQ=WEEKLY" },
+  { labelKey: "inbox.recurrence.everyMonth", value: "FREQ=MONTHLY" },
 ] as const;
 
-const getRecurrenceLabel = (rule: string | null | undefined) => {
-  if (!rule) return "One time";
-  return recurrenceOptions.find((option) => option.value === rule)?.label ?? "Repeats";
+const getRecurrenceLabel = (rule: string | null | undefined, t: TFunction) => {
+  if (!rule) return t("inbox.recurrence.oneTime");
+  const option = recurrenceOptions.find((nextOption) => nextOption.value === rule);
+  return option ? t(option.labelKey) : t("inbox.recurrence.repeats");
 };
 
 const isLicenseReminder = (title: string) => title.startsWith("License renewal:");
@@ -58,6 +61,7 @@ const toDateTimeLocalValue = (value: string | null) => {
 };
 
 export const InboxPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { formatDate } = useLocale();
   const {
@@ -113,7 +117,7 @@ export const InboxPage = () => {
   const handleCreateTodo = async () => {
     const title = todoTitle.trim();
     if (!title) {
-      setFormError("Add a todo title first.");
+      setFormError(t("inbox.errors.todoTitle"));
       return;
     }
 
@@ -137,7 +141,7 @@ export const InboxPage = () => {
 
   const saveEditingTodo = async () => {
     if (!editingTodoId || !editingTodoTitle.trim()) {
-      setFormError("Add a todo title first.");
+      setFormError(t("inbox.errors.todoTitle"));
       return;
     }
 
@@ -161,7 +165,7 @@ export const InboxPage = () => {
 
   const saveEditingReminder = async () => {
     if (!editingReminderId || !editingReminderTitle.trim() || !editingReminderAt) {
-      setFormError("Add a reminder title and time first.");
+      setFormError(t("inbox.errors.reminderTitleTime"));
       return;
     }
 
@@ -179,7 +183,7 @@ export const InboxPage = () => {
   const handleCreateReminder = async () => {
     const title = reminderTitle.trim();
     if (!title || !reminderAt) {
-      setFormError("Add a reminder title and time first.");
+      setFormError(t("inbox.errors.reminderTitleTime"));
       return;
     }
 
@@ -200,31 +204,31 @@ export const InboxPage = () => {
     <section className="page-stack inbox-page">
       <header className="inbox-hero">
         <div>
-          <h1>Inbox</h1>
+          <h1>{t("inbox.title")}</h1>
         </div>
         <div className="inbox-hero-status">
           <button className="secondary-button inbox-mark-all-button" disabled={unreadCount === 0} onClick={() => void markAllRead()} type="button">
             <CheckCheck size={14} />
-            <span>Mark all read</span>
+            <span>{t("inbox.actions.markAllRead")}</span>
           </button>
         </div>
       </header>
 
       <div className="inbox-summary-grid">
         <article className={unreadCount > 0 ? "is-hot" : ""}>
-          <span>Unread</span>
+          <span>{t("inbox.summary.unread")}</span>
           <strong>{unreadCount}</strong>
-          <small>{unreadCount ? "Needs attention" : "All caught up"}</small>
+          <small>{unreadCount ? t("inbox.summary.needsAttention") : t("inbox.summary.allCaughtUp")}</small>
         </article>
         <article>
-          <span>Open todos</span>
+          <span>{t("inbox.summary.openTodos")}</span>
           <strong>{openTodos.length}</strong>
-          <small>{todos.length} total visible</small>
+          <small>{t("inbox.summary.totalVisible", { count: todos.length })}</small>
         </article>
         <article>
-          <span>Next reminder</span>
-          <strong>{nextReminder ? formatDate(nextReminder.remindAt, SHORT_DATE_FORMAT) : "None"}</strong>
-          <small>{pendingReminders.length} scheduled</small>
+          <span>{t("inbox.summary.nextReminder")}</span>
+          <strong>{nextReminder ? formatDate(nextReminder.remindAt, SHORT_DATE_FORMAT) : t("common.none")}</strong>
+          <small>{t("inbox.summary.scheduled", { count: pendingReminders.length })}</small>
         </article>
       </div>
 
@@ -233,22 +237,22 @@ export const InboxPage = () => {
           <button className={activeTab === "notifications" ? "inbox-tab is-active" : "inbox-tab"} onClick={() => setActiveTab("notifications")} type="button">
             <Bell size={15} />
             <span>
-              <strong>Notifications</strong>
-              <small>{unreadCount} unread</small>
+              <strong>{t("inbox.tabs.notifications")}</strong>
+              <small>{t("inbox.tabs.unread", { count: unreadCount })}</small>
             </span>
           </button>
           <button className={activeTab === "todos" ? "inbox-tab is-active" : "inbox-tab"} onClick={() => setActiveTab("todos")} type="button">
             <ListTodo size={15} />
             <span>
-              <strong>Todos</strong>
-              <small>{openTodos.length} open</small>
+              <strong>{t("inbox.tabs.todos")}</strong>
+              <small>{t("inbox.tabs.open", { count: openTodos.length })}</small>
             </span>
           </button>
           <button className={activeTab === "reminders" ? "inbox-tab is-active" : "inbox-tab"} onClick={() => setActiveTab("reminders")} type="button">
             <Clock3 size={15} />
             <span>
-              <strong>Reminders</strong>
-              <small>{pendingReminders.length} scheduled</small>
+              <strong>{t("inbox.tabs.reminders")}</strong>
+              <small>{t("inbox.tabs.scheduled", { count: pendingReminders.length })}</small>
             </span>
           </button>
         </div>
@@ -259,13 +263,13 @@ export const InboxPage = () => {
           {activeTab === "notifications" && isLoading ? (
           <div className="notifications-empty">
             <InboxIcon size={18} />
-            <span>Loading notifications…</span>
+            <span>{t("inbox.notifications.loading")}</span>
           </div>
         ) : activeTab === "notifications" && items.length === 0 ? (
           <div className="notifications-empty inbox-empty-state">
             <Bell size={22} />
-            <strong>No notifications yet</strong>
-            <span>When an agent finishes work, a reminder fires or a workspace event needs attention, it will appear here.</span>
+            <strong>{t("inbox.notifications.emptyTitle")}</strong>
+            <span>{t("inbox.notifications.emptyBody")}</span>
           </div>
         ) : activeTab === "notifications" ? (
           <div className="inbox-list">
@@ -297,21 +301,21 @@ export const InboxPage = () => {
           <div className="inbox-list">
             <div className="inbox-composer">
               <div>
-                <p className="inbox-composer-title">Quick add</p>
+                <p className="inbox-composer-title">{t("inbox.quickAdd")}</p>
               </div>
               <div className="inbox-quick-form">
-                <input aria-label="Todo title" value={todoTitle} onChange={(event) => setTodoTitle(event.target.value)} placeholder="What needs to happen?" />
-                <input aria-label="Todo due date" value={todoDueAt} onChange={(event) => setTodoDueAt(event.target.value)} type="datetime-local" />
-                <select aria-label="Todo frequency" value={todoRecurrenceRule} onChange={(event) => setTodoRecurrenceRule(event.target.value)}>
+                <input aria-label={t("inbox.todos.titleAria")} value={todoTitle} onChange={(event) => setTodoTitle(event.target.value)} placeholder={t("inbox.todos.placeholder")} />
+                <input aria-label={t("inbox.todos.dueDateAria")} value={todoDueAt} onChange={(event) => setTodoDueAt(event.target.value)} type="datetime-local" />
+                <select aria-label={t("inbox.todos.frequencyAria")} value={todoRecurrenceRule} onChange={(event) => setTodoRecurrenceRule(event.target.value)}>
                   {recurrenceOptions.map((option) => (
                     <option key={option.value || "one-time"} value={option.value}>
-                      {option.label}
+                      {t(option.labelKey)}
                     </option>
                   ))}
                 </select>
                 <button className="inbox-add-button" onClick={() => void handleCreateTodo()} type="button">
                   <Plus size={14} />
-                  <span>Add todo</span>
+                  <span>{t("inbox.todos.add")}</span>
                 </button>
               </div>
             </div>
@@ -327,18 +331,18 @@ export const InboxPage = () => {
                           <ListTodo size={14} />
                         </span>
                         <span className={`inbox-meta-pill tone-${getDueTone(todo.dueAt)}`}>
-                          {todo.dueAt ? `Due ${formatDate(todo.dueAt, SHORT_DATE_FORMAT)}` : "No due date"}
+                          {todo.dueAt ? t("inbox.todos.due", { date: formatDate(todo.dueAt, SHORT_DATE_FORMAT) }) : t("inbox.todos.noDueDate")}
                         </span>
-                        {todo.recurrenceRule ? <span className="inbox-meta-pill tone-info">{getRecurrenceLabel(todo.recurrenceRule)}</span> : null}
+                        {todo.recurrenceRule ? <span className="inbox-meta-pill tone-info">{getRecurrenceLabel(todo.recurrenceRule, t)}</span> : null}
                       </div>
                       {isEditing ? (
                         <div className="inbox-edit-form">
-                          <input aria-label="Todo title" value={editingTodoTitle} onChange={(event) => setEditingTodoTitle(event.target.value)} />
-                          <input aria-label="Todo due date" value={editingTodoDueAt} onChange={(event) => setEditingTodoDueAt(event.target.value)} type="datetime-local" />
-                          <select aria-label="Todo frequency" value={editingTodoRecurrenceRule} onChange={(event) => setEditingTodoRecurrenceRule(event.target.value)}>
+                          <input aria-label={t("inbox.todos.titleAria")} value={editingTodoTitle} onChange={(event) => setEditingTodoTitle(event.target.value)} />
+                          <input aria-label={t("inbox.todos.dueDateAria")} value={editingTodoDueAt} onChange={(event) => setEditingTodoDueAt(event.target.value)} type="datetime-local" />
+                          <select aria-label={t("inbox.todos.frequencyAria")} value={editingTodoRecurrenceRule} onChange={(event) => setEditingTodoRecurrenceRule(event.target.value)}>
                             {recurrenceOptions.map((option) => (
                               <option key={option.value || "one-time"} value={option.value}>
-                                {option.label}
+                                {t(option.labelKey)}
                               </option>
                             ))}
                           </select>
@@ -348,7 +352,7 @@ export const InboxPage = () => {
                           <strong className="inbox-copy-title">
                             <span>{todo.title}</span>
                           </strong>
-                          {todo.notes ? <span>{todo.notes}</span> : <span>No notes</span>}
+                          {todo.notes ? <span>{todo.notes}</span> : <span>{t("inbox.noNotes")}</span>}
                         </div>
                       )}
                       <div className="inbox-task-card-actions">
@@ -356,11 +360,11 @@ export const InboxPage = () => {
                           <>
                             <button className="inbox-cancel-button" onClick={() => setEditingTodoId(null)} type="button">
                               <X size={13} />
-                              Cancel
+                              {t("common.cancel")}
                             </button>
                             <button className="inbox-add-button compact" onClick={() => void saveEditingTodo()} type="button">
                               <Check size={13} />
-                              Save
+                              {t("common.save")}
                             </button>
                           </>
                         ) : (
@@ -368,14 +372,14 @@ export const InboxPage = () => {
                             {!todo.completedAt ? (
                               <button className="inbox-card-done-button" onClick={() => void markTodoDone(todo.id)} type="button">
                                 <Check size={14} />
-                                <span>Done</span>
+                                <span>{t("inbox.actions.done")}</span>
                               </button>
                             ) : null}
                             <span className="inbox-card-hover-actions">
-                              <button className="icon-ghost-control" data-tooltip="Edit" onClick={() => startEditingTodo(todo)} type="button">
+                              <button className="icon-ghost-control" data-tooltip={t("common.edit")} onClick={() => startEditingTodo(todo)} type="button">
                                 <Pencil size={14} />
                               </button>
-                              <button className="icon-ghost-control danger-icon-control" data-tooltip="Delete" onClick={() => void deleteTodo(todo.id)} type="button">
+                              <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} onClick={() => void deleteTodo(todo.id)} type="button">
                                 <Trash2 size={14} />
                               </button>
                             </span>
@@ -389,8 +393,8 @@ export const InboxPage = () => {
             ) : (
               <div className="notifications-empty inbox-empty-state">
                 <ListTodo size={22} />
-                <strong>No todos yet</strong>
-                <span>Add one above or ask an agent to create a follow-up.</span>
+                <strong>{t("inbox.todos.emptyTitle")}</strong>
+                <span>{t("inbox.todos.emptyBody")}</span>
               </div>
             )}
           </div>
@@ -398,22 +402,22 @@ export const InboxPage = () => {
           <div className="inbox-list">
             <div className="inbox-composer">
               <div>
-                <p className="inbox-composer-title">Quick add</p>
+                <p className="inbox-composer-title">{t("inbox.quickAdd")}</p>
               </div>
               <div className="inbox-quick-form inbox-reminder-form">
-                <input aria-label="Reminder title" value={reminderTitle} onChange={(event) => setReminderTitle(event.target.value)} placeholder="Remind me to…" />
-                <input aria-label="Reminder time" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} type="datetime-local" />
-                <select aria-label="Reminder frequency" value={reminderRecurrenceRule} onChange={(event) => setReminderRecurrenceRule(event.target.value)}>
+                <input aria-label={t("inbox.reminders.titleAria")} value={reminderTitle} onChange={(event) => setReminderTitle(event.target.value)} placeholder={t("inbox.reminders.placeholder")} />
+                <input aria-label={t("inbox.reminders.timeAria")} value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} type="datetime-local" />
+                <select aria-label={t("inbox.reminders.frequencyAria")} value={reminderRecurrenceRule} onChange={(event) => setReminderRecurrenceRule(event.target.value)}>
                   {recurrenceOptions.map((option) => (
                     <option key={option.value || "one-time"} value={option.value}>
-                      {option.label}
+                      {t(option.labelKey)}
                     </option>
                   ))}
                 </select>
-                <input aria-label="Reminder notes" value={reminderBody} onChange={(event) => setReminderBody(event.target.value)} placeholder="Notes optional" />
+                <input aria-label={t("inbox.reminders.notesAria")} value={reminderBody} onChange={(event) => setReminderBody(event.target.value)} placeholder={t("inbox.reminders.notesPlaceholder")} />
                 <button className="inbox-add-button" onClick={() => void handleCreateReminder()} type="button">
                   <Plus size={14} />
-                  <span>Add reminder</span>
+                  <span>{t("inbox.reminders.add")}</span>
                 </button>
               </div>
             </div>
@@ -422,10 +426,10 @@ export const InboxPage = () => {
                 {reminders.map((reminder) => {
                   const isEditing = editingReminderId === reminder.id;
                   const reminderMeta = reminder.completedAt
-                    ? "Delivered"
+                    ? t("inbox.reminders.delivered")
                     : reminder.snoozedUntil
-                      ? `Snoozed until ${formatDate(reminder.snoozedUntil, SHORT_DATE_FORMAT)}`
-                      : `Reminds ${formatDate(reminder.remindAt, SHORT_DATE_FORMAT)}`;
+                      ? t("inbox.reminders.snoozedUntil", { date: formatDate(reminder.snoozedUntil, SHORT_DATE_FORMAT) })
+                      : t("inbox.reminders.reminds", { date: formatDate(reminder.remindAt, SHORT_DATE_FORMAT) });
                   return (
                     <article
                       key={reminder.id}
@@ -439,28 +443,28 @@ export const InboxPage = () => {
                         <span className={`inbox-meta-pill tone-${reminder.completedAt ? "neutral" : getDueTone(reminder.snoozedUntil ?? reminder.remindAt)}`}>
                           {reminderMeta}
                         </span>
-                        {isLicenseReminder(reminder.title) ? <span className="inbox-meta-pill tone-info">Licenses</span> : null}
-                        {reminder.recurrenceRule ? <span className="inbox-meta-pill tone-info">{getRecurrenceLabel(reminder.recurrenceRule)}</span> : null}
+                        {isLicenseReminder(reminder.title) ? <span className="inbox-meta-pill tone-info">{t("inbox.reminders.licenses")}</span> : null}
+                        {reminder.recurrenceRule ? <span className="inbox-meta-pill tone-info">{getRecurrenceLabel(reminder.recurrenceRule, t)}</span> : null}
                       </div>
                       {isEditing ? (
                         <div className="inbox-edit-form">
-                          <input aria-label="Reminder title" value={editingReminderTitle} onChange={(event) => setEditingReminderTitle(event.target.value)} />
-                          <input aria-label="Reminder time" value={editingReminderAt} onChange={(event) => setEditingReminderAt(event.target.value)} type="datetime-local" />
-                          <select aria-label="Reminder frequency" value={editingReminderRecurrenceRule} onChange={(event) => setEditingReminderRecurrenceRule(event.target.value)}>
+                          <input aria-label={t("inbox.reminders.titleAria")} value={editingReminderTitle} onChange={(event) => setEditingReminderTitle(event.target.value)} />
+                          <input aria-label={t("inbox.reminders.timeAria")} value={editingReminderAt} onChange={(event) => setEditingReminderAt(event.target.value)} type="datetime-local" />
+                          <select aria-label={t("inbox.reminders.frequencyAria")} value={editingReminderRecurrenceRule} onChange={(event) => setEditingReminderRecurrenceRule(event.target.value)}>
                             {recurrenceOptions.map((option) => (
                               <option key={option.value || "one-time"} value={option.value}>
-                                {option.label}
+                                {t(option.labelKey)}
                               </option>
                             ))}
                           </select>
-                          <input aria-label="Reminder body" value={editingReminderBody} onChange={(event) => setEditingReminderBody(event.target.value)} />
+                          <input aria-label={t("inbox.reminders.bodyAria")} value={editingReminderBody} onChange={(event) => setEditingReminderBody(event.target.value)} />
                         </div>
                       ) : (
                         <div className="inbox-task-card-copy">
                           <strong className="inbox-copy-title">
                             <span>{reminder.title}</span>
                           </strong>
-                          {reminder.body ? <span>{reminder.body}</span> : <span>No notes</span>}
+                          {reminder.body ? <span>{reminder.body}</span> : <span>{t("inbox.noNotes")}</span>}
                         </div>
                       )}
                       <div className="inbox-task-card-actions">
@@ -468,11 +472,11 @@ export const InboxPage = () => {
                           <>
                             <button className="inbox-cancel-button" onClick={() => setEditingReminderId(null)} type="button">
                               <X size={13} />
-                              Cancel
+                              {t("common.cancel")}
                             </button>
                             <button className="inbox-add-button compact" onClick={() => void saveEditingReminder()} type="button">
                               <Check size={13} />
-                              Save
+                              {t("common.save")}
                             </button>
                           </>
                         ) : (
@@ -480,19 +484,19 @@ export const InboxPage = () => {
                             {!reminder.completedAt ? (
                               <>
                                 <button className="secondary-button compact" onClick={() => void snoozeReminder(reminder.id, 15)} type="button">
-                                  Snooze
+                                  {t("inbox.actions.snooze")}
                                 </button>
                                 <button className="inbox-card-done-button" onClick={() => void markReminderDone(reminder.id)} type="button">
                                   <Check size={14} />
-                                  <span>Done</span>
+                                  <span>{t("inbox.actions.done")}</span>
                                 </button>
                               </>
                             ) : null}
                             <span className="inbox-card-hover-actions">
-                              <button className="icon-ghost-control" data-tooltip="Edit" onClick={() => startEditingReminder(reminder)} type="button">
+                              <button className="icon-ghost-control" data-tooltip={t("common.edit")} onClick={() => startEditingReminder(reminder)} type="button">
                                 <Pencil size={14} />
                               </button>
-                              <button className="icon-ghost-control danger-icon-control" data-tooltip="Delete" onClick={() => void deleteReminder(reminder.id)} type="button">
+                              <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} onClick={() => void deleteReminder(reminder.id)} type="button">
                                 <Trash2 size={14} />
                               </button>
                             </span>
@@ -506,8 +510,8 @@ export const InboxPage = () => {
             ) : (
               <div className="notifications-empty inbox-empty-state">
                 <Clock3 size={22} />
-                <strong>No reminders yet</strong>
-                <span>Scheduled reminders will fire natively on macOS.</span>
+                <strong>{t("inbox.reminders.emptyTitle")}</strong>
+                <span>{t("inbox.reminders.emptyBody")}</span>
               </div>
             )}
           </div>

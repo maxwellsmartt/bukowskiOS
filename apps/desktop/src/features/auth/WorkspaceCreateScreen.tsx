@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
@@ -16,6 +17,7 @@ const slugifyWorkspaceName = (value: string) =>
     .slice(0, 42);
 
 export const WorkspaceCreateScreen = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { isLocalFallback } = useSession();
   const { createWorkspace, isCreatingWorkspace, workspaceError } = useWorkspace();
@@ -33,13 +35,13 @@ export const WorkspaceCreateScreen = () => {
   return (
     <div className="auth-screen">
       <section className="auth-panel" aria-labelledby="workspace-create-title">
-        <p className="auth-eyebrow">Workspace setup</p>
-        <h1 id="workspace-create-title">Create workspace</h1>
+        <p className="auth-eyebrow">{t("auth.workspaceCreate.eyebrow")}</p>
+        <h1 id="workspace-create-title">{t("auth.workspaceCreate.title")}</h1>
 
         {isLocalFallback ? (
           <div className="auth-placeholder">
             <Plus size={20} />
-            <p>Supabase is not configured. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to create remote workspaces.</p>
+            <p>{t("auth.workspaceCreate.supabaseMissing")}</p>
           </div>
         ) : null}
 
@@ -55,11 +57,11 @@ export const WorkspaceCreateScreen = () => {
               iconColor,
             })
               .then(() => navigate("/workspaces/select", { replace: true }))
-              .catch((error: unknown) => setStatus(getUserFacingErrorMessage(error, "Workspace creation failed.")));
+              .catch((error: unknown) => setStatus(getUserFacingErrorMessage(error, t("auth.workspaceCreate.failed"))));
           }}
         >
           <label className="auth-field">
-            <span>Name</span>
+            <span>{t("auth.workspaceCreate.name")}</span>
             <input
               className="text-input"
               disabled={isCreatingWorkspace || isLocalFallback}
@@ -69,7 +71,7 @@ export const WorkspaceCreateScreen = () => {
             />
           </label>
           <label className="auth-field">
-            <span>Slug</span>
+            <span>{t("auth.workspaceCreate.slug")}</span>
             <input
               className="text-input"
               disabled={isCreatingWorkspace || isLocalFallback}
@@ -79,7 +81,7 @@ export const WorkspaceCreateScreen = () => {
             />
           </label>
           <label className="auth-field">
-            <span>Currency</span>
+            <span>{t("auth.workspaceCreate.currency")}</span>
             <input
               className="text-input"
               disabled={isCreatingWorkspace || isLocalFallback}
@@ -90,7 +92,7 @@ export const WorkspaceCreateScreen = () => {
             />
           </label>
           <label className="auth-field">
-            <span>Color</span>
+            <span>{t("auth.workspaceCreate.color")}</span>
             <input
               className="text-input"
               disabled={isCreatingWorkspace || isLocalFallback}
@@ -101,12 +103,12 @@ export const WorkspaceCreateScreen = () => {
           </label>
           <button className="auth-primary-button" disabled={isCreatingWorkspace || isLocalFallback} type="submit">
             <Plus size={16} />
-            <span>{isCreatingWorkspace ? "Creating..." : "Create workspace"}</span>
+            <span>{isCreatingWorkspace ? t("auth.workspaceCreate.creating") : t("auth.workspaceCreate.create")}</span>
           </button>
         </form>
 
         {status || workspaceError ? <p className="auth-status">{status ?? workspaceError}</p> : null}
-        <Link className="auth-back-link" to="/workspaces/select">Back to workspaces</Link>
+        <Link className="auth-back-link" to="/workspaces/select">{t("auth.workspaceCreate.backToWorkspaces")}</Link>
       </section>
     </div>
   );

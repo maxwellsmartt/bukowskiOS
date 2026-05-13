@@ -947,6 +947,170 @@
       "descending": "Descending"
     }
   },
+  "shared": {
+    "agentCreatedBadge": "Created by agent"
+  },
+  "auth": {
+    "backToSignIn": "Back to sign in",
+    "providers": {
+      "google": "Google",
+      "github": "GitHub"
+    },
+    "fields": {
+      "email": "Email",
+      "password": "Password"
+    },
+    "login": {
+      "title": "Welcome back",
+      "localFallback": "Local dev session is active.",
+      "forgotPassword": "Forgot password?",
+      "use2fa": "Use 2FA",
+      "remember": "Keep me signed in on this Mac",
+      "signingIn": "Signing in...",
+      "signIn": "Sign in",
+      "or": "or",
+      "sendMagicLink": "Send magic link",
+      "magicLinkSent": "Magic link sent. Check your email.",
+      "continueWith": "Continue with {{provider}}",
+      "firstTimeTitle": "First time here?",
+      "firstTimeBody": "Enter your email and get a secure link to create your password.",
+      "setupPassword": "Set up password",
+      "setupLinkSent": "Setup link sent. Open it to create your password.",
+      "oauthOpening": "Opening {{provider}}. Approve access in your browser and bukowskiOS will continue here.",
+      "oauthWaitingStatus": "Waiting for {{provider}} approval. You can return here after approving in the browser.",
+      "waitingFor": "Waiting for {{provider}}",
+      "oauthWaitingBody": "Approve access in your browser. This window will continue automatically when the secure callback returns.",
+      "useAnotherMethod": "Use another method",
+      "errors": {
+        "authFailed": "Authentication failed.",
+        "oauthStartFailed": "{{provider}} sign in could not start."
+      }
+    },
+    "recovery": {
+      "eyebrow": "Account recovery",
+      "title": "Recover access",
+      "sent": "Recovery email sent. Open the link in your email to set a new password.",
+      "sendFailed": "Could not send recovery link.",
+      "sending": "Sending...",
+      "send": "Send recovery email"
+    },
+    "reset": {
+      "firstLoginEyebrow": "First login",
+      "eyebrow": "Password reset",
+      "firstLoginTitle": "Create your password",
+      "title": "Set a new password",
+      "firstLoginBody": "Add a password so you can sign in quickly next time. You can still use magic links whenever needed.",
+      "body": "Choose a new password for your bukowskiOS account.",
+      "minLength": "Use at least 8 characters for the new password.",
+      "passwordMismatch": "Passwords do not match.",
+      "updated": "Password updated. Opening your workspaces...",
+      "updateFailed": "Could not update the password.",
+      "openLinkFirst": "Open the secure email link first, then return here to set the password.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "updating": "Updating...",
+      "updatePassword": "Update password"
+    },
+    "mfa": {
+      "eyebrow": "Two-factor authentication",
+      "title": "2FA challenge",
+      "placeholder": "TOTP verification is reserved for the Supabase MFA wiring step in this slice."
+    },
+    "workspacePicker": {
+      "title": "Choose workspace",
+      "loadingTitle": "Loading workspaces",
+      "loadingBody": "Restoring your latest access...",
+      "emptyTitle": "No workspace access yet",
+      "emptyBody": "Ask an admin to invite this email, then refresh once you accept the invite.",
+      "refreshAccess": "Refresh access",
+      "createWorkspace": "Create workspace",
+      "backToLogin": "Back to login"
+    },
+    "workspaceCreate": {
+      "eyebrow": "Workspace setup",
+      "title": "Create workspace",
+      "supabaseMissing": "Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to create remote workspaces.",
+      "failed": "Workspace creation failed.",
+      "name": "Name",
+      "slug": "Slug",
+      "currency": "Currency",
+      "color": "Color",
+      "creating": "Creating...",
+      "create": "Create workspace",
+      "backToWorkspaces": "Back to workspaces"
+    }
+  },
+  "inbox": {
+    "title": "Inbox",
+    "quickAdd": "Quick add",
+    "noNotes": "No notes",
+    "actions": {
+      "markAllRead": "Mark all read",
+      "done": "Done",
+      "snooze": "Snooze"
+    },
+    "summary": {
+      "unread": "Unread",
+      "needsAttention": "Needs attention",
+      "allCaughtUp": "All caught up",
+      "openTodos": "Open todos",
+      "totalVisible": "{{count}} total visible",
+      "nextReminder": "Next reminder",
+      "scheduled": "{{count}} scheduled"
+    },
+    "tabs": {
+      "notifications": "Notifications",
+      "todos": "Todos",
+      "reminders": "Reminders",
+      "unread": "{{count}} unread",
+      "open": "{{count}} open",
+      "scheduled": "{{count}} scheduled"
+    },
+    "notifications": {
+      "loading": "Loading notifications...",
+      "emptyTitle": "No notifications yet",
+      "emptyBody": "When an agent finishes work, a reminder fires or a workspace event needs attention, it will appear here."
+    },
+    "todos": {
+      "titleAria": "Todo title",
+      "dueDateAria": "Todo due date",
+      "frequencyAria": "Todo frequency",
+      "placeholder": "What needs to happen?",
+      "add": "Add todo",
+      "due": "Due {{date}}",
+      "noDueDate": "No due date",
+      "emptyTitle": "No todos yet",
+      "emptyBody": "Add one above or ask an agent to create a follow-up."
+    },
+    "reminders": {
+      "titleAria": "Reminder title",
+      "timeAria": "Reminder time",
+      "frequencyAria": "Reminder frequency",
+      "notesAria": "Reminder notes",
+      "bodyAria": "Reminder body",
+      "placeholder": "Remind me to...",
+      "notesPlaceholder": "Notes optional",
+      "add": "Add reminder",
+      "delivered": "Delivered",
+      "snoozedUntil": "Snoozed until {{date}}",
+      "reminds": "Reminds {{date}}",
+      "licenses": "Licenses",
+      "emptyTitle": "No reminders yet",
+      "emptyBody": "Scheduled reminders will fire natively on macOS."
+    },
+    "recurrence": {
+      "oneTime": "One time",
+      "everyDay": "Every day",
+      "weekdays": "Weekdays",
+      "everyWeek": "Every week",
+      "everyMonth": "Every month",
+      "repeats": "Repeats"
+    },
+    "errors": {
+      "todoTitle": "Add a todo title first.",
+      "reminderTitleTime": "Add a reminder title and time first."
+    }
+  },
   "catalog": {
     "title": "Catalog",
     "unavailable": "Catalog unavailable: {{message}}",
