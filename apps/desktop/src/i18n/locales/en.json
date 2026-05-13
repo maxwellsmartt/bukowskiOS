@@ -1111,7 +1111,147 @@
       "reminderTitleTime": "Add a reminder title and time first."
     }
   },
+  "assistantChat": {
+    "actions": {
+      "openRuns": "Open runs",
+      "viewAgent": "View agent",
+      "threadActions": "Thread actions",
+      "expandThreads": "Expand threads",
+      "close": "Close assistant chat",
+      "hideDetails": "Hide response details",
+      "showDetails": "Show response details"
+    },
+    "session": {
+      "context": "Context",
+      "assigned": "Assigned",
+      "intent": "Intent",
+      "command": "Command",
+      "notRoutedYet": "Not routed yet",
+      "pendingClassification": "Pending classification"
+    },
+    "command": {
+      "noChangesApplied": "No changes applied"
+    },
+    "pending": {
+      "supervisorReviewing": "Supervisor reviewing request",
+      "routingBody": "Routing intent and preparing a supervised response. No changes have been made."
+    },
+    "review": {
+      "continuing": "Continuing approved work",
+      "continuingSession": "Continuing approved work for this session",
+      "continuingSupervisedBody": "Understood. I am continuing this approved work under supervision.",
+      "continuingSessionBody": "Understood. I am continuing this approved work for the whole session.",
+      "approvalBody": "Applying your approval and waiting for the delegated work to finish.",
+      "sessionApprovalBody": "Using your session approval to continue the delegated work without asking again in this thread.",
+      "decisionRecorded": "Approval decision recorded"
+    },
+    "notifications": {
+      "runDenied": "Agent run denied",
+      "runUpdated": "Agent run updated"
+    },
+    "errors": {
+      "prepareDraft": "Mission Control could not prepare this draft run."
+    },
+    "actionEntities": {
+      "asset": "Asset",
+      "incident": "Incident",
+      "packing_slip": "Packing slip",
+      "project": "Project",
+      "quote": "Quote",
+      "rma": "RMA",
+      "item": "Item"
+    },
+    "actionCompleted": "Action completed",
+    "singleEntityReady": "{{entity}} ready",
+    "multipleEntitiesReady": "{{entities}} and {{last}} ready",
+    "approval": {
+      "chooseHandling": "Choose how you want to handle this supervised draft.",
+      "noExecutionYet": "No real execution happens here yet. This only records your decision cleanly in the flow.",
+      "ifApproved": "If approved"
+    },
+    "approvalResult": {
+      "denied": "Denied. This supervised draft stops here and nothing executes.",
+      "approvedForSession": "Approved for this session. Similar follow-ups in this thread can continue without asking again for this specialist.",
+      "approved": "Approved. This draft can continue under supervision, but the command layer still does not execute automatically."
+    },
+    "approvalMode": {
+      "supervised": "Supervised",
+      "needs_approval": "Needs approval",
+      "unsupervised": "Unsupervised"
+    },
+    "approvalModeDescription": {
+      "supervised": "Drafts and delegated work stay review-aware.",
+      "needs_approval": "Always ask before continuing delegated work in this thread.",
+      "unsupervised": "Skips approval prompts for supervised agents only. Agents marked needs approval still ask."
+    },
+    "reasoning": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    }
+  },
   "agents": {
+    "shared": {
+      "aiService": "AI service",
+      "operationalState": {
+        "idle": "Idle",
+        "working": "Working",
+        "not_working": "Not working"
+      },
+      "agentStatus": {
+        "active": "Active",
+        "paused": "Paused"
+      }
+    },
+    "team": {
+      "title": "Automation Team",
+      "body": "The roster of AI assistants set up for this workspace. Each one has a focus area, a model and an approval mode.",
+      "cardTitle": "Agents",
+      "createAgent": "Create agent",
+      "unavailable": "Agents unavailable: {{message}}",
+      "copyName": "{{name}} Copy",
+      "pauseAgent": "Pause agent",
+      "reactivateAgent": "Reactivate",
+      "pauseAgentNamed": "Pause {{name}}",
+      "reactivateAgentNamed": "Reactivate {{name}}",
+      "duplicateAgent": "Duplicate agent",
+      "duplicateAgentNamed": "Duplicate {{name}}",
+      "loadingAgent": "Loading agent",
+      "closeDetail": "Close agent detail",
+      "tools": "Tools",
+      "domains": "Domains",
+      "domain": "Domain",
+      "mission": "Mission",
+      "role": "Role",
+      "allowedTools": "Allowed tools",
+      "noToolsDefined": "No tools defined",
+      "noToolsAssigned": "No tools assigned",
+      "noDomainsDefined": "No domains defined",
+      "noNotes": "No notes for this agent yet.",
+      "noRecentActivity": "No recent activity for this agent yet.",
+      "loadingDetails": "Loading agent details...",
+      "readOnlyTools_one": "{{count}} read-only",
+      "readOnlyTools_other": "{{count}} read-only",
+      "writeTools_one": "{{count}} write tool · requires approval",
+      "writeTools_other": "{{count}} write tools · requires approval"
+    },
+    "mission": {
+      "title": "Automation Overview",
+      "unavailable": "Automation overview unavailable: {{message}}",
+      "teamMap": "Team Map",
+      "changeReviewMode": "Change review mode",
+      "needsReview": "Needs Review",
+      "approvalFallback": "This supervised draft is waiting for your review.",
+      "viewAgent": "View agent",
+      "updates": "Updates",
+      "health": {
+        "activeAgents": "Active agents",
+        "pausedAgents": "Paused agents",
+        "recentActivity": "Recent activity",
+        "activeChannels": "Active channels",
+        "assignedModels": "Assigned models"
+      }
+    },
     "models": {
       "title": "AI Models",
       "services": "AI Services",
@@ -1136,6 +1276,7 @@
       "lastTested": "Last tested",
       "lastSuccess": "Last success",
       "assignedModels": "Assigned models",
+      "noAgentsAssigned": "No agents assigned yet",
       "modelsSynced": "Models synced",
       "noneYet": "None yet",
       "lastError": "Last error",
@@ -1183,6 +1324,14 @@
         "refreshModels": "Unable to refresh model options.",
         "testProvider": "Unable to test the provider connection.",
         "updateAssignment": "Unable to update the agent assignment."
+      }
+    },
+    "connectors": {
+      "title": "Channels",
+      "status": {
+        "configured": "Ready",
+        "disabled": "Disabled",
+        "needs_setup": "Needs setup"
       }
     },
     "runs": {

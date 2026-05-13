@@ -25,6 +25,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { AssistantChatSession, AssistantChatSessionState } from "@app/providers/AssistantChatContext";
 import type { AssistantApprovalPreference, AssistantChatMessageMeta, AssistantChatSnapshot, AssistantGatewayAttachment } from "@contracts";
@@ -38,17 +39,11 @@ import { readJsonPreference, uiPreferenceKeys, writeJsonPreference } from "@shar
 
 const modelOptions = ["GPT-5.4", "Claude Sonnet", "OpenClaw Balanced"];
 const reasoningOptions = ["Low", "Medium", "High"];
-const approvalOptions: Array<{ label: string; value: AssistantApprovalPreference }> = [
-  { label: "Supervised", value: "supervised" },
-  { label: "Needs approval", value: "needs_approval" },
-  { label: "Unsupervised", value: "unsupervised" },
+const approvalOptions: Array<{ labelKey: string; value: AssistantApprovalPreference }> = [
+  { labelKey: "assistantChat.approvalMode.supervised", value: "supervised" },
+  { labelKey: "assistantChat.approvalMode.needs_approval", value: "needs_approval" },
+  { labelKey: "assistantChat.approvalMode.unsupervised", value: "unsupervised" },
 ];
-const approvalModeDescriptions: Record<AssistantApprovalPreference, string> = {
-  supervised: "Drafts and delegated work stay review-aware.",
-  needs_approval: "Always ask before continuing delegated work in this thread.",
-  unsupervised: "Skips approval prompts for supervised agents only. Agents marked needs approval still ask.",
-};
-
 type ActiveSelector = "model" | "reasoning" | "approval" | null;
 type ThreadSourceFilter = "app" | "telegram" | "all";
 type ThreadMenuState = {
@@ -422,7 +417,7 @@ const buildAgentCompletionNotification = (meta: AssistantChatMessageMeta | null,
   };
 };
 
-const buildStateActions = (state: AssistantChatSessionState | null) => {
+const buildStateActions = (state: AssistantChatSessionState | null, t: ReturnType<typeof useTranslation>["t"]) => {
   if (!state) {
     return [];
   }
@@ -441,7 +436,7 @@ const buildStateActions = (state: AssistantChatSessionState | null) => {
 
   if (state.tone !== "sending") {
     seenPaths.add("/agents/runs");
-    actions.push({ label: "Open runs", to: "/agents/runs" });
+    actions.push({ label: t("assistantChat.actions.openRuns"), to: "/agents/runs" });
   }
 
   if (state.routedAgentId) {
@@ -452,7 +447,7 @@ const buildStateActions = (state: AssistantChatSessionState | null) => {
 
     seenPaths.add(agentPath);
     actions.push({
-      label: "View agent",
+      label: t("assistantChat.actions.viewAgent"),
       to: agentPath,
     });
   }
@@ -469,19 +464,21 @@ const actionEntityLabels: Record<NonNullable<AssistantChatSessionState["actionLi
   rma: "RMA",
 };
 
-const buildActionResultSummary = (state: AssistantChatSessionState) => {
+const buildActionResultSummary = (state: AssistantChatSessionState, t: ReturnType<typeof useTranslation>["t"]) => {
   const links = state.actionLinks ?? [];
-  const labels = Array.from(new Set(links.map((link) => actionEntityLabels[link.entityType] ?? "Item")));
+  const labels = Array.from(
+    new Set(links.map((link) => t(`assistantChat.actionEntities.${link.entityType}`, { defaultValue: actionEntityLabels[link.entityType] ?? t("assistantChat.actionEntities.item") }))),
+  );
 
   if (!labels.length) {
-    return "Action completed";
+    return t("assistantChat.actionCompleted");
   }
 
   if (labels.length === 1) {
-    return `${labels[0]} ready`;
+    return t("assistantChat.singleEntityReady", { entity: labels[0] });
   }
 
-  return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)} ready`;
+  return t("assistantChat.multipleEntitiesReady", { entities: labels.slice(0, -1).join(", "), last: labels.at(-1) });
 };
 
 const buildOperationalReceiptRows = (state: AssistantChatSessionState | null) => {
@@ -506,16 +503,16 @@ const resolveApprovalToneClass = (decision: AssistantChatSessionState["approvalD
   return "is-approved";
 };
 
-const resolveApprovalSummary = (state: AssistantChatSessionState) => {
+const resolveApprovalSummary = (state: AssistantChatSessionState, t: ReturnType<typeof useTranslation>["t"]) => {
   if (state.approvalDecision === "denied") {
-    return "Denied. This supervised draft stops here and nothing executes.";
+    return t("assistantChat.approvalResult.denied");
   }
 
   if (state.approvalDecision === "approved_for_session") {
-    return "Approved for this session. Similar follow-ups in this thread can continue without asking again for this specialist.";
+    return t("assistantChat.approvalResult.approvedForSession");
   }
 
-  return "Approved. This draft can continue under supervision, but the command layer still does not execute automatically.";
+  return t("assistantChat.approvalResult.approved");
 };
 
 const buildOptimisticSession = (
@@ -558,6 +555,7 @@ const buildOptimisticSession = (
 };
 
 export const GlobalAssistantChat = () => {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { items } = useCompareTray();
@@ -640,7 +638,7 @@ export const GlobalAssistantChat = () => {
     [activeVisibleSession, optimisticAssistantMessage, optimisticTurn],
   );
   const activeSessionState = resolvedActiveSession.latestState;
-  const stateActions = useMemo(() => buildStateActions(activeSessionState), [activeSessionState]);
+  const stateActions = useMemo(() => buildStateActions(activeSessionState, t), [activeSessionState, t]);
   const threadMenuSession = useMemo(
     () => sessions.find((session) => session.id === threadMenuState?.sessionId) ?? null,
     [sessions, threadMenuState?.sessionId],
@@ -1041,13 +1039,13 @@ export const GlobalAssistantChat = () => {
     const outgoingUserMessage = buildUserBubbleMessage(nextMessage, attachments);
     const pendingState = {
       tone: "sending",
-      label: "Supervisor reviewing request",
-      body: "Routing intent and preparing a supervised response. No changes have been made.",
+      label: t("assistantChat.pending.supervisorReviewing"),
+      body: t("assistantChat.pending.routingBody"),
       routedAgentId: null,
-      routedAgentName: "Supervisor Agent",
-      routedAgentRole: "Supervisor Agent",
+      routedAgentName: t("agents.runs.supervisorAgent"),
+      routedAgentRole: t("agents.runs.supervisorAgent"),
       intentLabel,
-      commandStateLabel: "No changes applied",
+      commandStateLabel: t("assistantChat.command.noChangesApplied"),
     } satisfies AssistantChatSessionState;
 
     open();
@@ -1104,7 +1102,7 @@ export const GlobalAssistantChat = () => {
         }).catch(() => undefined);
       }
     } catch (error) {
-      setAttachmentError(getUserFacingErrorMessage(error, "Mission Control could not prepare this draft run."));
+      setAttachmentError(getUserFacingErrorMessage(error, t("assistantChat.errors.prepareDraft")));
     } finally {
       setOptimisticTurn(null);
       setIsSending(false);
@@ -1126,20 +1124,23 @@ export const GlobalAssistantChat = () => {
           role: "assistant",
           body:
             decision === "approve_for_session"
-              ? "Understood. I am continuing this approved work for the whole session."
-              : "Understood. I am continuing this approved work under supervision.",
+              ? t("assistantChat.review.continuingSessionBody")
+              : t("assistantChat.review.continuingSupervisedBody"),
           state: {
             tone: "sending",
-            label: decision === "approve_for_session" ? "Continuing approved work for this session" : "Continuing approved work",
+            label:
+              decision === "approve_for_session"
+                ? t("assistantChat.review.continuingSession")
+                : t("assistantChat.review.continuing"),
             body:
               decision === "approve_for_session"
-                ? "Using your session approval to continue the delegated work without asking again in this thread."
-                : "Applying your approval and waiting for the delegated work to finish.",
+                ? t("assistantChat.review.sessionApprovalBody")
+                : t("assistantChat.review.approvalBody"),
             routedAgentId: resolvedActiveSession.lastRoutedAgentId,
-            routedAgentName: activeSessionState?.routedAgentName ?? "Supervisor Agent",
-            routedAgentRole: activeSessionState?.routedAgentRole ?? "Supervisor Agent",
-            intentLabel: "Approval decision recorded",
-            commandStateLabel: "No changes applied",
+            routedAgentName: activeSessionState?.routedAgentName ?? t("agents.runs.supervisorAgent"),
+            routedAgentRole: activeSessionState?.routedAgentRole ?? t("agents.runs.supervisorAgent"),
+            intentLabel: t("assistantChat.review.decisionRecorded"),
+            commandStateLabel: t("assistantChat.command.noChangesApplied"),
             draftRunId: runId,
             approvalDecision: decision === "approve_for_session" ? "approved_for_session" : "approved",
             approvalScope: decision === "approve_for_session" ? "session" : "run",
@@ -1159,7 +1160,7 @@ export const GlobalAssistantChat = () => {
       if (!isOpen || !document.hasFocus()) {
         await createNotification({
           kind: "agent_completion",
-          title: decision === "deny" ? "Agent run denied" : "Agent run updated",
+          title: decision === "deny" ? t("assistantChat.notifications.runDenied") : t("assistantChat.notifications.runUpdated"),
           body: result.summary,
           linkTo: "/agents/runs",
           sourceType: "agent",
@@ -1378,7 +1379,7 @@ export const GlobalAssistantChat = () => {
                           className={`assistant-chat-session-action assistant-chat-session-menu-trigger${
                             threadMenuState?.sessionId === session.id ? " is-open" : ""
                           }`}
-                          data-tooltip="Thread actions"
+                          data-tooltip={t("assistantChat.actions.threadActions")}
                           onClick={(event) => openThreadMenu(session.id, event.currentTarget)}
                           type="button"
                         >
@@ -1392,26 +1393,36 @@ export const GlobalAssistantChat = () => {
                     {isExpanded ? (
                       <div className="assistant-chat-session-detail">
                         <div className="assistant-chat-session-detail-row">
-                          <span>Context</span>
+                          <span>{t("assistantChat.session.context")}</span>
                           <strong>{session.contextLabel}</strong>
                         </div>
                         <div className="assistant-chat-session-detail-row">
-                          <span>Assigned</span>
+                          <span>{t("assistantChat.session.assigned")}</span>
                           <div className="assistant-chat-assigned-agent">
-                            <strong>{hasState ? session.latestState?.routedAgentName ?? "Supervisor Agent" : "Not routed yet"}</strong>
+                            <strong>
+                              {hasState
+                                ? session.latestState?.routedAgentName ?? t("agents.runs.supervisorAgent")
+                                : t("assistantChat.session.notRoutedYet")}
+                            </strong>
                             {hasState && session.latestState?.routedAgentRole ? (
                               <span>{session.latestState.routedAgentRole}</span>
                             ) : null}
                           </div>
                         </div>
                         <div className="assistant-chat-session-detail-row">
-                          <span>Intent</span>
-                          <strong>{hasState ? session.latestState?.intentLabel ?? "Pending classification" : "Pending classification"}</strong>
+                          <span>{t("assistantChat.session.intent")}</span>
+                          <strong>
+                            {hasState
+                              ? session.latestState?.intentLabel ?? t("assistantChat.session.pendingClassification")
+                              : t("assistantChat.session.pendingClassification")}
+                          </strong>
                         </div>
                         <div className="assistant-chat-session-detail-row">
-                          <span>Command</span>
+                          <span>{t("assistantChat.session.command")}</span>
                           <strong>
-                            {hasState ? session.latestState?.commandStateLabel ?? "No changes applied" : "No changes applied"}
+                            {hasState
+                              ? session.latestState?.commandStateLabel ?? t("assistantChat.command.noChangesApplied")
+                              : t("assistantChat.command.noChangesApplied")}
                           </strong>
                         </div>
                       </div>
@@ -1427,9 +1438,9 @@ export const GlobalAssistantChat = () => {
               <div className="assistant-chat-topbar-leading">
                 {isSidebarCollapsed ? (
                   <button
-                    aria-label="Expand threads sidebar"
+                    aria-label={t("assistantChat.actions.expandThreads")}
                     className="surface-card-action"
-                    data-tooltip="Expand threads"
+                    data-tooltip={t("assistantChat.actions.expandThreads")}
                     onClick={() => setIsSidebarCollapsed(false)}
                     type="button"
                   >
@@ -1439,9 +1450,9 @@ export const GlobalAssistantChat = () => {
                 <div className="assistant-chat-context-pill">{resolvedActiveSession.contextLabel}</div>
               </div>
               <button
-                aria-label="Close assistant chat"
+                aria-label={t("assistantChat.actions.close")}
                 className="surface-card-action"
-                data-tooltip="Close assistant chat"
+                data-tooltip={t("assistantChat.actions.close")}
                 onClick={close}
                 type="button"
               >
@@ -1475,7 +1486,7 @@ export const GlobalAssistantChat = () => {
 
                 const messageState = entry.state ?? null;
                 const isExpanded = expandedMessageDetails[entry.id] ?? false;
-                const messageActions = buildStateActions(messageState);
+                const messageActions = buildStateActions(messageState, t);
                 const resultLinks = messageState?.actionLinks ?? [];
                 const receipt = messageState?.operationalReceipt ?? null;
                 const receiptRows = buildOperationalReceiptRows(messageState);
@@ -1492,7 +1503,7 @@ export const GlobalAssistantChat = () => {
                     <div className="assistant-chat-message-meta">
                       <div className="assistant-chat-speaker-meta">
                         <span className={`assistant-chat-speaker-pill${messageState ? ` assistant-chat-speaker-pill-${messageState.tone}` : ""}`}>
-                          {messageState?.routedAgentName ?? "Supervisor Agent"}
+                          {messageState?.routedAgentName ?? t("agents.runs.supervisorAgent")}
                         </span>
                         {messageState?.routedAgentRole ? (
                           <span className="assistant-chat-speaker-role">{messageState.routedAgentRole}</span>
@@ -1500,7 +1511,7 @@ export const GlobalAssistantChat = () => {
                       </div>
                       {messageState ? (
                         <button
-                          aria-label={isExpanded ? "Hide response details" : "Show response details"}
+                          aria-label={isExpanded ? t("assistantChat.actions.hideDetails") : t("assistantChat.actions.showDetails")}
                           className={`assistant-chat-message-toggle${isExpanded ? " is-open" : ""}`}
                           onClick={() =>
                             setExpandedMessageDetails((current) => ({
@@ -1529,8 +1540,8 @@ export const GlobalAssistantChat = () => {
                           <CheckCircle2 size={15} />
                         </div>
                         <div className="assistant-chat-result-copy">
-                          <span className="assistant-chat-result-eyebrow">Action completed</span>
-                          <strong>{buildActionResultSummary(messageState)}</strong>
+                          <span className="assistant-chat-result-eyebrow">{t("assistantChat.actionCompleted")}</span>
+                          <strong>{buildActionResultSummary(messageState, t)}</strong>
                           <div className="assistant-chat-result-actions">
                             {resultLinks.map((link) => (
                               <button
@@ -1554,7 +1565,7 @@ export const GlobalAssistantChat = () => {
                     {showReceipt && receipt ? (
                       <div className="assistant-chat-receipt-card">
                         <div className="assistant-chat-receipt-header">
-                          <span className="assistant-chat-result-eyebrow">Operational receipt</span>
+                          <span className="assistant-chat-result-eyebrow">{t("agents.runs.operationalReceipt")}</span>
                           <strong>{receipt.summary}</strong>
                         </div>
                         {receiptRows.length ? (
@@ -1570,19 +1581,21 @@ export const GlobalAssistantChat = () => {
                             ))}
                           </div>
                         ) : null}
-                        {receipt.nextSteps[0] ? <p className="assistant-chat-receipt-next">Next: {receipt.nextSteps[0]}</p> : null}
+                        {receipt.nextSteps[0] ? (
+                          <p className="assistant-chat-receipt-next">{t("agents.runs.nextStep", { step: receipt.nextSteps[0] })}</p>
+                        ) : null}
                       </div>
                     ) : null}
 
                     {needsApproval && messageState?.draftRunId ? (
                       <div className="assistant-chat-approval-card">
                         <div className="assistant-chat-approval-copy">
-                          <span className="assistant-chat-approval-eyebrow">Approval required</span>
-                          <strong>Choose how you want to handle this supervised draft.</strong>
-                          <p>{messageState.approvalReason ?? "No real execution happens here yet. This only records your decision cleanly in the flow."}</p>
+                          <span className="assistant-chat-approval-eyebrow">{t("agents.runs.approvalRequired")}</span>
+                          <strong>{t("assistantChat.approval.chooseHandling")}</strong>
+                          <p>{messageState.approvalReason ?? t("assistantChat.approval.noExecutionYet")}</p>
                           {messageState.pendingMutation ? (
                             <div className="assistant-chat-mutation-preview">
-                              <span className="assistant-chat-mutation-tag">If approved</span>
+                              <span className="assistant-chat-mutation-tag">{t("assistantChat.approval.ifApproved")}</span>
                               <strong>{messageState.pendingMutation.summary}</strong>
                               <code>{messageState.pendingMutation.toolName}</code>
                             </div>
@@ -1595,7 +1608,7 @@ export const GlobalAssistantChat = () => {
                             onClick={() => void handleReviewRun(messageState.draftRunId ?? "", "approve")}
                             type="button"
                           >
-                            Approve
+                            {t("agents.runs.approve")}
                           </button>
                           <button
                             className="surface-card-action-text"
@@ -1603,7 +1616,7 @@ export const GlobalAssistantChat = () => {
                             onClick={() => void handleReviewRun(messageState.draftRunId ?? "", "approve_for_session")}
                             type="button"
                           >
-                            Approve for this session
+                            {t("agents.runs.approveForSession")}
                           </button>
                           <button
                             className="surface-card-action-text assistant-chat-approval-deny"
@@ -1611,7 +1624,7 @@ export const GlobalAssistantChat = () => {
                             onClick={() => void handleReviewRun(messageState.draftRunId ?? "", "deny")}
                             type="button"
                           >
-                            Deny
+                            {t("agents.runs.deny")}
                           </button>
                         </div>
                       </div>
@@ -1622,7 +1635,7 @@ export const GlobalAssistantChat = () => {
                         <span className="assistant-chat-approval-result-pill">
                           {messageState.approvalDecision?.replace(/_/g, " ")}
                         </span>
-                        <p>{resolveApprovalSummary(messageState)}</p>
+                        <p>{resolveApprovalSummary(messageState, t)}</p>
                       </div>
                     ) : null}
 
@@ -1838,7 +1851,7 @@ export const GlobalAssistantChat = () => {
                     onClick={() => setActiveSelector((current) => (current === "reasoning" ? null : "reasoning"))}
                     type="button"
                   >
-                    <span>{selectedReasoning}</span>
+                    <span>{t(`assistantChat.reasoning.${selectedReasoning.toLowerCase()}`, { defaultValue: selectedReasoning })}</span>
                     <ChevronDown size={14} />
                   </button>
                   {activeSelector === "reasoning" ? (
@@ -1853,7 +1866,7 @@ export const GlobalAssistantChat = () => {
                           }}
                           type="button"
                         >
-                          {option}
+                          {t(`assistantChat.reasoning.${option.toLowerCase()}`, { defaultValue: option })}
                         </button>
                       ))}
                     </div>
@@ -1866,7 +1879,7 @@ export const GlobalAssistantChat = () => {
                     onClick={() => setActiveSelector((current) => (current === "approval" ? null : "approval"))}
                     type="button"
                   >
-                    <span>{approvalOptions.find((option) => option.value === selectedApproval)?.label ?? "Supervised"}</span>
+                    <span>{t(approvalOptions.find((option) => option.value === selectedApproval)?.labelKey ?? "assistantChat.approvalMode.supervised")}</span>
                     <ChevronDown size={14} />
                   </button>
                   {activeSelector === "approval" ? (
@@ -1881,11 +1894,11 @@ export const GlobalAssistantChat = () => {
                           }}
                           type="button"
                         >
-                          {option.label}
+                          {t(option.labelKey)}
                         </button>
                       ))}
                       <p className="assistant-chat-selector-helper">
-                        {approvalModeDescriptions[selectedApproval]}
+                        {t(`assistantChat.approvalModeDescription.${selectedApproval}`)}
                       </p>
                     </div>
                   ) : null}
@@ -1920,7 +1933,7 @@ export const GlobalAssistantChat = () => {
                   }}
                   type="button"
                 >
-                  Open runs
+                  {t("assistantChat.actions.openRuns")}
                 </button>
               ) : null}
               {threadMenuSession?.latestState?.routedAgentId ? (
@@ -1934,7 +1947,7 @@ export const GlobalAssistantChat = () => {
                   }}
                   type="button"
                 >
-                  View agent
+                  {t("assistantChat.actions.viewAgent")}
                 </button>
               ) : null}
               <button

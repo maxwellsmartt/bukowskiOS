@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Bot, ChevronDown, CircleAlert, PauseCircle, PlayCircle, ShieldCheck, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
@@ -13,17 +14,6 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { AgentWizardPanel } from "./AgentWizardPanel";
 import { reviewAgentRun, setAgentApprovalMode, setAgentStatus, useAgentDetail, useMissionControlSnapshot } from "./useAgentsData";
-
-const statusLabelMap = {
-  active: "Active",
-  paused: "Paused",
-} as const;
-
-const operationalStateLabelMap = {
-  idle: "Idle",
-  working: "Working",
-  not_working: "Not working",
-} as const;
 
 const getAgentIndicatorTone = (
   status: "active" | "paused",
@@ -47,12 +37,13 @@ const getAgentIndicatorTone = (
 const getAgentIndicatorLabel = (
   status: "active" | "paused",
   operationalState: "idle" | "working" | "not_working",
+  t: ReturnType<typeof useTranslation>["t"],
 ) => {
   if (status !== "active") {
-    return "Paused";
+    return t("agents.shared.agentStatus.paused");
   }
 
-  return operationalStateLabelMap[operationalState];
+  return t(`agents.shared.operationalState.${operationalState}`);
 };
 
 type MissionSectionKey = "queue" | "activity" | "models" | "connectors";
@@ -101,6 +92,7 @@ const CollapsibleMissionCard = ({
 );
 
 export const AgentsMissionControlPage = () => {
+  const { t } = useTranslation();
   const { activeWorkspaceId: workspaceId } = useWorkspace();
   const { data, error, reload } = useMissionControlSnapshot();
   const [searchParams] = useSearchParams();
@@ -145,13 +137,13 @@ export const AgentsMissionControlPage = () => {
   const selectedAgent = detail.agent;
   const healthCards = useMemo(
     () => [
-      { label: "Active agents", value: data.health.activeAgents },
-      { label: "Paused agents", value: data.health.pausedAgents },
-      { label: "Recent activity", value: data.health.recentRuns },
-      { label: "Active channels", value: data.health.connectorsConfigured },
-      { label: "Assigned models", value: data.health.modelsAssigned },
+      { label: t("agents.mission.health.activeAgents"), value: data.health.activeAgents },
+      { label: t("agents.mission.health.pausedAgents"), value: data.health.pausedAgents },
+      { label: t("agents.mission.health.recentActivity"), value: data.health.recentRuns },
+      { label: t("agents.mission.health.activeChannels"), value: data.health.connectorsConfigured },
+      { label: t("agents.mission.health.assignedModels"), value: data.health.modelsAssigned },
     ],
-    [data.health],
+    [data.health, t],
   );
 
   const filteredQueue = useMemo(() => {
@@ -228,7 +220,7 @@ export const AgentsMissionControlPage = () => {
         reloadDetail();
       }
     } catch (error) {
-      setApprovalFeedback(getUserFacingErrorMessage(error, "I could not record that decision."));
+      setApprovalFeedback(getUserFacingErrorMessage(error, t("agents.runs.errors.reviewDecision")));
     } finally {
       setProcessingRunId(null);
     }
@@ -237,11 +229,11 @@ export const AgentsMissionControlPage = () => {
   return (
     <div className="page-stack">
       <SectionHeader
-        title="Automation Overview"
+        title={t("agents.mission.title")}
         titleTone="accent"
       />
 
-      {error ? <div className="empty-state">Automation overview unavailable: {error}</div> : null}
+      {error ? <div className="empty-state">{t("agents.mission.unavailable", { message: error })}</div> : null}
       {approvalFeedback ? <div className="form-inline-error">{approvalFeedback}</div> : null}
 
       <div className="agents-health-grid">
@@ -256,7 +248,7 @@ export const AgentsMissionControlPage = () => {
       <div className={`agents-mission-layout${selectedAgent ? "" : " is-graph-expanded"}`}>
         <SurfaceCard
           className="agents-graph-card"
-          title="Team Map"
+          title={t("agents.mission.teamMap")}
         >
           <div className="mission-graph">
             {data.supervisor ? (
@@ -272,12 +264,12 @@ export const AgentsMissionControlPage = () => {
                     type="button"
                   >
                     <span
-                      aria-label={getAgentIndicatorLabel(data.supervisor.status, data.supervisor.operationalState)}
+                      aria-label={getAgentIndicatorLabel(data.supervisor.status, data.supervisor.operationalState, t)}
                       className={`agent-live-dot agent-live-dot-${getAgentIndicatorTone(
                         data.supervisor.status,
                         data.supervisor.operationalState,
                       )}`}
-                      data-tooltip={getAgentIndicatorLabel(data.supervisor.status, data.supervisor.operationalState)}
+                      data-tooltip={getAgentIndicatorLabel(data.supervisor.status, data.supervisor.operationalState, t)}
                     />
                     <div className="mission-node-topline">
                       <span className="mission-node-emoji">{data.supervisor.emoji}</span>
@@ -290,7 +282,7 @@ export const AgentsMissionControlPage = () => {
                       <span className="subtle-pill mission-node-model-pill" title={data.supervisor.modelLabel}>
                         {providerBrand.logoSrc ? (
                           <img
-                            alt={providerBrand.logoAlt ?? providerBrand.label ?? "AI service"}
+                            alt={providerBrand.logoAlt ?? providerBrand.label ?? t("agents.shared.aiService")}
                             className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
                             src={providerBrand.logoSrc}
                           />
@@ -299,10 +291,10 @@ export const AgentsMissionControlPage = () => {
                       </span>
                       <div className="mission-node-footer-status-row">
                         <span className={`mission-operational-pill mission-operational-pill-${data.supervisor.operationalState}`}>
-                          {operationalStateLabelMap[data.supervisor.operationalState]}
+                          {t(`agents.shared.operationalState.`)}
                         </span>
                         <span className={`mission-node-status mission-node-status-${data.supervisor.status}`}>
-                          {statusLabelMap[data.supervisor.status]}
+                          {t(`agents.shared.agentStatus.`)}
                         </span>
                       </div>
                     </div>
@@ -329,12 +321,12 @@ export const AgentsMissionControlPage = () => {
                         type="button"
                       >
                         <span
-                          aria-label={getAgentIndicatorLabel(agent.status, agent.operationalState)}
+                          aria-label={getAgentIndicatorLabel(agent.status, agent.operationalState, t)}
                           className={`agent-live-dot agent-live-dot-${getAgentIndicatorTone(
                             agent.status,
                             agent.operationalState,
                           )}`}
-                          data-tooltip={getAgentIndicatorLabel(agent.status, agent.operationalState)}
+                          data-tooltip={getAgentIndicatorLabel(agent.status, agent.operationalState, t)}
                         />
                         <div className="mission-node-topline">
                           <span className="mission-node-emoji">{agent.emoji}</span>
@@ -347,7 +339,7 @@ export const AgentsMissionControlPage = () => {
                           <span className="subtle-pill mission-node-model-pill" title={agent.modelLabel}>
                             {providerBrand.logoSrc ? (
                               <img
-                                alt={providerBrand.logoAlt ?? providerBrand.label ?? "AI service"}
+                                alt={providerBrand.logoAlt ?? providerBrand.label ?? t("agents.shared.aiService")}
                                 className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
                                 src={providerBrand.logoSrc}
                               />
@@ -356,10 +348,10 @@ export const AgentsMissionControlPage = () => {
                           </span>
                           <div className="mission-node-footer-status-row">
                             <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
-                              {operationalStateLabelMap[agent.operationalState]}
+                              {t(`agents.shared.operationalState.`)}
                             </span>
                             <span className={`mission-node-status mission-node-status-${agent.status}`}>
-                              {statusLabelMap[agent.status]}
+                              {t(`agents.shared.agentStatus.`)}
                             </span>
                           </div>
                         </div>
@@ -380,10 +372,10 @@ export const AgentsMissionControlPage = () => {
             aside={
               <div className="surface-card-actions">
                 <button className="ghost-control mission-control-configure" onClick={() => setEditorOpen(true)} type="button">
-                  Edit
+                  {t("common.edit")}
                 </button>
                 <button
-                  aria-label="Close agent detail"
+                  aria-label={t("agents.team.closeDetail")}
                   className="surface-card-action"
                   onClick={() => setSelectedAgentId(null)}
                   type="button"
@@ -396,17 +388,17 @@ export const AgentsMissionControlPage = () => {
             <div className="agent-detail-stack">
               <div className="agent-detail-row agent-activity-filter-row">
                 <span className={`mission-operational-pill mission-operational-pill-${selectedAgent.operationalState}`}>
-                  {operationalStateLabelMap[selectedAgent.operationalState]}
+                  {t(`agents.shared.operationalState.`)}
                 </span>
                 <span className={`mission-node-status mission-node-status-${selectedAgent.status}`}>
-                  {statusLabelMap[selectedAgent.status]}
+                  {t(`agents.shared.agentStatus.`)}
                 </span>
                 <span className="subtle-pill">
                   {(() => {
                     const providerBrand = getAgentProviderBrand(selectedAgent.modelLabel);
                     return providerBrand.logoSrc ? (
                       <img
-                        alt={providerBrand.logoAlt ?? providerBrand.label ?? "AI service"}
+                        alt={providerBrand.logoAlt ?? providerBrand.label ?? t("agents.shared.aiService")}
                         className={`provider-pill-logo${providerBrand.logoClassName ? ` ${providerBrand.logoClassName}` : ""}`}
                         src={providerBrand.logoSrc}
                       />
@@ -419,36 +411,36 @@ export const AgentsMissionControlPage = () => {
 
               <div className="agent-detail-meta">
                 <div>
-                  <span className="agent-detail-kicker">Role</span>
+                  <span className="agent-detail-kicker">{t("agents.team.role")}</span>
                   <strong>{selectedAgent.role}</strong>
                 </div>
                 <div>
-                  <span className="agent-detail-kicker">Mission</span>
+                  <span className="agent-detail-kicker">{t("agents.team.mission")}</span>
                   <strong>{selectedAgent.mission}</strong>
                 </div>
                 <div>
-                  <span className="agent-detail-kicker">Domain</span>
+                  <span className="agent-detail-kicker">{t("agents.team.domain")}</span>
                   <strong>{selectedAgent.domain}</strong>
                 </div>
                 <div>
-                  <span className="agent-detail-kicker">Allowed tools</span>
-                  <strong>{detail.tools.join(" · ") || "No tools assigned"}</strong>
+                  <span className="agent-detail-kicker">{t("agents.team.allowedTools")}</span>
+                  <strong>{detail.tools.join(" · ") || t("agents.team.noToolsAssigned")}</strong>
                 </div>
               </div>
 
               <div className="agent-detail-actions">
                 <button className="ghost-control" onClick={handleToggleStatus} type="button">
                   {selectedAgent.status === "active" ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
-                  <span>{selectedAgent.status === "active" ? "Pause agent" : "Reactivate"}</span>
+                  <span>{selectedAgent.status === "active" ? t("agents.team.pauseAgent") : t("agents.team.reactivateAgent")}</span>
                 </button>
                 <button className="ghost-control" onClick={handleApprovalModeCycle} type="button">
                   <ShieldCheck size={14} />
-                  <span>Change review mode</span>
+                  <span>{t("agents.mission.changeReviewMode")}</span>
                 </button>
               </div>
 
               <div className="agent-detail-runs">
-                <span className="agent-detail-kicker">Recent activity</span>
+                <span className="agent-detail-kicker">{t("agents.runs.recentActivity")}</span>
                 {detail.recentRuns.length ? (
                   detail.recentRuns.map((run) => (
                     <div key={run.id} className="agent-run-row">
@@ -456,11 +448,13 @@ export const AgentsMissionControlPage = () => {
                         <strong>{run.title}</strong>
                         <p>{run.summary}</p>
                       </div>
-                      <span className={`run-status-pill run-status-pill-${run.status}`}>{getAgentRunStatusLabel(run.status)}</span>
+                      <span className={`run-status-pill run-status-pill-${run.status}`}>
+                        {t(`agents.runs.status.${run.status}`, { defaultValue: getAgentRunStatusLabel(run.status) })}
+                      </span>
                     </div>
                   ))
                 ) : (
-                  <div className="empty-state">No recent activity for this agent yet.</div>
+                  <div className="empty-state">{t("agents.team.noRecentActivity")}</div>
                 )}
               </div>
             </div>
@@ -470,7 +464,7 @@ export const AgentsMissionControlPage = () => {
 
       {pendingApprovals.length ? (
         <SurfaceCard
-          title="Needs Review"
+          title={t("agents.mission.needsReview")}
         >
           <div className="agent-support-list">
             {pendingApprovals.map((run) => (
@@ -478,10 +472,12 @@ export const AgentsMissionControlPage = () => {
                 <div className="agent-run-row-copy">
                   <div className="agent-run-row-heading">
                     <strong>{run.title}</strong>
-                    <span className={`run-status-pill run-status-pill-${run.status}`}>{getAgentRunStatusLabel(run.status)}</span>
+                    <span className={`run-status-pill run-status-pill-${run.status}`}>
+                      {t(`agents.runs.status.${run.status}`, { defaultValue: getAgentRunStatusLabel(run.status) })}
+                    </span>
                   </div>
                   <p>{run.agentDisplayName}</p>
-                  <p>{run.approvalReason ?? "This supervised draft is waiting for your review."}</p>
+                  <p>{run.approvalReason ?? t("agents.mission.approvalFallback")}</p>
                   <div className="agent-run-approval-actions">
                     <button
                       className="primary-control"
@@ -489,7 +485,7 @@ export const AgentsMissionControlPage = () => {
                       onClick={() => void handleReviewRun(run.id, "approve")}
                       type="button"
                     >
-                      Approve
+                      {t("agents.runs.approve")}
                     </button>
                     {run.threadId ? (
                       <button
@@ -498,7 +494,7 @@ export const AgentsMissionControlPage = () => {
                         onClick={() => void handleReviewRun(run.id, "approve_for_session")}
                         type="button"
                       >
-                        Approve for this session
+                        {t("agents.runs.approveForSession")}
                       </button>
                     ) : null}
                     <button
@@ -507,14 +503,14 @@ export const AgentsMissionControlPage = () => {
                       onClick={() => void handleReviewRun(run.id, "deny")}
                       type="button"
                     >
-                      Deny
+                      {t("agents.runs.deny")}
                     </button>
                     <button
                       className="surface-card-action-text"
                       onClick={() => setSelectedAgentId(run.agentId ?? data.supervisor?.id ?? null)}
                       type="button"
                     >
-                      View agent
+                      {t("agents.mission.viewAgent")}
                     </button>
                   </div>
                 </div>
@@ -532,29 +528,29 @@ export const AgentsMissionControlPage = () => {
           className="mission-activity-card"
           collapsed={collapsedSections.queue}
           onToggle={() => toggleSection("queue")}
-          title="Recent Activity"
+          title={t("agents.runs.recentActivity")}
         >
             <div className="mission-collapsible-content">
               <div className="agent-detail-row">
                 <button className={`chip-button${queueFilter === "all" ? " is-active" : ""}`} onClick={() => setQueueFilter("all")} type="button">
-                  All
+                  {t("agents.runs.filters.all")}
                 </button>
                 <button
                   className={`chip-button${queueFilter === "needs_approval" ? " is-active" : ""}`}
                   onClick={() => setQueueFilter("needs_approval")}
                   type="button"
                 >
-                  Needs approval
+                  {t("agents.runs.summary.needsApproval")}
                 </button>
                 <button
                   className={`chip-button${queueFilter === "running" ? " is-active" : ""}`}
                   onClick={() => setQueueFilter("running")}
                   type="button"
                 >
-                  Running
+                  {t("agents.runs.summary.running")}
                 </button>
                 <button className={`chip-button${queueFilter === "done" ? " is-active" : ""}`} onClick={() => setQueueFilter("done")} type="button">
-                  Done
+                  {t("agents.runs.summary.done")}
                 </button>
               </div>
               <div className="agent-support-list agent-support-list-scroll">
@@ -570,7 +566,9 @@ export const AgentsMissionControlPage = () => {
                       <p>{run.status === "needs_approval" ? run.approvalReason ?? run.agentDisplayName : run.agentDisplayName}</p>
                     </div>
                     <div className="agent-run-row-meta">
-                      <span className={`run-status-pill run-status-pill-${run.status}`}>{getAgentRunStatusLabel(run.status)}</span>
+                      <span className={`run-status-pill run-status-pill-${run.status}`}>
+                        {t(`agents.runs.status.${run.status}`, { defaultValue: getAgentRunStatusLabel(run.status) })}
+                      </span>
                       <span className="agent-run-time">{run.updatedAtLabel}</span>
                     </div>
                   </button>
@@ -583,7 +581,7 @@ export const AgentsMissionControlPage = () => {
           className="mission-activity-card"
           collapsed={collapsedSections.activity}
           onToggle={() => toggleSection("activity")}
-          title="Updates"
+          title={t("agents.mission.updates")}
         >
             <div className="agent-support-list agent-support-list-scroll mission-collapsible-content">
               {data.activity.map((activity) => (
@@ -613,7 +611,7 @@ export const AgentsMissionControlPage = () => {
         <CollapsibleMissionCard
           collapsed={collapsedSections.models}
           onToggle={() => toggleSection("models")}
-          title="AI Models"
+          title={t("agents.models.title")}
         >
             <div className="agent-compact-grid mission-collapsible-content">
               {orderedModelSummary.map((model) => (
@@ -632,9 +630,11 @@ export const AgentsMissionControlPage = () => {
                       })()}
                       <span>{model.label}</span>
                     </strong>
-                    <p>{model.assignedAgents.join(" · ") || "No agents assigned yet"}</p>
+                    <p>{model.assignedAgents.join(" · ") || t("agents.models.noAgentsAssigned")}</p>
                   </div>
-                  <span className={`run-status-pill run-status-pill-${model.status}`}>{titleCaseEnum(model.status)}</span>
+                  <span className={`run-status-pill run-status-pill-${model.status}`}>
+                    {t(`agents.models.status.${model.status}`, { defaultValue: titleCaseEnum(model.status) })}
+                  </span>
                 </div>
               ))}
             </div>
@@ -643,7 +643,7 @@ export const AgentsMissionControlPage = () => {
         <CollapsibleMissionCard
           collapsed={collapsedSections.connectors}
           onToggle={() => toggleSection("connectors")}
-          title="Channels"
+          title={t("agents.connectors.title")}
         >
             <div className="agent-compact-grid mission-collapsible-content">
               {orderedConnectorSummary.map((connector) => (
@@ -664,7 +664,9 @@ export const AgentsMissionControlPage = () => {
                     </strong>
                     <p>{connector.capability}</p>
                   </div>
-                  <span className={`run-status-pill run-status-pill-${connector.status}`}>{titleCaseEnum(connector.status)}</span>
+                  <span className={`run-status-pill run-status-pill-${connector.status}`}>
+                    {t(`agents.connectors.status.${connector.status}`, { defaultValue: titleCaseEnum(connector.status) })}
+                  </span>
                 </div>
               ))}
             </div>

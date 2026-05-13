@@ -1111,7 +1111,147 @@
       "reminderTitleTime": "Agrega primero título y hora para el reminder."
     }
   },
+  "assistantChat": {
+    "actions": {
+      "openRuns": "Abrir runs",
+      "viewAgent": "Ver agente",
+      "threadActions": "Acciones del hilo",
+      "expandThreads": "Expandir hilos",
+      "close": "Cerrar chat del asistente",
+      "hideDetails": "Ocultar detalles de la respuesta",
+      "showDetails": "Mostrar detalles de la respuesta"
+    },
+    "session": {
+      "context": "Contexto",
+      "assigned": "Asignado",
+      "intent": "Intención",
+      "command": "Comando",
+      "notRoutedYet": "Sin asignar todavía",
+      "pendingClassification": "Clasificación pendiente"
+    },
+    "command": {
+      "noChangesApplied": "Sin cambios aplicados"
+    },
+    "pending": {
+      "supervisorReviewing": "Supervisor revisando la solicitud",
+      "routingBody": "Clasificando la intención y preparando una respuesta supervisada. No se ha aplicado ningún cambio."
+    },
+    "review": {
+      "continuing": "Continuando trabajo aprobado",
+      "continuingSession": "Continuando trabajo aprobado por esta sesión",
+      "continuingSupervisedBody": "Entendido. Continúo este trabajo aprobado bajo supervisión.",
+      "continuingSessionBody": "Entendido. Continúo este trabajo aprobado por toda la sesión.",
+      "approvalBody": "Aplicando tu aprobación y esperando que termine el trabajo delegado.",
+      "sessionApprovalBody": "Usando tu aprobación de sesión para continuar el trabajo delegado sin volver a preguntar en este hilo.",
+      "decisionRecorded": "Decisión de aprobación registrada"
+    },
+    "notifications": {
+      "runDenied": "Run de agente denegado",
+      "runUpdated": "Run de agente actualizado"
+    },
+    "errors": {
+      "prepareDraft": "Mission Control no pudo preparar este draft run."
+    },
+    "actionEntities": {
+      "asset": "Equipo",
+      "incident": "Incidente",
+      "packing_slip": "Packing slip",
+      "project": "Proyecto",
+      "quote": "Cotización",
+      "rma": "RMA",
+      "item": "Item"
+    },
+    "actionCompleted": "Acción completada",
+    "singleEntityReady": "{{entity}} listo",
+    "multipleEntitiesReady": "{{entities}} y {{last}} listos",
+    "approval": {
+      "chooseHandling": "Elige cómo quieres manejar este borrador supervisado.",
+      "noExecutionYet": "Aquí todavía no se ejecuta nada real. Sólo se registra tu decisión de forma limpia en el flujo.",
+      "ifApproved": "Si se aprueba"
+    },
+    "approvalResult": {
+      "denied": "Denegado. Este borrador supervisado se detiene aquí y no ejecuta nada.",
+      "approvedForSession": "Aprobado por esta sesión. Seguimientos similares en este hilo pueden continuar sin volver a preguntar para este especialista.",
+      "approved": "Aprobado. Este borrador puede continuar bajo supervisión, pero la capa de comandos todavía no ejecuta automáticamente."
+    },
+    "approvalMode": {
+      "supervised": "Supervisado",
+      "needs_approval": "Requiere aprobación",
+      "unsupervised": "Sin supervisión"
+    },
+    "approvalModeDescription": {
+      "supervised": "Los drafts y trabajos delegados se mantienen listos para revisión.",
+      "needs_approval": "Siempre pide aprobación antes de continuar trabajo delegado en este hilo.",
+      "unsupervised": "Omite prompts de aprobación sólo para agentes supervisados. Los agentes marcados como requiere aprobación seguirán preguntando."
+    },
+    "reasoning": {
+      "low": "Bajo",
+      "medium": "Medio",
+      "high": "Alto"
+    }
+  },
   "agents": {
+    "shared": {
+      "aiService": "Servicio AI",
+      "operationalState": {
+        "idle": "En espera",
+        "working": "Trabajando",
+        "not_working": "Sin trabajar"
+      },
+      "agentStatus": {
+        "active": "Activo",
+        "paused": "Pausado"
+      }
+    },
+    "team": {
+      "title": "Equipo de automatización",
+      "body": "El roster de asistentes AI configurados para este workspace. Cada uno tiene un foco, un modelo y un modo de aprobación.",
+      "cardTitle": "Agentes",
+      "createAgent": "Crear agente",
+      "unavailable": "Agentes no disponibles: {{message}}",
+      "copyName": "Copia de {{name}}",
+      "pauseAgent": "Pausar agente",
+      "reactivateAgent": "Reactivar",
+      "pauseAgentNamed": "Pausar {{name}}",
+      "reactivateAgentNamed": "Reactivar {{name}}",
+      "duplicateAgent": "Duplicar agente",
+      "duplicateAgentNamed": "Duplicar {{name}}",
+      "loadingAgent": "Cargando agente",
+      "closeDetail": "Cerrar detalle del agente",
+      "tools": "Tools",
+      "domains": "Dominios",
+      "domain": "Dominio",
+      "mission": "Misión",
+      "role": "Rol",
+      "allowedTools": "Tools permitidas",
+      "noToolsDefined": "Sin tools definidas",
+      "noToolsAssigned": "Sin tools asignadas",
+      "noDomainsDefined": "Sin dominios definidos",
+      "noNotes": "Este agente aún no tiene notas.",
+      "noRecentActivity": "Este agente aún no tiene actividad reciente.",
+      "loadingDetails": "Cargando detalles del agente...",
+      "readOnlyTools_one": "{{count}} sólo lectura",
+      "readOnlyTools_other": "{{count}} sólo lectura",
+      "writeTools_one": "{{count}} tool de escritura · requiere aprobación",
+      "writeTools_other": "{{count}} tools de escritura · requieren aprobación"
+    },
+    "mission": {
+      "title": "Resumen de automatización",
+      "unavailable": "Resumen de automatización no disponible: {{message}}",
+      "teamMap": "Mapa del equipo",
+      "changeReviewMode": "Cambiar modo de revisión",
+      "needsReview": "Requiere revisión",
+      "approvalFallback": "Este borrador supervisado espera tu revisión.",
+      "viewAgent": "Ver agente",
+      "updates": "Actualizaciones",
+      "health": {
+        "activeAgents": "Agentes activos",
+        "pausedAgents": "Agentes pausados",
+        "recentActivity": "Actividad reciente",
+        "activeChannels": "Canales activos",
+        "assignedModels": "Modelos asignados"
+      }
+    },
     "models": {
       "title": "Modelos AI",
       "services": "Servicios AI",
@@ -1136,6 +1276,7 @@
       "lastTested": "Última prueba",
       "lastSuccess": "Último éxito",
       "assignedModels": "Modelos asignados",
+      "noAgentsAssigned": "Sin agentes asignados todavía",
       "modelsSynced": "Modelos sincronizados",
       "noneYet": "Ninguno todavía",
       "lastError": "Último error",
@@ -1183,6 +1324,14 @@
         "refreshModels": "No se pudieron actualizar las opciones de modelos.",
         "testProvider": "No se pudo probar la conexión del provider.",
         "updateAssignment": "No se pudo actualizar la asignación del agente."
+      }
+    },
+    "connectors": {
+      "title": "Canales",
+      "status": {
+        "configured": "Listo",
+        "disabled": "Inactivo",
+        "needs_setup": "Requiere setup"
       }
     },
     "runs": {
