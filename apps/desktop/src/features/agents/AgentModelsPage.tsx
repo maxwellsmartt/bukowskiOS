@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, KeyRound, RadioTower, RotateCcw, ServerCog } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import type { AgentModelAssignmentRow, AgentModelRow } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
@@ -16,15 +17,6 @@ import {
   testAIProviderConnection,
   useAgentModels,
 } from "./useAgentsData";
-
-const providerStatusLabelMap: Record<AgentModelRow["status"], string> = {
-  not_configured: "Not configured",
-  configured: "Configured",
-  testing: "Testing",
-  healthy: "Healthy",
-  invalid_key: "Invalid key",
-  unavailable: "Unavailable",
-};
 
 const providerStatusIndicatorToneMap: Record<AgentModelRow["status"], "green" | "amber" | "red"> = {
   healthy: "green",
@@ -74,6 +66,7 @@ const buildAssignmentDraftMap = (assignments: AgentModelAssignmentRow[]) =>
   }, {});
 
 export const AgentModelsPage = () => {
+  const { t } = useTranslation();
   const { activeWorkspaceId: workspaceId } = useWorkspace();
   const toast = useToast();
   const { data, error } = useAgentModels();
@@ -132,13 +125,15 @@ export const AgentModelsPage = () => {
 
   const summaryCards = useMemo(
     () => [
-      { label: "Active services", value: data.summary.activeProviders },
-      { label: "Configured", value: data.summary.configuredProviders },
-      { label: "Healthy", value: data.summary.healthyProviders },
-      { label: "Assigned agents", value: data.summary.assignedAgents },
+      { label: t("agents.models.summary.activeServices"), value: data.summary.activeProviders },
+      { label: t("agents.models.summary.configured"), value: data.summary.configuredProviders },
+      { label: t("agents.models.summary.healthy"), value: data.summary.healthyProviders },
+      { label: t("agents.models.summary.assignedAgents"), value: data.summary.assignedAgents },
     ],
-    [data.summary],
+    [data.summary, t],
   );
+  const providerStatusLabel = (status: AgentModelRow["status"]) =>
+    t(`agents.models.status.${status}`, { defaultValue: status });
 
   const handleProviderFieldChange = <K extends keyof ProviderDraft>(field: K, value: ProviderDraft[K]) => {
     setProviderDraft((current) => ({
@@ -169,13 +164,13 @@ export const AgentModelsPage = () => {
         retryCount: providerDraft.retryCount,
       });
 
-      toast.success("Provider saved", result.summary);
+      toast.success(t("agents.models.toasts.providerSaved"), result.summary);
       setProviderDraft((current) => ({
         ...current,
         apiKey: "",
       }));
     } catch (saveError) {
-      setErrorMessage(getUserFacingErrorMessage(saveError, "Unable to save provider configuration."));
+      setErrorMessage(getUserFacingErrorMessage(saveError, t("agents.models.errors.saveProvider")));
     } finally {
       setIsSavingProvider(false);
     }
@@ -203,9 +198,9 @@ export const AgentModelsPage = () => {
         retryCount: providerDraft.retryCount,
       });
 
-      toast.success("Provider key cleared", result.summary);
+      toast.success(t("agents.models.toasts.keyCleared"), result.summary);
     } catch (saveError) {
-      setErrorMessage(getUserFacingErrorMessage(saveError, "Unable to clear the stored API key."));
+      setErrorMessage(getUserFacingErrorMessage(saveError, t("agents.models.errors.clearKey")));
     } finally {
       setIsSavingProvider(false);
     }
@@ -224,9 +219,9 @@ export const AgentModelsPage = () => {
         workspaceId,
         providerKey: selectedProvider.providerKey,
       });
-      toast.success("Models refreshed", result.summary);
+      toast.success(t("agents.models.toasts.modelsRefreshed"), result.summary);
     } catch (refreshError) {
-      setErrorMessage(getUserFacingErrorMessage(refreshError, "Unable to refresh model options."));
+      setErrorMessage(getUserFacingErrorMessage(refreshError, t("agents.models.errors.refreshModels")));
     } finally {
       setIsRefreshingModels(false);
     }
@@ -245,9 +240,9 @@ export const AgentModelsPage = () => {
         workspaceId,
         providerKey: selectedProvider.providerKey,
       });
-      toast.success("Provider tested", result.summary);
+      toast.success(t("agents.models.toasts.providerTested"), result.summary);
     } catch (testError) {
-      setErrorMessage(getUserFacingErrorMessage(testError, "Unable to test the provider connection."));
+      setErrorMessage(getUserFacingErrorMessage(testError, t("agents.models.errors.testProvider")));
     } finally {
       setIsTestingProvider(false);
     }
@@ -267,7 +262,7 @@ export const AgentModelsPage = () => {
       if (field === "providerKey") {
         const fallbackModel = data.providers.find((provider) => provider.providerKey === value)?.modelOptions[0];
         next.modelKey = fallbackModel?.key ?? `${value}:default`;
-        next.modelLabel = fallbackModel?.label ?? "Default model";
+        next.modelLabel = fallbackModel?.label ?? t("agents.models.defaultModel");
       }
 
       if (field === "modelKey") {
@@ -304,9 +299,9 @@ export const AgentModelsPage = () => {
         modelLabel: draft.modelLabel,
       });
 
-      toast.success("Agent model updated", result.summary);
+      toast.success(t("agents.models.toasts.assignmentUpdated"), result.summary);
     } catch (assignmentError) {
-      setErrorMessage(getUserFacingErrorMessage(assignmentError, "Unable to update the agent assignment."));
+      setErrorMessage(getUserFacingErrorMessage(assignmentError, t("agents.models.errors.updateAssignment")));
     } finally {
       setAssignmentBusyAgentId(null);
     }
@@ -314,7 +309,7 @@ export const AgentModelsPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="AI Models" titleTone="accent" />
+      <SectionHeader title={t("agents.models.title")} titleTone="accent" />
 
       <div className="agents-health-grid">
         {summaryCards.map((card) => (
@@ -326,8 +321,8 @@ export const AgentModelsPage = () => {
       </div>
 
       <div className="agents-models-layout">
-        <SurfaceCard title="AI Services">
-          {error ? <div className="empty-state">AI models unavailable: {error}</div> : null}
+        <SurfaceCard title={t("agents.models.services")}>
+          {error ? <div className="empty-state">{t("agents.models.unavailable", { message: error })}</div> : null}
 
           <div className="models-provider-list">
             {orderedProviders.map((provider) => (
@@ -345,9 +340,9 @@ export const AgentModelsPage = () => {
                     type="button"
                   >
                     <span
-                      aria-label={providerStatusLabelMap[provider.status]}
+                      aria-label={providerStatusLabel(provider.status)}
                       className={`agent-live-dot agent-live-dot-${indicatorTone}`}
-                      data-tooltip={`${provider.label} · ${providerStatusLabelMap[provider.status]}`}
+                      data-tooltip={`${provider.label} · ${providerStatusLabel(provider.status)}`}
                     />
                     <div className="models-provider-row-copy">
                       <div className="models-provider-row-topline">
@@ -361,17 +356,17 @@ export const AgentModelsPage = () => {
                           ) : null}
                           <span>{provider.label}</span>
                         </strong>
-                        {!provider.supportsLiveRequests ? <span className="subtle-pill">Coming soon</span> : null}
+                        {!provider.supportsLiveRequests ? <span className="subtle-pill">{t("agents.models.comingSoon")}</span> : null}
                       </div>
                       <div className="agent-detail-row">
                         <span className={`run-status-pill run-status-pill-${provider.status}`}>
-                          {providerStatusLabelMap[provider.status]}
+                          {providerStatusLabel(provider.status)}
                         </span>
-                        <span>{provider.assignedAgents.length} agents</span>
+                        <span>{t("agents.models.assignedAgentCount", { count: provider.assignedAgents.length })}</span>
                         {provider.hasStoredSecret ? (
                           <span className="subtle-pill">
                             <KeyRound size={12} />
-                            <span>Key stored</span>
+                            <span>{t("agents.models.keyStored")}</span>
                           </span>
                         ) : null}
                       </div>
@@ -400,18 +395,18 @@ export const AgentModelsPage = () => {
                 <span>{selectedProvider.label}</span>
               </span>
             ) : (
-              "Select an AI service"
+              t("agents.models.selectService")
             )
           }
           aside={
             selectedProvider ? (
               <div className="agent-detail-row">
                 <span
-                  aria-label={providerStatusLabelMap[selectedProvider.status]}
+                  aria-label={providerStatusLabel(selectedProvider.status)}
                   className={`agent-live-dot agent-live-dot-${providerStatusIndicatorToneMap[selectedProvider.status]}`}
-                  data-tooltip={`${selectedProvider.label} · ${providerStatusLabelMap[selectedProvider.status]}`}
+                  data-tooltip={`${selectedProvider.label} · ${providerStatusLabel(selectedProvider.status)}`}
                 />
-                {!selectedProvider.supportsLiveRequests ? <span className="subtle-pill">Coming soon</span> : null}
+                {!selectedProvider.supportsLiveRequests ? <span className="subtle-pill">{t("agents.models.comingSoon")}</span> : null}
               </div>
             ) : null
           }
@@ -420,7 +415,7 @@ export const AgentModelsPage = () => {
             <div className="agent-detail-stack">
               <div className="agent-detail-row">
                 <span className={`run-status-pill run-status-pill-${selectedProvider.status}`}>
-                  {providerStatusLabelMap[selectedProvider.status]}
+                  {providerStatusLabel(selectedProvider.status)}
                 </span>
                 <span className="subtle-pill">
                   <ServerCog size={12} />
@@ -429,56 +424,56 @@ export const AgentModelsPage = () => {
                 {selectedProvider.hasStoredSecret ? (
                   <span className="subtle-pill">
                     <KeyRound size={12} />
-                    <span>Stored on this Mac</span>
+                    <span>{t("agents.models.storedOnThisMac")}</span>
                   </span>
                 ) : null}
               </div>
 
               <div className="models-provider-health-grid">
                 <div className="models-provider-health-card">
-                  <span className="agent-detail-kicker">Last tested</span>
+                  <span className="agent-detail-kicker">{t("agents.models.lastTested")}</span>
                   <strong>{selectedProvider.lastTestedAtLabel}</strong>
                 </div>
                 <div className="models-provider-health-card">
-                  <span className="agent-detail-kicker">Last success</span>
+                  <span className="agent-detail-kicker">{t("agents.models.lastSuccess")}</span>
                   <strong>{selectedProvider.lastSuccessAtLabel}</strong>
                 </div>
                 <div className="models-provider-health-card">
-                  <span className="agent-detail-kicker">Assigned models</span>
-                  <strong>{selectedProvider.assignedModels.join(" · ") || "None yet"}</strong>
+                  <span className="agent-detail-kicker">{t("agents.models.assignedModels")}</span>
+                  <strong>{selectedProvider.assignedModels.join(" · ") || t("agents.models.noneYet")}</strong>
                 </div>
                 <div className="models-provider-health-card">
-                  <span className="agent-detail-kicker">Models synced</span>
+                  <span className="agent-detail-kicker">{t("agents.models.modelsSynced")}</span>
                   <strong>{selectedProvider.modelsLastSyncedAtLabel}</strong>
                 </div>
               </div>
 
               <div className="action-form-grid">
                 <label className="field-block field-block-span-2">
-                  <span className="field-label">API key</span>
+                  <span className="field-label">{t("agents.models.fields.apiKey")}</span>
                   <input
                     className="field-input"
                     disabled={!selectedProvider.supportsLiveRequests}
                     onChange={(event) => handleProviderFieldChange("apiKey", event.target.value)}
                     placeholder={
-                      selectedProvider.hasStoredSecret ? "Leave blank to keep the stored key" : "Paste the API key"
+                      selectedProvider.hasStoredSecret ? t("agents.models.placeholders.keepStoredKey") : t("agents.models.placeholders.apiKey")
                     }
                     type="password"
                     value={providerDraft.apiKey}
                   />
                 </label>
                 <label className="field-block field-block-span-2">
-                  <span className="field-label">Base URL override</span>
+                  <span className="field-label">{t("agents.models.fields.baseUrl")}</span>
                   <input
                     className="field-input"
                     disabled={!selectedProvider.supportsLiveRequests}
                     onChange={(event) => handleProviderFieldChange("baseUrl", event.target.value)}
-                    placeholder="Optional custom endpoint"
+                    placeholder={t("agents.models.placeholders.baseUrl")}
                     value={providerDraft.baseUrl}
                   />
                 </label>
                 <label className="field-block">
-                  <span className="field-label">Default model</span>
+                  <span className="field-label">{t("agents.models.fields.defaultModel")}</span>
                   <select
                     className="field-input"
                     disabled={!selectedProvider.supportsLiveRequests}
@@ -487,41 +482,41 @@ export const AgentModelsPage = () => {
                   >
                     {selectedProvider.modelOptions.map((option) => (
                       <option key={option.key} value={option.key}>
-                        {option.label}{option.source === "api" ? "" : " · default"}
+                        {option.label}{option.source === "api" ? "" : ` · ${t("agents.models.defaultSource")}`}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="field-block">
-                  <span className="field-label">Fallback model</span>
+                  <span className="field-label">{t("agents.models.fields.fallbackModel")}</span>
                   <select
                     className="field-input"
                     disabled={!selectedProvider.supportsLiveRequests}
                     onChange={(event) => handleProviderFieldChange("fallbackModelKey", event.target.value)}
                     value={providerDraft.fallbackModelKey}
                   >
-                    <option value="">No fallback</option>
+                    <option value="">{t("agents.models.noFallback")}</option>
                     {selectedProvider.modelOptions.map((option) => (
                       <option key={option.key} value={option.key}>
-                        {option.label}{option.source === "api" ? "" : " · default"}
+                        {option.label}{option.source === "api" ? "" : ` · ${t("agents.models.defaultSource")}`}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="field-block">
-                  <span className="field-label">Enabled</span>
+                  <span className="field-label">{t("agents.models.fields.enabled")}</span>
                   <select
                     className="field-input"
                     disabled={!selectedProvider.supportsLiveRequests}
                     onChange={(event) => handleProviderFieldChange("enabled", event.target.value === "true")}
                     value={String(providerDraft.enabled)}
                   >
-                    <option value="false">Disabled</option>
-                    <option value="true">Enabled</option>
+                    <option value="false">{t("agents.models.disabled")}</option>
+                    <option value="true">{t("agents.models.enabled")}</option>
                   </select>
                 </label>
                 <label className="field-block">
-                  <span className="field-label">Timeout (ms)</span>
+                  <span className="field-label">{t("agents.models.fields.timeout")}</span>
                   <input
                     className="field-input"
                     disabled={!selectedProvider.supportsLiveRequests}
@@ -533,7 +528,7 @@ export const AgentModelsPage = () => {
                   />
                 </label>
                 <label className="field-block">
-                  <span className="field-label">Retry count</span>
+                  <span className="field-label">{t("agents.models.fields.retryCount")}</span>
                   <input
                     className="field-input"
                     disabled={!selectedProvider.supportsLiveRequests}
@@ -548,7 +543,7 @@ export const AgentModelsPage = () => {
 
               {selectedProvider.lastErrorSummary ? (
                 <div className="models-provider-diagnostic">
-                  <span className="agent-detail-kicker">Last error</span>
+                  <span className="agent-detail-kicker">{t("agents.models.lastError")}</span>
                   <p>{selectedProvider.lastErrorSummary}</p>
                 </div>
               ) : null}
@@ -563,7 +558,7 @@ export const AgentModelsPage = () => {
                   type="button"
                 >
                   <CheckCircle2 size={14} />
-                  <span>{isSavingProvider ? "Saving..." : "Save"}</span>
+                  <span>{isSavingProvider ? t("common.saving") : t("common.save")}</span>
                 </button>
                 <button
                   className="ghost-control"
@@ -572,7 +567,7 @@ export const AgentModelsPage = () => {
                   type="button"
                 >
                   <RadioTower size={14} />
-                  <span>{isTestingProvider ? "Testing..." : "Test connection"}</span>
+                  <span>{isTestingProvider ? t("agents.models.testing") : t("agents.models.testConnection")}</span>
                 </button>
                 <button
                   className="ghost-control"
@@ -581,23 +576,23 @@ export const AgentModelsPage = () => {
                   type="button"
                 >
                   <RotateCcw size={14} />
-                  <span>{isRefreshingModels ? "Refreshing..." : "Refresh models"}</span>
+                  <span>{isRefreshingModels ? t("agents.models.refreshing") : t("agents.models.refreshModels")}</span>
                 </button>
                 {selectedProvider.hasStoredSecret ? (
                   <button className="ghost-control" disabled={isSavingProvider} onClick={handleClearStoredKey} type="button">
                     <RotateCcw size={14} />
-                    <span>Clear stored key</span>
+                    <span>{t("agents.models.clearStoredKey")}</span>
                   </button>
                 ) : null}
               </div>
             </div>
           ) : (
-            <div className="empty-state">Select an AI service to review its setup and health.</div>
+            <div className="empty-state">{t("agents.models.selectServiceEmpty")}</div>
           )}
         </SurfaceCard>
       </div>
 
-      <SurfaceCard title="Assignments">
+      <SurfaceCard title={t("agents.models.assignments")}>
         <div className="models-assignment-list">
           {data.assignments.map((assignment) => {
             const draft = assignmentDrafts[assignment.agentId] ?? {
@@ -610,7 +605,7 @@ export const AgentModelsPage = () => {
               <div key={assignment.agentId} className="models-assignment-row">
                 <div className="models-assignment-copy">
                   <strong>{assignment.displayName}</strong>
-                  <p>{assignment.isSupervisor ? "Supervisor" : assignment.providerLabel}</p>
+                  <p>{assignment.isSupervisor ? t("agents.models.supervisor") : assignment.providerLabel}</p>
                 </div>
 
                 <div className="models-assignment-controls">
@@ -644,7 +639,7 @@ export const AgentModelsPage = () => {
                     onClick={() => handleSaveAssignment(assignment)}
                     type="button"
                   >
-                    <span>{assignmentBusyAgentId === assignment.agentId ? "Saving..." : "Assign"}</span>
+                    <span>{assignmentBusyAgentId === assignment.agentId ? t("common.saving") : t("agents.models.assign")}</span>
                   </button>
                 </div>
               </div>

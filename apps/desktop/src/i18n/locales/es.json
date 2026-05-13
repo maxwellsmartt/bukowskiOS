@@ -1111,6 +1111,81 @@
       "reminderTitleTime": "Agrega primero título y hora para el reminder."
     }
   },
+  "agents": {
+    "models": {
+      "title": "Modelos AI",
+      "services": "Servicios AI",
+      "unavailable": "Modelos AI no disponibles: {{message}}",
+      "selectService": "Selecciona un servicio AI",
+      "selectServiceEmpty": "Selecciona un servicio AI para revisar su setup y estado.",
+      "comingSoon": "Próximamente",
+      "keyStored": "Key guardada",
+      "storedOnThisMac": "Guardada en esta Mac",
+      "assignedAgentCount_one": "{{count}} agente",
+      "assignedAgentCount_other": "{{count}} agentes",
+      "defaultModel": "Modelo default",
+      "defaultSource": "default",
+      "noFallback": "Sin fallback",
+      "enabled": "Activo",
+      "disabled": "Inactivo",
+      "testing": "Probando...",
+      "testConnection": "Probar conexión",
+      "refreshing": "Actualizando...",
+      "refreshModels": "Actualizar modelos",
+      "clearStoredKey": "Borrar key guardada",
+      "lastTested": "Última prueba",
+      "lastSuccess": "Último éxito",
+      "assignedModels": "Modelos asignados",
+      "modelsSynced": "Modelos sincronizados",
+      "noneYet": "Ninguno todavía",
+      "lastError": "Último error",
+      "assignments": "Asignaciones",
+      "supervisor": "Supervisor",
+      "assign": "Asignar",
+      "status": {
+        "not_configured": "Sin configurar",
+        "configured": "Configurado",
+        "testing": "Probando",
+        "healthy": "Saludable",
+        "invalid_key": "Key inválida",
+        "unavailable": "No disponible"
+      },
+      "summary": {
+        "activeServices": "Servicios activos",
+        "configured": "Configurados",
+        "healthy": "Saludables",
+        "assignedAgents": "Agentes asignados"
+      },
+      "fields": {
+        "apiKey": "API key",
+        "baseUrl": "Override de Base URL",
+        "defaultModel": "Modelo default",
+        "fallbackModel": "Modelo fallback",
+        "enabled": "Activo",
+        "timeout": "Timeout (ms)",
+        "retryCount": "Cantidad de retries"
+      },
+      "placeholders": {
+        "keepStoredKey": "Deja vacío para mantener la key guardada",
+        "apiKey": "Pega la API key",
+        "baseUrl": "Endpoint custom opcional"
+      },
+      "toasts": {
+        "providerSaved": "Provider guardado",
+        "keyCleared": "Key del provider borrada",
+        "modelsRefreshed": "Modelos actualizados",
+        "providerTested": "Provider probado",
+        "assignmentUpdated": "Modelo del agente actualizado"
+      },
+      "errors": {
+        "saveProvider": "No se pudo guardar la configuración del provider.",
+        "clearKey": "No se pudo borrar la API key guardada.",
+        "refreshModels": "No se pudieron actualizar las opciones de modelos.",
+        "testProvider": "No se pudo probar la conexión del provider.",
+        "updateAssignment": "No se pudo actualizar la asignación del agente."
+      }
+    }
+  },
   "catalog": {
     "title": "Catálogo",
     "unavailable": "Catálogo no disponible: {{message}}",

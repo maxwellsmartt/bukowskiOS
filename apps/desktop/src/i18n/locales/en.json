@@ -1111,6 +1111,81 @@
       "reminderTitleTime": "Add a reminder title and time first."
     }
   },
+  "agents": {
+    "models": {
+      "title": "AI Models",
+      "services": "AI Services",
+      "unavailable": "AI models unavailable: {{message}}",
+      "selectService": "Select an AI service",
+      "selectServiceEmpty": "Select an AI service to review its setup and health.",
+      "comingSoon": "Coming soon",
+      "keyStored": "Key stored",
+      "storedOnThisMac": "Stored on this Mac",
+      "assignedAgentCount_one": "{{count}} agent",
+      "assignedAgentCount_other": "{{count}} agents",
+      "defaultModel": "Default model",
+      "defaultSource": "default",
+      "noFallback": "No fallback",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "testing": "Testing...",
+      "testConnection": "Test connection",
+      "refreshing": "Refreshing...",
+      "refreshModels": "Refresh models",
+      "clearStoredKey": "Clear stored key",
+      "lastTested": "Last tested",
+      "lastSuccess": "Last success",
+      "assignedModels": "Assigned models",
+      "modelsSynced": "Models synced",
+      "noneYet": "None yet",
+      "lastError": "Last error",
+      "assignments": "Assignments",
+      "supervisor": "Supervisor",
+      "assign": "Assign",
+      "status": {
+        "not_configured": "Not configured",
+        "configured": "Configured",
+        "testing": "Testing",
+        "healthy": "Healthy",
+        "invalid_key": "Invalid key",
+        "unavailable": "Unavailable"
+      },
+      "summary": {
+        "activeServices": "Active services",
+        "configured": "Configured",
+        "healthy": "Healthy",
+        "assignedAgents": "Assigned agents"
+      },
+      "fields": {
+        "apiKey": "API key",
+        "baseUrl": "Base URL override",
+        "defaultModel": "Default model",
+        "fallbackModel": "Fallback model",
+        "enabled": "Enabled",
+        "timeout": "Timeout (ms)",
+        "retryCount": "Retry count"
+      },
+      "placeholders": {
+        "keepStoredKey": "Leave blank to keep the stored key",
+        "apiKey": "Paste the API key",
+        "baseUrl": "Optional custom endpoint"
+      },
+      "toasts": {
+        "providerSaved": "Provider saved",
+        "keyCleared": "Provider key cleared",
+        "modelsRefreshed": "Models refreshed",
+        "providerTested": "Provider tested",
+        "assignmentUpdated": "Agent model updated"
+      },
+      "errors": {
+        "saveProvider": "Unable to save provider configuration.",
+        "clearKey": "Unable to clear the stored API key.",
+        "refreshModels": "Unable to refresh model options.",
+        "testProvider": "Unable to test the provider connection.",
+        "updateAssignment": "Unable to update the agent assignment."
+      }
+    }
+  },
   "catalog": {
     "title": "Catalog",
     "unavailable": "Catalog unavailable: {{message}}",
