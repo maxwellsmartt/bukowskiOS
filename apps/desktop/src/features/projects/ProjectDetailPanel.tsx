@@ -273,7 +273,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
                     totalQuantity: row.totalQuantity,
                     assignedQuantity: row.assignedQuantity,
                     checkedOutQuantity: row.checkedOutQuantity,
-                  })}
+                  }, t)}
                 </span>
               ),
             },

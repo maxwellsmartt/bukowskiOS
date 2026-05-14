@@ -199,6 +199,104 @@
       }
     },
     "inKit": "In kit {{codes}}",
+    "availability": {
+      "title": "Availability",
+      "subtitle": "What you can do with this asset right now.",
+      "tooltip": "Day-to-day state of the asset: whether it is in stock, checked out, assigned to a project or unavailable.",
+      "currentState": "Current state",
+      "toUse": "To use",
+      "inKit": {
+        "label": "In kit",
+        "reason": "Part of an active kit.",
+        "reasonWithKit": "In kit {{kitCodes}}.",
+        "nextAction": "Remove from kit to use separately."
+      },
+      "retired": {
+        "label": "Retired",
+        "reason": "Unavailable; kept for history.",
+        "nextAction": "Use replacement equipment."
+      },
+      "inRepair": {
+        "label": "In repair",
+        "reason": "Out for repair.",
+        "nextAction": "Close repair case to return it to stock."
+      },
+      "checkedOut": {
+        "label": "Checked out",
+        "reason": "{{count}} checked out.",
+        "reasonWithProject": "{{count}} checked out on {{project}}.",
+        "nextAction": "Process return before reusing."
+      },
+      "assigned": {
+        "label": "Assigned",
+        "reason": "{{count}} reserved.",
+        "reasonWithProject": "{{count}} reserved for {{project}}.",
+        "nextAction": "Release or move the reservation first."
+      },
+      "noStock": {
+        "label": "No stock",
+        "reason": "No units available.",
+        "nextAction": "Wait for return or add stock."
+      },
+      "available": {
+        "label": "Available",
+        "reason_one": "{{count}} unit available.",
+        "reason_other": "{{count}} units available.",
+        "nextAction": "Ready to use."
+      },
+      "summary": {
+        "assigned": "{{count}} assigned",
+        "checkedOut": "{{count}} checked out",
+        "inKit": "{{count}} in kit",
+        "inRepair": "{{count}} in repair",
+        "noStock": "{{count}} out of stock",
+        "retired": "{{count}} retired"
+      }
+    },
+    "assignMove": {
+      "title": "Assign / move",
+      "close": "Close assign and move panel",
+      "selected_one": "{{count}} asset selected",
+      "selected_other": "{{count}} assets selected",
+      "itemsToAssign_one": "{{count}} item to assign",
+      "itemsToAssign_other": "{{count}} items to assign",
+      "reserved": "Reserved {{count}}",
+      "qtyValue": "Qty {{count}}",
+      "adjustQuantity": "Adjust quantity for bulk assets before applying the assignment.",
+      "cannotAssign": "Cannot assign: {{summary}}.",
+      "modeAria": "Asset action mode",
+      "assign": "Assign",
+      "move": "Move",
+      "project": "Project",
+      "noProject": "No project",
+      "responsible": "Responsible",
+      "unassigned": "Unassigned",
+      "unit": "Unit",
+      "noSpecificUnit": "No specific unit",
+      "chooseProjectFirst": "Choose project first",
+      "targetLocation": "Target location",
+      "keepCurrentLocation": "Keep current location",
+      "chooseDestination": "Choose destination",
+      "department": "Department",
+      "noDepartment": "No department",
+      "expectedReturn": "Expected return",
+      "notes": "Notes",
+      "optionalNote": "Optional note",
+      "applying": "Applying...",
+      "applyAssignment": "Apply assignment",
+      "moveAssets": "Move assets"
+    },
+    "stock": {
+      "available": "available",
+      "reserved": "reserved",
+      "out": "out",
+      "total": "Total",
+      "availableLabel": "Available",
+      "reservedOnProject": "Reserved on project",
+      "checkedOutOnSlip": "Checked out on slip",
+      "assignedRatio": "Assigned {{count}} / {{total}}",
+      "outCount": "Out {{count}}"
+    },
     "metrics": {
       "totalUnits": "Total units",
       "reservedOut": "Reserved / out units",
@@ -1479,6 +1577,11 @@
       "agentStatus": {
         "active": "Active",
         "paused": "Paused"
+      },
+      "approvalMode": {
+        "auto": "Automatic",
+        "supervised": "Supervised",
+        "needs_approval": "Needs approval"
       }
     },
     "team": {

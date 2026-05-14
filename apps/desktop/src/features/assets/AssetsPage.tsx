@@ -20,7 +20,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
-import { resolveAssetAvailability, summarizeUnavailableAssets } from "@shared/lib/assetAvailability";
+import { resolveAssetAvailability, summarizeUnavailableAssets, translateAssetAvailabilityLabel, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
 import { formatAssetStockDetailRows, formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
@@ -454,7 +454,7 @@ const AssetOperationCart = ({
         <div className="asset-operation-cart-warning">
           {lockedItems.length ? t("assets.cart.lockedSummary", { count: lockedItems.length }) : null}
           {lockedItems.length && unavailableItems.length ? " " : ""}
-          {unavailableItems.length ? summarizeUnavailableAssets(unavailableItems) : null}
+          {unavailableItems.length ? summarizeUnavailableAssets(unavailableItems, t) : null}
         </div>
       ) : null}
 
@@ -470,7 +470,7 @@ const AssetOperationCart = ({
               <div className="asset-operation-cart-row-copy">
                 <span className="asset-operation-cart-title">{asset.name}</span>
                 <span className="asset-operation-cart-meta">
-                  {asset.code} · {availability.label} · {availability.reason}
+                  {asset.code} · {translateAssetAvailabilityLabel(availability, t)} · {translateAssetAvailabilityReason(availability, t)}
                 </span>
               </div>
               <label className="asset-operation-cart-quantity">
@@ -1443,7 +1443,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               availableQuantity: row.quantity,
               assignedQuantity: row.assignedQuantity,
               checkedOutQuantity: row.checkedOutQuantity,
-            })}
+            }, t)}
           </span>
         ),
       },
@@ -2092,7 +2092,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       availableQuantity: activeAsset.quantity,
                       assignedQuantity: activeAsset.assignedQuantity,
                       checkedOutQuantity: activeAsset.checkedOutQuantity,
-                    }).map((row) => (
+                    }, t).map((row) => (
                       <div key={row.label} className="summary-row">
                         <span className="summary-label">{row.label}</span>
                         <span className="summary-value">{row.value}</span>

@@ -727,7 +727,7 @@ export const CatalogEditorPanel = ({
                         availableQuantity: asset.quantity,
                         assignedQuantity: asset.assignedQuantity,
                         checkedOutQuantity: asset.checkedOutQuantity,
-                      })}
+                      }, t)}
                     </span>
                     <span className="identity-meta catalog-kit-asset-context">
                       {asset.currentProject

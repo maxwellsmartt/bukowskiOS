@@ -1,11 +1,12 @@
 import { ArrowRightLeft, PackagePlus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
 import { useProjectDetail } from "@features/projects/useProjectsData";
 import { SelectField } from "@shared/components/SelectField";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
-import { resolveAssetAvailability, summarizeUnavailableAssets } from "@shared/lib/assetAvailability";
+import { resolveAssetAvailability, summarizeUnavailableAssets, translateAssetAvailabilityLabel, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
 
 export type AssetAssignMoveFormValue = {
   assetSelections?: Array<{ assetId: string; quantity: number }>;
@@ -77,6 +78,7 @@ export const AssetAssignMovePanel = ({
   title,
   users,
 }: AssetAssignMovePanelProps) => {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<"assign" | "move">(allowedModes[0] ?? "assign");
   const [projectId, setProjectId] = useState(defaultProjectId ?? "");
   const [projectUnitId, setProjectUnitId] = useState("");
@@ -177,23 +179,23 @@ export const AssetAssignMovePanel = ({
     });
   };
 
-  const selectedLabel = selectedCount === 1 ? "1 asset selected" : `${selectedCount} assets selected`;
-  const quantityLabel = totalAssignQuantity === 1 ? "1 item" : `${totalAssignQuantity} items`;
+  const selectedLabel = t("assets.assignMove.selected", { count: selectedCount });
+  const quantityLabel = t("assets.assignMove.itemsToAssign", { count: totalAssignQuantity });
 
   return (
     <SurfaceCard
       aside={
-        <button aria-label="Close assign and move panel" className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("assets.assignMove.close")} className="surface-card-action" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }
-      title={title ?? "Assign / move"}
+      title={title ?? t("assets.assignMove.title")}
       subtitle={subtitle}
     >
       <div className="action-panel-summary">
         <span>{selectedLabel}</span>
         {mode === "assign" ? (
-          <span>{quantityLabel} to assign</span>
+          <span>{quantityLabel}</span>
         ) : null}
       </div>
 
@@ -205,16 +207,19 @@ export const AssetAssignMovePanel = ({
                 <div className="packing-builder-selection-copy">
                   <span className="packing-builder-selection-title">{asset.name}</span>
                   <span className="packing-builder-selection-meta">
-                    {asset.code} · {resolveAssetAvailability(asset).label} · {resolveAssetAvailability(asset).reason}
-                    {asset.assignedQuantity > 0 ? ` · Reserved ${asset.assignedQuantity}` : ""}
+                    {(() => {
+                      const availability = resolveAssetAvailability(asset);
+                      return `${asset.code} · ${translateAssetAvailabilityLabel(availability, t)} · ${translateAssetAvailabilityReason(availability, t)}`;
+                    })()}
+                    {asset.assignedQuantity > 0 ? ` · ${t("assets.assignMove.reserved", { count: asset.assignedQuantity })}` : ""}
                     {asset.serialNumber && asset.serialNumber !== "—" ? ` · ${asset.serialNumber}` : ""}
                   </span>
                 </div>
                 {lockedAssetSelections?.length ? (
-                  <span className="packing-builder-selection-fixed">Qty {asset.requestedQuantity}</span>
+                  <span className="packing-builder-selection-fixed">{t("assets.assignMove.qtyValue", { count: asset.requestedQuantity })}</span>
                 ) : asset.sourceQuantity > 1 ? (
                   <label className="packing-builder-selection-quantity">
-                    <span className="action-field-label">Qty</span>
+                    <span className="action-field-label">{t("assets.cart.qty")}</span>
                     <input
                       className="action-field-control"
                       max={asset.sourceQuantity}
@@ -225,7 +230,7 @@ export const AssetAssignMovePanel = ({
                     />
                   </label>
                 ) : (
-                  <span className="packing-builder-selection-fixed">Qty 1</span>
+                  <span className="packing-builder-selection-fixed">{t("assets.assignMove.qtyValue", { count: 1 })}</span>
                 )}
               </div>
             ))}
@@ -233,19 +238,19 @@ export const AssetAssignMovePanel = ({
 
           {hasVariableQuantityAssets ? (
             <div className="action-feedback action-feedback-warning">
-              Adjust quantity for bulk assets before applying the assignment.
+              {t("assets.assignMove.adjustQuantity")}
             </div>
           ) : null}
           {unavailableAssignAssets.length ? (
             <div className="action-feedback action-feedback-warning">
-              Cannot assign: {summarizeUnavailableAssets(unavailableAssignAssets)}.
+              {t("assets.assignMove.cannotAssign", { summary: summarizeUnavailableAssets(unavailableAssignAssets, t) })}
             </div>
           ) : null}
         </>
       ) : null}
 
       {allowedModes.length > 1 ? (
-        <div className="action-mode-toggle" role="tablist" aria-label="Asset action mode">
+        <div className="action-mode-toggle" role="tablist" aria-label={t("assets.assignMove.modeAria")}>
           {allowedModes.includes("assign") ? (
             <button
               className={`action-mode-button${mode === "assign" ? " active" : ""}`}
@@ -253,7 +258,7 @@ export const AssetAssignMovePanel = ({
               type="button"
             >
               <PackagePlus size={14} />
-              <span>Assign</span>
+              <span>{t("assets.assignMove.assign")}</span>
             </button>
           ) : null}
           {allowedModes.includes("move") ? (
@@ -263,7 +268,7 @@ export const AssetAssignMovePanel = ({
               type="button"
             >
               <ArrowRightLeft size={14} />
-              <span>Move</span>
+              <span>{t("assets.assignMove.move")}</span>
             </button>
           ) : null}
         </div>
@@ -273,9 +278,9 @@ export const AssetAssignMovePanel = ({
         {mode === "assign" ? (
           <>
             <label className="action-field">
-              <span className="action-field-label">Project</span>
+              <span className="action-field-label">{t("assets.assignMove.project")}</span>
               <SelectField onChange={(event) => setProjectId(event.target.value)} value={projectId}>
-                <option value="">No project</option>
+                <option value="">{t("assets.assignMove.noProject")}</option>
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.code} · {project.name}
@@ -285,9 +290,9 @@ export const AssetAssignMovePanel = ({
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Responsible</span>
+              <span className="action-field-label">{t("assets.assignMove.responsible")}</span>
               <SelectField onChange={(event) => setAssignedToUserId(event.target.value)} value={assignedToUserId}>
-                <option value="">Unassigned</option>
+                <option value="">{t("assets.assignMove.unassigned")}</option>
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.fullName}
@@ -297,9 +302,9 @@ export const AssetAssignMovePanel = ({
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Unit</span>
+              <span className="action-field-label">{t("assets.assignMove.unit")}</span>
               <SelectField disabled={!projectId} onChange={(event) => setProjectUnitId(event.target.value)} value={projectUnitId}>
-                <option value="">{projectId ? "No specific unit" : "Choose project first"}</option>
+                <option value="">{projectId ? t("assets.assignMove.noSpecificUnit") : t("assets.assignMove.chooseProjectFirst")}</option>
                 {projectDetail.units.map((unit) => (
                   <option key={unit.id} value={unit.id}>
                     {unit.code} · {unit.name}
@@ -311,9 +316,9 @@ export const AssetAssignMovePanel = ({
         ) : null}
 
         <label className="action-field">
-          <span className="action-field-label">Target location</span>
+          <span className="action-field-label">{t("assets.assignMove.targetLocation")}</span>
           <SelectField onChange={(event) => setTargetLocationId(event.target.value)} value={targetLocationId}>
-            <option value="">{mode === "assign" ? "Keep current location" : "Choose destination"}</option>
+            <option value="">{mode === "assign" ? t("assets.assignMove.keepCurrentLocation") : t("assets.assignMove.chooseDestination")}</option>
             {locations.map((location) => (
               <option key={location.id} value={location.id}>
                 {location.code} · {location.name}
@@ -324,15 +329,15 @@ export const AssetAssignMovePanel = ({
       </div>
 
       <details className="detail-disclosure">
-        <summary className="detail-disclosure-summary">More details</summary>
+        <summary className="detail-disclosure-summary">{t("assets.detail.sections.moreDetails")}</summary>
         <div className="detail-disclosure-content">
           <div className="action-form-grid">
             {mode === "assign" ? (
               <>
                 <label className="action-field">
-                  <span className="action-field-label">Department</span>
+                  <span className="action-field-label">{t("assets.assignMove.department")}</span>
                   <SelectField onChange={(event) => setDepartmentId(event.target.value)} value={departmentId}>
-                    <option value="">No department</option>
+                    <option value="">{t("assets.assignMove.noDepartment")}</option>
                     {departments.map((department) => (
                       <option key={department.id} value={department.id}>
                         {department.code} · {department.name}
@@ -342,7 +347,7 @@ export const AssetAssignMovePanel = ({
                 </label>
 
                 <label className="action-field">
-                  <span className="action-field-label">Expected return</span>
+                  <span className="action-field-label">{t("assets.assignMove.expectedReturn")}</span>
                   <input
                     className="action-field-control"
                     onChange={(event) => setExpectedReturnAt(event.target.value)}
@@ -354,11 +359,11 @@ export const AssetAssignMovePanel = ({
             ) : null}
 
             <label className="action-field action-field-wide">
-              <span className="action-field-label">Notes</span>
+              <span className="action-field-label">{t("assets.assignMove.notes")}</span>
               <textarea
                 className="action-field-control action-textarea"
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional note"
+                placeholder={t("assets.assignMove.optionalNote")}
                 rows={3}
                 value={notes}
               />
@@ -371,7 +376,7 @@ export const AssetAssignMovePanel = ({
 
       <div className="action-panel-actions">
         <button className="ghost-control cancel-control" onClick={onClose} type="button">
-          Cancel
+          {t("common.cancel")}
         </button>
         <button
           className="action-primary-button"
@@ -379,7 +384,7 @@ export const AssetAssignMovePanel = ({
           onClick={() => void handleSubmit()}
           type="button"
         >
-          {isSubmitting ? "Applying..." : mode === "assign" ? "Apply assignment" : "Move assets"}
+          {isSubmitting ? t("assets.assignMove.applying") : mode === "assign" ? t("assets.assignMove.applyAssignment") : t("assets.assignMove.moveAssets")}
         </button>
       </div>
     </SurfaceCard>

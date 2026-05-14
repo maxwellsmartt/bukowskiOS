@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next";
+
 type AvailabilityAsset = {
   status: string;
   quantity: number;
@@ -9,10 +11,16 @@ type AvailabilityAsset = {
 };
 
 export type AssetAvailability = {
+  key: "inKit" | "retired" | "inRepair" | "checkedOut" | "assigned" | "noStock" | "available";
   isAvailable: boolean;
   label: string;
   reason: string;
   nextAction: string;
+  values?: {
+    count?: number;
+    project?: string;
+    kitCodes?: string;
+  };
   tone: "success" | "info" | "warning" | "critical" | "neutral";
 };
 
@@ -23,16 +31,19 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
 
   if ((asset.linkedKitCount ?? 0) > 0) {
     return {
+      key: "inKit",
       isAvailable: false,
       label: "In kit",
       reason: linkedKitCodes.length ? `In kit ${linkedKitCodes.join(", ")}.` : "Part of an active kit.",
       nextAction: "Remove from kit to use separately.",
+      values: { kitCodes: linkedKitCodes.join(", ") },
       tone: "warning",
     };
   }
 
   if (asset.status === "Retired") {
     return {
+      key: "retired",
       isAvailable: false,
       label: "Retired",
       reason: "Unavailable; kept for history.",
@@ -43,6 +54,7 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
 
   if (asset.status === "Maintenance") {
     return {
+      key: "inRepair",
       isAvailable: false,
       label: "In repair",
       reason: "Out for repair.",
@@ -53,26 +65,31 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
 
   if (asset.checkedOutQuantity && asset.checkedOutQuantity > 0) {
     return {
+      key: "checkedOut",
       isAvailable: false,
       label: "Checked out",
       reason: `${asset.checkedOutQuantity} checked out${hasMeaningfulProject(asset.project) ? ` on ${asset.project}` : ""}.`,
       nextAction: "Process return before reusing.",
+      values: { count: asset.checkedOutQuantity, project: hasMeaningfulProject(asset.project) ? asset.project : undefined },
       tone: "warning",
     };
   }
 
   if (asset.quantity <= 0 && asset.assignedQuantity && asset.assignedQuantity > 0) {
     return {
+      key: "assigned",
       isAvailable: false,
       label: "Assigned",
       reason: `${asset.assignedQuantity} reserved${hasMeaningfulProject(asset.project) ? ` for ${asset.project}` : ""}.`,
       nextAction: "Release or move the reservation first.",
+      values: { count: asset.assignedQuantity, project: hasMeaningfulProject(asset.project) ? asset.project : undefined },
       tone: "info",
     };
   }
 
   if (asset.quantity <= 0) {
     return {
+      key: "noStock",
       isAvailable: false,
       label: "No stock",
       reason: "No units available.",
@@ -82,31 +99,59 @@ export const resolveAssetAvailability = (asset: AvailabilityAsset): AssetAvailab
   }
 
   return {
+    key: "available",
     isAvailable: true,
     label: "Available",
     reason: asset.quantity === 1 ? "1 unit available." : `${asset.quantity} units available.`,
     nextAction: "Ready to use.",
+    values: { count: asset.quantity },
     tone: "success",
   };
 };
 
-const unavailableSummaryLabel: Record<string, string> = {
-  Assigned: "assigned",
-  "Checked out": "checked out",
-  "In kit": "in kit",
-  "In repair": "in repair",
-  "No stock": "out of stock",
-  Retired: "retired",
+export const translateAssetAvailabilityLabel = (availability: AssetAvailability, t: TFunction) =>
+  t(`assets.availability.${availability.key}.label`, { defaultValue: availability.label });
+
+export const translateAssetAvailabilityReason = (availability: AssetAvailability, t: TFunction) => {
+  const reasonKey =
+    availability.key === "inKit" && availability.values?.kitCodes
+      ? "reasonWithKit"
+      : (availability.key === "checkedOut" || availability.key === "assigned") && availability.values?.project
+        ? "reasonWithProject"
+        : "reason";
+
+  return t(`assets.availability.${availability.key}.${reasonKey}`, {
+    count: availability.values?.count ?? 0,
+    defaultValue: availability.reason,
+    kitCodes: availability.values?.kitCodes,
+    project: availability.values?.project,
+  });
 };
 
-export const summarizeUnavailableAssets = (assets: AvailabilityAsset[]) => {
+export const translateAssetAvailabilityNextAction = (availability: AssetAvailability, t: TFunction) =>
+  t(`assets.availability.${availability.key}.nextAction`, { defaultValue: availability.nextAction });
+
+const unavailableSummaryLabel: Record<string, string> = {
+  assigned: "assigned",
+  checkedOut: "checked out",
+  inKit: "in kit",
+  inRepair: "in repair",
+  noStock: "out of stock",
+  retired: "retired",
+};
+
+export const summarizeUnavailableAssets = (assets: AvailabilityAsset[], t?: TFunction) => {
   const unavailable = assets.map((asset) => resolveAssetAvailability(asset)).filter((availability) => !availability.isAvailable);
   const counts = unavailable.reduce<Record<string, number>>((summary, availability) => {
-    summary[availability.label] = (summary[availability.label] ?? 0) + 1;
+    summary[availability.key] = (summary[availability.key] ?? 0) + 1;
     return summary;
   }, {});
 
   return Object.entries(counts)
-    .map(([label, count]) => `${count} ${unavailableSummaryLabel[label] ?? label.toLowerCase()}`)
+    .map(([key, count]) =>
+      t
+        ? t(`assets.availability.summary.${key}`, { count })
+        : `${count} ${unavailableSummaryLabel[key] ?? key.toLowerCase()}`,
+    )
     .join(", ");
 };

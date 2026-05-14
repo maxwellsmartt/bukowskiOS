@@ -199,6 +199,106 @@
       }
     },
     "inKit": "En kit {{codes}}",
+    "availability": {
+      "title": "Disponibilidad",
+      "subtitle": "Lo que puedes hacer con este equipo ahora mismo.",
+      "tooltip": "Estado operativo del equipo: si está en stock, fuera, reservado, en kit o no disponible.",
+      "currentState": "Estado actual",
+      "toUse": "Para usarlo",
+      "inKit": {
+        "label": "En kit",
+        "reason": "Parte de un kit activo.",
+        "reasonWithKit": "En kit {{kitCodes}}.",
+        "nextAction": "Quítalo del kit para usarlo por separado."
+      },
+      "retired": {
+        "label": "Retirado",
+        "reason": "No disponible; se conserva en el historial.",
+        "nextAction": "Usa un equipo de reemplazo."
+      },
+      "inRepair": {
+        "label": "En reparación",
+        "reason": "Fuera por reparación.",
+        "nextAction": "Cierra la reparación para devolverlo al stock."
+      },
+      "checkedOut": {
+        "label": "Fuera",
+        "reason": "{{count}} fuera.",
+        "reasonWithProject": "{{count}} fuera en {{project}}.",
+        "nextAction": "Registra la devolución antes de reutilizarlo."
+      },
+      "assigned": {
+        "label": "Reservado",
+        "reason": "{{count}} reservado.",
+        "reasonWithProject": "{{count}} reservado para {{project}}.",
+        "nextAction": "Libera o mueve la reserva primero."
+      },
+      "noStock": {
+        "label": "Sin stock",
+        "reason": "No hay unidades disponibles.",
+        "nextAction": "Espera una devolución o agrega stock."
+      },
+      "available": {
+        "label": "Disponible",
+        "reason_one": "{{count}} unidad disponible.",
+        "reason_other": "{{count}} unidades disponibles.",
+        "nextAction": "Listo para usar."
+      },
+      "summary": {
+        "assigned": "{{count}} reservados",
+        "checkedOut": "{{count}} fuera",
+        "inKit": "{{count}} en kit",
+        "inRepair": "{{count}} en reparación",
+        "noStock": "{{count}} sin stock",
+        "retired": "{{count}} retirados"
+      }
+    },
+    "assignMove": {
+      "title": "Asignar / mover",
+      "close": "Cerrar panel de asignación y movimiento",
+      "selected_one": "{{count}} equipo seleccionado",
+      "selected_other": "{{count}} equipos seleccionados",
+      "itemsToAssign_one": "{{count}} item para asignar",
+      "itemsToAssign_other": "{{count}} items para asignar",
+      "reserved": "{{count}} reservado",
+      "qtyValue": "Cant. {{count}}",
+      "adjustQuantity": "Ajusta la cantidad de equipos agrupados antes de aplicar la asignación.",
+      "cannotAssign": "No se puede asignar: {{summary}}.",
+      "modeAria": "Modo de acción del equipo",
+      "assign": "Asignar",
+      "move": "Mover",
+      "project": "Proyecto",
+      "noProject": "Sin proyecto",
+      "responsible": "Responsable",
+      "unassigned": "Sin asignar",
+      "unit": "Unidad",
+      "noSpecificUnit": "Sin unidad específica",
+      "chooseProjectFirst": "Elige un proyecto primero",
+      "targetLocation": "Ubicación destino",
+      "keepCurrentLocation": "Mantener ubicación actual",
+      "chooseDestination": "Elegir destino",
+      "department": "Departamento",
+      "noDepartment": "Sin departamento",
+      "expectedReturn": "Retorno esperado",
+      "notes": "Notas",
+      "optionalNote": "Nota opcional",
+      "applying": "Aplicando…",
+      "applyAssignment": "Aplicar asignación",
+      "moveAssets": "Mover equipos"
+    },
+    "stock": {
+      "available_one": "disponible",
+      "available_other": "disponibles",
+      "reserved_one": "reservada",
+      "reserved_other": "reservadas",
+      "out": "fuera",
+      "total": "Total",
+      "availableLabel": "Disponibles",
+      "reservedOnProject": "Reservadas en proyecto",
+      "checkedOutOnSlip": "Fuera en packing slip",
+      "assignedRatio": "Asignadas {{count}} / {{total}}",
+      "outCount": "Fuera {{count}}"
+    },
     "metrics": {
       "totalUnits": "Unidades totales",
       "reservedOut": "Reservadas / fuera",
@@ -1479,6 +1579,11 @@
       "agentStatus": {
         "active": "Activo",
         "paused": "Pausado"
+      },
+      "approvalMode": {
+        "auto": "Automático",
+        "supervised": "Supervisado",
+        "needs_approval": "Requiere aprobación"
       }
     },
     "team": {

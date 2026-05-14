@@ -155,7 +155,7 @@ export const PackingSlipBuilderPanel = ({
 
       {unavailableAssets.length ? (
         <div className="action-feedback action-feedback-warning">
-          {t("packing.builder.cannotIssue", { summary: summarizeUnavailableAssets(unavailableAssets) })}
+          {t("packing.builder.cannotIssue", { summary: summarizeUnavailableAssets(unavailableAssets, t) })}
         </div>
       ) : null}
 

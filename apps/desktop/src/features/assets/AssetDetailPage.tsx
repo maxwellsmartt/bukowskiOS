@@ -14,7 +14,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useLocale } from "@shared/hooks/useLocale";
 import { useShellContext } from "@shared/hooks/useShellContext";
-import { resolveAssetAvailability } from "@shared/lib/assetAvailability";
+import { resolveAssetAvailability, translateAssetAvailabilityLabel, translateAssetAvailabilityNextAction, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
@@ -194,25 +194,25 @@ export const AssetDetailPage = () => {
       </SurfaceCard>
 
       <SurfaceCard
-        title="Availability"
-        subtitle="What you can do with this asset right now."
+        title={t("assets.availability.title")}
+        subtitle={t("assets.availability.subtitle")}
         aside={
-          <span data-tooltip="Day-to-day state of the asset: whether it is in stock, checked out, assigned to a project or unavailable.">
-            <StatusBadge tone={availability.tone}>{availability.label}</StatusBadge>
+          <span data-tooltip={t("assets.availability.tooltip")}>
+            <StatusBadge tone={availability.tone}>{translateAssetAvailabilityLabel(availability, t)}</StatusBadge>
           </span>
         }
       >
         <div className="summary-grid compact-summary-grid">
           <div className="summary-row">
-            <span className="summary-label">Current state</span>
-            <span className="summary-value">{availability.reason}</span>
+            <span className="summary-label">{t("assets.availability.currentState")}</span>
+            <span className="summary-value">{translateAssetAvailabilityReason(availability, t)}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">To use</span>
-            <span className="summary-value">{availability.nextAction}</span>
+            <span className="summary-label">{t("assets.availability.toUse")}</span>
+            <span className="summary-value">{translateAssetAvailabilityNextAction(availability, t)}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Stock</span>
+            <span className="summary-label">{t("assets.columns.stock")}</span>
             <span className="summary-value">{stockSummary}</span>
           </div>
         </div>

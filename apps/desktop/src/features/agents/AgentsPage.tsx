@@ -6,7 +6,7 @@ import type { AgentRosterRow } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
-import { getAgentApprovalModeLabel, titleCaseEnum } from "@shared/labels/statusLabels";
+import { titleCaseEnum } from "@shared/labels/statusLabels";
 import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
 
 import { AgentDomainInsightPanel } from "./AgentDomainInsightPanel";
@@ -214,7 +214,7 @@ export const AgentsPage = () => {
                   })()}
                   <span>{detail.agent.modelLabel}</span>
                 </span>
-                <span className="subtle-pill">{getAgentApprovalModeLabel(detail.agent.approvalMode)}</span>
+                <span className="subtle-pill">{t(`agents.shared.approvalMode.${detail.agent.approvalMode}`, { defaultValue: titleCaseEnum(detail.agent.approvalMode) })}</span>
               </div>
               <div className="agent-detail-meta">
                 <div>

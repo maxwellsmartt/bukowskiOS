@@ -38,6 +38,9 @@ const emptyDiagnostics: AppDiagnosticsSnapshot = {
   internalBuildArtifacts: [],
 };
 
+const syncOutboxStatusLabel = (status: string, t: ReturnType<typeof useTranslation>["t"]) =>
+  t(`settings.sync.filters.${status}`, { defaultValue: getSyncOutboxStatusLabel(status) });
+
 type SyncFilter = "all" | "pending" | "processing" | "failed" | "sent";
 type SyncEntityFilter = "all" | string;
 
@@ -585,7 +588,7 @@ export const SyncOutboxPage = () => {
                 {
                   key: "status",
                   label: t("settings.sync.queueColumns.status"),
-                  render: (row) => <StatusBadge tone={formatSyncStatusTone(row.status)}>{getSyncOutboxStatusLabel(row.status)}</StatusBadge>,
+                  render: (row) => <StatusBadge tone={formatSyncStatusTone(row.status)}>{syncOutboxStatusLabel(row.status, t)}</StatusBadge>,
                 },
                 { key: "entityType", label: t("settings.sync.queueColumns.entity"), render: (row) => row.entityType },
                 { key: "entityId", label: t("settings.sync.queueColumns.entityId"), render: (row) => row.entityId },
@@ -606,7 +609,7 @@ export const SyncOutboxPage = () => {
                 <div className="summary-grid">
                   <div className="summary-row">
                     <span className="summary-label">{t("settings.sync.detail.status")}</span>
-                    <span className="summary-value">{getSyncOutboxStatusLabel(activeRow.status)}</span>
+                    <span className="summary-value">{syncOutboxStatusLabel(activeRow.status, t)}</span>
                   </div>
                   <div className="summary-row">
                     <span className="summary-label">{t("settings.sync.detail.entity")}</span>

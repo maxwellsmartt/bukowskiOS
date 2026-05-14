@@ -7,7 +7,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
-import { getAgentApprovalModeLabel, getAgentRunStatusLabel, titleCaseEnum } from "@shared/labels/statusLabels";
+import { getAgentRunStatusLabel, titleCaseEnum } from "@shared/labels/statusLabels";
 import { getAgentProviderBrand } from "@shared/lib/agentProviderBranding";
 import { getConnectorBrand } from "@shared/lib/connectorBranding";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
@@ -388,10 +388,10 @@ export const AgentsMissionControlPage = () => {
             <div className="agent-detail-stack">
               <div className="agent-detail-row agent-activity-filter-row">
                 <span className={`mission-operational-pill mission-operational-pill-${selectedAgent.operationalState}`}>
-                  {t(`agents.shared.operationalState.`)}
+                  {t(`agents.shared.operationalState.${selectedAgent.operationalState}`, { defaultValue: titleCaseEnum(selectedAgent.operationalState) })}
                 </span>
                 <span className={`mission-node-status mission-node-status-${selectedAgent.status}`}>
-                  {t(`agents.shared.agentStatus.`)}
+                  {t(`agents.shared.agentStatus.${selectedAgent.status}`, { defaultValue: titleCaseEnum(selectedAgent.status) })}
                 </span>
                 <span className="subtle-pill">
                   {(() => {
@@ -406,7 +406,7 @@ export const AgentsMissionControlPage = () => {
                   })()}
                   <span>{selectedAgent.modelLabel}</span>
                 </span>
-                <span className="subtle-pill">{getAgentApprovalModeLabel(selectedAgent.approvalMode)}</span>
+                <span className="subtle-pill">{t(`agents.shared.approvalMode.${selectedAgent.approvalMode}`, { defaultValue: titleCaseEnum(selectedAgent.approvalMode) })}</span>
               </div>
 
               <div className="agent-detail-meta">
