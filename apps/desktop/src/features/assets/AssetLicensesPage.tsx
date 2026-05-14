@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, CreditCard, KeyRound, Pencil, Plus, ReceiptText, RefreshCw, Repeat2, Save, Trash2, UsersRound, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useSession } from "@app/providers/SessionProvider";
@@ -64,23 +65,6 @@ const emptyDraft: LicenseDraft = {
   reminderDaysBefore: "0",
   seatAssignments: "",
   notes: "",
-};
-
-const licenseTypeLabels: Record<SoftwareLicenseRow["license_type"], string> = {
-  subscription: "Subscription",
-  perpetual: "Permanent",
-  trial: "Trial",
-  usage_based: "Usage based",
-  web_service: "Web service",
-  other: "Other",
-};
-
-const statusLabels: Record<SoftwareLicenseRow["status"], string> = {
-  active: "Active",
-  expiring: "Expiring",
-  expired: "Expired",
-  permanent: "Permanent",
-  archived: "Archived",
 };
 
 const resolveStatusTone = (status: SoftwareLicenseRow["status"]) => {
@@ -161,13 +145,14 @@ const buildLicenseReminderTime = (expiresAt: string, reminderDaysBefore: number)
 };
 
 export const AssetLicensesPage = () => {
+  const { t } = useTranslation();
   const { supabase, isLocalFallback } = useSession();
   const { createReminder, deleteReminder, reminders, updateReminder } = useNotifications();
   const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const { formatDate: formatDateLocale } = useLocale();
   const formatDate = (value: string | null) => {
-    if (!value) return "No expiry";
+    if (!value) return t("assets.licenses.noExpiry");
     return formatDateLocale(`${value}T00:00:00`) || value;
   };
   const [rows, setRows] = useState<SoftwareLicenseRow[]>([]);
@@ -200,7 +185,7 @@ export const AssetLicensesPage = () => {
       if (queryError) throw queryError;
       setRows(((data ?? []) as SoftwareLicenseRow[]).map((row) => ({ ...row, seat_assignments: normalizeSeatAssignments(row.seat_assignments), status: deriveStatus(row) })));
     } catch (nextError) {
-      toast.error("Licenses unavailable", getUserFacingErrorMessage(nextError, "Run the latest Supabase migration and try again."));
+      toast.error(t("assets.licenses.toasts.unavailableTitle"), getUserFacingErrorMessage(nextError, t("assets.licenses.toasts.unavailableBody")));
     } finally {
       setIsLoading(false);
     }
@@ -220,6 +205,16 @@ export const AssetLicensesPage = () => {
     }),
     [rows],
   );
+  const licenseTypeOptions = useMemo(
+    () =>
+      (["subscription", "perpetual", "trial", "usage_based", "web_service", "other"] as const).map((value) => ({
+        label: t(`assets.licenses.types.${value}`),
+        value,
+      })),
+    [t],
+  );
+  const licenseTypeLabel = (value: SoftwareLicenseRow["license_type"]) => t(`assets.licenses.types.${value}`);
+  const licenseStatusLabel = (value: SoftwareLicenseRow["status"]) => t(`assets.licenses.statuses.${value}`);
   const hasRequiredDraft = draft.softwareName.trim().length > 0;
   const draftSeatLimit = Math.max(0, Number.parseInt(draft.seatCount, 10) || 0);
   const draftSeatLines = splitSeatAssignmentLines(draft.seatAssignments).slice(0, draftSeatLimit);
@@ -280,7 +275,7 @@ export const AssetLicensesPage = () => {
       return;
     }
 
-    const body = `Review renewal before ${formatDate(expiresAt)}.`;
+    const body = t("assets.licenses.reminder.body", { date: formatDate(expiresAt) });
     if (existingReminder) {
       await updateReminder({
         id: existingReminder.id,
@@ -302,7 +297,7 @@ export const AssetLicensesPage = () => {
   const handleSave = async () => {
     if (!supabase || !activeWorkspaceId) return;
     if (!draft.softwareName.trim()) {
-      toast.warning("Software name required", "Add the software name before saving this license.");
+      toast.warning(t("assets.licenses.toasts.softwareRequiredTitle"), t("assets.licenses.toasts.softwareRequiredBody"));
       return;
     }
 
@@ -342,14 +337,14 @@ export const AssetLicensesPage = () => {
         reminderDaysBefore: payload.reminder_days_before,
         softwareName: payload.software_name,
       }).catch((reminderError) => {
-        toast.warning("License saved without reminder", getUserFacingErrorMessage(reminderError, "Open Inbox to add the renewal reminder manually."));
+        toast.warning(t("assets.licenses.toasts.savedWithoutReminderTitle"), getUserFacingErrorMessage(reminderError, t("assets.licenses.toasts.savedWithoutReminderBody")));
       });
       setDraft(emptyDraft);
       setEditingLicenseId(null);
-      toast.success(editingLicenseId ? "License updated" : "License saved", draft.softwareName.trim());
+      toast.success(editingLicenseId ? t("assets.licenses.toasts.updatedTitle") : t("assets.licenses.toasts.savedTitle"), draft.softwareName.trim());
       await loadLicenses();
     } catch (nextError) {
-      toast.error("Could not save license", getUserFacingErrorMessage(nextError, "Check the license details and try again."));
+      toast.error(t("assets.licenses.toasts.saveFailedTitle"), getUserFacingErrorMessage(nextError, t("assets.licenses.toasts.saveFailedBody")));
     } finally {
       setIsSaving(false);
     }
@@ -380,13 +375,13 @@ export const AssetLicensesPage = () => {
       if (reminder) {
         await deleteReminder(reminder.id).catch(() => undefined);
       }
-      toast.success("License removed", license.software_name);
+      toast.success(t("assets.licenses.toasts.removedTitle"), license.software_name);
       if (editingLicenseId === license.id) {
         handleCancelEdit();
       }
       await loadLicenses();
     } catch (nextError) {
-      toast.error("Could not remove license", getUserFacingErrorMessage(nextError, "Try again in a moment."));
+      toast.error(t("assets.licenses.toasts.removeFailedTitle"), getUserFacingErrorMessage(nextError, t("assets.licenses.toasts.removeFailedBody")));
     }
   };
 
@@ -421,8 +416,12 @@ export const AssetLicensesPage = () => {
     const assignments = compactSeatAssignments(seatEditorDraft);
     if (assignments.length > license.seat_count) {
       toast.warning(
-        "Too many seats assigned",
-        `${license.software_name} has ${license.seat_count} seat${license.seat_count === 1 ? "" : "s"}. Remove ${assignments.length - license.seat_count} assignment${assignments.length - license.seat_count === 1 ? "" : "s"} or update the seat count.`,
+        t("assets.licenses.toasts.tooManySeatsTitle"),
+        t("assets.licenses.toasts.tooManySeatsBody", {
+          count: assignments.length - license.seat_count,
+          license: license.software_name,
+          seats: license.seat_count,
+        }),
       );
       return;
     }
@@ -440,13 +439,13 @@ export const AssetLicensesPage = () => {
 
       if (updateError) throw updateError;
       if (!updatedLicense) {
-        throw new Error("This license could not be updated. Make sure your user has license management access in this workspace.");
+        throw new Error(t("assets.licenses.toasts.seatAccessError"));
       }
-      toast.success("Seats updated", license.software_name);
+      toast.success(t("assets.licenses.toasts.seatsUpdatedTitle"), license.software_name);
       cancelSeatEdit();
       await loadLicenses();
     } catch (nextError) {
-      toast.error("Could not update seats", getUserFacingErrorMessage(nextError, "Check the assignments and try again."));
+      toast.error(t("assets.licenses.toasts.seatsFailedTitle"), getUserFacingErrorMessage(nextError, t("assets.licenses.toasts.seatsFailedBody")));
     } finally {
       setSeatEditorBusyId(null);
     }
@@ -457,10 +456,10 @@ export const AssetLicensesPage = () => {
     try {
       await navigator.clipboard.writeText(license.license_key);
       setCopiedLicenseId(license.id);
-      toast.success("License code copied", license.software_name);
+      toast.success(t("assets.licenses.toasts.codeCopiedTitle"), license.software_name);
       window.setTimeout(() => setCopiedLicenseId((current) => (current === license.id ? null : current)), 1800);
     } catch (nextError) {
-      toast.error("Could not copy code", getUserFacingErrorMessage(nextError, "Copy it manually from the license card."));
+      toast.error(t("assets.licenses.toasts.copyFailedTitle"), getUserFacingErrorMessage(nextError, t("assets.licenses.toasts.copyFailedBody")));
     }
   };
 
@@ -471,35 +470,35 @@ export const AssetLicensesPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Licenses" titleTone="accent" />
+      <SectionHeader title={t("assets.licenses.title")} titleTone="accent" />
 
       <div className="license-summary-grid">
         <SurfaceCard className="agents-health-card">
-          <span className="agents-health-label">Licenses</span>
+          <span className="agents-health-label">{t("assets.licenses.metrics.licenses")}</span>
           <strong className="agents-health-value">{summary.total}</strong>
         </SurfaceCard>
         <SurfaceCard className="agents-health-card">
-          <span className="agents-health-label">Expiring soon</span>
+          <span className="agents-health-label">{t("assets.licenses.metrics.expiringSoon")}</span>
           <strong className="agents-health-value">{summary.expiring}</strong>
         </SurfaceCard>
         <SurfaceCard className="agents-health-card">
-          <span className="agents-health-label">Expired</span>
+          <span className="agents-health-label">{t("assets.licenses.metrics.expired")}</span>
           <strong className="agents-health-value">{summary.expired}</strong>
         </SurfaceCard>
         <SurfaceCard className="agents-health-card">
-          <span className="agents-health-label">Seats</span>
+          <span className="agents-health-label">{t("assets.licenses.metrics.seats")}</span>
           <strong className="agents-health-value">{summary.seats}</strong>
         </SurfaceCard>
       </div>
 
       <div className="license-layout">
         <SurfaceCard
-          title="Add license"
+          title={t("assets.licenses.add.title")}
           aside={
             <button
-              aria-label="Refresh licenses"
+              aria-label={t("assets.licenses.actions.refresh")}
               className="icon-ghost-control license-refresh-button"
-              data-tooltip="Refresh licenses"
+              data-tooltip={t("assets.licenses.actions.refresh")}
               disabled={isLoading}
               onClick={() => void loadLicenses()}
               type="button"
@@ -510,17 +509,17 @@ export const AssetLicensesPage = () => {
         >
           <div className="license-form-grid">
             <label className="field-block field-block-span-2">
-              <span className="field-label">Software</span>
-              <input className="field-input" onChange={(event) => updateDraft("softwareName", event.target.value)} placeholder="DaVinci Resolve Studio" value={draft.softwareName} />
+              <span className="field-label">{t("assets.licenses.fields.software")}</span>
+              <input className="field-input" onChange={(event) => updateDraft("softwareName", event.target.value)} placeholder={t("assets.licenses.placeholders.software")} value={draft.softwareName} />
             </label>
             <label className="field-block">
-              <span className="field-label">Vendor</span>
-              <input className="field-input" onChange={(event) => updateDraft("vendor", event.target.value)} placeholder="Blackmagic Design" value={draft.vendor} />
+              <span className="field-label">{t("assets.licenses.fields.vendor")}</span>
+              <input className="field-input" onChange={(event) => updateDraft("vendor", event.target.value)} placeholder={t("assets.licenses.placeholders.vendor")} value={draft.vendor} />
             </label>
             <label className="field-block">
-              <span className="field-label">Type</span>
+              <span className="field-label">{t("assets.licenses.fields.type")}</span>
               <select className="field-input" onChange={(event) => updateDraft("licenseType", event.target.value as LicenseDraft["licenseType"])} value={draft.licenseType}>
-                {Object.entries(licenseTypeLabels).map(([value, label]) => (
+                {licenseTypeOptions.map(({ value, label }) => (
                   <option key={value} value={value}>
                     {label}
                   </option>
@@ -528,56 +527,56 @@ export const AssetLicensesPage = () => {
               </select>
             </label>
             <label className="field-block">
-              <span className="field-label">Seats</span>
+              <span className="field-label">{t("assets.licenses.fields.seats")}</span>
               <input className="field-input" min="0" onChange={(event) => updateDraftSeatCount(event.target.value)} type="number" value={draft.seatCount} />
             </label>
             <label className="field-block">
-              <span className="field-label">Renewal reminder</span>
+              <span className="field-label">{t("assets.licenses.fields.renewalReminder")}</span>
               <input className="field-input" min="0" onChange={(event) => updateDraft("reminderDaysBefore", event.target.value)} type="number" value={draft.reminderDaysBefore} />
             </label>
             {draft.licenseType !== "perpetual" && draft.licenseType !== "trial" ? (
               <label className="field-block">
-                <span className="field-label">Start</span>
+                <span className="field-label">{t("assets.licenses.fields.start")}</span>
                 <input className="field-input" onChange={(event) => updateDraft("startsAt", event.target.value)} type="date" value={draft.startsAt} />
               </label>
             ) : null}
             {draft.licenseType !== "perpetual" && draft.licenseType !== "usage_based" ? (
               <label className="field-block">
-                <span className="field-label">{draft.licenseType === "trial" ? "Trial ends" : "Expires"}</span>
+                <span className="field-label">{draft.licenseType === "trial" ? t("assets.licenses.fields.trialEnds") : t("assets.licenses.fields.expires")}</span>
                 <input className="field-input" onChange={(event) => updateDraft("expiresAt", event.target.value)} type="date" value={draft.expiresAt} />
               </label>
             ) : null}
             <label className="field-block field-block-span-2">
-              <span className="field-label">License code</span>
-              <input className="field-input" onChange={(event) => updateDraft("licenseKey", event.target.value)} placeholder="Code, serial or activation key" value={draft.licenseKey} />
+              <span className="field-label">{t("assets.licenses.fields.licenseCode")}</span>
+              <input className="field-input" onChange={(event) => updateDraft("licenseKey", event.target.value)} placeholder={t("assets.licenses.placeholders.licenseCode")} value={draft.licenseKey} />
             </label>
             <label className="field-block">
-              <span className="field-label">Account email</span>
-              <input className="field-input" onChange={(event) => updateDraft("accountEmail", event.target.value)} placeholder="billing@company.com" value={draft.accountEmail} />
+              <span className="field-label">{t("assets.licenses.fields.accountEmail")}</span>
+              <input className="field-input" onChange={(event) => updateDraft("accountEmail", event.target.value)} placeholder={t("assets.licenses.placeholders.accountEmail")} value={draft.accountEmail} />
             </label>
             <label className="field-block">
-              <span className="field-label">Renewal link</span>
+              <span className="field-label">{t("assets.licenses.fields.renewalLink")}</span>
               <input className="field-input" onChange={(event) => updateDraft("renewalUrl", event.target.value)} placeholder="https://" value={draft.renewalUrl} />
             </label>
             <label className="field-block">
-              <span className="field-label">Payment link</span>
+              <span className="field-label">{t("assets.licenses.fields.paymentLink")}</span>
               <input className="field-input" onChange={(event) => updateDraft("paymentUrl", event.target.value)} placeholder="https://" value={draft.paymentUrl} />
             </label>
             <label className="field-block">
-              <span className="field-label">Invoice link</span>
+              <span className="field-label">{t("assets.licenses.fields.invoiceLink")}</span>
               <input className="field-input" onChange={(event) => updateDraft("invoiceUrl", event.target.value)} placeholder="https://" value={draft.invoiceUrl} />
             </label>
             <div className="field-block field-block-span-2">
               <div className="license-seat-editor-header">
                 <div>
-                  <span className="field-label">Seat assignments</span>
+                  <span className="field-label">{t("assets.licenses.fields.seatAssignments")}</span>
                   <small>
-                    {compactSeatAssignments(draftSeatLines).length}/{draftSeatLimit} seats used
+                    {t("assets.licenses.seats.used", { assigned: compactSeatAssignments(draftSeatLines).length, total: draftSeatLimit })}
                   </small>
                 </div>
                 <button className="ghost-control compact" disabled={draftSeatLines.length >= draftSeatLimit} onClick={addDraftSeatLine} type="button">
                   <Plus size={13} />
-                  <span>Add seat</span>
+                  <span>{t("assets.licenses.actions.addSeat")}</span>
                 </button>
               </div>
               {draftSeatLimit > 0 ? (
@@ -586,45 +585,45 @@ export const AssetLicensesPage = () => {
                     <div key={`draft-seat-${index}`} className="license-seat-line">
                       <span className="license-seat-line-index">{index + 1}</span>
                       <input
-                        aria-label={`Seat ${index + 1} assignment`}
+                        aria-label={t("assets.licenses.aria.seatAssignment", { index: index + 1 })}
                         className="field-input"
                         onChange={(event) => updateDraftSeatLine(index, event.target.value)}
-                        placeholder="User, machine or workstation"
+                        placeholder={t("assets.licenses.placeholders.seatAssignment")}
                         value={seat}
                       />
-                      <button aria-label="Remove seat line" className="icon-ghost-control" onClick={() => removeDraftSeatLine(index)} type="button">
+                      <button aria-label={t("assets.licenses.actions.removeSeatLine")} className="icon-ghost-control" onClick={() => removeDraftSeatLine(index)} type="button">
                         <X size={13} />
                       </button>
                     </div>
                   ))}
-                  {!draftSeatLines.length ? <div className="license-seat-list is-empty">No seats assigned yet</div> : null}
+                  {!draftSeatLines.length ? <div className="license-seat-list is-empty">{t("assets.licenses.seats.none")}</div> : null}
                 </div>
               ) : (
-                <div className="license-seat-list is-empty">Set at least 1 seat before assigning seats.</div>
+                <div className="license-seat-list is-empty">{t("assets.licenses.seats.setSeatFirst")}</div>
               )}
             </div>
             <label className="field-block field-block-span-2">
-              <span className="field-label">Notes</span>
-              <textarea className="field-input field-textarea" onChange={(event) => updateDraft("notes", event.target.value)} placeholder="Renewal notes, account owner or billing context" value={draft.notes} />
+              <span className="field-label">{t("assets.licenses.fields.notes")}</span>
+              <textarea className="field-input field-textarea" onChange={(event) => updateDraft("notes", event.target.value)} placeholder={t("assets.licenses.placeholders.notes")} value={draft.notes} />
             </label>
           </div>
           <div className="license-form-actions">
             {editingLicenseId ? (
               <button className="ghost-control" onClick={handleCancelEdit} type="button">
-                Cancel
+                {t("common.cancel")}
               </button>
             ) : null}
             <button className={`primary-control license-save-button${hasRequiredDraft ? " is-ready" : ""}`} disabled={isSaving} onClick={() => void handleSave()} type="button">
               {isSaving ? <Save size={14} /> : <Plus size={14} />}
-              <span>{isSaving ? "Saving..." : editingLicenseId ? "Save changes" : "Add license"}</span>
+              <span>{isSaving ? t("common.saving") : editingLicenseId ? t("common.saveChanges") : t("assets.licenses.actions.addLicense")}</span>
             </button>
           </div>
         </SurfaceCard>
 
-        <SurfaceCard className="license-register-card" title="License register">
-          {isLoading ? <div className="empty-state">Loading licenses...</div> : null}
+        <SurfaceCard className="license-register-card" title={t("assets.licenses.register.title")}>
+          {isLoading ? <div className="empty-state">{t("assets.licenses.register.loading")}</div> : null}
           {!isLoading && !rows.length ? (
-            <div className="empty-state">No software licenses yet. Add the first license to start tracking renewals, seats and codes.</div>
+            <div className="empty-state">{t("assets.licenses.register.empty")}</div>
           ) : (
             <div className="license-list">
               {rows.map((license) => {
@@ -642,46 +641,46 @@ export const AssetLicensesPage = () => {
                         </span>
                         <div>
                           <strong>{license.software_name}</strong>
-                          <span>{[license.vendor, license.account_email].filter(Boolean).join(" · ") || "No vendor details"}</span>
+                          <span>{[license.vendor, license.account_email].filter(Boolean).join(" · ") || t("assets.licenses.register.noVendorDetails")}</span>
                         </div>
                       </div>
 
                       <div className="license-row-actions">
-                        <button className="icon-ghost-control" data-tooltip="Renewal" disabled={!license.renewal_url} onClick={() => openUrl(license.renewal_url)} type="button">
+                        <button className="icon-ghost-control" data-tooltip={t("assets.licenses.actions.renewal")} disabled={!license.renewal_url} onClick={() => openUrl(license.renewal_url)} type="button">
                           <Repeat2 size={14} />
                         </button>
-                        <button className="icon-ghost-control" data-tooltip="Payment" disabled={!license.payment_url} onClick={() => openUrl(license.payment_url)} type="button">
+                        <button className="icon-ghost-control" data-tooltip={t("assets.licenses.actions.payment")} disabled={!license.payment_url} onClick={() => openUrl(license.payment_url)} type="button">
                           <CreditCard size={14} />
                         </button>
-                        <button className="icon-ghost-control" data-tooltip="Invoice" disabled={!license.invoice_url} onClick={() => openUrl(license.invoice_url)} type="button">
+                        <button className="icon-ghost-control" data-tooltip={t("assets.licenses.actions.invoice")} disabled={!license.invoice_url} onClick={() => openUrl(license.invoice_url)} type="button">
                           <ReceiptText size={14} />
                         </button>
-                        <button className="icon-ghost-control" data-tooltip="Edit" onClick={() => handleEdit(license)} type="button">
+                        <button className="icon-ghost-control" data-tooltip={t("common.edit")} onClick={() => handleEdit(license)} type="button">
                           <Pencil size={14} />
                         </button>
-                        <button className="icon-ghost-control danger-icon-control" data-tooltip="Delete" onClick={() => void handleArchive(license)} type="button">
+                        <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} onClick={() => void handleArchive(license)} type="button">
                           <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
 
                     <div className="license-row-meta">
-                      <StatusBadge tone={resolveStatusTone(license.status)}>{statusLabels[license.status]}</StatusBadge>
-                      <span>{licenseTypeLabels[license.license_type]}</span>
+                      <StatusBadge tone={resolveStatusTone(license.status)}>{licenseStatusLabel(license.status)}</StatusBadge>
+                      <span>{licenseTypeLabel(license.license_type)}</span>
                       <span>{formatDate(license.expires_at)}</span>
                     </div>
 
                     <div className="license-seat-summary">
                       <div>
-                        <span className="license-code-label">Seats</span>
+                        <span className="license-code-label">{t("assets.licenses.fields.seats")}</span>
                         <strong>
-                          {assignedSeats.length}/{license.seat_count} assigned
+                          {t("assets.licenses.seats.assigned", { assigned: assignedSeats.length, total: license.seat_count })}
                         </strong>
-                        <small>{availableSeats} available</small>
+                        <small>{t("assets.licenses.seats.available", { count: availableSeats })}</small>
                       </div>
                       <button className="ghost-control license-seat-edit-button" onClick={() => startSeatEdit(license)} type="button">
                         <UsersRound size={13} />
-                        <span>Assign seats</span>
+                        <span>{t("assets.licenses.actions.assignSeats")}</span>
                       </button>
                     </div>
 
@@ -689,14 +688,14 @@ export const AssetLicensesPage = () => {
                       <div className="license-seat-editor">
                         <div className="license-seat-editor-header">
                           <div>
-                            <span className="field-label">Assigned seats</span>
+                            <span className="field-label">{t("assets.licenses.fields.assignedSeats")}</span>
                             <small>
-                              {compactSeatAssignments(seatEditorDraft).length}/{license.seat_count} seats used
+                              {t("assets.licenses.seats.used", { assigned: compactSeatAssignments(seatEditorDraft).length, total: license.seat_count })}
                             </small>
                           </div>
                           <button className="ghost-control compact" disabled={!canAddSeatLine} onClick={() => addSeatEditorLine(license)} type="button">
                             <Plus size={13} />
-                            <span>Add seat</span>
+                            <span>{t("assets.licenses.actions.addSeat")}</span>
                           </button>
                         </div>
                         {license.seat_count > 0 ? (
@@ -705,26 +704,26 @@ export const AssetLicensesPage = () => {
                               <div key={`${license.id}-seat-${index}`} className="license-seat-line">
                                 <span className="license-seat-line-index">{index + 1}</span>
                                 <input
-                                  aria-label={`Seat ${index + 1} assignment`}
+                                  aria-label={t("assets.licenses.aria.seatAssignment", { index: index + 1 })}
                                   className="field-input"
                                   onChange={(event) => updateSeatEditorLine(index, event.target.value)}
-                                  placeholder="User, machine or workstation"
+                                  placeholder={t("assets.licenses.placeholders.seatAssignment")}
                                   value={seat}
                                 />
-                                <button aria-label="Remove seat line" className="icon-ghost-control" onClick={() => removeSeatEditorLine(index)} type="button">
+                                <button aria-label={t("assets.licenses.actions.removeSeatLine")} className="icon-ghost-control" onClick={() => removeSeatEditorLine(index)} type="button">
                                   <X size={13} />
                                 </button>
                               </div>
                             ))}
-                            {!seatEditorDraft.length ? <div className="license-seat-list is-empty">No seat lines yet</div> : null}
+                            {!seatEditorDraft.length ? <div className="license-seat-list is-empty">{t("assets.licenses.seats.noLines")}</div> : null}
                           </div>
                         ) : (
-                          <div className="license-seat-list is-empty">Set at least 1 seat on this license before assigning seats.</div>
+                          <div className="license-seat-list is-empty">{t("assets.licenses.seats.setLicenseSeatFirst")}</div>
                         )}
                         <div className="license-seat-editor-actions">
                           <button className="ghost-control" onClick={cancelSeatEdit} type="button">
                             <X size={13} />
-                            <span>Cancel</span>
+                            <span>{t("common.cancel")}</span>
                           </button>
                           <button
                             className="primary-control"
@@ -733,7 +732,7 @@ export const AssetLicensesPage = () => {
                             type="button"
                           >
                             <Save size={13} />
-                            <span>{seatEditorBusyId === license.id ? "Saving..." : "Save seats"}</span>
+                            <span>{seatEditorBusyId === license.id ? t("common.saving") : t("assets.licenses.actions.saveSeats")}</span>
                           </button>
                         </div>
                       </div>
@@ -742,20 +741,20 @@ export const AssetLicensesPage = () => {
                         {assignedSeats.slice(0, 6).map((seat) => (
                           <span key={seat}>{seat}</span>
                         ))}
-                        {assignedSeats.length > 6 ? <span>+{assignedSeats.length - 6} more</span> : null}
+                        {assignedSeats.length > 6 ? <span>{t("assets.licenses.seats.more", { count: assignedSeats.length - 6 })}</span> : null}
                       </div>
                     ) : (
-                      <div className="license-seat-list is-empty">No seats assigned yet</div>
+                      <div className="license-seat-list is-empty">{t("assets.licenses.seats.none")}</div>
                     )}
 
                     <div className="license-code-row">
-                      <span className="license-code-label">Code</span>
-                      <code>{license.license_key ?? "Not added"}</code>
+                      <span className="license-code-label">{t("assets.licenses.fields.code")}</span>
+                      <code>{license.license_key ?? t("assets.licenses.register.notAdded")}</code>
                       {license.license_key ? (
                         <button
-                          aria-label="Copy license code"
+                          aria-label={t("assets.licenses.actions.copyCode")}
                           className="icon-ghost-control"
-                          data-tooltip={copiedLicenseId === license.id ? "Copied" : "Copy code"}
+                          data-tooltip={copiedLicenseId === license.id ? t("common.copied") : t("assets.licenses.actions.copyCode")}
                           onClick={() => void handleCopyLicenseCode(license)}
                           type="button"
                         >

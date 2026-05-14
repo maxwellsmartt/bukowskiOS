@@ -179,12 +179,147 @@
       "openIssues": "Open issues"
     },
     "detail": {
-      "title": "Asset detail"
+      "title": "Asset detail",
+      "missing": "This asset does not exist anymore or was removed from the workspace.",
+      "pending": "Pending",
+      "stockSummary": "{{available}} available · {{assigned}} reserved · {{checkedOut}} checked out",
+      "sections": {
+        "details": "Details",
+        "moreDetails": "More details"
+      },
+      "labels": {
+        "tracking": "Tracking",
+        "kitMembership": "Kit membership",
+        "insuredValue": "Insured value",
+        "primaryCode": "Primary code"
+      },
+      "toasts": {
+        "filesUpdated": "Files updated",
+        "unableRemoveImage": "Unable to remove that asset image."
+      }
     },
     "inKit": "In kit {{codes}}",
     "metrics": {
       "totalUnits": "Total units",
-      "reservedOut": "Reserved / out units"
+      "reservedOut": "Reserved / out units",
+      "overdueReturns": "Overdue returns",
+      "openPackingSlips": "Open packing slips",
+      "activeIncidents": "Active incidents",
+      "maintenanceWatch": "Maintenance watch"
+    },
+    "licenses": {
+      "title": "Licenses",
+      "noExpiry": "No expiry",
+      "metrics": {
+        "licenses": "Licenses",
+        "expiringSoon": "Expiring soon",
+        "expired": "Expired",
+        "seats": "Seats"
+      },
+      "add": {
+        "title": "Add license"
+      },
+      "register": {
+        "title": "License register",
+        "loading": "Loading licenses…",
+        "empty": "No software licenses yet. Add the first license to start tracking renewals, seats and codes.",
+        "noVendorDetails": "No vendor details",
+        "notAdded": "Not added"
+      },
+      "types": {
+        "subscription": "Subscription",
+        "perpetual": "Permanent",
+        "trial": "Trial",
+        "usage_based": "Usage based",
+        "web_service": "Web service",
+        "other": "Other"
+      },
+      "statuses": {
+        "active": "Active",
+        "expiring": "Expiring",
+        "expired": "Expired",
+        "permanent": "Permanent",
+        "archived": "Archived"
+      },
+      "fields": {
+        "software": "Software",
+        "vendor": "Vendor",
+        "type": "Type",
+        "seats": "Seats",
+        "renewalReminder": "Renewal reminder",
+        "start": "Start",
+        "trialEnds": "Trial ends",
+        "expires": "Expires",
+        "licenseCode": "License code",
+        "accountEmail": "Account email",
+        "renewalLink": "Renewal link",
+        "paymentLink": "Payment link",
+        "invoiceLink": "Invoice link",
+        "seatAssignments": "Seat assignments",
+        "assignedSeats": "Assigned seats",
+        "notes": "Notes",
+        "code": "Code"
+      },
+      "placeholders": {
+        "software": "Software name",
+        "vendor": "Vendor",
+        "licenseCode": "Code, serial or activation key",
+        "accountEmail": "billing@company.com",
+        "seatAssignment": "User, machine or workstation",
+        "notes": "Renewal notes, account owner or billing context"
+      },
+      "actions": {
+        "refresh": "Refresh licenses",
+        "addLicense": "Add license",
+        "addSeat": "Add seat",
+        "removeSeatLine": "Remove seat line",
+        "renewal": "Renewal",
+        "payment": "Payment",
+        "invoice": "Invoice",
+        "assignSeats": "Assign seats",
+        "saveSeats": "Save seats",
+        "copyCode": "Copy license code"
+      },
+      "seats": {
+        "used": "{{assigned}}/{{total}} seats used",
+        "assigned": "{{assigned}}/{{total}} assigned",
+        "available": "{{count}} available",
+        "none": "No seats assigned yet",
+        "noLines": "No seat lines yet",
+        "setSeatFirst": "Set at least 1 seat before assigning seats.",
+        "setLicenseSeatFirst": "Set at least 1 seat on this license before assigning seats.",
+        "more": "+{{count}} more"
+      },
+      "aria": {
+        "seatAssignment": "Seat {{index}} assignment"
+      },
+      "reminder": {
+        "body": "Review renewal before {{date}}."
+      },
+      "toasts": {
+        "unavailableTitle": "Licenses unavailable",
+        "unavailableBody": "Run the latest Supabase migration and try again.",
+        "softwareRequiredTitle": "Software name required",
+        "softwareRequiredBody": "Add the software name before saving this license.",
+        "savedWithoutReminderTitle": "License saved without reminder",
+        "savedWithoutReminderBody": "Open Inbox to add the renewal reminder manually.",
+        "savedTitle": "License saved",
+        "updatedTitle": "License updated",
+        "saveFailedTitle": "Could not save license",
+        "saveFailedBody": "Check the license details and try again.",
+        "removedTitle": "License removed",
+        "removeFailedTitle": "Could not remove license",
+        "removeFailedBody": "Try again in a moment.",
+        "tooManySeatsTitle": "Too many seats assigned",
+        "tooManySeatsBody": "{{license}} has {{seats}} seats. Remove {{count}} assignment(s) or update the seat count.",
+        "seatAccessError": "This license could not be updated. Make sure your user has license management access in this workspace.",
+        "seatsUpdatedTitle": "Seats updated",
+        "seatsFailedTitle": "Could not update seats",
+        "seatsFailedBody": "Check the assignments and try again.",
+        "codeCopiedTitle": "License code copied",
+        "copyFailedTitle": "Could not copy code",
+        "copyFailedBody": "Copy it manually from the license card."
+      }
     },
     "selection": {
       "readyTitle": "Ready for checkout",
@@ -389,6 +524,13 @@
       "actions": {
         "exportPdf": "Export PDF",
         "exportingPdf": "Exporting PDF..."
+      },
+      "metrics": {
+        "incidentExposure": "Incident exposure",
+        "replacementAtRisk": "Replacement at risk",
+        "trackedSpend": "Tracked spend",
+        "missingEstimates": "Missing estimates",
+        "maintenanceQueue": "Maintenance queue"
       },
       "exchange": {
         "title": "Exchange rates",

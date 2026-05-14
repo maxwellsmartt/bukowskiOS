@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { useToast } from "@app/providers/ToastProvider";
@@ -59,6 +60,7 @@ const resolveFileTone = (status: "available" | "missing" | "deleted") => {
 const isAssetImageFile = (file: { mimeType: string }) => file.mimeType.startsWith("image/");
 
 export const AssetDetailPage = () => {
+  const { t } = useTranslation();
   const { assetId } = useParams();
   const [searchParams] = useSearchParams();
   const toast = useToast();
@@ -100,9 +102,9 @@ export const AssetDetailPage = () => {
       setDeletingFileId(target.id);
       const result = await deleteAssetFile(target.id);
       await reload();
-      toast.success("Files updated", result.summary);
+      toast.success(t("assets.detail.toasts.filesUpdated"), result.summary);
     } catch (nextError) {
-      setFilesError(getUserFacingErrorMessage(nextError, "Unable to remove that asset image."));
+      setFilesError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableRemoveImage")));
     } finally {
       setDeletingFileId(null);
       setPendingImageDelete(null);
@@ -110,10 +112,14 @@ export const AssetDetailPage = () => {
   };
 
   if (!data.asset) {
-    return <div className="empty-state">This asset does not exist anymore or was removed from the workspace.</div>;
+    return <div className="empty-state">{t("assets.detail.missing")}</div>;
   }
 
-  const stockSummary = `${data.asset.quantity} available · ${data.asset.assignedQuantity} reserved · ${data.asset.checkedOutQuantity} checked out`;
+  const stockSummary = t("assets.detail.stockSummary", {
+    assigned: data.asset.assignedQuantity,
+    available: data.asset.quantity,
+    checkedOut: data.asset.checkedOutQuantity,
+  });
   const availability = resolveAssetAvailability(data.asset);
   const secondaryCodes = data.scannableCodes.filter((code) => !code.isPrimary);
   const assetImages = data.files.filter((file) => file.status === "available" && isAssetImageFile(file)).slice(0, 2);
@@ -418,16 +424,16 @@ export const AssetDetailPage = () => {
 
       <ResizableSideRailLayout className="split-layout asset-detail-layout" defaultWidth={420} maxWidth={640} minWidth={320} storageKey="asset-detail-side-rail-width">
         <div className="page-stack">
-          <SurfaceCard title="Details">
+          <SurfaceCard title={t("assets.detail.sections.details")}>
             <div className="summary-grid">
               <div className="summary-row">
-                <span className="summary-label">Tracking</span>
+                <span className="summary-label">{t("assets.detail.labels.tracking")}</span>
                 <span className="summary-value">{data.asset.tracking}</span>
               </div>
               <div className="summary-row">
-                <span className="summary-label">Kit membership</span>
+                <span className="summary-label">{t("assets.detail.labels.kitMembership")}</span>
                 <span className="summary-value">
-                  {data.asset.linkedKitCount ? data.asset.linkedKitCodes.join(" · ") : "Standalone"}
+                  {data.asset.linkedKitCount ? data.asset.linkedKitCodes.join(" · ") : t("assets.quickPreview.standalone")}
                 </span>
               </div>
             </div>
@@ -440,23 +446,23 @@ export const AssetDetailPage = () => {
             ].some((value) => value !== "Pending") ? (
               <div className="summary-grid compact-summary-grid">
                 <div className="summary-row">
-                  <span className="summary-label">Insured value</span>
+                  <span className="summary-label">{t("assets.detail.labels.insuredValue")}</span>
                   <span className="summary-value">{data.asset.insuredValue}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Purchase price</span>
+                  <span className="summary-label">{t("assets.columns.purchasePrice")}</span>
                   <span className="summary-value">{data.asset.purchasePrice}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Additional costs</span>
+                  <span className="summary-label">{t("assets.columns.additionalCosts")}</span>
                   <span className="summary-value">{data.asset.additionalCosts}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Current value</span>
+                  <span className="summary-label">{t("assets.columns.currentValue")}</span>
                   <span className="summary-value">{data.asset.currentBookValue}</span>
                 </div>
                 <div className="summary-row">
-                  <span className="summary-label">Replacement value</span>
+                  <span className="summary-label">{t("assets.columns.replacementValue")}</span>
                   <span className="summary-value">{data.asset.replacementValue}</span>
                 </div>
               </div>
@@ -465,7 +471,7 @@ export const AssetDetailPage = () => {
             {data.editor?.primaryCodeValue ? (
               <ScannableCodePanel
                 codeValue={data.editor.primaryCodeValue}
-                subtitle="Primary code"
+                subtitle={t("assets.detail.labels.primaryCode")}
                 title={data.asset.name}
                 onPrint={({ qrDataUrl, barcodeDataUrl }) =>
                   printScannableLabel({
@@ -480,12 +486,12 @@ export const AssetDetailPage = () => {
             ) : null}
 
             <details className="detail-disclosure">
-              <summary className="detail-disclosure-summary">More details</summary>
+              <summary className="detail-disclosure-summary">{t("assets.detail.sections.moreDetails")}</summary>
               <div className="detail-disclosure-content">
                 <div className="summary-grid">
                   <div className="summary-row">
-                    <span className="summary-label">Primary code</span>
-                    <span className="summary-value">{data.editor?.primaryCodeValue ?? "Pending"}</span>
+                    <span className="summary-label">{t("assets.detail.labels.primaryCode")}</span>
+                    <span className="summary-value">{data.editor?.primaryCodeValue ?? t("assets.detail.pending")}</span>
                   </div>
                   {data.legacy ? (
                     <div className="summary-row">

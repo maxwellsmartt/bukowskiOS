@@ -151,6 +151,18 @@ const getRateDisplayCopy = (source: CurrencyRateSource, baseCurrency: "USD" | "E
   };
 };
 
+const financeMetricLabel = (label: string, t: TFunction) => {
+  const keyByLabel: Record<string, string> = {
+    "Incident exposure": "incidentExposure",
+    "Replacement at risk": "replacementAtRisk",
+    "Tracked spend": "trackedSpend",
+    "Missing estimates": "missingEstimates",
+    "Maintenance queue": "maintenanceQueue",
+  };
+  const key = keyByLabel[label];
+  return key ? t(`finance.overview.metrics.${key}`, { defaultValue: label }) : label;
+};
+
 const RateChartTooltip = ({
   active,
   label,
@@ -505,7 +517,7 @@ export const FinanceOverviewPage = () => {
         {data.metrics.map((metric) => (
           <SurfaceCard key={metric.label}>
             <span className={`metric-value metric-tone-${metric.tone}`}>{metric.value}</span>
-            <p className="metric-label">{metric.label}</p>
+            <p className="metric-label">{financeMetricLabel(metric.label, t)}</p>
           </SurfaceCard>
         ))}
       </div>

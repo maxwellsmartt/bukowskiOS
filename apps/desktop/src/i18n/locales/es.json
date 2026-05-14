@@ -179,12 +179,147 @@
       "openIssues": "Incidencias abiertas"
     },
     "detail": {
-      "title": "Detalle del equipo"
+      "title": "Detalle del equipo",
+      "missing": "Este equipo ya no existe o fue eliminado del workspace.",
+      "pending": "Pendiente",
+      "stockSummary": "{{available}} disponibles · {{assigned}} reservadas · {{checkedOut}} fuera",
+      "sections": {
+        "details": "Detalles",
+        "moreDetails": "Más detalles"
+      },
+      "labels": {
+        "tracking": "Tracking",
+        "kitMembership": "Membresía de kit",
+        "insuredValue": "Valor asegurado",
+        "primaryCode": "Código principal"
+      },
+      "toasts": {
+        "filesUpdated": "Archivos actualizados",
+        "unableRemoveImage": "No se pudo eliminar esa imagen del equipo."
+      }
     },
     "inKit": "En kit {{codes}}",
     "metrics": {
       "totalUnits": "Unidades totales",
-      "reservedOut": "Reservadas / fuera"
+      "reservedOut": "Reservadas / fuera",
+      "overdueReturns": "Devoluciones vencidas",
+      "openPackingSlips": "Packing slips abiertos",
+      "activeIncidents": "Incidentes activos",
+      "maintenanceWatch": "Mantenimiento"
+    },
+    "licenses": {
+      "title": "Licencias",
+      "noExpiry": "Sin vencimiento",
+      "metrics": {
+        "licenses": "Licencias",
+        "expiringSoon": "Por vencer",
+        "expired": "Vencidas",
+        "seats": "Seats"
+      },
+      "add": {
+        "title": "Agregar licencia"
+      },
+      "register": {
+        "title": "Registro de licencias",
+        "loading": "Cargando licencias…",
+        "empty": "Aún no hay licencias de software. Agrega la primera para controlar renovaciones, seats y códigos.",
+        "noVendorDetails": "Sin datos del proveedor",
+        "notAdded": "Sin agregar"
+      },
+      "types": {
+        "subscription": "Suscripción",
+        "perpetual": "Permanente",
+        "trial": "Prueba",
+        "usage_based": "Por uso",
+        "web_service": "Servicio web",
+        "other": "Otro"
+      },
+      "statuses": {
+        "active": "Activa",
+        "expiring": "Por vencer",
+        "expired": "Vencida",
+        "permanent": "Permanente",
+        "archived": "Archivada"
+      },
+      "fields": {
+        "software": "Software",
+        "vendor": "Proveedor",
+        "type": "Tipo",
+        "seats": "Seats",
+        "renewalReminder": "Aviso de renovación",
+        "start": "Inicio",
+        "trialEnds": "Fin de prueba",
+        "expires": "Vence",
+        "licenseCode": "Código de licencia",
+        "accountEmail": "Correo de cuenta",
+        "renewalLink": "Link de renovación",
+        "paymentLink": "Link de pago",
+        "invoiceLink": "Link de factura",
+        "seatAssignments": "Asignación de seats",
+        "assignedSeats": "Seats asignados",
+        "notes": "Notas",
+        "code": "Código"
+      },
+      "placeholders": {
+        "software": "Nombre del software",
+        "vendor": "Proveedor",
+        "licenseCode": "Código, serie o llave de activación",
+        "accountEmail": "facturacion@empresa.com",
+        "seatAssignment": "Usuario, equipo o estación",
+        "notes": "Notas de renovación, dueño de cuenta o contexto de facturación"
+      },
+      "actions": {
+        "refresh": "Actualizar licencias",
+        "addLicense": "Agregar licencia",
+        "addSeat": "Agregar seat",
+        "removeSeatLine": "Quitar línea de seat",
+        "renewal": "Renovación",
+        "payment": "Pago",
+        "invoice": "Factura",
+        "assignSeats": "Asignar seats",
+        "saveSeats": "Guardar seats",
+        "copyCode": "Copiar código de licencia"
+      },
+      "seats": {
+        "used": "{{assigned}}/{{total}} seats usados",
+        "assigned": "{{assigned}}/{{total}} asignados",
+        "available": "{{count}} disponibles",
+        "none": "Aún no hay seats asignados",
+        "noLines": "Aún no hay líneas de seat",
+        "setSeatFirst": "Define al menos 1 seat antes de asignarlo.",
+        "setLicenseSeatFirst": "Define al menos 1 seat en esta licencia antes de asignarlo.",
+        "more": "+{{count}} más"
+      },
+      "aria": {
+        "seatAssignment": "Asignación del seat {{index}}"
+      },
+      "reminder": {
+        "body": "Revisar renovación antes de {{date}}."
+      },
+      "toasts": {
+        "unavailableTitle": "Licencias no disponibles",
+        "unavailableBody": "Ejecuta la migración más reciente de Supabase e intenta otra vez.",
+        "softwareRequiredTitle": "Falta el nombre del software",
+        "softwareRequiredBody": "Agrega el nombre del software antes de guardar esta licencia.",
+        "savedWithoutReminderTitle": "Licencia guardada sin recordatorio",
+        "savedWithoutReminderBody": "Abre Inbox para agregar el recordatorio manualmente.",
+        "savedTitle": "Licencia guardada",
+        "updatedTitle": "Licencia actualizada",
+        "saveFailedTitle": "No se pudo guardar la licencia",
+        "saveFailedBody": "Revisa los datos de la licencia e intenta otra vez.",
+        "removedTitle": "Licencia eliminada",
+        "removeFailedTitle": "No se pudo eliminar la licencia",
+        "removeFailedBody": "Inténtalo de nuevo en un momento.",
+        "tooManySeatsTitle": "Demasiados seats asignados",
+        "tooManySeatsBody": "{{license}} tiene {{seats}} seats. Quita {{count}} asignación(es) o actualiza la cantidad de seats.",
+        "seatAccessError": "Esta licencia no pudo actualizarse. Verifica que tu usuario tenga acceso para gestionar licencias en este workspace.",
+        "seatsUpdatedTitle": "Seats actualizados",
+        "seatsFailedTitle": "No se pudieron actualizar los seats",
+        "seatsFailedBody": "Revisa las asignaciones e intenta otra vez.",
+        "codeCopiedTitle": "Código de licencia copiado",
+        "copyFailedTitle": "No se pudo copiar el código",
+        "copyFailedBody": "Cópialo manualmente desde el card de licencia."
+      }
     },
     "selection": {
       "readyTitle": "Listo para entregar",
@@ -389,6 +524,13 @@
       "actions": {
         "exportPdf": "Exportar PDF",
         "exportingPdf": "Exportando PDF..."
+      },
+      "metrics": {
+        "incidentExposure": "Exposición por incidentes",
+        "replacementAtRisk": "Reposición en riesgo",
+        "trackedSpend": "Gasto registrado",
+        "missingEstimates": "Estimados faltantes",
+        "maintenanceQueue": "Cola de mantenimiento"
       },
       "exchange": {
         "title": "Tasas de cambio",

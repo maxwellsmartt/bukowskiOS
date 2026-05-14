@@ -2219,6 +2219,12 @@ const GlobalAssetsMetrics = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
   const { data: assetsOverview, error } = useAssetsOverview({ workspaceId: activeWorkspaceId });
+  const operationalCards = [
+    { ...assetsOverview.cards.overdueReturns, label: t("assets.metrics.overdueReturns") },
+    { ...assetsOverview.cards.openPackingSlips, label: t("assets.metrics.openPackingSlips") },
+    { ...assetsOverview.cards.activeIncidents, label: t("assets.metrics.activeIncidents") },
+    { ...assetsOverview.cards.maintenanceWatch, label: t("assets.metrics.maintenanceWatch") },
+  ];
   const overviewCards = [
     {
       label: t("assets.metrics.totalUnits"),
@@ -2230,10 +2236,7 @@ const GlobalAssetsMetrics = () => {
       value: assetsOverview.assignedAssets,
       tone: "info" as const,
     },
-    assetsOverview.cards.overdueReturns,
-    assetsOverview.cards.openPackingSlips,
-    assetsOverview.cards.activeIncidents,
-    assetsOverview.cards.maintenanceWatch,
+    ...operationalCards,
   ];
 
   return (
