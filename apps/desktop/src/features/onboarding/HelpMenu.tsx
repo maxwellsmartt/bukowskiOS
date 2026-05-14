@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { HelpCircle, Keyboard, RefreshCcw, Settings as SettingsIcon, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { triggerOnboardingTour } from "./OnboardingTour";
@@ -13,6 +14,7 @@ type HelpItem = {
 };
 
 export const HelpMenu = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [isPulsing, setIsPulsing] = useState(false);
@@ -59,8 +61,8 @@ export const HelpMenu = () => {
   const items: HelpItem[] = [
     {
       icon: <RefreshCcw size={14} />,
-      label: "Replay onboarding tour",
-      body: "Walk through the four key concepts again.",
+      label: t("onboarding.help.replayTour"),
+      body: t("onboarding.help.replayTourBody"),
       onClick: () => {
         setOpen(false);
         triggerOnboardingTour();
@@ -68,8 +70,8 @@ export const HelpMenu = () => {
     },
     {
       icon: <Keyboard size={14} />,
-      label: "Open command palette",
-      body: "Jump anywhere fast.",
+      label: t("onboarding.help.openCommandPalette"),
+      body: t("onboarding.help.openCommandPaletteBody"),
       shortcut: "⌘K",
       onClick: () => {
         setOpen(false);
@@ -80,8 +82,8 @@ export const HelpMenu = () => {
     },
     {
       icon: <SettingsIcon size={14} />,
-      label: "Workspace settings",
-      body: "Members, invites and roles.",
+      label: t("onboarding.help.workspaceSettings"),
+      body: t("onboarding.help.workspaceSettingsBody"),
       onClick: () => {
         setOpen(false);
         navigate("/settings/workspace");
@@ -93,9 +95,9 @@ export const HelpMenu = () => {
     <div className="help-menu" ref={containerRef}>
       <button
         aria-expanded={open}
-        aria-label={open ? "Close help" : "Open help"}
+        aria-label={open ? t("onboarding.help.closeHelp") : t("onboarding.help.openHelp")}
         className={`icon-ghost-control help-menu-trigger${open ? " is-open" : ""}${isPulsing ? " is-pulsing" : ""}`}
-        data-tooltip="Help & tour"
+        data-tooltip={t("onboarding.help.tooltip")}
         onClick={() => {
           setOpen((current) => !current);
           setIsPulsing(false);
@@ -108,8 +110,8 @@ export const HelpMenu = () => {
       {open ? (
         <div className="help-menu-popover" role="menu">
           <div className="help-menu-header">
-            <strong>Need a hand?</strong>
-            <button aria-label="Close help" className="help-menu-close" onClick={() => setOpen(false)} type="button">
+            <strong>{t("onboarding.help.title")}</strong>
+            <button aria-label={t("onboarding.help.closeHelp")} className="help-menu-close" onClick={() => setOpen(false)} type="button">
               <X size={13} />
             </button>
           </div>

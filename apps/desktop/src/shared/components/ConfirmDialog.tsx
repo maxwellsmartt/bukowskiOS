@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 type ConfirmDialogProps = {
   title: string;
@@ -18,14 +19,16 @@ export const ConfirmDialog = ({
   title,
   body,
   details,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   tone = "default",
   isOpen,
   isSubmitting = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) => {
+  const { t } = useTranslation();
+
   if (!isOpen) {
     return null;
   }
@@ -47,7 +50,7 @@ export const ConfirmDialog = ({
 
         <div className="confirm-dialog-actions">
           <button className="ghost-control cancel-control" disabled={isSubmitting} onClick={onCancel} type="button">
-            {cancelLabel}
+            {cancelLabel ?? t("common.cancel")}
           </button>
           <button
             className={tone === "danger" ? "action-danger-button" : "action-primary-button"}
@@ -55,7 +58,7 @@ export const ConfirmDialog = ({
             onClick={() => void onConfirm()}
             type="button"
           >
-            {isSubmitting ? "Working..." : confirmLabel}
+            {isSubmitting ? t("shared.confirmDialog.working") : confirmLabel ?? t("common.confirm")}
           </button>
         </div>
       </div>

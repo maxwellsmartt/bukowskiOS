@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { ScheduleTimelineRange, ScheduleTimelineScale } from "@contracts";
 import { DataTable } from "@shared/components/DataTable";
@@ -31,6 +32,7 @@ const isTimelineScale = (value: string | null): value is ScheduleTimelineScale =
   value === "day" || value === "week" || value === "month";
 
 const OverviewContent = () => {
+  const { t } = useTranslation();
   const { projectDataVersion } = useShellContext();
   const { data, error } = useOverviewSnapshot(projectDataVersion);
   const [timelineRange, setTimelineRange] = useState<ScheduleTimelineRange>(() => {
@@ -57,7 +59,22 @@ const OverviewContent = () => {
     data.cards.openPackingSlips,
     data.cards.activeIncidents,
     data.cards.maintenanceWatch,
-  ];
+  ].map((card) => {
+    const keyByLabel: Record<string, string> = {
+      "Overdue returns": "overdueReturns",
+      "Open packing slips": "openPackingSlips",
+      "Active incidents": "activeIncidents",
+      "Maintenance watch": "maintenanceWatch",
+    };
+    const key = keyByLabel[card.label];
+    return key
+      ? {
+          ...card,
+          label: t(`overview.cards.${key}.label`),
+          subtitle: t(`overview.cards.${key}.subtitle`),
+        }
+      : card;
+  });
 
   useEffect(() => {
     writePreference(uiPreferenceKeys.overviewTimelineRange, timelineRange);
@@ -81,9 +98,9 @@ const OverviewContent = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title="Overview" titleTone="accent" />
+      <SectionHeader title={t("overview.title")} titleTone="accent" />
 
-      {error ? <div className="empty-state">Overview unavailable: {error}</div> : null}
+      {error ? <div className="empty-state">{t("overview.unavailable", { error })}</div> : null}
 
       <div className="overview-operational-grid">
         {operationalCards.map((card) => (
@@ -106,14 +123,12 @@ const OverviewContent = () => {
         snapshot={timelineSnapshot}
       />
 
-      <SurfaceCard
-        title="Recent movements"
-      >
+      <SurfaceCard title={t("overview.recentMovements.title")}>
         <DataTable
           columns={[
             {
               key: "asset",
-              label: "Asset",
+              label: t("overview.recentMovements.columns.asset"),
               render: (row) => (
                 <div className="identity-cell">
                   <span className="identity-title">{row.asset}</span>
@@ -121,10 +136,10 @@ const OverviewContent = () => {
                 </div>
               ),
             },
-            { key: "from", label: "From", render: (row) => row.from },
-            { key: "to", label: "To", render: (row) => row.to },
-            { key: "actor", label: "Handled by", render: (row) => row.actor },
-            { key: "time", label: "Time", align: "right", render: (row) => row.timestamp },
+            { key: "from", label: t("overview.recentMovements.columns.from"), render: (row) => row.from },
+            { key: "to", label: t("overview.recentMovements.columns.to"), render: (row) => row.to },
+            { key: "actor", label: t("overview.recentMovements.columns.actor"), render: (row) => row.actor },
+            { key: "time", label: t("overview.recentMovements.columns.time"), align: "right", render: (row) => row.timestamp },
           ]}
           maxHeight="min(44vh, 420px)"
           persistKey="overview-recent-movements"

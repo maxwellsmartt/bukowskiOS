@@ -32,8 +32,9 @@ Actualización 2026-05-13:
 - Project Setup Wizard queda localizado por secciones: header/tabs, General Info, Assets, Crew, Units, Summary/Conflicts, footer, validaciones visibles y diálogo de draft.
 - Verificación: JSON i18n válido, `corepack pnpm --filter @bukowski/desktop typecheck` y `corepack pnpm --filter @bukowski/desktop build` pasan después del wizard completo.
 - Se avanza el pase transversal de traducción visible en Agents: Auth, Inbox, labels compartidos, AI Models y Agent Runs/Activity quedan conectados a `i18n`, manteniendo intactas las keys técnicas de modelos/providers/status.
+- Se continúa desde casa y se cierra otro pase transversal de traducción: shared components, onboarding/help tour, Overview/Schedule, Agent Connectors y Agent Wizard quedan conectados a `i18n` sin tocar contratos ni valores internos.
 - Pendiente menor: auditar labels compartidos que todavía viven fuera de componentes traducidos (`statusLabels.ts`, receipts generados por runtime, links dinámicos de actions) para decidir si se parametrizan globalmente o se mantienen como datos operativos.
-- Pase corto posterior: Agents Team, Mission Control y Global Assistant Chat dejan de renderizar hardcoded labels de alto impacto en inglés (`Operational receipt`, `Next`, approval actions, supervisor fallbacks, run links, estados de agente y health cards). Queda pendiente un pase específico para Agent Connectors y Agent Wizard, donde todavía hay bastante copy de configuración y placeholders técnicos.
+- Pase corto posterior: Agents Team, Mission Control, Global Assistant Chat, Agent Connectors y Agent Wizard dejan de renderizar hardcoded labels de alto impacto en inglés (`Operational receipt`, `Next`, approval actions, supervisor fallbacks, run links, canales, vínculo Telegram y campos del builder). Queda pendiente revisar sólo labels generados por runtime y datos operativos dinámicos.
 
 ## Decisión de foco
 

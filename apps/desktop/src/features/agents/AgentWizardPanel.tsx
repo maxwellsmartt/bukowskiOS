@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import type { TFunction } from "i18next";
 import { Sparkles, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import type { AgentApprovalMode, AgentRosterRow, AgentStatus } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
@@ -84,13 +86,13 @@ type AgentDraft = {
   notes: string;
 };
 
-const buildDraftFromMission = (mission: string): AgentDraft => {
+const buildDraftFromMission = (mission: string, t: TFunction): AgentDraft => {
   const missionText = mission.trim();
   const domain = inferDomain(missionText);
-  const firstSentence = missionText.split(".")[0]?.trim() || "New Agent";
+  const firstSentence = missionText.split(".")[0]?.trim() || t("agents.wizard.defaults.newAgent");
   const displayName = firstSentence.length > 52 ? `${firstSentence.slice(0, 49)}...` : firstSentence;
   const agentId = slugify(displayName || "new-agent") || "new-agent";
-  const defaultRole = `${displayName || "New"} Agent`;
+  const defaultRole = t("agents.wizard.defaults.role", { name: displayName || t("agents.wizard.defaults.new") });
 
   return {
     agentId,
@@ -98,13 +100,13 @@ const buildDraftFromMission = (mission: string): AgentDraft => {
     emoji: "◌",
     modelKey: defaultModelByDomain[domain] ?? "openai:gpt-5-mini",
     role: defaultRole,
-    mission: missionText || "Supports operational routing inside BukowskiOS.",
+    mission: missionText || t("agents.wizard.defaults.mission"),
     domain,
     allowedTools: defaultToolsByDomain[domain] ?? ["workspace.search"],
     allowedDomains: defaultDomainsByDomain[domain] ?? [domain],
     status: "active",
     approvalMode: domain === "communications" ? "needs_approval" : "supervised",
-    notes: "Created from the visual agent builder.",
+    notes: t("agents.wizard.defaults.notes"),
   };
 };
 
@@ -135,6 +137,7 @@ export const AgentWizardPanel = ({
   onClose,
   onSaved,
 }: AgentWizardPanelProps) => {
+  const { t } = useTranslation();
   const { activeWorkspaceId: workspaceId } = useWorkspace();
   const [step, setStep] = useState(mode === "edit" ? 2 : 1);
   const [mission, setMission] = useState(initialAgent?.role ?? "");
@@ -157,8 +160,12 @@ export const AgentWizardPanel = ({
   const isEdit = mode === "edit" && Boolean(initialAgent?.id);
 
   const examples = useMemo(
-    () => ["Assets triage specialist", "Maintenance follow-up agent", "Projects schedule reviewer"],
-    [],
+    () => [
+      t("agents.wizard.examples.assets"),
+      t("agents.wizard.examples.maintenance"),
+      t("agents.wizard.examples.projects"),
+    ],
+    [t],
   );
 
   if (!open) {
@@ -166,7 +173,7 @@ export const AgentWizardPanel = ({
   }
 
   const handleGenerateConfig = () => {
-    const nextDraft = buildDraftFromMission(mission);
+    const nextDraft = buildDraftFromMission(mission, t);
     setDraft(nextDraft);
     setStep(2);
     setError(null);
@@ -174,7 +181,7 @@ export const AgentWizardPanel = ({
 
   const handleSave = async () => {
     if (!draft) {
-      setError("Generate or review a configuration first.");
+      setError(t("agents.wizard.errors.generateFirst"));
       return;
     }
 
@@ -222,7 +229,7 @@ export const AgentWizardPanel = ({
       onSaved?.();
       onClose();
     } catch (nextError) {
-      setError(getUserFacingErrorMessage(nextError, "Unable to save agent."));
+      setError(getUserFacingErrorMessage(nextError, t("agents.wizard.errors.save")));
     } finally {
       setIsSaving(false);
     }
@@ -233,10 +240,10 @@ export const AgentWizardPanel = ({
       <section aria-modal="true" className="agent-wizard-modal" role="dialog">
         <header className="agent-wizard-header">
           <div>
-            <span className="agent-wizard-step-label">Step {step} of 2</span>
-            <h2 className="agent-wizard-title">{step === 1 ? "Create new agent" : "Review & configure"}</h2>
+            <span className="agent-wizard-step-label">{t("agents.wizard.stepLabel", { step, total: 2 })}</span>
+            <h2 className="agent-wizard-title">{step === 1 ? t("agents.wizard.createTitle") : t("agents.wizard.reviewTitle")}</h2>
           </div>
-          <button aria-label="Close agent builder" className="surface-card-action" onClick={onClose} type="button">
+          <button aria-label={t("agents.wizard.close")} className="surface-card-action" onClick={onClose} type="button">
             <X size={16} />
           </button>
         </header>
@@ -244,12 +251,12 @@ export const AgentWizardPanel = ({
         {step === 1 ? (
           <div className="agent-wizard-step">
             <p className="agent-wizard-copy">
-              Describe what this agent should do, where it should operate and how supervised it needs to be.
+              {t("agents.wizard.intro")}
             </p>
             <textarea
               className="field-textarea field-textarea-large"
               onChange={(event) => setMission(event.target.value)}
-              placeholder="A maintenance agent that reviews damage, prepares RMA drafts and flags anything that needs approval before outreach."
+              placeholder={t("agents.wizard.placeholder")}
               rows={6}
               value={mission}
             />
@@ -266,11 +273,11 @@ export const AgentWizardPanel = ({
 
             <div className="agent-wizard-actions">
               <button className="ghost-control cancel-control" onClick={onClose} type="button">
-                Cancel
+                {t("common.cancel")}
               </button>
               <button className="primary-control" disabled={!mission.trim()} onClick={handleGenerateConfig} type="button">
                 <Sparkles size={14} />
-                <span>Generate config</span>
+                <span>{t("agents.wizard.generateConfig")}</span>
               </button>
             </div>
           </div>
@@ -278,7 +285,7 @@ export const AgentWizardPanel = ({
           <div className="agent-wizard-step agent-wizard-step-review">
             <div className="agent-form-grid">
               <label className="field-block">
-                <span className="field-label">Agent ID</span>
+                <span className="field-label">{t("agents.wizard.fields.agentId")}</span>
                 <input
                   className="field-input"
                   onChange={(event) => setDraft((current) => (current ? { ...current, agentId: slugify(event.target.value) } : current))}
@@ -287,7 +294,7 @@ export const AgentWizardPanel = ({
               </label>
 
               <label className="field-block">
-                <span className="field-label">Display Name</span>
+                <span className="field-label">{t("agents.wizard.fields.displayName")}</span>
                 <input
                   className="field-input"
                   onChange={(event) => setDraft((current) => (current ? { ...current, displayName: event.target.value } : current))}
@@ -296,7 +303,7 @@ export const AgentWizardPanel = ({
               </label>
 
               <label className="field-block">
-                <span className="field-label">Emoji / icon</span>
+                <span className="field-label">{t("agents.wizard.fields.icon")}</span>
                 <input
                   className="field-input"
                   maxLength={4}
@@ -306,7 +313,7 @@ export const AgentWizardPanel = ({
               </label>
 
               <label className="field-block">
-                <span className="field-label">Model</span>
+                <span className="field-label">{t("agents.wizard.fields.model")}</span>
                 <select
                   className="field-input"
                   onChange={(event) => setDraft((current) => (current ? { ...current, modelKey: event.target.value } : current))}
@@ -321,7 +328,7 @@ export const AgentWizardPanel = ({
               </label>
 
               <label className="field-block">
-                <span className="field-label">Domain</span>
+                <span className="field-label">{t("agents.wizard.fields.domain")}</span>
                 <input
                   className="field-input"
                   onChange={(event) => setDraft((current) => (current ? { ...current, domain: event.target.value } : current))}
@@ -330,7 +337,7 @@ export const AgentWizardPanel = ({
               </label>
 
               <label className="field-block">
-                <span className="field-label">Status</span>
+                <span className="field-label">{t("agents.wizard.fields.status")}</span>
                 <select
                   className="field-input"
                   onChange={(event) =>
@@ -338,13 +345,13 @@ export const AgentWizardPanel = ({
                   }
                   value={draft?.status ?? "active"}
                 >
-                  <option value="active">Active</option>
-                  <option value="paused">Paused</option>
+                  <option value="active">{t("agents.shared.agentStatus.active")}</option>
+                  <option value="paused">{t("agents.shared.agentStatus.paused")}</option>
                 </select>
               </label>
 
               <label className="field-block">
-                <span className="field-label">Approval mode</span>
+                <span className="field-label">{t("agents.wizard.fields.approvalMode")}</span>
                 <select
                   className="field-input"
                   onChange={(event) =>
@@ -354,14 +361,14 @@ export const AgentWizardPanel = ({
                   }
                   value={draft?.approvalMode ?? "supervised"}
                 >
-                  <option value="auto">Auto</option>
-                  <option value="supervised">Supervised</option>
-                  <option value="needs_approval">Needs approval</option>
+                  <option value="auto">{t("agents.wizard.approval.auto")}</option>
+                  <option value="supervised">{t("agents.wizard.approval.supervised")}</option>
+                  <option value="needs_approval">{t("agents.wizard.approval.needsApproval")}</option>
                 </select>
               </label>
 
               <label className="field-block field-block-span-2">
-                <span className="field-label">Role</span>
+                <span className="field-label">{t("agents.wizard.fields.role")}</span>
                 <textarea
                   className="field-textarea"
                   onChange={(event) => setDraft((current) => (current ? { ...current, role: event.target.value } : current))}
@@ -371,7 +378,7 @@ export const AgentWizardPanel = ({
               </label>
 
               <label className="field-block field-block-span-2">
-                <span className="field-label">Mission</span>
+                <span className="field-label">{t("agents.wizard.fields.mission")}</span>
                 <textarea
                   className="field-textarea"
                   onChange={(event) => setDraft((current) => (current ? { ...current, mission: event.target.value } : current))}
@@ -381,7 +388,7 @@ export const AgentWizardPanel = ({
               </label>
 
               <label className="field-block">
-                <span className="field-label">Allowed tools</span>
+                <span className="field-label">{t("agents.wizard.fields.allowedTools")}</span>
                 <input
                   className="field-input"
                   onChange={(event) =>
@@ -402,7 +409,7 @@ export const AgentWizardPanel = ({
               </label>
 
               <label className="field-block">
-                <span className="field-label">Allowed domains</span>
+                <span className="field-label">{t("agents.wizard.fields.allowedDomains")}</span>
                 <input
                   className="field-input"
                   onChange={(event) =>
@@ -423,7 +430,7 @@ export const AgentWizardPanel = ({
               </label>
 
               <label className="field-block field-block-span-2">
-                <span className="field-label">Notes</span>
+                <span className="field-label">{t("agents.wizard.fields.notes")}</span>
                 <textarea
                   className="field-textarea"
                   onChange={(event) => setDraft((current) => (current ? { ...current, notes: event.target.value } : current))}
@@ -437,14 +444,14 @@ export const AgentWizardPanel = ({
 
             <div className="agent-wizard-actions">
               <button className="ghost-control" onClick={() => setStep(1)} type="button">
-                Refine
+                {t("agents.wizard.refine")}
               </button>
               <div className="agent-wizard-actions-end">
                 <button className="ghost-control cancel-control" onClick={onClose} type="button">
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button className="primary-control" disabled={isSaving} onClick={handleSave} type="button">
-                  <span>{isSaving ? "Saving..." : isEdit ? "Update agent" : "Create agent"}</span>
+                  <span>{isSaving ? t("common.saving") : isEdit ? t("agents.wizard.updateAgent") : t("agents.wizard.createAgent")}</span>
                 </button>
               </div>
             </div>

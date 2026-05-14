@@ -10,6 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Check, Columns3, RotateCcw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import type { ListSortDirection } from "@contracts";
 import { readJsonPreference, writeJsonPreference } from "@shared/lib/preferences";
@@ -68,7 +69,7 @@ export const DataTable = <T = unknown,>({
   onRowClick,
   onRowDoubleClick,
   maxHeight,
-  emptyMessage = "No rows available.",
+  emptyMessage,
   emptyContent,
   persistKey,
   defaultVisibleColumnKeys,
@@ -79,6 +80,7 @@ export const DataTable = <T = unknown,>({
   controlsAddon,
   pruneSelectionOnRowsChange = true,
 }: DataTableProps<T>) => {
+  const { t } = useTranslation();
   const defaultMinColumnWidth = 56;
   const tableShellRef = useRef<HTMLDivElement | null>(null);
   const tableRef = useRef<HTMLTableElement | null>(null);
@@ -472,9 +474,9 @@ export const DataTable = <T = unknown,>({
           <button
             aria-expanded={columnsMenuOpen}
             aria-haspopup="menu"
-            aria-label="Manage visible columns"
+            aria-label={t("shared.dataTable.manageColumns")}
             className={`icon-ghost-control data-table-columns-trigger${columnsMenuOpen ? " is-open" : ""}`}
-            data-tooltip="Columns"
+            data-tooltip={t("shared.dataTable.columns")}
             onClick={() => setColumnsMenuOpen((current) => !current)}
             ref={columnsTriggerRef}
             type="button"
@@ -505,7 +507,7 @@ export const DataTable = <T = unknown,>({
             {selectable ? (
               <th className="data-table-select-cell">
                 <input
-                  aria-label="Select all rows"
+                  aria-label={t("shared.dataTable.selectAllRows")}
                   checked={allRowsSelected}
                   className="table-checkbox"
                   onChange={(event) => toggleAllRows(event.target.checked)}
@@ -562,7 +564,7 @@ export const DataTable = <T = unknown,>({
                   )}
                   {column.resizable === false ? null : (
                     <button
-                      aria-label={`Resize ${column.label} column`}
+                      aria-label={t("shared.dataTable.resizeColumn", { label: column.label })}
                       className="column-resizer"
                       onMouseDown={(event) => handleResizeStart(event, column.key)}
                       type="button"
@@ -598,7 +600,7 @@ export const DataTable = <T = unknown,>({
                   {selectable ? (
                     <td className="data-table-select-cell" onClick={(event) => event.stopPropagation()}>
                       <input
-                        aria-label={`Select row ${index + 1}`}
+                        aria-label={t("shared.dataTable.selectRow", { index: index + 1 })}
                         checked={isSelected}
                         className="table-checkbox"
                         onChange={(event) => toggleRowSelection(rowId, event.target.checked)}
@@ -618,7 +620,7 @@ export const DataTable = <T = unknown,>({
           ) : (
             <tr>
               <td className="data-table-empty" colSpan={visibleColumns.length + (selectable ? 1 : 0)}>
-                {emptyContent ?? emptyMessage}
+                {emptyContent ?? emptyMessage ?? t("shared.dataTable.empty")}
               </td>
             </tr>
           )}
@@ -634,7 +636,7 @@ export const DataTable = <T = unknown,>({
               style={{ top: columnsMenuStyle.top, left: columnsMenuStyle.left }}
             >
               <div className="list-toolbar-menu-section">
-                <span className="list-toolbar-menu-label">Columns</span>
+                <span className="list-toolbar-menu-label">{t("shared.dataTable.columns")}</span>
                 {columns.map((column) => {
                   const isVisible = visibleColumnKeys.includes(column.key);
                   const locked = column.hideable === false;
@@ -672,7 +674,7 @@ export const DataTable = <T = unknown,>({
                 >
                   <span className="list-toolbar-menu-item-copy">
                     <RotateCcw aria-hidden size={14} />
-                    <span>Reset columns</span>
+                    <span>{t("shared.dataTable.resetColumns")}</span>
                   </span>
                 </button>
               </div>

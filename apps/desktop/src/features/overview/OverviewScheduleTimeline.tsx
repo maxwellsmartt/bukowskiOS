@@ -14,6 +14,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 import type {
   ScheduleTimelineProjectLane,
@@ -39,9 +40,9 @@ const rangeLabelMap: Record<ScheduleTimelineRange, string> = {
 };
 
 const scaleLabelMap: Record<ScheduleTimelineScale, string> = {
-  day: "Day",
-  week: "Week",
-  month: "Month",
+  day: "overview.timeline.scale.day",
+  week: "overview.timeline.scale.week",
+  month: "overview.timeline.scale.month",
 };
 
 const zoomScaleOrder: ScheduleTimelineScale[] = ["month", "week", "day"];
@@ -321,8 +322,10 @@ const clampDate = (value: string, min: string, max: string) => {
 };
 
 const formatRangeLabel = (startDate: string | null, endDate: string | null, language: string) => {
+  const isSpanish = language.toLowerCase().startsWith("es");
+
   if (!startDate && !endDate) {
-    return "Dates pending";
+    return isSpanish ? "Fechas pendientes" : "Dates pending";
   }
 
   if (startDate && endDate) {
@@ -330,15 +333,15 @@ const formatRangeLabel = (startDate: string | null, endDate: string | null, lang
   }
 
   if (startDate) {
-    return `From ${formatShortDate(parseDateOnly(startDate), language)}`;
+    return `${isSpanish ? "Desde" : "From"} ${formatShortDate(parseDateOnly(startDate), language)}`;
   }
 
-  return `Until ${formatShortDate(parseDateOnly(endDate ?? ""), language)}`;
+  return `${isSpanish ? "Hasta" : "Until"} ${formatShortDate(parseDateOnly(endDate ?? ""), language)}`;
 };
 
-const formatPlayheadDisplayLabel = (value: string, language: string) =>
+const formatPlayheadDisplayLabel = (value: string, language: string, todayLabel: string) =>
   value === todayDateOnly()
-    ? `Today · ${formatShortDate(parseDateOnly(value), language)}`
+    ? `${todayLabel} · ${formatShortDate(parseDateOnly(value), language)}`
     : formatShortDate(parseDateOnly(value), language);
 
 const extractRgb = (color: string) => {
@@ -483,7 +486,7 @@ const resolveWindowSegments = (segments: ScheduleTimelineSegment[]) =>
 
 const formatWindowSegmentChip = (segment: ScheduleTimelineSegment, language: string) => {
   const baseLabel = formatRangeLabel(segment.startDate, segment.endDate, language);
-  return segment.kind === "preproduction" ? `Pre · ${baseLabel}` : baseLabel;
+  return segment.kind === "preproduction" ? `${language.toLowerCase().startsWith("es") ? "Pre" : "Pre"} · ${baseLabel}` : baseLabel;
 };
 
 const isHeaderBandVisible = (
@@ -797,55 +800,59 @@ const TimelineSignalRow = ({
     total: number,
   ) => void;
   onChipLeave: () => void;
-}) => (
+}) => {
+  const { t } = useTranslation();
+
+  return (
   <div className="timeline-signal-row">
     {conflicts ? (
       <button
         className="timeline-signal-chip is-warning"
-        onPointerEnter={(event) => onChipHover(event, "Conflicts", details.conflicts, conflicts)}
+        onPointerEnter={(event) => onChipHover(event, t("overview.timeline.signals.conflictsTitle"), details.conflicts, conflicts)}
         onPointerLeave={onChipLeave}
-        onPointerMove={(event) => onChipHover(event, "Conflicts", details.conflicts, conflicts)}
+        onPointerMove={(event) => onChipHover(event, t("overview.timeline.signals.conflictsTitle"), details.conflicts, conflicts)}
         type="button"
       >
-        {conflicts} conflicts
+        {t("overview.timeline.signals.conflicts", { count: conflicts })}
       </button>
     ) : null}
     {incidents ? (
       <button
         className="timeline-signal-chip is-critical"
-        onPointerEnter={(event) => onChipHover(event, "Incidents", details.incidents, incidents)}
+        onPointerEnter={(event) => onChipHover(event, t("overview.timeline.signals.incidentsTitle"), details.incidents, incidents)}
         onPointerLeave={onChipLeave}
-        onPointerMove={(event) => onChipHover(event, "Incidents", details.incidents, incidents)}
+        onPointerMove={(event) => onChipHover(event, t("overview.timeline.signals.incidentsTitle"), details.incidents, incidents)}
         type="button"
       >
-        {incidents} incidents
+        {t("overview.timeline.signals.incidents", { count: incidents })}
       </button>
     ) : null}
     {assets ? (
       <button
         className="timeline-signal-chip"
-        onPointerEnter={(event) => onChipHover(event, "Assets assigned", details.assets, assets)}
+        onPointerEnter={(event) => onChipHover(event, t("overview.timeline.signals.assetsTitle"), details.assets, assets)}
         onPointerLeave={onChipLeave}
-        onPointerMove={(event) => onChipHover(event, "Assets assigned", details.assets, assets)}
+        onPointerMove={(event) => onChipHover(event, t("overview.timeline.signals.assetsTitle"), details.assets, assets)}
         type="button"
       >
-        {assets} assets
+        {t("overview.timeline.signals.assets", { count: assets })}
       </button>
     ) : null}
     {crew ? (
       <button
         className="timeline-signal-chip is-info"
-        onPointerEnter={(event) => onChipHover(event, "Crew assigned", details.crew, crew)}
+        onPointerEnter={(event) => onChipHover(event, t("overview.timeline.signals.crewTitle"), details.crew, crew)}
         onPointerLeave={onChipLeave}
-        onPointerMove={(event) => onChipHover(event, "Crew assigned", details.crew, crew)}
+        onPointerMove={(event) => onChipHover(event, t("overview.timeline.signals.crewTitle"), details.crew, crew)}
         type="button"
       >
-        {crew} crew
+        {t("overview.timeline.signals.crew", { count: crew })}
       </button>
     ) : null}
-    {!conflicts && !incidents && !assets && !crew ? <span className="timeline-signal-chip is-muted">No live load</span> : null}
+    {!conflicts && !incidents && !assets && !crew ? <span className="timeline-signal-chip is-muted">{t("overview.timeline.signals.noLoad")}</span> : null}
   </div>
-);
+  );
+};
 
 const TimelineWindowPills = ({
   segments,
@@ -854,10 +861,11 @@ const TimelineWindowPills = ({
   segments: ScheduleTimelineSegment[];
   language: string;
 }) => {
+  const { t } = useTranslation();
   const visibleSegments = resolveWindowSegments(segments);
 
   if (!visibleSegments.length) {
-    return <span className="timeline-lane-subtitle">Dates pending</span>;
+    return <span className="timeline-lane-subtitle">{t("overview.timeline.datesPending")}</span>;
   }
 
   return (
@@ -950,6 +958,7 @@ const TimelineLane = ({
   scale: ScheduleTimelineScale;
   language: string;
 }) => {
+  const { t } = useTranslation();
   const projectPalette = resolveTimelinePalette(project.colorKey);
   const projectBars = resolveSegmentGeometries(project, rangeStart, rangeEnd, projectPalette);
 
@@ -975,7 +984,9 @@ const TimelineLane = ({
                     </div>
                     <div className="timeline-lane-subtitle-group">
                       <TimelineWindowPills segments={project.segments} language={language} />
-                      {project.units.length ? <span className="timeline-lane-subtitle-accent">{project.units.length} units</span> : null}
+                      {project.units.length ? (
+                        <span className="timeline-lane-subtitle-accent">{t("overview.timeline.unitsCount", { count: project.units.length })}</span>
+                      ) : null}
                     </div>
                     <TimelineSignalRow
                       assets={project.assignedAssetCount}
@@ -1056,7 +1067,7 @@ const TimelineLane = ({
                     startDate: reportedAt,
                     endDate: reportedAt,
                   },
-                  "Incident",
+                  t("overview.timeline.incident"),
                 )
               }
               onLeave={onBarLeave}
@@ -1212,6 +1223,7 @@ export const OverviewScheduleTimeline = ({
   scale,
   snapshot,
 }: OverviewScheduleTimelineProps) => {
+  const { t } = useTranslation();
   const { language } = useLocale();
   const timelineRootRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<DragState>({
@@ -1319,7 +1331,7 @@ export const OverviewScheduleTimeline = ({
       ? resolveDateLeft(clampedPlayheadDate, visibleWindow.start, visibleWindow.end)
       : 0;
   const renderedPlayheadLeft = Math.min(99.2, Math.max(0.8, playheadLeft));
-  const playheadLabel = formatPlayheadDisplayLabel(currentDate, language);
+  const playheadLabel = formatPlayheadDisplayLabel(currentDate, language, t("overview.timeline.today"));
   const bands = useMemo(() => {
     if (!visibleWindow.start || !visibleWindow.end) {
       return emptyBands;
@@ -1405,7 +1417,7 @@ export const OverviewScheduleTimeline = ({
           : [
               {
                 id: `${title.toLowerCase().replace(/\s+/g, "-")}-empty`,
-                label: "Details unavailable",
+                label: t("overview.timeline.detailsUnavailable"),
                 meta: null,
               },
             ],
@@ -1530,7 +1542,7 @@ export const OverviewScheduleTimeline = ({
   return (
     <SurfaceCard
       className="timeline-surface"
-      title="Schedule"
+      title={t("overview.timeline.title")}
       aside={
         <div className="timeline-toolbar">
           <div className="timeline-control-group">
@@ -1541,7 +1553,7 @@ export const OverviewScheduleTimeline = ({
                 onClick={() => onScaleChange(value)}
                 type="button"
               >
-                {label}
+                {t(label)}
               </button>
             ))}
           </div>
@@ -1565,7 +1577,7 @@ export const OverviewScheduleTimeline = ({
             </button>
             <button className="timeline-icon-button" onClick={setTodayAnchor} type="button">
               <Crosshair size={14} />
-              <span>Today</span>
+              <span>{t("overview.timeline.today")}</span>
             </button>
             <button className="timeline-icon-button" onClick={() => shiftWindow(1)} type="button">
               <ArrowRight size={14} />
@@ -1574,7 +1586,7 @@ export const OverviewScheduleTimeline = ({
 
           <div className="timeline-control-group timeline-control-group-grid">
             <input
-              aria-label="Timeline grid density"
+              aria-label={t("overview.timeline.gridDensity")}
               className="timeline-grid-density-slider"
               max={2}
               min={0}
@@ -1593,7 +1605,7 @@ export const OverviewScheduleTimeline = ({
         </div>
       }
     >
-      {isLoading && !snapshot.projects.length && !snapshot.unscheduled.length ? <div className="empty-state">Loading schedule...</div> : null}
+      {isLoading && !snapshot.projects.length && !snapshot.unscheduled.length ? <div className="empty-state">{t("overview.timeline.loading")}</div> : null}
 
       <div className={`timeline-layout${isTimelineInteracting ? " is-interacting" : ""}`} ref={timelineRootRef}>
         <div className="timeline-main">
@@ -1604,7 +1616,7 @@ export const OverviewScheduleTimeline = ({
 
           <div className="timeline-header-row">
             <div className="timeline-header-copy">
-              <span className="timeline-header-label">Projects / units</span>
+              <span className="timeline-header-label">{t("overview.timeline.projectsUnits")}</span>
             </div>
 
             <div
@@ -1697,7 +1709,7 @@ export const OverviewScheduleTimeline = ({
                 onClick={onLoadMoreProjects}
                 type="button"
               >
-                Show more projects
+                {t("overview.timeline.showMore")}
               </button>
             </div>
           ) : null}
@@ -1706,8 +1718,8 @@ export const OverviewScheduleTimeline = ({
         {snapshot.unscheduled.length ? (
           <div className="timeline-unscheduled">
             <div className="timeline-unscheduled-header">
-              <strong>Unscheduled projects</strong>
-              <span>Still visible here until dates are confirmed.</span>
+              <strong>{t("overview.timeline.unscheduled.title")}</strong>
+              <span>{t("overview.timeline.unscheduled.body")}</span>
             </div>
 
             <div className="timeline-unscheduled-list">
@@ -1746,7 +1758,7 @@ export const OverviewScheduleTimeline = ({
               ))}
             </div>
             {signalPopover.remainingCount ? (
-              <span className="timeline-signal-popover-more">+{signalPopover.remainingCount} more</span>
+              <span className="timeline-signal-popover-more">{t("overview.timeline.more", { count: signalPopover.remainingCount })}</span>
             ) : null}
           </div>
         ) : null}

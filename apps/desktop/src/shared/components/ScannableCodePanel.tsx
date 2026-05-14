@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type ScannableCodePanelProps = {
   title: string;
@@ -14,9 +15,11 @@ export const ScannableCodePanel = ({
   subtitle,
   codeValue,
   qrLabel = "QR",
-  barcodeLabel = "Barcode",
+  barcodeLabel,
   onPrint,
 }: ScannableCodePanelProps) => {
+  const { t } = useTranslation();
+  const resolvedBarcodeLabel = barcodeLabel ?? t("shared.scannable.barcode");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [barcodeDataUrl, setBarcodeDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +31,7 @@ export const ScannableCodePanel = ({
       if (!codeValue.trim()) {
         setQrDataUrl(null);
         setBarcodeDataUrl(null);
-        setError("No scannable code is available yet.");
+        setError(t("shared.scannable.noCode"));
         return;
       }
 
@@ -64,7 +67,7 @@ export const ScannableCodePanel = ({
         if (!cancelled) {
           setQrDataUrl(null);
           setBarcodeDataUrl(null);
-          setError("Unable to render QR and barcode preview for this code.");
+          setError(t("shared.scannable.renderFailed"));
         }
       }
     };
@@ -74,7 +77,7 @@ export const ScannableCodePanel = ({
     return () => {
       cancelled = true;
     };
-  }, [codeValue]);
+  }, [codeValue, t]);
 
   const isReadyToPrint = Boolean(qrDataUrl && barcodeDataUrl && onPrint);
 
@@ -91,12 +94,12 @@ export const ScannableCodePanel = ({
             onClick={() => onPrint?.({ qrDataUrl: qrDataUrl!, barcodeDataUrl: barcodeDataUrl! })}
             type="button"
           >
-            Print label
+            {t("shared.scannable.printLabel")}
           </button>
         ) : null}
       </div>
 
-      <div className="scannable-code-value">{codeValue || "Pending code"}</div>
+      <div className="scannable-code-value">{codeValue || t("shared.scannable.pendingCode")}</div>
 
       {error ? <div className="empty-state">{error}</div> : null}
 
@@ -107,7 +110,7 @@ export const ScannableCodePanel = ({
             <img alt={`${title} QR`} className="scannable-preview-image" src={qrDataUrl} />
           </div>
           <div className="scannable-preview-card">
-            <span className="summary-label">{barcodeLabel}</span>
+            <span className="summary-label">{resolvedBarcodeLabel}</span>
             <img alt={`${title} barcode`} className="scannable-preview-barcode" src={barcodeDataUrl} />
           </div>
         </div>

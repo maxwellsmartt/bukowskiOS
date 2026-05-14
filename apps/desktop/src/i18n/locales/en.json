@@ -935,6 +935,8 @@
     "never": "Never",
     "none": "None",
     "optional": "Optional",
+    "yes": "Yes",
+    "no": "No",
     "workspace": "Workspace",
     "listToolbar": {
       "searchAria": "Search current view",
@@ -948,7 +950,141 @@
     }
   },
   "shared": {
-    "agentCreatedBadge": "Created by agent"
+    "agentCreatedBadge": "Created by agent",
+    "confirmDialog": {
+      "working": "Working..."
+    },
+    "dataTable": {
+      "columns": "Columns",
+      "empty": "No rows available.",
+      "manageColumns": "Manage visible columns",
+      "resetColumns": "Reset columns",
+      "resizeColumn": "Resize {{label}} column",
+      "selectAllRows": "Select all rows",
+      "selectRow": "Select row {{index}}"
+    },
+    "scannable": {
+      "noCode": "No scannable code is available yet.",
+      "barcode": "Barcode",
+      "pendingCode": "Pending code",
+      "printLabel": "Print label",
+      "renderFailed": "Unable to render QR and barcode preview for this code."
+    },
+    "tableSkeleton": {
+      "title": "Loading data",
+      "body": "Preparing the latest local snapshot for this view."
+    }
+  },
+  "onboarding": {
+    "help": {
+      "closeHelp": "Close help",
+      "openHelp": "Open help",
+      "openCommandPalette": "Open command palette",
+      "openCommandPaletteBody": "Jump anywhere fast.",
+      "replayTour": "Replay onboarding tour",
+      "replayTourBody": "Walk through the four key concepts again.",
+      "title": "Need a hand?",
+      "tooltip": "Help & tour",
+      "workspaceSettings": "Workspace settings",
+      "workspaceSettingsBody": "Members, invites and roles."
+    },
+    "tour": {
+      "back": "Back",
+      "done": "Done",
+      "eyebrow": "Tour for {{workspace}} · Step {{current}} of {{total}}",
+      "next": "Next",
+      "skipOnboarding": "Skip onboarding",
+      "skipTour": "Skip tour",
+      "stepAria": "Step {{index}}: {{title}}",
+      "stepsAria": "Tour steps",
+      "thisWorkspace": "this workspace",
+      "steps": {
+        "assets": {
+          "body": "Assets are individual pieces of equipment. Add them one by one or import a CSV. You can attach photos, print QR labels and track every movement.",
+          "cta": "Open Assets",
+          "title": "Add gear to your catalog"
+        },
+        "projects": {
+          "body": "Projects group everything for a single shoot or production: units, crew, assigned gear, incidents and budget. Open Projects to start one.",
+          "cta": "Open Projects",
+          "title": "Create your first project"
+        },
+        "team": {
+          "body": "Bring your crew, finance lead and operators in. Each person gets a role that controls what they can see and do.",
+          "cta": "Invite team",
+          "title": "Invite your team"
+        },
+        "workspace": {
+          "body": "A workspace is your team's universe — every project, asset, incident and finance entry lives inside one. You can switch workspaces from the top-left dropdown.",
+          "title": "Welcome to your workspace"
+        }
+      }
+    }
+  },
+  "overview": {
+    "title": "Overview",
+    "unavailable": "Overview unavailable: {{error}}",
+    "cards": {
+      "activeIncidents": {
+        "label": "Active incidents",
+        "subtitle": "Open issues with pending follow-up or missing estimates."
+      },
+      "maintenanceWatch": {
+        "label": "Maintenance watch",
+        "subtitle": "Assets flagged for bench review or spare-part follow-up."
+      },
+      "openPackingSlips": {
+        "label": "Open packing slips",
+        "subtitle": "Issued slips still active across warehouse and set."
+      },
+      "overdueReturns": {
+        "label": "Overdue returns",
+        "subtitle": "Slips nearing or past due return need review."
+      }
+    },
+    "recentMovements": {
+      "title": "Recent movements",
+      "columns": {
+        "actor": "Handled by",
+        "asset": "Asset",
+        "from": "From",
+        "time": "Time",
+        "to": "To"
+      }
+    },
+    "timeline": {
+      "datesPending": "Dates pending",
+      "detailsUnavailable": "Details unavailable",
+      "gridDensity": "Timeline grid density",
+      "incident": "Incident",
+      "loading": "Loading schedule...",
+      "more": "+{{count}} more",
+      "projectsUnits": "Projects / units",
+      "showMore": "Show more projects",
+      "title": "Schedule",
+      "today": "Today",
+      "unitsCount": "{{count}} units",
+      "scale": {
+        "day": "Day",
+        "month": "Month",
+        "week": "Week"
+      },
+      "signals": {
+        "assets": "{{count}} assets",
+        "assetsTitle": "Assets assigned",
+        "conflicts": "{{count}} conflicts",
+        "conflictsTitle": "Conflicts",
+        "crew": "{{count}} crew",
+        "crewTitle": "Crew assigned",
+        "incidents": "{{count}} incidents",
+        "incidentsTitle": "Incidents",
+        "noLoad": "No live load"
+      },
+      "unscheduled": {
+        "body": "Still visible here until dates are confirmed.",
+        "title": "Unscheduled projects"
+      }
+    }
   },
   "auth": {
     "backToSignIn": "Back to sign in",
@@ -1235,6 +1371,53 @@
       "writeTools_one": "{{count}} write tool · requires approval",
       "writeTools_other": "{{count}} write tools · requires approval"
     },
+    "wizard": {
+      "approval": {
+        "auto": "Auto",
+        "needsApproval": "Needs approval",
+        "supervised": "Supervised"
+      },
+      "close": "Close agent builder",
+      "createAgent": "Create agent",
+      "createTitle": "Create new agent",
+      "errors": {
+        "generateFirst": "Generate or review a configuration first.",
+        "save": "Unable to save agent."
+      },
+      "defaults": {
+        "mission": "Supports operational routing inside BukowskiOS.",
+        "new": "New",
+        "newAgent": "New Agent",
+        "notes": "Created from the visual agent builder.",
+        "role": "{{name}} Agent"
+      },
+      "examples": {
+        "assets": "Assets triage specialist",
+        "maintenance": "Maintenance follow-up agent",
+        "projects": "Projects schedule reviewer"
+      },
+      "fields": {
+        "agentId": "Agent ID",
+        "allowedDomains": "Allowed domains",
+        "allowedTools": "Allowed tools",
+        "approvalMode": "Approval mode",
+        "displayName": "Display name",
+        "domain": "Domain",
+        "icon": "Emoji / icon",
+        "mission": "Mission",
+        "model": "Model",
+        "notes": "Notes",
+        "role": "Role",
+        "status": "Status"
+      },
+      "generateConfig": "Generate config",
+      "intro": "Describe what this agent should do, where it should operate and how supervised it needs to be.",
+      "placeholder": "A maintenance agent that reviews damage, prepares RMA drafts and flags anything that needs approval before outreach.",
+      "refine": "Refine",
+      "reviewTitle": "Review & configure",
+      "stepLabel": "Step {{step}} of {{total}}",
+      "updateAgent": "Update agent"
+    },
     "mission": {
       "title": "Automation Overview",
       "unavailable": "Automation overview unavailable: {{message}}",
@@ -1328,10 +1511,177 @@
     },
     "connectors": {
       "title": "Channels",
+      "availableChannels": "Available channels",
+      "channelFallback": "Channel",
+      "unavailable": "Channels unavailable: {{message}}",
+      "notVerified": "Not verified",
+      "setupFuture": "Visible now. Setup will appear here when this channel is ready.",
+      "linkBlocked": "Link blocked",
+      "linkBlockedCrew": "This crew member still needs an internal user. Create it from Crew or link an existing user first.",
+      "linkBlockedUser": "This internal user is not ready for Telegram yet. Check active status, membership and role.",
+      "lastError": "Last error",
+      "linkUserToTelegram": "Link a user to Telegram",
+      "telegramIdentities": "Telegram identities",
+      "linkTokenReady": "Link token ready",
+      "commandCopied": "Command copied",
+      "copyTelegramCommand": "Copy Telegram command",
+      "copyCommand": "Copy command",
+      "copyCommandBody": "Copy this command and paste it into Telegram.",
+      "testing": "Testing...",
+      "testConnection": "Test connection",
+      "generating": "Generating...",
+      "generateLink": "Generate link",
+      "disable": "Disable",
+      "clearToken": "Clear token",
+      "selectChannel": "Select a channel to configure it.",
+      "availability": {
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
+      "capabilities": {
+        "default": "Integrations",
+        "email": "Alerts and drafts",
+        "telegram": "Direct messages",
+        "whatsapp": "Messaging"
+      },
+      "errors": {
+        "clearToken": "Unable to clear the stored token.",
+        "copyCommand": "Unable to copy the Telegram command.",
+        "disable": "Unable to disable this channel.",
+        "linkCode": "Unable to generate a link code.",
+        "save": "Unable to save channel settings.",
+        "test": "Unable to test this channel."
+      },
+      "fields": {
+        "accessToken": "Access token",
+        "availability": "Availability",
+        "botUsername": "Bot username",
+        "channel": "Channel",
+        "inbound": "Inbound",
+        "internalUser": "Internal user",
+        "lastOutbound": "Last outbound",
+        "lastTest": "Last test",
+        "pending": "Pending",
+        "readiness": "Readiness",
+        "role": "Role",
+        "selectedUser": "Selected user",
+        "status": "Status",
+        "summary": "Summary",
+        "tokenStored": "Token stored"
+      },
+      "identity": {
+        "blockedInactiveAccount": "Blocked · account inactive",
+        "blockedInactiveUser": "Blocked · user inactive",
+        "blockedLinkUser": "Blocked · link a user first",
+        "blockedPrefix": "[Blocked]",
+        "blockedRole": "Blocked · assign a role",
+        "crewWithoutUser": "Crew without internal user yet",
+        "internalUser": "{{role}} · internal user",
+        "linkedCrew": "{{role}} · linked to crew {{crew}}",
+        "noRole": "No role",
+        "readyLinked": "Ready · Telegram linked",
+        "readyToLink": "Ready to link",
+        "state": {
+          "blocked": "Blocked",
+          "linked": "Linked",
+          "ready": "Ready",
+          "revoked": "Revoked"
+        },
+        "summary": {
+          "blocked": "Blocked",
+          "linked": "Linked",
+          "ready": "Ready to link",
+          "revoked": "Revoked"
+        }
+      },
+      "placeholders": {
+        "keepToken": "Leave blank to keep the stored token",
+        "pasteToken": "Paste the token"
+      },
+      "shells": {
+        "planned": "Planned",
+        "secretStorage": "Stored in the secret store, never visible after save.",
+        "stagedUi": "Staged · UI ready",
+        "userLinkingFlow": "User linking flow",
+        "whenWired": "When wired, you'll provide",
+        "email": {
+          "expectedSecretLabel": "API key or SMTP password",
+          "label": "Email / Notifications",
+          "linkInstructions": "Email works automatically once a teammate has an email on their profile.",
+          "shortDescription": "Drafts, support outreach and internal notices via SMTP or a transactional provider.",
+          "extras": {
+            "fromAddress": {
+              "label": "From address",
+              "placeholder": "ops@studio.com"
+            },
+            "smtpHost": {
+              "label": "SMTP host",
+              "placeholder": "smtp.postmark.app"
+            }
+          }
+        },
+        "sms": {
+          "expectedSecretLabel": "Auth token",
+          "label": "SMS",
+          "linkInstructions": "Each teammate confirms with a one-time code we text to the phone on their profile.",
+          "shortDescription": "Operator alerts via Twilio or a compatible SMS gateway.",
+          "extras": {
+            "accountSid": {
+              "label": "Account SID",
+              "placeholder": "ACxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            "fromNumber": {
+              "label": "From number",
+              "placeholder": "+15551234567"
+            }
+          }
+        },
+        "webhook": {
+          "expectedSecretLabel": "Signing secret",
+          "label": "Webhook / Future",
+          "linkInstructions": "Linking is per-endpoint configuration, not per-user.",
+          "shortDescription": "Fan-out delivery to custom HTTPS endpoints for future integrations.",
+          "extras": {
+            "endpointUrl": {
+              "label": "Endpoint URL",
+              "placeholder": "https://hooks.example.com/bukowski"
+            }
+          }
+        },
+        "whatsapp": {
+          "expectedSecretLabel": "Access token",
+          "label": "WhatsApp",
+          "linkInstructions": "Once wired, each teammate scans a QR or sends a single keyword to the business number to claim their seat.",
+          "shortDescription": "Inbound and outbound messaging through the WhatsApp Business Cloud API.",
+          "extras": {
+            "businessPhoneNumberId": {
+              "label": "Business phone number ID",
+              "placeholder": "123456789"
+            },
+            "verifyToken": {
+              "label": "Webhook verify token",
+              "placeholder": "secret-string"
+            }
+          }
+        }
+      },
+      "summary": {
+        "activeLinks": "Active links",
+        "disabled": "Disabled",
+        "needsSetup": "Needs setup",
+        "ready": "Ready"
+      },
       "status": {
         "configured": "Ready",
         "disabled": "Disabled",
         "needs_setup": "Needs setup"
+      },
+      "toasts": {
+        "disabled": "Channel disabled",
+        "linkReady": "Link code ready",
+        "saved": "Channel saved",
+        "tested": "Channel tested",
+        "tokenCleared": "Token cleared"
       }
     },
     "runs": {

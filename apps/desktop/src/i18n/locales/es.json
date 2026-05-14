@@ -935,6 +935,8 @@
     "never": "Nunca",
     "none": "Ninguno",
     "optional": "Opcional",
+    "yes": "Sí",
+    "no": "No",
     "workspace": "Workspace",
     "listToolbar": {
       "searchAria": "Buscar en la vista actual",
@@ -948,7 +950,141 @@
     }
   },
   "shared": {
-    "agentCreatedBadge": "Creado por agente"
+    "agentCreatedBadge": "Creado por agente",
+    "confirmDialog": {
+      "working": "Trabajando..."
+    },
+    "dataTable": {
+      "columns": "Columnas",
+      "empty": "No hay filas disponibles.",
+      "manageColumns": "Gestionar columnas visibles",
+      "resetColumns": "Restaurar columnas",
+      "resizeColumn": "Ajustar columna {{label}}",
+      "selectAllRows": "Seleccionar todas las filas",
+      "selectRow": "Seleccionar fila {{index}}"
+    },
+    "scannable": {
+      "noCode": "Aún no hay un código escaneable.",
+      "barcode": "Código de barras",
+      "pendingCode": "Código pendiente",
+      "printLabel": "Imprimir etiqueta",
+      "renderFailed": "No se pudo generar la vista previa de QR y código de barras."
+    },
+    "tableSkeleton": {
+      "title": "Cargando datos",
+      "body": "Preparando la información local más reciente para esta vista."
+    }
+  },
+  "onboarding": {
+    "help": {
+      "closeHelp": "Cerrar ayuda",
+      "openHelp": "Abrir ayuda",
+      "openCommandPalette": "Abrir búsqueda rápida",
+      "openCommandPaletteBody": "Salta a cualquier lugar rápido.",
+      "replayTour": "Repetir tour inicial",
+      "replayTourBody": "Repasa otra vez los cuatro conceptos clave.",
+      "title": "¿Necesitas ayuda?",
+      "tooltip": "Ayuda y tour",
+      "workspaceSettings": "Ajustes del workspace",
+      "workspaceSettingsBody": "Miembros, invitaciones y roles."
+    },
+    "tour": {
+      "back": "Atrás",
+      "done": "Listo",
+      "eyebrow": "Tour de {{workspace}} · Paso {{current}} de {{total}}",
+      "next": "Siguiente",
+      "skipOnboarding": "Omitir onboarding",
+      "skipTour": "Omitir tour",
+      "stepAria": "Paso {{index}}: {{title}}",
+      "stepsAria": "Pasos del tour",
+      "thisWorkspace": "este workspace",
+      "steps": {
+        "assets": {
+          "body": "Los equipos son piezas individuales del inventario. Puedes agregarlos uno a uno o importar un CSV, adjuntar fotos, imprimir etiquetas QR y seguir cada movimiento.",
+          "cta": "Abrir Equipos",
+          "title": "Agrega equipos al catálogo"
+        },
+        "projects": {
+          "body": "Los proyectos agrupan todo lo de una producción: unidades, crew, equipos asignados, incidentes y presupuesto. Abre Proyectos para crear el primero.",
+          "cta": "Abrir Proyectos",
+          "title": "Crea tu primer proyecto"
+        },
+        "team": {
+          "body": "Invita al crew, finanzas y operadores. Cada persona recibe un rol que define qué puede ver y hacer.",
+          "cta": "Invitar equipo",
+          "title": "Invita a tu equipo"
+        },
+        "workspace": {
+          "body": "Un workspace es el universo de tu equipo: proyectos, equipos, incidentes y finanzas viven dentro de él. Puedes cambiarlo desde el selector superior izquierdo.",
+          "title": "Bienvenido a tu workspace"
+        }
+      }
+    }
+  },
+  "overview": {
+    "title": "Resumen",
+    "unavailable": "Resumen no disponible: {{error}}",
+    "cards": {
+      "activeIncidents": {
+        "label": "Incidentes activos",
+        "subtitle": "Casos abiertos con seguimiento pendiente o estimados faltantes."
+      },
+      "maintenanceWatch": {
+        "label": "Mantenimiento",
+        "subtitle": "Equipos marcados para revisión o seguimiento de piezas."
+      },
+      "openPackingSlips": {
+        "label": "Packing slips abiertos",
+        "subtitle": "Salidas activas entre almacén y set."
+      },
+      "overdueReturns": {
+        "label": "Devoluciones vencidas",
+        "subtitle": "Packing slips cerca o fuera de fecha que necesitan revisión."
+      }
+    },
+    "recentMovements": {
+      "title": "Movimientos recientes",
+      "columns": {
+        "actor": "Gestionado por",
+        "asset": "Equipo",
+        "from": "Desde",
+        "time": "Hora",
+        "to": "Hacia"
+      }
+    },
+    "timeline": {
+      "datesPending": "Fechas pendientes",
+      "detailsUnavailable": "Detalles no disponibles",
+      "gridDensity": "Densidad del calendario",
+      "incident": "Incidente",
+      "loading": "Cargando calendario...",
+      "more": "+{{count}} más",
+      "projectsUnits": "Proyectos / unidades",
+      "showMore": "Mostrar más proyectos",
+      "title": "Calendario",
+      "today": "Hoy",
+      "unitsCount": "{{count}} unidades",
+      "scale": {
+        "day": "Día",
+        "month": "Mes",
+        "week": "Semana"
+      },
+      "signals": {
+        "assets": "{{count}} equipos",
+        "assetsTitle": "Equipos asignados",
+        "conflicts": "{{count}} conflictos",
+        "conflictsTitle": "Conflictos",
+        "crew": "{{count}} crew",
+        "crewTitle": "Crew asignado",
+        "incidents": "{{count}} incidentes",
+        "incidentsTitle": "Incidentes",
+        "noLoad": "Sin carga activa"
+      },
+      "unscheduled": {
+        "body": "Siguen visibles aquí hasta confirmar sus fechas.",
+        "title": "Proyectos sin fechas"
+      }
+    }
   },
   "auth": {
     "backToSignIn": "Volver al login",
@@ -1235,6 +1371,53 @@
       "writeTools_one": "{{count}} tool de escritura · requiere aprobación",
       "writeTools_other": "{{count}} tools de escritura · requieren aprobación"
     },
+    "wizard": {
+      "approval": {
+        "auto": "Automático",
+        "needsApproval": "Requiere aprobación",
+        "supervised": "Supervisado"
+      },
+      "close": "Cerrar creador de agentes",
+      "createAgent": "Crear agente",
+      "createTitle": "Crear nuevo agente",
+      "errors": {
+        "generateFirst": "Genera o revisa una configuración primero.",
+        "save": "No se pudo guardar el agente."
+      },
+      "defaults": {
+        "mission": "Apoya el flujo operativo dentro de BukowskiOS.",
+        "new": "Nuevo",
+        "newAgent": "Nuevo agente",
+        "notes": "Creado desde el constructor visual de agentes.",
+        "role": "Agente {{name}}"
+      },
+      "examples": {
+        "assets": "Especialista en revisión de equipos",
+        "maintenance": "Agente de seguimiento de mantenimiento",
+        "projects": "Revisor de calendario de proyectos"
+      },
+      "fields": {
+        "agentId": "ID del agente",
+        "allowedDomains": "Dominios permitidos",
+        "allowedTools": "Herramientas permitidas",
+        "approvalMode": "Modo de aprobación",
+        "displayName": "Nombre visible",
+        "domain": "Dominio",
+        "icon": "Emoji / icono",
+        "mission": "Misión",
+        "model": "Modelo",
+        "notes": "Notas",
+        "role": "Rol",
+        "status": "Estado"
+      },
+      "generateConfig": "Generar configuración",
+      "intro": "Describe qué debe hacer este agente, dónde debe operar y qué nivel de supervisión necesita.",
+      "placeholder": "Un agente de mantenimiento que revise daños, prepare borradores de RMA y marque lo que necesita aprobación antes de contactar proveedores.",
+      "refine": "Ajustar",
+      "reviewTitle": "Revisar y configurar",
+      "stepLabel": "Paso {{step}} de {{total}}",
+      "updateAgent": "Actualizar agente"
+    },
     "mission": {
       "title": "Resumen de automatización",
       "unavailable": "Resumen de automatización no disponible: {{message}}",
@@ -1328,10 +1511,177 @@
     },
     "connectors": {
       "title": "Canales",
+      "availableChannels": "Canales disponibles",
+      "channelFallback": "Canal",
+      "unavailable": "Canales no disponibles: {{message}}",
+      "notVerified": "Sin verificar",
+      "setupFuture": "Visible ahora. La configuración aparecerá aquí cuando este canal esté listo.",
+      "linkBlocked": "Vinculación bloqueada",
+      "linkBlockedCrew": "Este miembro del crew todavía necesita un usuario interno. Créalo desde Crew o vincula un usuario existente primero.",
+      "linkBlockedUser": "Este usuario interno todavía no está listo para Telegram. Revisa estado activo, membresía y rol.",
+      "lastError": "Último error",
+      "linkUserToTelegram": "Vincular usuario a Telegram",
+      "telegramIdentities": "Identidades de Telegram",
+      "linkTokenReady": "Código de vínculo listo",
+      "commandCopied": "Comando copiado",
+      "copyTelegramCommand": "Copiar comando de Telegram",
+      "copyCommand": "Copiar comando",
+      "copyCommandBody": "Copia este comando y pégalo en Telegram.",
+      "testing": "Probando...",
+      "testConnection": "Probar conexión",
+      "generating": "Generando...",
+      "generateLink": "Generar vínculo",
+      "disable": "Desactivar",
+      "clearToken": "Borrar token",
+      "selectChannel": "Selecciona un canal para configurarlo.",
+      "availability": {
+        "enabled": "Activo",
+        "disabled": "Inactivo"
+      },
+      "capabilities": {
+        "default": "Integraciones",
+        "email": "Alertas y borradores",
+        "telegram": "Mensajes directos",
+        "whatsapp": "Mensajería"
+      },
+      "errors": {
+        "clearToken": "No se pudo borrar el token guardado.",
+        "copyCommand": "No se pudo copiar el comando de Telegram.",
+        "disable": "No se pudo desactivar este canal.",
+        "linkCode": "No se pudo generar el código de vínculo.",
+        "save": "No se pudo guardar la configuración del canal.",
+        "test": "No se pudo probar este canal."
+      },
+      "fields": {
+        "accessToken": "Token de acceso",
+        "availability": "Disponibilidad",
+        "botUsername": "Usuario del bot",
+        "channel": "Canal",
+        "inbound": "Entrantes",
+        "internalUser": "Usuario interno",
+        "lastOutbound": "Último envío",
+        "lastTest": "Última prueba",
+        "pending": "Pendientes",
+        "readiness": "Estado para vincular",
+        "role": "Rol",
+        "selectedUser": "Usuario seleccionado",
+        "status": "Estado",
+        "summary": "Resumen",
+        "tokenStored": "Token guardado"
+      },
+      "identity": {
+        "blockedInactiveAccount": "Bloqueado · cuenta inactiva",
+        "blockedInactiveUser": "Bloqueado · usuario inactivo",
+        "blockedLinkUser": "Bloqueado · vincula un usuario primero",
+        "blockedPrefix": "[Bloqueado]",
+        "blockedRole": "Bloqueado · asigna un rol",
+        "crewWithoutUser": "Crew sin usuario interno todavía",
+        "internalUser": "{{role}} · usuario interno",
+        "linkedCrew": "{{role}} · vinculado al crew {{crew}}",
+        "noRole": "Sin rol",
+        "readyLinked": "Listo · Telegram vinculado",
+        "readyToLink": "Listo para vincular",
+        "state": {
+          "blocked": "Bloqueado",
+          "linked": "Vinculado",
+          "ready": "Listo",
+          "revoked": "Revocado"
+        },
+        "summary": {
+          "blocked": "Bloqueados",
+          "linked": "Vinculados",
+          "ready": "Listos para vincular",
+          "revoked": "Revocados"
+        }
+      },
+      "placeholders": {
+        "keepToken": "Déjalo vacío para conservar el token guardado",
+        "pasteToken": "Pega el token"
+      },
+      "shells": {
+        "planned": "Planificado",
+        "secretStorage": "Se guarda en el almacén seguro y no vuelve a mostrarse después de guardar.",
+        "stagedUi": "Preparado · UI lista",
+        "userLinkingFlow": "Flujo de vinculación de usuarios",
+        "whenWired": "Cuando esté conectado, necesitarás",
+        "email": {
+          "expectedSecretLabel": "API key o contraseña SMTP",
+          "label": "Email / Notificaciones",
+          "linkInstructions": "Email funciona automáticamente cuando una persona tiene correo en su perfil.",
+          "shortDescription": "Borradores, soporte y avisos internos vía SMTP o proveedor transaccional.",
+          "extras": {
+            "fromAddress": {
+              "label": "Correo remitente",
+              "placeholder": "ops@studio.com"
+            },
+            "smtpHost": {
+              "label": "Host SMTP",
+              "placeholder": "smtp.postmark.app"
+            }
+          }
+        },
+        "sms": {
+          "expectedSecretLabel": "Token de autenticación",
+          "label": "SMS",
+          "linkInstructions": "Cada persona confirma con un código único enviado al teléfono de su perfil.",
+          "shortDescription": "Alertas operativas vía Twilio o un gateway SMS compatible.",
+          "extras": {
+            "accountSid": {
+              "label": "Account SID",
+              "placeholder": "ACxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            "fromNumber": {
+              "label": "Número remitente",
+              "placeholder": "+15551234567"
+            }
+          }
+        },
+        "webhook": {
+          "expectedSecretLabel": "Secreto de firma",
+          "label": "Webhook / Futuro",
+          "linkInstructions": "La vinculación es por endpoint, no por usuario.",
+          "shortDescription": "Entrega a endpoints HTTPS personalizados para integraciones futuras.",
+          "extras": {
+            "endpointUrl": {
+              "label": "URL del endpoint",
+              "placeholder": "https://hooks.example.com/bukowski"
+            }
+          }
+        },
+        "whatsapp": {
+          "expectedSecretLabel": "Token de acceso",
+          "label": "WhatsApp",
+          "linkInstructions": "Cuando esté conectado, cada persona escanea un QR o envía una palabra clave al número del negocio para reclamar su acceso.",
+          "shortDescription": "Mensajería entrante y saliente vía WhatsApp Business Cloud API.",
+          "extras": {
+            "businessPhoneNumberId": {
+              "label": "ID del número de negocio",
+              "placeholder": "123456789"
+            },
+            "verifyToken": {
+              "label": "Token de verificación del webhook",
+              "placeholder": "secret-string"
+            }
+          }
+        }
+      },
+      "summary": {
+        "activeLinks": "Vínculos activos",
+        "disabled": "Inactivos",
+        "needsSetup": "Requieren setup",
+        "ready": "Listos"
+      },
       "status": {
         "configured": "Listo",
         "disabled": "Inactivo",
         "needs_setup": "Requiere setup"
+      },
+      "toasts": {
+        "disabled": "Canal desactivado",
+        "linkReady": "Código de vínculo listo",
+        "saved": "Canal guardado",
+        "tested": "Canal probado",
+        "tokenCleared": "Token borrado"
       }
     },
     "runs": {

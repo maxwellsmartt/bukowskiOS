@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Box, Check, Compass, FolderKanban, Send, X } from "lucide-react";
 
@@ -12,29 +14,29 @@ type OnboardingStep = {
   cta?: { label: string; to: string };
 };
 
-const tourSteps: OnboardingStep[] = [
+const buildTourSteps = (t: TFunction): OnboardingStep[] => [
   {
     icon: <Compass size={28} />,
-    title: "Welcome to your workspace",
-    body: "A workspace is your team's universe — every project, asset, incident and finance entry lives inside one. You can switch workspaces from the top-left dropdown.",
+    title: t("onboarding.tour.steps.workspace.title"),
+    body: t("onboarding.tour.steps.workspace.body"),
   },
   {
     icon: <FolderKanban size={28} />,
-    title: "Create your first project",
-    body: "Projects group everything for a single shoot or production: units, crew, assigned gear, incidents and budget. Open Projects to start one.",
-    cta: { label: "Open Projects", to: "/projects" },
+    title: t("onboarding.tour.steps.projects.title"),
+    body: t("onboarding.tour.steps.projects.body"),
+    cta: { label: t("onboarding.tour.steps.projects.cta"), to: "/projects" },
   },
   {
     icon: <Box size={28} />,
-    title: "Add gear to your catalog",
-    body: "Assets are individual pieces of equipment. Add them one by one or import a CSV. You can attach photos, print QR labels and track every movement.",
-    cta: { label: "Open Assets", to: "/assets" },
+    title: t("onboarding.tour.steps.assets.title"),
+    body: t("onboarding.tour.steps.assets.body"),
+    cta: { label: t("onboarding.tour.steps.assets.cta"), to: "/assets" },
   },
   {
     icon: <Send size={28} />,
-    title: "Invite your team",
-    body: "Bring your crew, finance lead and operators in. Each person gets a role that controls what they can see and do.",
-    cta: { label: "Invite team", to: "/settings/workspace" },
+    title: t("onboarding.tour.steps.team.title"),
+    body: t("onboarding.tour.steps.team.body"),
+    cta: { label: t("onboarding.tour.steps.team.cta"), to: "/settings/workspace" },
   },
 ];
 
@@ -51,6 +53,7 @@ const markTourCompleted = (workspaceId: string) => {
 };
 
 export const OnboardingTour = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { activeWorkspaceId, activeWorkspaceName, isWorkspaceReady } = useWorkspace();
   const [stepIndex, setStepIndex] = useState(0);
@@ -61,6 +64,7 @@ export const OnboardingTour = () => {
     () => completedWorkspaces.includes(activeWorkspaceId),
     [activeWorkspaceId, completedWorkspaces],
   );
+  const tourSteps = useMemo(() => buildTourSteps(t), [t]);
 
   useEffect(() => {
     setCompletedWorkspaces(readCompletedWorkspaces());
@@ -146,9 +150,13 @@ export const OnboardingTour = () => {
       <div className="onboarding-card">
         <div className="onboarding-card-header">
           <span className="onboarding-eyebrow">
-            Tour for {activeWorkspaceName || "this workspace"} · Step {stepIndex + 1} of {tourSteps.length}
+            {t("onboarding.tour.eyebrow", {
+              workspace: activeWorkspaceName || t("onboarding.tour.thisWorkspace"),
+              current: stepIndex + 1,
+              total: tourSteps.length,
+            })}
           </span>
-          <button aria-label="Skip onboarding" className="onboarding-close" onClick={handleClose} type="button">
+          <button aria-label={t("onboarding.tour.skipOnboarding")} className="onboarding-close" onClick={handleClose} type="button">
             <X size={14} />
           </button>
         </div>
@@ -167,12 +175,12 @@ export const OnboardingTour = () => {
           />
         </div>
 
-        <div className="onboarding-progress" role="tablist" aria-label="Tour steps">
+        <div className="onboarding-progress" role="tablist" aria-label={t("onboarding.tour.stepsAria")}>
           {tourSteps.map((tourStep, index) => (
             <button
               key={tourStep.title}
               aria-current={index === stepIndex ? "step" : undefined}
-              aria-label={`Step ${index + 1}: ${tourStep.title}`}
+              aria-label={t("onboarding.tour.stepAria", { index: index + 1, title: tourStep.title })}
               className={`onboarding-progress-dot${index === stepIndex ? " is-active" : index < stepIndex ? " is-done" : ""}`}
               onClick={() => setStepIndex(index)}
               type="button"
@@ -182,14 +190,14 @@ export const OnboardingTour = () => {
 
         <div className="onboarding-actions">
           <button className="ghost-control" onClick={handleClose} type="button">
-            Skip tour
+            {t("onboarding.tour.skipTour")}
           </button>
 
           <div className="onboarding-actions-right">
             {!isFirst ? (
               <button className="ghost-control" onClick={handleBack} type="button">
                 <ArrowLeft size={14} />
-                <span>Back</span>
+                <span>{t("onboarding.tour.back")}</span>
               </button>
             ) : null}
             {step.cta ? (
@@ -200,11 +208,11 @@ export const OnboardingTour = () => {
             <button className="action-primary-button" onClick={handleNext} type="button">
               {isLast ? (
                 <>
-                  <Check size={14} /> <span>Done</span>
+                  <Check size={14} /> <span>{t("onboarding.tour.done")}</span>
                 </>
               ) : (
                 <>
-                  <span>Next</span> <ArrowRight size={14} />
+                  <span>{t("onboarding.tour.next")}</span> <ArrowRight size={14} />
                 </>
               )}
             </button>
