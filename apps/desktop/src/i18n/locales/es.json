@@ -861,6 +861,7 @@
         "quoteNumber": "Cotización #",
         "client": "Cliente",
         "projectProduction": "Proyecto / Producción",
+        "packageTitle": "Paquete",
         "date": "Fecha",
         "validUntil": "Válida hasta",
         "total": "Total",

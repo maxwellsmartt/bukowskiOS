@@ -859,6 +859,7 @@
         "quoteNumber": "Quote #",
         "client": "Client",
         "projectProduction": "Project / Production",
+        "packageTitle": "Package",
         "date": "Date",
         "validUntil": "Valid until",
         "total": "Total",

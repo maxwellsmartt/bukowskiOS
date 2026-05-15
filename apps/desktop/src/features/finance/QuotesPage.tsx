@@ -174,7 +174,17 @@ export const QuotesPage = () => {
         key: "project",
         label: t("finance.quotes.columns.projectProduction"),
         render: (row: QuoteRow) =>
-          row.projectNameSnapshot || row.productionName || row.packageTitle || "—",
+          row.projectNameSnapshot || row.productionName || "—",
+      },
+      {
+        key: "packageTitle",
+        label: t("finance.quotes.columns.packageTitle"),
+        render: (row: QuoteRow) =>
+          row.packageTitle ? (
+            <span className="quotes-list-package">{row.packageTitle}</span>
+          ) : (
+            <span className="text-muted">—</span>
+          ),
       },
       {
         key: "date",

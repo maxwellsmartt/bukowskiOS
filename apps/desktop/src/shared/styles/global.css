@@ -15980,9 +15980,10 @@ input[type="number"] {
   font-style: italic;
   padding: 4px 0 2px;
 }
-/* Track flows left-to-right and only grows as far as there are versions —
-   the connector line is drawn as a per-node `::before` so it never
-   over-reaches into empty space (no centered single-dot artifact). */
+/* Track flows left-to-right. A subtle background rail spans the full
+   track width so the timeline reads as a "rail" even when there's only
+   one version; the brighter per-segment connectors highlight where
+   adjacent dots actually meet. */
 .quote-versions-strip-track {
   align-items: flex-start;
   display: flex;
@@ -15990,6 +15991,24 @@ input[type="number"] {
   justify-content: flex-start;
   overflow-x: auto;
   padding: 14px 4px 6px;
+  position: relative;
+}
+.quote-versions-strip-track::before {
+  background: linear-gradient(
+    90deg,
+    rgba(214, 173, 112, 0.04),
+    rgba(214, 173, 112, 0.16) 12%,
+    rgba(214, 173, 112, 0.16) 88%,
+    rgba(214, 173, 112, 0.04)
+  );
+  border-radius: 1px;
+  content: "";
+  height: 2px;
+  left: 12px;
+  position: absolute;
+  right: 12px;
+  top: 20px; /* 14px padding-top + 6px (centre of the 14px dot - 1px line offset) */
+  z-index: 0;
 }
 .quote-versions-strip-node {
   align-items: center;
