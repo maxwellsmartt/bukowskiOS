@@ -13,6 +13,7 @@ import type {
 } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { CompactSelect } from "@shared/components/CompactSelect";
 import { HelpHint } from "@shared/components/HelpHint";
 import { NumberStepper } from "@shared/components/NumberStepper";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -1196,43 +1197,36 @@ export const QuoteEditorPage = () => {
                       </span>
                     </>
                   ) : null}
-                  <select
-                    aria-label={t("finance.quotes.editor.aria.durationUnitLine", { line: index + 1 })}
-                    className="field-input quote-items-duration-unit"
-                    onChange={(e) => {
-                      const nextUnit = e.target.value as QuoteItemDurationUnit;
+                  <CompactSelect<QuoteItemDurationUnit>
+                    ariaLabel={t("finance.quotes.editor.aria.durationUnitLine", { line: index + 1 })}
+                    className="quote-items-duration-unit"
+                    value={item.durationUnit ?? "flat"}
+                    options={durationUnitOptions.map((opt) => ({
+                      value: opt,
+                      label: durationUnitLabel(opt),
+                    }))}
+                    onChange={(nextUnit) => {
                       if (nextUnit === "flat") {
                         updateItem(index, { durationUnit: null, durationValue: null });
                         return;
                       }
                       updateItem(index, {
                         durationUnit: nextUnit,
-                        // Seed a sensible default when transitioning out of flat.
                         durationValue: item.durationValue ?? 1,
                       });
                     }}
-                    value={item.durationUnit ?? "flat"}
-                  >
-                    {durationUnitOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {durationUnitLabel(opt)}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
-                <select
-                  className="field-input quote-items-tax"
-                  onChange={(e) =>
-                    updateItem(index, { taxBehavior: e.target.value as QuoteItemTaxBehavior })
-                  }
+                <CompactSelect<QuoteItemTaxBehavior>
+                  ariaLabel={t("finance.quotes.editor.itemColumns.tax")}
+                  className="quote-items-tax"
                   value={item.taxBehavior}
-                >
-                  {taxBehaviorOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {taxBehaviorLabel(opt)}
-                    </option>
-                  ))}
-                </select>
+                  options={taxBehaviorOptions.map((opt) => ({
+                    value: opt,
+                    label: taxBehaviorLabel(opt),
+                  }))}
+                  onChange={(next) => updateItem(index, { taxBehavior: next })}
+                />
                 <span className="quote-items-cell-total">
                   {breakdown ? formatCurrency(breakdown.lineTotal, draft.currency, language) : "—"}
                 </span>
