@@ -15802,6 +15802,128 @@ input[type="number"] {
   margin: 4px 0 0;
 }
 
+/* Timeline rows became buttons so users can open the detail panel. The
+   button reset preserves the layout. */
+.quote-versions-row-button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  border-radius: 8px;
+  transition: background-color 0.12s ease;
+}
+.quote-versions-row-button:hover,
+.quote-versions-row-button:focus-visible {
+  background: rgba(255, 255, 255, 0.025);
+  outline: none;
+}
+.quote-versions-row-button.is-selected {
+  background: rgba(214, 173, 112, 0.08);
+  box-shadow: inset 2px 0 0 var(--accent, #d6ad70);
+}
+
+/* Detail / diff panel that opens below the timeline. */
+.quote-version-panel {
+  margin-top: 8px;
+}
+.quote-version-panel-heading {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+.quote-version-panel-tabs {
+  display: inline-flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--hairline-faint, rgba(255, 255, 255, 0.06));
+  margin-bottom: 12px;
+}
+.quote-version-tab {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 8px 14px;
+  font-size: var(--font-sm, 12px);
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+.quote-version-tab:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+.quote-version-tab.is-active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent, #d6ad70);
+}
+.quote-version-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.quote-version-legacy {
+  margin-bottom: 12px;
+}
+.quote-version-table {
+  border-collapse: collapse;
+  font-size: var(--font-xs, 11px);
+  margin-top: 8px;
+  width: 100%;
+}
+.quote-version-table th,
+.quote-version-table td {
+  border-bottom: 1px solid var(--hairline-faint, rgba(255, 255, 255, 0.05));
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.quote-version-table thead th {
+  font-size: var(--font-2xs, 10px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.quote-version-table tr.is-changed td,
+.quote-version-table tr.is-changed th {
+  background: rgba(214, 173, 112, 0.06);
+}
+.quote-version-table tr.is-added td,
+.quote-version-table tr.is-added th {
+  background: rgba(110, 200, 130, 0.07);
+}
+.quote-version-table tr.is-removed td,
+.quote-version-table tr.is-removed th {
+  background: rgba(220, 110, 110, 0.07);
+  text-decoration: line-through;
+  text-decoration-color: rgba(220, 110, 110, 0.5);
+}
+.quote-version-changed-after {
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 10px);
+  margin-top: 2px;
+}
+.quote-version-section-title {
+  font-size: var(--font-sm, 12px);
+  margin: 16px 0 4px;
+  color: var(--text-secondary);
+}
+.quote-version-items-table th:first-child,
+.quote-version-items-table td:first-child {
+  width: 60px;
+  font-variant-numeric: tabular-nums;
+}
+.quote-version-no-changes {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 12px 0;
+}
+.quote-version-panel-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  border-top: 1px solid var(--hairline-faint, rgba(255, 255, 255, 0.05));
+  padding-top: 12px;
+}
+
 /* --- Currency picker (User Settings → General) --- */
 .currency-picker {
   position: relative;

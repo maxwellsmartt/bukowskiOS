@@ -376,6 +376,9 @@ declare global {
           snapshot: Record<string, unknown>;
         }>
       >;
+      restoreVersion: (
+        input: import("@contracts").RestoreQuoteFromVersionCommand,
+      ) => Promise<import("@contracts").QuoteMutationResult>;
     };
     bukowskiCatalog?: {
       getSnapshot: (query?: CatalogListQuery) => Promise<CatalogSnapshot>;

@@ -32,6 +32,7 @@ import {
   taxProfileLabel,
 } from "./quoteHelpers";
 import { quoteTemplates, type QuoteTemplate } from "./quoteTemplates";
+import { QuoteVersionPanel } from "./QuoteVersionPanel";
 import { fetchLatestRate, useCurrencySettings } from "./useCurrencyData";
 import { useQuoteDetail, useQuoteMutations, useQuoteVersions } from "./useQuoteData";
 import { useCatalogData } from "@features/projects/useProjectsData";
@@ -131,6 +132,8 @@ export const QuoteEditorPage = () => {
   const { data: catalog } = useCatalogData();
   const mutations = useQuoteMutations();
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [isRestoringVersion, setIsRestoringVersion] = useState(false);
   const [rateSuggestion, setRateSuggestion] = useState<{ rate: number; effectiveDate: string } | null>(null);
   const [activeItemSuggestion, setActiveItemSuggestion] = useState<{
     field: "title" | "description";
@@ -513,6 +516,37 @@ export const QuoteEditorPage = () => {
     }
   };
 
+  const handleRestoreVersion = async (versionNumber: number) => {
+    if (!quoteId) return;
+    setIsRestoringVersion(true);
+    try {
+      await mutations.restoreFromVersion({
+        commandId: newCommandId(`quote-restore-v${versionNumber}`),
+        workspaceId: activeWorkspaceId,
+        quoteId,
+        versionNumber,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+      toast.success(
+        t("finance.quotes.editor.versions.restoreSuccessTitle"),
+        t("finance.quotes.editor.versions.restoreSuccessBody", { number: versionNumber }),
+      );
+      setSelectedVersionId(null);
+      refresh();
+      refreshVersions();
+    } catch (err) {
+      toast.error(
+        t("finance.quotes.editor.versions.restoreFailureTitle"),
+        err instanceof Error
+          ? err.message.replace(/^Error invoking remote method.*?Error:\s*/i, "")
+          : t("common.tryAgain"),
+      );
+    } finally {
+      setIsRestoringVersion(false);
+    }
+  };
+
   const handleSetStatus = async (status: "sent" | "approved" | "rejected" | "cancelled") => {
     if (!quoteId) return;
     try {
@@ -575,8 +609,17 @@ export const QuoteEditorPage = () => {
                 typeof version.snapshot.total === "number"
                   ? formatCurrency(version.snapshot.total, String(version.snapshot.currency ?? draft.currency), language)
                   : "—";
+              const isSelected = selectedVersionId === version.id;
               return (
-                <div className="quote-versions-row" key={version.id}>
+                <button
+                  type="button"
+                  className={`quote-versions-row quote-versions-row-button${isSelected ? " is-selected" : ""}`}
+                  key={version.id}
+                  data-tooltip={t("finance.quotes.editor.versions.openTooltip", { number: version.versionNumber })}
+                  onClick={() =>
+                    setSelectedVersionId((current) => (current === version.id ? null : version.id))
+                  }
+                >
                   <div className="quote-versions-marker">
                     <span className="quote-versions-dot" />
                     <span className="quote-versions-line" />
@@ -594,12 +637,27 @@ export const QuoteEditorPage = () => {
                       <p className="quote-versions-summary">{version.changeSummary}</p>
                     ) : null}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
         </SurfaceCard>
       ) : null}
+
+      {isVersionsOpen && !isNew && selectedVersionId ? (() => {
+        const selected = versions.find((v) => v.id === selectedVersionId);
+        if (!selected) return null;
+        return (
+          <QuoteVersionPanel
+            version={selected}
+            currentQuote={existingQuote}
+            canRestore={Boolean(existingQuote) && existingQuote?.status === "draft"}
+            isRestoring={isRestoringVersion}
+            onClose={() => setSelectedVersionId(null)}
+            onRestore={() => handleRestoreVersion(selected.versionNumber)}
+          />
+        );
+      })() : null}
 
       <SectionHeader
         eyebrow={isNew ? t("finance.quotes.editor.newEyebrow") : t("finance.quotes.editor.quoteEyebrow", { number: existingQuote?.quoteNumber ?? "" })}

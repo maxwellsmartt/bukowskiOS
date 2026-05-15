@@ -23,6 +23,7 @@ import {
   currencySettingsReadArgsSchema,
   deleteExchangeRateSchema,
   duplicateQuoteSchema,
+  restoreQuoteFromVersionSchema,
   exchangeRateListReadArgsSchema,
   latestExchangeRateReadArgsSchema,
   quoteDetailReadArgsSchema,
@@ -273,6 +274,9 @@ type RegisterFoundationIpcOptions = {
     setStatus: (input: import("@contracts").SetQuoteStatusCommand) => import("@contracts").QuoteMutationResult;
     duplicateQuote: (input: import("@contracts").DuplicateQuoteCommand) => import("@contracts").QuoteMutationResult;
     deleteQuote: (input: import("@contracts").DuplicateQuoteCommand) => import("@contracts").QuoteMutationResult;
+    restoreQuoteFromVersion: (
+      input: import("@contracts").RestoreQuoteFromVersionCommand,
+    ) => import("@contracts").QuoteMutationResult;
   };
   quoteReads: {
     listQuotes: (filter: import("@contracts").QuoteListFilter) => import("@contracts").QuoteRow[];
@@ -1808,6 +1812,15 @@ export const registerFoundationIpc = ({
     },
     "The app could not load quote versions.",
   );
+  safeHandle(ipcChannels.quotes.restoreVersion, restoreQuoteFromVersionSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "restore quote version",
+      accessLevel: "write",
+      requiredPermission: "quotes.edit",
+    });
+    return quoteMutations.restoreQuoteFromVersion(input);
+  });
   safeHandleReadWithSchema(
     ipcChannels.quotes.exportPdf,
     quoteExportPdfReadArgsSchema,

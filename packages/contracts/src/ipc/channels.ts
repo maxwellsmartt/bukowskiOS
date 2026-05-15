@@ -183,5 +183,6 @@ export const ipcChannels = {
     delete: "bukowskiQuotes:delete",
     exportPdf: "bukowskiQuotes:exportPdf",
     listVersions: "bukowskiQuotes:listVersions",
+    restoreVersion: "bukowskiQuotes:restoreVersion",
   },
 } as const;

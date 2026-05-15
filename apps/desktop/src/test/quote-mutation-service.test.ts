@@ -175,6 +175,75 @@ describe("quote mutation service", () => {
     cleanup();
   });
 
+  it("restoreQuoteFromVersion rebuilds the draft from a past version and preserves history", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-quote-restore");
+    const reads = createQuoteReadService(database);
+    const mutations = createQuoteMutationService(database);
+
+    // v1: create with two items.
+    const created = mutations.createQuote({
+      commandId: "cmd-restore-1",
+      workspaceId: "workspace-metadata",
+      ...baseChannel,
+      ...buildHeader(),
+      items: [
+        { sortOrder: 1, quantity: 5, title: "DIT operator", unitPrice: 8000, taxBehavior: "follows_quote" },
+        { sortOrder: 2, quantity: 1, title: "Backup drives", unitPrice: 25000, taxBehavior: "follows_quote" },
+      ],
+    });
+
+    // v2: edit — drop second item, bump first item's price.
+    mutations.updateQuote({
+      commandId: "cmd-restore-2",
+      workspaceId: "workspace-metadata",
+      quoteId: created.quoteId,
+      ...baseChannel,
+      ...buildHeader({ observations: "Updated to a smaller scope." }),
+      items: [
+        { sortOrder: 1, quantity: 5, title: "DIT operator", unitPrice: 9000, taxBehavior: "follows_quote" },
+      ],
+      changeSummary: "Removed backup drives.",
+    });
+
+    const versionsAfterUpdate = reads.listQuoteVersions("workspace-metadata", created.quoteId);
+    expect(versionsAfterUpdate).toHaveLength(2);
+    // listQuoteVersions returns DESC: [v2, v1].
+    expect(versionsAfterUpdate[0]?.versionNumber).toBe(2);
+    expect(versionsAfterUpdate[1]?.versionNumber).toBe(1);
+
+    // Restore back to v1 — must produce v3 on top.
+    const restored = mutations.restoreQuoteFromVersion({
+      commandId: "cmd-restore-3",
+      workspaceId: "workspace-metadata",
+      quoteId: created.quoteId,
+      versionNumber: 1,
+      ...baseChannel,
+    });
+    expect(restored.summary).toContain("v1");
+
+    // Live row should now match v1's content (two items, original price).
+    const detailAfterRestore = reads.getQuoteDetail("workspace-metadata", created.quoteId);
+    expect(detailAfterRestore?.items).toHaveLength(2);
+    expect(detailAfterRestore?.items.find((i) => i.title === "DIT operator")?.unitPrice).toBe(8000);
+
+    // History must include v1, v2, and the new v3.
+    const versionsAfterRestore = reads.listQuoteVersions("workspace-metadata", created.quoteId);
+    expect(versionsAfterRestore.map((v) => v.versionNumber)).toEqual([3, 2, 1]);
+    expect(versionsAfterRestore[0]?.changeSummary).toBe("Restored from v1");
+
+    // Idempotency: replaying the same restore command returns repeated=true.
+    const replay = mutations.restoreQuoteFromVersion({
+      commandId: "cmd-restore-3",
+      workspaceId: "workspace-metadata",
+      quoteId: created.quoteId,
+      versionNumber: 1,
+      ...baseChannel,
+    });
+    expect(replay.repeated).toBe(true);
+
+    cleanup();
+  });
+
   it("expires overdue draft and sent quotes", () => {
     const { cleanup, database } = createTestDatabase("bukowski-quote-expire");
     const mutations = createQuoteMutationService(database);

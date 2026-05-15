@@ -6,6 +6,8 @@ import type {
   QuoteItemInput,
   QuoteMutationResult,
   QuoteStatus,
+  QuoteVersionSnapshotV2,
+  RestoreQuoteFromVersionCommand,
   SetQuoteStatusCommand,
   UpdateQuoteCommand,
 } from "@contracts";
@@ -139,25 +141,95 @@ const insertVersionSnapshot = (
   );
 };
 
+/**
+ * Build the full v2 snapshot that gets persisted to `quote_versions.snapshot_json`.
+ *
+ * The shape covers everything `UpdateQuoteCommand` needs so that
+ * `restoreQuoteFromVersion` can rebuild a draft from any past version
+ * without re-running calculations. We also keep the legacy header-summary
+ * keys (`client`, `productionCompany`, `total`, `baseCurrencyTotal`,
+ * `itemCount`) at the top level so older renderers that read those
+ * directly (timeline pills) keep working unchanged.
+ *
+ * Pre-v2 rows (snapshots written before this change shipped) lack
+ * `schemaVersion` and most fields. Consumers must treat any snapshot
+ * with `schemaVersion !== 2` as read-only summary — restore is disabled
+ * for those versions.
+ */
 const buildQuoteSnapshot = (
   header: CreateQuoteCommand | UpdateQuoteCommand,
   totals: ReturnType<typeof calculateQuote>,
   quoteNumber: string,
   validUntil: string,
-) => ({
+): QuoteVersionSnapshotV2 => ({
+  schemaVersion: 2,
   quoteNumber,
   status: "draft",
   quoteDate: header.quoteDate,
+  validityDays: header.validityDays,
   validUntil,
+  clientId: header.clientId ?? null,
+  clientNameSnapshot: header.clientNameSnapshot,
+  clientRncSnapshot: header.clientRncSnapshot ?? null,
+  productionCompanyId: header.productionCompanyId ?? null,
+  productionCompanyNameSnapshot: header.productionCompanyNameSnapshot ?? null,
+  productionPurSnapshot: header.productionPurSnapshot ?? null,
+  workspaceSirecineSnapshot: header.workspaceSirecineSnapshot ?? null,
+  attentionName: header.attentionName ?? null,
+  attentionPhone: header.attentionPhone ?? null,
+  projectId: header.projectId ?? null,
+  projectNameSnapshot: header.projectNameSnapshot ?? null,
+  productionName: header.productionName ?? null,
+  description: header.description ?? null,
+  packageTitle: header.packageTitle ?? null,
+  currency: header.currency,
+  baseCurrency: header.baseCurrency,
+  exchangeRate: header.exchangeRate,
+  exchangeRateSource: header.exchangeRateSource,
+  exchangeRateType: header.exchangeRateType,
+  exchangeRateEffectiveDate: header.exchangeRateEffectiveDate ?? null,
+  taxProfile: header.taxProfile,
+  itbisRate: header.itbisRate,
+  taxAddedToTotal: header.taxAddedToTotal,
+  taxNotes: header.taxNotes ?? null,
+  discountRate: header.discountRate ?? null,
+  discountAmount: header.discountAmount ?? null,
+  observations: header.observations ?? null,
+  items: header.items.map((item) => ({
+    sortOrder: item.sortOrder,
+    quantity: item.quantity,
+    title: item.title,
+    description: item.description ?? null,
+    durationValue: item.durationValue ?? null,
+    durationUnit: item.durationUnit ?? null,
+    unitPrice: item.unitPrice,
+    discountRate: item.discountRate ?? null,
+    discountAmount: item.discountAmount ?? null,
+    taxBehavior: item.taxBehavior,
+    taxRate: item.taxRate ?? null,
+    notes: item.notes ?? null,
+  })),
+  totals: {
+    subtotal: totals.subtotal,
+    discountAmount: totals.discountAmount,
+    taxAmount: totals.taxAmount,
+    total: totals.total,
+    baseCurrencyTotal: totals.baseCurrencyTotal,
+  },
+  // Legacy aliases for older UI lookups.
   client: header.clientNameSnapshot,
   productionCompany: header.productionCompanyNameSnapshot ?? null,
-  currency: header.currency,
   total: totals.total,
   baseCurrencyTotal: totals.baseCurrencyTotal,
-  taxProfile: header.taxProfile,
-  taxAddedToTotal: header.taxAddedToTotal,
   itemCount: header.items.length,
 });
+
+/** Type guard for the full v2 snapshot shape. */
+const isV2Snapshot = (raw: unknown): raw is QuoteVersionSnapshotV2 =>
+  Boolean(raw) &&
+  typeof raw === "object" &&
+  (raw as { schemaVersion?: unknown }).schemaVersion === 2 &&
+  Array.isArray((raw as { items?: unknown }).items);
 
 export const createQuoteMutationService = (db: DatabaseSync) => ({
   createQuote(input: CreateQuoteCommand): QuoteMutationResult {
@@ -917,6 +989,141 @@ export const createQuoteMutationService = (db: DatabaseSync) => ({
       );
       throw error;
     }
+  },
+
+  /**
+   * Restore a draft quote to the state captured in a previous version. The
+   * target version's snapshot must be `schemaVersion >= 2` (full snapshot,
+   * not the legacy header-summary). The quote must still be in `draft`.
+   *
+   * Implementation: reads the snapshot, rebuilds an `UpdateQuoteCommand`-
+   * equivalent payload, and delegates to the same code path as a normal
+   * edit (so totals get recomputed, items get rewritten, a new version
+   * snapshot lands on top with `changeSummary = "Restored from v{N}"`).
+   *
+   * Never overwrites history — restoring v3 produces vN+1.
+   */
+  restoreQuoteFromVersion(input: RestoreQuoteFromVersionCommand): QuoteMutationResult {
+    const receiptHelpers = createCommandReceiptHelpers(db);
+    const existing = receiptHelpers.getExistingReceipt(input.commandId);
+    if (existing?.outcome_status === "success") {
+      return {
+        commandId: input.commandId,
+        quoteId: input.quoteId,
+        quoteNumber: "—",
+        repeated: true,
+        summary: "Quote restore was already applied.",
+      };
+    }
+    if (existing?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage("quote restore", existing.error_message));
+    }
+
+    const current = db
+      .prepare("SELECT id, quote_number, status FROM quotes WHERE workspace_id = ? AND id = ?")
+      .get(input.workspaceId, input.quoteId) as
+      | { id: string; quote_number: string; status: QuoteStatus }
+      | undefined;
+    if (!current) throw new Error("Quote not found.");
+    if (current.status !== "draft") {
+      throw new Error(`Only draft quotes can be restored (current status: ${current.status}).`);
+    }
+
+    const versionRow = db
+      .prepare(
+        `
+          SELECT version_number, snapshot_json
+          FROM quote_versions
+          WHERE workspace_id = ? AND quote_id = ? AND version_number = ?
+          LIMIT 1
+        `,
+      )
+      .get(input.workspaceId, input.quoteId, input.versionNumber) as
+      | { version_number: number; snapshot_json: string }
+      | undefined;
+    if (!versionRow) {
+      throw new Error(`Version v${input.versionNumber} not found for this quote.`);
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(versionRow.snapshot_json);
+    } catch {
+      throw new Error("Stored snapshot is malformed — cannot restore.");
+    }
+    if (!isV2Snapshot(parsed)) {
+      throw new Error(
+        `Version v${input.versionNumber} predates full snapshots and cannot be restored.`,
+      );
+    }
+    const snapshot = parsed;
+
+    // Synthesize an UpdateQuoteCommand from the snapshot and run the same
+    // update path. We pass a child commandId so the receipt of THIS restore
+    // command is preserved separately from the inner update's idempotency.
+    const innerCommandId = `${input.commandId}:restore`;
+    const updateInput: UpdateQuoteCommand = {
+      commandId: innerCommandId,
+      workspaceId: input.workspaceId,
+      quoteId: input.quoteId,
+      actorType: input.actorType,
+      sourceChannel: input.sourceChannel,
+      quoteDate: snapshot.quoteDate,
+      validityDays: snapshot.validityDays,
+      clientId: snapshot.clientId,
+      clientNameSnapshot: snapshot.clientNameSnapshot,
+      clientRncSnapshot: snapshot.clientRncSnapshot,
+      productionCompanyId: snapshot.productionCompanyId,
+      productionCompanyNameSnapshot: snapshot.productionCompanyNameSnapshot,
+      productionPurSnapshot: snapshot.productionPurSnapshot,
+      workspaceSirecineSnapshot: snapshot.workspaceSirecineSnapshot,
+      attentionName: snapshot.attentionName,
+      attentionPhone: snapshot.attentionPhone,
+      projectId: snapshot.projectId,
+      projectNameSnapshot: snapshot.projectNameSnapshot,
+      productionName: snapshot.productionName,
+      description: snapshot.description,
+      packageTitle: snapshot.packageTitle,
+      currency: snapshot.currency,
+      baseCurrency: snapshot.baseCurrency,
+      exchangeRate: snapshot.exchangeRate,
+      exchangeRateSource: snapshot.exchangeRateSource,
+      exchangeRateType: snapshot.exchangeRateType,
+      exchangeRateEffectiveDate: snapshot.exchangeRateEffectiveDate,
+      taxProfile: snapshot.taxProfile,
+      itbisRate: snapshot.itbisRate,
+      taxAddedToTotal: snapshot.taxAddedToTotal,
+      taxNotes: snapshot.taxNotes,
+      discountRate: snapshot.discountRate,
+      discountAmount: snapshot.discountAmount,
+      observations: snapshot.observations,
+      items: snapshot.items,
+      changeSummary: `Restored from v${input.versionNumber}`,
+    };
+
+    const result = this.updateQuote(updateInput);
+
+    // Mark the outer (restore) command as successful so retries are
+    // idempotent at the user-facing layer.
+    const now = new Date().toISOString();
+    receiptHelpers.insertReceipt.run(
+      input.commandId,
+      input.workspaceId,
+      defaultActorUserId,
+      input.actorType,
+      input.sourceChannel,
+      now,
+      "success",
+      null,
+    );
+
+    return {
+      commandId: input.commandId,
+      quoteId: input.quoteId,
+      quoteNumber: current.quote_number,
+      repeated: result.repeated,
+      summary: `Restored quote to v${input.versionNumber}.`,
+    };
   },
 
   expireOverdueQuotes(workspaceId: string, asOf?: string): { expiredCount: number } {

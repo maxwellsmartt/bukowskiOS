@@ -486,6 +486,10 @@ const bukowskiQuotes = {
         snapshot: Record<string, unknown>;
       }>
     >,
+  restoreVersion: (input: import("@contracts").RestoreQuoteFromVersionCommand) =>
+    ipcRenderer.invoke(ipcChannels.quotes.restoreVersion, input) as Promise<
+      import("@contracts").QuoteMutationResult
+    >,
 };
 
 const bukowskiCatalog = {

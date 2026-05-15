@@ -1121,6 +1121,17 @@ export const duplicateQuoteSchema = z
   })
   .strict();
 
+export const restoreQuoteFromVersionSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    quoteId: nonEmptyString,
+    versionNumber: z.number().int().positive(),
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
 export const quoteListQuerySchema = z
   .object({
     workspaceId: nonEmptyString,
