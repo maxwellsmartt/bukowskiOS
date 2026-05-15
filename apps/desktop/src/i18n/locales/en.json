@@ -896,6 +896,11 @@
         "noQuotesTitle": "No quotes yet",
         "noQuotesBody": "Create a quote in DOP, USD or EUR. The exchange-rate snapshot is captured automatically so older quotes never change."
       },
+      "list": {
+        "versionsStripTitle": "Versions of {{number}}",
+        "versionsStripLoading": "Loading versions…",
+        "versionsStripEmpty": "This quote has no recorded versions yet."
+      },
       "deleteDialog": {
         "title": "Delete this quote?",
         "bodyPrefix": "Delete quote",

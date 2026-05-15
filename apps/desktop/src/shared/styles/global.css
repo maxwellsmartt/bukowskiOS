@@ -15733,36 +15733,53 @@ input[type="number"] {
 .quote-versions-timeline {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 6px;
+  padding: 4px 2px;
 }
 
+/* Each row renders as a soft card with its own connector segment to the
+   left. The marker column is full-height (line above + dot + line below)
+   so consecutive rows render as a continuous spine. */
 .quote-versions-row {
   display: grid;
   grid-template-columns: 28px 1fr;
-  gap: 12px;
-  padding: 8px 0;
+  gap: 14px;
+  align-items: stretch;
+  padding: 10px 14px 10px 4px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  position: relative;
 }
 
 .quote-versions-marker {
-  align-items: stretch;
   display: flex;
   flex-direction: column;
+  align-items: center;
   position: relative;
+  /* Stretch to the parent row's full height so the line is continuous. */
 }
 
 .quote-versions-dot {
   background: var(--accent, #d6ad70);
+  box-shadow: 0 0 0 3px rgba(214, 173, 112, 0.18);
   border-radius: 50%;
-  height: 8px;
-  margin: 6px auto 0;
-  width: 8px;
+  height: 10px;
+  width: 10px;
+  margin-top: 6px;
+  flex: 0 0 auto;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .quote-versions-line {
-  background: var(--hairline-faint, rgba(255, 255, 255, 0.05));
+  background: linear-gradient(
+    to bottom,
+    rgba(214, 173, 112, 0.35),
+    rgba(255, 255, 255, 0.05) 60%
+  );
   flex: 1;
-  margin: 4px auto 0;
-  width: 1px;
+  margin: 4px 0 0;
+  width: 2px;
+  border-radius: 1px;
 }
 
 .quote-versions-row:last-child .quote-versions-line {
@@ -15770,57 +15787,266 @@ input[type="number"] {
 }
 
 .quote-versions-body {
-  padding-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .quote-versions-head {
-  align-items: baseline;
+  align-items: center;
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.quote-versions-head strong {
-  font-size: var(--font-base, 13px);
+/* "v1", "v2" etc. as a small pill so the version number reads as a
+   structured tag rather than a stray bold word. */
+.quote-versions-tag {
+  background: rgba(214, 173, 112, 0.14);
+  border: 1px solid rgba(214, 173, 112, 0.28);
+  border-radius: 6px;
+  color: var(--accent, #d6ad70);
+  font-size: var(--font-2xs, 11px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  padding: 3px 8px;
+  text-transform: uppercase;
 }
 
-.quote-versions-head .text-muted {
-  font-size: var(--font-2xs, 10px);
+/* Date with clock icon aligned vertically (flex centers them instead of
+   the previous inline-baseline hack with verticalAlign:-2px). */
+.quote-versions-timestamp {
+  align-items: center;
+  color: var(--text-muted);
+  display: inline-flex;
+  font-size: var(--font-xs, 12px);
+  gap: 6px;
+}
+.quote-versions-timestamp svg {
+  color: var(--text-muted);
+  flex: 0 0 auto;
 }
 
 .quote-versions-total {
-  color: var(--text-secondary);
-  font-size: var(--font-xs, 11px);
+  color: var(--text-primary);
+  font-size: var(--font-sm, 13px);
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
   margin-left: auto;
+  padding-left: 12px;
 }
 
 .quote-versions-summary {
   color: var(--text-secondary);
-  font-size: var(--font-xs, 11px);
-  line-height: 1.45;
-  margin: 4px 0 0;
+  font-size: var(--font-xs, 12px);
+  line-height: 1.5;
+  margin: 0;
+  padding-left: 0;
 }
 
 /* Timeline rows became buttons so users can open the detail panel. The
    button reset preserves the layout. */
 .quote-versions-row-button {
   background: transparent;
-  border: 0;
   cursor: pointer;
   text-align: left;
   width: 100%;
-  border-radius: 8px;
-  transition: background-color 0.12s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-.quote-versions-row-button:hover,
-.quote-versions-row-button:focus-visible {
+.quote-versions-row-button:hover {
   background: rgba(255, 255, 255, 0.025);
-  outline: none;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.quote-versions-row-button:hover .quote-versions-dot {
+  box-shadow: 0 0 0 4px rgba(214, 173, 112, 0.22);
+  transform: scale(1.05);
+}
+.quote-versions-row-button:focus-visible {
+  outline: 2px solid rgba(214, 173, 112, 0.55);
+  outline-offset: 2px;
 }
 .quote-versions-row-button.is-selected {
-  background: rgba(214, 173, 112, 0.08);
-  box-shadow: inset 2px 0 0 var(--accent, #d6ad70);
+  background: linear-gradient(
+    90deg,
+    rgba(214, 173, 112, 0.12),
+    rgba(214, 173, 112, 0.02) 60%
+  );
+  border-color: rgba(214, 173, 112, 0.28);
+}
+.quote-versions-row-button.is-selected .quote-versions-dot {
+  box-shadow: 0 0 0 5px rgba(214, 173, 112, 0.28);
+  transform: scale(1.1);
+}
+
+/* === Quote editor header pills =============================================
+   The "1 versión" button and the status badge share a pill shape so they
+   read as a coherent pair instead of two mismatched controls. */
+.quote-editor-header-pills {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+.quote-editor-header-pill {
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--hairline-faint, rgba(255, 255, 255, 0.08));
+  display: inline-flex;
+  font-size: var(--font-2xs, 11px);
+  font-weight: 500;
+  gap: 6px;
+  height: 26px;
+  line-height: 1;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+.quote-editor-header-pill-button {
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.quote-editor-header-pill-button:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+.quote-editor-header-pill-button[aria-pressed="true"] {
+  background: rgba(214, 173, 112, 0.12);
+  border-color: rgba(214, 173, 112, 0.32);
+  color: var(--accent, #d6ad70);
+}
+.quote-editor-header-pill-status {
+  text-transform: capitalize;
+}
+.quote-editor-header-pill-status.status-tone-success {
+  background: rgba(110, 200, 130, 0.12);
+  border-color: rgba(110, 200, 130, 0.32);
+  color: rgba(190, 230, 200, 0.95);
+}
+.quote-editor-header-pill-status.status-tone-warning {
+  background: rgba(214, 173, 112, 0.12);
+  border-color: rgba(214, 173, 112, 0.32);
+  color: var(--accent, #d6ad70);
+}
+.quote-editor-header-pill-status.status-tone-neutral {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+.quote-editor-header-pill-status.status-tone-info {
+  background: rgba(120, 160, 230, 0.12);
+  border-color: rgba(120, 160, 230, 0.32);
+  color: rgba(180, 200, 240, 0.95);
+}
+.quote-editor-header-pill-status.status-tone-critical {
+  background: rgba(220, 110, 110, 0.14);
+  border-color: rgba(220, 110, 110, 0.34);
+  color: rgba(240, 180, 180, 0.95);
+}
+
+/* === Quote versions horizontal strip (Quotes list expanded row) =============
+   Compact dot timeline rendered under a selected row in the Quotes list.
+   Each dot is a clickable button that deep-links to the editor at that
+   specific version. */
+.quote-versions-strip {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--hairline-faint, rgba(255, 255, 255, 0.06));
+  background: rgba(255, 255, 255, 0.015);
+}
+.quote-versions-strip-header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.quote-versions-strip-title {
+  color: var(--text-secondary);
+  font-size: var(--font-xs, 12px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.quote-versions-strip-count {
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 11px);
+}
+.quote-versions-strip-empty {
+  color: var(--text-muted);
+  font-size: var(--font-xs, 12px);
+  font-style: italic;
+  padding: 4px 0 2px;
+}
+.quote-versions-strip-track {
+  align-items: center;
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  padding: 14px 4px 6px;
+  position: relative;
+}
+.quote-versions-strip-track::before {
+  /* Continuous horizontal line behind the dots. */
+  background: linear-gradient(
+    90deg,
+    rgba(214, 173, 112, 0.05),
+    rgba(214, 173, 112, 0.35) 12%,
+    rgba(214, 173, 112, 0.35) 88%,
+    rgba(214, 173, 112, 0.05)
+  );
+  content: "";
+  height: 2px;
+  left: 12px;
+  position: absolute;
+  right: 12px;
+  top: 22px;
+  border-radius: 1px;
+}
+.quote-versions-strip-node {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 60px;
+  padding: 0 8px;
+  position: relative;
+  z-index: 1;
+}
+.quote-versions-strip-dot {
+  background: var(--surface-elevated, #1a1d23);
+  border: 2px solid var(--accent, #d6ad70);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(214, 173, 112, 0.12);
+  height: 14px;
+  width: 14px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+.quote-versions-strip-node:hover .quote-versions-strip-dot,
+.quote-versions-strip-node:focus-visible .quote-versions-strip-dot {
+  background: var(--accent, #d6ad70);
+  box-shadow: 0 0 0 5px rgba(214, 173, 112, 0.25);
+  transform: scale(1.15);
+}
+.quote-versions-strip-node:focus-visible {
+  outline: none;
+}
+.quote-versions-strip-label {
+  color: var(--text-primary);
+  font-size: var(--font-2xs, 11px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.quote-versions-strip-date {
+  color: var(--text-muted);
+  font-size: 10px;
 }
 
 /* Detail / diff panel that opens below the timeline. */

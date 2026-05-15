@@ -898,6 +898,11 @@
         "noQuotesTitle": "Aún no hay cotizaciones",
         "noQuotesBody": "Crea cotizaciones en DOP, USD o EUR. El snapshot de tasa se guarda automáticamente para que las cotizaciones viejas no cambien."
       },
+      "list": {
+        "versionsStripTitle": "Versiones de {{number}}",
+        "versionsStripLoading": "Cargando versiones…",
+        "versionsStripEmpty": "Esta cotización aún no tiene versiones registradas."
+      },
       "deleteDialog": {
         "title": "¿Eliminar esta cotización?",
         "bodyPrefix": "Eliminar cotización",

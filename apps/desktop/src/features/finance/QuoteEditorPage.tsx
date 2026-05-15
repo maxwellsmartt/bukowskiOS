@@ -1,7 +1,7 @@
 import { ArrowLeft, Clock, Download, GripVertical, History, Plus, Save, Send, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import type {
   CurrencyRateSource,
@@ -115,6 +115,7 @@ const taxProfileOptions: QuoteTaxProfile[] = ["standard_itbis", "film_law_exempt
 export const QuoteEditorPage = () => {
   const { t } = useTranslation();
   const { quoteId } = useParams<{ quoteId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isNew = !quoteId || quoteId === "new";
   const navigate = useNavigate();
   const toast = useToast();
@@ -134,6 +135,11 @@ export const QuoteEditorPage = () => {
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [isRestoringVersion, setIsRestoringVersion] = useState(false);
+  // Deep-link: `/finance/quotes/:id?version=N` auto-opens the versions
+  // card and pre-selects that version once they finish loading. We only
+  // honour it once per param value so flipping versions inside the editor
+  // does not get clobbered by the URL.
+  const consumedVersionParamRef = useRef<string | null>(null);
   const [rateSuggestion, setRateSuggestion] = useState<{ rate: number; effectiveDate: string } | null>(null);
   const [activeItemSuggestion, setActiveItemSuggestion] = useState<{
     field: "title" | "description";
@@ -158,6 +164,31 @@ export const QuoteEditorPage = () => {
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Honour the `?version=N` deep-link once versions have loaded. Drop the
+  // param after we apply it so the URL stays clean and re-opening the same
+  // version manually doesn't re-trigger this effect.
+  useEffect(() => {
+    const raw = searchParams.get("version");
+    if (!raw || raw === consumedVersionParamRef.current) return;
+    if (!versions.length) return;
+
+    const target = versions.find((v) => String(v.versionNumber) === raw);
+    if (!target) return;
+
+    setIsVersionsOpen(true);
+    setSelectedVersionId(target.id);
+    consumedVersionParamRef.current = raw;
+
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("version");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, versions, setSearchParams]);
 
   // Hydrate draft when settings or existing quote change.
   useEffect(() => {
@@ -581,19 +612,22 @@ export const QuoteEditorPage = () => {
           <ArrowLeft size={13} />
           <span>{t("finance.quotes.editor.allQuotes")}</span>
         </button>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="quote-editor-header-pills">
           {!isNew && versions.length > 0 ? (
             <button
-              className="ghost-control"
+              className="quote-editor-header-pill quote-editor-header-pill-button"
+              aria-pressed={isVersionsOpen}
               onClick={() => setIsVersionsOpen((prev) => !prev)}
               type="button"
             >
-              <History size={13} />
+              <History size={13} aria-hidden="true" />
               <span>{t("finance.quotes.editor.versionCount", { count: versions.length })}</span>
             </button>
           ) : null}
           {existingQuote ? (
-            <StatusBadge tone={statusTone(existingQuote.status)}>{quoteStatusLabel(existingQuote.status)}</StatusBadge>
+            <span className={`quote-editor-header-pill quote-editor-header-pill-status status-tone-${statusTone(existingQuote.status)}`}>
+              {quoteStatusLabel(existingQuote.status)}
+            </span>
           ) : null}
         </div>
       </div>
@@ -615,7 +649,8 @@ export const QuoteEditorPage = () => {
                   type="button"
                   className={`quote-versions-row quote-versions-row-button${isSelected ? " is-selected" : ""}`}
                   key={version.id}
-                  data-tooltip={t("finance.quotes.editor.versions.openTooltip", { number: version.versionNumber })}
+                  aria-pressed={isSelected}
+                  aria-label={t("finance.quotes.editor.versions.openTooltip", { number: version.versionNumber })}
                   onClick={() =>
                     setSelectedVersionId((current) => (current === version.id ? null : version.id))
                   }
@@ -626,10 +661,10 @@ export const QuoteEditorPage = () => {
                   </div>
                   <div className="quote-versions-body">
                     <div className="quote-versions-head">
-                      <strong>v{version.versionNumber}</strong>
-                      <span className="text-muted">
-                        <Clock size={11} style={{ verticalAlign: "-2px", marginRight: 4 }} />
-                        {version.createdAt.slice(0, 16).replace("T", " ")}
+                      <span className="quote-versions-tag">v{version.versionNumber}</span>
+                      <span className="quote-versions-timestamp">
+                        <Clock size={12} aria-hidden="true" />
+                        <span>{version.createdAt.slice(0, 16).replace("T", " ")}</span>
                       </span>
                       <span className="quote-versions-total">{total}</span>
                     </div>

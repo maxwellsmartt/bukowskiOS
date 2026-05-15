@@ -22,6 +22,7 @@ import {
   statusLabel,
   statusTone,
 } from "./quoteHelpers";
+import { QuoteVersionsStrip } from "./QuoteVersionsStrip";
 import { useQuoteMutations, useQuotesList } from "./useQuoteData";
 
 const allStatuses: Array<QuoteStatus | "all"> = [
@@ -49,6 +50,10 @@ export const QuotesPage = () => {
   const [search, setSearch] = useState("");
   const [pendingDelete, setPendingDelete] = useState<QuoteRow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // Single-click on a row reveals an inline horizontal version timeline
+  // below the table (double-click still opens the editor). The selection
+  // is local to this view — switching workspaces or refreshing clears it.
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
   const filter = useMemo(
     () => ({
@@ -380,9 +385,27 @@ export const QuotesPage = () => {
             rows={data}
             persistKey="quotes-list-v1"
             getRowId={(row) => row.id}
+            activeRowId={expandedRowId}
+            onRowClick={(row) =>
+              setExpandedRowId((current) => (current === row.id ? null : row.id))
+            }
             onRowDoubleClick={(row) => navigate(`/finance/quotes/${row.id}`)}
           />
         )}
+
+        {expandedRowId
+          ? (() => {
+              const expanded = data.find((row) => row.id === expandedRowId);
+              if (!expanded) return null;
+              return (
+                <QuoteVersionsStrip
+                  quoteId={expanded.id}
+                  workspaceId={activeWorkspaceId}
+                  quoteLabel={expanded.quoteNumber}
+                />
+              );
+            })()
+          : null}
 
         {error ? <div className="form-inline-error">{error}</div> : null}
       </SurfaceCard>
