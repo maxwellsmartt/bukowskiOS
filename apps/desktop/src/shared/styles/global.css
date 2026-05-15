@@ -15200,7 +15200,12 @@ input[type="number"] {
   align-items: center;
   display: flex;
   gap: 8px;
+  resize: none;
   width: 100%;
+}
+.quote-items-duration .number-stepper,
+.quote-items-duration .compact-select-trigger {
+  resize: none;
 }
 .quote-items-duration.is-flat .quote-items-duration-unit {
   flex: 1;
@@ -15223,28 +15228,10 @@ input[type="number"] {
   justify-content: center;
   width: 8px;
 }
+/* CompactSelect supplies its own chevron + height + border. The class
+   below only carries layout-flow info specific to the duration cell. */
 .quote-items-duration-unit {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background: rgba(255, 255, 255, 0.03)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%23a4adbb' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E")
-    no-repeat right 10px center;
-  border: 1px solid var(--hairline-faint, rgba(255, 255, 255, 0.04));
-  border-radius: var(--radius-sm, 11px);
-  color: var(--text-primary);
   font-size: var(--font-sm, 12px);
-  height: 32px;
-  line-height: 1;
-  padding: 0 28px 0 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  overflow: hidden;
-  width: 100%;
-}
-.quote-items-duration-unit:focus {
-  border-color: var(--accent, #d6ad70);
-  outline: none;
 }
 
 .quote-items-row.is-dragging {
@@ -15367,26 +15354,9 @@ input[type="number"] {
   min-height: 28px;
 }
 
+/* CompactSelect handles chevron + height + border for the tax cell. */
 .quote-items-tax {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background: rgba(255, 255, 255, 0.03)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%23a4adbb' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E")
-    no-repeat right 10px center;
-  border: 1px solid var(--hairline-faint, rgba(255, 255, 255, 0.04));
-  border-radius: var(--radius-sm, 11px);
-  color: var(--text-primary);
   font-size: var(--font-sm, 12px);
-  height: 32px;
-  line-height: 1;
-  padding: 0 26px 0 12px;
-  width: 100%;
-}
-
-.quote-items-tax:focus {
-  border-color: var(--accent, #d6ad70);
-  outline: none;
 }
 
 .quote-items-cell-total {
@@ -16270,12 +16240,16 @@ input[type="number"] {
    mirrors `.field-input` so it slots into existing form layouts. */
 .compact-select-trigger {
   align-items: center;
+  cursor: pointer;
   display: inline-flex;
   gap: 6px;
+  height: 32px;
   justify-content: space-between;
-  padding-right: 10px;
+  /* Override the heavy 11px vertical padding inherited from .field-input
+     so the trigger lines up with NumberStepper and other 32px controls. */
+  padding: 0 10px 0 12px;
+  resize: none;
   text-align: left;
-  cursor: pointer;
 }
 .compact-select-trigger:disabled {
   cursor: not-allowed;
