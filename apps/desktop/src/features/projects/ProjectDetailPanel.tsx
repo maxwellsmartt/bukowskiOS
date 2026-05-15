@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -37,6 +38,16 @@ const toneForStatus = (status: string) => {
       return undefined;
   }
 };
+
+const projectMetricLabelKeys: Record<string, string> = {
+  "Assigned assets": "projects.detail.metrics.assignedAssets",
+  "Open incidents": "projects.detail.metrics.openIncidents",
+  "Incident exposure": "projects.detail.metrics.incidentExposure",
+  "Replacement at risk": "projects.detail.metrics.replacementAtRisk",
+};
+
+const translateProjectMetricLabel = (label: string, t: TFunction) =>
+  projectMetricLabelKeys[label] ? t(projectMetricLabelKeys[label]) : label;
 
 export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }: ProjectDetailPanelProps) => {
   const { t } = useTranslation();
@@ -192,7 +203,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         {data.metrics.map((metric) => (
           <SurfaceCard key={metric.label}>
             <span className={`metric-value metric-tone-${metric.tone}`}>{metric.value}</span>
-            <p className="metric-label">{metric.label}</p>
+            <p className="metric-label">{translateProjectMetricLabel(metric.label, t)}</p>
           </SurfaceCard>
         ))}
       </div>

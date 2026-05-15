@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ClipboardList, FileUp, Plus, SquarePen, Trash2, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import type { AssetListQuery, AssetListRow, AssetSortField } from "@contracts";
@@ -42,6 +42,11 @@ import {
 type AssetsPageProps = {
   projectId?: string | null;
   projectName?: string | null;
+};
+
+type AssetsRouteState = {
+  assignProjectId?: string;
+  assignProjectName?: string;
 };
 
 /**
@@ -856,6 +861,7 @@ export const AssetsPage = ({ projectId = null, projectName = null }: AssetsPageP
 
 const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const { t } = useTranslation();
+  const location = useLocation();
   const { activeWorkspaceId } = useWorkspace();
   const { projects, refreshProjects } = useShellContext();
   const { addItems } = useCompareTray();
@@ -895,6 +901,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     sortDirection: "asc",
   });
   const navigate = useNavigate();
+  const routeState = (location.state ?? null) as AssetsRouteState | null;
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [cartItemsById, setCartItemsById] = useState<Record<string, AssetOperationCartItem>>({});
   const [actionPanelOpen, setActionPanelOpen] = useState(false);
@@ -965,6 +972,17 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       .map((asset) => `${asset.code} (${asset.linkedKitCodes.join(", ")})`)
       .join(", ");
   }, [selectedKitLockedAssets]);
+
+  useEffect(() => {
+    if (isProjectMode || !routeState?.assignProjectId) {
+      return;
+    }
+
+    setAssignNextStep({
+      projectId: routeState.assignProjectId,
+      projectName: routeState.assignProjectName ?? t("assets.projectActions.selectedProjectFallback"),
+    });
+  }, [isProjectMode, routeState?.assignProjectId, routeState?.assignProjectName, t]);
 
   useEffect(() => {
     if (!assets.length) {
@@ -1620,33 +1638,68 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           title={t("assets.cardTitle")}
           aside={
             <div className="asset-registry-header-actions">
-              <button
-                className="asset-create-button action-row-button"
-                onClick={() => {
-                  setEditorMode("create");
-                  setEditorError(null);
-                }}
-                type="button"
-              >
-                <Plus size={14} />
-                <span>{t("assets.newAsset")}</span>
-              </button>
-              <button
-                className="ghost-control action-row-button"
-                disabled={isImportingAssets}
-                onClick={() => fileInputRef.current?.click()}
-                type="button"
-              >
-                <FileUp size={14} />
-                <span>{isImportingAssets ? t("assets.importing") : t("assets.importCsv")}</span>
-              </button>
-              <input
-                ref={fileInputRef}
-                accept=".csv,text/csv"
-                hidden
-                onChange={(event) => void handleImportCsvFile(event.target.files?.[0] ?? null)}
-                type="file"
-              />
+              {isProjectMode ? (
+                <>
+                  <button
+                    className="asset-create-button action-row-button"
+                    onClick={() =>
+                      navigate("/assets", {
+                        state: {
+                          assignProjectId: projectId ?? undefined,
+                          assignProjectName: projectName ?? undefined,
+                        } satisfies AssetsRouteState,
+                      })
+                    }
+                    type="button"
+                  >
+                    <Plus size={14} />
+                    <span>{t("assets.projectActions.assignAssets")}</span>
+                  </button>
+                  <button
+                    className="ghost-control action-row-button"
+                    disabled={!selectedRowIds.length}
+                    onClick={() => {
+                      setActionPanelOpen(true);
+                      setAssignNextStep(null);
+                    }}
+                    title={!selectedRowIds.length ? t("assets.projectActions.selectToEdit") : undefined}
+                    type="button"
+                  >
+                    <SquarePen size={14} />
+                    <span>{t("assets.projectActions.editAssignments")}</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="asset-create-button action-row-button"
+                    onClick={() => {
+                      setEditorMode("create");
+                      setEditorError(null);
+                    }}
+                    type="button"
+                  >
+                    <Plus size={14} />
+                    <span>{t("assets.newAsset")}</span>
+                  </button>
+                  <button
+                    className="ghost-control action-row-button"
+                    disabled={isImportingAssets}
+                    onClick={() => fileInputRef.current?.click()}
+                    type="button"
+                  >
+                    <FileUp size={14} />
+                    <span>{isImportingAssets ? t("assets.importing") : t("assets.importCsv")}</span>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    accept=".csv,text/csv"
+                    hidden
+                    onChange={(event) => void handleImportCsvFile(event.target.files?.[0] ?? null)}
+                    type="file"
+                  />
+                </>
+              )}
             </div>
           }
         >

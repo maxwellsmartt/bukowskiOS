@@ -1,5 +1,6 @@
-import { Archive, ArchiveRestore, Pencil, Trash2, createLucideIcon } from "lucide-react";
+import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   ProjectSetupWizard,
@@ -11,25 +12,6 @@ import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import type { ProjectCardRow, ProjectDeletePreview } from "@contracts";
-
-const LayersPlus = createLucideIcon("layers-plus", [
-  [
-    "path",
-    {
-      d: "M13 13.74a2 2 0 0 1-2 0L2.5 8.87a1 1 0 0 1 0-1.74L11 2.26a2 2 0 0 1 2 0l8.5 4.87a1 1 0 0 1 0 1.74z",
-      key: "layers-plus-top",
-    },
-  ],
-  [
-    "path",
-    {
-      d: "m20 14.285 1.5.845a1 1 0 0 1 0 1.74L13 21.74a2 2 0 0 1-2 0l-8.5-4.87a1 1 0 0 1 0-1.74l1.5-.845",
-      key: "layers-plus-bottom",
-    },
-  ],
-  ["path", { d: "M19 8h4", key: "layers-plus-horizontal" }],
-  ["path", { d: "M21 6v4", key: "layers-plus-vertical" }],
-]);
 
 type LinkedItem = { label: string; count: number };
 
@@ -46,6 +28,7 @@ const buildLinkedItems = (preview: ProjectDeletePreview): LinkedItem[] => {
 };
 
 export const ShellProjectsPanel = () => {
+  const { t } = useTranslation();
   const {
     activeProjectId,
     archiveProject,
@@ -145,10 +128,10 @@ export const ShellProjectsPanel = () => {
   return (
     <section className="shell-projects">
       <div className="shell-projects-header">
-        <span className="shell-nav-label">Projects</span>
+        <span className="shell-nav-label">{t("shell.nav.primary.projects")}</span>
         <div className="shell-projects-header-actions">
           <button
-            aria-label={showArchivedProjects ? "Hide archived projects" : "Show archived projects"}
+            aria-label={showArchivedProjects ? t("shell.projectsPanel.hideArchived") : t("shell.projectsPanel.showArchived")}
             className={`icon-ghost-control shell-project-toggle${showArchivedProjects ? " is-active" : ""}`}
             onClick={() => setShowArchivedProjects(!showArchivedProjects)}
             type="button"
@@ -156,7 +139,7 @@ export const ShellProjectsPanel = () => {
             <Archive size={14} />
           </button>
           <button
-            aria-label="New project"
+            aria-label={t("shell.projectsPanel.newProject")}
             className="icon-ghost-control shell-project-create-button"
             onClick={() => {
               setWizardOpen(true);
@@ -165,7 +148,7 @@ export const ShellProjectsPanel = () => {
             }}
             type="button"
           >
-            <LayersPlus size={14} />
+            <Plus size={14} />
           </button>
         </div>
       </div>
@@ -191,10 +174,10 @@ export const ShellProjectsPanel = () => {
               <div className="shell-project-title-row">
                 <span className="shell-project-code-badge">{project.code}</span>
                 <span className="shell-project-name">{project.name}</span>
-                {project.isArchived ? <span className="shell-project-archived-badge">Archived</span> : null}
+                {project.isArchived ? <span className="shell-project-archived-badge">{t("shell.projectsPanel.archived")}</span> : null}
               </div>
               <span className="shell-project-meta">
-                {project.assetCount} assets · {project.incidentCount} incidents
+                {t("shell.projectsPanel.assets", { count: project.assetCount })} · {t("shell.projectsPanel.incidents", { count: project.incidentCount })}
               </span>
             </div>
             <div className="shell-project-item-actions" aria-label={`${project.name} actions`}>
@@ -205,7 +188,7 @@ export const ShellProjectsPanel = () => {
                   event.stopPropagation();
                   handleEditProject(project.id);
                 }}
-                title="Edit details"
+                title={t("shell.projectsPanel.editProject")}
                 type="button"
               >
                 <Pencil size={13} />
@@ -217,7 +200,7 @@ export const ShellProjectsPanel = () => {
                   event.stopPropagation();
                   void handleToggleArchive(project);
                 }}
-                title={project.isArchived ? "Restore project (reversible)" : "Archive project (reversible)"}
+                title={project.isArchived ? t("shell.projectsPanel.restoreProject") : t("shell.projectsPanel.archiveProject")}
                 type="button"
               >
                 {project.isArchived ? <ArchiveRestore size={13} /> : <Archive size={13} />}

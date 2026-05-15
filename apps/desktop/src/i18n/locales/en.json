@@ -73,6 +73,19 @@
       "createWorkspace": "Create workspace",
       "settings": "Settings"
     },
+    "projectsPanel": {
+      "archiveProject": "Archive project",
+      "archived": "Archived",
+      "assets_one": "{{count}} asset",
+      "assets_other": "{{count}} assets",
+      "editProject": "Edit details",
+      "hideArchived": "Hide archived projects",
+      "incidents_one": "{{count}} incident",
+      "incidents_other": "{{count}} incidents",
+      "newProject": "Create project",
+      "restoreProject": "Restore project",
+      "showArchived": "Show archived projects"
+    },
     "notifications": {
       "title": "Notifications",
       "ariaLabel": "Notifications",
@@ -138,6 +151,12 @@
     "newAsset": "New asset",
     "importing": "Importing…",
     "importCsv": "Import CSV",
+    "projectActions": {
+      "assignAssets": "Assign assets",
+      "editAssignments": "Edit assignments",
+      "selectedProjectFallback": "Selected project",
+      "selectToEdit": "Select assets to edit their assignments"
+    },
     "sort": {
       "name": "Name",
       "code": "Code",
@@ -2211,6 +2230,7 @@
       "timelineColor": "Timeline color"
     },
     "help": {
+      "mainUnitDepartments": "Choose the departments operating inside Main Unit. The project inherits departments from every unit automatically.",
       "selectDepartmentsFirst": "Select project departments first to seed the Main Unit."
     },
     "placeholders": {
@@ -2258,6 +2278,7 @@
       },
       "chooseStaging": "Choose staging slip",
       "departmentOption": "{{name}} · {{assets}} assets · {{crew}} crew",
+      "departmentCounts": "{{assets}} assets · {{crew}} crew",
       "inUseOn": "In use on {{project}}{{unit}}{{department}}",
       "loadingStaging": "Loading staging slips…",
       "noAvailableMatches": "No assets match the current filters.",
@@ -2300,6 +2321,7 @@
       "stagingSlip": "Staging slip",
       "targetDepartment": "Target department",
       "targetUnit": "Target unit",
+      "unitCounts": "{{assets}} assets · {{crew}} crew",
       "unitOption": "{{label}} · {{dateRange}} · {{assets}} assets · {{crew}} crew"
     },
     "crew": {
@@ -2364,6 +2386,8 @@
       "removeWindowAria": "Remove window {{number}} from {{unit}}",
       "removeWindowTooltip": "Remove window {{number}}",
       "selectProjectDepartmentsFirst": "Select project departments in General Info first.",
+      "unitDepartments": "Unit departments",
+      "unitDepartmentsHelp": "Select only the departments operating inside this unit.",
       "unitName": "Unit name",
       "unitSummaryLine": "{{window}} · {{departments}} · {{assets}} assets · {{crew}} crew",
       "windows": "Windows",
@@ -2740,6 +2764,12 @@
         "client": "Client",
         "exposure": "Exposure",
         "timeline": "Timeline"
+      },
+      "metrics": {
+        "assignedAssets": "Assigned assets",
+        "incidentExposure": "Incident exposure",
+        "openIncidents": "Open incidents",
+        "replacementAtRisk": "Replacement at risk"
       },
       "units": {
         "title": "Units",

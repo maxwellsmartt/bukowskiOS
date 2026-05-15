@@ -73,6 +73,19 @@
       "createWorkspace": "Crear workspace",
       "settings": "Ajustes"
     },
+    "projectsPanel": {
+      "archiveProject": "Archivar proyecto",
+      "archived": "Archivado",
+      "assets_one": "{{count}} equipo",
+      "assets_other": "{{count}} equipos",
+      "editProject": "Editar detalles",
+      "hideArchived": "Ocultar proyectos archivados",
+      "incidents_one": "{{count}} incidente",
+      "incidents_other": "{{count}} incidentes",
+      "newProject": "Crear proyecto",
+      "restoreProject": "Restaurar proyecto",
+      "showArchived": "Mostrar proyectos archivados"
+    },
     "notifications": {
       "title": "Notificaciones",
       "ariaLabel": "Notificaciones",
@@ -138,6 +151,12 @@
     "newAsset": "Nuevo equipo",
     "importing": "Importando…",
     "importCsv": "Importar CSV",
+    "projectActions": {
+      "assignAssets": "Asignar equipos",
+      "editAssignments": "Editar asignaciones",
+      "selectedProjectFallback": "Proyecto seleccionado",
+      "selectToEdit": "Selecciona equipos para editar sus asignaciones"
+    },
     "sort": {
       "name": "Nombre",
       "code": "Código",
@@ -2213,6 +2232,7 @@
       "timelineColor": "Color de timeline"
     },
     "help": {
+      "mainUnitDepartments": "Elige los departamentos que operan dentro de Main Unit. El proyecto heredará automáticamente los departamentos de todas sus unidades.",
       "selectDepartmentsFirst": "Selecciona departamentos del proyecto primero para sembrar Main Unit."
     },
     "placeholders": {
@@ -2260,6 +2280,7 @@
       },
       "chooseStaging": "Elegir packing slip de staging",
       "departmentOption": "{{name}} · {{assets}} equipos · {{crew}} crew",
+      "departmentCounts": "{{assets}} equipos · {{crew}} crew",
       "inUseOn": "En uso en {{project}}{{unit}}{{department}}",
       "loadingStaging": "Cargando packing slips de staging…",
       "noAvailableMatches": "Ningún equipo coincide con los filtros actuales.",
@@ -2302,6 +2323,7 @@
       "stagingSlip": "Packing slip de staging",
       "targetDepartment": "Departamento destino",
       "targetUnit": "Unidad destino",
+      "unitCounts": "{{assets}} equipos · {{crew}} crew",
       "unitOption": "{{label}} · {{dateRange}} · {{assets}} equipos · {{crew}} crew"
     },
     "crew": {
@@ -2366,6 +2388,8 @@
       "removeWindowAria": "Quitar ventana {{number}} de {{unit}}",
       "removeWindowTooltip": "Quitar ventana {{number}}",
       "selectProjectDepartmentsFirst": "Selecciona departamentos del proyecto en Información general primero.",
+      "unitDepartments": "Departamentos de la unidad",
+      "unitDepartmentsHelp": "Selecciona sólo los departamentos que operan dentro de esta unidad.",
       "unitName": "Nombre de unidad",
       "unitSummaryLine": "{{window}} · {{departments}} · {{assets}} equipos · {{crew}} crew",
       "windows": "Ventanas",
@@ -2742,6 +2766,12 @@
         "client": "Cliente",
         "exposure": "Exposición",
         "timeline": "Cronograma"
+      },
+      "metrics": {
+        "assignedAssets": "Equipos asignados",
+        "incidentExposure": "Exposición por incidentes",
+        "openIncidents": "Incidentes abiertos",
+        "replacementAtRisk": "Reposición en riesgo"
       },
       "units": {
         "title": "Unidades",

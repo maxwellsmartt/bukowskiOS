@@ -1,6 +1,6 @@
 import { AlertTriangle, ChevronDown, ChevronRight, FileDown, Plus, Trash2, X } from "lucide-react";
 import type { TFunction } from "i18next";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
@@ -102,6 +102,16 @@ const syncUnitDepartments = (
   );
 };
 
+const deriveProjectDepartmentIds = (draft: ProjectSetupDraft) =>
+  uniqueIds([
+    ...draft.mainUnit.departmentIds,
+    ...draft.mainUnit.unitDepartments.map((bucket) => bucket.departmentId),
+    ...draft.additionalUnits.flatMap((unit) => [
+      ...unit.departmentIds,
+      ...unit.unitDepartments.map((bucket) => bucket.departmentId),
+    ]),
+  ]);
+
 const createEmptyDraft = (): ProjectSetupDraft => ({
   generalInfo: {
     code: "",
@@ -179,7 +189,7 @@ const normalizeDraftForSubmit = (draft: ProjectSetupDraft): ProjectBlueprintDraf
     status: draft.generalInfo.status.trim(),
     colorKey: draft.generalInfo.colorKey.trim(),
     description: normalizeOptional(draft.generalInfo.description),
-    departmentIds: uniqueIds(draft.generalInfo.departmentIds),
+    departmentIds: deriveProjectDepartmentIds(draft),
   },
   mainUnit: {
     name: "Main Unit",
@@ -344,6 +354,7 @@ const isValidDateWindow = (startDate: string, endDate: string) => !startDate || 
 
 const buildValidationErrors = (draft: ProjectSetupDraft, t: TFunction) => {
   const errors: string[] = [];
+  const projectDepartmentIds = deriveProjectDepartmentIds(draft);
 
   if (!draft.generalInfo.name.trim()) {
     errors.push(t("projectSetup.validation.projectNameRequired"));
@@ -399,7 +410,7 @@ const buildValidationErrors = (draft: ProjectSetupDraft, t: TFunction) => {
     });
 
     unit.departmentIds.forEach((departmentId) => {
-      if (!draft.generalInfo.departmentIds.includes(departmentId)) {
+      if (!projectDepartmentIds.includes(departmentId)) {
         errors.push(t("projectSetup.validation.additionalUnitDepartment", { number: index + 1 }));
       }
     });
@@ -472,6 +483,10 @@ export const ProjectSetupWizard = ({
   const [assetSelectedDirection, setAssetSelectedDirection] = useState<ListSortDirection>("asc");
   const [crewAvailableSearch, setCrewAvailableSearch] = useState("");
   const [crewSelectedSearch, setCrewSelectedSearch] = useState("");
+  const deferredAssetAvailableSearch = useDeferredValue(assetAvailableSearch);
+  const deferredAssetSelectedSearch = useDeferredValue(assetSelectedSearch);
+  const deferredCrewAvailableSearch = useDeferredValue(crewAvailableSearch);
+  const deferredCrewSelectedSearch = useDeferredValue(crewSelectedSearch);
   const [crewAvailableSort, setCrewAvailableSort] = useState<CrewAvailableSort>("name");
   const [crewSelectedSort, setCrewSelectedSort] = useState<CrewSelectedSort>("name");
   const [crewAvailableDirection, setCrewAvailableDirection] = useState<ListSortDirection>("asc");
@@ -541,8 +556,6 @@ export const ProjectSetupWizard = ({
     }
   }, [activeAssignmentUnitId, draft.additionalUnits]);
 
-  const projectDepartmentIds = draft.generalInfo.departmentIds;
-
   const setGeneralInfo = <K extends keyof ProjectSetupDraft["generalInfo"]>(key: K, value: ProjectSetupDraft["generalInfo"][K]) => {
     onChangeDraft({
       ...draft,
@@ -557,32 +570,6 @@ export const ProjectSetupWizard = ({
               colorKey: String(value),
             }
           : draft.mainUnit,
-    });
-  };
-
-  const setProjectDepartmentIds = (departmentIds: string[]) => {
-    const nextProjectDepartmentIds = uniqueIds(departmentIds);
-    const nextMainDepartmentIds = draft.mainUnit.departmentIds.filter((departmentId) => nextProjectDepartmentIds.includes(departmentId));
-
-    onChangeDraft({
-      ...draft,
-      generalInfo: {
-        ...draft.generalInfo,
-        departmentIds: nextProjectDepartmentIds,
-      },
-      mainUnit: {
-        ...draft.mainUnit,
-        departmentIds: nextMainDepartmentIds,
-        unitDepartments: syncUnitDepartments({ ...draft.mainUnit, departmentIds: nextMainDepartmentIds }, nextMainDepartmentIds),
-      },
-      additionalUnits: draft.additionalUnits.map((unit) => {
-        const nextUnitDepartmentIds = unit.departmentIds.filter((departmentId) => nextProjectDepartmentIds.includes(departmentId));
-        return {
-          ...unit,
-          departmentIds: nextUnitDepartmentIds,
-          unitDepartments: syncUnitDepartments({ ...unit, departmentIds: nextUnitDepartmentIds }, nextUnitDepartmentIds),
-        };
-      }),
     });
   };
 
@@ -609,8 +596,8 @@ export const ProjectSetupWizard = ({
           id: nextId,
           name: resolvedPreset === "Custom unit" ? "" : unit.name,
           suggestedPreset: resolvedPreset,
-          departmentIds: [...draft.generalInfo.departmentIds],
-          unitDepartments: syncUnitDepartments({ ...unit, departmentIds: [...draft.generalInfo.departmentIds] }, [...draft.generalInfo.departmentIds]),
+          departmentIds: [],
+          unitDepartments: [],
         },
       ],
     });
@@ -719,6 +706,103 @@ export const ProjectSetupWizard = ({
     catalog.departments.find((department) => department.id === activeAssignmentDepartmentId) ?? null;
   const activeAssignmentBucket =
     activeAssignmentUnit.unitDepartments.find((bucket) => bucket.departmentId === activeAssignmentDepartmentId) ?? null;
+  const renderDepartmentPicker = (unitId: AssignmentUnitId, selectedDepartmentIds: string[]) => (
+    <div className="project-setup-department-picker" role="list">
+      {catalog.departments.map((department) => {
+        const selected = selectedDepartmentIds.includes(department.id);
+        return (
+          <button
+            key={department.id}
+            className={`project-setup-checklist-row project-setup-department-option${selected ? " is-selected" : ""}`}
+            onClick={() =>
+              updateAssignmentUnitDepartmentIds(
+                unitId,
+                selected
+                  ? selectedDepartmentIds.filter((departmentId) => departmentId !== department.id)
+                  : [...selectedDepartmentIds, department.id],
+              )
+            }
+            type="button"
+          >
+            <span className={`project-setup-checklist-toggle${selected ? " is-selected" : ""}`} />
+            <span className="project-setup-checklist-copy">
+              <strong>{department.name}</strong>
+              <span>{department.code}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+  const renderAssignmentTargetPanel = (mode: "assets" | "crew") => (
+    <div className="project-setup-inline-card project-setup-target-card">
+      <div className="project-setup-card-heading">
+        <div>
+          <h3>{t(`projectSetup.${mode}.assignToUnit`)}</h3>
+          <p>{t(`projectSetup.${mode}.assignToUnitHelp`)}</p>
+        </div>
+      </div>
+
+      <div className="project-setup-assignment-unit-grid" role="list">
+        {assignmentUnitOptions.map((unit) => (
+          <button
+            key={unit.id}
+            className={`project-setup-assignment-unit-card${unit.id === activeAssignmentUnitId ? " is-active" : ""}`}
+            onClick={() => setActiveAssignmentUnitId(unit.id)}
+            type="button"
+          >
+            <strong>{unit.label}</strong>
+            <span>{unit.dateRange}</span>
+            <small>
+              {t("projectSetup.assets.unitCounts", {
+                assets: unit.assetCount,
+                crew: unit.crewCount,
+              })}
+            </small>
+          </button>
+        ))}
+      </div>
+
+      {renderActiveWindowBadges()}
+
+      <div className="project-setup-target-departments">
+        <div className="project-setup-card-heading">
+          <div>
+            <h3>{t(`projectSetup.${mode}.assignToDepartment`)}</h3>
+            <p>{t(`projectSetup.${mode}.assignToDepartmentHelp`)}</p>
+          </div>
+        </div>
+
+        {activeUnitDepartmentIds.length ? (
+          <div className="project-setup-department-chip-row" role="list">
+            {activeUnitDepartmentIds.map((departmentId) => {
+              const department = catalog.departments.find((row) => row.id === departmentId);
+              const bucket = activeAssignmentUnit.unitDepartments.find((row) => row.departmentId === departmentId);
+              const active = departmentId === activeAssignmentDepartmentId;
+              return (
+                <button
+                  key={departmentId}
+                  className={`project-setup-department-chip${active ? " is-active" : ""}`}
+                  onClick={() => setActiveAssignmentDepartmentId(departmentId)}
+                  type="button"
+                >
+                  <strong>{department?.name ?? departmentId}</strong>
+                  <span>
+                    {t("projectSetup.assets.departmentCounts", {
+                      assets: bucket?.assetIds.length ?? 0,
+                      crew: countAssignedCrew(bucket?.crewAssignments ?? []),
+                    })}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <span className="project-setup-field-note">{t("projectSetup.assets.noDepartmentBody")}</span>
+        )}
+      </div>
+    </div>
+  );
   const renderActiveWindowBadges = () =>
     activeAssignmentWindowEntries.length ? (
       <div className="project-setup-window-badges" role="presentation">
@@ -743,7 +827,8 @@ export const ProjectSetupWizard = ({
   };
 
   const updateAssignmentUnitDepartmentIds = (unitId: AssignmentUnitId, departmentIds: string[]) => {
-    const normalizedDepartmentIds = uniqueIds(departmentIds.filter((departmentId) => projectDepartmentIds.includes(departmentId)));
+    const catalogDepartmentIds = new Set(catalog.departments.map((department) => department.id));
+    const normalizedDepartmentIds = uniqueIds(departmentIds.filter((departmentId) => catalogDepartmentIds.has(departmentId)));
 
     if (unitId === "main") {
       updateMainUnit({
@@ -868,35 +953,35 @@ export const ProjectSetupWizard = ({
   const assetAvailableRows = useMemo(() => {
     return [...catalog.assetOptions]
       .filter((asset) => !(activeAssignmentBucket?.assetIds ?? []).includes(asset.id))
-      .filter((asset) => matchesSearch(assetAvailableSearch, [asset.code, asset.name, asset.category, asset.status]))
+      .filter((asset) => matchesSearch(deferredAssetAvailableSearch, [asset.code, asset.name, asset.category, asset.status]))
       .sort((left, right) => {
         const leftValue = left[assetAvailableSort];
         const rightValue = right[assetAvailableSort];
         return compareValues(leftValue, rightValue, assetAvailableDirection);
       });
-  }, [activeAssignmentBucket?.assetIds, assetAvailableDirection, assetAvailableSearch, assetAvailableSort, catalog.assetOptions]);
+  }, [activeAssignmentBucket?.assetIds, assetAvailableDirection, deferredAssetAvailableSearch, assetAvailableSort, catalog.assetOptions]);
 
   const selectedAssetRows = useMemo(() => {
     return [...catalog.assetOptions]
       .filter((asset) => (activeAssignmentBucket?.assetIds ?? []).includes(asset.id))
-      .filter((asset) => matchesSearch(assetSelectedSearch, [asset.code, asset.name, asset.category]))
+      .filter((asset) => matchesSearch(deferredAssetSelectedSearch, [asset.code, asset.name, asset.category]))
       .sort((left, right) => {
         const leftValue = left[assetSelectedSort];
         const rightValue = right[assetSelectedSort];
         return compareValues(leftValue, rightValue, assetSelectedDirection);
       });
-  }, [activeAssignmentBucket?.assetIds, assetSelectedDirection, assetSelectedSearch, assetSelectedSort, catalog.assetOptions]);
+  }, [activeAssignmentBucket?.assetIds, assetSelectedDirection, deferredAssetSelectedSearch, assetSelectedSort, catalog.assetOptions]);
 
   const crewAvailableRows = useMemo(() => {
     return [...catalog.crewMembers]
       .filter((crewMember) => !(activeAssignmentBucket?.crewAssignments ?? []).some((assignment) => assignment.crewMemberId === crewMember.id))
-      .filter((crewMember) => matchesSearch(crewAvailableSearch, [crewMember.fullName, crewMember.roleLabel]))
+      .filter((crewMember) => matchesSearch(deferredCrewAvailableSearch, [crewMember.fullName, crewMember.roleLabel]))
       .sort((left, right) => {
         const leftValue = crewAvailableSort === "role" ? left.roleLabel : left.fullName;
         const rightValue = crewAvailableSort === "role" ? right.roleLabel : right.fullName;
         return compareValues(leftValue, rightValue, crewAvailableDirection);
       });
-  }, [activeAssignmentBucket?.crewAssignments, catalog.crewMembers, crewAvailableDirection, crewAvailableSearch, crewAvailableSort]);
+  }, [activeAssignmentBucket?.crewAssignments, catalog.crewMembers, crewAvailableDirection, deferredCrewAvailableSearch, crewAvailableSort]);
 
   const blockingCrewAssignmentsByMember = useMemo(() => {
     const nextMap = new Map<
@@ -991,7 +1076,7 @@ export const ProjectSetupWizard = ({
       .filter((assignment) => assignmentHasCrewMember(assignment.assignment))
       .filter((assignment) => {
         const crewMember = catalog.crewMembers.find((row) => row.id === assignment.assignment.crewMemberId);
-        return matchesSearch(crewSelectedSearch, [crewMember?.fullName, assignment.assignment.roleLabel, crewMember?.roleLabel]);
+        return matchesSearch(deferredCrewSelectedSearch, [crewMember?.fullName, assignment.assignment.roleLabel, crewMember?.roleLabel]);
       })
       .sort((left, right) => {
         const leftCrew = catalog.crewMembers.find((row) => row.id === left.assignment.crewMemberId);
@@ -1010,7 +1095,7 @@ export const ProjectSetupWizard = ({
               : rightCrew?.fullName || "";
         return compareValues(leftValue, rightValue, crewSelectedDirection);
       });
-  }, [activeAssignmentBucket?.crewAssignments, catalog.crewMembers, crewSelectedDirection, crewSelectedSearch, crewSelectedSort]);
+  }, [activeAssignmentBucket?.crewAssignments, catalog.crewMembers, crewSelectedDirection, deferredCrewSelectedSearch, crewSelectedSort]);
 
   if (!open) {
     return null;
@@ -1191,60 +1276,9 @@ export const ProjectSetupWizard = ({
                 </label>
 
                 <div className="action-field action-field-wide">
-                  <span className="action-field-label">{t("projectSetup.fields.projectDepartments")}</span>
-                  <div className="project-setup-checkbox-grid">
-                    {catalog.departments.map((department) => {
-                      const checked = draft.generalInfo.departmentIds.includes(department.id);
-                      return (
-                        <label key={department.id} className="project-setup-toggle">
-                          <input
-                            checked={checked}
-                            onChange={(event) =>
-                              setProjectDepartmentIds(
-                                event.target.checked
-                                  ? [...draft.generalInfo.departmentIds, department.id]
-                                  : draft.generalInfo.departmentIds.filter((departmentId) => departmentId !== department.id),
-                              )
-                            }
-                            type="checkbox"
-                          />
-                          <span>{department.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="action-field action-field-wide">
                   <span className="action-field-label">{t("projectSetup.fields.mainUnitDepartments")}</span>
-                  <div className="project-setup-checkbox-grid">
-                    {draft.generalInfo.departmentIds.length ? (
-                      catalog.departments
-                        .filter((department) => draft.generalInfo.departmentIds.includes(department.id))
-                        .map((department) => {
-                          const checked = draft.mainUnit.departmentIds.includes(department.id);
-                          return (
-                            <label key={department.id} className="project-setup-toggle">
-                              <input
-                                checked={checked}
-                                onChange={(event) =>
-                                  updateAssignmentUnitDepartmentIds(
-                                    "main",
-                                    event.target.checked
-                                      ? [...draft.mainUnit.departmentIds, department.id]
-                                      : draft.mainUnit.departmentIds.filter((departmentId) => departmentId !== department.id),
-                                  )
-                                }
-                                type="checkbox"
-                              />
-                              <span>{department.name}</span>
-                            </label>
-                          );
-                        })
-                    ) : (
-                      <span className="project-setup-field-note">{t("projectSetup.help.selectDepartmentsFirst")}</span>
-                    )}
-                  </div>
+                  <span className="project-setup-field-note">{t("projectSetup.help.mainUnitDepartments")}</span>
+                  {renderDepartmentPicker("main", draft.mainUnit.departmentIds)}
                 </div>
 
                 <label className="project-setup-toggle">
@@ -1321,64 +1355,7 @@ export const ProjectSetupWizard = ({
           {activeTab === "assets" ? (
             <div className="project-setup-panel">
               <div className="project-setup-section-stack">
-                {assignmentUnitOptions.length > 1 ? (
-                  <div className="project-setup-inline-card">
-                    <div className="project-setup-card-heading">
-                      <div>
-                        <h3>{t("projectSetup.assets.assignToUnit")}</h3>
-                        <p>{t("projectSetup.assets.assignToUnitHelp")}</p>
-                      </div>
-                    </div>
-
-                    <label className="action-field">
-                      <span className="action-field-label">{t("projectSetup.assets.targetUnit")}</span>
-                      <SelectField onChange={(event) => setActiveAssignmentUnitId(event.target.value)} value={activeAssignmentUnitId}>
-                        {assignmentUnitOptions.map((unit) => (
-                          <option key={unit.id} value={unit.id}>
-                            {t("projectSetup.assets.unitOption", {
-                              label: unit.label,
-                              dateRange: unit.dateRange,
-                              assets: unit.assetCount,
-                              crew: unit.crewCount,
-                            })}
-                          </option>
-                        ))}
-                      </SelectField>
-                    </label>
-                    {renderActiveWindowBadges()}
-                  </div>
-                ) : null}
-
-                {activeUnitDepartmentIds.length > 1 ? (
-                  <div className="project-setup-inline-card">
-                    <div className="project-setup-card-heading">
-                      <div>
-                        <h3>{t("projectSetup.assets.assignToDepartment")}</h3>
-                        <p>{t("projectSetup.assets.assignToDepartmentHelp")}</p>
-                      </div>
-                    </div>
-
-                    <label className="action-field">
-                      <span className="action-field-label">{t("projectSetup.assets.targetDepartment")}</span>
-                      <SelectField onChange={(event) => setActiveAssignmentDepartmentId(event.target.value)} value={activeAssignmentDepartmentId}>
-                        {activeUnitDepartmentIds.map((departmentId) => {
-                          const department = catalog.departments.find((row) => row.id === departmentId);
-                          const bucket = activeAssignmentUnit.unitDepartments.find((row) => row.departmentId === departmentId);
-                          return (
-                            <option key={departmentId} value={departmentId}>
-                              {t("projectSetup.assets.departmentOption", {
-                                name: department?.name ?? departmentId,
-                                assets: bucket?.assetIds.length ?? 0,
-                                crew: countAssignedCrew(bucket?.crewAssignments ?? []),
-                              })}
-                            </option>
-                          );
-                        })}
-                      </SelectField>
-                    </label>
-                    {renderActiveWindowBadges()}
-                  </div>
-                ) : null}
+                {renderAssignmentTargetPanel("assets")}
 
                 {activeAssignmentDepartmentId ? (
                   <div className="project-setup-inline-card">
@@ -1510,6 +1487,7 @@ export const ProjectSetupWizard = ({
                   </div>
                 )}
 
+                {activeAssignmentDepartmentId ? (
                 <div className="project-setup-two-column project-setup-resource-panels">
                   <div className="project-setup-inline-card">
                     <div className="project-setup-card-heading">
@@ -1657,71 +1635,16 @@ export const ProjectSetupWizard = ({
                     </div>
                   </div>
                 </div>
+                ) : null}
               </div>
             </div>
           ) : null}
 
           {activeTab === "crew" ? (
             <div className="project-setup-panel">
-              {assignmentUnitOptions.length > 1 ? (
-                <div className="project-setup-inline-card">
-                  <div className="project-setup-card-heading">
-                    <div>
-                      <h3>{t("projectSetup.crew.assignToUnit")}</h3>
-                      <p>{t("projectSetup.crew.assignToUnitHelp")}</p>
-                    </div>
-                  </div>
+              {renderAssignmentTargetPanel("crew")}
 
-                  <label className="action-field">
-                    <span className="action-field-label">{t("projectSetup.crew.targetUnit")}</span>
-                    <SelectField onChange={(event) => setActiveAssignmentUnitId(event.target.value)} value={activeAssignmentUnitId}>
-                      {assignmentUnitOptions.map((unit) => (
-                        <option key={unit.id} value={unit.id}>
-                          {t("projectSetup.assets.unitOption", {
-                            label: unit.label,
-                            dateRange: unit.dateRange,
-                            assets: unit.assetCount,
-                            crew: unit.crewCount,
-                          })}
-                        </option>
-                      ))}
-                    </SelectField>
-                  </label>
-                  {renderActiveWindowBadges()}
-                  </div>
-                ) : null}
-
-              {activeUnitDepartmentIds.length > 1 ? (
-                <div className="project-setup-inline-card">
-                  <div className="project-setup-card-heading">
-                    <div>
-                      <h3>{t("projectSetup.crew.assignToDepartment")}</h3>
-                      <p>{t("projectSetup.crew.assignToDepartmentHelp")}</p>
-                    </div>
-                  </div>
-
-                  <label className="action-field">
-                    <span className="action-field-label">{t("projectSetup.crew.targetDepartment")}</span>
-                    <SelectField onChange={(event) => setActiveAssignmentDepartmentId(event.target.value)} value={activeAssignmentDepartmentId}>
-                      {activeUnitDepartmentIds.map((departmentId) => {
-                        const department = catalog.departments.find((row) => row.id === departmentId);
-                        const bucket = activeAssignmentUnit.unitDepartments.find((row) => row.departmentId === departmentId);
-                        return (
-                          <option key={departmentId} value={departmentId}>
-                            {t("projectSetup.assets.departmentOption", {
-                              name: department?.name ?? departmentId,
-                              assets: bucket?.assetIds.length ?? 0,
-                              crew: countAssignedCrew(bucket?.crewAssignments ?? []),
-                            })}
-                          </option>
-                        );
-                      })}
-                    </SelectField>
-                  </label>
-                  {renderActiveWindowBadges()}
-                </div>
-              ) : null}
-
+              {activeAssignmentDepartmentId ? (
               <div className="project-setup-two-column project-setup-resource-panels">
                 <div className="project-setup-inline-card">
                   <div className="project-setup-card-heading">
@@ -1931,6 +1854,7 @@ export const ProjectSetupWizard = ({
                   </div>
                 </div>
               </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -2041,35 +1965,9 @@ export const ProjectSetupWizard = ({
                               </label>
 
                               <div className="action-field action-field-wide">
-                                <span className="action-field-label">{t("projectSetup.fields.projectDepartments")}</span>
-                                <div className="project-setup-checkbox-grid">
-                                  {draft.generalInfo.departmentIds.length ? (
-                                    catalog.departments
-                                      .filter((department) => draft.generalInfo.departmentIds.includes(department.id))
-                                      .map((department) => {
-                                        const checked = unit.departmentIds.includes(department.id);
-                                        return (
-                                          <label key={department.id} className="project-setup-toggle">
-                                            <input
-                                              checked={checked}
-                                              onChange={(event) =>
-                                                updateAssignmentUnitDepartmentIds(
-                                                  unit.id!,
-                                                  event.target.checked
-                                                    ? [...unit.departmentIds, department.id]
-                                                    : unit.departmentIds.filter((departmentId) => departmentId !== department.id),
-                                                )
-                                              }
-                                              type="checkbox"
-                                            />
-                                            <span>{department.name}</span>
-                                          </label>
-                                        );
-                                      })
-                                  ) : (
-                                    <span className="project-setup-field-note">{t("projectSetup.units.selectProjectDepartmentsFirst")}</span>
-                                  )}
-                                </div>
+                                <span className="action-field-label">{t("projectSetup.units.unitDepartments")}</span>
+                                <span className="project-setup-field-note">{t("projectSetup.units.unitDepartmentsHelp")}</span>
+                                {renderDepartmentPicker(unit.id!, unit.departmentIds)}
                               </div>
                             </div>
 

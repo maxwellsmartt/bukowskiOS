@@ -97,6 +97,7 @@ export const DataTable = <T = unknown,>({
   const columnReorderStateRef = useRef<{ columnKey: string; startX: number; startY: number; active: boolean } | null>(null);
   const suppressNextSortClickRef = useRef(false);
   const columnOrderUndoStackRef = useRef<string[][]>([]);
+  const selectionAnchorRowIdRef = useRef<string | null>(null);
 
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
     const parsedWidths = persistKey ? readJsonPreference<Record<string, number>>(`table:${persistKey}`, {}) : {};
@@ -335,8 +336,82 @@ export const DataTable = <T = unknown,>({
     setSelection(
       checked
         ? Array.from(new Set([...activeSelection, ...resolvedRowIds]))
-        : activeSelection.filter((rowId) => !visibleRowIds.has(rowId)),
+      : activeSelection.filter((rowId) => !visibleRowIds.has(rowId)),
     );
+  };
+
+  const replaceSelectionWithRow = (rowId: string, isSelected: boolean) => {
+    setSelection(isSelected && activeSelection.length === 1 ? [] : [rowId]);
+  };
+
+  const toggleAdditiveSelection = (rowId: string, isSelected: boolean) => {
+    toggleRowSelection(rowId, !isSelected);
+  };
+
+  const selectRowRange = (rowId: string) => {
+    const anchorRowId = selectionAnchorRowIdRef.current;
+    const anchorIndex = anchorRowId ? resolvedRowIds.indexOf(anchorRowId) : -1;
+    const rowIndex = resolvedRowIds.indexOf(rowId);
+
+    if (anchorIndex === -1 || rowIndex === -1) {
+      setSelection([rowId]);
+      selectionAnchorRowIdRef.current = rowId;
+      return;
+    }
+
+    const [startIndex, endIndex] = anchorIndex < rowIndex ? [anchorIndex, rowIndex] : [rowIndex, anchorIndex];
+    const rangeRowIds = resolvedRowIds.slice(startIndex, endIndex + 1);
+    setSelection(Array.from(new Set([...activeSelection, ...rangeRowIds])));
+  };
+
+  const applyRowSelectionGesture = (event: ReactMouseEvent<HTMLElement>, rowId: string, isSelected: boolean) => {
+    if (event.shiftKey) {
+      selectRowRange(rowId);
+      return;
+    }
+
+    if (event.altKey || event.metaKey) {
+      toggleAdditiveSelection(rowId, isSelected);
+      selectionAnchorRowIdRef.current = rowId;
+      return;
+    }
+
+    replaceSelectionWithRow(rowId, isSelected);
+    selectionAnchorRowIdRef.current = rowId;
+  };
+
+  const shouldIgnoreRowSelection = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    return Boolean(
+      target.closest(
+        [
+          "button",
+          "a",
+          "input",
+          "label",
+          "select",
+          "textarea",
+          "[role='button']",
+          "[role='menuitem']",
+          "[role='menuitemcheckbox']",
+          "[data-prevent-row-selection]",
+          "[data-table-row-action]",
+        ].join(","),
+      ),
+    );
+  };
+
+  const handleRowClick = (event: ReactMouseEvent<HTMLTableRowElement>, row: T, rowId: string, isSelected: boolean) => {
+    onRowClick?.(row);
+
+    if (!selectable || event.detail > 1 || shouldIgnoreRowSelection(event.target)) {
+      return;
+    }
+
+    applyRowSelectionGesture(event, rowId, isSelected);
   };
 
   const handleResizeStart = (event: ReactMouseEvent<HTMLButtonElement>, columnKey: string) => {
@@ -594,7 +669,7 @@ export const DataTable = <T = unknown,>({
                   ]
                     .filter(Boolean)
                     .join(" ")}
-                  onClick={() => onRowClick?.(row)}
+                  onClick={(event) => handleRowClick(event, row, rowId, isSelected)}
                   onDoubleClick={() => onRowDoubleClick?.(row)}
                 >
                   {selectable ? (
@@ -603,7 +678,19 @@ export const DataTable = <T = unknown,>({
                         aria-label={t("shared.dataTable.selectRow", { index: index + 1 })}
                         checked={isSelected}
                         className="table-checkbox"
-                        onChange={(event) => toggleRowSelection(rowId, event.target.checked)}
+                        onChange={(event) => {
+                          toggleRowSelection(rowId, event.target.checked);
+                          selectionAnchorRowIdRef.current = rowId;
+                        }}
+                        onClick={(event) => {
+                          if (!event.shiftKey && !event.altKey && !event.metaKey) {
+                            return;
+                          }
+
+                          event.preventDefault();
+                          event.stopPropagation();
+                          applyRowSelectionGesture(event, rowId, isSelected);
+                        }}
                         type="checkbox"
                       />
                     </td>
