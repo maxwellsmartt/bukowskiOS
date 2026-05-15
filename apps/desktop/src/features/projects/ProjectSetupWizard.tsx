@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronDown, ChevronRight, FileDown, Plus, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, FileDown, Plus, Save, Trash2, X } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -1241,6 +1241,21 @@ export const ProjectSetupWizard = ({
     setCloseConfirmOpen(true);
   };
 
+  const handleSaveDraft = () => {
+    setCloseConfirmOpen(false);
+    onClose();
+  };
+
+  const handleRequestDiscardDraft = () => {
+    if (!dirty) {
+      onDiscardDraft();
+      onClose();
+      return;
+    }
+
+    setCloseConfirmOpen(true);
+  };
+
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
@@ -2335,9 +2350,25 @@ export const ProjectSetupWizard = ({
           ) : (
             <div />
           )}
-          <button className="action-primary-button" disabled={isSubmitting || !canSubmit} onClick={() => void handleSubmit()} type="button">
-            {isSubmitting ? t("projectSetup.actions.creating") : t("projectSetup.actions.createProject")}
-          </button>
+          <div className="project-setup-footer-actions">
+            <button className="project-setup-footer-button" disabled={!dirty || isSubmitting} onClick={handleSaveDraft} type="button">
+              <Save size={15} />
+              <span>{t("projectSetup.actions.saveDraft")}</span>
+            </button>
+            <button className="project-setup-footer-button is-danger" disabled={isSubmitting} onClick={handleRequestDiscardDraft} type="button">
+              <Trash2 size={15} />
+              <span>{t("projectSetup.actions.discardChanges")}</span>
+            </button>
+            <button
+              className="project-setup-footer-button is-primary"
+              disabled={isSubmitting || !canSubmit}
+              onClick={() => void handleSubmit()}
+              type="button"
+            >
+              <Plus size={15} />
+              <span>{isSubmitting ? t("projectSetup.actions.creating") : t("projectSetup.actions.createProject")}</span>
+            </button>
+          </div>
         </footer>
       </section>
 
@@ -2358,8 +2389,7 @@ export const ProjectSetupWizard = ({
               <button
                 className="ghost-control"
                 onClick={() => {
-                  setCloseConfirmOpen(false);
-                  onClose();
+                  handleSaveDraft();
                 }}
                 type="button"
               >

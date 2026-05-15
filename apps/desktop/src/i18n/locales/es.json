@@ -2209,6 +2209,8 @@
       "close": "Cerrar configuración del proyecto",
       "createProject": "Crear proyecto",
       "creating": "Creando…",
+      "discardChanges": "Descartar cambios",
+      "saveDraft": "Guardar borrador",
       "exportPdf": "Exportar PDF"
     },
     "fields": {
