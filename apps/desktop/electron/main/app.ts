@@ -358,6 +358,8 @@ app.whenReady().then(() => {
     currencyRateProviders: localDatabase.currencyRateProviders,
     quoteMutations: localDatabase.quoteMutations,
     quoteReads: localDatabase.quoteReads,
+    invoiceMutations: localDatabase.invoiceMutations,
+    invoiceReads: localDatabase.invoiceReads,
     exportQuotePdf: async (workspaceId: string, quoteId: string) => {
       const detail = localDatabase.quoteReads.getQuoteDetail(workspaceId, quoteId);
       if (!detail) {

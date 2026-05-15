@@ -185,4 +185,14 @@ export const ipcChannels = {
     listVersions: "bukowskiQuotes:listVersions",
     restoreVersion: "bukowskiQuotes:restoreVersion",
   },
+  invoices: {
+    list: "bukowskiInvoices:list",
+    detail: "bukowskiInvoices:detail",
+    create: "bukowskiInvoices:create",
+    update: "bukowskiInvoices:update",
+    issue: "bukowskiInvoices:issue",
+    cancel: "bukowskiInvoices:cancel",
+    recordPayment: "bukowskiInvoices:recordPayment",
+    createFromQuote: "bukowskiInvoices:createFromQuote",
+  },
 } as const;

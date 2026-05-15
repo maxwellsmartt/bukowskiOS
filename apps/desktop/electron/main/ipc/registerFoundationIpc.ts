@@ -19,10 +19,16 @@ import {
   createExchangeRateSchema,
   currencyRateProviderStatusReadArgsSchema,
   createFinancialEntrySchema,
+  createInvoiceSchema,
+  createInvoiceFromQuoteSchema,
   createQuoteSchema,
   currencySettingsReadArgsSchema,
   deleteExchangeRateSchema,
   duplicateQuoteSchema,
+  cancelInvoiceSchema,
+  invoiceDetailReadArgsSchema,
+  invoiceListReadArgsSchema,
+  issueInvoiceSchema,
   restoreQuoteFromVersionSchema,
   exchangeRateListReadArgsSchema,
   latestExchangeRateReadArgsSchema,
@@ -55,6 +61,7 @@ import {
   packingSlipListReadArgsSchema,
   projectListReadArgsSchema,
   catalogListReadArgsSchema,
+  recordInvoicePaymentSchema,
   recordRuntimeErrorSchema,
   reportIncidentSchema,
   resolveIncidentSchema,
@@ -84,6 +91,7 @@ import {
   updateCatalogEntitySchema,
   updateIncidentSchema,
   updateFinancialEntrySchema,
+  updateInvoiceSchema,
   updateProjectSchema,
   updateProjectUnitSchema,
   updateRmaCaseSchema,
@@ -293,6 +301,32 @@ type RegisterFoundationIpcOptions = {
       snapshot: Record<string, unknown>;
     }>;
   };
+  invoiceMutations: {
+    createInvoice: (input: import("@contracts").CreateInvoiceCommand) => import("@contracts").InvoiceMutationResult;
+    updateInvoice: (input: import("@contracts").UpdateInvoiceCommand) => import("@contracts").InvoiceMutationResult;
+    issueInvoice: (input: import("@contracts").IssueInvoiceCommand) => import("@contracts").InvoiceMutationResult;
+    cancelInvoice: (input: import("@contracts").CancelInvoiceCommand) => import("@contracts").InvoiceMutationResult;
+    recordInvoicePayment: (
+      input: import("@contracts").RecordInvoicePaymentCommand,
+    ) => import("@contracts").InvoiceMutationResult;
+    createInvoiceFromQuote: (
+      quote: import("@contracts").QuoteDetail,
+      options: {
+        commandId: string;
+        actorType: import("@contracts").CreateInvoiceCommand["actorType"];
+        sourceChannel: import("@contracts").CreateInvoiceCommand["sourceChannel"];
+        issueDate?: string;
+        paymentTermsDays?: number;
+      },
+    ) => import("@contracts").InvoiceMutationResult;
+  };
+  invoiceReads: {
+    listInvoices: (filter: import("@contracts").InvoiceListFilter) => import("@contracts").InvoiceRow[];
+    getInvoiceDetail: (
+      workspaceId: string,
+      invoiceId: string,
+    ) => import("@contracts").InvoiceDetail | null;
+  };
   exportQuotePdf: (
     workspaceId: string,
     quoteId: string,
@@ -428,6 +462,8 @@ export const registerFoundationIpc = ({
   currencyRateProviders,
   quoteMutations,
   quoteReads,
+  invoiceMutations,
+  invoiceReads,
   exportQuotePdf,
   packingMutations,
   exportFinanceReportPdf,
@@ -1821,6 +1857,109 @@ export const registerFoundationIpc = ({
     });
     return quoteMutations.restoreQuoteFromVersion(input);
   });
+
+  // -- Invoices ----------------------------------------------------------------
+  safeHandleReadWithSchema(
+    ipcChannels.invoices.list,
+    invoiceListReadArgsSchema,
+    async (_event, filter: import("@contracts").InvoiceListFilter) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: filter.workspaceId,
+        action: "load invoices",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return invoiceReads.listInvoices(filter);
+    },
+    "The app could not load invoices.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.invoices.detail,
+    invoiceDetailReadArgsSchema,
+    async (_event, query: { workspaceId: string; invoiceId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load invoice detail",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return invoiceReads.getInvoiceDetail(query.workspaceId, query.invoiceId);
+    },
+    "The app could not load the invoice detail.",
+  );
+  safeHandle(ipcChannels.invoices.create, createInvoiceSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "create invoice",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return invoiceMutations.createInvoice(input);
+  });
+  safeHandle(ipcChannels.invoices.update, updateInvoiceSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update invoice",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return invoiceMutations.updateInvoice(input);
+  });
+  safeHandle(ipcChannels.invoices.issue, issueInvoiceSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "issue invoice",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return invoiceMutations.issueInvoice(input);
+  });
+  safeHandle(ipcChannels.invoices.cancel, cancelInvoiceSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "cancel invoice",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return invoiceMutations.cancelInvoice(input);
+  });
+  safeHandle(ipcChannels.invoices.recordPayment, recordInvoicePaymentSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "record invoice payment",
+      accessLevel: "write",
+      requiredPermission: "finance.read",
+    });
+    return invoiceMutations.recordInvoicePayment(input);
+  });
+  // `createFromQuote` is a convenience: the renderer passes the quote id +
+  // a fresh command id, and the main process snapshots the live quote into
+  // a brand-new invoice draft. Validation happens server-side: only quotes
+  // currently in `approved` status can seed an invoice.
+  safeHandle(
+    ipcChannels.invoices.createFromQuote,
+    createInvoiceFromQuoteSchema,
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "generate invoice from quote",
+        accessLevel: "write",
+        requiredPermission: "finance.read",
+      });
+      const quote = quoteReads.getQuoteDetail(input.workspaceId, input.quoteId);
+      if (!quote) {
+        throw new Error("Quote not found.");
+      }
+      if (quote.status !== "approved") {
+        throw new Error(`Only approved quotes can seed an invoice (current status: ${quote.status}).`);
+      }
+      return invoiceMutations.createInvoiceFromQuote(quote, {
+        commandId: input.commandId,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+    },
+  );
   safeHandleReadWithSchema(
     ipcChannels.quotes.exportPdf,
     quoteExportPdfReadArgsSchema,

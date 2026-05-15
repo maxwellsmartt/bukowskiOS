@@ -1132,6 +1132,114 @@ export const restoreQuoteFromVersionSchema = z
   })
   .strict();
 
+// ----------------------------------------------------------------------------
+// Invoices
+// ----------------------------------------------------------------------------
+//
+// Most validators are reused from the quote schemas above — same item
+// shape, same currency/tax shape, same actor channels.
+
+const invoiceHeaderInputSchema = z.object({
+  issueDate: nonEmptyString,
+  dueDate: nullableOrOptionalString,
+  paymentTermsDays: z.number().int().min(0).nullable().optional(),
+  clientId: nullableOrOptionalString,
+  clientNameSnapshot: nonEmptyString,
+  clientRncSnapshot: nullableOrOptionalString,
+  productionCompanyId: nullableOrOptionalString,
+  productionCompanyNameSnapshot: nullableOrOptionalString,
+  productionPurSnapshot: nullableOrOptionalString,
+  workspaceSirecineSnapshot: nullableOrOptionalString,
+  attentionName: nullableOrOptionalString,
+  attentionPhone: nullableOrOptionalString,
+  projectId: nullableOrOptionalString,
+  projectNameSnapshot: nullableOrOptionalString,
+  productionName: nullableOrOptionalString,
+  description: nullableOrOptionalString,
+  packageTitle: nullableOrOptionalString,
+  currency: z.string().trim().min(2).max(8).transform((v) => v.toUpperCase()),
+  baseCurrency: z.string().trim().min(2).max(8).transform((v) => v.toUpperCase()),
+  exchangeRate: z.number().finite().positive(),
+  exchangeRateSource: z.enum(["manual", "banco_popular", "banco_central", "banco_santa_cruz", "custom"]),
+  exchangeRateType: z.enum(["buy", "sell", "average", "manual"]),
+  exchangeRateEffectiveDate: nullableOrOptionalString,
+  taxProfile: quoteTaxProfileSchema,
+  itbisRate: z.number().finite().min(0).max(1),
+  taxAddedToTotal: z.boolean(),
+  taxNotes: nullableOrOptionalString,
+  discountRate: z.number().finite().min(0).max(1).nullable().optional(),
+  discountAmount: z.number().finite().min(0).nullable().optional(),
+  observations: nullableOrOptionalString,
+});
+
+export const createInvoiceSchema = invoiceHeaderInputSchema
+  .extend({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    items: z.array(quoteItemInputSchema).min(1),
+    sourceQuoteId: nullableOrOptionalString,
+  })
+  .strict();
+
+export const updateInvoiceSchema = invoiceHeaderInputSchema
+  .extend({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    invoiceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    items: z.array(quoteItemInputSchema).min(1),
+  })
+  .strict();
+
+export const issueInvoiceSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    invoiceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
+export const cancelInvoiceSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    invoiceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    reason: optionalTrimmedString,
+  })
+  .strict();
+
+export const recordInvoicePaymentSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    invoiceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    paidAt: nonEmptyString,
+    amount: z.number().finite().positive(),
+    currency: z.string().trim().min(2).max(8).transform((v) => v.toUpperCase()),
+    exchangeRate: z.number().finite().positive().nullable().optional(),
+    paymentMethod: nullableOrOptionalString,
+    reference: nullableOrOptionalString,
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+export const createInvoiceFromQuoteSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    quoteId: nonEmptyString,
+  })
+  .strict();
+
 export const quoteListQuerySchema = z
   .object({
     workspaceId: nonEmptyString,
@@ -1165,3 +1273,38 @@ export const quoteExportPdfReadArgsSchema = z.tuple([
 export const quoteVersionsReadArgsSchema = z.tuple([
   z.object({ workspaceId: nonEmptyString, quoteId: nonEmptyString }).strict(),
 ]);
+
+// ----------------------------------------------------------------------------
+// Invoices — read schemas
+// ----------------------------------------------------------------------------
+
+const invoiceStatusSchema = z.enum([
+  "draft",
+  "issued",
+  "partially_paid",
+  "paid",
+  "cancelled",
+  "void",
+]);
+
+export const invoiceListQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    status: invoiceStatusSchema.optional(),
+    clientId: optionalTrimmedString,
+    projectId: optionalTrimmedString,
+    dateFrom: optionalTrimmedString,
+    dateTo: optionalTrimmedString,
+    currency: optionalTrimmedString,
+    search: optionalTrimmedString,
+    hasOutstanding: z.boolean().optional(),
+    limit: z.number().int().positive().max(500).optional(),
+  })
+  .strict();
+
+export const invoiceDetailQuerySchema = z
+  .object({ workspaceId: nonEmptyString, invoiceId: nonEmptyString })
+  .strict();
+
+export const invoiceListReadArgsSchema = z.tuple([invoiceListQuerySchema]);
+export const invoiceDetailReadArgsSchema = z.tuple([invoiceDetailQuerySchema]);
