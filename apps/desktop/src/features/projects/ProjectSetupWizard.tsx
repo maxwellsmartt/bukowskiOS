@@ -70,6 +70,12 @@ type ProjectSetupWizardProps = {
   open: boolean;
 };
 
+type SelectedAssetIssue = {
+  assetId: string;
+  label: string;
+  reason: string;
+};
+
 const emptyCrewAssignment = (): ProjectBlueprintCrewDraftInput => ({
   crewMemberId: "",
   roleLabel: "",
@@ -437,6 +443,8 @@ const compareValues = (left: string, right: string, direction: ListSortDirection
 
 const assignmentHasCrewMember = (assignment: ProjectBlueprintCrewDraftInput) => Boolean(assignment.crewMemberId?.trim());
 const isAssetOccupiedForNewProject = (asset: CatalogAssetOptionRow) => Boolean(asset.currentProjectId);
+const formatAssetOptionLabel = (asset: Pick<CatalogAssetOptionRow, "code" | "name">) => `${asset.code ? `${asset.code} · ` : ""}${asset.name}`;
+const assignableOperationalStatuses = new Set(["ready", "available"]);
 const datesOverlap = (leftStart?: string | null, leftEnd?: string | null, rightStart?: string | null, rightEnd?: string | null) =>
   (!leftEnd || !rightStart || leftEnd >= rightStart) && (!rightEnd || !leftStart || rightEnd >= leftStart);
 const resolveAssignmentWindow = (
@@ -899,6 +907,93 @@ export const ProjectSetupWizard = ({
     return Boolean(asset?.linkedKitCount);
   };
 
+  const selectedAssetIdsForSubmit = useMemo(
+    () => uniqueIds([getUnitAssetIds(draft.mainUnit), ...draft.additionalUnits.map((unit) => getUnitAssetIds(unit))].flat()),
+    [draft.additionalUnits, draft.mainUnit],
+  );
+  const assetOptionsById = useMemo(() => new Map(catalog.assetOptions.map((asset) => [asset.id, asset] as const)), [catalog.assetOptions]);
+  const selectedAssetIssues = useMemo<SelectedAssetIssue[]>(() => {
+    return selectedAssetIdsForSubmit
+      .map((assetId) => {
+        const asset = assetOptionsById.get(assetId);
+
+        if (!asset) {
+          return {
+            assetId,
+            label: assetId,
+            reason: t("projectSetup.validation.assetMissing"),
+          };
+        }
+
+        if (asset.linkedKitCount) {
+          return {
+            assetId,
+            label: formatAssetOptionLabel(asset),
+            reason: t("projectSetup.validation.assetInKit", {
+              kits: asset.linkedKitCodes.length
+                ? asset.linkedKitCodes.join(", ")
+                : asset.linkedKitNames.length
+                  ? asset.linkedKitNames.join(", ")
+                  : t("projectSetup.validation.unknownKit"),
+            }),
+          };
+        }
+
+        if (asset.currentProjectId) {
+          return {
+            assetId,
+            label: formatAssetOptionLabel(asset),
+            reason: t("projectSetup.validation.assetAssigned", {
+              project: asset.currentProject ?? t("projectSetup.validation.unknownProject"),
+              unit: asset.currentUnit ? ` / ${asset.currentUnit}` : "",
+            }),
+          };
+        }
+
+        if (asset.custodyStatus === "checked_out") {
+          return {
+            assetId,
+            label: formatAssetOptionLabel(asset),
+            reason: t("projectSetup.validation.assetCheckedOut"),
+          };
+        }
+
+        if (asset.operationalStatus && !assignableOperationalStatuses.has(asset.operationalStatus)) {
+          return {
+            assetId,
+            label: formatAssetOptionLabel(asset),
+            reason: t("projectSetup.validation.assetOperationalStatus", { status: asset.operationalStatus }),
+          };
+        }
+
+        if (asset.quantity <= 0) {
+          return {
+            assetId,
+            label: formatAssetOptionLabel(asset),
+            reason: t("projectSetup.validation.assetNoUnits"),
+          };
+        }
+
+        if (asset.quantity > 0 && (asset.assignedQuantity > 0 || asset.checkedOutQuantity > 0)) {
+          return {
+            assetId,
+            label: formatAssetOptionLabel(asset),
+            reason: t("projectSetup.validation.assetPartialQuantity"),
+          };
+        }
+
+        return null;
+      })
+      .filter((issue): issue is SelectedAssetIssue => Boolean(issue));
+  }, [assetOptionsById, selectedAssetIdsForSubmit, t]);
+  const selectedAssetPreview = selectedAssetIdsForSubmit
+    .slice(0, 5)
+    .map((assetId) => {
+      const asset = assetOptionsById.get(assetId);
+      return asset ? formatAssetOptionLabel(asset) : assetId;
+    })
+    .join(", ");
+
   const sameSetupAssetAssignmentsById = useMemo(() => {
     const nextMap = new Map<
       string,
@@ -1150,6 +1245,10 @@ export const ProjectSetupWizard = ({
     try {
       setIsSubmitting(true);
       setSubmitError(null);
+      if (selectedAssetIssues.length) {
+        onChangeTab("assets");
+        return;
+      }
       const createdProject = await createProjectBlueprint(normalizeDraftForSubmit(draft));
       onDiscardDraft();
       onClose();
@@ -1158,7 +1257,14 @@ export const ProjectSetupWizard = ({
         openProject(createdProject.id, "info");
       }
     } catch (error) {
-      setSubmitError(getUserFacingErrorMessage(error, t("projectSetup.errors.createProject")));
+      const message = getUserFacingErrorMessage(error, t("projectSetup.errors.createProject"));
+      setSubmitError(
+        /selected assets.*no longer available/i.test(message)
+          ? t("projectSetup.validation.assetsUnavailableBackend", {
+              assets: selectedAssetPreview || t("projectSetup.validation.selectedAssetsFallback"),
+            })
+          : message,
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1174,7 +1280,7 @@ export const ProjectSetupWizard = ({
     }
   };
 
-  const canSubmit = validationErrors.length === 0 && !conflicts?.hasConflicts && !isCheckingConflicts;
+  const canSubmit = validationErrors.length === 0 && selectedAssetIssues.length === 0 && !conflicts?.hasConflicts && !isCheckingConflicts;
   const conflictCount = conflicts?.groups.reduce((count, group) => count + group.items.length, 0) ?? 0;
 
   const tabItems: Array<{ id: WizardTab; label: string }> = [
@@ -2196,6 +2302,26 @@ export const ProjectSetupWizard = ({
         {validationErrors.length ? (
           <div className="action-feedback action-feedback-error project-setup-feedback">
             {validationErrors[0]}
+          </div>
+        ) : null}
+        {selectedAssetIssues.length ? (
+          <div className="action-feedback action-feedback-error project-setup-feedback project-setup-asset-issues">
+            <div>
+              <strong>{t("projectSetup.validation.assetsUnavailableTitle")}</strong>
+              <ul>
+                {selectedAssetIssues.slice(0, 5).map((issue) => (
+                  <li key={issue.assetId}>
+                    {t("projectSetup.validation.assetsUnavailableItem", {
+                      asset: issue.label,
+                      reason: issue.reason,
+                    })}
+                  </li>
+                ))}
+              </ul>
+              {selectedAssetIssues.length > 5 ? (
+                <span>{t("projectSetup.validation.assetsUnavailableMore", { count: selectedAssetIssues.length - 5 })}</span>
+              ) : null}
+            </div>
           </div>
         ) : null}
         {stagingError ? <div className="action-feedback action-feedback-error project-setup-feedback">{stagingError}</div> : null}

@@ -454,6 +454,23 @@ body.has-floating-tooltips .icon-danger-control[aria-label]::after {
   margin: 0 28px 12px;
 }
 
+.project-setup-asset-issues {
+  align-items: flex-start;
+  line-height: 1.45;
+}
+
+.project-setup-asset-issues div {
+  display: grid;
+  gap: 6px;
+}
+
+.project-setup-asset-issues ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+}
+
 .project-setup-panel,
 .project-setup-section-stack {
   display: grid;
@@ -806,8 +823,6 @@ body.has-floating-tooltips .icon-danger-control[aria-label]::after {
   display: grid;
   gap: 10px;
   min-height: 280px;
-  max-height: 360px;
-  overflow: auto;
 }
 
 .project-setup-resource-row {
