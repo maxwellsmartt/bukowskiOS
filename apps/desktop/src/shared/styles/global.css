@@ -15176,7 +15176,7 @@ input[type="number"] {
 .quote-items-row {
   display: grid;
   /* drag | description | qty | unit price | duration | tax | total | remove */
-  grid-template-columns: 28px minmax(220px, 1fr) 110px 140px 168px 140px 110px 32px;
+  grid-template-columns: 28px minmax(220px, 1fr) 110px 140px 220px 140px 110px 32px;
   gap: 8px;
   align-items: start;
 }
@@ -15188,27 +15188,40 @@ input[type="number"] {
   gap: 4px;
 }
 
-/* Compact pair: numeric multiplier + unit dropdown. When the unit is
-   "flat" the multiplier collapses to a passive "×" mark so the cell
-   reads as a flat-rate item without a wobble in grid alignment. */
+/* Duration cell — two layouts share the cell:
+   - is-flat: just the unit dropdown, full-width, no multiplier (a flat
+     rate doesn't need one).
+   - has-multiplier: [stepper] × [unit ▾]. The × is a styled separator,
+     not a typed character, so it reads as a math operator regardless
+     of the locale's label conventions.
+   The stepper's width is fixed so the dropdown always has enough room
+   for the longest label ("Tarifa plana", "Semana") without truncation. */
 .quote-items-duration {
   align-items: center;
-  display: grid;
-  gap: 6px;
-  grid-template-columns: 64px 1fr;
-}
-.quote-items-duration-value {
+  display: flex;
+  gap: 8px;
   width: 100%;
 }
-.quote-items-duration-flatmark {
+.quote-items-duration.is-flat .quote-items-duration-unit {
+  flex: 1;
+}
+.quote-items-duration.has-multiplier .quote-items-duration-value {
+  flex: 0 0 96px;
+}
+.quote-items-duration.has-multiplier .quote-items-duration-unit {
+  flex: 1;
+  min-width: 0;
+}
+.quote-items-duration-sign {
   align-items: center;
   color: var(--text-muted);
   display: inline-flex;
-  font-size: var(--font-base, 13px);
+  flex: 0 0 auto;
+  font-size: var(--font-sm, 12px);
   font-weight: 600;
   height: 32px;
   justify-content: center;
-  letter-spacing: 0.05em;
+  width: 8px;
 }
 .quote-items-duration-unit {
   -webkit-appearance: none;
@@ -15223,7 +15236,10 @@ input[type="number"] {
   font-size: var(--font-sm, 12px);
   height: 32px;
   line-height: 1;
-  padding: 0 26px 0 10px;
+  padding: 0 28px 0 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
   width: 100%;
 }
 .quote-items-duration-unit:focus {

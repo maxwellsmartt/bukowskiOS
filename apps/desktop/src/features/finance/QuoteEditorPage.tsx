@@ -1170,25 +1170,32 @@ export const QuoteEditorPage = () => {
                   step={500}
                   value={item.unitPrice}
                 />
-                <div className="quote-items-duration">
+                {/* Duration cell. Flat mode renders the unit dropdown
+                    full-width (no multiplier makes sense for a flat
+                    rate). Day/week/month/unit modes render as
+                    [stepper] × [unit ▾] so the × reads as a clear visual
+                    multiplication operator. */}
+                <div
+                  className={`quote-items-duration${isCountableDurationUnit(item.durationUnit) ? " has-multiplier" : " is-flat"}`}
+                >
                   {isCountableDurationUnit(item.durationUnit) ? (
-                    <NumberStepper
-                      ariaLabel={t("finance.quotes.editor.aria.durationValueLine", { line: index + 1 })}
-                      className="quote-items-duration-value"
-                      min={0}
-                      onChange={(next) =>
-                        updateItem(index, { durationValue: next > 0 ? next : null })
-                      }
-                      precision={2}
-                      step={1}
-                      value={item.durationValue ?? 1}
-                    />
-                  ) : (
-                    // Placeholder to keep grid alignment in flat-rate mode.
-                    <span className="quote-items-duration-flatmark" aria-hidden="true">
-                      ×
-                    </span>
-                  )}
+                    <>
+                      <NumberStepper
+                        ariaLabel={t("finance.quotes.editor.aria.durationValueLine", { line: index + 1 })}
+                        className="quote-items-duration-value"
+                        min={0}
+                        onChange={(next) =>
+                          updateItem(index, { durationValue: next > 0 ? next : null })
+                        }
+                        precision={2}
+                        step={1}
+                        value={item.durationValue ?? 1}
+                      />
+                      <span className="quote-items-duration-sign" aria-hidden="true">
+                        ×
+                      </span>
+                    </>
+                  ) : null}
                   <select
                     aria-label={t("finance.quotes.editor.aria.durationUnitLine", { line: index + 1 })}
                     className="field-input quote-items-duration-unit"

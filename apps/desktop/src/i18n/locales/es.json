@@ -1050,10 +1050,10 @@
         },
         "durationUnits": {
           "flat": "Tarifa plana",
-          "day": "× día",
-          "week": "× semana",
-          "month": "× mes",
-          "unit": "× unidad"
+          "day": "Día",
+          "week": "Semana",
+          "month": "Mes",
+          "unit": "Unidad"
         },
         "taxProfiles": {
           "film_law_exempt": "Ley de Cine (exento)",

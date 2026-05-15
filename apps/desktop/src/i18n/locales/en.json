@@ -1048,10 +1048,10 @@
         },
         "durationUnits": {
           "flat": "Flat rate",
-          "day": "× day",
-          "week": "× week",
-          "month": "× month",
-          "unit": "× unit"
+          "day": "Day",
+          "week": "Week",
+          "month": "Month",
+          "unit": "Unit"
         },
         "taxProfiles": {
           "film_law_exempt": "Film Law (exempt)",
