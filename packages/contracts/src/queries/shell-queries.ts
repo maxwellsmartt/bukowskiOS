@@ -26,6 +26,16 @@ export type ShellAppAction =
       type: "switch-workspace";
     }
   | {
+      type: "request-reload";
+      force?: boolean;
+    }
+  | {
+      type: "request-close-window";
+    }
+  | {
+      type: "request-quit";
+    }
+  | {
       type: "workspace-data-changed";
       source?: string;
       entities?: string[];
