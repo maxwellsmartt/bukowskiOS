@@ -1018,6 +1018,8 @@
           "dragLine": "Drag to reorder line {{line}}",
           "quantityLine": "Quantity for line {{line}}",
           "unitPriceLine": "Unit price for line {{line}}",
+          "durationValueLine": "Duration value for line {{line}}",
+          "durationUnitLine": "Duration unit for line {{line}}",
           "removeLine": "Remove line {{line}}"
         },
         "actions": {
@@ -1040,8 +1042,16 @@
           "description": "Description",
           "qty": "Qty",
           "unitPrice": "Unit price",
+          "duration": "Duration",
           "tax": "Tax",
           "total": "Total"
+        },
+        "durationUnits": {
+          "flat": "Flat rate",
+          "day": "× day",
+          "week": "× week",
+          "month": "× month",
+          "unit": "× unit"
         },
         "taxProfiles": {
           "film_law_exempt": "Film Law (exempt)",
@@ -1057,6 +1067,8 @@
           "included": "Tax included"
         },
         "help": {
+          "durationLabel": "Duration",
+          "duration": "How the price scales: Flat rate prices the line as quantity × unit price. Pick a unit (day / week / month / unit) and a value (e.g. 3.8) so the line totals quantity × unit price × duration value. The unit prints on the PDF (e.g. \"× 3.8 weeks\").",
           "taxBehaviorLabel": "Tax behavior",
           "taxBehavior": "How this line is taxed: Follows quote uses the quote profile. Taxable adds ITBIS to the line. Exempt has no ITBIS. Show only shows ITBIS but does not add it (Ley de Cine). Included means the price already contains ITBIS.",
           "itbisNotAddedLabel": "ITBIS not added",

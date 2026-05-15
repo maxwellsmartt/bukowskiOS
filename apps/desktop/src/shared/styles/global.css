@@ -15175,15 +15175,60 @@ input[type="number"] {
 .quote-items-header,
 .quote-items-row {
   display: grid;
-  grid-template-columns: 28px minmax(220px, 1fr) 110px 140px 140px 110px 32px;
+  /* drag | description | qty | unit price | duration | tax | total | remove */
+  grid-template-columns: 28px minmax(220px, 1fr) 110px 140px 168px 140px 110px 32px;
   gap: 8px;
   align-items: start;
 }
 
-.quote-items-header-tax {
+.quote-items-header-tax,
+.quote-items-header-duration {
   align-items: center;
   display: inline-flex;
   gap: 4px;
+}
+
+/* Compact pair: numeric multiplier + unit dropdown. When the unit is
+   "flat" the multiplier collapses to a passive "×" mark so the cell
+   reads as a flat-rate item without a wobble in grid alignment. */
+.quote-items-duration {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 64px 1fr;
+}
+.quote-items-duration-value {
+  width: 100%;
+}
+.quote-items-duration-flatmark {
+  align-items: center;
+  color: var(--text-muted);
+  display: inline-flex;
+  font-size: var(--font-base, 13px);
+  font-weight: 600;
+  height: 32px;
+  justify-content: center;
+  letter-spacing: 0.05em;
+}
+.quote-items-duration-unit {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.03)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%23a4adbb' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+  border: 1px solid var(--hairline-faint, rgba(255, 255, 255, 0.04));
+  border-radius: var(--radius-sm, 11px);
+  color: var(--text-primary);
+  font-size: var(--font-sm, 12px);
+  height: 32px;
+  line-height: 1;
+  padding: 0 26px 0 10px;
+  width: 100%;
+}
+.quote-items-duration-unit:focus {
+  border-color: var(--accent, #d6ad70);
+  outline: none;
 }
 
 .quote-items-row.is-dragging {

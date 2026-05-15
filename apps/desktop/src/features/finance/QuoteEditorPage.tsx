@@ -6,6 +6,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
   CurrencyRateSource,
   CurrencyRateType,
+  QuoteItemDurationUnit,
   QuoteItemInput,
   QuoteItemTaxBehavior,
   QuoteTaxProfile,
@@ -111,6 +112,14 @@ const emptyDraft = (baseCurrency: string, itbisRate: number): Draft => ({
 const taxBehaviorOptions: QuoteItemTaxBehavior[] = ["follows_quote", "taxable", "exempt", "show_only", "included"];
 
 const taxProfileOptions: QuoteTaxProfile[] = ["standard_itbis", "film_law_exempt", "mixed", "manual"];
+
+// Order matters: the "flat" option sits first because picking it hides
+// the duration value (the cell acts as a flat-rate item × quantity).
+const durationUnitOptions: QuoteItemDurationUnit[] = ["flat", "day", "week", "month", "unit"];
+
+/** A "duration unit" is meaningful only when it implies a multiplier. */
+const isCountableDurationUnit = (unit: QuoteItemDurationUnit | null | undefined) =>
+  unit !== null && unit !== undefined && unit !== "flat";
 
 export const QuoteEditorPage = () => {
   const { t } = useTranslation();
@@ -251,6 +260,8 @@ export const QuoteEditorPage = () => {
     t(`finance.quotes.editor.taxProfiles.${profile}`, { defaultValue: taxProfileLabel(profile) });
   const taxBehaviorLabel = (behavior: QuoteItemTaxBehavior) =>
     t(`finance.quotes.editor.taxBehaviors.${behavior}`, { defaultValue: behavior });
+  const durationUnitLabel = (unit: QuoteItemDurationUnit) =>
+    t(`finance.quotes.editor.durationUnits.${unit}`, { defaultValue: unit });
 
   // Whenever the quote currency changes (and isn't equal to base), look up the
   // most recent exchange rate so we can offer a one-click "use this rate" pill.
@@ -1040,6 +1051,13 @@ export const QuoteEditorPage = () => {
             <span>{t("finance.quotes.editor.itemColumns.description")}</span>
             <span>{t("finance.quotes.editor.itemColumns.qty")}</span>
             <span>{t("finance.quotes.editor.itemColumns.unitPrice")}</span>
+            <span className="quote-items-header-duration">
+              {t("finance.quotes.editor.itemColumns.duration")}
+              <HelpHint
+                body={t("finance.quotes.editor.help.duration")}
+                label={t("finance.quotes.editor.help.durationLabel")}
+              />
+            </span>
             <span className="quote-items-header-tax">
               {t("finance.quotes.editor.itemColumns.tax")}
               <HelpHint
@@ -1152,6 +1170,49 @@ export const QuoteEditorPage = () => {
                   step={500}
                   value={item.unitPrice}
                 />
+                <div className="quote-items-duration">
+                  {isCountableDurationUnit(item.durationUnit) ? (
+                    <NumberStepper
+                      ariaLabel={t("finance.quotes.editor.aria.durationValueLine", { line: index + 1 })}
+                      className="quote-items-duration-value"
+                      min={0}
+                      onChange={(next) =>
+                        updateItem(index, { durationValue: next > 0 ? next : null })
+                      }
+                      precision={2}
+                      step={1}
+                      value={item.durationValue ?? 1}
+                    />
+                  ) : (
+                    // Placeholder to keep grid alignment in flat-rate mode.
+                    <span className="quote-items-duration-flatmark" aria-hidden="true">
+                      ×
+                    </span>
+                  )}
+                  <select
+                    aria-label={t("finance.quotes.editor.aria.durationUnitLine", { line: index + 1 })}
+                    className="field-input quote-items-duration-unit"
+                    onChange={(e) => {
+                      const nextUnit = e.target.value as QuoteItemDurationUnit;
+                      if (nextUnit === "flat") {
+                        updateItem(index, { durationUnit: null, durationValue: null });
+                        return;
+                      }
+                      updateItem(index, {
+                        durationUnit: nextUnit,
+                        // Seed a sensible default when transitioning out of flat.
+                        durationValue: item.durationValue ?? 1,
+                      });
+                    }}
+                    value={item.durationUnit ?? "flat"}
+                  >
+                    {durationUnitOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {durationUnitLabel(opt)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <select
                   className="field-input quote-items-tax"
                   onChange={(e) =>
