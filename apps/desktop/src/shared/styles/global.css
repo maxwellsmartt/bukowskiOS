@@ -15980,30 +15980,16 @@ input[type="number"] {
   font-style: italic;
   padding: 4px 0 2px;
 }
+/* Track flows left-to-right and only grows as far as there are versions —
+   the connector line is drawn as a per-node `::before` so it never
+   over-reaches into empty space (no centered single-dot artifact). */
 .quote-versions-strip-track {
-  align-items: center;
+  align-items: flex-start;
   display: flex;
   gap: 0;
+  justify-content: flex-start;
   overflow-x: auto;
   padding: 14px 4px 6px;
-  position: relative;
-}
-.quote-versions-strip-track::before {
-  /* Continuous horizontal line behind the dots. */
-  background: linear-gradient(
-    90deg,
-    rgba(214, 173, 112, 0.05),
-    rgba(214, 173, 112, 0.35) 12%,
-    rgba(214, 173, 112, 0.35) 88%,
-    rgba(214, 173, 112, 0.05)
-  );
-  content: "";
-  height: 2px;
-  left: 12px;
-  position: absolute;
-  right: 12px;
-  top: 22px;
-  border-radius: 1px;
 }
 .quote-versions-strip-node {
   align-items: center;
@@ -16012,13 +15998,31 @@ input[type="number"] {
   color: var(--text-muted);
   cursor: pointer;
   display: flex;
-  flex: 1;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: 6px;
-  min-width: 60px;
-  padding: 0 8px;
+  min-width: 88px;
+  padding: 0 12px;
   position: relative;
-  z-index: 1;
+}
+/* Connector segment to the previous dot. Spans the full node width
+   anchored to the previous node's centre, so a single dot draws no line
+   and N dots draw N-1 segments naturally. */
+.quote-versions-strip-node:not(:first-child)::before {
+  background: linear-gradient(
+    90deg,
+    rgba(214, 173, 112, 0.18),
+    rgba(214, 173, 112, 0.4) 50%,
+    rgba(214, 173, 112, 0.18)
+  );
+  border-radius: 1px;
+  content: "";
+  height: 2px;
+  left: -50%;
+  position: absolute;
+  top: 6px; /* aligned with the dot's vertical centre (14px dot → 7px) */
+  width: 100%;
+  z-index: 0;
 }
 .quote-versions-strip-dot {
   background: var(--surface-elevated, #1a1d23);
@@ -16027,6 +16031,8 @@ input[type="number"] {
   box-shadow: 0 0 0 3px rgba(214, 173, 112, 0.12);
   height: 14px;
   width: 14px;
+  position: relative;
+  z-index: 1;
   transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
 }
 .quote-versions-strip-node:hover .quote-versions-strip-dot,
