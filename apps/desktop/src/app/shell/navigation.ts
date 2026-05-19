@@ -57,6 +57,7 @@ export const assetsSubnav: NavItem[] = [
 export const financeSubnav: NavItem[] = [
   { label: "shell.nav.finance.overview", path: "/finance", icon: BarChart3 },
   { label: "shell.nav.finance.quotes", path: "/finance/quotes", icon: FileText },
+  { label: "shell.nav.finance.invoices", path: "/finance/invoices", icon: ScrollText },
   { label: "shell.nav.finance.entries", path: "/finance/entries", icon: ScrollText },
   { label: "shell.nav.finance.reviewQueue", path: "/finance/cost-links", icon: ClipboardList },
 ];

@@ -34,6 +34,10 @@ export const CurrencySettingsCard = () => {
   const [defaultItbisRate, setDefaultItbisRate] = useState(0.18);
   const [defaultQuoteValidityDays, setDefaultQuoteValidityDays] = useState(30);
   const [sirecineNumber, setSirecineNumber] = useState("");
+  const [ncfSeriesActive, setNcfSeriesActive] = useState("");
+  const [ncfSequenceNext, setNcfSequenceNext] = useState<number | null>(null);
+  const [ncfSequenceMax, setNcfSequenceMax] = useState<number | null>(null);
+  const [ncfExpiresAt, setNcfExpiresAt] = useState("");
   const [enabled, setEnabled] = useState<string[]>(enabledCurrencyOptions);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -56,6 +60,10 @@ export const CurrencySettingsCard = () => {
     setDefaultItbisRate(settings.defaultItbisRate);
     setDefaultQuoteValidityDays(settings.defaultQuoteValidityDays);
     setSirecineNumber(settings.sirecineNumber ?? "");
+    setNcfSeriesActive(settings.ncfSeriesActive ?? "");
+    setNcfSequenceNext(settings.ncfSequenceNext);
+    setNcfSequenceMax(settings.ncfSequenceMax);
+    setNcfExpiresAt(settings.ncfExpiresAt?.slice(0, 10) ?? "");
     setEnabled(settings.enabledCurrencies);
   }, [settings]);
 
@@ -83,6 +91,10 @@ export const CurrencySettingsCard = () => {
         defaultItbisRate,
         defaultQuoteValidityDays,
         sirecineNumber: sirecineNumber.trim() || null,
+        ncfSeriesActive: ncfSeriesActive.trim().toUpperCase() || null,
+        ncfSequenceNext,
+        ncfSequenceMax,
+        ncfExpiresAt: ncfExpiresAt.trim() || null,
         workspaceLogoUrl: settings.workspaceLogoUrl,
         workspaceSealUrl: settings.workspaceSealUrl,
         workspaceSignatureUrl: settings.workspaceSignatureUrl,
@@ -328,6 +340,56 @@ export const CurrencySettingsCard = () => {
               );
             })}
           </div>
+        </label>
+      </div>
+
+      <div className="surface-card-divider" />
+
+      <div className="page-stack-row" style={{ marginBottom: 8 }}>
+        <strong>{t("settings.workspace.currencyCard.ncf.title")}</strong>
+        <small className="text-muted">{t("settings.workspace.currencyCard.ncf.subtitle")}</small>
+      </div>
+
+      <div className="agent-form-grid">
+        <label className="field-block">
+          <span className="field-label">{t("settings.workspace.currencyCard.ncf.series")}</span>
+          <input
+            className="field-input"
+            onChange={(e) => setNcfSeriesActive(e.target.value.toUpperCase())}
+            placeholder="B01"
+            value={ncfSeriesActive}
+          />
+        </label>
+        <label className="field-block">
+          <span className="field-label">{t("settings.workspace.currencyCard.ncf.next")}</span>
+          <input
+            className="field-input"
+            min={1}
+            onChange={(e) => setNcfSequenceNext(e.target.value ? Number(e.target.value) : null)}
+            placeholder="1"
+            type="number"
+            value={ncfSequenceNext ?? ""}
+          />
+        </label>
+        <label className="field-block">
+          <span className="field-label">{t("settings.workspace.currencyCard.ncf.max")}</span>
+          <input
+            className="field-input"
+            min={1}
+            onChange={(e) => setNcfSequenceMax(e.target.value ? Number(e.target.value) : null)}
+            placeholder="99999999"
+            type="number"
+            value={ncfSequenceMax ?? ""}
+          />
+        </label>
+        <label className="field-block">
+          <span className="field-label">{t("settings.workspace.currencyCard.ncf.expires")}</span>
+          <input
+            className="field-input"
+            onChange={(e) => setNcfExpiresAt(e.target.value)}
+            type="date"
+            value={ncfExpiresAt}
+          />
         </label>
       </div>
 

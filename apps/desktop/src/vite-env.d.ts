@@ -380,6 +380,33 @@ declare global {
         input: import("@contracts").RestoreQuoteFromVersionCommand,
       ) => Promise<import("@contracts").QuoteMutationResult>;
     };
+    bukowskiInvoices?: {
+      list: (filter: import("@contracts").InvoiceListFilter) => Promise<import("@contracts").InvoiceRow[]>;
+      detail: (
+        workspaceId: string,
+        invoiceId: string,
+      ) => Promise<import("@contracts").InvoiceDetail | null>;
+      create: (
+        input: import("@contracts").CreateInvoiceCommand,
+      ) => Promise<import("@contracts").InvoiceMutationResult>;
+      update: (
+        input: import("@contracts").UpdateInvoiceCommand,
+      ) => Promise<import("@contracts").InvoiceMutationResult>;
+      issue: (
+        input: import("@contracts").IssueInvoiceCommand,
+      ) => Promise<import("@contracts").InvoiceMutationResult>;
+      cancel: (
+        input: import("@contracts").CancelInvoiceCommand,
+      ) => Promise<import("@contracts").InvoiceMutationResult>;
+      recordPayment: (
+        input: import("@contracts").RecordInvoicePaymentCommand,
+      ) => Promise<import("@contracts").InvoiceMutationResult>;
+      createFromQuote: (input: {
+        workspaceId: string;
+        quoteId: string;
+        commandId: string;
+      }) => Promise<import("@contracts").InvoiceMutationResult>;
+    };
     bukowskiCatalog?: {
       getSnapshot: (query?: CatalogListQuery) => Promise<CatalogSnapshot>;
       create: (input: CreateCatalogEntityInput) => Promise<CatalogSnapshot>;

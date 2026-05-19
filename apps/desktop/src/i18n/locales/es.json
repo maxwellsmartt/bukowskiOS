@@ -33,6 +33,7 @@
       "finance": {
         "overview": "Resumen",
         "quotes": "Cotizaciones",
+        "invoices": "Facturas",
         "entries": "Movimientos",
         "reviewQueue": "Cola de revisión"
       },
@@ -626,6 +627,111 @@
   },
   "finance": {
     "title": "Finanzas",
+    "invoices": {
+      "title": "Facturas",
+      "searchPlaceholder": "Buscar por número, NCF, cliente o proyecto...",
+      "outstanding": "{{amount}} pendiente",
+      "footnote": "Las facturas en borrador se generan desde cotizaciones aprobadas. Emitir consume la secuencia NCF del workspace y congela el snapshot fiscal.",
+      "status": {
+        "draft": "Borrador",
+        "issued": "Emitida",
+        "partially_paid": "Parcialmente pagada",
+        "paid": "Pagada",
+        "cancelled": "Cancelada",
+        "void": "Anulada"
+      },
+      "summary": {
+        "totalInvoices": "Facturas",
+        "issuedOpen": "Emitidas / abiertas",
+        "totalAmount": "Total mostrado",
+        "outstanding": "Pendiente"
+      },
+      "filters": {
+        "all": "Todas",
+        "status": "Estado"
+      },
+      "columns": {
+        "invoiceNumber": "Factura #",
+        "ncf": "NCF",
+        "client": "Cliente",
+        "projectProduction": "Proyecto / Producción",
+        "issueDate": "Fecha de emisión",
+        "dueDate": "Fecha de vencimiento",
+        "total": "Total",
+        "status": "Estado",
+        "actions": "Acciones"
+      },
+      "actions": {
+        "newManual": "Factura manual",
+        "manualDeferred": "Las facturas manuales vienen después de cerrar el flujo generado desde cotizaciones.",
+        "view": "Ver factura"
+      },
+      "toasts": {
+        "issued": "Factura emitida",
+        "issueFailed": "No se pudo emitir la factura",
+        "cancelled": "Factura cancelada",
+        "cancelFailed": "No se pudo cancelar la factura",
+        "paymentRecorded": "Pago registrado",
+        "paymentFailed": "No se pudo registrar el pago",
+        "tryAgain": "Inténtalo de nuevo en un momento."
+      },
+      "detail": {
+        "back": "Volver a facturas",
+        "eyebrow": "Factura",
+        "title": "Factura {{number}}",
+        "notIssued": "Aún no emitida",
+        "client": "Cliente",
+        "document": "Contexto del documento",
+        "productionCompany": "Productora",
+        "rnc": "RNC",
+        "items": "Items",
+        "itemsBody": "{{count}} item(s) congelados en esta factura.",
+        "payments": "Pagos",
+        "paymentsBody": "{{count}} pago(s) registrados.",
+        "noPayments": "Aún no hay pagos registrados.",
+        "notFoundTitle": "Factura no encontrada",
+        "notFoundBody": "Esta factura pudo haberse eliminado localmente o todavía no está sincronizada en este equipo.",
+        "actions": {
+          "issue": "Emitir factura",
+          "cancel": "Cancelar factura",
+          "recordPayment": "Registrar pago"
+        },
+        "totals": {
+          "title": "Totales",
+          "subtotal": "Subtotal",
+          "discount": "Descuento",
+          "tax": "ITBIS",
+          "total": "Total",
+          "paid": "Pagado",
+          "outstanding": "Pendiente"
+        },
+        "recordPayment": {
+          "title": "Registrar pago",
+          "body": "Los pagos sólo se registran después de emitir la factura.",
+          "amount": "Monto",
+          "date": "Fecha de pago",
+          "method": "Método",
+          "reference": "Referencia",
+          "notes": "Notas"
+        },
+        "issueConfirm": {
+          "title": "¿Emitir esta factura?",
+          "body": "Esto consume la próxima secuencia NCF y congela el snapshot fiscal. Luego de emitida, la factura sólo puede recibir pagos o cancelarse si no tiene pagos."
+        },
+        "cancelConfirm": {
+          "title": "¿Cancelar esta factura?",
+          "body": "Las facturas canceladas permanecen en la auditoría. Usa esto sólo cuando el documento no debe continuar a cobros.",
+          "reason": "Razón"
+        }
+      },
+      "empty": {
+        "clearFilters": "Limpiar filtros",
+        "noMatchesTitle": "No hay facturas con estos filtros",
+        "noMatchesBody": "Amplía el filtro de estado o limpia la búsqueda.",
+        "noInvoicesTitle": "Aún no hay facturas",
+        "noInvoicesBody": "Aprueba una cotización y usa Generar factura para crear el primer borrador fiscal."
+      }
+    },
     "overview": {
       "title": "Finanzas",
       "unavailable": "Overview de finanzas no disponible: {{message}}",
@@ -874,6 +980,9 @@
         "exportAria": "Exportar PDF de {{number}}",
         "duplicate": "Duplicar como borrador nuevo",
         "duplicateAria": "Duplicar {{number}}",
+        "generateInvoice": "Generar factura",
+        "generateInvoiceAria": "Generar factura desde {{number}}",
+        "generateInvoiceDisabled": "Aprueba la cotización antes de generar una factura",
         "delete": "Eliminar permanentemente",
         "deleteAria": "Eliminar {{number}}",
         "deleteDisabled": "Cancela la cotización primero; las enviadas o aprobadas no se eliminan directamente"
@@ -887,6 +996,8 @@
         "duplicatedTitle": "Duplicada como {{number}}",
         "duplicatedBody": "Copiamos los items en un borrador nuevo. Ajusta y guarda cuando esté listo.",
         "duplicateFailed": "No pudimos duplicar esa cotización",
+        "invoiceCreatedTitle": "Factura {{number}} creada",
+        "invoiceCreateFailed": "No pudimos generar la factura",
         "deletedTitle": "Cotización {{number}} eliminada",
         "deletedBody": "Ya no está; no hay undo. Usa Cancelar la próxima vez si necesitas trazabilidad.",
         "deleteFailed": "No pudimos eliminar esta cotización"
@@ -1031,6 +1142,7 @@
           "removeLine": "Eliminar esta línea",
           "addLine": "Agregar línea",
           "exportPdf": "Exportar PDF",
+          "generateInvoice": "Generar factura",
           "markSent": "Marcar enviada",
           "markApproved": "Marcar aprobada",
           "markRejected": "Marcar rechazada",
@@ -2079,14 +2191,38 @@
       "asset": "Equipo de catálogo"
     },
     "entities": {
-      "location": { "singular": "ubicación", "plural": "Ubicaciones" },
-      "department": { "singular": "departamento", "plural": "Departamentos" },
-      "crew": { "singular": "miembro de crew", "plural": "Crew" },
-      "client": { "singular": "cliente", "plural": "Clientes" },
-      "production_company": { "singular": "productora", "plural": "Productoras" },
-      "manufacturer": { "singular": "fabricante", "plural": "Fabricantes" },
-      "category": { "singular": "categoría", "plural": "Categorías" },
-      "kit": { "singular": "kit", "plural": "Kits" }
+      "location": {
+        "singular": "ubicación",
+        "plural": "Ubicaciones"
+      },
+      "department": {
+        "singular": "departamento",
+        "plural": "Departamentos"
+      },
+      "crew": {
+        "singular": "miembro de crew",
+        "plural": "Crew"
+      },
+      "client": {
+        "singular": "cliente",
+        "plural": "Clientes"
+      },
+      "production_company": {
+        "singular": "productora",
+        "plural": "Productoras"
+      },
+      "manufacturer": {
+        "singular": "fabricante",
+        "plural": "Fabricantes"
+      },
+      "category": {
+        "singular": "categoría",
+        "plural": "Categorías"
+      },
+      "kit": {
+        "singular": "kit",
+        "plural": "Kits"
+      }
     },
     "fields": {
       "accountHolder": "Titular",
@@ -3095,12 +3231,30 @@
   },
   "settings": {
     "nav": {
-      "general": { "label": "General", "description": "Perfil y preferencias" },
-      "workspace": { "label": "Workspace", "description": "Configuración de la empresa" },
-      "team": { "label": "Equipo", "description": "Usuarios y accesos" },
-      "data": { "label": "Datos", "description": "Copias y exportaciones" },
-      "sync": { "label": "Sincronización", "description": "Estado en la nube" },
-      "advanced": { "label": "Avanzado", "description": "Herramientas de soporte" }
+      "general": {
+        "label": "General",
+        "description": "Perfil y preferencias"
+      },
+      "workspace": {
+        "label": "Workspace",
+        "description": "Configuración de la empresa"
+      },
+      "team": {
+        "label": "Equipo",
+        "description": "Usuarios y accesos"
+      },
+      "data": {
+        "label": "Datos",
+        "description": "Copias y exportaciones"
+      },
+      "sync": {
+        "label": "Sincronización",
+        "description": "Estado en la nube"
+      },
+      "advanced": {
+        "label": "Avanzado",
+        "description": "Herramientas de soporte"
+      }
     },
     "general": {
       "title": "General",
@@ -3356,16 +3510,46 @@
       },
       "coverageCard": "Cobertura de bajada",
       "coverage": {
-        "asset_snapshots": { "label": "Equipos", "detail": "Inventario y estado actual" },
-        "asset_categories": { "label": "Categorías", "detail": "Categorías de equipos" },
-        "locations": { "label": "Ubicaciones", "detail": "Almacenes y ubicaciones operativas" },
-        "clients": { "label": "Clientes", "detail": "Catálogo de clientes" },
-        "manufacturers": { "label": "Fabricantes", "detail": "Catálogo de fabricantes" },
-        "production_companies": { "label": "Productoras", "detail": "Catálogo de productoras" },
-        "projects": { "label": "Proyectos", "detail": "Proyectos, unidades y asignaciones de crew" },
-        "packing_slips": { "label": "Packing slips", "detail": "Slips emitidos, ítems y devoluciones" },
-        "incidents": { "label": "Incidentes", "detail": "Reportes de incidentes y evidencia" },
-        "rma_cases": { "label": "RMAs", "detail": "Casos de reparación de fabricante y equipos vinculados" }
+        "asset_snapshots": {
+          "label": "Equipos",
+          "detail": "Inventario y estado actual"
+        },
+        "asset_categories": {
+          "label": "Categorías",
+          "detail": "Categorías de equipos"
+        },
+        "locations": {
+          "label": "Ubicaciones",
+          "detail": "Almacenes y ubicaciones operativas"
+        },
+        "clients": {
+          "label": "Clientes",
+          "detail": "Catálogo de clientes"
+        },
+        "manufacturers": {
+          "label": "Fabricantes",
+          "detail": "Catálogo de fabricantes"
+        },
+        "production_companies": {
+          "label": "Productoras",
+          "detail": "Catálogo de productoras"
+        },
+        "projects": {
+          "label": "Proyectos",
+          "detail": "Proyectos, unidades y asignaciones de crew"
+        },
+        "packing_slips": {
+          "label": "Packing slips",
+          "detail": "Slips emitidos, ítems y devoluciones"
+        },
+        "incidents": {
+          "label": "Incidentes",
+          "detail": "Reportes de incidentes y evidencia"
+        },
+        "rma_cases": {
+          "label": "RMAs",
+          "detail": "Casos de reparación de fabricante y equipos vinculados"
+        }
       },
       "coverageRowsLatest": "{{count}} filas en la última bajada",
       "coverageBadge": {
@@ -3562,7 +3746,12 @@
         "empty": "Aún no hay miembros."
       },
       "invites": {
-        "column": { "email": "Correo", "role": "Rol", "invited": "Invitado el", "actions": "Acciones" },
+        "column": {
+          "email": "Correo",
+          "role": "Rol",
+          "invited": "Invitado el",
+          "actions": "Acciones"
+        },
         "pendingFallback": "Pendiente",
         "empty": "No hay invitaciones esperando. Los nuevos miembros reciben un enlace mágico por correo.",
         "emptyTable": "Sin invitaciones pendientes.",
@@ -3572,7 +3761,12 @@
       "systemActors": {
         "title": "Identidades de automatización",
         "subtitle": "Los actores del sistema auditan las acciones del asistente sin crear cuentas humanas falsas ni correos de invitación.",
-        "column": { "actor": "Actor", "type": "Tipo", "status": "Estado", "permissions": "Permisos" },
+        "column": {
+          "actor": "Actor",
+          "type": "Tipo",
+          "status": "Estado",
+          "permissions": "Permisos"
+        },
         "managedBy": "Gestionado por bukowskiOS",
         "empty": "Ejecuta la migración de actores del sistema para crear la identidad del agente en este workspace."
       },
@@ -3674,6 +3868,14 @@
         "sirecineNumber": "Número Sirecine",
         "enabledCurrencies": "Monedas habilitadas",
         "saveDefaults": "Guardar valores",
+        "ncf": {
+          "title": "Numeración fiscal (NCF)",
+          "subtitle": "Sólo se usa al emitir una factura. Los borradores no consumen secuencia.",
+          "series": "Serie activa",
+          "next": "Próxima secuencia",
+          "max": "Secuencia máxima",
+          "expires": "Fecha de vencimiento"
+        },
         "rateSources": {
           "manual": "Manual",
           "banco_popular": "Banco Popular",

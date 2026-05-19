@@ -78,6 +78,15 @@ export const createCurrencyMutationService = (db: DatabaseSync) => ({
     if (input.enabledCurrencies.length === 0) {
       throw new Error("At least one currency must be enabled.");
     }
+    if (
+      input.ncfSequenceNext !== null &&
+      input.ncfSequenceNext !== undefined &&
+      input.ncfSequenceMax !== null &&
+      input.ncfSequenceMax !== undefined &&
+      input.ncfSequenceNext > input.ncfSequenceMax
+    ) {
+      throw new Error("The next NCF sequence cannot be greater than the maximum sequence.");
+    }
 
     const now = new Date().toISOString();
     const settingsId = `currency-settings-${input.workspaceId}`;
@@ -91,8 +100,9 @@ export const createCurrencyMutationService = (db: DatabaseSync) => ({
             enabled_currencies_json, default_rate_source, default_rate_type,
             default_itbis_rate, default_quote_validity_days, sirecine_number,
             workspace_logo_url, workspace_seal_url, workspace_signature_url,
+            ncf_series_active, ncf_sequence_next, ncf_sequence_max, ncf_expires_at,
             created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(workspace_id) DO UPDATE SET
             base_currency = excluded.base_currency,
             default_quote_currency = excluded.default_quote_currency,
@@ -105,6 +115,10 @@ export const createCurrencyMutationService = (db: DatabaseSync) => ({
             workspace_logo_url = excluded.workspace_logo_url,
             workspace_seal_url = excluded.workspace_seal_url,
             workspace_signature_url = excluded.workspace_signature_url,
+            ncf_series_active = excluded.ncf_series_active,
+            ncf_sequence_next = excluded.ncf_sequence_next,
+            ncf_sequence_max = excluded.ncf_sequence_max,
+            ncf_expires_at = excluded.ncf_expires_at,
             updated_at = excluded.updated_at
         `,
       ).run(
@@ -121,6 +135,10 @@ export const createCurrencyMutationService = (db: DatabaseSync) => ({
         input.workspaceLogoUrl?.trim() || null,
         input.workspaceSealUrl?.trim() || null,
         input.workspaceSignatureUrl?.trim() || null,
+        input.ncfSeriesActive?.trim() || null,
+        input.ncfSequenceNext ?? null,
+        input.ncfSequenceMax ?? null,
+        input.ncfExpiresAt?.trim() || null,
         now,
         now,
       );
@@ -142,6 +160,10 @@ export const createCurrencyMutationService = (db: DatabaseSync) => ({
           workspaceLogoUrl: input.workspaceLogoUrl ?? null,
           workspaceSealUrl: input.workspaceSealUrl ?? null,
           workspaceSignatureUrl: input.workspaceSignatureUrl ?? null,
+          ncfSeriesActive: input.ncfSeriesActive ?? null,
+          ncfSequenceNext: input.ncfSequenceNext ?? null,
+          ncfSequenceMax: input.ncfSequenceMax ?? null,
+          ncfExpiresAt: input.ncfExpiresAt ?? null,
         },
         `sync-${input.commandId}`,
         now,

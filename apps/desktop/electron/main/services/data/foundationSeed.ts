@@ -8,6 +8,13 @@ const permissions = [
   ["perm-incidents-read", "incidents.read", "Read incidents", "View incident queues and details"],
   ["perm-incidents-create", "incidents.create", "Create incidents", "Report new incidents"],
   ["perm-finance-read", "finance.read", "Read finance shell", "View finance exposure and entries"],
+  ["perm-invoices-read", "invoices.read", "Read invoices", "View workspace invoices"],
+  ["perm-invoices-create", "invoices.create", "Create invoices", "Create invoice drafts"],
+  ["perm-invoices-edit-draft", "invoices.edit_draft", "Edit invoice drafts", "Edit invoices that are still drafts"],
+  ["perm-invoices-issue", "invoices.issue", "Issue invoices", "Issue invoices and consume NCF sequence"],
+  ["perm-invoices-cancel", "invoices.cancel", "Cancel invoices", "Cancel invoices before payment"],
+  ["perm-invoices-record-payment", "invoices.record_payment", "Record invoice payments", "Register payments against invoices"],
+  ["perm-invoices-export", "invoices.export", "Export invoices", "Generate invoice PDFs"],
 ] as const;
 
 const roles = [
@@ -603,10 +610,18 @@ export const seedFoundationData = (db: DatabaseSync) => {
         ["role-admin", "perm-incidents-read", now],
         ["role-admin", "perm-incidents-create", now],
         ["role-admin", "perm-finance-read", now],
+        ["role-admin", "perm-invoices-read", now],
+        ["role-admin", "perm-invoices-create", now],
+        ["role-admin", "perm-invoices-edit-draft", now],
+        ["role-admin", "perm-invoices-issue", now],
+        ["role-admin", "perm-invoices-cancel", now],
+        ["role-admin", "perm-invoices-record-payment", now],
+        ["role-admin", "perm-invoices-export", now],
         ["role-supervisor", "perm-assets-read", now],
         ["role-supervisor", "perm-incidents-read", now],
         ["role-supervisor", "perm-incidents-create", now],
         ["role-supervisor", "perm-finance-read", now],
+        ["role-supervisor", "perm-invoices-read", now],
       ],
     );
 

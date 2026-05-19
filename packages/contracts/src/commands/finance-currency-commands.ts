@@ -17,6 +17,18 @@ export type CurrencySettingsRow = {
   workspaceLogoUrl: string | null;
   workspaceSealUrl: string | null;
   workspaceSignatureUrl: string | null;
+  /**
+   * Dominican NCF (Número de Comprobante Fiscal) state used when issuing
+   * invoices. `ncfSeriesActive` is the prefix (e.g. "B01"); each issue
+   * consumes `ncfSequenceNext` and bumps it. `ncfSequenceMax` is the
+   * highest sequence allowed in this series (DGII allocates a range);
+   * `ncfExpiresAt` is the DGII expiry date for the series so we can warn
+   * before it lapses.
+   */
+  ncfSeriesActive: string | null;
+  ncfSequenceNext: number | null;
+  ncfSequenceMax: number | null;
+  ncfExpiresAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -53,6 +65,10 @@ export type UpsertCurrencySettingsCommand = {
   workspaceLogoUrl?: string | null;
   workspaceSealUrl?: string | null;
   workspaceSignatureUrl?: string | null;
+  ncfSeriesActive?: string | null;
+  ncfSequenceNext?: number | null;
+  ncfSequenceMax?: number | null;
+  ncfExpiresAt?: string | null;
 };
 
 export type CreateExchangeRateCommand = {

@@ -492,6 +492,41 @@ const bukowskiQuotes = {
     >,
 };
 
+const bukowskiInvoices = {
+  list: (filter: import("@contracts").InvoiceListFilter) =>
+    ipcRenderer.invoke(ipcChannels.invoices.list, filter) as Promise<
+      import("@contracts").InvoiceRow[]
+    >,
+  detail: (workspaceId: string, invoiceId: string) =>
+    ipcRenderer.invoke(ipcChannels.invoices.detail, { workspaceId, invoiceId }) as Promise<
+      import("@contracts").InvoiceDetail | null
+    >,
+  create: (input: import("@contracts").CreateInvoiceCommand) =>
+    ipcRenderer.invoke(ipcChannels.invoices.create, input) as Promise<
+      import("@contracts").InvoiceMutationResult
+    >,
+  update: (input: import("@contracts").UpdateInvoiceCommand) =>
+    ipcRenderer.invoke(ipcChannels.invoices.update, input) as Promise<
+      import("@contracts").InvoiceMutationResult
+    >,
+  issue: (input: import("@contracts").IssueInvoiceCommand) =>
+    ipcRenderer.invoke(ipcChannels.invoices.issue, input) as Promise<
+      import("@contracts").InvoiceMutationResult
+    >,
+  cancel: (input: import("@contracts").CancelInvoiceCommand) =>
+    ipcRenderer.invoke(ipcChannels.invoices.cancel, input) as Promise<
+      import("@contracts").InvoiceMutationResult
+    >,
+  recordPayment: (input: import("@contracts").RecordInvoicePaymentCommand) =>
+    ipcRenderer.invoke(ipcChannels.invoices.recordPayment, input) as Promise<
+      import("@contracts").InvoiceMutationResult
+    >,
+  createFromQuote: (input: { workspaceId: string; quoteId: string; commandId: string }) =>
+    ipcRenderer.invoke(ipcChannels.invoices.createFromQuote, input) as Promise<
+      import("@contracts").InvoiceMutationResult
+    >,
+};
+
 const bukowskiCatalog = {
   getSnapshot: (query?: CatalogListQuery) => ipcRenderer.invoke(ipcChannels.catalog.getSnapshot, query) as Promise<CatalogSnapshot>,
   create: (input: CreateCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.create, input) as Promise<CatalogSnapshot>,
@@ -567,5 +602,6 @@ contextBridge.exposeInMainWorld("bukowskiProjects", bukowskiProjects);
 contextBridge.exposeInMainWorld("bukowskiFinance", bukowskiFinance);
 contextBridge.exposeInMainWorld("bukowskiCurrency", bukowskiCurrency);
 contextBridge.exposeInMainWorld("bukowskiQuotes", bukowskiQuotes);
+contextBridge.exposeInMainWorld("bukowskiInvoices", bukowskiInvoices);
 contextBridge.exposeInMainWorld("bukowskiCatalog", bukowskiCatalog);
 contextBridge.exposeInMainWorld("bukowskiRma", bukowskiRma);

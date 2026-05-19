@@ -25,6 +25,10 @@ const fallbackSettings = (workspaceId: string): CurrencySettingsRow => ({
   workspaceLogoUrl: null,
   workspaceSealUrl: null,
   workspaceSignatureUrl: null,
+  ncfSeriesActive: null,
+  ncfSequenceNext: null,
+  ncfSequenceMax: null,
+  ncfExpiresAt: null,
   createdAt: "",
   updatedAt: "",
 });

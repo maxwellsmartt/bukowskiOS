@@ -1,4 +1,4 @@
-import { Copy, Download, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, Download, Pencil, Plus, ReceiptText, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
@@ -23,6 +23,7 @@ import {
   statusTone,
 } from "./quoteHelpers";
 import { QuoteVersionsStrip } from "./QuoteVersionsStrip";
+import { useInvoiceMutations } from "./useInvoiceData";
 import { useQuoteMutations, useQuotesList } from "./useQuoteData";
 
 const allStatuses: Array<QuoteStatus | "all"> = [
@@ -65,6 +66,7 @@ export const QuotesPage = () => {
   );
   const { data, isLoading, error, refresh } = useQuotesList(filter);
   const mutations = useQuoteMutations();
+  const invoiceMutations = useInvoiceMutations();
 
   // Status counts derived from the unfiltered set (we re-fetch with filter,
   // but for the summary tiles we want the count of *visible* matches across
@@ -112,6 +114,23 @@ export const QuotesPage = () => {
       navigate(`/finance/quotes/${result.quoteId}`);
     } catch (err) {
       toast.error(t("finance.quotes.toasts.duplicateFailed"), cleanIpcMessage(err, t("common.tryAgain")));
+    }
+  };
+
+  const handleGenerateInvoice = async (row: QuoteRow) => {
+    try {
+      const result = await invoiceMutations.createFromQuote({
+        commandId: newCommandId("inv"),
+        workspaceId: activeWorkspaceId,
+        quoteId: row.id,
+      });
+      toast.success(
+        t("finance.quotes.toasts.invoiceCreatedTitle", { number: result.invoiceNumber }),
+        result.summary,
+      );
+      navigate("/finance/invoices");
+    } catch (err) {
+      toast.error(t("finance.quotes.toasts.invoiceCreateFailed"), cleanIpcMessage(err, t("common.tryAgain")));
     }
   };
 
@@ -265,6 +284,24 @@ export const QuotesPage = () => {
               type="button"
             >
               <Copy size={13} />
+            </button>
+            <button
+              aria-label={t("finance.quotes.actions.generateInvoiceAria", { number: row.quoteNumber })}
+              className="row-icon-button"
+              disabled={row.status !== "approved"}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (row.status === "approved") void handleGenerateInvoice(row);
+              }}
+              title={
+                row.status === "approved"
+                  ? t("finance.quotes.actions.generateInvoice")
+                  : t("finance.quotes.actions.generateInvoiceDisabled")
+              }
+              type="button"
+            >
+              <ReceiptText size={13} />
             </button>
             <button
               aria-label={t("finance.quotes.actions.deleteAria", { number: row.quoteNumber })}

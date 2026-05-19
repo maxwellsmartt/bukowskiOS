@@ -934,6 +934,10 @@ export const upsertCurrencySettingsSchema = z
     workspaceLogoUrl: nullableOrOptionalText,
     workspaceSealUrl: nullableOrOptionalText,
     workspaceSignatureUrl: nullableOrOptionalText,
+    ncfSeriesActive: nullableOrOptionalText,
+    ncfSequenceNext: z.number().int().min(1).nullable().optional(),
+    ncfSequenceMax: z.number().int().min(1).nullable().optional(),
+    ncfExpiresAt: nullableOrOptionalText,
   })
   .strict();
 

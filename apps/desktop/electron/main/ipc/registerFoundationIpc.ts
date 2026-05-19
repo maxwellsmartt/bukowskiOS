@@ -1867,7 +1867,7 @@ export const registerFoundationIpc = ({
         workspaceId: filter.workspaceId,
         action: "load invoices",
         accessLevel: "read",
-        requiredPermission: "finance.read",
+        requiredPermission: "invoices.read",
       });
       return invoiceReads.listInvoices(filter);
     },
@@ -1881,7 +1881,7 @@ export const registerFoundationIpc = ({
         workspaceId: query.workspaceId,
         action: "load invoice detail",
         accessLevel: "read",
-        requiredPermission: "finance.read",
+        requiredPermission: "invoices.read",
       });
       return invoiceReads.getInvoiceDetail(query.workspaceId, query.invoiceId);
     },
@@ -1892,7 +1892,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "create invoice",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "invoices.create",
     });
     return invoiceMutations.createInvoice(input);
   });
@@ -1901,7 +1901,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "update invoice",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "invoices.edit_draft",
     });
     return invoiceMutations.updateInvoice(input);
   });
@@ -1910,7 +1910,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "issue invoice",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "invoices.issue",
     });
     return invoiceMutations.issueInvoice(input);
   });
@@ -1919,7 +1919,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "cancel invoice",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "invoices.cancel",
     });
     return invoiceMutations.cancelInvoice(input);
   });
@@ -1928,7 +1928,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "record invoice payment",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "invoices.record_payment",
     });
     return invoiceMutations.recordInvoicePayment(input);
   });
@@ -1944,7 +1944,7 @@ export const registerFoundationIpc = ({
         workspaceId: input.workspaceId,
         action: "generate invoice from quote",
         accessLevel: "write",
-        requiredPermission: "finance.read",
+        requiredPermission: "invoices.create",
       });
       const quote = quoteReads.getQuoteDetail(input.workspaceId, input.quoteId);
       if (!quote) {

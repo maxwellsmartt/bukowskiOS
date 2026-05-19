@@ -33,6 +33,7 @@
       "finance": {
         "overview": "Overview",
         "quotes": "Quotes",
+        "invoices": "Invoices",
         "entries": "Entries",
         "reviewQueue": "Review Queue"
       },
@@ -624,6 +625,111 @@
   },
   "finance": {
     "title": "Finance",
+    "invoices": {
+      "title": "Invoices",
+      "searchPlaceholder": "Search by number, NCF, client or project...",
+      "outstanding": "{{amount}} outstanding",
+      "footnote": "Draft invoices can be generated from approved quotes. Issuing consumes the workspace NCF sequence and freezes the fiscal snapshot.",
+      "status": {
+        "draft": "Draft",
+        "issued": "Issued",
+        "partially_paid": "Partially paid",
+        "paid": "Paid",
+        "cancelled": "Cancelled",
+        "void": "Void"
+      },
+      "summary": {
+        "totalInvoices": "Invoices",
+        "issuedOpen": "Issued / open",
+        "totalAmount": "Total shown",
+        "outstanding": "Outstanding"
+      },
+      "filters": {
+        "all": "All",
+        "status": "Status"
+      },
+      "columns": {
+        "invoiceNumber": "Invoice #",
+        "ncf": "NCF",
+        "client": "Client",
+        "projectProduction": "Project / Production",
+        "issueDate": "Issue date",
+        "dueDate": "Due date",
+        "total": "Total",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "actions": {
+        "newManual": "Manual invoice",
+        "manualDeferred": "Manual invoices come after quote-generated invoices are fully wired.",
+        "view": "View invoice"
+      },
+      "toasts": {
+        "issued": "Invoice issued",
+        "issueFailed": "Could not issue invoice",
+        "cancelled": "Invoice cancelled",
+        "cancelFailed": "Could not cancel invoice",
+        "paymentRecorded": "Payment recorded",
+        "paymentFailed": "Could not record payment",
+        "tryAgain": "Try again in a moment."
+      },
+      "detail": {
+        "back": "Back to invoices",
+        "eyebrow": "Invoice",
+        "title": "Invoice {{number}}",
+        "notIssued": "Not issued yet",
+        "client": "Client",
+        "document": "Document context",
+        "productionCompany": "Production company",
+        "rnc": "RNC",
+        "items": "Line items",
+        "itemsBody": "{{count}} item(s) frozen in this invoice.",
+        "payments": "Payments",
+        "paymentsBody": "{{count}} payment(s) recorded.",
+        "noPayments": "No payments recorded yet.",
+        "notFoundTitle": "Invoice not found",
+        "notFoundBody": "This invoice may have been deleted locally or may not be synced on this device yet.",
+        "actions": {
+          "issue": "Issue invoice",
+          "cancel": "Cancel invoice",
+          "recordPayment": "Record payment"
+        },
+        "totals": {
+          "title": "Totals",
+          "subtotal": "Subtotal",
+          "discount": "Discount",
+          "tax": "ITBIS",
+          "total": "Total",
+          "paid": "Paid",
+          "outstanding": "Outstanding"
+        },
+        "recordPayment": {
+          "title": "Record payment",
+          "body": "Payments are only allowed after the invoice is issued.",
+          "amount": "Amount",
+          "date": "Paid at",
+          "method": "Method",
+          "reference": "Reference",
+          "notes": "Notes"
+        },
+        "issueConfirm": {
+          "title": "Issue this invoice?",
+          "body": "This consumes the next NCF sequence and freezes the fiscal snapshot. After issuing, the invoice can only receive payments or be cancelled if no payment exists."
+        },
+        "cancelConfirm": {
+          "title": "Cancel this invoice?",
+          "body": "Cancelled invoices stay in the audit trail. Use this only when the document should not continue through collections.",
+          "reason": "Reason"
+        }
+      },
+      "empty": {
+        "clearFilters": "Clear filters",
+        "noMatchesTitle": "No invoices match these filters",
+        "noMatchesBody": "Try widening the status filter or clearing the search.",
+        "noInvoicesTitle": "No invoices yet",
+        "noInvoicesBody": "Approve a quote and use Generate invoice to create the first draft fiscal invoice."
+      }
+    },
     "overview": {
       "title": "Finance",
       "unavailable": "Finance overview unavailable: {{message}}",
@@ -872,6 +978,9 @@
         "exportAria": "Export PDF for {{number}}",
         "duplicate": "Duplicate as a new draft",
         "duplicateAria": "Duplicate {{number}}",
+        "generateInvoice": "Generate invoice",
+        "generateInvoiceAria": "Generate invoice from {{number}}",
+        "generateInvoiceDisabled": "Approve the quote before generating an invoice",
         "delete": "Delete permanently",
         "deleteAria": "Delete {{number}}",
         "deleteDisabled": "Cancel the quote first (sent or approved quotes can't be deleted directly)"
@@ -885,6 +994,8 @@
         "duplicatedTitle": "Duplicated as {{number}}",
         "duplicatedBody": "We copied the items into a fresh draft. Adjust and save when ready.",
         "duplicateFailed": "We couldn't duplicate that quote",
+        "invoiceCreatedTitle": "Invoice {{number}} created",
+        "invoiceCreateFailed": "We couldn't generate the invoice",
         "deletedTitle": "Quote {{number}} deleted",
         "deletedBody": "It's gone; there's no undo. Use Cancel instead next time if you need an audit trail.",
         "deleteFailed": "We couldn't delete this quote"
@@ -1029,6 +1140,7 @@
           "removeLine": "Remove this line",
           "addLine": "Add line",
           "exportPdf": "Export PDF",
+          "generateInvoice": "Generate invoice",
           "markSent": "Mark sent",
           "markApproved": "Mark approved",
           "markRejected": "Mark rejected",
@@ -2077,14 +2189,38 @@
       "asset": "Catalog asset"
     },
     "entities": {
-      "location": { "singular": "location", "plural": "Locations" },
-      "department": { "singular": "department", "plural": "Departments" },
-      "crew": { "singular": "crew member", "plural": "Crew" },
-      "client": { "singular": "client", "plural": "Clients" },
-      "production_company": { "singular": "production company", "plural": "Production Companies" },
-      "manufacturer": { "singular": "manufacturer", "plural": "Manufacturers" },
-      "category": { "singular": "category", "plural": "Categories" },
-      "kit": { "singular": "kit", "plural": "Kits" }
+      "location": {
+        "singular": "location",
+        "plural": "Locations"
+      },
+      "department": {
+        "singular": "department",
+        "plural": "Departments"
+      },
+      "crew": {
+        "singular": "crew member",
+        "plural": "Crew"
+      },
+      "client": {
+        "singular": "client",
+        "plural": "Clients"
+      },
+      "production_company": {
+        "singular": "production company",
+        "plural": "Production Companies"
+      },
+      "manufacturer": {
+        "singular": "manufacturer",
+        "plural": "Manufacturers"
+      },
+      "category": {
+        "singular": "category",
+        "plural": "Categories"
+      },
+      "kit": {
+        "singular": "kit",
+        "plural": "Kits"
+      }
     },
     "fields": {
       "accountHolder": "Account holder",
@@ -3093,12 +3229,30 @@
   },
   "settings": {
     "nav": {
-      "general": { "label": "General", "description": "Profile & preferences" },
-      "workspace": { "label": "Workspace", "description": "Company setup" },
-      "team": { "label": "Team", "description": "Users & access" },
-      "data": { "label": "Data", "description": "Backups & exports" },
-      "sync": { "label": "Sync", "description": "Cloud status" },
-      "advanced": { "label": "Advanced", "description": "Support tools" }
+      "general": {
+        "label": "General",
+        "description": "Profile & preferences"
+      },
+      "workspace": {
+        "label": "Workspace",
+        "description": "Company setup"
+      },
+      "team": {
+        "label": "Team",
+        "description": "Users & access"
+      },
+      "data": {
+        "label": "Data",
+        "description": "Backups & exports"
+      },
+      "sync": {
+        "label": "Sync",
+        "description": "Cloud status"
+      },
+      "advanced": {
+        "label": "Advanced",
+        "description": "Support tools"
+      }
     },
     "general": {
       "title": "General",
@@ -3354,16 +3508,46 @@
       },
       "coverageCard": "Download coverage",
       "coverage": {
-        "asset_snapshots": { "label": "Assets", "detail": "Inventory and current stock state" },
-        "asset_categories": { "label": "Categories", "detail": "Asset categories" },
-        "locations": { "label": "Locations", "detail": "Warehouses and operational locations" },
-        "clients": { "label": "Clients", "detail": "Client catalog" },
-        "manufacturers": { "label": "Manufacturers", "detail": "Manufacturer catalog" },
-        "production_companies": { "label": "Production companies", "detail": "Production company catalog" },
-        "projects": { "label": "Projects", "detail": "Project shells, units and crew assignments" },
-        "packing_slips": { "label": "Packing slips", "detail": "Issued slips, items and returns" },
-        "incidents": { "label": "Incidents", "detail": "Incident reports and evidence metadata" },
-        "rma_cases": { "label": "RMAs", "detail": "Manufacturer repair cases and linked assets" }
+        "asset_snapshots": {
+          "label": "Assets",
+          "detail": "Inventory and current stock state"
+        },
+        "asset_categories": {
+          "label": "Categories",
+          "detail": "Asset categories"
+        },
+        "locations": {
+          "label": "Locations",
+          "detail": "Warehouses and operational locations"
+        },
+        "clients": {
+          "label": "Clients",
+          "detail": "Client catalog"
+        },
+        "manufacturers": {
+          "label": "Manufacturers",
+          "detail": "Manufacturer catalog"
+        },
+        "production_companies": {
+          "label": "Production companies",
+          "detail": "Production company catalog"
+        },
+        "projects": {
+          "label": "Projects",
+          "detail": "Project shells, units and crew assignments"
+        },
+        "packing_slips": {
+          "label": "Packing slips",
+          "detail": "Issued slips, items and returns"
+        },
+        "incidents": {
+          "label": "Incidents",
+          "detail": "Incident reports and evidence metadata"
+        },
+        "rma_cases": {
+          "label": "RMAs",
+          "detail": "Manufacturer repair cases and linked assets"
+        }
       },
       "coverageRowsLatest": "{{count}} rows in latest pull",
       "coverageBadge": {
@@ -3560,7 +3744,12 @@
         "empty": "No members yet."
       },
       "invites": {
-        "column": { "email": "Email", "role": "Role", "invited": "Invited", "actions": "Actions" },
+        "column": {
+          "email": "Email",
+          "role": "Role",
+          "invited": "Invited",
+          "actions": "Actions"
+        },
         "pendingFallback": "Pending",
         "empty": "No invitations waiting. New teammates get a magic link by email.",
         "emptyTable": "No pending invites.",
@@ -3570,7 +3759,12 @@
       "systemActors": {
         "title": "Automation identities",
         "subtitle": "System actors audit assistant-driven actions without creating fake human accounts or invite emails.",
-        "column": { "actor": "Actor", "type": "Type", "status": "Status", "permissions": "Permissions" },
+        "column": {
+          "actor": "Actor",
+          "type": "Type",
+          "status": "Status",
+          "permissions": "Permissions"
+        },
         "managedBy": "Managed by bukowskiOS",
         "empty": "Run the system actors migration to create the AI Agent identity for this workspace."
       },
@@ -3672,6 +3866,14 @@
         "sirecineNumber": "Sirecine number",
         "enabledCurrencies": "Enabled currencies",
         "saveDefaults": "Save defaults",
+        "ncf": {
+          "title": "Fiscal numbering (NCF)",
+          "subtitle": "Used only when an invoice is issued. Drafts do not consume a sequence.",
+          "series": "Active series",
+          "next": "Next sequence",
+          "max": "Max sequence",
+          "expires": "Expiration date"
+        },
         "rateSources": {
           "manual": "Manual",
           "banco_popular": "Banco Popular",

@@ -35,6 +35,8 @@ const CompareView = lazyPage(() => import("@features/compare/CompareView"), "Com
 const FinanceCostLinksPage = lazyPage(() => import("@features/finance/FinanceCostLinksPage"), "FinanceCostLinksPage");
 const FinanceEntriesPage = lazyPage(() => import("@features/finance/FinanceEntriesPage"), "FinanceEntriesPage");
 const FinanceOverviewPage = lazyPage(() => import("@features/finance/FinanceOverviewPage"), "FinanceOverviewPage");
+const InvoiceDetailPage = lazyPage(() => import("@features/finance/InvoiceDetailPage"), "InvoiceDetailPage");
+const InvoicesPage = lazyPage(() => import("@features/finance/InvoicesPage"), "InvoicesPage");
 const QuotesPage = lazyPage(() => import("@features/finance/QuotesPage"), "QuotesPage");
 const QuoteEditorPage = lazyPage(() => import("@features/finance/QuoteEditorPage"), "QuoteEditorPage");
 const IncidentsPage = lazyPage(() => import("@features/incidents/IncidentsPage"), "IncidentsPage");
@@ -71,6 +73,8 @@ const routeElements = {
   "/finance": <FinanceOverviewPage />,
   "/finance/cost-links": <FinanceCostLinksPage />,
   "/finance/entries": <FinanceEntriesPage />,
+  "/finance/invoices": <InvoicesPage />,
+  "/finance/invoices/:invoiceId": <InvoiceDetailPage />,
   "/finance/quotes": <QuotesPage />,
   "/finance/quotes/new": <QuoteEditorPage />,
   "/finance/quotes/:quoteId": <QuoteEditorPage />,

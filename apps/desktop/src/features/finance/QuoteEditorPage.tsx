@@ -1,4 +1,4 @@
-import { ArrowLeft, Clock, Download, GripVertical, History, Plus, Save, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Clock, Download, GripVertical, History, Plus, ReceiptText, Save, Send, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -36,6 +36,7 @@ import {
 import { quoteTemplates, type QuoteTemplate } from "./quoteTemplates";
 import { QuoteVersionPanel } from "./QuoteVersionPanel";
 import { fetchLatestRate, useCurrencySettings } from "./useCurrencyData";
+import { useInvoiceMutations } from "./useInvoiceData";
 import { useQuoteDetail, useQuoteMutations, useQuoteVersions } from "./useQuoteData";
 import { useCatalogData } from "@features/projects/useProjectsData";
 
@@ -142,6 +143,7 @@ export const QuoteEditorPage = () => {
   );
   const { data: catalog } = useCatalogData();
   const mutations = useQuoteMutations();
+  const invoiceMutations = useInvoiceMutations();
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [isRestoringVersion, setIsRestoringVersion] = useState(false);
@@ -610,6 +612,29 @@ export const QuoteEditorPage = () => {
     } catch (err) {
       toast.error(
         t("finance.quotes.editor.toasts.statusFailed"),
+        err instanceof Error
+          ? err.message.replace(/^Error invoking remote method.*?Error:\s*/i, "")
+          : t("common.tryAgain"),
+      );
+    }
+  };
+
+  const handleGenerateInvoice = async () => {
+    if (!quoteId || existingQuote?.status !== "approved") return;
+    try {
+      const result = await invoiceMutations.createFromQuote({
+        commandId: newCommandId("inv"),
+        workspaceId: activeWorkspaceId,
+        quoteId,
+      });
+      toast.success(
+        t("finance.quotes.toasts.invoiceCreatedTitle", { number: result.invoiceNumber }),
+        result.summary,
+      );
+      navigate("/finance/invoices");
+    } catch (err) {
+      toast.error(
+        t("finance.quotes.toasts.invoiceCreateFailed"),
         err instanceof Error
           ? err.message.replace(/^Error invoking remote method.*?Error:\s*/i, "")
           : t("common.tryAgain"),
@@ -1325,6 +1350,12 @@ export const QuoteEditorPage = () => {
           <button className="ghost-control" onClick={() => void handleExportPdf()} type="button">
             <Download size={13} />
             <span>{t("finance.quotes.editor.actions.exportPdf")}</span>
+          </button>
+        ) : null}
+        {!isNew && existingQuote?.status === "approved" ? (
+          <button className="ghost-control" onClick={() => void handleGenerateInvoice()} type="button">
+            <ReceiptText size={13} />
+            <span>{t("finance.quotes.editor.actions.generateInvoice")}</span>
           </button>
         ) : null}
         {!isNew && existingQuote?.status === "draft" ? (

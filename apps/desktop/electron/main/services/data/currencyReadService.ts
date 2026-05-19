@@ -34,6 +34,16 @@ const mapSettings = (row: Record<string, unknown>): CurrencySettingsRow => ({
   workspaceLogoUrl: (row.workspace_logo_url as string | null) ?? null,
   workspaceSealUrl: (row.workspace_seal_url as string | null) ?? null,
   workspaceSignatureUrl: (row.workspace_signature_url as string | null) ?? null,
+  ncfSeriesActive: (row.ncf_series_active as string | null) ?? null,
+  ncfSequenceNext:
+    row.ncf_sequence_next === null || row.ncf_sequence_next === undefined
+      ? null
+      : Number(row.ncf_sequence_next),
+  ncfSequenceMax:
+    row.ncf_sequence_max === null || row.ncf_sequence_max === undefined
+      ? null
+      : Number(row.ncf_sequence_max),
+  ncfExpiresAt: (row.ncf_expires_at as string | null) ?? null,
   createdAt: row.created_at as string,
   updatedAt: row.updated_at as string,
 });
@@ -68,6 +78,10 @@ const DEFAULT_SETTINGS = (workspaceId: string): CurrencySettingsRow => ({
   workspaceLogoUrl: null,
   workspaceSealUrl: null,
   workspaceSignatureUrl: null,
+  ncfSeriesActive: null,
+  ncfSequenceNext: null,
+  ncfSequenceMax: null,
+  ncfExpiresAt: null,
   createdAt: "",
   updatedAt: "",
 });
