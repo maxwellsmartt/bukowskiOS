@@ -49,6 +49,7 @@ export const useInvoicesList = (filter: InvoiceListFilter) => {
   }, [
     filter.workspaceId,
     filter.status,
+    filter.sourceQuoteId,
     filter.clientId,
     filter.projectId,
     filter.dateFrom,

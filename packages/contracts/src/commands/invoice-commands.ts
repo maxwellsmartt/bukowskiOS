@@ -252,6 +252,7 @@ export type InvoiceDetail = InvoiceRow & {
 export type InvoiceListFilter = {
   workspaceId: string;
   status?: InvoiceStatus;
+  sourceQuoteId?: string;
   clientId?: string;
   projectId?: string;
   dateFrom?: string;

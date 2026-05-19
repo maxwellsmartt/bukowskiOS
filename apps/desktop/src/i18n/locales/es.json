@@ -1148,6 +1148,19 @@
           "markRejected": "Marcar rechazada",
           "createDraft": "Crear borrador"
         },
+        "invoiceHandoff": {
+          "title": "Handoff a factura",
+          "readyBody": "Esta cotización aprobada está lista para convertirse en factura fiscal. La cotización sigue siendo la fuente de verdad para correcciones hasta emitir la factura.",
+          "activeBody": "Esta cotización ya tiene una factura activa. Ábrela para emitir, cancelar o registrar pagos antes de generar un reemplazo.",
+          "replacementBody": "La factura anterior está cancelada o anulada. Puedes generar un nuevo borrador desde esta cotización aprobada.",
+          "source": "Modelo de corrección",
+          "sourceValue": "Corrige la cotización y luego genera una factura nueva",
+          "lastInvoice": "Última factura",
+          "openInvoice": "Abrir factura",
+          "generateReplacement": "Generar reemplazo",
+          "generateTooltip": "Generar un borrador de factura desde esta cotización aprobada.",
+          "generateBlocked": "Abre o cancela la factura activa antes de generar un reemplazo."
+        },
         "itbisOptions": {
           "yes": "Sí: agregar ITBIS al total",
           "no": "No: mostrar ITBIS sin sumarlo"

@@ -1295,6 +1295,7 @@ export const invoiceListQuerySchema = z
   .object({
     workspaceId: nonEmptyString,
     status: invoiceStatusSchema.optional(),
+    sourceQuoteId: optionalTrimmedString,
     clientId: optionalTrimmedString,
     projectId: optionalTrimmedString,
     dateFrom: optionalTrimmedString,

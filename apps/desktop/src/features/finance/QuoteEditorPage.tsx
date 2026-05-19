@@ -36,7 +36,7 @@ import {
 import { quoteTemplates, type QuoteTemplate } from "./quoteTemplates";
 import { QuoteVersionPanel } from "./QuoteVersionPanel";
 import { fetchLatestRate, useCurrencySettings } from "./useCurrencyData";
-import { useInvoiceMutations } from "./useInvoiceData";
+import { useInvoiceMutations, useInvoicesList } from "./useInvoiceData";
 import { useQuoteDetail, useQuoteMutations, useQuoteVersions } from "./useQuoteData";
 import { useCatalogData } from "@features/projects/useProjectsData";
 
@@ -141,6 +141,16 @@ export const QuoteEditorPage = () => {
     activeWorkspaceId,
     isNew ? null : quoteId,
   );
+  const relatedInvoiceFilter = useMemo(
+    () => ({
+      workspaceId: activeWorkspaceId,
+      sourceQuoteId: quoteId ?? "__new_quote__",
+      limit: 10,
+    }),
+    [activeWorkspaceId, quoteId],
+  );
+  const { data: relatedInvoices, isLoading: isLoadingRelatedInvoices, refresh: refreshRelatedInvoices } =
+    useInvoicesList(relatedInvoiceFilter);
   const { data: catalog } = useCatalogData();
   const mutations = useQuoteMutations();
   const invoiceMutations = useInvoiceMutations();
@@ -631,7 +641,8 @@ export const QuoteEditorPage = () => {
         t("finance.quotes.toasts.invoiceCreatedTitle", { number: result.invoiceNumber }),
         result.summary,
       );
-      navigate("/finance/invoices");
+      refreshRelatedInvoices();
+      navigate(`/finance/invoices/${result.invoiceId}`);
     } catch (err) {
       toast.error(
         t("finance.quotes.toasts.invoiceCreateFailed"),
@@ -641,6 +652,16 @@ export const QuoteEditorPage = () => {
       );
     }
   };
+
+  const activeInvoiceForQuote = relatedInvoices.find(
+    (invoice) => invoice.status !== "cancelled" && invoice.status !== "void",
+  );
+  const lastInvoiceForQuote = relatedInvoices[0] ?? null;
+  const canGenerateInvoiceFromQuote =
+    Boolean(existingQuote) &&
+    existingQuote?.status === "approved" &&
+    !isLoadingRelatedInvoices &&
+    !activeInvoiceForQuote;
 
   return (
     <div className="page-stack">
@@ -744,6 +765,79 @@ export const QuoteEditorPage = () => {
         }
         titleTone="accent"
       />
+
+      {!isNew && existingQuote?.status === "approved" ? (
+        <SurfaceCard>
+          <div className="surface-card-header">
+            <div>
+              <h3>{t("finance.quotes.editor.invoiceHandoff.title")}</h3>
+              <p>
+                {activeInvoiceForQuote
+                  ? t("finance.quotes.editor.invoiceHandoff.activeBody")
+                  : lastInvoiceForQuote
+                    ? t("finance.quotes.editor.invoiceHandoff.replacementBody")
+                    : t("finance.quotes.editor.invoiceHandoff.readyBody")}
+              </p>
+            </div>
+            <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap" }}>
+              {activeInvoiceForQuote ? (
+                <button
+                  className="ghost-control"
+                  onClick={() => navigate(`/finance/invoices/${activeInvoiceForQuote.id}`)}
+                  type="button"
+                >
+                  <ReceiptText size={13} />
+                  <span>{t("finance.quotes.editor.invoiceHandoff.openInvoice")}</span>
+                </button>
+              ) : null}
+              <button
+                className="ghost-control is-active"
+                disabled={!canGenerateInvoiceFromQuote}
+                onClick={() => void handleGenerateInvoice()}
+                title={
+                  activeInvoiceForQuote
+                    ? t("finance.quotes.editor.invoiceHandoff.generateBlocked")
+                    : t("finance.quotes.editor.invoiceHandoff.generateTooltip")
+                }
+                type="button"
+              >
+                <ReceiptText size={13} />
+                <span>
+                  {lastInvoiceForQuote
+                    ? t("finance.quotes.editor.invoiceHandoff.generateReplacement")
+                    : t("finance.quotes.editor.actions.generateInvoice")}
+                </span>
+              </button>
+            </div>
+          </div>
+          <div className="settings-mini-list">
+            <div className="settings-mini-row">
+              <span>{t("finance.quotes.editor.invoiceHandoff.source")}</span>
+              <strong>{t("finance.quotes.editor.invoiceHandoff.sourceValue")}</strong>
+            </div>
+            {activeInvoiceForQuote ? (
+              <div className="settings-mini-row">
+                <span>{activeInvoiceForQuote.invoiceNumber}</span>
+                <strong>
+                  {t(`finance.invoices.status.${activeInvoiceForQuote.status}`, {
+                    defaultValue: activeInvoiceForQuote.status,
+                  })}
+                </strong>
+              </div>
+            ) : lastInvoiceForQuote ? (
+              <div className="settings-mini-row">
+                <span>{t("finance.quotes.editor.invoiceHandoff.lastInvoice")}</span>
+                <strong>
+                  {lastInvoiceForQuote.invoiceNumber} ·{" "}
+                  {t(`finance.invoices.status.${lastInvoiceForQuote.status}`, {
+                    defaultValue: lastInvoiceForQuote.status,
+                  })}
+                </strong>
+              </div>
+            ) : null}
+          </div>
+        </SurfaceCard>
+      ) : null}
 
       {isNew ? (
         <SurfaceCard title={t("finance.quotes.editor.quickStart")} subtitle={t("finance.quotes.editor.quickStartSubtitle")}>
@@ -1353,7 +1447,17 @@ export const QuoteEditorPage = () => {
           </button>
         ) : null}
         {!isNew && existingQuote?.status === "approved" ? (
-          <button className="ghost-control" onClick={() => void handleGenerateInvoice()} type="button">
+          <button
+            className="ghost-control"
+            disabled={!canGenerateInvoiceFromQuote}
+            onClick={() => void handleGenerateInvoice()}
+            title={
+              activeInvoiceForQuote
+                ? t("finance.quotes.editor.invoiceHandoff.generateBlocked")
+                : t("finance.quotes.editor.invoiceHandoff.generateTooltip")
+            }
+            type="button"
+          >
             <ReceiptText size={13} />
             <span>{t("finance.quotes.editor.actions.generateInvoice")}</span>
           </button>

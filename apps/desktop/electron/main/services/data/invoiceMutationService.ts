@@ -837,6 +837,28 @@ export const createInvoiceMutationService = (db: DatabaseSync) => ({
       paymentTermsDays?: number;
     },
   ): InvoiceMutationResult {
+    const activeInvoice = db
+      .prepare(
+        `
+          SELECT id, invoice_number, status
+          FROM invoices
+          WHERE workspace_id = ?
+            AND source_quote_id = ?
+            AND status NOT IN ('cancelled', 'void')
+          ORDER BY created_at DESC
+          LIMIT 1
+        `,
+      )
+      .get(quote.workspaceId, quote.id) as
+      | { id: string; invoice_number: string; status: InvoiceStatus }
+      | undefined;
+
+    if (activeInvoice) {
+      throw new Error(
+        `Quote ${quote.quoteNumber} already has active invoice ${activeInvoice.invoice_number} (${activeInvoice.status}). Open or cancel that invoice before generating a replacement.`,
+      );
+    }
+
     const issueDate = options.issueDate ?? new Date().toISOString().slice(0, 10);
     return this.createInvoice({
       commandId: options.commandId,

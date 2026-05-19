@@ -128,7 +128,7 @@ export const QuotesPage = () => {
         t("finance.quotes.toasts.invoiceCreatedTitle", { number: result.invoiceNumber }),
         result.summary,
       );
-      navigate("/finance/invoices");
+      navigate(`/finance/invoices/${result.invoiceId}`);
     } catch (err) {
       toast.error(t("finance.quotes.toasts.invoiceCreateFailed"), cleanIpcMessage(err, t("common.tryAgain")));
     }

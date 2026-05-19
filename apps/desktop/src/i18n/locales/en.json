@@ -1146,6 +1146,19 @@
           "markRejected": "Mark rejected",
           "createDraft": "Create draft"
         },
+        "invoiceHandoff": {
+          "title": "Invoice handoff",
+          "readyBody": "This approved quote is ready to become a fiscal invoice. The quote remains the source of truth for corrections until the invoice is issued.",
+          "activeBody": "This quote already has an active invoice. Open it to issue, cancel or record payments before generating any replacement.",
+          "replacementBody": "The previous invoice is cancelled or void. You can generate a fresh draft from this approved quote.",
+          "source": "Correction model",
+          "sourceValue": "Correct the quote, then generate a new invoice",
+          "lastInvoice": "Last invoice",
+          "openInvoice": "Open invoice",
+          "generateReplacement": "Generate replacement",
+          "generateTooltip": "Generate a draft invoice from this approved quote.",
+          "generateBlocked": "Open or cancel the active invoice before generating a replacement."
+        },
         "itbisOptions": {
           "yes": "Yes: add ITBIS to total",
           "no": "No: show ITBIS but don't add"

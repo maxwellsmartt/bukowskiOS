@@ -125,6 +125,10 @@ export const createInvoiceReadService = (db: DatabaseSync) => ({
       clauses.push("status = ?");
       params.push(filter.status);
     }
+    if (filter.sourceQuoteId) {
+      clauses.push("source_quote_id = ?");
+      params.push(filter.sourceQuoteId);
+    }
     if (filter.clientId) {
       clauses.push("client_id = ?");
       params.push(filter.clientId);
