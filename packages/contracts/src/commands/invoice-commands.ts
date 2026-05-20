@@ -144,6 +144,15 @@ export type RecordInvoicePaymentCommand = {
   notes?: string | null;
 };
 
+export type RenumberInvoiceCommand = {
+  commandId: string;
+  workspaceId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+};
+
 export type InvoiceMutationResult = {
   commandId: string;
   invoiceId: string;

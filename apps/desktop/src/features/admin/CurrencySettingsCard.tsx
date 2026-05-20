@@ -1,12 +1,14 @@
 import { RefreshCw, Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CurrencyRateSource, CurrencyRateType } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { NumberStepper } from "@shared/components/NumberStepper";
+import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { evaluateNcfHealth } from "@features/finance/ncfHealth";
 import { newCommandId } from "@features/finance/quoteHelpers";
 import {
   refreshCurrencyRates,
@@ -66,6 +68,19 @@ export const CurrencySettingsCard = () => {
     setNcfExpiresAt(settings.ncfExpiresAt?.slice(0, 10) ?? "");
     setEnabled(settings.enabledCurrencies);
   }, [settings]);
+
+  const ncfHealth = useMemo(
+    () =>
+      evaluateNcfHealth({
+        ncfSeriesActive,
+        ncfSequenceNext,
+        ncfSequenceMax,
+        ncfExpiresAt,
+      }),
+    [ncfExpiresAt, ncfSequenceMax, ncfSequenceNext, ncfSeriesActive],
+  );
+
+  const ncfMeterWidth = `${Math.round((ncfHealth.percentRemaining ?? 0) * 100)}%`;
 
   const handleSave = async () => {
     if (!window.bukowskiCurrency || !settings) return;
@@ -348,6 +363,33 @@ export const CurrencySettingsCard = () => {
       <div className="page-stack-row" style={{ marginBottom: 8 }}>
         <strong>{t("settings.workspace.currencyCard.ncf.title")}</strong>
         <small className="text-muted">{t("settings.workspace.currencyCard.ncf.subtitle")}</small>
+      </div>
+
+      <div className={`ncf-health-card ncf-health-card-${ncfHealth.tone}`}>
+        <div className="ncf-health-main">
+          <div>
+            <div className="ncf-health-title-row">
+              <strong>{t(`settings.workspace.currencyCard.ncf.health.${ncfHealth.status}.title`)}</strong>
+              <StatusBadge tone={ncfHealth.tone}>
+                {t(`settings.workspace.currencyCard.ncf.health.status.${ncfHealth.status}`)}
+              </StatusBadge>
+            </div>
+            <p>
+              {t(`settings.workspace.currencyCard.ncf.health.${ncfHealth.status}.body`, {
+                series: ncfHealth.series ?? t("settings.workspace.currencyCard.ncf.health.noSeries"),
+                count: ncfHealth.remaining ?? 0,
+                days: ncfHealth.daysUntilExpiry ?? 0,
+              })}
+            </p>
+          </div>
+          <div className="ncf-health-stat">
+            <span>{t("settings.workspace.currencyCard.ncf.health.remaining")}</span>
+            <strong>{ncfHealth.remaining ?? "—"}</strong>
+          </div>
+        </div>
+        <div className="ncf-health-meter" aria-hidden="true">
+          <span className={`ncf-health-meter-fill ncf-health-meter-${ncfHealth.tone}`} style={{ width: ncfMeterWidth }} />
+        </div>
       </div>
 
       <div className="agent-form-grid">

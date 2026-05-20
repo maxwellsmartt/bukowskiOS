@@ -67,6 +67,7 @@ export type CreateCatalogClientInput = {
   contactName?: string;
   email?: string;
   phone?: string;
+  rnc?: string;
   notes?: string;
 };
 
@@ -76,6 +77,7 @@ export type CreateCatalogProductionCompanyInput = {
   contactName?: string;
   email?: string;
   phone?: string;
+  pur?: string;
   notes?: string;
 };
 

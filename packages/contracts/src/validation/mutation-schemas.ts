@@ -748,6 +748,7 @@ const createCatalogClientSchema = z
     contactName: optionalTrimmedString,
     email: optionalTrimmedString,
     phone: optionalTrimmedString,
+    rnc: optionalTrimmedString,
     notes: optionalTrimmedString,
   })
   .strict();
@@ -760,6 +761,7 @@ const createCatalogProductionCompanySchema = z
     contactName: optionalTrimmedString,
     email: optionalTrimmedString,
     phone: optionalTrimmedString,
+    pur: optionalTrimmedString,
     notes: optionalTrimmedString,
   })
   .strict();
@@ -1136,6 +1138,22 @@ export const restoreQuoteFromVersionSchema = z
   })
   .strict();
 
+const commercialDocumentNumberSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{1,8}$/, "Use the format YYYY-0001.");
+
+export const renumberQuoteSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    quoteId: nonEmptyString,
+    quoteNumber: commercialDocumentNumberSchema,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
 // ----------------------------------------------------------------------------
 // Invoices
 // ----------------------------------------------------------------------------
@@ -1233,6 +1251,17 @@ export const recordInvoicePaymentSchema = z
     paymentMethod: nullableOrOptionalString,
     reference: nullableOrOptionalString,
     notes: nullableOrOptionalString,
+  })
+  .strict();
+
+export const renumberInvoiceSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    invoiceId: nonEmptyString,
+    invoiceNumber: commercialDocumentNumberSchema,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
   })
   .strict();
 

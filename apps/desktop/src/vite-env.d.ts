@@ -362,6 +362,9 @@ declare global {
       delete: (
         input: import("@contracts").DuplicateQuoteCommand,
       ) => Promise<import("@contracts").QuoteMutationResult>;
+      renumber: (
+        input: import("@contracts").RenumberQuoteCommand,
+      ) => Promise<import("@contracts").QuoteMutationResult>;
       exportPdf: (workspaceId: string, quoteId: string) => Promise<AppExportResult>;
       listVersions: (
         workspaceId: string,
@@ -401,6 +404,9 @@ declare global {
       ) => Promise<import("@contracts").InvoiceMutationResult>;
       recordPayment: (
         input: import("@contracts").RecordInvoicePaymentCommand,
+      ) => Promise<import("@contracts").InvoiceMutationResult>;
+      renumber: (
+        input: import("@contracts").RenumberInvoiceCommand,
       ) => Promise<import("@contracts").InvoiceMutationResult>;
       createFromQuote: (input: {
         workspaceId: string;

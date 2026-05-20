@@ -87,6 +87,13 @@ Catalog tables `clients` (workspace-scoped) and `production_companies` got
 so editing a catalog row doesn't rewrite history. The PDF always reads from
 the snapshot.
 
+Quote Editor now watches the draft for reusable business data. If a typed
+client or production company is new — or if an existing catalog row is missing
+RNC/PUR/contact/phone — it shows a compact "New data detected" card. The user
+can save that data into Catalog without leaving the quote flow. This keeps the
+quote fast to draft while gradually building the searchable database for future
+quotes.
+
 ## Quote numbering
 
 ```sql
@@ -101,6 +108,39 @@ quote_sequence)` guarantees no collisions even if the SELECT/INSERT race.
 
 `quote_number` is rendered as `${year}-${seq.padStart(4, "0")}`, e.g.
 `2026-0001`.
+
+Commercial numbers can be corrected after creation through the explicit
+`renumberQuote` command. The command:
+
+- accepts `YYYY-0001` style input and normalizes short sequences such as
+  `2026-42` to `2026-0042`;
+- runs inside `BEGIN IMMEDIATE`;
+- rejects duplicates with the same `(workspace_id, quote_year, quote_sequence)`;
+- records a compact quote-version audit entry without rewriting quote content.
+
+Because creation always reads `MAX(quote_sequence) + 1`, a manual correction to
+a higher number also advances future quotes naturally. Invoice commercial
+numbers follow the same rule through `renumberInvoice`, but NCF/fiscal numbers
+remain separate and immutable once issued.
+
+## NCF preflight
+
+Currency Settings evaluates the active NCF series before users issue invoices:
+
+- `missing`: series, next sequence or max sequence is incomplete; issuing is
+  blocked.
+- `expired`: expiration date is before today; issuing is blocked.
+- `exhausted`: next sequence is past max sequence; issuing is blocked.
+- `low`: 10 or fewer sequences remain, or remaining stock is at or below 10%;
+  issuing is allowed with a warning.
+- `expiring`: expiration is within 30 days; issuing is allowed with a warning.
+- `ready`: configured, in date and enough sequence stock remains.
+
+`InvoiceDetailPage` shows the same state next to the NCF tile for draft
+invoices. The Issue action is disabled only for blocking states, so the user
+does not find out about fiscal setup problems after confirming the action. The
+date math uses UTC day boundaries to avoid off-by-one warnings across local
+timezones.
 
 ## PDF layout
 

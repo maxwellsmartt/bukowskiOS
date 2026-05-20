@@ -62,6 +62,8 @@ import {
   projectListReadArgsSchema,
   catalogListReadArgsSchema,
   recordInvoicePaymentSchema,
+  renumberInvoiceSchema,
+  renumberQuoteSchema,
   recordRuntimeErrorSchema,
   reportIncidentSchema,
   resolveIncidentSchema,
@@ -282,6 +284,7 @@ type RegisterFoundationIpcOptions = {
     setStatus: (input: import("@contracts").SetQuoteStatusCommand) => import("@contracts").QuoteMutationResult;
     duplicateQuote: (input: import("@contracts").DuplicateQuoteCommand) => import("@contracts").QuoteMutationResult;
     deleteQuote: (input: import("@contracts").DuplicateQuoteCommand) => import("@contracts").QuoteMutationResult;
+    renumberQuote: (input: import("@contracts").RenumberQuoteCommand) => import("@contracts").QuoteMutationResult;
     restoreQuoteFromVersion: (
       input: import("@contracts").RestoreQuoteFromVersionCommand,
     ) => import("@contracts").QuoteMutationResult;
@@ -309,6 +312,7 @@ type RegisterFoundationIpcOptions = {
     recordInvoicePayment: (
       input: import("@contracts").RecordInvoicePaymentCommand,
     ) => import("@contracts").InvoiceMutationResult;
+    renumberInvoice: (input: import("@contracts").RenumberInvoiceCommand) => import("@contracts").InvoiceMutationResult;
     createInvoiceFromQuote: (
       quote: import("@contracts").QuoteDetail,
       options: {
@@ -1839,6 +1843,15 @@ export const registerFoundationIpc = ({
     });
     return quoteMutations.deleteQuote(input);
   });
+  safeHandle(ipcChannels.quotes.renumber, renumberQuoteSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "renumber quote",
+      accessLevel: "write",
+      requiredPermission: "quotes.edit",
+    });
+    return quoteMutations.renumberQuote(input);
+  });
   safeHandleReadWithSchema(
     ipcChannels.quotes.listVersions,
     quoteVersionsReadArgsSchema,
@@ -1981,6 +1994,15 @@ export const registerFoundationIpc = ({
       requiredPermission: "invoices.record_payment",
     });
     return invoiceMutations.recordInvoicePayment(input);
+  });
+  safeHandle(ipcChannels.invoices.renumber, renumberInvoiceSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "renumber invoice",
+      accessLevel: "write",
+      requiredPermission: "invoices.edit_draft",
+    });
+    return invoiceMutations.renumberInvoice(input);
   });
   // `createFromQuote` is a convenience: the renderer passes the quote id +
   // a fresh command id, and the main process snapshots the live quote into

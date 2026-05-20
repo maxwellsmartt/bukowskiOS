@@ -7,6 +7,7 @@ import type {
   QuoteListFilter,
   QuoteMutationResult,
   QuoteRow,
+  RenumberQuoteCommand,
   RestoreQuoteFromVersionCommand,
   SetQuoteStatusCommand,
   UpdateQuoteCommand,
@@ -164,6 +165,10 @@ export const useQuoteMutations = () =>
       async deleteQuote(input: DuplicateQuoteCommand): Promise<QuoteMutationResult> {
         if (!window.bukowskiQuotes) throw new Error("Quotes bridge unavailable.");
         return window.bukowskiQuotes.delete(input);
+      },
+      async renumberQuote(input: RenumberQuoteCommand): Promise<QuoteMutationResult> {
+        if (!window.bukowskiQuotes) throw new Error("Quotes bridge unavailable.");
+        return window.bukowskiQuotes.renumber(input);
       },
       async restoreFromVersion(input: RestoreQuoteFromVersionCommand): Promise<QuoteMutationResult> {
         if (!window.bukowskiQuotes) throw new Error("Quotes bridge unavailable.");

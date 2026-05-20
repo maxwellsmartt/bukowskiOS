@@ -473,6 +473,10 @@ const bukowskiQuotes = {
     ipcRenderer.invoke(ipcChannels.quotes.delete, input) as Promise<
       import("@contracts").QuoteMutationResult
     >,
+  renumber: (input: import("@contracts").RenumberQuoteCommand) =>
+    ipcRenderer.invoke(ipcChannels.quotes.renumber, input) as Promise<
+      import("@contracts").QuoteMutationResult
+    >,
   exportPdf: (workspaceId: string, quoteId: string) =>
     ipcRenderer.invoke(ipcChannels.quotes.exportPdf, { workspaceId, quoteId }) as Promise<AppExportResult>,
   listVersions: (workspaceId: string, quoteId: string) =>
@@ -523,6 +527,10 @@ const bukowskiInvoices = {
     >,
   recordPayment: (input: import("@contracts").RecordInvoicePaymentCommand) =>
     ipcRenderer.invoke(ipcChannels.invoices.recordPayment, input) as Promise<
+      import("@contracts").InvoiceMutationResult
+    >,
+  renumber: (input: import("@contracts").RenumberInvoiceCommand) =>
+    ipcRenderer.invoke(ipcChannels.invoices.renumber, input) as Promise<
       import("@contracts").InvoiceMutationResult
     >,
   createFromQuote: (input: { workspaceId: string; quoteId: string; commandId: string }) =>

@@ -113,6 +113,15 @@ export type RestoreQuoteFromVersionCommand = {
   sourceChannel: CommandSourceChannel;
 };
 
+export type RenumberQuoteCommand = {
+  commandId: string;
+  workspaceId: string;
+  quoteId: string;
+  quoteNumber: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+};
+
 export type QuoteMutationResult = {
   commandId: string;
   quoteId: string;

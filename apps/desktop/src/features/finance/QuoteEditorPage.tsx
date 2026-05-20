@@ -38,7 +38,7 @@ import { QuoteVersionPanel } from "./QuoteVersionPanel";
 import { fetchLatestRate, useCurrencySettings } from "./useCurrencyData";
 import { useInvoiceMutations, useInvoicesList } from "./useInvoiceData";
 import { useQuoteDetail, useQuoteMutations, useQuoteVersions } from "./useQuoteData";
-import { useCatalogData } from "@features/projects/useProjectsData";
+import { createCatalogEntity, notifyCatalogChanged, updateCatalogEntity, useCatalogData } from "@features/projects/useProjectsData";
 
 type Draft = {
   quoteDate: string;
@@ -123,6 +123,11 @@ const durationUnitOptions: QuoteItemDurationUnit[] = ["flat", "day", "week", "mo
 const isCountableDurationUnit = (unit: QuoteItemDurationUnit | null | undefined) =>
   unit !== null && unit !== undefined && unit !== "flat";
 
+const cleanIpcMessage = (err: unknown, fallback: string) =>
+  err instanceof Error
+    ? err.message.replace(/^Error invoking remote method.*?Error:\s*/i, "")
+    : fallback;
+
 export const QuoteEditorPage = () => {
   const { t } = useTranslation();
   const { quoteId } = useParams<{ quoteId: string }>();
@@ -151,7 +156,13 @@ export const QuoteEditorPage = () => {
   );
   const { data: relatedInvoices, isLoading: isLoadingRelatedInvoices, refresh: refreshRelatedInvoices } =
     useInvoicesList(relatedInvoiceFilter);
-  const { data: catalog } = useCatalogData();
+  const { data: catalog } = useCatalogData({
+    workspaceId: activeWorkspaceId,
+    entityType: "client",
+    search: "",
+    sortBy: "name",
+    sortDirection: "asc",
+  });
   const mutations = useQuoteMutations();
   const invoiceMutations = useInvoiceMutations();
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
@@ -186,6 +197,9 @@ export const QuoteEditorPage = () => {
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [quoteNumberDraft, setQuoteNumberDraft] = useState("");
+  const [isRenumberingQuote, setIsRenumberingQuote] = useState(false);
+  const [savingCatalogSuggestion, setSavingCatalogSuggestion] = useState<"client" | "production_company" | null>(null);
 
   // Honour the `?version=N` deep-link once versions have loaded. Drop the
   // param after we apply it so the URL stays clean and re-opening the same
@@ -263,6 +277,10 @@ export const QuoteEditorPage = () => {
     }
   }, [isNew, currencySettings, existingQuote, draft]);
 
+  useEffect(() => {
+    setQuoteNumberDraft(existingQuote?.quoteNumber ?? "");
+  }, [existingQuote?.quoteNumber]);
+
   // Drag-and-drop reorder state — declared BEFORE any early return to keep the
   // hook order stable across renders (React enforces this).
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
@@ -336,6 +354,30 @@ export const QuoteEditorPage = () => {
       </div>
     );
   }
+
+  const normalizeCatalogKey = (value: string | null | undefined) => value?.trim().toLowerCase() ?? "";
+  const clientName = draft.clientNameSnapshot.trim();
+  const productionCompanyName = draft.productionCompanyNameSnapshot.trim();
+  const matchingClient = clientName
+    ? catalog.clients.find((client) => normalizeCatalogKey(client.name) === normalizeCatalogKey(clientName)) ?? null
+    : null;
+  const matchingProductionCompany = productionCompanyName
+    ? catalog.productionCompanies.find(
+        (company) => normalizeCatalogKey(company.name) === normalizeCatalogKey(productionCompanyName),
+      ) ?? null
+    : null;
+  const clientNeedsCapture = Boolean(
+    clientName &&
+      (!matchingClient ||
+        (draft.clientRncSnapshot.trim() && draft.clientRncSnapshot.trim() !== (matchingClient.rnc ?? "")) ||
+        (draft.attentionName.trim() && !matchingClient.contactName) ||
+        (draft.attentionPhone.trim() && !matchingClient.phone)),
+  );
+  const productionCompanyNeedsCapture = Boolean(
+    productionCompanyName &&
+      (!matchingProductionCompany ||
+        (draft.productionPurSnapshot.trim() && draft.productionPurSnapshot.trim() !== (matchingProductionCompany.pur ?? ""))),
+  );
 
   const updateDraft = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -457,6 +499,60 @@ export const QuoteEditorPage = () => {
       recentItemTitles.remember(item.title);
       recentItemDescriptions.remember(item.description ?? "");
     });
+  };
+
+  const handleSaveCatalogSuggestion = async (kind: "client" | "production_company") => {
+    if (!draft) return;
+    setSavingCatalogSuggestion(kind);
+    try {
+      if (kind === "client") {
+        const name = draft.clientNameSnapshot.trim();
+        const payload = {
+          workspaceId: activeWorkspaceId,
+          entityType: "client" as const,
+          name,
+          contactName: draft.attentionName.trim() || matchingClient?.contactName || undefined,
+          phone: draft.attentionPhone.trim() || matchingClient?.phone || undefined,
+          email: matchingClient?.email || undefined,
+          rnc: draft.clientRncSnapshot.trim() || matchingClient?.rnc || undefined,
+          notes: matchingClient?.notes || undefined,
+        };
+        if (matchingClient) {
+          await updateCatalogEntity({ ...payload, id: matchingClient.id });
+        } else {
+          await createCatalogEntity(payload);
+        }
+      } else {
+        const name = draft.productionCompanyNameSnapshot.trim();
+        const payload = {
+          workspaceId: activeWorkspaceId,
+          entityType: "production_company" as const,
+          name,
+          contactName: matchingProductionCompany?.contactName || undefined,
+          phone: matchingProductionCompany?.phone || undefined,
+          email: matchingProductionCompany?.email || undefined,
+          pur: draft.productionPurSnapshot.trim() || matchingProductionCompany?.pur || undefined,
+          notes: matchingProductionCompany?.notes || undefined,
+        };
+        if (matchingProductionCompany) {
+          await updateCatalogEntity({ ...payload, id: matchingProductionCompany.id });
+        } else {
+          await createCatalogEntity(payload);
+        }
+      }
+      notifyCatalogChanged();
+      toast.success(
+        t("finance.quotes.editor.catalogCapture.savedTitle"),
+        t(`finance.quotes.editor.catalogCapture.saved.${kind}`),
+      );
+    } catch (err) {
+      toast.error(
+        t("finance.quotes.editor.catalogCapture.saveFailed"),
+        cleanIpcMessage(err, t("common.tryAgain")),
+      );
+    } finally {
+      setSavingCatalogSuggestion(null);
+    }
   };
 
   const handleSave = async () => {
@@ -599,6 +695,35 @@ export const QuoteEditorPage = () => {
       );
     } finally {
       setIsRestoringVersion(false);
+    }
+  };
+
+  const handleRenumberQuote = async () => {
+    if (!quoteId || !existingQuote) return;
+    const nextNumber = quoteNumberDraft.trim();
+    if (!nextNumber || nextNumber === existingQuote.quoteNumber) return;
+
+    setIsRenumberingQuote(true);
+    try {
+      const result = await mutations.renumberQuote({
+        commandId: newCommandId("quote-renumber"),
+        workspaceId: activeWorkspaceId,
+        quoteId,
+        quoteNumber: nextNumber,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+      toast.success(t("finance.quotes.editor.toasts.renumberedTitle"), result.summary);
+      refresh();
+      refreshVersions();
+      refreshRelatedInvoices();
+    } catch (err) {
+      toast.error(
+        t("finance.quotes.editor.toasts.renumberFailed"),
+        cleanIpcMessage(err, t("common.tryAgain")),
+      );
+    } finally {
+      setIsRenumberingQuote(false);
     }
   };
 
@@ -765,6 +890,45 @@ export const QuoteEditorPage = () => {
         }
         titleTone="accent"
       />
+
+      {!isNew && existingQuote ? (
+        <SurfaceCard>
+          <div className="surface-card-header">
+            <div>
+              <h3>{t("finance.quotes.editor.numbering.title")}</h3>
+              <p>{t("finance.quotes.editor.numbering.body")}</p>
+            </div>
+            <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap" }}>
+              <label className="field-label" style={{ minWidth: 150 }}>
+                <span>{t("finance.quotes.editor.numbering.label")}</span>
+                <input
+                  className="field-input"
+                  onChange={(event) => setQuoteNumberDraft(event.target.value)}
+                  placeholder={t("finance.quotes.editor.numbering.placeholder")}
+                  value={quoteNumberDraft}
+                />
+              </label>
+              <button
+                className="ghost-control is-active"
+                disabled={
+                  isRenumberingQuote ||
+                  !quoteNumberDraft.trim() ||
+                  quoteNumberDraft.trim() === existingQuote.quoteNumber
+                }
+                onClick={() => void handleRenumberQuote()}
+                type="button"
+              >
+                <Save size={13} />
+                <span>
+                  {isRenumberingQuote
+                    ? t("finance.quotes.editor.numbering.saving")
+                    : t("finance.quotes.editor.numbering.save")}
+                </span>
+              </button>
+            </div>
+          </div>
+        </SurfaceCard>
+      ) : null}
 
       {!isNew && existingQuote?.status === "approved" ? (
         <SurfaceCard>
@@ -1050,6 +1214,67 @@ export const QuoteEditorPage = () => {
           </label>
         </div>
       </SurfaceCard>
+
+      {clientNeedsCapture || productionCompanyNeedsCapture ? (
+        <SurfaceCard>
+          <div className="surface-card-header">
+            <div>
+              <h3>{t("finance.quotes.editor.catalogCapture.title")}</h3>
+              <p>{t("finance.quotes.editor.catalogCapture.body")}</p>
+            </div>
+          </div>
+          <div className="settings-mini-list">
+            {clientNeedsCapture ? (
+              <div className="settings-mini-row">
+                <span>
+                  {matchingClient
+                    ? t("finance.quotes.editor.catalogCapture.updateClient", { name: clientName })
+                    : t("finance.quotes.editor.catalogCapture.createClient", { name: clientName })}
+                </span>
+                <button
+                  className="ghost-control is-active"
+                  disabled={savingCatalogSuggestion !== null}
+                  onClick={() => void handleSaveCatalogSuggestion("client")}
+                  type="button"
+                >
+                  <Plus size={13} />
+                  <span>
+                    {savingCatalogSuggestion === "client"
+                      ? t("finance.quotes.editor.catalogCapture.saving")
+                      : t("finance.quotes.editor.catalogCapture.saveClient")}
+                  </span>
+                </button>
+              </div>
+            ) : null}
+            {productionCompanyNeedsCapture ? (
+              <div className="settings-mini-row">
+                <span>
+                  {matchingProductionCompany
+                    ? t("finance.quotes.editor.catalogCapture.updateProductionCompany", {
+                        name: productionCompanyName,
+                      })
+                    : t("finance.quotes.editor.catalogCapture.createProductionCompany", {
+                        name: productionCompanyName,
+                      })}
+                </span>
+                <button
+                  className="ghost-control is-active"
+                  disabled={savingCatalogSuggestion !== null}
+                  onClick={() => void handleSaveCatalogSuggestion("production_company")}
+                  type="button"
+                >
+                  <Plus size={13} />
+                  <span>
+                    {savingCatalogSuggestion === "production_company"
+                      ? t("finance.quotes.editor.catalogCapture.saving")
+                      : t("finance.quotes.editor.catalogCapture.saveProductionCompany")}
+                  </span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </SurfaceCard>
+      ) : null}
 
       <SurfaceCard title={t("finance.quotes.editor.currencyTax")}>
         <div className="agent-form-grid">

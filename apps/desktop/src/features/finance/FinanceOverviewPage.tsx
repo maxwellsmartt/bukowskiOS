@@ -78,11 +78,16 @@ const RATE_TIMESTAMP_FORMAT: Intl.DateTimeFormatOptions = {
 };
 
 const RATE_TREND_FORMAT: Intl.DateTimeFormatOptions = {
-  hour: "numeric",
-  minute: "2-digit",
+  weekday: "short",
+  month: "short",
+  day: "numeric",
 };
 
-const minuteBucketIso = (value: number) => new Date(Math.floor(value / 60_000) * 60_000).toISOString();
+const dayBucketIso = (value: number) => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date.toISOString();
+};
 
 const nextLocalMidnightIso = () => {
   const next = new Date();
@@ -293,7 +298,8 @@ export const FinanceOverviewPage = () => {
 
   const rateTrendRows = useMemo(() => {
     const rowsByTimestamp = new Map<string, Record<string, number | string>>();
-    const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
+    const sourceMetaByDay = new Map<string, { fetchedMs: number; priority: number }>();
+    const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const trendRates = [...exchangeRates].sort((a, b) => String(a.fetchedAt ?? "").localeCompare(String(b.fetchedAt ?? "")));
     for (const rate of trendRates) {
       if (rate.rateType !== "buy" && rate.rateType !== "average" && rate.rateType !== "manual") continue;
@@ -301,18 +307,37 @@ export const FinanceOverviewPage = () => {
       if (!rate.fetchedAt) continue;
       const fetchedMs = new Date(rate.fetchedAt).getTime();
       if (Number.isNaN(fetchedMs) || fetchedMs < cutoffMs) continue;
-      const bucket = minuteBucketIso(fetchedMs);
+      const bucket = dayBucketIso(fetchedMs);
       const row = rowsByTimestamp.get(bucket) ?? {
         label: formatRateTrendTime(bucket),
         timestamp: bucket,
       };
-      if (typeof row[rate.source] !== "number" || rate.rateType === "buy") {
+      const metaKey = `${bucket}:${rate.source}`;
+      const priority = rate.rateType === "buy" ? 3 : rate.rateType === "average" ? 2 : 1;
+      const currentMeta = sourceMetaByDay.get(metaKey);
+      if (!currentMeta || priority > currentMeta.priority || (priority === currentMeta.priority && fetchedMs > currentMeta.fetchedMs)) {
         row[rate.source] = rate.rate;
+        sourceMetaByDay.set(metaKey, { fetchedMs, priority });
       }
       rowsByTimestamp.set(bucket, row);
     }
     return Array.from(rowsByTimestamp.values()).sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
   }, [exchangeRates]);
+
+  const rateTrendDeltas = useMemo(() => {
+    const deltas: Partial<Record<CurrencyRateSource, { latest: number; delta: number }>> = {};
+    exchangeRateInstitutions.forEach((institution) => {
+      const values = rateTrendRows
+        .map((row) => row[institution.source])
+        .filter((value): value is number => typeof value === "number");
+      if (values.length >= 1) {
+        const first = values[0]!;
+        const latest = values[values.length - 1]!;
+        deltas[institution.source] = { latest, delta: latest - first };
+      }
+    });
+    return deltas;
+  }, [rateTrendRows]);
 
   const rateTrendDomain = useMemo<[number, number]>(() => {
     const values = rateTrendRows.flatMap((row) =>
@@ -686,7 +711,15 @@ export const FinanceOverviewPage = () => {
               {exchangeRateInstitutions.map((institution) => (
                 <span key={institution.source}>
                   <i style={{ background: rateSourceColor(institution.source) }} />
-                  {institution.label}
+                  <strong>{institution.label}</strong>
+                  {rateTrendDeltas[institution.source] ? (
+                    <em className={rateTrendDeltas[institution.source]!.delta >= 0 ? "is-positive" : "is-negative"}>
+                      {rateTrendDeltas[institution.source]!.latest.toFixed(2)}
+                      {" · "}
+                      {rateTrendDeltas[institution.source]!.delta >= 0 ? "+" : ""}
+                      {rateTrendDeltas[institution.source]!.delta.toFixed(2)}
+                    </em>
+                  ) : null}
                 </span>
               ))}
             </div>

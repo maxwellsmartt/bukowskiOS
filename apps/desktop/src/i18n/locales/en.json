@@ -673,6 +673,8 @@
         "paymentFailed": "Could not record payment",
         "exported": "Invoice PDF exported",
         "exportFailed": "Could not export invoice PDF",
+        "renumbered": "Invoice number updated",
+        "renumberFailed": "Could not update invoice number",
         "tryAgain": "Try again in a moment."
       },
       "detail": {
@@ -680,6 +682,42 @@
         "eyebrow": "Invoice",
         "title": "Invoice {{number}}",
         "notIssued": "Not issued yet",
+        "ncfHealth": {
+          "configure": "Configure NCF",
+          "noSeries": "no series",
+          "status": {
+            "missing": "NCF pending",
+            "expired": "NCF expired",
+            "exhausted": "NCF exhausted",
+            "low": "NCF low",
+            "expiring": "NCF expiring",
+            "ready": "NCF ready"
+          },
+          "missing": {
+            "title": "Configure NCF before issuing",
+            "body": "This invoice is still a draft. To issue it, set the active series, next sequence and max sequence in Workspace."
+          },
+          "expired": {
+            "title": "NCF is expired",
+            "body": "Series {{series}} is expired. Update settings before issuing this invoice."
+          },
+          "exhausted": {
+            "title": "NCF is exhausted",
+            "body": "Series {{series}} has no available sequences. Load a new series before issuing."
+          },
+          "low": {
+            "title": "NCF low, but still usable",
+            "body": "Series {{series}} has {{count}} sequences available. You can issue this invoice."
+          },
+          "expiring": {
+            "title": "NCF expiring soon",
+            "body": "Series {{series}} expires in {{days}} days. You can issue this invoice."
+          },
+          "ready": {
+            "title": "NCF ready",
+            "body": "Series {{series}} has {{count}} sequences available for issuing."
+          }
+        },
         "client": "Client",
         "document": "Document context",
         "productionCompany": "Production company",
@@ -697,6 +735,15 @@
           "issue": "Issue invoice",
           "cancel": "Cancel invoice",
           "recordPayment": "Record payment"
+        },
+        "numbering": {
+          "title": "Commercial number",
+          "body": "Correct the visible invoice sequence without changing the fiscal NCF.",
+          "label": "Invoice #",
+          "placeholder": "2026-0001",
+          "save": "Update number",
+          "saving": "Updating...",
+          "ncfNote": "The NCF stays separate and immutable after issuing."
         },
         "totals": {
           "title": "Totals",
@@ -791,7 +838,7 @@
         "noSavedRatesNoKey": "Add bank rates in Settings → Workspace → Currency. API connectors can later update this same register automatically.",
         "rateLimitNotice": "Daily TasaReal limit reached. Showing last saved rates until {{time}}.",
         "sourceNote": "Source: tasareal.com · Last fetched {{time}} · Stored as a quote-safe snapshot.",
-        "trendTitle": "{{currency}}/DOP 24h trend"
+        "trendTitle": "{{currency}}/DOP weekly trend"
       },
       "toasts": {
         "rateLimitTitle": "Daily exchange-rate limit reached",
@@ -805,8 +852,8 @@
       },
       "empty": {
         "noTrackedSpend": "No tracked spend",
-        "noTrendTitle": "No 24h trend yet",
-        "noTrendBody": "Refresh {{currency}} rates through the day to build a local 24-hour trend from verified TasaReal snapshots.",
+        "noTrendTitle": "No weekly trend yet",
+        "noTrendBody": "Refresh {{currency}} rates across several days to build a weekly view from verified TasaReal snapshots.",
         "noExposureTitle": "No exposure yet",
         "noExposureBody": "Once incidents and reserves start landing, this chart will show which projects are carrying the most pressure."
       },
@@ -1092,6 +1139,31 @@
         "quoteNumber": "Quote {{number}}",
         "headerBodyNew": "Client, package, items, exchange rate and tax profile. The PDF stays in Spanish for Iván's clients.",
         "headerBodyExisting": "Created {{created}} · Updated {{updated}}",
+        "numbering": {
+          "title": "Quote number",
+          "body": "Adjust the commercial sequence. If an invoice is linked, its quote reference updates when it reads the quote.",
+          "label": "Quote #",
+          "placeholder": "2026-0001",
+          "save": "Update number",
+          "saving": "Updating..."
+        },
+        "catalogCapture": {
+          "title": "New data detected",
+          "body": "Save clients, production companies and fiscal details so future quotes can reuse them.",
+          "createClient": "Create client {{name}} in Catalog",
+          "updateClient": "Complete client {{name}} in Catalog",
+          "createProductionCompany": "Create production company {{name}} in Catalog",
+          "updateProductionCompany": "Complete production company {{name}} in Catalog",
+          "saveClient": "Save client",
+          "saveProductionCompany": "Save production company",
+          "saving": "Saving...",
+          "savedTitle": "Catalog updated",
+          "saved": {
+            "client": "The client is now available for future quotes.",
+            "production_company": "The production company is now available for future quotes."
+          },
+          "saveFailed": "Could not update catalog"
+        },
         "quickStart": "Quick start",
         "quickStartSubtitle": "Pick a Metadata template to pre-fill the quote, then tweak.",
         "clientProduction": "Client & production",
@@ -1225,6 +1297,8 @@
           "createdBody": "Draft saved. Export the PDF or send it when you're done.",
           "updatedTitle": "Quote updated",
           "updatedBody": "Your changes were saved as a new version.",
+          "renumberedTitle": "Number updated",
+          "renumberFailed": "Could not update number",
           "saveFailed": "We couldn't save the quote",
           "checkConnection": "Check your internet and try again.",
           "statusChangedTitle": "Quote moved to {{status}}",
@@ -3889,7 +3963,43 @@
           "series": "Active series",
           "next": "Next sequence",
           "max": "Max sequence",
-          "expires": "Expiration date"
+          "expires": "Expiration date",
+          "health": {
+            "remaining": "Available",
+            "noSeries": "no series",
+            "status": {
+              "missing": "Not configured",
+              "expired": "Expired",
+              "exhausted": "Exhausted",
+              "low": "Low",
+              "expiring": "Expiring",
+              "ready": "Ready"
+            },
+            "missing": {
+              "title": "NCF is not configured",
+              "body": "Add a series, next sequence and max sequence before issuing fiscal invoices."
+            },
+            "expired": {
+              "title": "Series {{series}} is expired",
+              "body": "Update the expiration date or load a new series before issuing."
+            },
+            "exhausted": {
+              "title": "Series {{series}} is exhausted",
+              "body": "The next sequence is past the configured maximum. Load a new series."
+            },
+            "low": {
+              "title": "NCF stock is low",
+              "body": "Series {{series}} has {{count}} sequences available. You can issue, but should prepare the next series."
+            },
+            "expiring": {
+              "title": "Series expires soon",
+              "body": "Series {{series}} expires in {{days}} days. You can issue, but should review renewal."
+            },
+            "ready": {
+              "title": "NCF ready to issue",
+              "body": "Series {{series}} has {{count}} sequences available."
+            }
+          }
         },
         "rateSources": {
           "manual": "Manual",

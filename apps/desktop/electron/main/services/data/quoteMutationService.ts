@@ -7,6 +7,7 @@ import type {
   QuoteMutationResult,
   QuoteStatus,
   QuoteVersionSnapshotV2,
+  RenumberQuoteCommand,
   RestoreQuoteFromVersionCommand,
   SetQuoteStatusCommand,
   UpdateQuoteCommand,
@@ -59,6 +60,24 @@ const enqueueOutbox = (
 };
 
 const padSequence = (seq: number) => seq.toString().padStart(4, "0");
+
+const parseCommercialNumber = (value: string) => {
+  const normalized = value.trim();
+  const match = /^(\d{4})-(\d{1,8})$/.exec(normalized);
+  if (!match) {
+    throw new Error("Document number must use the format YYYY-0001.");
+  }
+  const year = Number(match[1]);
+  const sequence = Number(match[2]);
+  if (!Number.isInteger(year) || !Number.isInteger(sequence) || sequence < 1) {
+    throw new Error("Document number must use a positive sequence.");
+  }
+  return {
+    documentNumber: `${year}-${padSequence(sequence)}`,
+    year,
+    sequence,
+  };
+};
 
 const computeValidUntil = (quoteDate: string, validityDays: number): string => {
   const base = new Date(`${quoteDate}T00:00:00Z`);
@@ -1124,6 +1143,126 @@ export const createQuoteMutationService = (db: DatabaseSync) => ({
       repeated: result.repeated,
       summary: `Restored quote to v${input.versionNumber}.`,
     };
+  },
+
+  renumberQuote(input: RenumberQuoteCommand): QuoteMutationResult {
+    const receiptHelpers = createCommandReceiptHelpers(db);
+    const existing = receiptHelpers.getExistingReceipt(input.commandId);
+    if (existing?.outcome_status === "success") {
+      const found = db
+        .prepare("SELECT id, quote_number FROM quotes WHERE workspace_id = ? AND id = ?")
+        .get(input.workspaceId, input.quoteId) as { id: string; quote_number: string } | undefined;
+      return {
+        commandId: input.commandId,
+        quoteId: found?.id ?? input.quoteId,
+        quoteNumber: found?.quote_number ?? "—",
+        repeated: true,
+        summary: "Quote number was already updated for this command.",
+      };
+    }
+    if (existing?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage("quote renumbering", existing.error_message));
+    }
+
+    const parsed = parseCommercialNumber(input.quoteNumber);
+    const now = new Date().toISOString();
+
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const current = db
+        .prepare("SELECT id, quote_number FROM quotes WHERE workspace_id = ? AND id = ?")
+        .get(input.workspaceId, input.quoteId) as { id: string; quote_number: string } | undefined;
+      if (!current) throw new Error("Quote not found.");
+
+      if (current.quote_number === parsed.documentNumber) {
+        receiptHelpers.insertReceipt.run(
+          input.commandId,
+          input.workspaceId,
+          defaultActorUserId,
+          input.actorType,
+          input.sourceChannel,
+          now,
+          "success",
+          null,
+        );
+        db.exec("COMMIT");
+
+        return {
+          commandId: input.commandId,
+          quoteId: input.quoteId,
+          quoteNumber: parsed.documentNumber,
+          repeated: false,
+          summary: `Quote ${parsed.documentNumber} already uses this number.`,
+        };
+      }
+
+      const duplicate = db
+        .prepare("SELECT id FROM quotes WHERE workspace_id = ? AND quote_year = ? AND quote_sequence = ? AND id != ?")
+        .get(input.workspaceId, parsed.year, parsed.sequence, input.quoteId) as { id: string } | undefined;
+      if (duplicate) {
+        throw new Error(`Quote number ${parsed.documentNumber} is already in use.`);
+      }
+
+      db.prepare(
+        `
+          UPDATE quotes
+          SET quote_number = ?, quote_year = ?, quote_sequence = ?, updated_by_user_id = ?, updated_at = ?
+          WHERE workspace_id = ? AND id = ?
+        `,
+      ).run(parsed.documentNumber, parsed.year, parsed.sequence, defaultActorUserId, now, input.workspaceId, input.quoteId);
+
+      const versionRow = db
+        .prepare("SELECT COALESCE(MAX(version_number), 0) AS max_version FROM quote_versions WHERE quote_id = ?")
+        .get(input.quoteId) as { max_version: number };
+      insertVersionSnapshot(
+        db,
+        input.workspaceId,
+        input.quoteId,
+        (versionRow?.max_version ?? 0) + 1,
+        {
+          schemaVersion: "renumber-v1",
+          quoteNumber: parsed.documentNumber,
+          previousQuoteNumber: current.quote_number,
+          renumberedAt: now,
+          changeType: "renumber",
+        },
+        `Renumbered from ${current.quote_number} to ${parsed.documentNumber}.`,
+        now,
+      );
+
+      receiptHelpers.insertReceipt.run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        "success",
+        null,
+      );
+      db.exec("COMMIT");
+
+      return {
+        commandId: input.commandId,
+        quoteId: input.quoteId,
+        quoteNumber: parsed.documentNumber,
+        repeated: false,
+        summary: `Quote ${current.quote_number} renumbered to ${parsed.documentNumber}.`,
+      };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      receiptHelpers.insertReceipt.run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        "failed",
+        error instanceof Error ? error.message : "Unknown quote renumbering error.",
+      );
+      throw error;
+    }
   },
 
   expireOverdueQuotes(workspaceId: string, asOf?: string): { expiredCount: number } {

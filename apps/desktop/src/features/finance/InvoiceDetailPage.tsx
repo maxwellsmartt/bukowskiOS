@@ -1,4 +1,4 @@
-import { ArrowLeft, Ban, CheckCircle2, CreditCard, Download } from "lucide-react";
+import { ArrowLeft, Ban, CheckCircle2, CreditCard, Download, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -15,6 +15,8 @@ import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useLocale } from "@shared/hooks/useLocale";
 
 import { formatCurrency, newCommandId } from "./quoteHelpers";
+import { evaluateNcfHealth } from "./ncfHealth";
+import { useCurrencySettings } from "./useCurrencyData";
 import { useInvoiceDetail, useInvoiceMutations } from "./useInvoiceData";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -39,12 +41,15 @@ export const InvoiceDetailPage = () => {
   const { invoiceId } = useParams();
   const { activeWorkspaceId } = useWorkspace();
   const { data: invoice, isLoading, error, refresh } = useInvoiceDetail(activeWorkspaceId, invoiceId);
+  const { data: currencySettings } = useCurrencySettings(activeWorkspaceId);
   const mutations = useInvoiceMutations();
 
   const [confirmIssueOpen, setConfirmIssueOpen] = useState(false);
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [invoiceNumberDraft, setInvoiceNumberDraft] = useState("");
+  const [isRenumberingInvoice, setIsRenumberingInvoice] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(today());
@@ -59,10 +64,38 @@ export const InvoiceDetailPage = () => {
     }
   }, [invoice, paymentAmount]);
 
+  useEffect(() => {
+    setInvoiceNumberDraft(invoice?.invoiceNumber ?? "");
+  }, [invoice?.invoiceNumber]);
+
   const statusLabel = (status: InvoiceStatus) =>
     t(`finance.invoices.status.${status}`, { defaultValue: status });
 
-  const canIssue = invoice?.status === "draft";
+  const ncfHealth = useMemo(
+    () =>
+      evaluateNcfHealth({
+        ncfSeriesActive: currencySettings?.ncfSeriesActive,
+        ncfSequenceNext: currencySettings?.ncfSequenceNext,
+        ncfSequenceMax: currencySettings?.ncfSequenceMax,
+        ncfExpiresAt: currencySettings?.ncfExpiresAt,
+      }),
+    [
+      currencySettings?.ncfExpiresAt,
+      currencySettings?.ncfSequenceMax,
+      currencySettings?.ncfSequenceNext,
+      currencySettings?.ncfSeriesActive,
+    ],
+  );
+  const ncfBlocksIssue = invoice?.status === "draft" && !ncfHealth.canIssue;
+  const ncfFeedbackClass =
+    ncfHealth.tone === "critical"
+      ? "action-feedback-error"
+      : ncfHealth.tone === "warning"
+        ? "action-feedback-warning"
+        : ncfHealth.tone === "success"
+          ? "action-feedback-success"
+          : "action-feedback-info";
+  const canIssue = invoice?.status === "draft" && !ncfBlocksIssue;
   const canCancel = invoice?.status === "draft" || invoice?.status === "issued";
   const canRecordPayment = invoice?.status === "issued" || invoice?.status === "partially_paid";
   const parsedPaymentAmount = Number(paymentAmount);
@@ -186,6 +219,33 @@ export const InvoiceDetailPage = () => {
     }
   };
 
+  const handleRenumberInvoice = async () => {
+    if (!invoice) return;
+    const nextNumber = invoiceNumberDraft.trim();
+    if (!nextNumber || nextNumber === invoice.invoiceNumber) return;
+
+    setIsRenumberingInvoice(true);
+    try {
+      const result = await mutations.renumberInvoice({
+        commandId: newCommandId("invoice-renumber"),
+        workspaceId: activeWorkspaceId,
+        invoiceId: invoice.id,
+        invoiceNumber: nextNumber,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+      toast.success(t("finance.invoices.toasts.renumbered"), result.summary);
+      refresh();
+    } catch (err) {
+      toast.error(
+        t("finance.invoices.toasts.renumberFailed"),
+        cleanIpcMessage(err, t("finance.invoices.toasts.tryAgain")),
+      );
+    } finally {
+      setIsRenumberingInvoice(false);
+    }
+  };
+
   if (isLoading && !invoice) {
     return (
       <div className="page-stack">
@@ -236,7 +296,13 @@ export const InvoiceDetailPage = () => {
             <Download size={13} />
             <span>{isExportingPdf ? t("finance.invoices.detail.actions.exportingPdf") : t("finance.invoices.detail.actions.exportPdf")}</span>
           </button>
-          <button className="ghost-control" disabled={!canIssue} onClick={() => setConfirmIssueOpen(true)} type="button">
+          <button
+            className="ghost-control"
+            disabled={!canIssue}
+            onClick={() => setConfirmIssueOpen(true)}
+            title={ncfBlocksIssue ? t(`finance.invoices.detail.ncfHealth.${ncfHealth.status}.title`) : undefined}
+            type="button"
+          >
             <CheckCircle2 size={13} />
             <span>{t("finance.invoices.detail.actions.issue")}</span>
           </button>
@@ -256,6 +322,11 @@ export const InvoiceDetailPage = () => {
         <SurfaceCard className="quotes-summary-tile">
           <span className="quotes-summary-tile-label">{t("finance.invoices.columns.ncf")}</span>
           <strong className="quotes-summary-tile-value">{invoice.ncf ?? t("finance.invoices.detail.notIssued")}</strong>
+          {invoice.status === "draft" ? (
+            <StatusBadge tone={ncfHealth.tone}>
+              {t(`finance.invoices.detail.ncfHealth.status.${ncfHealth.status}`)}
+            </StatusBadge>
+          ) : null}
         </SurfaceCard>
         <SurfaceCard className="quotes-summary-tile">
           <span className="quotes-summary-tile-label">{t("finance.invoices.detail.client")}</span>
@@ -274,6 +345,64 @@ export const InvoiceDetailPage = () => {
           </strong>
         </SurfaceCard>
       </div>
+
+      {invoice.status === "draft" ? (
+        <div className={`action-feedback ${ncfFeedbackClass}`}>
+          <strong>{t(`finance.invoices.detail.ncfHealth.${ncfHealth.status}.title`)}</strong>
+          <span>
+            {t(`finance.invoices.detail.ncfHealth.${ncfHealth.status}.body`, {
+              series: ncfHealth.series ?? t("finance.invoices.detail.ncfHealth.noSeries"),
+              count: ncfHealth.remaining ?? 0,
+              days: ncfHealth.daysUntilExpiry ?? 0,
+            })}
+          </span>
+          {!ncfHealth.canIssue ? (
+            <button className="ghost-control" onClick={() => navigate("/settings/workspace")} type="button">
+              {t("finance.invoices.detail.ncfHealth.configure")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <SurfaceCard>
+        <div className="surface-card-header">
+          <div>
+            <h3>{t("finance.invoices.detail.numbering.title")}</h3>
+            <p>{t("finance.invoices.detail.numbering.body")}</p>
+          </div>
+          <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap" }}>
+            <label className="field-label" style={{ minWidth: 150 }}>
+              <span>{t("finance.invoices.detail.numbering.label")}</span>
+              <input
+                className="field-input"
+                disabled={invoice.status === "void"}
+                onChange={(event) => setInvoiceNumberDraft(event.target.value)}
+                placeholder={t("finance.invoices.detail.numbering.placeholder")}
+                value={invoiceNumberDraft}
+              />
+            </label>
+            <button
+              className="ghost-control is-active"
+              disabled={
+                isRenumberingInvoice ||
+                invoice.status === "void" ||
+                !invoiceNumberDraft.trim() ||
+                invoiceNumberDraft.trim() === invoice.invoiceNumber
+              }
+              onClick={() => void handleRenumberInvoice()}
+              type="button"
+            >
+              <Save size={13} />
+              <span>
+                {isRenumberingInvoice
+                  ? t("finance.invoices.detail.numbering.saving")
+                  : t("finance.invoices.detail.numbering.save")}
+              </span>
+            </button>
+          </div>
+        </div>
+        <p className="text-muted">{t("finance.invoices.detail.numbering.ncfNote")}</p>
+      </SurfaceCard>
 
       <div className="asset-workbench-layout" style={{ alignItems: "start" }}>
         <div className="page-stack">

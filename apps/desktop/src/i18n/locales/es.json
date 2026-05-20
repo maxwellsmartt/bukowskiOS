@@ -675,6 +675,8 @@
         "paymentFailed": "No se pudo registrar el pago",
         "exported": "PDF de factura exportado",
         "exportFailed": "No se pudo exportar el PDF de factura",
+        "renumbered": "Número de factura actualizado",
+        "renumberFailed": "No se pudo actualizar el número de factura",
         "tryAgain": "Inténtalo de nuevo en un momento."
       },
       "detail": {
@@ -682,6 +684,42 @@
         "eyebrow": "Factura",
         "title": "Factura {{number}}",
         "notIssued": "Aún no emitida",
+        "ncfHealth": {
+          "configure": "Configurar NCF",
+          "noSeries": "sin serie",
+          "status": {
+            "missing": "NCF pendiente",
+            "expired": "NCF vencido",
+            "exhausted": "NCF agotado",
+            "low": "NCF bajo",
+            "expiring": "NCF por vencer",
+            "ready": "NCF listo"
+          },
+          "missing": {
+            "title": "Configura el NCF antes de emitir",
+            "body": "Esta factura está en borrador. Para emitirla necesitas serie, próxima secuencia y secuencia máxima en Workspace."
+          },
+          "expired": {
+            "title": "El NCF está vencido",
+            "body": "La serie {{series}} venció. Actualiza la configuración antes de emitir esta factura."
+          },
+          "exhausted": {
+            "title": "El NCF está agotado",
+            "body": "La serie {{series}} no tiene secuencias disponibles. Carga una nueva serie antes de emitir."
+          },
+          "low": {
+            "title": "NCF bajo, pero aún usable",
+            "body": "La serie {{series}} tiene {{count}} secuencias disponibles. Puedes emitir esta factura."
+          },
+          "expiring": {
+            "title": "NCF por vencer",
+            "body": "La serie {{series}} vence en {{days}} días. Puedes emitir esta factura."
+          },
+          "ready": {
+            "title": "NCF listo",
+            "body": "La serie {{series}} tiene {{count}} secuencias disponibles para emitir."
+          }
+        },
         "client": "Cliente",
         "document": "Contexto del documento",
         "productionCompany": "Productora",
@@ -699,6 +737,15 @@
           "issue": "Emitir factura",
           "cancel": "Cancelar factura",
           "recordPayment": "Registrar pago"
+        },
+        "numbering": {
+          "title": "Número comercial",
+          "body": "Corrige la secuencia visible de la factura sin tocar el NCF fiscal.",
+          "label": "Factura #",
+          "placeholder": "2026-0001",
+          "save": "Actualizar número",
+          "saving": "Actualizando...",
+          "ncfNote": "El NCF permanece separado e inmutable después de emitir."
         },
         "totals": {
           "title": "Totales",
@@ -793,7 +840,7 @@
         "noSavedRatesNoKey": "Agrega tasas bancarias en Settings → Workspace → Moneda. Los conectores API podrán actualizar este mismo registro automáticamente.",
         "rateLimitNotice": "Límite diario de TasaReal alcanzado. Mostrando las últimas tasas guardadas hasta {{time}}.",
         "sourceNote": "Fuente: tasareal.com · Última consulta {{time}} · Guardada como snapshot seguro para cotizaciones.",
-        "trendTitle": "Tendencia 24h {{currency}}/DOP"
+        "trendTitle": "Tendencia semanal {{currency}}/DOP"
       },
       "toasts": {
         "rateLimitTitle": "Límite diario de tasas alcanzado",
@@ -807,8 +854,8 @@
       },
       "empty": {
         "noTrackedSpend": "Sin gasto registrado",
-        "noTrendTitle": "Sin tendencia de 24h todavía",
-        "noTrendBody": "Actualiza tasas {{currency}} durante el día para construir una tendencia local de 24 horas desde snapshots verificados de TasaReal.",
+        "noTrendTitle": "Sin tendencia semanal todavía",
+        "noTrendBody": "Actualiza tasas {{currency}} durante varios días para construir una lectura semanal desde snapshots verificados de TasaReal.",
         "noExposureTitle": "Sin exposición todavía",
         "noExposureBody": "Cuando empiecen a llegar incidentes y reservas, este gráfico mostrará qué proyectos cargan más presión."
       },
@@ -1094,6 +1141,31 @@
         "quoteNumber": "Cotización {{number}}",
         "headerBodyNew": "Cliente, paquete, items, tasa de cambio y perfil fiscal. El PDF se mantiene en español para los clientes de Iván.",
         "headerBodyExisting": "Creada {{created}} · Actualizada {{updated}}",
+        "numbering": {
+          "title": "Número de cotización",
+          "body": "Ajusta la secuencia comercial. Si existe una factura vinculada, la referencia se actualiza al leer la cotización.",
+          "label": "Cotización #",
+          "placeholder": "2026-0001",
+          "save": "Actualizar número",
+          "saving": "Actualizando..."
+        },
+        "catalogCapture": {
+          "title": "Datos nuevos detectados",
+          "body": "Guarda clientes, productoras y datos fiscales para reutilizarlos en próximas cotizaciones.",
+          "createClient": "Crear cliente {{name}} en Catálogo",
+          "updateClient": "Completar cliente {{name}} en Catálogo",
+          "createProductionCompany": "Crear productora {{name}} en Catálogo",
+          "updateProductionCompany": "Completar productora {{name}} en Catálogo",
+          "saveClient": "Guardar cliente",
+          "saveProductionCompany": "Guardar productora",
+          "saving": "Guardando...",
+          "savedTitle": "Catálogo actualizado",
+          "saved": {
+            "client": "El cliente quedó disponible para próximas cotizaciones.",
+            "production_company": "La productora quedó disponible para próximas cotizaciones."
+          },
+          "saveFailed": "No se pudo actualizar el catálogo"
+        },
         "quickStart": "Inicio rápido",
         "quickStartSubtitle": "Elige un template de Metadata para prellenar la cotización y luego ajustarla.",
         "clientProduction": "Cliente y producción",
@@ -1227,6 +1299,8 @@
           "createdBody": "Borrador guardado. Exporta el PDF o envíalo cuando esté listo.",
           "updatedTitle": "Cotización actualizada",
           "updatedBody": "Tus cambios se guardaron como una nueva versión.",
+          "renumberedTitle": "Número actualizado",
+          "renumberFailed": "No se pudo actualizar el número",
           "saveFailed": "No pudimos guardar la cotización",
           "checkConnection": "Revisa tu conexión e inténtalo otra vez.",
           "statusChangedTitle": "Cotización movida a {{status}}",
@@ -3891,7 +3965,43 @@
           "series": "Serie activa",
           "next": "Próxima secuencia",
           "max": "Secuencia máxima",
-          "expires": "Fecha de vencimiento"
+          "expires": "Fecha de vencimiento",
+          "health": {
+            "remaining": "Disponibles",
+            "noSeries": "sin serie",
+            "status": {
+              "missing": "Sin configurar",
+              "expired": "Vencido",
+              "exhausted": "Agotado",
+              "low": "Bajo",
+              "expiring": "Por vencer",
+              "ready": "Listo"
+            },
+            "missing": {
+              "title": "NCF sin configurar",
+              "body": "Agrega serie, próxima secuencia y secuencia máxima antes de emitir facturas fiscales."
+            },
+            "expired": {
+              "title": "La serie {{series}} está vencida",
+              "body": "Actualiza la fecha de vencimiento o carga una nueva serie antes de emitir."
+            },
+            "exhausted": {
+              "title": "La serie {{series}} está agotada",
+              "body": "La próxima secuencia supera el máximo configurado. Carga una nueva serie."
+            },
+            "low": {
+              "title": "Quedan pocos NCF",
+              "body": "La serie {{series}} tiene {{count}} secuencias disponibles. Puedes emitir, pero conviene preparar la próxima serie."
+            },
+            "expiring": {
+              "title": "La serie vence pronto",
+              "body": "La serie {{series}} vence en {{days}} días. Puedes emitir, pero conviene revisar la renovación."
+            },
+            "ready": {
+              "title": "NCF listo para emitir",
+              "body": "La serie {{series}} tiene {{count}} secuencias disponibles."
+            }
+          }
         },
         "rateSources": {
           "manual": "Manual",

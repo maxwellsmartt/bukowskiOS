@@ -16,6 +16,7 @@ describe("catalog mutation service", () => {
       contactName: "Ops Desk",
       email: "ops@hbo.test",
       phone: "+1 809 555 2020",
+      rnc: "1-30-20200-1",
       notes: "Created from catalog test.",
     });
 
@@ -43,6 +44,7 @@ describe("catalog mutation service", () => {
     const createdKit = snapshot.kits.find((kit) => kit.code === "MONKIT");
 
     expect(createdClient?.contactName).toBe("Ops Desk");
+    expect(createdClient?.rnc).toBe("1-30-20200-1");
     expect(createdCategory?.name).toBe("Batteries");
     expect(createdKit?.assetCount).toBe(2);
     expect(createdKit?.primaryCodeValue.startsWith("KIT-MONKIT")).toBe(true);
@@ -55,11 +57,13 @@ describe("catalog mutation service", () => {
       contactName: "Operations",
       email: "operations@hbo.test",
       phone: "+1 809 555 3030",
+      rnc: "1-30-30300-1",
       notes: "Renamed from test.",
     });
 
     snapshot = reads.getCatalogSnapshot();
     expect(snapshot.clients.find((client) => client.id === createdClient!.id)?.name).toBe("HBO LatAm");
+    expect(snapshot.clients.find((client) => client.id === createdClient!.id)?.rnc).toBe("1-30-30300-1");
 
     expect(() =>
       mutations.deleteEntity({

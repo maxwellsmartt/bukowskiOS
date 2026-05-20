@@ -4676,6 +4676,102 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   color: var(--accent-info);
 }
 
+.ncf-health-card {
+  display: grid;
+  gap: 12px;
+  margin: 10px 0 16px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(16, 18, 20, 0.72);
+}
+
+.ncf-health-card-success {
+  border-color: rgba(96, 168, 117, 0.22);
+}
+
+.ncf-health-card-warning {
+  border-color: rgba(201, 156, 84, 0.26);
+}
+
+.ncf-health-card-critical {
+  border-color: rgba(168, 72, 68, 0.28);
+}
+
+.ncf-health-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+}
+
+.ncf-health-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ncf-health-card p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ncf-health-stat {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  min-width: 82px;
+}
+
+.ncf-health-stat span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ncf-health-stat strong {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.ncf-health-meter {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ncf-health-meter-fill {
+  display: block;
+  min-width: 0;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 160ms ease;
+}
+
+.ncf-health-meter-success {
+  background: var(--accent-success);
+}
+
+.ncf-health-meter-warning {
+  background: var(--accent-warning);
+}
+
+.ncf-health-meter-critical {
+  background: var(--accent-critical);
+}
+
+.ncf-health-meter-neutral {
+  background: rgba(255, 255, 255, 0.24);
+}
+
 .action-panel-actions {
   display: flex;
   align-items: center;
@@ -5116,8 +5212,33 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
   color: var(--text-secondary);
   font-size: 11px;
+}
+
+.finance-fx-trend-legend strong {
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.finance-fx-trend-legend em {
+  color: var(--text-secondary);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.finance-fx-trend-legend em.is-positive {
+  color: var(--accent-success);
+}
+
+.finance-fx-trend-legend em.is-negative {
+  color: var(--accent-danger);
 }
 
 .finance-fx-trend-legend i {

@@ -450,9 +450,9 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             db.prepare(
               `
                 INSERT INTO clients (
-                  id, workspace_id, name, contact_name, email, phone, notes, is_active, created_at, updated_at
+                  id, workspace_id, name, contact_name, email, phone, rnc, notes, is_active, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
               `,
             ).run(
               `client-${slugify(name)}-${Date.now().toString(36)}`,
@@ -461,6 +461,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               optionalValue(input.contactName),
               optionalValue(input.email),
               optionalValue(input.phone),
+              optionalValue(input.rnc),
               optionalValue(input.notes),
               now,
               now,
@@ -475,9 +476,9 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             db.prepare(
               `
                 INSERT INTO production_companies (
-                  id, workspace_id, name, contact_name, email, phone, notes, is_active, created_at, updated_at
+                  id, workspace_id, name, contact_name, email, phone, pur, notes, is_active, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
               `,
             ).run(
               `production-company-${slugify(name)}-${Date.now().toString(36)}`,
@@ -486,6 +487,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               optionalValue(input.contactName),
               optionalValue(input.email),
               optionalValue(input.phone),
+              optionalValue(input.pur),
               optionalValue(input.notes),
               now,
               now,
@@ -662,7 +664,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const result = db.prepare(
               `
                 UPDATE clients
-                SET name = ?, contact_name = ?, email = ?, phone = ?, notes = ?, updated_at = ?
+                SET name = ?, contact_name = ?, email = ?, phone = ?, rnc = ?, notes = ?, updated_at = ?
                 WHERE id = ? AND workspace_id = ?
               `,
             ).run(
@@ -670,6 +672,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               optionalValue(input.contactName),
               optionalValue(input.email),
               optionalValue(input.phone),
+              optionalValue(input.rnc),
               optionalValue(input.notes),
               now,
               input.id,
@@ -689,7 +692,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const result = db.prepare(
               `
                 UPDATE production_companies
-                SET name = ?, contact_name = ?, email = ?, phone = ?, notes = ?, updated_at = ?
+                SET name = ?, contact_name = ?, email = ?, phone = ?, pur = ?, notes = ?, updated_at = ?
                 WHERE id = ? AND workspace_id = ?
               `,
             ).run(
@@ -697,6 +700,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               optionalValue(input.contactName),
               optionalValue(input.email),
               optionalValue(input.phone),
+              optionalValue(input.pur),
               optionalValue(input.notes),
               now,
               input.id,

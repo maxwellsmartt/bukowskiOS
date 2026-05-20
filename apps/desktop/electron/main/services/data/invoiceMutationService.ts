@@ -9,6 +9,7 @@ import type {
   IssueInvoiceCommand,
   QuoteDetail,
   RecordInvoicePaymentCommand,
+  RenumberInvoiceCommand,
   UpdateInvoiceCommand,
 } from "@contracts";
 
@@ -60,6 +61,24 @@ const enqueueOutbox = (
 };
 
 const padSequence = (seq: number) => seq.toString().padStart(4, "0");
+
+const parseCommercialNumber = (value: string) => {
+  const normalized = value.trim();
+  const match = /^(\d{4})-(\d{1,8})$/.exec(normalized);
+  if (!match) {
+    throw new Error("Document number must use the format YYYY-0001.");
+  }
+  const year = Number(match[1]);
+  const sequence = Number(match[2]);
+  if (!Number.isInteger(year) || !Number.isInteger(sequence) || sequence < 1) {
+    throw new Error("Document number must use a positive sequence.");
+  }
+  return {
+    documentNumber: `${year}-${padSequence(sequence)}`,
+    year,
+    sequence,
+  };
+};
 
 const persistInvoiceItems = (
   db: DatabaseSync,
@@ -815,6 +834,111 @@ export const createInvoiceMutationService = (db: DatabaseSync) => ({
         new Date().toISOString(),
         "failed",
         message,
+      );
+      throw error;
+    }
+  },
+
+  renumberInvoice(input: RenumberInvoiceCommand): InvoiceMutationResult {
+    const receiptHelpers = createCommandReceiptHelpers(db);
+    const existing = receiptHelpers.getExistingReceipt(input.commandId);
+    if (existing?.outcome_status === "success") {
+      const found = db
+        .prepare("SELECT id, invoice_number FROM invoices WHERE workspace_id = ? AND id = ?")
+        .get(input.workspaceId, input.invoiceId) as { id: string; invoice_number: string } | undefined;
+      return {
+        commandId: input.commandId,
+        invoiceId: found?.id ?? input.invoiceId,
+        invoiceNumber: found?.invoice_number ?? "—",
+        repeated: true,
+        summary: "Invoice number was already updated for this command.",
+      };
+    }
+    if (existing?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage("invoice renumbering", existing.error_message));
+    }
+
+    const parsed = parseCommercialNumber(input.invoiceNumber);
+    const now = new Date().toISOString();
+
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const current = db
+        .prepare("SELECT id, invoice_number, status FROM invoices WHERE workspace_id = ? AND id = ?")
+        .get(input.workspaceId, input.invoiceId) as
+        | { id: string; invoice_number: string; status: InvoiceStatus }
+        | undefined;
+      if (!current) throw new Error("Invoice not found.");
+      if (current.status === "void") {
+        throw new Error("Void invoices cannot be renumbered.");
+      }
+      if (current.invoice_number === parsed.documentNumber) {
+        receiptHelpers.insertReceipt.run(
+          input.commandId,
+          input.workspaceId,
+          defaultActorUserId,
+          input.actorType,
+          input.sourceChannel,
+          now,
+          "success",
+          null,
+        );
+        db.exec("COMMIT");
+
+        return {
+          commandId: input.commandId,
+          invoiceId: input.invoiceId,
+          invoiceNumber: parsed.documentNumber,
+          repeated: false,
+          summary: `Invoice ${parsed.documentNumber} already uses this number.`,
+        };
+      }
+
+      const duplicate = db
+        .prepare("SELECT id FROM invoices WHERE workspace_id = ? AND invoice_year = ? AND invoice_sequence = ? AND id != ?")
+        .get(input.workspaceId, parsed.year, parsed.sequence, input.invoiceId) as { id: string } | undefined;
+      if (duplicate) {
+        throw new Error(`Invoice number ${parsed.documentNumber} is already in use.`);
+      }
+
+      db.prepare(
+        `
+          UPDATE invoices
+          SET invoice_number = ?, invoice_year = ?, invoice_sequence = ?, updated_by_user_id = ?, updated_at = ?
+          WHERE workspace_id = ? AND id = ?
+        `,
+      ).run(parsed.documentNumber, parsed.year, parsed.sequence, defaultActorUserId, now, input.workspaceId, input.invoiceId);
+
+      receiptHelpers.insertReceipt.run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        "success",
+        null,
+      );
+      db.exec("COMMIT");
+
+      return {
+        commandId: input.commandId,
+        invoiceId: input.invoiceId,
+        invoiceNumber: parsed.documentNumber,
+        repeated: false,
+        summary: `Invoice ${current.invoice_number} renumbered to ${parsed.documentNumber}.`,
+      };
+    } catch (error) {
+      db.exec("ROLLBACK");
+      receiptHelpers.insertReceipt.run(
+        input.commandId,
+        input.workspaceId,
+        defaultActorUserId,
+        input.actorType,
+        input.sourceChannel,
+        now,
+        "failed",
+        error instanceof Error ? error.message : "Unknown invoice renumbering error.",
       );
       throw error;
     }

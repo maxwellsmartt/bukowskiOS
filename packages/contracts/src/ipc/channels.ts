@@ -181,6 +181,7 @@ export const ipcChannels = {
     setStatus: "bukowskiQuotes:setStatus",
     duplicate: "bukowskiQuotes:duplicate",
     delete: "bukowskiQuotes:delete",
+    renumber: "bukowskiQuotes:renumber",
     exportPdf: "bukowskiQuotes:exportPdf",
     listVersions: "bukowskiQuotes:listVersions",
     restoreVersion: "bukowskiQuotes:restoreVersion",
@@ -194,6 +195,7 @@ export const ipcChannels = {
     issue: "bukowskiInvoices:issue",
     cancel: "bukowskiInvoices:cancel",
     recordPayment: "bukowskiInvoices:recordPayment",
+    renumber: "bukowskiInvoices:renumber",
     createFromQuote: "bukowskiInvoices:createFromQuote",
   },
 } as const;

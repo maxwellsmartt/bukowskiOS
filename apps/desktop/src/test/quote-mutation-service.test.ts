@@ -92,6 +92,59 @@ describe("quote mutation service", () => {
     cleanup();
   });
 
+  it("renumbers quotes and keeps the next sequence above the highest manual correction", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-quote-renumber");
+    const reads = createQuoteReadService(database);
+    const mutations = createQuoteMutationService(database);
+
+    const first = mutations.createQuote({
+      commandId: "cmd-renumber-quote-1",
+      workspaceId: "workspace-metadata",
+      ...baseChannel,
+      ...buildHeader(),
+      items: [{ sortOrder: 1, quantity: 1, title: "A", unitPrice: 1000, taxBehavior: "exempt" }],
+    });
+    const second = mutations.createQuote({
+      commandId: "cmd-renumber-quote-2",
+      workspaceId: "workspace-metadata",
+      ...baseChannel,
+      ...buildHeader(),
+      items: [{ sortOrder: 1, quantity: 1, title: "B", unitPrice: 1000, taxBehavior: "exempt" }],
+    });
+
+    const renumbered = mutations.renumberQuote({
+      commandId: "cmd-renumber-quote-3",
+      workspaceId: "workspace-metadata",
+      ...baseChannel,
+      quoteId: first.quoteId,
+      quoteNumber: "2026-42",
+    });
+
+    expect(renumbered.quoteNumber).toBe("2026-0042");
+    expect(reads.getQuoteDetail("workspace-metadata", first.quoteId)?.quoteNumber).toBe("2026-0042");
+    expect(() =>
+      mutations.renumberQuote({
+        commandId: "cmd-renumber-quote-duplicate",
+        workspaceId: "workspace-metadata",
+        ...baseChannel,
+        quoteId: first.quoteId,
+        quoteNumber: second.quoteNumber,
+      }),
+    ).toThrow(/already in use/);
+
+    const next = mutations.createQuote({
+      commandId: "cmd-renumber-quote-4",
+      workspaceId: "workspace-metadata",
+      ...baseChannel,
+      ...buildHeader(),
+      items: [{ sortOrder: 1, quantity: 1, title: "C", unitPrice: 1000, taxBehavior: "exempt" }],
+    });
+
+    expect(next.quoteNumber).toBe("2026-0043");
+
+    cleanup();
+  });
+
   it("supports status transitions and rejects invalid ones", () => {
     const { cleanup, database } = createTestDatabase("bukowski-quote-status");
     const mutations = createQuoteMutationService(database);

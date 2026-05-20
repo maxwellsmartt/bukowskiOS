@@ -9,6 +9,7 @@ import type {
   InvoiceRow,
   IssueInvoiceCommand,
   RecordInvoicePaymentCommand,
+  RenumberInvoiceCommand,
   UpdateInvoiceCommand,
 } from "@contracts";
 import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
@@ -126,6 +127,10 @@ export const useInvoiceMutations = () =>
       async recordPayment(input: RecordInvoicePaymentCommand): Promise<InvoiceMutationResult> {
         if (!window.bukowskiInvoices) throw new Error("Invoices bridge unavailable.");
         return window.bukowskiInvoices.recordPayment(input);
+      },
+      async renumberInvoice(input: RenumberInvoiceCommand): Promise<InvoiceMutationResult> {
+        if (!window.bukowskiInvoices) throw new Error("Invoices bridge unavailable.");
+        return window.bukowskiInvoices.renumber(input);
       },
       async createFromQuote(input: {
         workspaceId: string;
