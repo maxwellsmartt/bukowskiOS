@@ -3778,6 +3778,7 @@
         "roles": "Roles",
         "branding": "Identidad visual",
         "currency": "Moneda",
+        "ncf": "NCF",
         "channels": "Canales",
         "otherWorkspaces": "Otros workspaces"
       },
@@ -3796,6 +3797,7 @@
         "workspacesConnected_other": "{{count}} workspaces conectados",
         "currency": "Moneda base y tipos de cambio",
         "currencyWith": "Moneda base y tipos de cambio · {{currency}}",
+        "ncf": "Serie fiscal, próxima secuencia y vencimiento para facturación",
         "branding": "Logotipo y recursos para documentos",
         "channels": "Acceso de mensajería para los miembros"
       },
@@ -3815,6 +3817,55 @@
         "workspaceAvatar": "Avatar del workspace",
         "workspaceAvatarHelp": "Aparece en el selector de workspaces, el switcher y la navegación.",
         "uploadAvatar": "Subir avatar del workspace"
+      },
+      "ncfCard": {
+        "cardTitle": "Numeración fiscal (NCF)",
+        "cardSubtitle": "Serie, secuencia y vencimiento fiscal que se consumen al emitir facturas.",
+        "series": "Serie activa",
+        "next": "Próxima secuencia",
+        "max": "Secuencia máxima",
+        "expires": "Fecha de vencimiento",
+        "save": "Guardar NCF",
+        "health": {
+          "remaining": "Disponibles",
+          "noSeries": "sin serie",
+          "status": {
+            "missing": "Sin configurar",
+            "expired": "Vencido",
+            "exhausted": "Agotado",
+            "low": "Bajo",
+            "expiring": "Por vencer",
+            "ready": "Listo"
+          },
+          "missing": {
+            "title": "NCF sin configurar",
+            "body": "Agrega serie, próxima secuencia y secuencia máxima antes de emitir facturas fiscales."
+          },
+          "expired": {
+            "title": "La serie {{series}} está vencida",
+            "body": "Actualiza la fecha de vencimiento o carga una nueva serie antes de emitir."
+          },
+          "exhausted": {
+            "title": "La serie {{series}} está agotada",
+            "body": "La próxima secuencia supera el máximo configurado. Carga una nueva serie."
+          },
+          "low": {
+            "title": "Quedan pocos NCF",
+            "body": "La serie {{series}} tiene {{count}} secuencias disponibles. Puedes emitir, pero conviene preparar la próxima serie."
+          },
+          "expiring": {
+            "title": "La serie vence pronto",
+            "body": "La serie {{series}} vence en {{days}} días. Puedes emitir, pero conviene revisar la renovación."
+          },
+          "ready": {
+            "title": "NCF listo para emitir",
+            "body": "La serie {{series}} tiene {{count}} secuencias disponibles."
+          }
+        },
+        "toasts": {
+          "savedTitle": "NCF guardado",
+          "savedBody": "La próxima factura usará esta configuración fiscal."
+        }
       },
       "members": {
         "invite": "Invitar miembro",

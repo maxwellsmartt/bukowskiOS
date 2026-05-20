@@ -3776,6 +3776,7 @@
         "roles": "Roles",
         "branding": "Branding",
         "currency": "Currency",
+        "ncf": "NCF",
         "channels": "Channels",
         "otherWorkspaces": "Other workspaces"
       },
@@ -3794,6 +3795,7 @@
         "workspacesConnected_other": "{{count}} workspaces connected",
         "currency": "Base currency and exchange rates",
         "currencyWith": "Base currency and exchange rates · {{currency}}",
+        "ncf": "Fiscal series, next sequence and expiration for invoicing",
         "branding": "Logo and document assets",
         "channels": "Messaging access for workspace members"
       },
@@ -3813,6 +3815,55 @@
         "workspaceAvatar": "Workspace avatar",
         "workspaceAvatarHelp": "Appears in the workspace picker, switcher and navigation surfaces.",
         "uploadAvatar": "Upload workspace avatar"
+      },
+      "ncfCard": {
+        "cardTitle": "Fiscal numbering (NCF)",
+        "cardSubtitle": "Fiscal series, sequence and expiration consumed when invoices are issued.",
+        "series": "Active series",
+        "next": "Next sequence",
+        "max": "Max sequence",
+        "expires": "Expiration date",
+        "save": "Save NCF",
+        "health": {
+          "remaining": "Available",
+          "noSeries": "no series",
+          "status": {
+            "missing": "Not configured",
+            "expired": "Expired",
+            "exhausted": "Exhausted",
+            "low": "Low",
+            "expiring": "Expiring",
+            "ready": "Ready"
+          },
+          "missing": {
+            "title": "NCF is not configured",
+            "body": "Add a series, next sequence and max sequence before issuing fiscal invoices."
+          },
+          "expired": {
+            "title": "Series {{series}} is expired",
+            "body": "Update the expiration date or load a new series before issuing."
+          },
+          "exhausted": {
+            "title": "Series {{series}} is exhausted",
+            "body": "The next sequence is past the configured maximum. Load a new series."
+          },
+          "low": {
+            "title": "NCF stock is low",
+            "body": "Series {{series}} has {{count}} sequences available. You can issue, but should prepare the next series."
+          },
+          "expiring": {
+            "title": "Series expires soon",
+            "body": "Series {{series}} expires in {{days}} days. You can issue, but should review renewal."
+          },
+          "ready": {
+            "title": "NCF ready to issue",
+            "body": "Series {{series}} has {{count}} sequences available."
+          }
+        },
+        "toasts": {
+          "savedTitle": "NCF saved",
+          "savedBody": "The next invoice will use this fiscal setup."
+        }
       },
       "members": {
         "invite": "Invite member",

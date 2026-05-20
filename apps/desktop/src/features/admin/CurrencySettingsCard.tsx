@@ -1,14 +1,12 @@
 import { RefreshCw, Save } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CurrencyRateSource, CurrencyRateType } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { NumberStepper } from "@shared/components/NumberStepper";
-import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
-import { evaluateNcfHealth } from "@features/finance/ncfHealth";
 import { newCommandId } from "@features/finance/quoteHelpers";
 import {
   refreshCurrencyRates,
@@ -36,10 +34,6 @@ export const CurrencySettingsCard = () => {
   const [defaultItbisRate, setDefaultItbisRate] = useState(0.18);
   const [defaultQuoteValidityDays, setDefaultQuoteValidityDays] = useState(30);
   const [sirecineNumber, setSirecineNumber] = useState("");
-  const [ncfSeriesActive, setNcfSeriesActive] = useState("");
-  const [ncfSequenceNext, setNcfSequenceNext] = useState<number | null>(null);
-  const [ncfSequenceMax, setNcfSequenceMax] = useState<number | null>(null);
-  const [ncfExpiresAt, setNcfExpiresAt] = useState("");
   const [enabled, setEnabled] = useState<string[]>(enabledCurrencyOptions);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -62,25 +56,8 @@ export const CurrencySettingsCard = () => {
     setDefaultItbisRate(settings.defaultItbisRate);
     setDefaultQuoteValidityDays(settings.defaultQuoteValidityDays);
     setSirecineNumber(settings.sirecineNumber ?? "");
-    setNcfSeriesActive(settings.ncfSeriesActive ?? "");
-    setNcfSequenceNext(settings.ncfSequenceNext);
-    setNcfSequenceMax(settings.ncfSequenceMax);
-    setNcfExpiresAt(settings.ncfExpiresAt?.slice(0, 10) ?? "");
     setEnabled(settings.enabledCurrencies);
   }, [settings]);
-
-  const ncfHealth = useMemo(
-    () =>
-      evaluateNcfHealth({
-        ncfSeriesActive,
-        ncfSequenceNext,
-        ncfSequenceMax,
-        ncfExpiresAt,
-      }),
-    [ncfExpiresAt, ncfSequenceMax, ncfSequenceNext, ncfSeriesActive],
-  );
-
-  const ncfMeterWidth = `${Math.round((ncfHealth.percentRemaining ?? 0) * 100)}%`;
 
   const handleSave = async () => {
     if (!window.bukowskiCurrency || !settings) return;
@@ -106,10 +83,10 @@ export const CurrencySettingsCard = () => {
         defaultItbisRate,
         defaultQuoteValidityDays,
         sirecineNumber: sirecineNumber.trim() || null,
-        ncfSeriesActive: ncfSeriesActive.trim().toUpperCase() || null,
-        ncfSequenceNext,
-        ncfSequenceMax,
-        ncfExpiresAt: ncfExpiresAt.trim() || null,
+        ncfSeriesActive: settings.ncfSeriesActive,
+        ncfSequenceNext: settings.ncfSequenceNext,
+        ncfSequenceMax: settings.ncfSequenceMax,
+        ncfExpiresAt: settings.ncfExpiresAt,
         workspaceLogoUrl: settings.workspaceLogoUrl,
         workspaceSealUrl: settings.workspaceSealUrl,
         workspaceSignatureUrl: settings.workspaceSignatureUrl,
@@ -355,83 +332,6 @@ export const CurrencySettingsCard = () => {
               );
             })}
           </div>
-        </label>
-      </div>
-
-      <div className="surface-card-divider" />
-
-      <div className="page-stack-row" style={{ marginBottom: 8 }}>
-        <strong>{t("settings.workspace.currencyCard.ncf.title")}</strong>
-        <small className="text-muted">{t("settings.workspace.currencyCard.ncf.subtitle")}</small>
-      </div>
-
-      <div className={`ncf-health-card ncf-health-card-${ncfHealth.tone}`}>
-        <div className="ncf-health-main">
-          <div>
-            <div className="ncf-health-title-row">
-              <strong>{t(`settings.workspace.currencyCard.ncf.health.${ncfHealth.status}.title`)}</strong>
-              <StatusBadge tone={ncfHealth.tone}>
-                {t(`settings.workspace.currencyCard.ncf.health.status.${ncfHealth.status}`)}
-              </StatusBadge>
-            </div>
-            <p>
-              {t(`settings.workspace.currencyCard.ncf.health.${ncfHealth.status}.body`, {
-                series: ncfHealth.series ?? t("settings.workspace.currencyCard.ncf.health.noSeries"),
-                count: ncfHealth.remaining ?? 0,
-                days: ncfHealth.daysUntilExpiry ?? 0,
-              })}
-            </p>
-          </div>
-          <div className="ncf-health-stat">
-            <span>{t("settings.workspace.currencyCard.ncf.health.remaining")}</span>
-            <strong>{ncfHealth.remaining ?? "—"}</strong>
-          </div>
-        </div>
-        <div className="ncf-health-meter" aria-hidden="true">
-          <span className={`ncf-health-meter-fill ncf-health-meter-${ncfHealth.tone}`} style={{ width: ncfMeterWidth }} />
-        </div>
-      </div>
-
-      <div className="agent-form-grid">
-        <label className="field-block">
-          <span className="field-label">{t("settings.workspace.currencyCard.ncf.series")}</span>
-          <input
-            className="field-input"
-            onChange={(e) => setNcfSeriesActive(e.target.value.toUpperCase())}
-            placeholder="B01"
-            value={ncfSeriesActive}
-          />
-        </label>
-        <label className="field-block">
-          <span className="field-label">{t("settings.workspace.currencyCard.ncf.next")}</span>
-          <input
-            className="field-input"
-            min={1}
-            onChange={(e) => setNcfSequenceNext(e.target.value ? Number(e.target.value) : null)}
-            placeholder="1"
-            type="number"
-            value={ncfSequenceNext ?? ""}
-          />
-        </label>
-        <label className="field-block">
-          <span className="field-label">{t("settings.workspace.currencyCard.ncf.max")}</span>
-          <input
-            className="field-input"
-            min={1}
-            onChange={(e) => setNcfSequenceMax(e.target.value ? Number(e.target.value) : null)}
-            placeholder="99999999"
-            type="number"
-            value={ncfSequenceMax ?? ""}
-          />
-        </label>
-        <label className="field-block">
-          <span className="field-label">{t("settings.workspace.currencyCard.ncf.expires")}</span>
-          <input
-            className="field-input"
-            onChange={(e) => setNcfExpiresAt(e.target.value)}
-            type="date"
-            value={ncfExpiresAt}
-          />
         </label>
       </div>
 

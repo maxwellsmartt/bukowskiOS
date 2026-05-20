@@ -17,6 +17,7 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { CurrencySettingsCard } from "./CurrencySettingsCard";
 import { CustomRolesEditor } from "./CustomRolesEditor";
 import { InviteMemberDialog } from "./InviteMemberDialog";
+import { NcfSettingsCard } from "./NcfSettingsCard";
 import { SettingsLayout } from "./SettingsLayout";
 import { WorkspaceBrandingCard } from "./WorkspaceBrandingCard";
 import {
@@ -1231,6 +1232,15 @@ export const WorkspaceSettingsPage = () => {
         }
       >
         <CurrencySettingsCard />
+      </WorkspaceDisclosure>
+
+      <WorkspaceDisclosure
+        title={t("settings.workspace.sections.ncf", { defaultValue: "NCF" })}
+        summary={t("settings.workspace.summaries.ncf", {
+          defaultValue: "Serie fiscal, próxima secuencia y vencimiento para facturación.",
+        })}
+      >
+        <NcfSettingsCard />
       </WorkspaceDisclosure>
 
       <WorkspaceDisclosure
