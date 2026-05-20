@@ -501,6 +501,10 @@ const bukowskiInvoices = {
     ipcRenderer.invoke(ipcChannels.invoices.detail, { workspaceId, invoiceId }) as Promise<
       import("@contracts").InvoiceDetail | null
     >,
+  exportPdf: (workspaceId: string, invoiceId: string) =>
+    ipcRenderer.invoke(ipcChannels.invoices.exportPdf, { workspaceId, invoiceId }) as Promise<
+      import("@contracts").AppExportResult
+    >,
   create: (input: import("@contracts").CreateInvoiceCommand) =>
     ipcRenderer.invoke(ipcChannels.invoices.create, input) as Promise<
       import("@contracts").InvoiceMutationResult

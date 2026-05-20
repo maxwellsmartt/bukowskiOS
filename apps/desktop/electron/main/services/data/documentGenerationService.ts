@@ -137,6 +137,70 @@ export type QuotePdfPayload = {
   observations: string | null;
 };
 
+export type InvoicePdfPayload = {
+  invoiceNumber: string;
+  ncf: string | null;
+  status: string;
+  issueDate: string;
+  dueDate: string | null;
+  sourceQuoteNumber: string | null;
+  workspace: {
+    legalName: string;
+    rnc: string;
+    sirecineNumber: string | null;
+    addressLines: string[];
+    phone: string;
+    web: string;
+    email: string;
+    logoBuffer: Buffer | null;
+  };
+  client: {
+    name: string;
+    rnc: string | null;
+    attentionName: string | null;
+    phone: string | null;
+    productionName: string | null;
+    productionCompanyName: string | null;
+    projectName: string | null;
+    pur: string | null;
+  };
+  currency: {
+    code: string;
+    symbol: string;
+  };
+  exchangeRate: {
+    rate: number;
+    source: string;
+    effectiveDate: string | null;
+  };
+  items: Array<{
+    quantity: number;
+    title: string;
+    description: string | null;
+    durationValue: number | null;
+    durationUnit: string | null;
+    unitPrice: number;
+    discountAmount: number;
+    taxAmount: number;
+    lineTotal: number;
+  }>;
+  totals: {
+    subtotal: number;
+    discountAmount: number;
+    taxAmount: number;
+    total: number;
+    paid: number;
+    outstanding: number;
+  };
+  payments: Array<{
+    paidAt: string;
+    amount: number;
+    method: string | null;
+    reference: string | null;
+  }>;
+  observations: string | null;
+};
+
 type ProjectSetupSummaryPdfPayload = {
   projectCode: string;
   projectName: string;
@@ -236,6 +300,14 @@ const buildPackingSlipPdfFileName = (payload: PackingSlipPdfPayload, prefix: "PS
   const issuedDate = sanitizePdfFileNamePart(payload.issueDateCompact, "undated");
 
   return `${slipLabel}_${projectCode}_${projectName}_${departmentCode}_Packing_${issuedDate}.pdf`;
+};
+
+const buildInvoicePdfFileName = (payload: InvoicePdfPayload) => {
+  const invoiceNumber = sanitizePdfFileNamePart(payload.invoiceNumber, "invoice");
+  const client = sanitizePdfFileNamePart(payload.client.name, "client");
+  const ncf = sanitizePdfFileNamePart(payload.ncf, "draft");
+
+  return `Factura_${invoiceNumber}_${client}_${ncf}.pdf`;
 };
 
 const drawMetadataLogo = (document: PDFKit.PDFDocument, x: number, y: number, color = "#141619") => {
@@ -1316,6 +1388,319 @@ export const createDocumentGenerationService = () => ({
 
     return {
       fileName: `${payload.projectCode.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "project-setup-summary"}.pdf`,
+      mimeType: "application/pdf" as const,
+      buffer: await bufferPromise,
+    };
+  },
+
+  async createInvoicePdf(payload: InvoicePdfPayload) {
+    const document = new PDFDocument({ margin: 38, size: "A4" });
+    const bufferPromise = collectPdfBuffer(document);
+
+    const pageLeft = document.page.margins.left;
+    const pageRight = document.page.width - document.page.margins.right;
+    const pageWidth = pageRight - pageLeft;
+    const pageBottom = document.page.height - document.page.margins.bottom;
+    const ink = "#11151b";
+    const muted = "#677282";
+    const hairline = "#d7dce4";
+    const panel = "#f6f8fb";
+    const accent = "#101418";
+    let cursorY = document.page.margins.top;
+
+    const drawPageBackground = () => {
+      document.save();
+      document.rect(0, 0, document.page.width, document.page.height).fill("#ffffff");
+      document.restore();
+    };
+
+    drawPageBackground();
+
+    const formatAmount = (value: number) =>
+      `${payload.currency.symbol} ${Number.isFinite(value) ? value.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }) : "0.00"}`;
+
+    const formatDate = (value: string | null) => {
+      if (!value) return "—";
+      const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+      if (!match) return value;
+      return `${match[3]}/${match[2]}/${match[1]}`;
+    };
+
+    const labelText = (label: string, value: string | null, x: number, y: number, width: number) => {
+      document.font("Helvetica-Bold").fillColor(muted).fontSize(7.4).text(label.toUpperCase(), x, y, {
+        width,
+        characterSpacing: 0.7,
+        lineBreak: false,
+        ellipsis: true,
+      });
+      document.font("Helvetica").fillColor(ink).fontSize(9.2).text(value?.trim() || "—", x, y + 12, {
+        width,
+        lineBreak: false,
+        ellipsis: true,
+      });
+    };
+
+    const ensureSpace = (height: number) => {
+      if (cursorY + height <= pageBottom - 34) return;
+      document.addPage();
+      drawPageBackground();
+      cursorY = document.page.margins.top;
+    };
+
+    const logoBoxW = 104;
+    const logoBoxH = 72;
+    if (payload.workspace.logoBuffer) {
+      try {
+        document.image(payload.workspace.logoBuffer, pageLeft, cursorY, { fit: [logoBoxW, logoBoxH] });
+      } catch {
+        drawMetadataLogo(document, pageLeft + 16, cursorY + 9);
+      }
+    } else {
+      drawMetadataLogo(document, pageLeft + 16, cursorY + 9);
+    }
+
+    document.font("Helvetica-Bold").fillColor(ink).fontSize(22).text("FACTURA", pageRight - 230, cursorY + 2, {
+      width: 230,
+      align: "right",
+      lineBreak: false,
+    });
+    document.font("Helvetica").fillColor(muted).fontSize(10).text(payload.invoiceNumber, pageRight - 230, cursorY + 30, {
+      width: 230,
+      align: "right",
+      lineBreak: false,
+    });
+    document.font("Helvetica-Bold").fillColor(payload.ncf ? ink : "#9a6a17").fontSize(9.4).text(
+      payload.ncf ? `NCF ${payload.ncf}` : "BORRADOR SIN NCF",
+      pageRight - 230,
+      cursorY + 48,
+      { width: 230, align: "right", lineBreak: false },
+    );
+
+    cursorY += 84;
+
+    document.roundedRect(pageLeft, cursorY, pageWidth, 54, 12).fill(accent);
+    document.font("Helvetica-Bold").fillColor("#ffffff").fontSize(12).text(payload.workspace.legalName, pageLeft + 14, cursorY + 11, {
+      width: pageWidth * 0.55,
+      lineBreak: false,
+      ellipsis: true,
+    });
+    document.font("Helvetica").fillColor("#d7dde7").fontSize(8.6);
+    document.text(`RNC: ${payload.workspace.rnc}`, pageLeft + 14, cursorY + 30, {
+      width: pageWidth * 0.35,
+      lineBreak: false,
+    });
+    if (payload.workspace.sirecineNumber) {
+      document.text(`SIRECINE: ${payload.workspace.sirecineNumber}`, pageLeft + pageWidth * 0.36, cursorY + 30, {
+        width: pageWidth * 0.28,
+        lineBreak: false,
+        ellipsis: true,
+      });
+    }
+    document.text([payload.workspace.phone, payload.workspace.email].filter(Boolean).join(" · "), pageLeft + pageWidth * 0.63, cursorY + 30, {
+      width: pageWidth * 0.35,
+      align: "right",
+      lineBreak: false,
+      ellipsis: true,
+    });
+    cursorY += 70;
+
+    const infoGap = 14;
+    const infoWidth = (pageWidth - infoGap) / 2;
+    const infoHeight = 128;
+    document.roundedRect(pageLeft, cursorY, infoWidth, infoHeight, 10).fillAndStroke(panel, hairline);
+    document.roundedRect(pageLeft + infoWidth + infoGap, cursorY, infoWidth, infoHeight, 10).fillAndStroke(panel, hairline);
+
+    document.font("Helvetica-Bold").fillColor(ink).fontSize(10.5).text("CLIENTE", pageLeft + 14, cursorY + 13, {
+      width: infoWidth - 28,
+      lineBreak: false,
+    });
+    labelText("Nombre", payload.client.name, pageLeft + 14, cursorY + 34, infoWidth - 28);
+    labelText("RNC", payload.client.rnc, pageLeft + 14, cursorY + 66, (infoWidth - 34) / 2);
+    labelText("Atención", payload.client.attentionName, pageLeft + 22 + (infoWidth - 34) / 2, cursorY + 66, (infoWidth - 34) / 2);
+    labelText("Producción", payload.client.productionName ?? payload.client.projectName, pageLeft + 14, cursorY + 98, infoWidth - 28);
+
+    const docX = pageLeft + infoWidth + infoGap + 14;
+    document.font("Helvetica-Bold").fillColor(ink).fontSize(10.5).text("DOCUMENTO", docX, cursorY + 13, {
+      width: infoWidth - 28,
+      lineBreak: false,
+    });
+    labelText("Emisión", formatDate(payload.issueDate), docX, cursorY + 34, (infoWidth - 34) / 2);
+    labelText("Vence", formatDate(payload.dueDate), docX + 8 + (infoWidth - 34) / 2, cursorY + 34, (infoWidth - 34) / 2);
+    labelText("Estado", payload.status, docX, cursorY + 66, (infoWidth - 34) / 2);
+    labelText("Cotización fuente", payload.sourceQuoteNumber, docX + 8 + (infoWidth - 34) / 2, cursorY + 66, (infoWidth - 34) / 2);
+    labelText(
+      "Tasa",
+      `${payload.exchangeRate.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })} · ${payload.exchangeRate.source}${payload.exchangeRate.effectiveDate ? ` · ${formatDate(payload.exchangeRate.effectiveDate)}` : ""}`,
+      docX,
+      cursorY + 98,
+      infoWidth - 28,
+    );
+    cursorY += infoHeight + 22;
+
+    document.font("Helvetica-Bold").fillColor(ink).fontSize(11).text("DETALLE", pageLeft, cursorY, {
+      width: pageWidth,
+      lineBreak: false,
+    });
+    cursorY += 18;
+
+    const columns = [
+      { label: "Cant.", width: 42, align: "right" as const },
+      { label: "Descripción", width: pageWidth - 42 - 54 - 72 - 72 - 82, align: "left" as const },
+      { label: "Dur.", width: 54, align: "center" as const },
+      { label: "Precio", width: 72, align: "right" as const },
+      { label: "ITBIS", width: 72, align: "right" as const },
+      { label: "Total", width: 82, align: "right" as const },
+    ];
+
+    const drawTableHeader = () => {
+      ensureSpace(34);
+      document.roundedRect(pageLeft, cursorY, pageWidth, 24, 7).fill(accent);
+      let x = pageLeft + 10;
+      columns.forEach((column) => {
+        document.font("Helvetica-Bold").fillColor("#eef2f7").fontSize(7.4).text(column.label, x, cursorY + 8, {
+          width: column.width - 12,
+          align: column.align,
+          lineBreak: false,
+          ellipsis: true,
+        });
+        x += column.width;
+      });
+      cursorY += 32;
+    };
+
+    drawTableHeader();
+
+    payload.items.forEach((item, index) => {
+      const duration =
+        item.durationValue === null || item.durationValue === undefined
+          ? "—"
+          : `${item.durationValue.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${item.durationUnit ?? ""}`.trim();
+      document.font("Helvetica-Bold").fontSize(8.6);
+      const titleHeight = document.heightOfString(item.title, { width: columns[1]!.width - 16 });
+      document.font("Helvetica").fontSize(7.5);
+      const descriptionHeight = item.description
+        ? document.heightOfString(item.description, { width: columns[1]!.width - 16 })
+        : 0;
+      const rowHeight = Math.max(34, Math.ceil(titleHeight + descriptionHeight) + 16);
+      if (cursorY + rowHeight > pageBottom - 112) {
+        document.addPage();
+        drawPageBackground();
+        cursorY = document.page.margins.top;
+        drawTableHeader();
+      }
+      if (index % 2 === 0) {
+        document.roundedRect(pageLeft, cursorY - 3, pageWidth, rowHeight, 7).fill(panel);
+      }
+
+      const values = [
+        item.quantity.toLocaleString("en-US", { maximumFractionDigits: 2 }),
+        item.title,
+        duration,
+        formatAmount(item.unitPrice),
+        formatAmount(item.taxAmount),
+        formatAmount(item.lineTotal),
+      ];
+      let x = pageLeft + 10;
+      values.forEach((value, valueIndex) => {
+        const isDescription = valueIndex === 1;
+        document.font(isDescription ? "Helvetica-Bold" : "Helvetica").fillColor(ink).fontSize(isDescription ? 8.6 : 8);
+        document.text(value, x, cursorY + 6, {
+          width: columns[valueIndex]!.width - 12,
+          align: columns[valueIndex]!.align,
+          lineBreak: isDescription,
+          ellipsis: !isDescription,
+          height: rowHeight - 10,
+        });
+        x += columns[valueIndex]!.width;
+      });
+      if (item.description) {
+        document.font("Helvetica").fillColor(muted).fontSize(7.5).text(item.description, pageLeft + 10 + columns[0]!.width, cursorY + 18, {
+          width: columns[1]!.width - 12,
+          height: rowHeight - 20,
+          ellipsis: true,
+        });
+      }
+      cursorY += rowHeight;
+    });
+
+    cursorY += 14;
+    ensureSpace(176);
+
+    const notesW = pageWidth * 0.55;
+    const totalsX = pageLeft + notesW + 18;
+    const totalsW = pageWidth - notesW - 18;
+    document.roundedRect(pageLeft, cursorY, notesW, 118, 10).fillAndStroke(panel, hairline);
+    document.font("Helvetica-Bold").fillColor(muted).fontSize(7.5).text("OBSERVACIONES", pageLeft + 12, cursorY + 12, {
+      width: notesW - 24,
+      characterSpacing: 0.8,
+    });
+    document.font("Helvetica").fillColor(ink).fontSize(8.7).text(payload.observations?.trim() || "—", pageLeft + 12, cursorY + 28, {
+      width: notesW - 24,
+      height: 72,
+      ellipsis: true,
+    });
+
+    const drawTotalRow = (label: string, value: number, bold = false, tone: string = ink) => {
+      document.font(bold ? "Helvetica-Bold" : "Helvetica").fillColor(bold ? ink : muted).fontSize(bold ? 10 : 8.6);
+      document.text(label, totalsX, cursorY, { width: totalsW * 0.52, lineBreak: false });
+      document.fillColor(tone).text(formatAmount(value), totalsX + totalsW * 0.52, cursorY, {
+        width: totalsW * 0.48,
+        align: "right",
+        lineBreak: false,
+      });
+      cursorY += bold ? 18 : 15;
+    };
+
+    const totalsStartY = cursorY;
+    document.roundedRect(totalsX - 12, totalsStartY, totalsW + 12, 118, 10).fillAndStroke("#ffffff", hairline);
+    cursorY += 12;
+    drawTotalRow("Subtotal", payload.totals.subtotal);
+    drawTotalRow("Descuento", -Math.abs(payload.totals.discountAmount));
+    drawTotalRow("ITBIS", payload.totals.taxAmount);
+    drawTotalRow("Total", payload.totals.total, true);
+    drawTotalRow("Pagado", payload.totals.paid, false, "#17694a");
+    drawTotalRow("Pendiente", payload.totals.outstanding, true, payload.totals.outstanding > 0 ? "#9a4f10" : "#17694a");
+    cursorY = totalsStartY + 138;
+
+    if (payload.payments.length) {
+      ensureSpace(70);
+      document.font("Helvetica-Bold").fillColor(ink).fontSize(10.5).text("PAGOS REGISTRADOS", pageLeft, cursorY, {
+        width: pageWidth,
+        lineBreak: false,
+      });
+      cursorY += 18;
+      payload.payments.slice(0, 6).forEach((payment) => {
+        document.font("Helvetica").fillColor(ink).fontSize(8.4).text(
+          `${formatDate(payment.paidAt)} · ${payment.method ?? "Pago"}${payment.reference ? ` · ${payment.reference}` : ""}`,
+          pageLeft,
+          cursorY,
+          { width: pageWidth * 0.65, lineBreak: false, ellipsis: true },
+        );
+        document.text(formatAmount(payment.amount), pageLeft + pageWidth * 0.65, cursorY, {
+          width: pageWidth * 0.35,
+          align: "right",
+          lineBreak: false,
+        });
+        cursorY += 14;
+      });
+    }
+
+    const footerY = pageBottom - 28;
+    document.moveTo(pageLeft, footerY - 10).lineTo(pageRight, footerY - 10).strokeColor(hairline).lineWidth(0.7).stroke();
+    document.font("Helvetica").fillColor(muted).fontSize(7.4).text(
+      "Documento generado por bukowskiOS. Verifique NCF, RNC, montos y condiciones antes de enviar al cliente.",
+      pageLeft,
+      footerY,
+      { width: pageWidth, align: "center", lineBreak: false, ellipsis: true },
+    );
+
+    document.end();
+
+    return {
+      fileName: buildInvoicePdfFileName(payload),
       mimeType: "application/pdf" as const,
       buffer: await bufferPromise,
     };

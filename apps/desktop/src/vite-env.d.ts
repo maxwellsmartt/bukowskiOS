@@ -386,6 +386,7 @@ declare global {
         workspaceId: string,
         invoiceId: string,
       ) => Promise<import("@contracts").InvoiceDetail | null>;
+      exportPdf: (workspaceId: string, invoiceId: string) => Promise<AppExportResult>;
       create: (
         input: import("@contracts").CreateInvoiceCommand,
       ) => Promise<import("@contracts").InvoiceMutationResult>;

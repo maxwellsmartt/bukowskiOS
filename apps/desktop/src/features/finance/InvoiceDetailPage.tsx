@@ -1,4 +1,4 @@
-import { ArrowLeft, Ban, CheckCircle2, CreditCard } from "lucide-react";
+import { ArrowLeft, Ban, CheckCircle2, CreditCard, Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -44,6 +44,7 @@ export const InvoiceDetailPage = () => {
   const [confirmIssueOpen, setConfirmIssueOpen] = useState(false);
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(today());
@@ -167,6 +168,24 @@ export const InvoiceDetailPage = () => {
     }
   };
 
+  const handleExportPdf = async () => {
+    if (!invoice) return;
+    setIsExportingPdf(true);
+    try {
+      const result = await mutations.exportPdf(activeWorkspaceId, invoice.id);
+      if (result.saved) {
+        toast.success(t("finance.invoices.toasts.exported"), result.fileName ?? result.summary);
+      }
+    } catch (err) {
+      toast.error(
+        t("finance.invoices.toasts.exportFailed"),
+        cleanIpcMessage(err, t("finance.invoices.toasts.tryAgain")),
+      );
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   if (isLoading && !invoice) {
     return (
       <div className="page-stack">
@@ -208,6 +227,15 @@ export const InvoiceDetailPage = () => {
         </div>
         <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap" }}>
           <StatusBadge tone={statusTone(invoice.status)}>{statusLabel(invoice.status)}</StatusBadge>
+          <button
+            className="ghost-control"
+            disabled={isExportingPdf}
+            onClick={() => void handleExportPdf()}
+            type="button"
+          >
+            <Download size={13} />
+            <span>{isExportingPdf ? t("finance.invoices.detail.actions.exportingPdf") : t("finance.invoices.detail.actions.exportPdf")}</span>
+          </button>
           <button className="ghost-control" disabled={!canIssue} onClick={() => setConfirmIssueOpen(true)} type="button">
             <CheckCircle2 size={13} />
             <span>{t("finance.invoices.detail.actions.issue")}</span>

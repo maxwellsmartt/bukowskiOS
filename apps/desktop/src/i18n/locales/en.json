@@ -671,6 +671,8 @@
         "cancelFailed": "Could not cancel invoice",
         "paymentRecorded": "Payment recorded",
         "paymentFailed": "Could not record payment",
+        "exported": "Invoice PDF exported",
+        "exportFailed": "Could not export invoice PDF",
         "tryAgain": "Try again in a moment."
       },
       "detail": {
@@ -690,6 +692,8 @@
         "notFoundTitle": "Invoice not found",
         "notFoundBody": "This invoice may have been deleted locally or may not be synced on this device yet.",
         "actions": {
+          "exportPdf": "Export PDF",
+          "exportingPdf": "Exporting...",
           "issue": "Issue invoice",
           "cancel": "Cancel invoice",
           "recordPayment": "Record payment"

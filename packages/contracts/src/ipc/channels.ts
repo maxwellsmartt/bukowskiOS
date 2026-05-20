@@ -188,6 +188,7 @@ export const ipcChannels = {
   invoices: {
     list: "bukowskiInvoices:list",
     detail: "bukowskiInvoices:detail",
+    exportPdf: "bukowskiInvoices:exportPdf",
     create: "bukowskiInvoices:create",
     update: "bukowskiInvoices:update",
     issue: "bukowskiInvoices:issue",

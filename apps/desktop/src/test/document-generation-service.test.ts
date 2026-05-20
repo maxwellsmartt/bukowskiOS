@@ -163,3 +163,77 @@ test("document generation service creates a finance report pdf buffer", async ()
   expect(result.buffer.length).toBeGreaterThan(1000);
   expect(result.buffer.subarray(0, 4).toString("utf8")).toBe("%PDF");
 });
+
+test("document generation service creates an invoice pdf buffer", async () => {
+  const service = createDocumentGenerationService();
+
+  const result = await service.createInvoicePdf({
+    invoiceNumber: "INV-2026-0001",
+    ncf: "B0100000001",
+    status: "ISSUED",
+    issueDate: "15/05/2026",
+    dueDate: "30/05/2026",
+    sourceQuoteNumber: "Q-2026-8400",
+    workspace: {
+      legalName: "METADATA CINE S.R.L.",
+      rnc: "131-20642-5",
+      sirecineNumber: "SIRE-001",
+      addressLines: ["Calle Central #27", "Santo Domingo"],
+      phone: "(809) 424-4533",
+      web: "www.metadatacine.net",
+      email: "info@metadatacine.com",
+      logoBuffer: null,
+    },
+    client: {
+      name: "Ana Guerrero",
+      rnc: "001-0000000-0",
+      attentionName: "Ana Guerrero",
+      phone: "(809) 555-0000",
+      productionName: "Shiver",
+      productionCompanyName: "Fiction House",
+      projectName: "Shiver",
+      pur: "PUR-2026",
+    },
+    currency: { code: "DOP", symbol: "RD$" },
+    exchangeRate: {
+      rate: 1,
+      source: "manual",
+      effectiveDate: "15/05/2026",
+    },
+    items: [
+      {
+        quantity: 2,
+        title: "DIT / Data Cart Package",
+        description: "Camera media ingest, backup and editorial handoff.",
+        durationValue: 3,
+        durationUnit: "day",
+        unitPrice: 12000,
+        discountAmount: 0,
+        taxAmount: 12960,
+        lineTotal: 84960,
+      },
+    ],
+    totals: {
+      subtotal: 72000,
+      discountAmount: 0,
+      taxAmount: 12960,
+      total: 84960,
+      paid: 20000,
+      outstanding: 64960,
+    },
+    payments: [
+      {
+        paidAt: "20/05/2026",
+        amount: 20000,
+        method: "Transfer",
+        reference: "BPD-123",
+      },
+    ],
+    observations: "Pago inicial recibido. Balance pendiente antes de entrega final.",
+  });
+
+  expect(result.fileName).toBe("Factura_INV-2026-0001_Ana Guerrero_B0100000001.pdf");
+  expect(result.mimeType).toBe("application/pdf");
+  expect(result.buffer.length).toBeGreaterThan(1000);
+  expect(result.buffer.subarray(0, 4).toString("utf8")).toBe("%PDF");
+});

@@ -331,6 +331,10 @@ type RegisterFoundationIpcOptions = {
     workspaceId: string,
     quoteId: string,
   ) => Promise<{ fileName: string; mimeType: "application/pdf"; buffer: Buffer }>;
+  exportInvoicePdf: (
+    workspaceId: string,
+    invoiceId: string,
+  ) => Promise<{ fileName: string; mimeType: "application/pdf"; buffer: Buffer }>;
   packingMutations: {
     createPackingSlip: (input: CreatePackingSlipCommand) => unknown;
     returnPackingSlipItems: (input: ReturnPackingSlipItemsCommand) => unknown;
@@ -464,6 +468,7 @@ export const registerFoundationIpc = ({
   quoteReads,
   invoiceMutations,
   invoiceReads,
+  exportInvoicePdf,
   exportQuotePdf,
   packingMutations,
   exportFinanceReportPdf,
@@ -1886,6 +1891,51 @@ export const registerFoundationIpc = ({
       return invoiceReads.getInvoiceDetail(query.workspaceId, query.invoiceId);
     },
     "The app could not load the invoice detail.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.invoices.exportPdf,
+    invoiceDetailReadArgsSchema,
+    async (_event, query: { workspaceId: string; invoiceId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "export invoice PDF",
+        accessLevel: "read",
+        requiredPermission: "invoices.export",
+      });
+      const detail = invoiceReads.getInvoiceDetail(query.workspaceId, query.invoiceId);
+      if (!detail) {
+        throw new Error("Invoice was not found.");
+      }
+
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const safeNumber = detail.invoiceNumber.replace(/[^a-z0-9_-]+/gi, "_");
+      const safeClient = detail.clientNameSnapshot.replace(/[^a-z0-9_-]+/gi, "_").slice(0, 48);
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: "Export invoice PDF",
+        defaultPath: path.join(app.getPath("documents"), `Factura_${safeNumber}_${safeClient}_${dateStamp}.pdf`),
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+
+      if (canceled || !filePath) {
+        return {
+          saved: false,
+          fileName: null,
+          savedPath: null,
+          summary: "Invoice PDF export cancelled.",
+        };
+      }
+
+      const pdf = await exportInvoicePdf(query.workspaceId, query.invoiceId);
+      fs.writeFileSync(filePath, pdf.buffer);
+
+      return {
+        saved: true,
+        fileName: path.basename(filePath),
+        savedPath: filePath,
+        summary: `Exported ${pdf.fileName} to ${path.basename(filePath)}.`,
+      };
+    },
+    "The app could not export the invoice PDF.",
   );
   safeHandle(ipcChannels.invoices.create, createInvoiceSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({

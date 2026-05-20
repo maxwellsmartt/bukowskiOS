@@ -673,6 +673,8 @@
         "cancelFailed": "No se pudo cancelar la factura",
         "paymentRecorded": "Pago registrado",
         "paymentFailed": "No se pudo registrar el pago",
+        "exported": "PDF de factura exportado",
+        "exportFailed": "No se pudo exportar el PDF de factura",
         "tryAgain": "Inténtalo de nuevo en un momento."
       },
       "detail": {
@@ -692,6 +694,8 @@
         "notFoundTitle": "Factura no encontrada",
         "notFoundBody": "Esta factura pudo haberse eliminado localmente o todavía no está sincronizada en este equipo.",
         "actions": {
+          "exportPdf": "Exportar PDF",
+          "exportingPdf": "Exportando...",
           "issue": "Emitir factura",
           "cancel": "Cancelar factura",
           "recordPayment": "Registrar pago"

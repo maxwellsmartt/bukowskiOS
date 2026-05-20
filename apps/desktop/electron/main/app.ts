@@ -360,6 +360,39 @@ app.whenReady().then(() => {
     quoteReads: localDatabase.quoteReads,
     invoiceMutations: localDatabase.invoiceMutations,
     invoiceReads: localDatabase.invoiceReads,
+    exportInvoicePdf: async (workspaceId: string, invoiceId: string) => {
+      const detail = localDatabase.invoiceReads.getInvoiceDetail(workspaceId, invoiceId);
+      if (!detail) {
+        throw new Error("Invoice not found.");
+      }
+      const settings = localDatabase.currencyReads.getSettings(workspaceId);
+      const { buildInvoicePdfPayload } = await import("./services/data/invoicePdfPayloadBuilder");
+
+      const fetchOptional = async (url: string | null): Promise<Buffer | null> => {
+        if (!url) return null;
+        try {
+          const response = await fetch(url);
+          if (!response.ok) return null;
+          const arrayBuffer = await response.arrayBuffer();
+          return Buffer.from(arrayBuffer);
+        } catch {
+          return null;
+        }
+      };
+
+      const logoBuffer = await fetchOptional(settings.workspaceLogoUrl);
+      const sourceQuote = detail.sourceQuoteId
+        ? localDatabase.quoteReads.getQuoteDetail(workspaceId, detail.sourceQuoteId)
+        : null;
+      const payload = buildInvoicePdfPayload({
+        invoice: detail,
+        currencySettings: settings,
+        logoBuffer,
+        sourceQuoteNumber: sourceQuote?.quoteNumber ?? null,
+      });
+
+      return documentGeneration.createInvoicePdf(payload);
+    },
     exportQuotePdf: async (workspaceId: string, quoteId: string) => {
       const detail = localDatabase.quoteReads.getQuoteDetail(workspaceId, quoteId);
       if (!detail) {
