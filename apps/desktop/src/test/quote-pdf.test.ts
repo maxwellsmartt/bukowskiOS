@@ -118,4 +118,36 @@ describe("quote PDF generator", () => {
 
     expect(pdf.buffer.length).toBeGreaterThan(2000);
   });
+
+  it("keeps long quotes printable instead of dropping overflow pages", async () => {
+    const service = createDocumentGenerationService();
+    const pdf = await service.createQuotePdf(
+      buildPayload({
+        items: Array.from({ length: 24 }, (_, index) => ({
+          quantity: 1,
+          titleLine: `Production support line ${index + 1}`,
+          detailLines: [
+            "Camera, data and production support with notes that wrap cleanly inside the description column.",
+            "Includes handoff, setup and end-of-day verification.",
+          ],
+          durationValue: "1",
+          durationUnit: "DIA",
+          unitPrice: 10000 + index,
+          lineTotal: 10000 + index,
+        })),
+        totals: {
+          subtotal: 240000,
+          discountLabel: null,
+          discountRate: null,
+          discountAmount: 0,
+          taxRate: 0.18,
+          taxAmount: 43200,
+          taxAddedToTotal: true,
+          total: 283200,
+        },
+      }) as Parameters<typeof service.createQuotePdf>[0],
+    );
+
+    expect(pdf.buffer.length).toBeGreaterThan(6000);
+  });
 });

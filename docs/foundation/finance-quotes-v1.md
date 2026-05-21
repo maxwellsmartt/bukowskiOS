@@ -191,16 +191,34 @@ A4 portrait quote in this order:
 4. Address block (left) + client form (right, 4×2 fields).
 5. Section title (uppercase package title) + "VALIDITY: N DAYS".
 6. Items table with 5 columns: Cant. | Descripción | Duración | Precio | Costo.
-   We render exactly 10 row slots (real items + empty rows) so the table
-   always has a consistent visual shape.
+   Short quotes keep the historical single-page shape with empty rows filling
+   the remaining table area. Long quotes now continue onto additional pages
+   with repeated table headers; we never delete overflow pages or drop line
+   items just to preserve the old template.
 7. Totals: SUB-TOTAL → optional discount → ITBIS (with `**` marker if not
    added) → TOTAL GENERAL.
 8. Observaciones + signature image + sello + signatory name + "Recibido por:".
+
+Invoice PDFs use the newer operational finance layout: logo + fiscal header,
+client/document panels, a paginated item table, totals, observations, payments
+and a verification footer. Export dialogs suggest human-readable filenames
+using commercial number + client, not internal ids.
 
 Branding assets (logo, sello, firma) live in the public Supabase Storage
 bucket `workspace-assets`, with RLS gated by the `currency.manage_rates`
 permission. The renderer uploads via `WorkspaceBrandingCard`; the main
 process fetches the URLs as Buffers when generating the PDF.
+
+If a workspace-specific logo is unavailable or fails to load, quote and
+invoice PDFs fall back to the same bundled Metadata Cine logo used by packing
+slips. This keeps exported commercial documents branded even before workspace
+branding is configured.
+
+Long-document audit: quotes, invoices, packing slips, insurance lists, finance
+reports and project setup PDFs all use page-addition paths instead of removing
+overflow pages. Quotes were hardened specifically because the older
+pixel-faithful template forced a single page; long quotes now paginate with a
+continuation header and repeated table header.
 
 ## Sync (Plan L FQ7)
 

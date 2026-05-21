@@ -2042,13 +2042,16 @@ export const registerFoundationIpc = ({
         accessLevel: "read",
         requiredPermission: "finance.read",
       });
+      const detail = quoteReads.getQuoteDetail(query.workspaceId, query.quoteId);
+      if (!detail) {
+        throw new Error("Quote was not found.");
+      }
       const dateStamp = new Date().toISOString().slice(0, 10);
+      const safeNumber = detail.quoteNumber.replace(/[^a-z0-9_-]+/gi, "_");
+      const safeClient = (detail.clientNameSnapshot || detail.attentionName || "cliente").replace(/[^a-z0-9_-]+/gi, "_").slice(0, 48);
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: "Export quote PDF",
-        defaultPath: path.join(
-          app.getPath("documents"),
-          `Cotizacion_${query.quoteId.replace(/[^a-z0-9_-]+/gi, "_")}_${dateStamp}.pdf`,
-        ),
+        defaultPath: path.join(app.getPath("documents"), `Cotizacion_${safeNumber}_${safeClient}_${dateStamp}.pdf`),
         filters: [{ name: "PDF", extensions: ["pdf"] }],
       });
       if (canceled || !filePath) {

@@ -1707,8 +1707,11 @@ export const createDocumentGenerationService = () => ({
   },
 
   /**
-   * Quote PDF — pixel-faithful recreation of the Metadata Cine quote model
-   * (cotizaciones 2025-8400..8405). A4 portrait, single page.
+   * Quote PDF — Metadata Cine commercial quote layout.
+   *
+   * The first page stays close to the hand-prepared Metadata model, but the
+   * item table is allowed to continue onto extra pages. That is deliberate:
+   * losing line items is worse than breaking the historical single-page shape.
    *
    * Visual hierarchy:
    *  1. Logo (top-left, ~140x110), "COTIZACIÓN" + number (top-right).
@@ -1723,10 +1726,7 @@ export const createDocumentGenerationService = () => ({
    *  8. "Recibido por:" right.
    */
   async createQuotePdf(payload: QuotePdfPayload) {
-    // bufferPages keeps every page in memory so we can drop overflow pages
-    // before flushing to disk. autoFirstPage is on by default; we never want
-    // pdfkit to auto-create a second page from cursor drift.
-    const document = new PDFDocument({ margin: 32, size: "A4", bufferPages: true });
+    const document = new PDFDocument({ margin: 32, size: "A4" });
     const bufferPromise = collectPdfBuffer(document);
 
     const pageLeft = document.page.margins.left;
@@ -1759,15 +1759,7 @@ export const createDocumentGenerationService = () => ({
         drawMetadataLogo(document, logoBoxX + 22, logoBoxY + 8);
       }
     } else {
-      // Fallback: stacked META / DATA / CINE text blocks.
-      document.font("Helvetica-Bold").fillColor(ink).fontSize(22);
-      document.text("META", logoBoxX, logoBoxY, { lineBreak: false, characterSpacing: 1.4 });
-      document.text("DATA", logoBoxX, logoBoxY + 21, { lineBreak: false, characterSpacing: 1.4 });
-      document.font("Helvetica").fontSize(9);
-      document.text("C I N E", logoBoxX + 3, logoBoxY + 50, {
-        lineBreak: false,
-        characterSpacing: 6,
-      });
+      drawMetadataLogo(document, logoBoxX + 22, logoBoxY + 8);
     }
 
     // 2. "COTIZACIÓN" + number (top-right) ---------------------------------
@@ -1849,22 +1841,32 @@ export const createDocumentGenerationService = () => ({
       lineIndex: number,
     ) => {
       const y = formY + lineIndex * formLineH;
-      document.font("Helvetica").fillColor(ink).fontSize(9.5);
-      document.text(`${leftLabel} : `, formLeft, y, { continued: true, lineBreak: false });
-      document.font(leftValue ? "Helvetica-Bold" : "Helvetica");
-      document.text(leftValue ?? "", { lineBreak: false });
+      const labelW = 82;
+      const gutter = 8;
+      const drawFormField = (label: string, value: string | null, x: number, width: number) => {
+        document.font("Helvetica").fillColor(ink).fontSize(9.5);
+        document.text(`${label} :`, x, y, {
+          width: labelW,
+          lineBreak: false,
+          ellipsis: true,
+        });
+        document.font(value ? "Helvetica-Bold" : "Helvetica");
+        document.text(value ?? "", x + labelW + gutter, y, {
+          width: width - labelW - gutter,
+          lineBreak: false,
+          ellipsis: true,
+        });
+        document.font("Helvetica");
+      };
 
-      document.font("Helvetica").fontSize(9.5);
-      document.text(`${rightLabel} : `, formLeft + formColW, y, { continued: true, lineBreak: false });
-      document.font(rightValue ? "Helvetica-Bold" : "Helvetica");
-      document.text(rightValue ?? "", { lineBreak: false });
-      document.font("Helvetica");
+      drawFormField(leftLabel, leftValue, formLeft, formColW - 8);
+      drawFormField(rightLabel, rightValue, formLeft + formColW, formColW);
     };
 
     drawFormRow("ATENCIÓN", payload.client.attentionName, "FECHA", payload.quoteDate, 0);
     drawFormRow("PRODUCCIÓN", payload.client.productionName, "TEL", payload.client.phone, 1);
     drawFormRow(
-      "NOMBRE DEL PROJECTO",
+      "PROYECTO",
       payload.client.projectName,
       "RNC",
       payload.client.rnc,
@@ -1897,11 +1899,10 @@ export const createDocumentGenerationService = () => ({
 
     // 7. Items table -------------------------------------------------------
     //
-    // Strategy: compute the vertical area we have left after reserving space
-    // for the totals block, observations, and signature. Real items get their
-    // natural height (varies with description detail lines); empty slots
-    // share whatever height is left, so the table always fills the page
-    // without overflowing onto a second page.
+    // Strategy: keep Metadata's stable single-page shape when the quote is
+    // short, but paginate once real line items exceed the available page
+    // area. Quote PDFs must never drop billable lines just to preserve the old
+    // one-page template.
     const colCantW = 48;
     const colDurNumW = 34;
     const colDurUnitW = 42;
@@ -1913,7 +1914,8 @@ export const createDocumentGenerationService = () => ({
     const minRowHeight = 30;
     const totalsRowH = 18;
 
-    // Reserve space for everything that comes AFTER the items table.
+    // Reserve space for everything that comes AFTER the items table on the
+    // single-page happy path.
     const reservedTotals =
       totalsRowH * 3 + // SUB-TOTAL + ITBIS + TOTAL GENERAL
       (payload.totals.discountAmount && payload.totals.discountAmount !== 0 ? totalsRowH : 0);
@@ -1922,30 +1924,49 @@ export const createDocumentGenerationService = () => ({
     const tableBottomLimit = pageBottom - reservedTotals - reservedFooter;
     const tableAvailable = Math.max(headerHeight + minRowHeight, tableBottomLimit - tableTopY);
 
-    // Table header
-    document.rect(pageLeft, cursorY, pageWidth, headerHeight).strokeColor(hairline).lineWidth(0.7).stroke();
-    document.font("Helvetica-Bold").fillColor(ink).fontSize(8);
-    let tx = pageLeft;
-    const drawHeader = (label: string, w: number) => {
-      document.text(label, tx, cursorY + 6, { width: w, align: "center", lineBreak: false });
-      tx += w;
-    };
-    drawHeader("CANT.", colCantW);
-    drawHeader("DESCRIPCIÓN", colDescW);
-    drawHeader("DURACIÓN", colDurNumW + colDurUnitW);
-    drawHeader("PRECIO", colPrecioW);
-    drawHeader("COSTO", colCostoW);
+    const drawQuoteTableHeader = () => {
+      document.rect(pageLeft, cursorY, pageWidth, headerHeight).strokeColor(hairline).lineWidth(0.7).stroke();
+      document.font("Helvetica-Bold").fillColor(ink).fontSize(8);
+      let tx = pageLeft;
+      const drawHeader = (label: string, w: number) => {
+        document.text(label, tx, cursorY + 6, { width: w, align: "center", lineBreak: false });
+        tx += w;
+      };
+      drawHeader("CANT.", colCantW);
+      drawHeader("DESCRIPCIÓN", colDescW);
+      drawHeader("DURACIÓN", colDurNumW + colDurUnitW);
+      drawHeader("PRECIO", colPrecioW);
+      drawHeader("COSTO", colCostoW);
 
-    // Vertical column dividers in header
-    {
       let dx = pageLeft + colCantW;
       [colDescW, colDurNumW + colDurUnitW, colPrecioW].forEach((w) => {
         document.moveTo(dx, cursorY).lineTo(dx, cursorY + headerHeight).strokeColor(hairline).stroke();
         dx += w;
       });
-    }
 
-    cursorY += headerHeight;
+      cursorY += headerHeight;
+    };
+
+    const addQuoteContinuationPage = () => {
+      document.addPage();
+      cursorY = document.page.margins.top;
+      document.font("Helvetica").fillColor(muted).fontSize(8.5).text("COTIZACIÓN", pageLeft, cursorY, {
+        width: pageWidth * 0.45,
+        lineBreak: false,
+        characterSpacing: 0.8,
+      });
+      document.font("Helvetica-Bold").fillColor(ink).fontSize(11).text(payload.quoteNumber, pageRight - 180, cursorY, {
+        width: 180,
+        align: "right",
+        lineBreak: false,
+      });
+      cursorY += 18;
+      document.moveTo(pageLeft, cursorY).lineTo(pageRight, cursorY).strokeColor(hairline).lineWidth(0.7).stroke();
+      cursorY += 16;
+      drawQuoteTableHeader();
+    };
+
+    drawQuoteTableHeader();
 
     const drawItemRow = (
       item: QuotePdfPayload["items"][number] | null,
@@ -2050,13 +2071,23 @@ export const createDocumentGenerationService = () => ({
       emptyRowHeight = Math.max(minRowHeight, Math.floor(remainingForEmpties / emptyCount));
     }
 
+    const tableContinuationBottom = pageBottom - 36;
+    const shouldPaginateTable = realHeightTotal > tableAvailable - headerHeight;
+
     realItems.forEach((item, index) => {
-      drawItemRow(item, cursorY, realHeights[index]!);
-      cursorY += realHeights[index]!;
+      const rowHeight = realHeights[index]!;
+      if (shouldPaginateTable && cursorY + rowHeight > tableContinuationBottom) {
+        addQuoteContinuationPage();
+      }
+      drawItemRow(item, cursorY, rowHeight);
+      cursorY += rowHeight;
     });
-    for (let i = 0; i < emptyCount; i += 1) {
-      drawItemRow(null, cursorY, emptyRowHeight);
-      cursorY += emptyRowHeight;
+
+    if (!shouldPaginateTable) {
+      for (let i = 0; i < emptyCount; i += 1) {
+        drawItemRow(null, cursorY, emptyRowHeight);
+        cursorY += emptyRowHeight;
+      }
     }
 
     // 8. Totals rows -------------------------------------------------------
@@ -2086,6 +2117,24 @@ export const createDocumentGenerationService = () => ({
 
     const ccy = payload.currency.code.toUpperCase();
     const sym = payload.currency.symbol || "$";
+
+    const ensureQuoteFooterSpace = (height: number) => {
+      if (cursorY + height <= pageBottom - 24) return;
+      document.addPage();
+      cursorY = document.page.margins.top;
+    };
+
+    ensureQuoteFooterSpace(
+      reservedTotals +
+        22 +
+        Math.max(
+          14,
+          payload.observations?.trim()
+            ? Math.ceil(document.heightOfString(payload.observations.trim(), { width: pageWidth - 90 })) + 4
+            : 14,
+        ) +
+        96,
+    );
 
     drawTotalsRow(`( ${ccy} ) ${sym} SUB-TOTAL :`, formatAmount(payload.totals.subtotal));
 
@@ -2163,11 +2212,6 @@ export const createDocumentGenerationService = () => ({
     drawTotalsRow(`( ${ccy} ) ${sym} TOTAL GENERAL :`, formatAmount(payload.totals.total), true);
 
     // 9. Observaciones + signature/sello -----------------------------------
-    //
-    // Pin everything below to fixed Y coordinates measured from the bottom
-    // margin. This guarantees the signature, signatory name, legal name and
-    // "Recibido por:" all land on page 1 regardless of how tall the items
-    // table ended up.
     const observacionesY = cursorY + 14;
     document.font("Helvetica").fillColor(ink).fontSize(9);
     document.text("Observaciones :", pageLeft, observacionesY, { lineBreak: false });
@@ -2177,10 +2221,22 @@ export const createDocumentGenerationService = () => ({
       });
     }
 
-    // Signature block: anchored from page bottom so it never overflows.
+    cursorY =
+      observacionesY +
+      Math.max(
+        18,
+        payload.observations?.trim()
+          ? Math.ceil(document.heightOfString(payload.observations.trim(), { width: pageWidth - 90 })) + 8
+          : 18,
+      );
+
+    ensureQuoteFooterSpace(82);
+
+    // Signature block: anchored to the current cursor on multipage quotes and
+    // naturally lands near the bottom on the original single-page layout.
     const signatureBoxW = 230;
-    const signatureBlockY = pageBottom - 76;
-    const signatureLineY = pageBottom - 24;
+    const signatureBlockY = Math.min(pageBottom - 76, cursorY + 6);
+    const signatureLineY = signatureBlockY + 52;
 
     if (payload.workspace.signatureBuffer) {
       try {
@@ -2229,25 +2285,6 @@ export const createDocumentGenerationService = () => ({
       lineBreak: false,
     });
 
-    // pdfkit may have auto-created extra pages from cursor drift on text()
-    // calls near the page bottom. Force the document down to a single page
-    // by switching back to page 0 and dropping every later page from the
-    // page tree before flush.
-    const range = document.bufferedPageRange();
-    if (range.count > 1) {
-      // PDFKit does not expose a public removePage API. The internal page
-      // list lives on `document._root.data.Pages.data.Kids` and the count
-      // on `Count`. We splice the kids and update the count so only the
-      // first page remains.
-      const root = (document as unknown as {
-        _root: { data: { Pages: { data: { Kids: unknown[]; Count: number } } } };
-      })._root;
-      const kids = root.data.Pages.data.Kids;
-      if (Array.isArray(kids) && kids.length > 1) {
-        kids.length = 1;
-        root.data.Pages.data.Count = 1;
-      }
-    }
     document.end();
 
     const safeNumber = payload.quoteNumber.replace(/[^a-z0-9_-]+/gi, "_");
