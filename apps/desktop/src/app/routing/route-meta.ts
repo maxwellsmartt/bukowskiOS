@@ -36,6 +36,8 @@ export const globalRouteMeta: AppRouteMeta[] = [
   { path: "/finance/cost-links", label: "Review Queue", scopeMode: "global", domain: "finance" },
   { path: "/finance/entries", label: "Entries", scopeMode: "global", domain: "finance" },
   { path: "/finance/invoices", label: "Invoices", scopeMode: "global", domain: "finance" },
+  { path: "/finance/invoices/new", label: "New invoice", scopeMode: "global", domain: "finance" },
+  { path: "/finance/invoices/:invoiceId/edit", label: "Edit invoice", scopeMode: "global", domain: "finance" },
   { path: "/finance/invoices/:invoiceId", label: "Invoice detail", scopeMode: "global", domain: "finance" },
   { path: "/finance/quotes", label: "Quotes", scopeMode: "global", domain: "finance" },
   { path: "/finance/quotes/new", label: "New quote", scopeMode: "global", domain: "finance" },

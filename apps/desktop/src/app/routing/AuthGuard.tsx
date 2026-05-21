@@ -2,15 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 
 import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
-
-const AuthBlockingShell = ({ message }: { message: string }) => (
-  <div className="auth-blocking-shell" role="status" aria-live="polite">
-    <div className="auth-blocking-card">
-      <span className="auth-blocking-spinner" aria-hidden="true" />
-      <strong>{message}</strong>
-    </div>
-  </div>
-);
+import { AppStartupGate } from "@shared/components/AppStartupGate";
 
 export const AuthGuard = ({ children }: { children: JSX.Element }) => {
   const location = useLocation();
@@ -18,7 +10,7 @@ export const AuthGuard = ({ children }: { children: JSX.Element }) => {
   const { isLoadingWorkspaces, isWorkspaceReady } = useWorkspace();
 
   if (status === "loading") {
-    return <AuthBlockingShell message="Restoring secure session…" />;
+    return <AppStartupGate detail="Restoring secure session..." />;
   }
 
   if (status !== "authenticated") {
@@ -26,7 +18,7 @@ export const AuthGuard = ({ children }: { children: JSX.Element }) => {
   }
 
   if (isLoadingWorkspaces && !isWorkspaceReady) {
-    return <AuthBlockingShell message="Loading your workspace…" />;
+    return <AppStartupGate detail="Loading your workspace..." />;
   }
 
   if (!isWorkspaceReady && !location.pathname.startsWith("/workspaces")) {

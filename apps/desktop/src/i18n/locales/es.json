@@ -663,7 +663,6 @@
       },
       "actions": {
         "newManual": "Factura manual",
-        "manualDeferred": "Las facturas manuales vienen después de cerrar el flujo generado desde cotizaciones.",
         "view": "Ver factura"
       },
       "toasts": {
@@ -732,6 +731,7 @@
         "notFoundTitle": "Factura no encontrada",
         "notFoundBody": "Esta factura pudo haberse eliminado localmente o todavía no está sincronizada en este equipo.",
         "actions": {
+          "editDraft": "Editar borrador",
           "exportPdf": "Exportar PDF",
           "exportingPdf": "Exportando...",
           "issue": "Emitir factura",
@@ -773,6 +773,71 @@
           "title": "¿Cancelar esta factura?",
           "body": "Las facturas canceladas permanecen en la auditoría. Usa esto sólo cuando el documento no debe continuar a cobros.",
           "reason": "Razón"
+        }
+      },
+      "editor": {
+        "newTitle": "Nueva factura manual",
+        "editTitle": "Editar factura en borrador",
+        "body": "Crea un borrador operativo. La emisión, NCF, PDF y pagos se manejan desde el detalle de factura.",
+        "loading": "Preparando borrador...",
+        "lockedTitle": "Esta factura ya no se puede editar",
+        "lockedBody": "Sólo los borradores pueden editarse. Las facturas emitidas mantienen su snapshot fiscal congelado.",
+        "sections": {
+          "clientProduction": "Cliente y producción",
+          "money": "Moneda, fechas e impuestos",
+          "items": "Items facturados",
+          "totals": "Resumen",
+          "notes": "Notas"
+        },
+        "fields": {
+          "clientName": "Nombre del cliente",
+          "clientRnc": "RNC del cliente",
+          "productionCompany": "Productora",
+          "pur": "PUR",
+          "projectProduction": "Proyecto / Producción",
+          "packageTitle": "Título del paquete",
+          "description": "Descripción",
+          "issueDate": "Fecha de emisión",
+          "dueDate": "Fecha de vencimiento",
+          "paymentTerms": "Crédito (días)",
+          "currency": "Moneda",
+          "exchangeRate": "Tasa de cambio ({{from}} → {{to}})",
+          "taxProfile": "Perfil fiscal",
+          "itbisRate": "Tasa ITBIS",
+          "addItbis": "Agregar ITBIS al total",
+          "itemTitle": "Item",
+          "itemDescription": "Detalle",
+          "quantity": "Cantidad",
+          "unitPrice": "Precio unitario",
+          "taxBehavior": "ITBIS",
+          "lineTotal": "Total línea",
+          "observations": "Observaciones"
+        },
+        "aria": {
+          "paymentTerms": "Crédito en días",
+          "exchangeRate": "Tasa de cambio",
+          "itbisRate": "Tasa ITBIS",
+          "quantity": "Cantidad para línea {{line}}",
+          "unitPrice": "Precio unitario para línea {{line}}"
+        },
+        "actions": {
+          "saveDraft": "Guardar borrador",
+          "saving": "Guardando...",
+          "openDetail": "Abrir factura",
+          "useLatestRate": "Usar última: {{rate}} ({{date}})",
+          "addLine": "Agregar línea",
+          "removeLine": "Eliminar línea"
+        },
+        "validation": {
+          "clientRequiredTitle": "Falta el cliente",
+          "clientRequiredBody": "Agrega el nombre del cliente antes de guardar la factura.",
+          "itemRequiredTitle": "Revisa los items",
+          "itemRequiredBody": "La línea {{line}} necesita título y cantidad mayor que cero."
+        },
+        "toasts": {
+          "createdTitle": "Factura manual creada",
+          "updatedTitle": "Borrador actualizado",
+          "saveFailed": "No se pudo guardar la factura"
         }
       },
       "empty": {
@@ -1175,7 +1240,7 @@
         "totals": "Totales",
         "totalsSubtitle": "Preview en vivo: estos son los números que saldrán en el PDF.",
         "fields": {
-          "clientName": "Nombre del cliente *",
+          "clientName": "Nombre del cliente",
           "clientRnc": "RNC del cliente",
           "productionCompany": "Productora",
           "pur": "PUR (Permiso Único de Rodaje)",

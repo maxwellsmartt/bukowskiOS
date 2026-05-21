@@ -16,6 +16,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { CompactSelect } from "@shared/components/CompactSelect";
 import { HelpHint } from "@shared/components/HelpHint";
 import { NumberStepper } from "@shared/components/NumberStepper";
+import { RequiredLabel } from "@shared/components/RequiredLabel";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -892,8 +893,8 @@ export const QuoteEditorPage = () => {
       />
 
       {!isNew && existingQuote ? (
-        <SurfaceCard>
-          <div className="surface-card-header">
+        <SurfaceCard className="quote-numbering-card">
+          <div className="surface-card-header quote-numbering-header">
             <div>
               <h3>{t("finance.quotes.editor.numbering.title")}</h3>
               <p>{t("finance.quotes.editor.numbering.body")}</p>
@@ -1022,10 +1023,13 @@ export const QuoteEditorPage = () => {
       ) : null}
 
       <SurfaceCard title={t("finance.quotes.editor.clientProduction")}>
-        <div className="agent-form-grid">
+        <div className="agent-form-grid finance-editor-form">
           <label className="field-block">
-            <span className="field-label">{t("finance.quotes.editor.fields.clientName")}</span>
+            <span className="field-label">
+              <RequiredLabel>{t("finance.quotes.editor.fields.clientName")}</RequiredLabel>
+            </span>
             <input
+              aria-required="true"
               className="field-input"
               list="quote-catalog-clients"
               onChange={(e) => {
@@ -1213,24 +1217,14 @@ export const QuoteEditorPage = () => {
             />
           </label>
         </div>
-      </SurfaceCard>
-
-      {clientNeedsCapture || productionCompanyNeedsCapture ? (
-        <SurfaceCard>
-          <div className="surface-card-header">
+        {clientNeedsCapture || productionCompanyNeedsCapture ? (
+          <div className="catalog-capture-inline">
             <div>
-              <h3>{t("finance.quotes.editor.catalogCapture.title")}</h3>
-              <p>{t("finance.quotes.editor.catalogCapture.body")}</p>
+              <strong>{t("finance.quotes.editor.catalogCapture.title")}</strong>
+              <span>{t("finance.quotes.editor.catalogCapture.body")}</span>
             </div>
-          </div>
-          <div className="settings-mini-list">
-            {clientNeedsCapture ? (
-              <div className="settings-mini-row">
-                <span>
-                  {matchingClient
-                    ? t("finance.quotes.editor.catalogCapture.updateClient", { name: clientName })
-                    : t("finance.quotes.editor.catalogCapture.createClient", { name: clientName })}
-                </span>
+            <div className="catalog-capture-inline-actions">
+              {clientNeedsCapture ? (
                 <button
                   className="ghost-control is-active"
                   disabled={savingCatalogSuggestion !== null}
@@ -1244,19 +1238,8 @@ export const QuoteEditorPage = () => {
                       : t("finance.quotes.editor.catalogCapture.saveClient")}
                   </span>
                 </button>
-              </div>
-            ) : null}
-            {productionCompanyNeedsCapture ? (
-              <div className="settings-mini-row">
-                <span>
-                  {matchingProductionCompany
-                    ? t("finance.quotes.editor.catalogCapture.updateProductionCompany", {
-                        name: productionCompanyName,
-                      })
-                    : t("finance.quotes.editor.catalogCapture.createProductionCompany", {
-                        name: productionCompanyName,
-                      })}
-                </span>
+              ) : null}
+              {productionCompanyNeedsCapture ? (
                 <button
                   className="ghost-control is-active"
                   disabled={savingCatalogSuggestion !== null}
@@ -1270,17 +1253,20 @@ export const QuoteEditorPage = () => {
                       : t("finance.quotes.editor.catalogCapture.saveProductionCompany")}
                   </span>
                 </button>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </div>
-        </SurfaceCard>
-      ) : null}
+        ) : null}
+      </SurfaceCard>
 
       <SurfaceCard title={t("finance.quotes.editor.currencyTax")}>
-        <div className="agent-form-grid">
+        <div className="agent-form-grid finance-editor-form">
           <label className="field-block">
-            <span className="field-label">{t("finance.quotes.editor.fields.quoteDate")}</span>
+            <span className="field-label">
+              <RequiredLabel>{t("finance.quotes.editor.fields.quoteDate")}</RequiredLabel>
+            </span>
             <input
+              aria-required="true"
               className="field-input"
               onChange={(e) => updateDraft("quoteDate", e.target.value)}
               type="date"
@@ -1288,7 +1274,9 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">{t("finance.quotes.editor.fields.validityDays")}</span>
+            <span className="field-label">
+              <RequiredLabel>{t("finance.quotes.editor.fields.validityDays")}</RequiredLabel>
+            </span>
             <NumberStepper
               align="left"
               ariaLabel={t("finance.quotes.editor.aria.validityDays")}
@@ -1299,8 +1287,11 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">{t("finance.quotes.editor.fields.currency")}</span>
+            <span className="field-label">
+              <RequiredLabel>{t("finance.quotes.editor.fields.currency")}</RequiredLabel>
+            </span>
             <select
+              aria-required="true"
               className="field-input"
               onChange={(e) => updateDraft("currency", e.target.value)}
               value={draft.currency}
@@ -1314,7 +1305,7 @@ export const QuoteEditorPage = () => {
           </label>
           <label className="field-block">
             <span className="field-label">
-              {t("finance.quotes.editor.fields.exchangeRate", { from: draft.currency, to: draft.baseCurrency })}
+              <RequiredLabel>{t("finance.quotes.editor.fields.exchangeRate", { from: draft.currency, to: draft.baseCurrency })}</RequiredLabel>
             </span>
             <NumberStepper
               align="left"
@@ -1345,8 +1336,11 @@ export const QuoteEditorPage = () => {
             ) : null}
           </label>
           <label className="field-block field-block-span-2">
-            <span className="field-label">{t("finance.quotes.editor.fields.taxProfile")}</span>
+            <span className="field-label">
+              <RequiredLabel>{t("finance.quotes.editor.fields.taxProfile")}</RequiredLabel>
+            </span>
             <select
+              aria-required="true"
               className="field-input"
               onChange={(event) => updateDraft("taxProfile", event.target.value as typeof draft.taxProfile)}
               value={draft.taxProfile}
@@ -1359,7 +1353,9 @@ export const QuoteEditorPage = () => {
             </select>
           </label>
           <label className="field-block">
-            <span className="field-label">{t("finance.quotes.editor.fields.itbisRate")}</span>
+            <span className="field-label">
+              <RequiredLabel>{t("finance.quotes.editor.fields.itbisRate")}</RequiredLabel>
+            </span>
             <NumberStepper
               align="left"
               ariaLabel={t("finance.quotes.editor.aria.itbisRate")}
@@ -1373,8 +1369,11 @@ export const QuoteEditorPage = () => {
             />
           </label>
           <label className="field-block">
-            <span className="field-label">{t("finance.quotes.editor.fields.addItbis")}</span>
+            <span className="field-label">
+              <RequiredLabel>{t("finance.quotes.editor.fields.addItbis")}</RequiredLabel>
+            </span>
             <select
+              aria-required="true"
               className="field-input"
               onChange={(e) => updateDraft("taxAddedToTotal", e.target.value === "yes")}
               value={draft.taxAddedToTotal ? "yes" : "no"}
@@ -1440,6 +1439,7 @@ export const QuoteEditorPage = () => {
                 <div className="quote-items-description">
                   <div className="quote-item-autocomplete">
                     <input
+                      aria-required="true"
                       className="field-input quote-items-description-title"
                       onBlur={() => window.setTimeout(() => setActiveItemSuggestion(null), 120)}
                       onChange={(e) => {

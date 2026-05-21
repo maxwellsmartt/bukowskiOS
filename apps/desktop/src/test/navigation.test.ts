@@ -27,6 +27,8 @@ describe("foundation navigation shell", () => {
     ]);
     expect(appRoutes.some((route) => route.path === "/finance/entries")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/finance/invoices")).toBe(true);
+    expect(appRoutes.some((route) => route.path === "/finance/invoices/new")).toBe(true);
+    expect(appRoutes.some((route) => route.path === "/finance/invoices/:invoiceId/edit")).toBe(true);
   });
 
   it("adds an agents control plane without breaking the rest of the shell", () => {

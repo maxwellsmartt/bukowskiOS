@@ -12,6 +12,7 @@ import { notifyWorkspaceDataChanged } from "@shared/hooks/useWorkspaceDataRefres
 import { useSession } from "@app/providers/SessionProvider";
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { AppStartupGate } from "@shared/components/AppStartupGate";
 import { Breadcrumb } from "@shared/components/Breadcrumb";
 import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 import { pushRecentEntityKey } from "@shared/lib/recentEntities";
@@ -270,13 +271,7 @@ export const AppShell = () => {
         <WindowTitleBar />
         <main className="auth-shell-main">
           <ShellErrorBoundary>
-            <Suspense
-              fallback={
-                <div className="shell-loading-state">
-                  <div className="empty-state">Loading…</div>
-                </div>
-              }
-            >
+            <Suspense fallback={<AppStartupGate detail="Preparing authentication..." />}>
               <AppRoutes />
             </Suspense>
           </ShellErrorBoundary>
@@ -308,18 +303,10 @@ export const AppShell = () => {
             transitionKey={location.pathname}
           >
             {!isScopeReady ? (
-              <div className="shell-loading-state">
-                <div className="empty-state">Opening your last view…</div>
-              </div>
+              <AppStartupGate detail="Opening your last view..." />
             ) : (
               <ShellErrorBoundary>
-                <Suspense
-                  fallback={
-                    <div className="shell-loading-state">
-                      <div className="empty-state">Loading…</div>
-                    </div>
-                  }
-                >
+                <Suspense fallback={<AppStartupGate detail="Preparing this view..." />}>
                   <AppRoutes />
                 </Suspense>
               </ShellErrorBoundary>

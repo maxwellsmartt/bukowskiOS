@@ -89,10 +89,47 @@ the snapshot.
 
 Quote Editor now watches the draft for reusable business data. If a typed
 client or production company is new — or if an existing catalog row is missing
-RNC/PUR/contact/phone — it shows a compact "New data detected" card. The user
-can save that data into Catalog without leaving the quote flow. This keeps the
-quote fast to draft while gradually building the searchable database for future
-quotes.
+RNC/PUR/contact/phone — it shows compact inline capture actions inside the
+Client & Production section. The user can save that data into Catalog without
+leaving the quote flow. This keeps the quote fast to draft while gradually
+building the searchable database for future quotes.
+
+## Manual invoice MVP
+
+Invoices can now be created directly from Finance > Invoices through
+`/finance/invoices/new`. This path is intentionally scoped to a draft MVP:
+
+- Users can enter client/RNC, production/project context, dates, currency,
+  exchange rate, tax profile, ITBIS behavior, notes and line items.
+- The editor reuses the existing `CreateInvoiceCommand` and
+  `UpdateInvoiceCommand`; there is no new schema or special manual-invoice
+  table.
+- Draft invoices expose an explicit "Edit draft" action in
+  `InvoiceDetailPage`, routed through `/finance/invoices/:invoiceId/edit`.
+- Issuing, NCF consumption, PDF export, cancellation and payment registration
+  remain in the invoice detail surface so the fiscal lifecycle has one clear
+  operational home.
+- Issued/paid/cancelled/void invoices are not editable. Corrections should be
+  handled by cancelling/reissuing rather than mutating a fiscal snapshot.
+
+The manual path does not replace Quote -> Invoice. Quote-generated invoices
+remain the preferred production workflow when a quote exists; manual invoices
+cover operational exceptions and historical billing that did not start from a
+quote.
+
+## Startup instrumentation
+
+The Electron startup window still appears before the local SQLite bootstrap.
+The renderer now uses the same `Starting bukowskiOS` gate while session,
+workspace and route bootstrap complete, so slow starts feel intentional instead
+of blank. Main process startup logs now include phase durations for:
+
+- local database initialization;
+- total startup time before renderer load;
+- renderer `did-finish-load`.
+
+This is diagnostic only. Startup performance should be optimized from these
+timings rather than guessed.
 
 ## Quote numbering
 

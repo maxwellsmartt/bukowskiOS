@@ -296,15 +296,26 @@ app.whenReady().then(() => {
   });
 
   Menu.setApplicationMenu(buildAppMenu());
+  const startupStartedAt = Date.now();
   const mainWindow = createStartupWindow();
   logger.info("Startup window created before local database initialization.");
 
   let localDatabase: ReturnType<typeof initializeLocalDatabase>;
+  const databaseStartedAt = Date.now();
   try {
     localDatabase = initializeLocalDatabase();
-    logger.info("Local database initialized; loading renderer.");
+    logger.info("Local database initialized; loading renderer.", {
+      durationMs: Date.now() - databaseStartedAt,
+      startupDurationMs: Date.now() - startupStartedAt,
+    });
   } catch (error) {
-    logger.error("Local database initialization failed before renderer load.", error);
+    logger.error("Local database initialization failed before renderer load.", {
+      durationMs: Date.now() - databaseStartedAt,
+      startupDurationMs: Date.now() - startupStartedAt,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     throw error;
   }
   const documentGeneration = createDocumentGenerationService();
@@ -669,8 +680,15 @@ app.whenReady().then(() => {
     agentMutations: localDatabase.agentMutations,
     runtimeDiagnostics: localDatabase.runtimeDiagnostics,
   });
+  const rendererLoadStartedAt = Date.now();
   void loadMainWindowContent(mainWindow, devServerUrl, rendererDist);
-  mainWindow.webContents.once("did-finish-load", flushPendingDeepLinks);
+  mainWindow.webContents.once("did-finish-load", () => {
+    logger.info("Renderer finished loading.", {
+      durationMs: Date.now() - rendererLoadStartedAt,
+      startupDurationMs: Date.now() - startupStartedAt,
+    });
+    flushPendingDeepLinks();
+  });
 
   app.on("activate", () => {
     const existingWindow = BrowserWindow.getAllWindows()[0];

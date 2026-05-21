@@ -160,9 +160,8 @@ export const InvoicesPage = () => {
       <div className="page-stack-row">
         <SectionHeader eyebrow={t("finance.title")} title={t("finance.invoices.title")} titleTone="accent" />
         <button
-          className="ghost-control"
-          disabled
-          title={t("finance.invoices.actions.manualDeferred")}
+          className="ghost-control is-active"
+          onClick={() => navigate("/finance/invoices/new")}
           type="button"
         >
           <Plus size={13} />
@@ -261,8 +260,8 @@ export const InvoicesPage = () => {
         {error ? <div className="form-inline-error">{error}</div> : null}
       </SurfaceCard>
 
-      <SurfaceCard>
-        <div className="empty-state-inline">
+      <SurfaceCard className="invoice-footnote-card">
+        <div className="invoice-footnote-content">
           <FileText size={15} />
           <span>{t("finance.invoices.footnote")}</span>
         </div>

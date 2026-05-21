@@ -23,6 +23,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { useCatalogData, exportProjectBlueprintPdf, getProjectCreationConflicts, getStagingPackingSlips } from "@features/projects/useProjectsData";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { RequiredLabel } from "@shared/components/RequiredLabel";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { useShellContext } from "@shared/hooks/useShellContext";
@@ -1358,8 +1359,10 @@ export const ProjectSetupWizard = ({
                 </label>
 
                 <label className="action-field">
-                  <span className="action-field-label">{t("projectSetup.fields.projectName")}</span>
-                  <input className="action-field-control" onChange={(event) => setGeneralInfo("name", event.target.value)} value={draft.generalInfo.name} />
+                  <span className="action-field-label">
+                    <RequiredLabel>{t("projectSetup.fields.projectName")}</RequiredLabel>
+                  </span>
+                  <input aria-required="true" className="action-field-control" onChange={(event) => setGeneralInfo("name", event.target.value)} value={draft.generalInfo.name} />
                 </label>
 
                 <label className="action-field">
@@ -2046,8 +2049,11 @@ export const ProjectSetupWizard = ({
                           <div className="project-setup-section-stack">
                             <div className="project-setup-grid project-setup-grid-compact">
                               <label className="action-field">
-                                <span className="action-field-label">{t("projectSetup.units.unitName")}</span>
+                                <span className="action-field-label">
+                                  <RequiredLabel>{t("projectSetup.units.unitName")}</RequiredLabel>
+                                </span>
                                 <input
+                                  aria-required="true"
                                   className="action-field-control"
                                   onChange={(event) => updateAdditionalUnit(unit.id!, { name: event.target.value })}
                                   value={unit.name}

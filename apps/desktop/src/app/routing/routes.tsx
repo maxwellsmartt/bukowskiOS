@@ -36,6 +36,7 @@ const FinanceCostLinksPage = lazyPage(() => import("@features/finance/FinanceCos
 const FinanceEntriesPage = lazyPage(() => import("@features/finance/FinanceEntriesPage"), "FinanceEntriesPage");
 const FinanceOverviewPage = lazyPage(() => import("@features/finance/FinanceOverviewPage"), "FinanceOverviewPage");
 const InvoiceDetailPage = lazyPage(() => import("@features/finance/InvoiceDetailPage"), "InvoiceDetailPage");
+const InvoiceEditorPage = lazyPage(() => import("@features/finance/InvoiceEditorPage"), "InvoiceEditorPage");
 const InvoicesPage = lazyPage(() => import("@features/finance/InvoicesPage"), "InvoicesPage");
 const QuotesPage = lazyPage(() => import("@features/finance/QuotesPage"), "QuotesPage");
 const QuoteEditorPage = lazyPage(() => import("@features/finance/QuoteEditorPage"), "QuoteEditorPage");
@@ -74,6 +75,8 @@ const routeElements = {
   "/finance/cost-links": <FinanceCostLinksPage />,
   "/finance/entries": <FinanceEntriesPage />,
   "/finance/invoices": <InvoicesPage />,
+  "/finance/invoices/new": <InvoiceEditorPage />,
+  "/finance/invoices/:invoiceId/edit": <InvoiceEditorPage />,
   "/finance/invoices/:invoiceId": <InvoiceDetailPage />,
   "/finance/quotes": <QuotesPage />,
   "/finance/quotes/new": <QuoteEditorPage />,

@@ -1,4 +1,4 @@
-import { ArrowLeft, Ban, CheckCircle2, CreditCard, Download, Save } from "lucide-react";
+import { ArrowLeft, Ban, CheckCircle2, CreditCard, Download, Pencil, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -287,6 +287,16 @@ export const InvoiceDetailPage = () => {
         </div>
         <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap" }}>
           <StatusBadge tone={statusTone(invoice.status)}>{statusLabel(invoice.status)}</StatusBadge>
+          {invoice.status === "draft" ? (
+            <button
+              className="ghost-control"
+              onClick={() => navigate(`/finance/invoices/${invoice.id}/edit`)}
+              type="button"
+            >
+              <Pencil size={13} />
+              <span>{t("finance.invoices.detail.actions.editDraft")}</span>
+            </button>
+          ) : null}
           <button
             className="ghost-control"
             disabled={isExportingPdf}

@@ -45,6 +45,42 @@ const buildInvoice = (commandId: string, overrides: Record<string, unknown> = {}
 });
 
 describe("invoice mutation service", () => {
+  it("creates and updates a manual draft invoice with line items", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-invoice-manual-draft");
+    const reads = createInvoiceReadService(database);
+    const mutations = createInvoiceMutationService(database);
+
+    const created = mutations.createInvoice(buildInvoice("cmd-manual-invoice-create", {
+      clientNameSnapshot: "Manual Client",
+      sourceQuoteId: null,
+      items: [
+        { sortOrder: 1, quantity: 2, title: "DIT package", unitPrice: 12000, taxBehavior: "taxable" as const },
+        { sortOrder: 2, quantity: 1, title: "Data wrangling", unitPrice: 8000, taxBehavior: "taxable" as const },
+      ],
+    }));
+
+    const draft = reads.getInvoiceDetail("workspace-metadata", created.invoiceId);
+    expect(draft?.status).toBe("draft");
+    expect(draft?.sourceQuoteId).toBeNull();
+    expect(draft?.items).toHaveLength(2);
+    expect(draft?.totalAmount).toBeGreaterThan(0);
+
+    mutations.updateInvoice({
+      ...buildInvoice("cmd-manual-invoice-update", {
+        clientNameSnapshot: "Manual Client Updated",
+        items: [{ sortOrder: 1, quantity: 3, title: "Updated package", unitPrice: 9000, taxBehavior: "taxable" as const }],
+      }),
+      invoiceId: created.invoiceId,
+    });
+
+    const updated = reads.getInvoiceDetail("workspace-metadata", created.invoiceId);
+    expect(updated?.clientNameSnapshot).toBe("Manual Client Updated");
+    expect(updated?.items).toHaveLength(1);
+    expect(updated?.items[0]?.quantity).toBe(3);
+
+    cleanup();
+  });
+
   it("renumbers invoices without touching NCF and advances the next sequence", () => {
     const { cleanup, database } = createTestDatabase("bukowski-invoice-renumber");
     const reads = createInvoiceReadService(database);

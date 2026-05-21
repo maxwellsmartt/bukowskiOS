@@ -661,7 +661,6 @@
       },
       "actions": {
         "newManual": "Manual invoice",
-        "manualDeferred": "Manual invoices come after quote-generated invoices are fully wired.",
         "view": "View invoice"
       },
       "toasts": {
@@ -730,6 +729,7 @@
         "notFoundTitle": "Invoice not found",
         "notFoundBody": "This invoice may have been deleted locally or may not be synced on this device yet.",
         "actions": {
+          "editDraft": "Edit draft",
           "exportPdf": "Export PDF",
           "exportingPdf": "Exporting...",
           "issue": "Issue invoice",
@@ -771,6 +771,71 @@
           "title": "Cancel this invoice?",
           "body": "Cancelled invoices stay in the audit trail. Use this only when the document should not continue through collections.",
           "reason": "Reason"
+        }
+      },
+      "editor": {
+        "newTitle": "New manual invoice",
+        "editTitle": "Edit draft invoice",
+        "body": "Create an operational draft. Issuing, NCF, PDF and payments stay in the invoice detail.",
+        "loading": "Preparing draft...",
+        "lockedTitle": "This invoice can no longer be edited",
+        "lockedBody": "Only drafts are editable. Issued invoices keep their fiscal snapshot frozen.",
+        "sections": {
+          "clientProduction": "Client & production",
+          "money": "Currency, dates & tax",
+          "items": "Invoice items",
+          "totals": "Summary",
+          "notes": "Notes"
+        },
+        "fields": {
+          "clientName": "Client name",
+          "clientRnc": "Client RNC",
+          "productionCompany": "Production company",
+          "pur": "PUR",
+          "projectProduction": "Project / Production",
+          "packageTitle": "Package title",
+          "description": "Description",
+          "issueDate": "Issue date",
+          "dueDate": "Due date",
+          "paymentTerms": "Terms (days)",
+          "currency": "Currency",
+          "exchangeRate": "Exchange rate ({{from}} → {{to}})",
+          "taxProfile": "Tax profile",
+          "itbisRate": "ITBIS rate",
+          "addItbis": "Add ITBIS to total",
+          "itemTitle": "Item",
+          "itemDescription": "Detail",
+          "quantity": "Quantity",
+          "unitPrice": "Unit price",
+          "taxBehavior": "ITBIS",
+          "lineTotal": "Line total",
+          "observations": "Observations"
+        },
+        "aria": {
+          "paymentTerms": "Payment terms in days",
+          "exchangeRate": "Exchange rate",
+          "itbisRate": "ITBIS rate",
+          "quantity": "Quantity for line {{line}}",
+          "unitPrice": "Unit price for line {{line}}"
+        },
+        "actions": {
+          "saveDraft": "Save draft",
+          "saving": "Saving...",
+          "openDetail": "Open invoice",
+          "useLatestRate": "Use latest: {{rate}} ({{date}})",
+          "addLine": "Add line",
+          "removeLine": "Remove line"
+        },
+        "validation": {
+          "clientRequiredTitle": "Client is required",
+          "clientRequiredBody": "Add a client name before saving the invoice.",
+          "itemRequiredTitle": "Review line items",
+          "itemRequiredBody": "Line {{line}} needs a title and quantity greater than zero."
+        },
+        "toasts": {
+          "createdTitle": "Manual invoice created",
+          "updatedTitle": "Draft updated",
+          "saveFailed": "Could not save invoice"
         }
       },
       "empty": {
@@ -1173,7 +1238,7 @@
         "totals": "Totals",
         "totalsSubtitle": "Live preview: these are the numbers that will print on the PDF.",
         "fields": {
-          "clientName": "Client name *",
+          "clientName": "Client name",
           "clientRnc": "Client RNC",
           "productionCompany": "Production company",
           "pur": "PUR (Permiso Único de Rodaje)",

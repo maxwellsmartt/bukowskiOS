@@ -52,6 +52,16 @@ const appendImageSource = (policy: string, source: string | null) => {
   return policy.replace(imgRegex, (m) => `${m} ${source}`);
 };
 
+const rendererManualChunks = (id: string) => {
+  if (!id.includes("node_modules")) return undefined;
+  if (id.includes("bwip-js")) return "vendor-barcodes";
+  if (id.includes("recharts")) return "vendor-charts";
+  if (id.includes("@supabase")) return "vendor-supabase";
+  if (id.includes("lucide-react")) return "vendor-icons";
+  if (id.includes("i18next")) return "vendor-i18n";
+  return "vendor";
+};
+
 export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, rootDir, "VITE_");
   const supabaseOrigin = toHttpsOrigin(env.VITE_SUPABASE_URL);
@@ -111,7 +121,17 @@ export default defineConfig(async ({ mode }) => {
       react(),
       ...electronPlugins,
     ],
-    build: {},
+    build: {
+      // The barcode renderer is intentionally lazy-loaded and large. We split
+      // vendor islands so the app shell stays readable in build output, then
+      // keep the warning threshold above that known barcode chunk.
+      chunkSizeWarningLimit: 1100,
+      rollupOptions: {
+        output: {
+          manualChunks: rendererManualChunks,
+        },
+      },
+    },
     resolve: {
       alias: sharedAliases,
     },
