@@ -38,6 +38,7 @@ import {
   reviewReimbursementSchema,
   linkTransactionSchema,
   treasuryAccountsReadArgsSchema,
+  treasuryImportsReadArgsSchema,
   treasuryTransactionListReadArgsSchema,
   treasuryOverviewReadArgsSchema,
   treasuryReviewQueueReadArgsSchema,
@@ -375,6 +376,10 @@ type RegisterFoundationIpcOptions = {
     listTransactions: (
       query: import("@contracts").TreasuryTransactionListQuery,
     ) => import("@contracts").BankTransactionRow[];
+    listImports: (
+      workspaceId: string,
+      bankAccountId?: string,
+    ) => import("@contracts").BankStatementImportRow[];
     getOverview: (
       query: import("@contracts").TreasuryOverviewQuery,
     ) => import("@contracts").TreasuryOverviewSnapshot;
@@ -2119,6 +2124,20 @@ export const registerFoundationIpc = ({
       return treasuryReads.listTransactions(query);
     },
     "The app could not load transactions.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.listImports,
+    treasuryImportsReadArgsSchema,
+    async (_event, query: { workspaceId: string; bankAccountId?: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load imports",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.listImports(query.workspaceId, query.bankAccountId);
+    },
+    "The app could not load import history.",
   );
   safeHandleReadWithSchema(
     ipcChannels.treasury.overview,

@@ -1,4 +1,4 @@
-import { Landmark, Plus, Upload } from "lucide-react";
+import { Landmark, Plus, Trash2, Upload } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ import {
   useBankAccounts,
   useReviewQueue,
   useProjectPnl,
+  useTreasuryImports,
   useTreasuryMutations,
   useTreasuryOverview,
   useTreasuryTransactions,
@@ -87,6 +88,7 @@ export const TreasuryPage = () => {
   );
   const reviewQueue = useReviewQueue(activeWorkspaceId);
   const projectPnl = useProjectPnl(activeWorkspaceId);
+  const imports = useTreasuryImports(activeWorkspaceId, accountFilter || undefined);
 
   const kindLabel = (kind: TransactionKind | null | undefined) =>
     kind ? t(`finance.treasury.kinds.${kind}`, { defaultValue: kind }) : "—";
@@ -96,6 +98,29 @@ export const TreasuryPage = () => {
     overview.refresh();
     transactions.refresh();
     reviewQueue.refresh();
+    imports.refresh();
+  };
+
+  const openAccount = (accountId: string) => {
+    setAccountFilter(accountId);
+    setTab("movements");
+  };
+
+  const removeImport = async (importId: string) => {
+    if (!window.confirm(t("finance.treasury.imports.confirmDelete"))) return;
+    try {
+      await mutations.deleteImport({
+        commandId: newCommandId("treasury-del-import"),
+        workspaceId: activeWorkspaceId,
+        actorType: "user",
+        sourceChannel: "desktop",
+        importId,
+      });
+      toast.success(t("finance.treasury.imports.deleted"));
+      refreshAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("finance.treasury.imports.deleteFailed"));
+    }
   };
 
   /* --------------------------- Import handlers --------------------------- */
@@ -114,6 +139,29 @@ export const TreasuryPage = () => {
       if (parsed.rows.length === 0) {
         toast.error(t("finance.treasury.import.noRows"));
         return;
+      }
+      // Guard against importing a statement into the wrong account: warn when
+      // the file's detected currency or account number doesn't match the
+      // target account (e.g. a Santa Cruz USD statement into the DOP account).
+      const target = accounts.data.find((a) => a.id === importAccountId);
+      if (target) {
+        const currencyMismatch = parsed.currencyHint && parsed.currencyHint !== target.currency;
+        const numberMismatch =
+          parsed.accountNumber &&
+          target.accountNumberFull &&
+          !target.accountNumberFull.includes(parsed.accountNumber) &&
+          !parsed.accountNumber.includes(target.accountNumberFull);
+        if (currencyMismatch || numberMismatch) {
+          const proceed = window.confirm(
+            t("finance.treasury.import.mismatch", {
+              fileCurrency: parsed.currencyHint ?? "?",
+              fileAccount: parsed.accountNumber ?? "?",
+              accountLabel: target.accountLabel,
+              accountCurrency: target.currency,
+            }),
+          );
+          if (!proceed) return;
+        }
       }
       const result = await mutations.importStatement({
         commandId: newCommandId("treasury-import"),
@@ -357,23 +405,36 @@ export const TreasuryPage = () => {
             ) : (
               <div className="quotes-summary-grid">
                 {accounts.data.map((account) => (
-                  <div className="quotes-summary-tile" key={account.id}>
+                  <button
+                    className="quotes-summary-tile quotes-summary-tile--button"
+                    key={account.id}
+                    onClick={() => openAccount(account.id)}
+                    style={{ textAlign: "left", cursor: "pointer" }}
+                    title={t("finance.treasury.accounts.openHint")}
+                    type="button"
+                  >
                     <span className="quotes-summary-tile-label">
                       {account.accountLabel} · {account.currency}
                     </span>
                     <strong className="quotes-summary-tile-value">
                       {formatCurrency(account.currentBalance ?? account.openingBalance, account.currency, language)}
                     </strong>
-                    <button
+                    <small className="text-muted" style={{ marginTop: 4 }}>
+                      {t("finance.treasury.accounts.movementCount", { count: account.transactionCount })}
+                    </small>
+                    <span
                       className="ghost-control"
-                      onClick={() => triggerImport(account.id, account.bankName)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        triggerImport(account.id, account.bankName);
+                      }}
+                      role="button"
                       style={{ marginTop: 8 }}
-                      type="button"
                     >
                       <Upload size={12} />
                       <span>{t("finance.treasury.actions.import")}</span>
-                    </button>
-                  </div>
+                    </span>
+                  </button>
                 ))}
               </div>
             )}
@@ -427,6 +488,41 @@ export const TreasuryPage = () => {
               <span>{t("finance.treasury.actions.import")}</span>
             </button>
           </div>
+
+          {imports.data.length > 0 ? (
+            <div className="treasury-import-history" style={{ margin: "8px 0 14px" }}>
+              <h4 className="section-subtitle" style={{ marginBottom: 6 }}>
+                {t("finance.treasury.imports.title")}
+              </h4>
+              <div className="cell-stack" style={{ gap: 4 }}>
+                {imports.data.map((batch) => (
+                  <div
+                    className="surface-card-actions"
+                    key={batch.id}
+                    style={{ gap: 8, alignItems: "center", justifyContent: "space-between" }}
+                  >
+                    <small className="text-muted">
+                      {batch.originalFilename || batch.sourceFormat.toUpperCase()} ·{" "}
+                      {t("finance.treasury.imports.summary", {
+                        inserted: batch.insertedCount,
+                        duplicates: batch.duplicateCount,
+                      })}
+                      {batch.periodStart ? ` · ${batch.periodStart} → ${batch.periodEnd ?? "?"}` : ""} ·{" "}
+                      {batch.createdAt.slice(0, 10)}
+                    </small>
+                    <button
+                      className="icon-ghost-control"
+                      onClick={() => removeImport(batch.id)}
+                      title={t("finance.treasury.imports.delete")}
+                      type="button"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {transactions.isLoading && transactions.data.length === 0 ? (
             <TableSkeleton rows={6} />

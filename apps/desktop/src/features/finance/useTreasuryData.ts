@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   AnnotateTransactionCommand,
   BankAccountRow,
+  BankStatementImportRow,
   BankTransactionRow,
   ImportStatementCommand,
   LinkTransactionCommand,
@@ -142,6 +143,37 @@ export const useTreasuryOverview = (query: TreasuryOverviewQuery) => {
   }, [query.workspaceId, query.period, query.customStartDate, query.customEndDate, version, refreshVersion]);
 
   return { data, isLoading, error, refresh };
+};
+
+export const useTreasuryImports = (workspaceId: string, bankAccountId?: string) => {
+  const [data, setData] = useState<BankStatementImportRow[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !workspaceId) {
+      setData([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    window.bukowskiTreasury
+      .listImports(workspaceId, bankAccountId)
+      .then((rows) => {
+        if (!cancelled) setData(rows);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, bankAccountId, version, refreshVersion]);
+
+  return { data, isLoading, refresh };
 };
 
 export const useReviewQueue = (workspaceId: string) => {

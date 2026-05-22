@@ -422,6 +422,10 @@ declare global {
       listTransactions: (
         query: import("@contracts").TreasuryTransactionListQuery,
       ) => Promise<import("@contracts").BankTransactionRow[]>;
+      listImports: (
+        workspaceId: string,
+        bankAccountId?: string,
+      ) => Promise<import("@contracts").BankStatementImportRow[]>;
       overview: (
         query: import("@contracts").TreasuryOverviewQuery,
       ) => Promise<import("@contracts").TreasuryOverviewSnapshot>;

@@ -552,6 +552,10 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.listTransactions, query) as Promise<
       import("@contracts").BankTransactionRow[]
     >,
+  listImports: (workspaceId: string, bankAccountId?: string) =>
+    ipcRenderer.invoke(ipcChannels.treasury.listImports, { workspaceId, bankAccountId }) as Promise<
+      import("@contracts").BankStatementImportRow[]
+    >,
   overview: (query: import("@contracts").TreasuryOverviewQuery) =>
     ipcRenderer.invoke(ipcChannels.treasury.overview, query) as Promise<
       import("@contracts").TreasuryOverviewSnapshot

@@ -1416,7 +1416,10 @@
       "accounts": {
         "title": "Accounts",
         "emptyTitle": "No bank accounts yet",
-        "emptyBody": "Add a bank account, then import its CSV/XLSX statement to start tracking movements."
+        "emptyBody": "Add a bank account, then import its CSV/XLSX statement to start tracking movements.",
+        "openHint": "Open this account's movements",
+        "movementCount": "{{count}} movement",
+        "movementCount_other": "{{count}} movements"
       },
       "movements": {
         "emptyTitle": "No movements",
@@ -1452,7 +1455,8 @@
       },
       "import": {
         "noRows": "No movements were found in the file.",
-        "failed": "Could not import the statement."
+        "failed": "Could not import the statement.",
+        "mismatch": "This file looks like account {{fileAccount}} ({{fileCurrency}}), but you're importing into \"{{accountLabel}}\" ({{accountCurrency}}). Import anyway?"
       },
       "classify": {
         "placeholder": "Classify…",
@@ -1471,6 +1475,14 @@
         "interest": "Interest",
         "owner_draw": "Owner draw",
         "other": "Other"
+      },
+      "imports": {
+        "title": "Import history",
+        "summary": "{{inserted}} imported, {{duplicates}} duplicates",
+        "delete": "Delete this import batch",
+        "confirmDelete": "Delete this import batch and its movements? This cannot be undone.",
+        "deleted": "Import batch removed.",
+        "deleteFailed": "Could not delete the import batch."
       }
     }
   },

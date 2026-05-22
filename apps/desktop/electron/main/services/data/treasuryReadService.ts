@@ -5,7 +5,9 @@ import {
   type BankAccountRow,
   type BankAccountType,
   type BankName,
+  type BankStatementImportRow,
   type BankTransactionRow,
+  type StatementSourceFormat,
   type FiscalStatus,
   type ProjectAllocationRow,
   type ProjectPnlRow,
@@ -356,6 +358,39 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
         monthly,
         expenseByCategory,
       };
+    },
+
+    listImports(workspaceId: string, bankAccountId?: string): BankStatementImportRow[] {
+      const ws = resolveWorkspaceId(workspaceId);
+      const conditions: string[] = ["workspace_id = ?"];
+      const params: Array<string | number> = [ws];
+      if (bankAccountId) {
+        conditions.push("bank_account_id = ?");
+        params.push(bankAccountId);
+      }
+      const rows = db
+        .prepare(
+          `SELECT * FROM bank_statement_imports
+           WHERE ${conditions.join(" AND ")}
+           ORDER BY created_at DESC
+           LIMIT 200`,
+        )
+        .all(...params) as Record<string, unknown>[];
+      return rows.map((row) => ({
+        id: row.id as string,
+        workspaceId: row.workspace_id as string,
+        bankAccountId: row.bank_account_id as string,
+        sourceFormat: row.source_format as StatementSourceFormat,
+        originalFilename: (row.original_filename as string | null) ?? null,
+        periodStart: (row.period_start as string | null) ?? null,
+        periodEnd: (row.period_end as string | null) ?? null,
+        rowCount: Number(row.row_count ?? 0),
+        insertedCount: Number(row.inserted_count ?? 0),
+        duplicateCount: Number(row.duplicate_count ?? 0),
+        importedByUserId: (row.imported_by_user_id as string | null) ?? null,
+        notes: (row.notes as string | null) ?? null,
+        createdAt: row.created_at as string,
+      }));
     },
 
     getReviewQueue(workspaceId: string): ReviewQueueRow[] {

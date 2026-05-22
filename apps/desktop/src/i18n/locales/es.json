@@ -1418,7 +1418,10 @@
       "accounts": {
         "title": "Cuentas",
         "emptyTitle": "Aún no hay cuentas bancarias",
-        "emptyBody": "Agrega una cuenta bancaria y luego importa su estado CSV/XLSX para empezar a registrar movimientos."
+        "emptyBody": "Agrega una cuenta bancaria y luego importa su estado CSV/XLSX para empezar a registrar movimientos.",
+        "openHint": "Ver los movimientos de esta cuenta",
+        "movementCount": "{{count}} movimiento",
+        "movementCount_other": "{{count}} movimientos"
       },
       "movements": {
         "emptyTitle": "Sin movimientos",
@@ -1454,7 +1457,8 @@
       },
       "import": {
         "noRows": "No se encontraron movimientos en el archivo.",
-        "failed": "No se pudo importar el estado de cuenta."
+        "failed": "No se pudo importar el estado de cuenta.",
+        "mismatch": "Este archivo parece de la cuenta {{fileAccount}} ({{fileCurrency}}), pero lo estás importando en \"{{accountLabel}}\" ({{accountCurrency}}). ¿Importar de todos modos?"
       },
       "classify": {
         "placeholder": "Clasificar…",
@@ -1473,6 +1477,14 @@
         "interest": "Intereses",
         "owner_draw": "Retiro de socio",
         "other": "Otro"
+      },
+      "imports": {
+        "title": "Historial de importaciones",
+        "summary": "{{inserted}} importados, {{duplicates}} duplicados",
+        "delete": "Eliminar este lote de importación",
+        "confirmDelete": "¿Eliminar este lote y sus movimientos? No se puede deshacer.",
+        "deleted": "Lote de importación eliminado.",
+        "deleteFailed": "No se pudo eliminar el lote."
       }
     }
   },

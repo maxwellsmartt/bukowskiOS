@@ -1542,7 +1542,12 @@ export const treasuryProjectPnlQuerySchema = z
   })
   .strict();
 
+export const treasuryImportsQuerySchema = z
+  .object({ workspaceId: nonEmptyString, bankAccountId: optionalTrimmedString })
+  .strict();
+
 export const treasuryAccountsReadArgsSchema = z.tuple([treasuryAccountsQuerySchema]);
+export const treasuryImportsReadArgsSchema = z.tuple([treasuryImportsQuerySchema]);
 export const treasuryTransactionListReadArgsSchema = z.tuple([treasuryTransactionListQuerySchema]);
 export const treasuryOverviewReadArgsSchema = z.tuple([treasuryOverviewQuerySchema]);
 export const treasuryReviewQueueReadArgsSchema = z.tuple([treasuryAccountsQuerySchema]);
