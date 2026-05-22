@@ -29,6 +29,19 @@ import {
   invoiceDetailReadArgsSchema,
   invoiceListReadArgsSchema,
   issueInvoiceSchema,
+  upsertBankAccountSchema,
+  importStatementSchema,
+  addManualTransactionsSchema,
+  deleteImportSchema,
+  annotateTransactionSchema,
+  setAllocationsSchema,
+  reviewReimbursementSchema,
+  linkTransactionSchema,
+  treasuryAccountsReadArgsSchema,
+  treasuryTransactionListReadArgsSchema,
+  treasuryOverviewReadArgsSchema,
+  treasuryReviewQueueReadArgsSchema,
+  treasuryProjectPnlReadArgsSchema,
   restoreQuoteFromVersionSchema,
   exchangeRateListReadArgsSchema,
   latestExchangeRateReadArgsSchema,
@@ -331,6 +344,47 @@ type RegisterFoundationIpcOptions = {
       invoiceId: string,
     ) => import("@contracts").InvoiceDetail | null;
   };
+  treasuryMutations: {
+    upsertBankAccount: (
+      input: import("@contracts").UpsertBankAccountCommand,
+    ) => import("@contracts").BankAccountMutationResult;
+    importStatement: (
+      input: import("@contracts").ImportStatementCommand,
+    ) => import("@contracts").ImportStatementResult;
+    addManualTransactions: (
+      input: import("@contracts").AddManualTransactionsCommand,
+    ) => import("@contracts").ImportStatementResult;
+    deleteImport: (
+      input: import("@contracts").DeleteImportCommand,
+    ) => import("@contracts").TransactionMutationResult;
+    annotateTransaction: (
+      input: import("@contracts").AnnotateTransactionCommand,
+    ) => import("@contracts").TransactionMutationResult;
+    setAllocations: (
+      input: import("@contracts").SetAllocationsCommand,
+    ) => import("@contracts").TransactionMutationResult;
+    reviewReimbursement: (
+      input: import("@contracts").ReviewReimbursementCommand,
+    ) => import("@contracts").TransactionMutationResult;
+    linkTransaction: (
+      input: import("@contracts").LinkTransactionCommand,
+    ) => import("@contracts").TransactionMutationResult;
+  };
+  treasuryReads: {
+    getAccounts: (workspaceId: string) => import("@contracts").BankAccountRow[];
+    listTransactions: (
+      query: import("@contracts").TreasuryTransactionListQuery,
+    ) => import("@contracts").BankTransactionRow[];
+    getOverview: (
+      query: import("@contracts").TreasuryOverviewQuery,
+    ) => import("@contracts").TreasuryOverviewSnapshot;
+    getReviewQueue: (workspaceId: string) => import("@contracts").ReviewQueueRow[];
+    getProjectPnl: (
+      workspaceId: string,
+      dateFrom?: string,
+      dateTo?: string,
+    ) => import("@contracts").ProjectPnlRow[];
+  };
   exportQuotePdf: (
     workspaceId: string,
     quoteId: string,
@@ -472,6 +526,8 @@ export const registerFoundationIpc = ({
   quoteReads,
   invoiceMutations,
   invoiceReads,
+  treasuryMutations,
+  treasuryReads,
   exportInvoicePdf,
   exportQuotePdf,
   packingMutations,
@@ -2032,6 +2088,164 @@ export const registerFoundationIpc = ({
       });
     },
   );
+
+  // -------------------------------------------------------------------------
+  // Treasury (PILAR T) — bank reconciliation
+  // -------------------------------------------------------------------------
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.listAccounts,
+    treasuryAccountsReadArgsSchema,
+    async (_event, query: { workspaceId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load bank accounts",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.getAccounts(query.workspaceId);
+    },
+    "The app could not load bank accounts.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.listTransactions,
+    treasuryTransactionListReadArgsSchema,
+    async (_event, query: import("@contracts").TreasuryTransactionListQuery) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId ?? "",
+        action: "load treasury transactions",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.listTransactions(query);
+    },
+    "The app could not load transactions.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.overview,
+    treasuryOverviewReadArgsSchema,
+    async (_event, query: import("@contracts").TreasuryOverviewQuery) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId ?? "",
+        action: "load treasury overview",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.getOverview(query);
+    },
+    "The app could not load the treasury overview.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.reviewQueue,
+    treasuryReviewQueueReadArgsSchema,
+    async (_event, query: { workspaceId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load review queue",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.getReviewQueue(query.workspaceId);
+    },
+    "The app could not load the review queue.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.projectPnl,
+    treasuryProjectPnlReadArgsSchema,
+    async (_event, query: { workspaceId: string; dateFrom?: string; dateTo?: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load project P&L",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.getProjectPnl(query.workspaceId, query.dateFrom, query.dateTo);
+    },
+    "The app could not load project P&L.",
+  );
+  safeHandle(ipcChannels.treasury.upsertAccount, upsertBankAccountSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "save bank account",
+      accessLevel: "write",
+      requiredPermission: "treasury.accounts.manage",
+    });
+    return treasuryMutations.upsertBankAccount(input);
+  });
+  safeHandle(ipcChannels.treasury.importStatement, importStatementSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "import statement",
+      accessLevel: "write",
+      requiredPermission: "treasury.import",
+    });
+    return treasuryMutations.importStatement(input);
+  });
+  safeHandle(
+    ipcChannels.treasury.addManualTransactions,
+    addManualTransactionsSchema,
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "add manual transactions",
+        accessLevel: "write",
+        requiredPermission: "treasury.import",
+      });
+      return treasuryMutations.addManualTransactions(input);
+    },
+  );
+  safeHandle(ipcChannels.treasury.deleteImport, deleteImportSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "delete import",
+      accessLevel: "write",
+      requiredPermission: "treasury.import",
+    });
+    return treasuryMutations.deleteImport(input);
+  });
+  safeHandle(
+    ipcChannels.treasury.annotateTransaction,
+    annotateTransactionSchema,
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "classify transaction",
+        accessLevel: "write",
+        requiredPermission: "treasury.transactions.classify",
+      });
+      return treasuryMutations.annotateTransaction(input);
+    },
+  );
+  safeHandle(ipcChannels.treasury.setAllocations, setAllocationsSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "set allocations",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return treasuryMutations.setAllocations(input);
+  });
+  safeHandle(
+    ipcChannels.treasury.reviewReimbursement,
+    reviewReimbursementSchema,
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "review reimbursement",
+        accessLevel: "write",
+        requiredPermission: "treasury.reimbursements.review",
+      });
+      return treasuryMutations.reviewReimbursement(input);
+    },
+  );
+  safeHandle(ipcChannels.treasury.linkTransaction, linkTransactionSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "link transaction",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return treasuryMutations.linkTransaction(input);
+  });
   safeHandleReadWithSchema(
     ipcChannels.quotes.exportPdf,
     quoteExportPdfReadArgsSchema,

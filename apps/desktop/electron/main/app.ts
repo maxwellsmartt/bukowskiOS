@@ -371,6 +371,8 @@ app.whenReady().then(() => {
     quoteReads: localDatabase.quoteReads,
     invoiceMutations: localDatabase.invoiceMutations,
     invoiceReads: localDatabase.invoiceReads,
+    treasuryMutations: localDatabase.treasuryMutations,
+    treasuryReads: localDatabase.treasuryReads,
     exportInvoicePdf: async (workspaceId: string, invoiceId: string) => {
       const detail = localDatabase.invoiceReads.getInvoiceDetail(workspaceId, invoiceId);
       if (!detail) {

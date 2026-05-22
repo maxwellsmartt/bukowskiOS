@@ -35,7 +35,8 @@
         "quotes": "Cotizaciones",
         "invoices": "Facturas",
         "entries": "Movimientos",
-        "reviewQueue": "Cola de revisión"
+        "reviewQueue": "Cola de revisión",
+        "treasury": "Tesorería"
       },
       "agents": {
         "overview": "Resumen",
@@ -1372,6 +1373,106 @@
           "statusChangedBody": "Registramos el cambio en el historial de la cotización.",
           "statusFailed": "No pudimos cambiar el estado"
         }
+      }
+    },
+    "treasury": {
+      "title": "Tesorería",
+      "footnote": "Los movimientos bancarios importados quedan inmutables; la clasificación, el reparto por proyecto y la revisión contable van encima. Los cambios de divisa y transferencias internas se excluyen de los totales de ingreso/gasto.",
+      "searchPlaceholder": "Buscar descripción, concepto o contraparte…",
+      "tabs": {
+        "overview": "Resumen",
+        "movements": "Movimientos",
+        "review": "Revisión contable",
+        "projects": "Por proyecto"
+      },
+      "period": {
+        "month": "Mes",
+        "quarter": "Trimestre",
+        "year": "Año"
+      },
+      "kpi": {
+        "income": "Ingresos (reales)",
+        "expense": "Gastos",
+        "net": "Neto",
+        "deductible": "Gasto deducible",
+        "unclassified": "Sin clasificar"
+      },
+      "actions": {
+        "newAccount": "Nueva cuenta",
+        "import": "Importar estado"
+      },
+      "filters": {
+        "account": "Cuenta",
+        "allAccounts": "Todas las cuentas",
+        "unclassified": "Solo sin clasificar"
+      },
+      "columns": {
+        "date": "Fecha",
+        "account": "Cuenta",
+        "description": "Descripción",
+        "amount": "Monto",
+        "kind": "Tipo",
+        "project": "Proyecto",
+        "margin": "Margen"
+      },
+      "accounts": {
+        "title": "Cuentas",
+        "emptyTitle": "Aún no hay cuentas bancarias",
+        "emptyBody": "Agrega una cuenta bancaria y luego importa su estado CSV/XLSX para empezar a registrar movimientos."
+      },
+      "movements": {
+        "emptyTitle": "Sin movimientos",
+        "emptyBody": "Importa un estado de cuenta (CSV del Banco Popular, XLSX de Santa Cruz) o agrega movimientos manualmente."
+      },
+      "review": {
+        "title": "Reembolsos pendientes de revisión",
+        "emptyTitle": "Nada por revisar",
+        "emptyBody": "Aquí aparecerán los reembolsos y gastos pendientes de validación DGII.",
+        "deductible": "Monto deducible",
+        "apply": "Aplicar",
+        "saved": "Revisión guardada.",
+        "failed": "No se pudo guardar la revisión."
+      },
+      "projects": {
+        "title": "Rentabilidad por proyecto",
+        "emptyTitle": "Sin asignaciones a proyectos",
+        "emptyBody": "Reparte los gastos entre proyectos para ver la rentabilidad real por proyecto."
+      },
+      "account": {
+        "saved": "Cuenta bancaria guardada.",
+        "failed": "No se pudo guardar la cuenta bancaria.",
+        "bank": "Banco",
+        "label": "Etiqueta",
+        "number": "Número de cuenta",
+        "currency": "Moneda",
+        "openingBalance": "Balance inicial"
+      },
+      "banks": {
+        "popular": "Banco Popular",
+        "santa_cruz": "Banco Santa Cruz",
+        "custom": "Otro"
+      },
+      "import": {
+        "noRows": "No se encontraron movimientos en el archivo.",
+        "failed": "No se pudo importar el estado de cuenta."
+      },
+      "classify": {
+        "placeholder": "Clasificar…",
+        "failed": "No se pudo clasificar la transacción."
+      },
+      "kinds": {
+        "income": "Ingreso",
+        "expense": "Gasto",
+        "transfer": "Transferencia",
+        "fx_exchange": "Cambio de divisa",
+        "salary": "Sueldo",
+        "reimbursement": "Reembolso",
+        "tax": "Impuesto",
+        "tss": "Seguridad social (TSS)",
+        "bank_fee": "Comisión bancaria",
+        "interest": "Intereses",
+        "owner_draw": "Retiro de socio",
+        "other": "Otro"
       }
     }
   },

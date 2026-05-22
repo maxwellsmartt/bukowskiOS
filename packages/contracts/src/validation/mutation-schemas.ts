@@ -1342,3 +1342,208 @@ export const invoiceDetailQuerySchema = z
 
 export const invoiceListReadArgsSchema = z.tuple([invoiceListQuerySchema]);
 export const invoiceDetailReadArgsSchema = z.tuple([invoiceDetailQuerySchema]);
+
+// ----------------------------------------------------------------------------
+// Treasury (PILAR T) — bank reconciliation
+// ----------------------------------------------------------------------------
+
+const bankNameSchema = z.enum(["popular", "santa_cruz", "custom"]);
+const bankAccountTypeSchema = z.enum(["checking", "savings", "other"]);
+const transactionDirectionSchema = z.enum(["debit", "credit"]);
+const transactionKindSchema = z.enum([
+  "income",
+  "expense",
+  "transfer",
+  "fx_exchange",
+  "salary",
+  "reimbursement",
+  "tax",
+  "tss",
+  "bank_fee",
+  "interest",
+  "owner_draw",
+  "other",
+]);
+const reimbursementStatusSchema = z.enum(["n/a", "pending", "accepted", "rejected", "partial"]);
+const fiscalStatusSchema = z.enum(["pending", "accepted", "rejected"]);
+const statementSourceFormatSchema = z.enum(["csv", "xlsx", "manual", "pdf"]);
+const transactionLinkEntityTypeSchema = z.enum([
+  "invoice",
+  "invoice_payment",
+  "crew_voucher",
+  "financial_entry",
+]);
+
+export const upsertBankAccountSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    bankAccountId: nullableOrOptionalString,
+    bankName: bankNameSchema,
+    accountLabel: nonEmptyString,
+    accountNumberMasked: nullableOrOptionalString,
+    accountNumberFull: nullableOrOptionalString,
+    currency: z.string().trim().min(2).max(8).transform((v) => v.toUpperCase()),
+    accountType: bankAccountTypeSchema.nullable().optional(),
+    openingBalance: z.number().finite().nullable().optional(),
+    openingBalanceDate: nullableOrOptionalString,
+    isActive: z.boolean().optional(),
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+const parsedBankTransactionSchema = z
+  .object({
+    txnDate: nonEmptyString,
+    valueDate: nullableOrOptionalString,
+    rawDescription: nullableOrOptionalString,
+    reference: nullableOrOptionalString,
+    serial: nullableOrOptionalString,
+    amount: z.number().finite().min(0),
+    direction: transactionDirectionSchema,
+    runningBalance: z.number().finite().nullable().optional(),
+  })
+  .strict();
+
+export const importStatementSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    bankAccountId: nonEmptyString,
+    sourceFormat: statementSourceFormatSchema,
+    originalFilename: nullableOrOptionalString,
+    periodStart: nullableOrOptionalString,
+    periodEnd: nullableOrOptionalString,
+    rows: z.array(parsedBankTransactionSchema).min(1),
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+export const addManualTransactionsSchema = importStatementSchema;
+
+export const deleteImportSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    importId: nonEmptyString,
+  })
+  .strict();
+
+export const annotateTransactionSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    transactionId: nonEmptyString,
+    txnKind: transactionKindSchema.nullable().optional(),
+    concept: nullableOrOptionalString,
+    counterparty: nullableOrOptionalString,
+    counterpartyRnc: nullableOrOptionalString,
+    expenseCategory: nullableOrOptionalString,
+    isInternalTransfer: z.boolean().optional(),
+    reimbursementStatus: reimbursementStatusSchema.optional(),
+    claimedAmount: z.number().finite().nullable().optional(),
+    supportDocFileId: nullableOrOptionalString,
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+const projectAllocationInputSchema = z
+  .object({
+    projectId: nullableOrOptionalString,
+    projectNameSnapshot: nullableOrOptionalString,
+    amount: z.number().finite(),
+    percent: z.number().finite().min(0).max(100).nullable().optional(),
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+export const setAllocationsSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    transactionId: nonEmptyString,
+    allocations: z.array(projectAllocationInputSchema),
+  })
+  .strict();
+
+export const reviewReimbursementSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    transactionId: nonEmptyString,
+    reimbursementStatus: reimbursementStatusSchema,
+    deductibleAmount: z.number().finite().min(0).nullable().optional(),
+    fiscalStatus: fiscalStatusSchema,
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+export const linkTransactionSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    transactionId: nonEmptyString,
+    linkedEntityType: transactionLinkEntityTypeSchema,
+    linkedEntityId: nonEmptyString,
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+// Treasury — read schemas
+
+export const treasuryTransactionListQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    bankAccountId: optionalTrimmedString,
+    dateFrom: optionalTrimmedString,
+    dateTo: optionalTrimmedString,
+    kind: transactionKindSchema.optional(),
+    direction: transactionDirectionSchema.optional(),
+    projectId: optionalTrimmedString,
+    unclassifiedOnly: z.boolean().optional(),
+    pendingReviewOnly: z.boolean().optional(),
+    search: optionalTrimmedString,
+    limit: z.number().int().positive().max(1000).optional(),
+  })
+  .strict();
+
+export const treasuryOverviewQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    period: z.enum(["month", "quarter", "year", "custom"]),
+    customStartDate: optionalTrimmedString,
+    customEndDate: optionalTrimmedString,
+  })
+  .strict();
+
+export const treasuryAccountsQuerySchema = z
+  .object({ workspaceId: nonEmptyString })
+  .strict();
+
+export const treasuryProjectPnlQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    dateFrom: optionalTrimmedString,
+    dateTo: optionalTrimmedString,
+  })
+  .strict();
+
+export const treasuryAccountsReadArgsSchema = z.tuple([treasuryAccountsQuerySchema]);
+export const treasuryTransactionListReadArgsSchema = z.tuple([treasuryTransactionListQuerySchema]);
+export const treasuryOverviewReadArgsSchema = z.tuple([treasuryOverviewQuerySchema]);
+export const treasuryReviewQueueReadArgsSchema = z.tuple([treasuryAccountsQuerySchema]);
+export const treasuryProjectPnlReadArgsSchema = z.tuple([treasuryProjectPnlQuerySchema]);

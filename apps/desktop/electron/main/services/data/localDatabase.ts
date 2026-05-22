@@ -51,6 +51,8 @@ import { createCurrencyReadService } from "./currencyReadService";
 import { applyQuoteAgentSourceMigration } from "./quoteAgentSourceBootstrap";
 import { createInvoiceMutationService } from "./invoiceMutationService";
 import { createInvoiceReadService } from "./invoiceReadService";
+import { createTreasuryMutationService } from "./treasuryMutationService";
+import { createTreasuryReadService } from "./treasuryReadService";
 import { createQuoteMutationService } from "./quoteMutationService";
 import { createQuoteReadService } from "./quoteReadService";
 import { createFinanceMutationService } from "./financeMutationService";
@@ -97,6 +99,8 @@ type QuoteMutationServiceType = ReturnType<typeof createQuoteMutationService>;
 type QuoteReadServiceType = ReturnType<typeof createQuoteReadService>;
 type InvoiceMutationServiceType = ReturnType<typeof createInvoiceMutationService>;
 type InvoiceReadServiceType = ReturnType<typeof createInvoiceReadService>;
+type TreasuryMutationServiceType = ReturnType<typeof createTreasuryMutationService>;
+type TreasuryReadServiceType = ReturnType<typeof createTreasuryReadService>;
 type PackingMutationService = ReturnType<typeof createPackingMutationService>;
 type RmaMutationService = ReturnType<typeof createRmaMutationService>;
 type AgentMutationService = ReturnType<typeof createAgentMutationService>;
@@ -136,6 +140,8 @@ type LocalDatabaseRuntime = {
   quoteReads: QuoteReadServiceType;
   invoiceMutations: InvoiceMutationServiceType;
   invoiceReads: InvoiceReadServiceType;
+  treasuryMutations: TreasuryMutationServiceType;
+  treasuryReads: TreasuryReadServiceType;
   packingMutations: PackingMutationService;
   rmaMutations: RmaMutationService;
   agentMutations: AgentMutationService;
@@ -1063,6 +1069,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
   const quoteReads = createQuoteReadService(database);
   const invoiceMutations = createInvoiceMutationService(database);
   const invoiceReads = createInvoiceReadService(database);
+  const treasuryMutations = createTreasuryMutationService(database);
+  const treasuryReads = createTreasuryReadService(database);
   const packingMutations = createPackingMutationService(database);
   const rmaMutations = createRmaMutationService(database);
   const toolRegistry = createAgentToolRegistry(foundationReads, {
@@ -1315,6 +1323,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
     quoteReads,
     invoiceMutations,
     invoiceReads,
+    treasuryMutations,
+    treasuryReads,
     packingMutations,
     rmaMutations,
     applyRemoteCatalogRows: (input: {

@@ -539,6 +539,61 @@ const bukowskiInvoices = {
     >,
 };
 
+const bukowskiTreasury = {
+  listAccounts: (workspaceId: string) =>
+    ipcRenderer.invoke(ipcChannels.treasury.listAccounts, { workspaceId }) as Promise<
+      import("@contracts").BankAccountRow[]
+    >,
+  upsertAccount: (input: import("@contracts").UpsertBankAccountCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.upsertAccount, input) as Promise<
+      import("@contracts").BankAccountMutationResult
+    >,
+  listTransactions: (query: import("@contracts").TreasuryTransactionListQuery) =>
+    ipcRenderer.invoke(ipcChannels.treasury.listTransactions, query) as Promise<
+      import("@contracts").BankTransactionRow[]
+    >,
+  overview: (query: import("@contracts").TreasuryOverviewQuery) =>
+    ipcRenderer.invoke(ipcChannels.treasury.overview, query) as Promise<
+      import("@contracts").TreasuryOverviewSnapshot
+    >,
+  reviewQueue: (workspaceId: string) =>
+    ipcRenderer.invoke(ipcChannels.treasury.reviewQueue, { workspaceId }) as Promise<
+      import("@contracts").ReviewQueueRow[]
+    >,
+  projectPnl: (workspaceId: string, dateFrom?: string, dateTo?: string) =>
+    ipcRenderer.invoke(ipcChannels.treasury.projectPnl, { workspaceId, dateFrom, dateTo }) as Promise<
+      import("@contracts").ProjectPnlRow[]
+    >,
+  importStatement: (input: import("@contracts").ImportStatementCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.importStatement, input) as Promise<
+      import("@contracts").ImportStatementResult
+    >,
+  addManualTransactions: (input: import("@contracts").AddManualTransactionsCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.addManualTransactions, input) as Promise<
+      import("@contracts").ImportStatementResult
+    >,
+  deleteImport: (input: import("@contracts").DeleteImportCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.deleteImport, input) as Promise<
+      import("@contracts").TransactionMutationResult
+    >,
+  annotateTransaction: (input: import("@contracts").AnnotateTransactionCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.annotateTransaction, input) as Promise<
+      import("@contracts").TransactionMutationResult
+    >,
+  setAllocations: (input: import("@contracts").SetAllocationsCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.setAllocations, input) as Promise<
+      import("@contracts").TransactionMutationResult
+    >,
+  reviewReimbursement: (input: import("@contracts").ReviewReimbursementCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.reviewReimbursement, input) as Promise<
+      import("@contracts").TransactionMutationResult
+    >,
+  linkTransaction: (input: import("@contracts").LinkTransactionCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.linkTransaction, input) as Promise<
+      import("@contracts").TransactionMutationResult
+    >,
+};
+
 const bukowskiCatalog = {
   getSnapshot: (query?: CatalogListQuery) => ipcRenderer.invoke(ipcChannels.catalog.getSnapshot, query) as Promise<CatalogSnapshot>,
   create: (input: CreateCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.create, input) as Promise<CatalogSnapshot>,
@@ -615,5 +670,6 @@ contextBridge.exposeInMainWorld("bukowskiFinance", bukowskiFinance);
 contextBridge.exposeInMainWorld("bukowskiCurrency", bukowskiCurrency);
 contextBridge.exposeInMainWorld("bukowskiQuotes", bukowskiQuotes);
 contextBridge.exposeInMainWorld("bukowskiInvoices", bukowskiInvoices);
+contextBridge.exposeInMainWorld("bukowskiTreasury", bukowskiTreasury);
 contextBridge.exposeInMainWorld("bukowskiCatalog", bukowskiCatalog);
 contextBridge.exposeInMainWorld("bukowskiRma", bukowskiRma);

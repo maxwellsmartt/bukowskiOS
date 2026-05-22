@@ -39,6 +39,7 @@ const InvoiceDetailPage = lazyPage(() => import("@features/finance/InvoiceDetail
 const InvoiceEditorPage = lazyPage(() => import("@features/finance/InvoiceEditorPage"), "InvoiceEditorPage");
 const InvoicesPage = lazyPage(() => import("@features/finance/InvoicesPage"), "InvoicesPage");
 const QuotesPage = lazyPage(() => import("@features/finance/QuotesPage"), "QuotesPage");
+const TreasuryPage = lazyPage(() => import("@features/finance/TreasuryPage"), "TreasuryPage");
 const QuoteEditorPage = lazyPage(() => import("@features/finance/QuoteEditorPage"), "QuoteEditorPage");
 const IncidentsPage = lazyPage(() => import("@features/incidents/IncidentsPage"), "IncidentsPage");
 const InboxPage = lazyPage(() => import("@features/inbox/InboxPage"), "InboxPage");
@@ -78,6 +79,7 @@ const routeElements = {
   "/finance/invoices/new": <InvoiceEditorPage />,
   "/finance/invoices/:invoiceId/edit": <InvoiceEditorPage />,
   "/finance/invoices/:invoiceId": <InvoiceDetailPage />,
+  "/finance/treasury": <TreasuryPage />,
   "/finance/quotes": <QuotesPage />,
   "/finance/quotes/new": <QuoteEditorPage />,
   "/finance/quotes/:quoteId": <QuoteEditorPage />,

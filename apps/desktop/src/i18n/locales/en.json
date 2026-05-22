@@ -35,7 +35,8 @@
         "quotes": "Quotes",
         "invoices": "Invoices",
         "entries": "Entries",
-        "reviewQueue": "Review Queue"
+        "reviewQueue": "Review Queue",
+        "treasury": "Treasury"
       },
       "agents": {
         "overview": "Overview",
@@ -1370,6 +1371,106 @@
           "statusChangedBody": "We logged the change in the quote history.",
           "statusFailed": "We couldn't change the status"
         }
+      }
+    },
+    "treasury": {
+      "title": "Treasury",
+      "footnote": "Imported bank movements stay immutable; classification, project splits and accountant review live on top. Currency exchanges and internal transfers are excluded from income/expense totals.",
+      "searchPlaceholder": "Search description, concept or counterparty…",
+      "tabs": {
+        "overview": "Overview",
+        "movements": "Movements",
+        "review": "Accountant review",
+        "projects": "By project"
+      },
+      "period": {
+        "month": "Month",
+        "quarter": "Quarter",
+        "year": "Year"
+      },
+      "kpi": {
+        "income": "Income (real)",
+        "expense": "Expense",
+        "net": "Net",
+        "deductible": "Deductible expense",
+        "unclassified": "Unclassified"
+      },
+      "actions": {
+        "newAccount": "New account",
+        "import": "Import statement"
+      },
+      "filters": {
+        "account": "Account",
+        "allAccounts": "All accounts",
+        "unclassified": "Unclassified only"
+      },
+      "columns": {
+        "date": "Date",
+        "account": "Account",
+        "description": "Description",
+        "amount": "Amount",
+        "kind": "Type",
+        "project": "Project",
+        "margin": "Margin"
+      },
+      "accounts": {
+        "title": "Accounts",
+        "emptyTitle": "No bank accounts yet",
+        "emptyBody": "Add a bank account, then import its CSV/XLSX statement to start tracking movements."
+      },
+      "movements": {
+        "emptyTitle": "No movements",
+        "emptyBody": "Import a bank statement (CSV from Banco Popular, XLSX from Santa Cruz) or add movements manually."
+      },
+      "review": {
+        "title": "Reimbursements awaiting review",
+        "emptyTitle": "Nothing to review",
+        "emptyBody": "Reimbursements and expenses pending DGII validation will appear here.",
+        "deductible": "Deductible amount",
+        "apply": "Apply",
+        "saved": "Review saved.",
+        "failed": "Could not save the review."
+      },
+      "projects": {
+        "title": "Profit & loss by project",
+        "emptyTitle": "No project allocations",
+        "emptyBody": "Split expenses across projects to see real per-project profitability."
+      },
+      "account": {
+        "saved": "Bank account saved.",
+        "failed": "Could not save the bank account.",
+        "bank": "Bank",
+        "label": "Label",
+        "number": "Account number",
+        "currency": "Currency",
+        "openingBalance": "Opening balance"
+      },
+      "banks": {
+        "popular": "Banco Popular",
+        "santa_cruz": "Banco Santa Cruz",
+        "custom": "Other"
+      },
+      "import": {
+        "noRows": "No movements were found in the file.",
+        "failed": "Could not import the statement."
+      },
+      "classify": {
+        "placeholder": "Classify…",
+        "failed": "Could not classify the transaction."
+      },
+      "kinds": {
+        "income": "Income",
+        "expense": "Expense",
+        "transfer": "Transfer",
+        "fx_exchange": "FX exchange",
+        "salary": "Salary",
+        "reimbursement": "Reimbursement",
+        "tax": "Tax",
+        "tss": "Social security (TSS)",
+        "bank_fee": "Bank fee",
+        "interest": "Interest",
+        "owner_draw": "Owner draw",
+        "other": "Other"
       }
     }
   },

@@ -1,0 +1,247 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import type {
+  AnnotateTransactionCommand,
+  BankAccountRow,
+  BankTransactionRow,
+  ImportStatementCommand,
+  LinkTransactionCommand,
+  ProjectPnlRow,
+  ReviewQueueRow,
+  ReviewReimbursementCommand,
+  SetAllocationsCommand,
+  TransactionMutationResult,
+  TreasuryOverviewQuery,
+  TreasuryOverviewSnapshot,
+  TreasuryTransactionListQuery,
+  UpsertBankAccountCommand,
+} from "@contracts";
+import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
+
+const emptyAccounts: BankAccountRow[] = [];
+const emptyTransactions: BankTransactionRow[] = [];
+
+export const useBankAccounts = (workspaceId: string) => {
+  const [data, setData] = useState<BankAccountRow[]>(emptyAccounts);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !workspaceId) {
+      setData(emptyAccounts);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    window.bukowskiTreasury
+      .listAccounts(workspaceId)
+      .then((rows) => {
+        if (!cancelled) setData(rows);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load accounts.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, version, refreshVersion]);
+
+  return { data, isLoading, error, refresh };
+};
+
+export const useTreasuryTransactions = (query: TreasuryTransactionListQuery) => {
+  const [data, setData] = useState<BankTransactionRow[]>(emptyTransactions);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !query.workspaceId) {
+      setData(emptyTransactions);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    window.bukowskiTreasury
+      .listTransactions(query)
+      .then((rows) => {
+        if (!cancelled) setData(rows);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : "Could not load transactions.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    query.workspaceId,
+    query.bankAccountId,
+    query.dateFrom,
+    query.dateTo,
+    query.kind,
+    query.direction,
+    query.projectId,
+    query.unclassifiedOnly,
+    query.pendingReviewOnly,
+    query.search,
+    query.limit,
+    version,
+    refreshVersion,
+  ]);
+
+  return { data, isLoading, error, refresh };
+};
+
+export const useTreasuryOverview = (query: TreasuryOverviewQuery) => {
+  const [data, setData] = useState<TreasuryOverviewSnapshot | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !query.workspaceId) {
+      setData(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    window.bukowskiTreasury
+      .overview(query)
+      .then((snapshot) => {
+        if (!cancelled) setData(snapshot);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load overview.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [query.workspaceId, query.period, query.customStartDate, query.customEndDate, version, refreshVersion]);
+
+  return { data, isLoading, error, refresh };
+};
+
+export const useReviewQueue = (workspaceId: string) => {
+  const [data, setData] = useState<ReviewQueueRow[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !workspaceId) {
+      setData([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    window.bukowskiTreasury
+      .reviewQueue(workspaceId)
+      .then((rows) => {
+        if (!cancelled) setData(rows);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load review queue.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, version, refreshVersion]);
+
+  return { data, isLoading, error, refresh };
+};
+
+export const useProjectPnl = (workspaceId: string, dateFrom?: string, dateTo?: string) => {
+  const [data, setData] = useState<ProjectPnlRow[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !workspaceId) {
+      setData([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    window.bukowskiTreasury
+      .projectPnl(workspaceId, dateFrom, dateTo)
+      .then((rows) => {
+        if (!cancelled) setData(rows);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, dateFrom, dateTo, refreshVersion]);
+
+  return { data, isLoading };
+};
+
+export const useTreasuryMutations = () =>
+  useMemo(
+    () => ({
+      async upsertAccount(input: UpsertBankAccountCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.upsertAccount(input);
+      },
+      async importStatement(input: ImportStatementCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.importStatement(input);
+      },
+      async addManualTransactions(input: ImportStatementCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.addManualTransactions(input);
+      },
+      async deleteImport(input: { commandId: string; workspaceId: string; actorType: "user"; sourceChannel: "desktop"; importId: string }) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.deleteImport(input);
+      },
+      async annotate(input: AnnotateTransactionCommand): Promise<TransactionMutationResult> {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.annotateTransaction(input);
+      },
+      async setAllocations(input: SetAllocationsCommand): Promise<TransactionMutationResult> {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.setAllocations(input);
+      },
+      async reviewReimbursement(input: ReviewReimbursementCommand): Promise<TransactionMutationResult> {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.reviewReimbursement(input);
+      },
+      async linkTransaction(input: LinkTransactionCommand): Promise<TransactionMutationResult> {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.linkTransaction(input);
+      },
+    }),
+    [],
+  );

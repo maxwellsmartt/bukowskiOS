@@ -414,6 +414,45 @@ declare global {
         commandId: string;
       }) => Promise<import("@contracts").InvoiceMutationResult>;
     };
+    bukowskiTreasury?: {
+      listAccounts: (workspaceId: string) => Promise<import("@contracts").BankAccountRow[]>;
+      upsertAccount: (
+        input: import("@contracts").UpsertBankAccountCommand,
+      ) => Promise<import("@contracts").BankAccountMutationResult>;
+      listTransactions: (
+        query: import("@contracts").TreasuryTransactionListQuery,
+      ) => Promise<import("@contracts").BankTransactionRow[]>;
+      overview: (
+        query: import("@contracts").TreasuryOverviewQuery,
+      ) => Promise<import("@contracts").TreasuryOverviewSnapshot>;
+      reviewQueue: (workspaceId: string) => Promise<import("@contracts").ReviewQueueRow[]>;
+      projectPnl: (
+        workspaceId: string,
+        dateFrom?: string,
+        dateTo?: string,
+      ) => Promise<import("@contracts").ProjectPnlRow[]>;
+      importStatement: (
+        input: import("@contracts").ImportStatementCommand,
+      ) => Promise<import("@contracts").ImportStatementResult>;
+      addManualTransactions: (
+        input: import("@contracts").AddManualTransactionsCommand,
+      ) => Promise<import("@contracts").ImportStatementResult>;
+      deleteImport: (
+        input: import("@contracts").DeleteImportCommand,
+      ) => Promise<import("@contracts").TransactionMutationResult>;
+      annotateTransaction: (
+        input: import("@contracts").AnnotateTransactionCommand,
+      ) => Promise<import("@contracts").TransactionMutationResult>;
+      setAllocations: (
+        input: import("@contracts").SetAllocationsCommand,
+      ) => Promise<import("@contracts").TransactionMutationResult>;
+      reviewReimbursement: (
+        input: import("@contracts").ReviewReimbursementCommand,
+      ) => Promise<import("@contracts").TransactionMutationResult>;
+      linkTransaction: (
+        input: import("@contracts").LinkTransactionCommand,
+      ) => Promise<import("@contracts").TransactionMutationResult>;
+    };
     bukowskiCatalog?: {
       getSnapshot: (query?: CatalogListQuery) => Promise<CatalogSnapshot>;
       create: (input: CreateCatalogEntityInput) => Promise<CatalogSnapshot>;

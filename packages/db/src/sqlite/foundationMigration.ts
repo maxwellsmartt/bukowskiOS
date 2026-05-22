@@ -18,6 +18,7 @@ import catalogPullCursorsSql from "../migrations/0017_catalog_pull_cursors.sql?r
 import currencyAndQuotesFoundationSql from "../migrations/0018_currency_and_quotes_foundation.sql?raw";
 import quotesSchemaSql from "../migrations/0019_quotes_schema.sql?raw";
 import invoicesSchemaSql from "../migrations/0021_invoices_schema.sql?raw";
+import treasurySchemaSql from "../migrations/0022_treasury_schema.sql?raw";
 
 const foundationMigrations = [
   { version: "0001_foundation", sql: foundationCoreSql },
@@ -40,6 +41,7 @@ const foundationMigrations = [
   { version: "0018_currency_and_quotes_foundation", sql: currencyAndQuotesFoundationSql },
   { version: "0019_quotes_schema", sql: quotesSchemaSql },
   { version: "0021_invoices_schema", sql: invoicesSchemaSql },
+  { version: "0022_treasury_schema", sql: treasurySchemaSql },
 ] as const;
 
 const foundationMigrationSql = foundationMigrations.map((migration) => migration.sql).join("\n\n");
