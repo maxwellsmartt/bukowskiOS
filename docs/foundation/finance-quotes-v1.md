@@ -273,14 +273,19 @@ add user-editable templates without a schema change. When that happens, seed
 the 6 hard-coded templates per workspace at first arrival, then let the user
 edit/add via a `WorkspaceSettingsPage` card gated by `quotes.manage_templates`.
 
-## Out of scope for v1
+## Out of scope / not yet implemented
 
 - Hard refactor of `financial_entries` to integer minor units.
-- Live exchange-rate fetching from Banco Popular / Banco Central.
+- Full bank reconciliation.
 - Sending quotes via WhatsApp / Email / SMS (depends on Channels).
 - Client approval portal.
 - PDF cryptographic signature.
-- Bank reconciliation / payment links / invoicing.
+- Payment links.
+- Crew/collaborator fee approval and outbound payment history.
+
+Note: invoicing and invoice payment recording are now implemented. The missing
+payment surface is outbound crew/collaborator payments, not customer invoice
+collections.
 
 ## Test coverage
 

@@ -42,6 +42,16 @@
 - `financial_entries(id, workspace_id fk, entry_type, category, amount, currency, exchange_rate, base_currency_amount, status, project_id fk nullable, asset_id fk nullable, incident_id fk nullable, created_by_user_id fk, entry_date, description, notes, created_at, updated_at)`
 - `collaborator_fees(id, workspace_id fk, user_id fk, project_id fk nullable, department_id fk nullable, fee_type, agreed_amount, currency, status, notes, created_at)`
 
+Estado actual `2026-05-22`:
+
+- `financial_entries` si tiene servicio, UI, documentos, idempotencia y outbox.
+- `collaborator_fees` sigue siendo placeholder de schema local: no tiene
+  contratos, servicios, UI, Supabase/RLS ni sync productivo. No debe tratarse
+  como feature implementada hasta completar el modulo de honorarios/pagos a
+  colaboradores.
+- Los pagos implementados hoy viven en `invoice_payments` y representan cobros
+  recibidos contra facturas de clientes, no pagos salientes a tecnicos.
+
 ## Plataforma y sync
 
 - `command_receipts(command_id pk, workspace_id fk, actor_user_id fk nullable, actor_type, source_channel, executed_at, outcome_status, error_message nullable)`
