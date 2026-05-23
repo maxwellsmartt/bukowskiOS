@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpRight, Banknote, Check, Download, Edit3, Landmark, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, Landmark, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -121,6 +121,7 @@ export const TreasuryPage = () => {
   const [unclassifiedOnly, setUnclassifiedOnly] = useState(false);
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
+  const [importHistoryOpen, setImportHistoryOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<TransactionDraft | null>(null);
   const [pendingRule, setPendingRule] = useState<PendingClassificationRule | null>(null);
@@ -562,8 +563,8 @@ export const TreasuryPage = () => {
         type="file"
       />
 
-      <div className="page-stack-row">
-        <SectionHeader eyebrow={t("finance.title")} title={t("finance.treasury.title")} titleTone="accent" />
+      <div className="page-stack-row treasury-page-header">
+        <SectionHeader title={t("finance.treasury.title")} titleTone="accent" />
         <button
           className={`ghost-control treasury-new-account-button${showAccountForm ? " is-active" : ""}`}
           onClick={() => setShowAccountForm((v) => !v)}
@@ -596,12 +597,14 @@ export const TreasuryPage = () => {
         />
       ) : null}
 
-      <div className="surface-card-actions" style={{ gap: 6 }}>
+      <div className="treasury-segmented-tabs" role="tablist">
         {(["overview", "movements", "review", "projects"] as Tab[]).map((value) => (
           <button
-            className={`ghost-control${tab === value ? " is-active" : ""}`}
+            aria-selected={tab === value}
+            className="treasury-segmented-tab"
             key={value}
             onClick={() => setTab(value)}
+            role="tab"
             type="button"
           >
             {t(`finance.treasury.tabs.${value}`)}
@@ -724,56 +727,9 @@ export const TreasuryPage = () => {
             </div>
           </div>
 
-          <div className="surface-card-actions treasury-filter-bar">
-            <label className="compact-filter-field">
-              <span>{t("finance.treasury.filters.account")}</span>
-              <CompactSelect<string>
-                ariaLabel={t("finance.treasury.filters.account")}
-                onChange={setAccountFilter}
-                options={accountOptions}
-                popupMinWidth={240}
-                value={accountFilter}
-              />
-            </label>
-            <label className="compact-filter-field">
-              <span>{t("finance.treasury.filters.period")}</span>
-              <CompactSelect<MovementDateFilter>
-                ariaLabel={t("finance.treasury.filters.period")}
-                onChange={setDateFilter}
-                options={dateFilterOptions}
-                popupMinWidth={180}
-                value={dateFilter}
-              />
-            </label>
-            {dateFilter !== "all" ? (
-              <>
-                <label className="compact-filter-field">
-                  <span>{t("finance.treasury.filters.from")}</span>
-                  <input className="field-input" onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
-                </label>
-                <label className="compact-filter-field">
-                  <span>{t("finance.treasury.filters.to")}</span>
-                  <input className="field-input" onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
-                </label>
-              </>
-            ) : null}
-            <label className="compact-filter-field">
-              <span>{t("finance.treasury.filters.unclassified")}</span>
-              <input
-                checked={unclassifiedOnly}
-                onChange={(event) => setUnclassifiedOnly(event.target.checked)}
-                type="checkbox"
-              />
-            </label>
-            <input
-              className="field-input"
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t("finance.treasury.searchPlaceholder")}
-              style={{ minWidth: 240, marginLeft: "auto" }}
-              value={search}
-            />
+          <div className="treasury-movement-actions">
             <button
-              className="ghost-control"
+              className="ghost-control treasury-add-movement-button"
               disabled={accounts.data.length === 0}
               onClick={() => setShowManualForm((value) => !value)}
               type="button"
@@ -782,7 +738,7 @@ export const TreasuryPage = () => {
               <span>{t("finance.treasury.actions.addRow")}</span>
             </button>
             <button
-              className="ghost-control"
+              className="ghost-control treasury-import-button"
               disabled={accounts.data.length === 0 || busy}
               onClick={() => {
                 const account = accounts.data.find((a) => a.id === accountFilter) ?? accounts.data[0];
@@ -831,49 +787,116 @@ export const TreasuryPage = () => {
           ) : null}
 
           {imports.data.length > 0 ? (
-            <div className="treasury-import-history">
-              <div className="treasury-import-history-header">
+            <div className={`treasury-import-history${importHistoryOpen ? " is-open" : ""}`}>
+              <button
+                className="treasury-import-history-header"
+                onClick={() => setImportHistoryOpen((value) => !value)}
+                type="button"
+              >
                 <div>
                   <h4 className="section-subtitle">{t("finance.treasury.imports.title")}</h4>
-                  <small className="text-muted">{t("finance.treasury.imports.dedupeHint")}</small>
+                  <small className="text-muted">
+                    {t("finance.treasury.imports.summary", {
+                      inserted: imports.data.reduce((sum, batch) => sum + batch.insertedCount, 0),
+                      duplicates: imports.data.reduce((sum, batch) => sum + batch.duplicateCount, 0),
+                    })}
+                  </small>
                 </div>
-              </div>
-              <div className="treasury-import-list">
-                {imports.data.map((batch) => (
-                  <div
-                    className="treasury-import-row"
-                    key={batch.id}
-                  >
-                    <div className="cell-stack">
-                      <strong>{batch.originalFilename || batch.sourceFormat.toUpperCase()}</strong>
-                      <small className="text-muted">
-                        {batch.periodStart
-                          ? t("finance.treasury.imports.period", {
-                              start: batch.periodStart,
-                              end: batch.periodEnd ?? "?",
-                            })
-                          : t("finance.treasury.imports.noPeriod")}
-                        {" · "}
-                        {t("finance.treasury.imports.created", { date: batch.createdAt.slice(0, 10) })}
-                      </small>
-                    </div>
-                    <div className="treasury-import-stats">
-                      <span>{t("finance.treasury.imports.inserted", { count: batch.insertedCount })}</span>
-                      <span>{t("finance.treasury.imports.duplicates", { count: batch.duplicateCount })}</span>
-                    </div>
-                    <button
-                      className="icon-ghost-control"
-                      onClick={() => removeImport(batch.id)}
-                      title={t("finance.treasury.imports.delete")}
-                      type="button"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                <span className="treasury-import-history-toggle">
+                  <ChevronDown size={14} />
+                </span>
+              </button>
+              {importHistoryOpen ? (
+                <>
+                  <small className="text-muted treasury-import-history-note">{t("finance.treasury.imports.dedupeHint")}</small>
+                  <div className="treasury-import-list">
+                    {imports.data.map((batch) => (
+                      <div
+                        className="treasury-import-row"
+                        key={batch.id}
+                      >
+                        <div className="cell-stack">
+                          <strong>{batch.originalFilename || batch.sourceFormat.toUpperCase()}</strong>
+                          <small className="text-muted">
+                            {batch.periodStart
+                              ? t("finance.treasury.imports.period", {
+                                  start: batch.periodStart,
+                                  end: batch.periodEnd ?? "?",
+                                })
+                              : t("finance.treasury.imports.noPeriod")}
+                            {" · "}
+                            {t("finance.treasury.imports.created", { date: batch.createdAt.slice(0, 10) })}
+                          </small>
+                        </div>
+                        <div className="treasury-import-stats">
+                          <span>{t("finance.treasury.imports.inserted", { count: batch.insertedCount })}</span>
+                          <span>{t("finance.treasury.imports.duplicates", { count: batch.duplicateCount })}</span>
+                        </div>
+                        <button
+                          className="icon-ghost-control"
+                          onClick={() => removeImport(batch.id)}
+                          title={t("finance.treasury.imports.delete")}
+                          type="button"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              ) : null}
             </div>
           ) : null}
+
+          <div className="treasury-table-shell">
+            <div className="treasury-table-toolbar">
+              <label className="compact-filter-field">
+                <span>{t("finance.treasury.filters.account")}</span>
+                <CompactSelect<string>
+                  ariaLabel={t("finance.treasury.filters.account")}
+                  onChange={setAccountFilter}
+                  options={accountOptions}
+                  popupMinWidth={240}
+                  value={accountFilter}
+                />
+              </label>
+              <label className="compact-filter-field">
+                <span>{t("finance.treasury.filters.period")}</span>
+                <CompactSelect<MovementDateFilter>
+                  ariaLabel={t("finance.treasury.filters.period")}
+                  onChange={setDateFilter}
+                  options={dateFilterOptions}
+                  popupMinWidth={180}
+                  value={dateFilter}
+                />
+              </label>
+              {dateFilter !== "all" ? (
+                <>
+                  <label className="compact-filter-field">
+                    <span>{t("finance.treasury.filters.from")}</span>
+                    <input className="field-input" onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
+                  </label>
+                  <label className="compact-filter-field">
+                    <span>{t("finance.treasury.filters.to")}</span>
+                    <input className="field-input" onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
+                  </label>
+                </>
+              ) : null}
+              <label className="compact-filter-field treasury-unclassified-toggle">
+                <input
+                  checked={unclassifiedOnly}
+                  onChange={(event) => setUnclassifiedOnly(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>{t("finance.treasury.filters.unclassified")}</span>
+              </label>
+              <input
+                className="field-input treasury-table-search"
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t("finance.treasury.searchPlaceholder")}
+                value={search}
+              />
+            </div>
 
           {transactions.isLoading && transactions.data.length === 0 ? (
             <TableSkeleton rows={6} />
@@ -891,6 +914,7 @@ export const TreasuryPage = () => {
             />
           )}
           {transactions.error ? <div className="form-inline-error">{transactions.error}</div> : null}
+          </div>
         </SurfaceCard>
       ) : null}
 
