@@ -15995,13 +15995,34 @@ input[type="number"] {
   align-items: end;
   display: grid;
   gap: 10px 12px;
-  grid-template-columns: minmax(220px, 1.1fr) 140px minmax(120px, 0.55fr) 130px minmax(220px, 1.2fr) auto;
+  grid-template-columns:
+    minmax(240px, 1.15fr)
+    minmax(140px, 0.62fr)
+    minmax(108px, 0.5fr)
+    minmax(120px, 0.5fr)
+    minmax(240px, 1.15fr)
+    auto;
+}
+
+.treasury-manual-form-grid .compact-filter-field {
+  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.treasury-manual-form-grid .compact-filter-field > span {
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .treasury-manual-form-grid .field-input,
 .treasury-manual-form-grid .compact-select-trigger {
   height: 36px;
   min-height: 36px;
+  width: 100%;
 }
 
 .treasury-manual-account {
