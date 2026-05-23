@@ -7,6 +7,8 @@ import {
   type BankName,
   type BankStatementImportRow,
   type BankTransactionRow,
+  type CounterpartyRulePreview,
+  type CounterpartyRulePreviewQuery,
   type StatementSourceFormat,
   type FiscalStatus,
   type ProjectAllocationRow,
@@ -34,6 +36,8 @@ const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 1
 const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
 const resolveWorkspaceId = (workspaceId?: string | null) =>
   workspaceId?.trim() || DEFAULT_WORKSPACE_ID;
+const normalizeRuleText = (value: string | null | undefined) =>
+  (value ?? "").trim().replace(/\s+/g, " ").toUpperCase();
 
 const resolveWindow = (query?: TreasuryOverviewQuery) => {
   const now = new Date();
@@ -294,6 +298,69 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
         );
       }
       return mapped;
+    },
+
+    previewClassificationRule(query: CounterpartyRulePreviewQuery): CounterpartyRulePreview {
+      const ws = resolveWorkspaceId(query.workspaceId);
+      const selected = db
+        .prepare(
+          `SELECT raw_description FROM bank_transactions WHERE id = ? AND workspace_id = ? LIMIT 1`,
+        )
+        .get(query.transactionId, ws) as { raw_description: string | null } | undefined;
+      if (!selected) throw new Error("Transaction not found.");
+
+      const matchPattern = (query.matchPattern?.trim() || selected.raw_description?.trim() || "").replace(/\s+/g, " ");
+      if (!matchPattern) {
+        return {
+          transactionId: query.transactionId,
+          matchPattern: "",
+          matchType: query.matchType ?? "exact",
+          matchCount: 0,
+          sampleDescriptions: [],
+        };
+      }
+
+      const matchType = query.matchType ?? "exact";
+      const where =
+        matchType === "contains"
+          ? "UPPER(t.raw_description) LIKE ?"
+          : "UPPER(TRIM(t.raw_description)) = ?";
+      const param =
+        matchType === "contains"
+          ? `%${normalizeRuleText(matchPattern)}%`
+          : normalizeRuleText(matchPattern);
+      const rows = db
+        .prepare(
+          `SELECT t.raw_description
+           FROM bank_transactions t
+           LEFT JOIN transaction_annotations a ON a.transaction_id = t.id
+           WHERE t.workspace_id = ?
+             AND t.raw_description IS NOT NULL
+             AND ${where}
+             AND (a.transaction_id IS NULL OR a.txn_kind IS NULL)
+           ORDER BY t.txn_date DESC, t.created_at DESC
+           LIMIT 25`,
+        )
+        .all(ws, param) as Array<{ raw_description: string | null }>;
+      const count = db
+        .prepare(
+          `SELECT COUNT(*) AS count
+           FROM bank_transactions t
+           LEFT JOIN transaction_annotations a ON a.transaction_id = t.id
+           WHERE t.workspace_id = ?
+             AND t.raw_description IS NOT NULL
+             AND ${where}
+             AND (a.transaction_id IS NULL OR a.txn_kind IS NULL)`,
+        )
+        .get(ws, param) as { count: number };
+
+      return {
+        transactionId: query.transactionId,
+        matchPattern,
+        matchType,
+        matchCount: Number(count.count ?? 0),
+        sampleDescriptions: Array.from(new Set(rows.map((row) => row.raw_description || "").filter(Boolean))).slice(0, 5),
+      };
     },
 
     getOverview(query: TreasuryOverviewQuery): TreasuryOverviewSnapshot {

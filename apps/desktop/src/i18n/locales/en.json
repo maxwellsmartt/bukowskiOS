@@ -1486,6 +1486,13 @@
       },
       "classify": {
         "placeholder": "Classify…",
+        "saved": "Movement classified.",
+        "applySimilarTitle": "Apply to similar movements",
+        "applySimilarBody": "There are {{count}} unclassified movements with the same description. You can mark all of them as {{kind}} and remember the rule for future imports.",
+        "matchPattern": "Exact match",
+        "onlyThis": "Only this one",
+        "applySimilar": "Apply to all",
+        "appliedSimilar": "Classification applied to {{count}} similar movements.",
         "failed": "Could not classify the transaction."
       },
       "kinds": {

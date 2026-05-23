@@ -7,6 +7,7 @@ import type {
   BankAccountRow,
   BankName,
   BankTransactionRow,
+  CounterpartyRulePreview,
   ReviewQueueRow,
   TransactionDirection,
   TransactionKind,
@@ -15,6 +16,7 @@ import type {
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
 import { CompactSelect } from "@shared/components/CompactSelect";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -37,6 +39,11 @@ import {
 
 type Tab = "overview" | "movements" | "review" | "projects";
 type MovementDateFilter = "all" | "month" | "custom";
+type PendingClassificationRule = {
+  row: BankTransactionRow;
+  kind: TransactionKind;
+  preview: CounterpartyRulePreview;
+};
 type TransactionDraft = {
   txnDate: string;
   rawDescription: string;
@@ -116,6 +123,8 @@ export const TreasuryPage = () => {
   const [showManualForm, setShowManualForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<TransactionDraft | null>(null);
+  const [pendingRule, setPendingRule] = useState<PendingClassificationRule | null>(null);
+  const [isApplyingRule, setIsApplyingRule] = useState(false);
   const [importBankName, setImportBankName] = useState<BankName>("popular");
   const [importAccountId, setImportAccountId] = useState<string>("");
   const [busy, setBusy] = useState(false);
@@ -312,21 +321,74 @@ export const TreasuryPage = () => {
 
   /* --------------------------- Classify handler -------------------------- */
 
-  const classify = async (transactionId: string, kind: TransactionKind) => {
+  const classify = async (row: BankTransactionRow, kind: TransactionKind) => {
+    if (!kind) return;
     try {
-      await mutations.annotate({
-        commandId: newCommandId("treasury-classify"),
+      const baseCommand = {
         workspaceId: activeWorkspaceId,
-        actorType: "user",
-        sourceChannel: "desktop",
-        transactionId,
+        actorType: "user" as const,
+        sourceChannel: "desktop" as const,
+        transactionId: row.id,
         txnKind: kind,
         isInternalTransfer: kind === "transfer" || kind === "fx_exchange",
+      };
+      const preview = row.rawDescription?.trim()
+        ? await mutations.previewClassificationRule({
+            workspaceId: activeWorkspaceId,
+            transactionId: row.id,
+            matchType: "exact",
+          })
+        : null;
+      if (preview && preview.matchCount > 1) {
+        setPendingRule({ row, kind, preview });
+        return;
+      }
+
+      await mutations.annotate({
+        commandId: newCommandId("treasury-classify"),
+        ...baseCommand,
       });
+      toast.success(t("finance.treasury.classify.saved"));
       transactions.refresh();
       overview.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("finance.treasury.classify.failed"));
+    }
+  };
+
+  const applyPendingRule = async (applyToAll: boolean) => {
+    if (!pendingRule) return;
+    const baseCommand = {
+      workspaceId: activeWorkspaceId,
+      actorType: "user" as const,
+      sourceChannel: "desktop" as const,
+      transactionId: pendingRule.row.id,
+      txnKind: pendingRule.kind,
+      isInternalTransfer: pendingRule.kind === "transfer" || pendingRule.kind === "fx_exchange",
+    };
+    setIsApplyingRule(true);
+    try {
+      if (applyToAll) {
+        const result = await mutations.applyClassificationRule({
+          commandId: newCommandId("treasury-rule"),
+          ...baseCommand,
+          matchType: "exact",
+        });
+        toast.success(t("finance.treasury.classify.appliedSimilar", { count: result.affectedCount }));
+      } else {
+        await mutations.annotate({
+          commandId: newCommandId("treasury-classify"),
+          ...baseCommand,
+        });
+        toast.success(t("finance.treasury.classify.saved"));
+      }
+      setPendingRule(null);
+      transactions.refresh();
+      overview.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("finance.treasury.classify.failed"));
+    } finally {
+      setIsApplyingRule(false);
     }
   };
 
@@ -446,7 +508,7 @@ export const TreasuryPage = () => {
           ) : (
             <select
               className="compact-filter-select"
-              onChange={(event) => classify(row.id, event.target.value as TransactionKind)}
+              onChange={(event) => classify(row, event.target.value as TransactionKind)}
               value={row.annotation?.txnKind ?? ""}
             >
               <option value="">{t("finance.treasury.classify.placeholder")}</option>
@@ -490,6 +552,7 @@ export const TreasuryPage = () => {
   );
 
   return (
+    <>
     <div className="page-stack">
       <input
         accept=".csv,.xlsx,.xls"
@@ -901,6 +964,31 @@ export const TreasuryPage = () => {
         </div>
       </SurfaceCard>
     </div>
+    <ConfirmDialog
+      body={t("finance.treasury.classify.applySimilarBody", {
+        kind: pendingRule ? kindLabel(pendingRule.kind) : "",
+        count: pendingRule?.preview.matchCount ?? 0,
+      })}
+      cancelLabel={t("finance.treasury.classify.onlyThis")}
+      confirmLabel={t("finance.treasury.classify.applySimilar")}
+      details={
+        pendingRule ? (
+          <div className="cell-stack">
+            <span className="confirm-dialog-details-label">{t("finance.treasury.classify.matchPattern")}</span>
+            <strong>{pendingRule.preview.matchPattern}</strong>
+            {pendingRule.preview.sampleDescriptions.length > 0 ? (
+              <small className="text-muted">{pendingRule.preview.sampleDescriptions.slice(0, 2).join(" · ")}</small>
+            ) : null}
+          </div>
+        ) : null
+      }
+      isOpen={Boolean(pendingRule)}
+      isSubmitting={isApplyingRule}
+      onCancel={() => void applyPendingRule(false)}
+      onConfirm={() => void applyPendingRule(true)}
+      title={t("finance.treasury.classify.applySimilarTitle")}
+    />
+    </>
   );
 };
 

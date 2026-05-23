@@ -35,12 +35,14 @@ import {
   deleteImportSchema,
   correctTransactionSchema,
   annotateTransactionSchema,
+  applyCounterpartyRuleSchema,
   setAllocationsSchema,
   reviewReimbursementSchema,
   linkTransactionSchema,
   treasuryAccountsReadArgsSchema,
   treasuryImportsReadArgsSchema,
   treasuryTransactionListReadArgsSchema,
+  counterpartyRulePreviewReadArgsSchema,
   treasuryOverviewReadArgsSchema,
   treasuryReviewQueueReadArgsSchema,
   treasuryProjectPnlReadArgsSchema,
@@ -365,6 +367,9 @@ type RegisterFoundationIpcOptions = {
     annotateTransaction: (
       input: import("@contracts").AnnotateTransactionCommand,
     ) => import("@contracts").TransactionMutationResult;
+    applyCounterpartyRule: (
+      input: import("@contracts").ApplyCounterpartyRuleCommand,
+    ) => import("@contracts").ApplyCounterpartyRuleResult;
     setAllocations: (
       input: import("@contracts").SetAllocationsCommand,
     ) => import("@contracts").TransactionMutationResult;
@@ -380,6 +385,9 @@ type RegisterFoundationIpcOptions = {
     listTransactions: (
       query: import("@contracts").TreasuryTransactionListQuery,
     ) => import("@contracts").BankTransactionRow[];
+    previewClassificationRule: (
+      query: import("@contracts").CounterpartyRulePreviewQuery,
+    ) => import("@contracts").CounterpartyRulePreview;
     listImports: (
       workspaceId: string,
       bankAccountId?: string,
@@ -2130,6 +2138,20 @@ export const registerFoundationIpc = ({
     "The app could not load transactions.",
   );
   safeHandleReadWithSchema(
+    ipcChannels.treasury.previewClassificationRule,
+    counterpartyRulePreviewReadArgsSchema,
+    async (_event, query: import("@contracts").CounterpartyRulePreviewQuery) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "preview classification rule",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.previewClassificationRule(query);
+    },
+    "The app could not preview the classification rule.",
+  );
+  safeHandleReadWithSchema(
     ipcChannels.treasury.listImports,
     treasuryImportsReadArgsSchema,
     async (_event, query: { workspaceId: string; bankAccountId?: string }) => {
@@ -2245,6 +2267,19 @@ export const registerFoundationIpc = ({
         requiredPermission: "treasury.transactions.classify",
       });
       return treasuryMutations.annotateTransaction(input);
+    },
+  );
+  safeHandle(
+    ipcChannels.treasury.applyClassificationRule,
+    applyCounterpartyRuleSchema,
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "apply classification rule",
+        accessLevel: "write",
+        requiredPermission: "treasury.transactions.classify",
+      });
+      return treasuryMutations.applyCounterpartyRule(input);
     },
   );
   safeHandle(ipcChannels.treasury.setAllocations, setAllocationsSchema, async (_event, input) => {

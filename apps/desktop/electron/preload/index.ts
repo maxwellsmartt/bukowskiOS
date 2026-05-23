@@ -552,6 +552,10 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.listTransactions, query) as Promise<
       import("@contracts").BankTransactionRow[]
     >,
+  previewClassificationRule: (query: import("@contracts").CounterpartyRulePreviewQuery) =>
+    ipcRenderer.invoke(ipcChannels.treasury.previewClassificationRule, query) as Promise<
+      import("@contracts").CounterpartyRulePreview
+    >,
   listImports: (workspaceId: string, bankAccountId?: string) =>
     ipcRenderer.invoke(ipcChannels.treasury.listImports, { workspaceId, bankAccountId }) as Promise<
       import("@contracts").BankStatementImportRow[]
@@ -587,6 +591,10 @@ const bukowskiTreasury = {
   annotateTransaction: (input: import("@contracts").AnnotateTransactionCommand) =>
     ipcRenderer.invoke(ipcChannels.treasury.annotateTransaction, input) as Promise<
       import("@contracts").TransactionMutationResult
+    >,
+  applyClassificationRule: (input: import("@contracts").ApplyCounterpartyRuleCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.applyClassificationRule, input) as Promise<
+      import("@contracts").ApplyCounterpartyRuleResult
     >,
   setAllocations: (input: import("@contracts").SetAllocationsCommand) =>
     ipcRenderer.invoke(ipcChannels.treasury.setAllocations, input) as Promise<

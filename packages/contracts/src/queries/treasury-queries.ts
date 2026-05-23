@@ -113,6 +113,21 @@ export type TreasuryTransactionListQuery = {
   limit?: number;
 };
 
+export type CounterpartyRulePreviewQuery = {
+  workspaceId: string;
+  transactionId: string;
+  matchPattern?: string | null;
+  matchType?: "exact" | "contains";
+};
+
+export type CounterpartyRulePreview = {
+  transactionId: string;
+  matchPattern: string;
+  matchType: "exact" | "contains";
+  matchCount: number;
+  sampleDescriptions: string[];
+};
+
 export type TreasuryOverviewQuery = {
   workspaceId?: string;
   period: TreasuryPeriodPreset;

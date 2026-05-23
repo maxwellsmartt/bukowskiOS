@@ -163,6 +163,23 @@ export type AnnotateTransactionCommand = {
   notes?: string | null;
 };
 
+export type ApplyCounterpartyRuleCommand = AnnotateTransactionCommand & {
+  /** Optional override; defaults to the selected transaction description. */
+  matchPattern?: string | null;
+  /** MVP keeps this conservative: exact normalized description by default. */
+  matchType?: "exact" | "contains";
+};
+
+export type ApplyCounterpartyRuleResult = {
+  commandId: string;
+  transactionId: string;
+  ruleId: string;
+  matchPattern: string;
+  affectedCount: number;
+  repeated: boolean;
+  summary: string;
+};
+
 export type ProjectAllocationInput = {
   projectId?: string | null;
   projectNameSnapshot?: string | null;

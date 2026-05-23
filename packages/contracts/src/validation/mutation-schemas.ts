@@ -1474,6 +1474,11 @@ export const annotateTransactionSchema = z
   })
   .strict();
 
+export const applyCounterpartyRuleSchema = annotateTransactionSchema.extend({
+  matchPattern: nullableOrOptionalString,
+  matchType: z.enum(["exact", "contains"]).optional(),
+});
+
 const projectAllocationInputSchema = z
   .object({
     projectId: nullableOrOptionalString,
@@ -1540,6 +1545,15 @@ export const treasuryTransactionListQuerySchema = z
   })
   .strict();
 
+export const counterpartyRulePreviewQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    transactionId: nonEmptyString,
+    matchPattern: nullableOrOptionalString,
+    matchType: z.enum(["exact", "contains"]).optional(),
+  })
+  .strict();
+
 export const treasuryOverviewQuerySchema = z
   .object({
     workspaceId: nonEmptyString,
@@ -1568,6 +1582,7 @@ export const treasuryImportsQuerySchema = z
 export const treasuryAccountsReadArgsSchema = z.tuple([treasuryAccountsQuerySchema]);
 export const treasuryImportsReadArgsSchema = z.tuple([treasuryImportsQuerySchema]);
 export const treasuryTransactionListReadArgsSchema = z.tuple([treasuryTransactionListQuerySchema]);
+export const counterpartyRulePreviewReadArgsSchema = z.tuple([counterpartyRulePreviewQuerySchema]);
 export const treasuryOverviewReadArgsSchema = z.tuple([treasuryOverviewQuerySchema]);
 export const treasuryReviewQueueReadArgsSchema = z.tuple([treasuryAccountsQuerySchema]);
 export const treasuryProjectPnlReadArgsSchema = z.tuple([treasuryProjectPnlQuerySchema]);

@@ -1488,6 +1488,13 @@
       },
       "classify": {
         "placeholder": "Clasificar…",
+        "saved": "Movimiento clasificado.",
+        "applySimilarTitle": "Aplicar a movimientos similares",
+        "applySimilarBody": "Hay {{count}} movimientos sin clasificar con la misma descripción. Puedes marcar todos como {{kind}} y recordar la regla para futuras importaciones.",
+        "matchPattern": "Coincidencia exacta",
+        "onlyThis": "Solo este",
+        "applySimilar": "Aplicar a todos",
+        "appliedSimilar": "Clasificación aplicada a {{count}} movimientos similares.",
         "failed": "No se pudo clasificar la transacción."
       },
       "kinds": {

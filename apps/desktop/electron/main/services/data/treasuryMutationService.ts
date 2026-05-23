@@ -4,6 +4,8 @@ import type { DatabaseSync } from "node:sqlite";
 import type {
   AddManualTransactionsCommand,
   AnnotateTransactionCommand,
+  ApplyCounterpartyRuleCommand,
+  ApplyCounterpartyRuleResult,
   BankAccountMutationResult,
   CorrectTransactionCommand,
   DeleteImportCommand,
@@ -78,6 +80,40 @@ const computeDedupeHash = (bankAccountId: string, row: ParsedBankTransaction) =>
   ];
   return createHash("sha1").update(parts.join("|")).digest("hex");
 };
+
+const normalizeRuleText = (value: string | null | undefined) =>
+  (value ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+
+const ruleIdFor = (workspaceId: string, matchType: string, matchPattern: string) =>
+  `counterparty-rule-${createHash("sha1")
+    .update(`${workspaceId}|${matchType}|${normalizeRuleText(matchPattern)}`)
+    .digest("hex")}`;
+
+type CounterpartyRule = {
+  id: string;
+  match_pattern: string;
+  match_type: "exact" | "contains";
+  default_kind: TransactionKind | null;
+  default_category: string | null;
+  default_counterparty: string | null;
+};
+
+const matchesRule = (rule: CounterpartyRule, rawDescription: string | null | undefined) => {
+  const text = normalizeRuleText(rawDescription);
+  const pattern = normalizeRuleText(rule.match_pattern);
+  if (!text || !pattern) return false;
+  return rule.match_type === "contains" ? text.includes(pattern) : text === pattern;
+};
+
+const loadActiveRules = (db: DatabaseSync, workspaceId: string): CounterpartyRule[] =>
+  db
+    .prepare(
+      `SELECT id, match_pattern, match_type, default_kind, default_category, default_counterparty
+       FROM counterparty_rules
+       WHERE workspace_id = ? AND is_active = 1
+       ORDER BY priority DESC, updated_at DESC`,
+    )
+    .all(workspaceId) as CounterpartyRule[];
 
 /**
  * Heuristic auto-classification applied at import time. Always conservative —
@@ -193,6 +229,7 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
     const now = new Date().toISOString();
     let insertedCount = 0;
     let duplicateCount = 0;
+    const activeRules = loadActiveRules(db, input.workspaceId);
 
     db.exec("BEGIN");
     try {
@@ -225,8 +262,9 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
       );
       const insertAnnotation = db.prepare(
         `INSERT INTO transaction_annotations (
-           transaction_id, workspace_id, txn_kind, counterparty, is_internal_transfer, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?)`,
+           transaction_id, workspace_id, txn_kind, counterparty, expense_category,
+           is_internal_transfer, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       );
       const existsTxn = db.prepare(
         `SELECT id FROM bank_transactions WHERE workspace_id = ? AND bank_account_id = ? AND dedupe_hash = ? LIMIT 1`,
@@ -259,12 +297,16 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
         );
 
         const auto = autoClassify(row.rawDescription, ownAccountNumbers, account.currency);
-        if (auto.kind || auto.isInternalTransfer) {
+        const rememberedRule = !auto.kind && !auto.isInternalTransfer
+          ? activeRules.find((rule) => matchesRule(rule, row.rawDescription))
+          : null;
+        if (auto.kind || auto.isInternalTransfer || rememberedRule?.default_kind) {
           insertAnnotation.run(
             txnId,
             input.workspaceId,
-            auto.kind,
-            auto.counterparty,
+            auto.kind ?? rememberedRule?.default_kind ?? null,
+            auto.counterparty ?? rememberedRule?.default_counterparty ?? null,
+            rememberedRule?.default_category ?? null,
             auto.isInternalTransfer ? 1 : 0,
             now,
           );
@@ -655,6 +697,164 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
         repeated: false,
         summary: "Transaction classified.",
       };
+    },
+
+    applyCounterpartyRule(input: ApplyCounterpartyRuleCommand): ApplyCounterpartyRuleResult {
+      const existing = receiptHelpers.getExistingReceipt(input.commandId);
+      if (existing?.outcome_status === "success") {
+        const selected = db
+          .prepare(`SELECT raw_description FROM bank_transactions WHERE id = ? AND workspace_id = ? LIMIT 1`)
+          .get(input.transactionId, input.workspaceId) as { raw_description: string | null } | undefined;
+        const matchPattern = input.matchPattern?.trim() || selected?.raw_description?.trim() || "";
+        return {
+          commandId: input.commandId,
+          transactionId: input.transactionId,
+          ruleId: ruleIdFor(input.workspaceId, input.matchType ?? "exact", matchPattern),
+          matchPattern,
+          affectedCount: 0,
+          repeated: true,
+          summary: "Classification rule already applied.",
+        };
+      }
+      if (existing?.outcome_status === "failed") {
+        throw new Error(buildFailedCommandMessage("classification rule", existing.error_message));
+      }
+
+      const now = new Date().toISOString();
+      const matchType = input.matchType ?? "exact";
+      db.exec("BEGIN");
+      try {
+        const selected = db
+          .prepare(`SELECT raw_description FROM bank_transactions WHERE id = ? AND workspace_id = ? LIMIT 1`)
+          .get(input.transactionId, input.workspaceId) as { raw_description: string | null } | undefined;
+        if (!selected) throw new Error("Transaction not found.");
+
+        const matchPattern = (input.matchPattern?.trim() || selected.raw_description?.trim() || "").replace(/\s+/g, " ");
+        if (!matchPattern) throw new Error("This transaction has no description to remember.");
+
+        const ruleId = ruleIdFor(input.workspaceId, matchType, matchPattern);
+        db.prepare(
+          `INSERT INTO counterparty_rules (
+             id, workspace_id, match_pattern, match_type, default_kind,
+             default_category, default_counterparty, priority, is_active,
+             created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             default_kind = excluded.default_kind,
+             default_category = excluded.default_category,
+             default_counterparty = excluded.default_counterparty,
+             is_active = 1,
+             updated_at = excluded.updated_at`,
+        ).run(
+          ruleId,
+          input.workspaceId,
+          matchPattern,
+          matchType,
+          input.txnKind ?? null,
+          input.expenseCategory?.trim() || null,
+          input.counterparty?.trim() || null,
+          now,
+          now,
+        );
+
+        const where =
+          matchType === "contains"
+            ? "UPPER(t.raw_description) LIKE ?"
+            : "UPPER(TRIM(t.raw_description)) = ?";
+        const param =
+          matchType === "contains"
+            ? `%${normalizeRuleText(matchPattern)}%`
+            : normalizeRuleText(matchPattern);
+        const matches = db
+          .prepare(
+            `SELECT t.id
+             FROM bank_transactions t
+             LEFT JOIN transaction_annotations a ON a.transaction_id = t.id
+             WHERE t.workspace_id = ?
+               AND t.raw_description IS NOT NULL
+               AND ${where}
+               AND (a.transaction_id IS NULL OR a.txn_kind IS NULL)`,
+          )
+          .all(input.workspaceId, param) as Array<{ id: string }>;
+
+        const upsertAnnotation = db.prepare(
+          `INSERT INTO transaction_annotations (
+             transaction_id, workspace_id, txn_kind, concept, counterparty,
+             counterparty_rnc, expense_category, is_internal_transfer,
+             reimbursement_status, claimed_amount, support_doc_file_id, notes,
+             classified_by_user_id, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 'n/a'), ?, ?, ?, ?, ?)
+           ON CONFLICT(transaction_id) DO UPDATE SET
+             txn_kind = excluded.txn_kind,
+             concept = excluded.concept,
+             counterparty = COALESCE(excluded.counterparty, transaction_annotations.counterparty),
+             counterparty_rnc = COALESCE(excluded.counterparty_rnc, transaction_annotations.counterparty_rnc),
+             expense_category = COALESCE(excluded.expense_category, transaction_annotations.expense_category),
+             is_internal_transfer = excluded.is_internal_transfer,
+             reimbursement_status = excluded.reimbursement_status,
+             claimed_amount = COALESCE(excluded.claimed_amount, transaction_annotations.claimed_amount),
+             support_doc_file_id = COALESCE(excluded.support_doc_file_id, transaction_annotations.support_doc_file_id),
+             notes = COALESCE(excluded.notes, transaction_annotations.notes),
+             classified_by_user_id = excluded.classified_by_user_id,
+             updated_at = excluded.updated_at
+           WHERE transaction_annotations.txn_kind IS NULL`,
+        );
+
+        for (const match of matches) {
+          upsertAnnotation.run(
+            match.id,
+            input.workspaceId,
+            input.txnKind ?? null,
+            input.concept?.trim() || null,
+            input.counterparty?.trim() || null,
+            input.counterpartyRnc?.trim() || null,
+            input.expenseCategory?.trim() || null,
+            input.isInternalTransfer ? 1 : 0,
+            input.reimbursementStatus ?? null,
+            input.claimedAmount != null ? round2(input.claimedAmount) : null,
+            input.supportDocFileId?.trim() || null,
+            input.notes?.trim() || null,
+            defaultActorUserId,
+            now,
+          );
+        }
+
+        enqueueOutbox(
+          db,
+          input.workspaceId,
+          "counterparty_rule",
+          ruleId,
+          {
+            matchPattern,
+            matchType,
+            txnKind: input.txnKind ?? null,
+            expenseCategory: input.expenseCategory ?? null,
+            affectedCount: matches.length,
+          },
+          `sync-rule-${input.commandId}`,
+          now,
+        );
+        recordReceipt(input, now, "success", null);
+        db.exec("COMMIT");
+        return {
+          commandId: input.commandId,
+          transactionId: input.transactionId,
+          ruleId,
+          matchPattern,
+          affectedCount: matches.length,
+          repeated: false,
+          summary: `Applied classification to ${matches.length} movement(s).`,
+        };
+      } catch (error) {
+        db.exec("ROLLBACK");
+        recordReceipt(
+          input,
+          now,
+          "failed",
+          error instanceof Error ? error.message : "Classification rule failed.",
+        );
+        throw error;
+      }
     },
 
     setAllocations(input: SetAllocationsCommand): TransactionMutationResult {

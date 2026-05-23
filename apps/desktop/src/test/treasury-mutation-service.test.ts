@@ -160,6 +160,104 @@ describe("treasury mutation service", () => {
     cleanup();
   });
 
+  it("remembers an exact counterparty rule and applies it to matching unclassified movements", () => {
+    const { cleanup, database } = createTestDatabase("treasury-counterparty-rules");
+    const mutations = createTreasuryMutationService(database);
+    const reads = createTreasuryReadService(database);
+    mutations.upsertBankAccount(account("cmd-acct-rules"));
+    mutations.importStatement({
+      commandId: "cmd-import-rules",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-rules",
+      sourceFormat: "csv",
+      rows: [
+        { txnDate: "2026-04-01", rawDescription: "PAGO RECURRENTE SUPLIDOR A", amount: 1000, direction: "debit" },
+        { txnDate: "2026-04-02", rawDescription: "PAGO RECURRENTE SUPLIDOR A", amount: 1000, direction: "debit" },
+        { txnDate: "2026-04-03", rawDescription: "PAGO RECURRENTE SUPLIDOR B", amount: 1000, direction: "debit" },
+      ],
+    });
+
+    const target = reads
+      .listTransactions({ workspaceId })
+      .find((txn) => txn.rawDescription === "PAGO RECURRENTE SUPLIDOR A");
+    expect(target).toBeTruthy();
+
+    const preview = reads.previewClassificationRule({
+      workspaceId,
+      transactionId: target!.id,
+      matchType: "exact",
+    });
+    expect(preview.matchCount).toBe(2);
+
+    const result = mutations.applyCounterpartyRule({
+      commandId: "cmd-apply-rule",
+      workspaceId,
+      ...baseChannel,
+      transactionId: target!.id,
+      txnKind: "expense",
+      expenseCategory: "Servicios",
+      matchType: "exact",
+    });
+    expect(result.affectedCount).toBe(2);
+
+    const txns = reads.listTransactions({ workspaceId });
+    const supplierA = txns.filter((txn) => txn.rawDescription === "PAGO RECURRENTE SUPLIDOR A");
+    const supplierB = txns.find((txn) => txn.rawDescription === "PAGO RECURRENTE SUPLIDOR B");
+    expect(supplierA.every((txn) => txn.annotation?.txnKind === "expense")).toBe(true);
+    expect(supplierA.every((txn) => txn.annotation?.expenseCategory === "Servicios")).toBe(true);
+    expect(supplierB?.annotation).toBeNull();
+    cleanup();
+  });
+
+  it("applies remembered counterparty rules to future imports without overwriting heuristics", () => {
+    const { cleanup, database } = createTestDatabase("treasury-counterparty-rules-import");
+    const mutations = createTreasuryMutationService(database);
+    const reads = createTreasuryReadService(database);
+    mutations.upsertBankAccount(account("cmd-acct-rule-import"));
+    mutations.importStatement({
+      commandId: "cmd-import-rule-seed",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-rule-import",
+      sourceFormat: "csv",
+      rows: [
+        { txnDate: "2026-04-01", rawDescription: "PAGO RECURRENTE SUPLIDOR C", amount: 1000, direction: "debit" },
+      ],
+    });
+    const [seed] = reads.listTransactions({ workspaceId });
+    mutations.applyCounterpartyRule({
+      commandId: "cmd-apply-rule-import",
+      workspaceId,
+      ...baseChannel,
+      transactionId: seed.id,
+      txnKind: "expense",
+      expenseCategory: "Servicios",
+      matchType: "exact",
+    });
+
+    mutations.importStatement({
+      commandId: "cmd-import-rule-future",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-rule-import",
+      sourceFormat: "csv",
+      rows: [
+        { txnDate: "2026-05-01", rawDescription: "PAGO RECURRENTE SUPLIDOR C", amount: 1200, direction: "debit" },
+        { txnDate: "2026-05-01", rawDescription: "EXI COMISIONES LBTR", amount: 100, direction: "debit" },
+      ],
+    });
+
+    const future = reads
+      .listTransactions({ workspaceId })
+      .find((txn) => txn.txnDate === "2026-05-01" && txn.rawDescription === "PAGO RECURRENTE SUPLIDOR C");
+    const fee = reads.listTransactions({ workspaceId }).find((txn) => txn.rawDescription === "EXI COMISIONES LBTR");
+    expect(future?.annotation?.txnKind).toBe("expense");
+    expect(future?.annotation?.expenseCategory).toBe("Servicios");
+    expect(fee?.annotation?.txnKind).toBe("bank_fee");
+    cleanup();
+  });
+
   it("derives account balance from transactions when a statement has no running balance", () => {
     const { cleanup, database } = createTestDatabase("treasury-derived-balance");
     const mutations = createTreasuryMutationService(database);

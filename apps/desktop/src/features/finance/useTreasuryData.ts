@@ -2,10 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
   AnnotateTransactionCommand,
+  ApplyCounterpartyRuleCommand,
+  ApplyCounterpartyRuleResult,
   BankAccountRow,
   BankStatementImportRow,
   BankTransactionRow,
   CorrectTransactionCommand,
+  CounterpartyRulePreview,
+  CounterpartyRulePreviewQuery,
   ImportStatementCommand,
   LinkTransactionCommand,
   ProjectPnlRow,
@@ -251,6 +255,10 @@ export const useTreasuryMutations = () =>
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.importStatement(input);
       },
+      async previewClassificationRule(input: CounterpartyRulePreviewQuery): Promise<CounterpartyRulePreview> {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.previewClassificationRule(input);
+      },
       async addManualTransactions(input: ImportStatementCommand) {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.addManualTransactions(input);
@@ -266,6 +274,10 @@ export const useTreasuryMutations = () =>
       async annotate(input: AnnotateTransactionCommand): Promise<TransactionMutationResult> {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.annotateTransaction(input);
+      },
+      async applyClassificationRule(input: ApplyCounterpartyRuleCommand): Promise<ApplyCounterpartyRuleResult> {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.applyClassificationRule(input);
       },
       async setAllocations(input: SetAllocationsCommand): Promise<TransactionMutationResult> {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");

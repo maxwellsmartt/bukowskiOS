@@ -422,6 +422,9 @@ declare global {
       listTransactions: (
         query: import("@contracts").TreasuryTransactionListQuery,
       ) => Promise<import("@contracts").BankTransactionRow[]>;
+      previewClassificationRule: (
+        query: import("@contracts").CounterpartyRulePreviewQuery,
+      ) => Promise<import("@contracts").CounterpartyRulePreview>;
       listImports: (
         workspaceId: string,
         bankAccountId?: string,
@@ -450,6 +453,9 @@ declare global {
       annotateTransaction: (
         input: import("@contracts").AnnotateTransactionCommand,
       ) => Promise<import("@contracts").TransactionMutationResult>;
+      applyClassificationRule: (
+        input: import("@contracts").ApplyCounterpartyRuleCommand,
+      ) => Promise<import("@contracts").ApplyCounterpartyRuleResult>;
       setAllocations: (
         input: import("@contracts").SetAllocationsCommand,
       ) => Promise<import("@contracts").TransactionMutationResult>;
