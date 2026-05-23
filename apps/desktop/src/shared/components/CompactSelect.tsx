@@ -29,6 +29,7 @@ type PopupRect = { top: number; left: number; minWidth: number };
 
 const POPUP_GAP = 6;
 const POPUP_MAX_HEIGHT = 320;
+const VIEWPORT_GUTTER = 8;
 
 /**
  * Dropdown shaped like a native `<select>` but with a portaled popup
@@ -74,11 +75,13 @@ export const CompactSelect = <T extends string>({
     const r = node.getBoundingClientRect();
     const spaceBelow = window.innerHeight - r.bottom;
     const flip = spaceBelow < POPUP_MAX_HEIGHT + POPUP_GAP && r.top > spaceBelow;
+    const minWidth = popupMinWidth ?? Math.max(r.width, 168);
+    const maxLeft = Math.max(VIEWPORT_GUTTER, window.innerWidth - minWidth - VIEWPORT_GUTTER);
     setPlaceAbove(flip);
     setRect({
       top: flip ? r.top - POPUP_GAP : r.bottom + POPUP_GAP,
-      left: r.left,
-      minWidth: popupMinWidth ?? Math.max(r.width, 168),
+      left: Math.min(Math.max(r.left, VIEWPORT_GUTTER), maxLeft),
+      minWidth,
     });
   };
 

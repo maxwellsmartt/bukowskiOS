@@ -15730,6 +15730,253 @@ input[type="number"] {
 .quotes-summary-tile-expired .quotes-summary-tile-value { color: rgba(255, 220, 150, 0.95); }
 .quotes-summary-tile-cancelled .quotes-summary-tile-value { color: var(--text-muted); }
 
+.treasury-hero-card,
+.treasury-accounts-card,
+.treasury-detail-card {
+  border-color: rgba(155, 176, 196, 0.14);
+}
+
+.treasury-hero-card {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.treasury-hero-topline,
+.treasury-detail-header,
+.treasury-filter-bar {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.treasury-hero-topline h3 {
+  font-size: var(--font-lg, 18px);
+  font-weight: var(--weight-semibold, 600);
+  margin: 8px 0 0;
+}
+
+.treasury-period-picker {
+  min-width: 180px;
+}
+
+.treasury-kpi-grid,
+.treasury-account-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.treasury-kpi-grid {
+  grid-template-columns: repeat(auto-fit, minmax(164px, 1fr));
+}
+
+.treasury-account-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.treasury-kpi-tile,
+.treasury-account-tile {
+  appearance: none;
+  border-radius: 8px;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.treasury-kpi-tile {
+  background: rgba(255, 255, 255, 0.026);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: grid;
+  gap: 7px;
+  min-height: 94px;
+  padding: 12px;
+}
+
+.treasury-kpi-income {
+  border-color: rgba(94, 189, 139, 0.26);
+}
+
+.treasury-kpi-expense {
+  border-color: rgba(218, 118, 118, 0.24);
+}
+
+.treasury-kpi-deductible {
+  border-color: rgba(126, 183, 178, 0.24);
+}
+
+.treasury-kpi-neutral {
+  border-color: rgba(151, 164, 185, 0.22);
+}
+
+.treasury-kpi-income .treasury-money-value {
+  color: rgba(126, 220, 162, 0.96);
+}
+
+.treasury-kpi-expense .treasury-money-value {
+  color: rgba(255, 159, 159, 0.95);
+}
+
+.treasury-kpi-deductible .treasury-money-value {
+  color: rgba(135, 211, 207, 0.96);
+}
+
+.treasury-money-value,
+.treasury-account-balance {
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-bold, 700);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.treasury-account-tile {
+  background: rgba(255, 255, 255, 0.022);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  text-align: left;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.treasury-account-tile:hover {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(214, 173, 112, 0.28);
+}
+
+.treasury-account-tile .ghost-control {
+  justify-content: center;
+  width: 100%;
+}
+
+.treasury-account-heading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.treasury-bank-avatar {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 38px;
+  justify-content: center;
+  overflow: hidden;
+  width: 38px;
+}
+
+.treasury-bank-avatar img {
+  display: block;
+  height: 100%;
+  object-fit: contain;
+  padding: 5px;
+  width: 100%;
+}
+
+.treasury-bank-avatar svg {
+  color: rgba(39, 50, 65, 0.82);
+}
+
+.treasury-account-name {
+  display: block;
+  font-weight: var(--weight-semibold, 600);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.treasury-account-heading small,
+.treasury-account-meta {
+  color: var(--text-muted);
+  font-size: var(--font-xs, 12px);
+}
+
+.treasury-account-meta {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+}
+
+.treasury-detail-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+}
+
+.treasury-filter-bar {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.treasury-account-form-card {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(214, 173, 112, 0.14);
+}
+
+.treasury-account-form-grid {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns:
+    minmax(160px, 0.8fr)
+    minmax(180px, 1fr)
+    minmax(180px, 1fr)
+    minmax(120px, 0.65fr)
+    minmax(150px, 0.75fr)
+    auto;
+}
+
+.treasury-account-form-grid .field-input,
+.treasury-account-form-grid .compact-select-trigger {
+  min-height: 42px;
+}
+
+.treasury-account-form-actions {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .treasury-hero-topline,
+  .treasury-detail-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .treasury-period-picker {
+    min-width: 0;
+  }
+
+  .treasury-money-value,
+  .treasury-account-balance {
+    font-size: 18px;
+  }
+
+  .treasury-account-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .treasury-account-form-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+  .treasury-account-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .treasury-account-form-actions {
+    justify-content: flex-start;
+  }
+}
+
 .quotes-list-number {
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;

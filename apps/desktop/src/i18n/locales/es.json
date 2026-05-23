@@ -1385,10 +1385,16 @@
         "review": "Revisión contable",
         "projects": "Por proyecto"
       },
+      "overview": {
+        "title": "Pulso de caja",
+        "window": "Ventana"
+      },
       "period": {
         "month": "Mes",
         "quarter": "Trimestre",
-        "year": "Año"
+        "year": "Año",
+        "fiscal": "Año fiscal",
+        "all": "Todo"
       },
       "kpi": {
         "income": "Ingresos (reales)",
@@ -1399,7 +1405,8 @@
       },
       "actions": {
         "newAccount": "Nueva cuenta",
-        "import": "Importar estado"
+        "import": "Importar estado",
+        "backToOverview": "Volver al resumen"
       },
       "filters": {
         "account": "Cuenta",
@@ -1424,6 +1431,7 @@
         "movementCount_other": "{{count}} movimientos"
       },
       "movements": {
+        "title": "Detalle de movimientos",
         "emptyTitle": "Sin movimientos",
         "emptyBody": "Importa un estado de cuenta (CSV del Banco Popular, XLSX de Santa Cruz) o agrega movimientos manualmente."
       },

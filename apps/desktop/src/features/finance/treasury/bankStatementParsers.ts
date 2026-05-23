@@ -28,10 +28,29 @@ export type ParsedStatement = {
 const parseNumber = (value: unknown): number => {
   if (typeof value === "number") return value;
   if (value == null) return 0;
-  const cleaned = String(value)
-    .replace(/[^0-9.,-]/g, "")
-    .replace(/,/g, "");
-  const parsed = Number.parseFloat(cleaned);
+  const cleaned = String(value).replace(/[^0-9.,-]/g, "");
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  let normalized = cleaned;
+  if (lastComma >= 0 && lastDot >= 0) {
+    normalized =
+      lastComma > lastDot
+        ? cleaned.replace(/\./g, "").replace(",", ".")
+        : cleaned.replace(/,/g, "");
+  } else if (lastComma >= 0) {
+    const decimalLength = cleaned.length - lastComma - 1;
+    normalized = decimalLength > 0 && decimalLength <= 2 ? cleaned.replace(",", ".") : cleaned.replace(/,/g, "");
+  } else if ((cleaned.match(/\./g) ?? []).length > 1) {
+    const last = cleaned.lastIndexOf(".");
+    const decimalLength = cleaned.length - last - 1;
+    normalized =
+      decimalLength > 0 && decimalLength <= 2
+        ? `${cleaned.slice(0, last).replace(/\./g, "")}.${cleaned.slice(last + 1)}`
+        : cleaned.replace(/\./g, "");
+  } else if (lastDot >= 0 && cleaned.length - lastDot - 1 === 3) {
+    normalized = cleaned.replace(/\./g, "");
+  }
+  const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 

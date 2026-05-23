@@ -8,7 +8,7 @@ import type {
   TransactionKind,
 } from "../commands/treasury-commands";
 
-export type TreasuryPeriodPreset = "month" | "quarter" | "year" | "custom";
+export type TreasuryPeriodPreset = "month" | "quarter" | "year" | "fiscal" | "all" | "custom";
 
 export type BankAccountRow = {
   id: string;

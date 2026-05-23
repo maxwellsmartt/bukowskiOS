@@ -1383,10 +1383,16 @@
         "review": "Accountant review",
         "projects": "By project"
       },
+      "overview": {
+        "title": "Cash pulse",
+        "window": "Window"
+      },
       "period": {
         "month": "Month",
         "quarter": "Quarter",
-        "year": "Year"
+        "year": "Year",
+        "fiscal": "Fiscal year",
+        "all": "All"
       },
       "kpi": {
         "income": "Income (real)",
@@ -1397,7 +1403,8 @@
       },
       "actions": {
         "newAccount": "New account",
-        "import": "Import statement"
+        "import": "Import statement",
+        "backToOverview": "Back to overview"
       },
       "filters": {
         "account": "Account",
@@ -1422,6 +1429,7 @@
         "movementCount_other": "{{count}} movements"
       },
       "movements": {
+        "title": "Movement detail",
         "emptyTitle": "No movements",
         "emptyBody": "Import a bank statement (CSV from Banco Popular, XLSX from Santa Cruz) or add movements manually."
       },

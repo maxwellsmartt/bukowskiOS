@@ -160,6 +160,35 @@ describe("treasury mutation service", () => {
     cleanup();
   });
 
+  it("derives account balance from transactions when a statement has no running balance", () => {
+    const { cleanup, database } = createTestDatabase("treasury-derived-balance");
+    const mutations = createTreasuryMutationService(database);
+    const reads = createTreasuryReadService(database);
+    mutations.upsertBankAccount(
+      account("cmd-acct-bsc", {
+        bankName: "santa_cruz",
+        accountLabel: "Santa Cruz RD$",
+        accountNumberFull: "123456789",
+        openingBalance: 1000,
+      }),
+    );
+    mutations.importStatement({
+      commandId: "cmd-import-bsc",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-bsc",
+      sourceFormat: "xlsx",
+      rows: [
+        { txnDate: "2026-04-01", rawDescription: "Deposito cliente", amount: 2500, direction: "credit" },
+        { txnDate: "2026-04-02", rawDescription: "Pago suplidor", amount: 750.25, direction: "debit" },
+      ],
+    });
+
+    const santaCruz = reads.getAccounts(workspaceId).find((row) => row.id === "bank-account-cmd-acct-bsc");
+    expect(santaCruz?.currentBalance).toBe(2749.75);
+    cleanup();
+  });
+
   it("rejects allocations that exceed the transaction amount", () => {
     const { cleanup, database } = createTestDatabase("treasury-alloc-cap");
     const mutations = createTreasuryMutationService(database);

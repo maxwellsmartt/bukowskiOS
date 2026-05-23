@@ -44,6 +44,23 @@ const resolveWindow = (query?: TreasuryOverviewQuery) => {
       label: `${query.customStartDate} → ${query.customEndDate}`,
     };
   }
+  if (query?.period === "all") {
+    return {
+      startDate: null,
+      endDate: null,
+      label: "All time",
+    };
+  }
+  if (query?.period === "fiscal" || !query?.period) {
+    const fiscalStartYear = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+    const fiscalStart = new Date(fiscalStartYear, 9, 1);
+    const fiscalEnd = new Date(fiscalStartYear + 1, 8, 30);
+    return {
+      startDate: toIsoDate(fiscalStart),
+      endDate: toIsoDate(fiscalEnd),
+      label: `FY ${fiscalStartYear}-${fiscalStartYear + 1}`,
+    };
+  }
   if (query?.period === "quarter") {
     return {
       startDate: toIsoDate(startOfQuarter(now)),
@@ -58,7 +75,6 @@ const resolveWindow = (query?: TreasuryOverviewQuery) => {
       label: "This month",
     };
   }
-  // default: year
   return {
     startDate: toIsoDate(startOfYear(now)),
     endDate: toIsoDate(endOfYear(now)),
@@ -160,9 +176,16 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
       const rows = db
         .prepare(
           `SELECT acc.*,
-                  (SELECT t.running_balance FROM bank_transactions t
-                    WHERE t.bank_account_id = acc.id
-                    ORDER BY t.txn_date DESC, t.created_at DESC LIMIT 1) AS current_balance,
+                  COALESCE(
+                    (SELECT t.running_balance FROM bank_transactions t
+                      WHERE t.bank_account_id = acc.id AND t.running_balance IS NOT NULL
+                      ORDER BY t.txn_date DESC, t.created_at DESC LIMIT 1),
+                    acc.opening_balance + COALESCE((
+                      SELECT SUM(CASE WHEN t.direction = 'credit' THEN t.amount ELSE -t.amount END)
+                      FROM bank_transactions t
+                      WHERE t.bank_account_id = acc.id
+                    ), 0)
+                  ) AS current_balance,
                   (SELECT COUNT(*) FROM bank_transactions t2
                     WHERE t2.bank_account_id = acc.id) AS transaction_count
            FROM bank_accounts acc
@@ -278,16 +301,29 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
       const window = resolveWindow(query);
       const accounts = this.getAccounts(ws);
 
-      const rows = db
-        .prepare(
-          `SELECT t.txn_date, t.amount, t.direction,
-                  a.txn_kind, a.is_internal_transfer, a.deductible_amount,
-                  a.expense_category, a.reimbursement_status, a.transaction_id AS a_transaction_id
-           FROM bank_transactions t
-           LEFT JOIN transaction_annotations a ON a.transaction_id = t.id
-           WHERE t.workspace_id = ? AND t.txn_date >= ? AND t.txn_date <= ?`,
-        )
-        .all(ws, window.startDate, window.endDate) as Record<string, unknown>[];
+      const rows = (
+        window.startDate && window.endDate
+          ? db
+              .prepare(
+                `SELECT t.txn_date, t.amount, t.direction,
+                        a.txn_kind, a.is_internal_transfer, a.deductible_amount,
+                        a.expense_category, a.reimbursement_status, a.transaction_id AS a_transaction_id
+                 FROM bank_transactions t
+                 LEFT JOIN transaction_annotations a ON a.transaction_id = t.id
+                 WHERE t.workspace_id = ? AND t.txn_date >= ? AND t.txn_date <= ?`,
+              )
+              .all(ws, window.startDate, window.endDate)
+          : db
+              .prepare(
+                `SELECT t.txn_date, t.amount, t.direction,
+                        a.txn_kind, a.is_internal_transfer, a.deductible_amount,
+                        a.expense_category, a.reimbursement_status, a.transaction_id AS a_transaction_id
+                 FROM bank_transactions t
+                 LEFT JOIN transaction_annotations a ON a.transaction_id = t.id
+                 WHERE t.workspace_id = ?`,
+              )
+              .all(ws)
+      ) as Record<string, unknown>[];
 
       let totalIncome = 0;
       let totalExpense = 0;

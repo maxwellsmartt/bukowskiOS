@@ -1524,7 +1524,7 @@ export const treasuryTransactionListQuerySchema = z
 export const treasuryOverviewQuerySchema = z
   .object({
     workspaceId: nonEmptyString,
-    period: z.enum(["month", "quarter", "year", "custom"]),
+    period: z.enum(["month", "quarter", "year", "fiscal", "all", "custom"]),
     customStartDate: optionalTrimmedString,
     customEndDate: optionalTrimmedString,
   })

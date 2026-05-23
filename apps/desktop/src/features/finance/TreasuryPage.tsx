@@ -1,4 +1,4 @@
-import { Landmark, Plus, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Banknote, Download, Landmark, Plus, Trash2 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -13,14 +13,16 @@ import type {
 } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
+import { CompactSelect } from "@shared/components/CompactSelect";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
-import { useLocale } from "@shared/hooks/useLocale";
+import bancoPopularLogo from "@shared/assets/inbox/logos/banco popular dominicano-logo.jpg";
+import bancoSantaCruzLogo from "@shared/assets/inbox/logos/banco santa cruz-logo.png";
 
-import { formatCurrency, newCommandId } from "./quoteHelpers";
+import { newCommandId } from "./quoteHelpers";
 import { parseStatementFile } from "./treasury/bankStatementParsers";
 import {
   useBankAccounts,
@@ -51,17 +53,33 @@ const transactionKinds: TransactionKind[] = [
 
 const bankNames: BankName[] = ["popular", "santa_cruz", "custom"];
 
-const periods: TreasuryPeriodPreset[] = ["month", "quarter", "year"];
+const periods: TreasuryPeriodPreset[] = ["fiscal", "month", "quarter", "year", "all"];
+const bankLogoByName: Partial<Record<BankName, string>> = {
+  popular: bancoPopularLogo,
+  santa_cruz: bancoSantaCruzLogo,
+};
+const currencySuffix = (currency: string) => {
+  const normalized = currency.trim().toUpperCase();
+  if (normalized === "USD") return "US$";
+  if (normalized === "EUR") return "€";
+  return normalized || currency;
+};
+const formatTreasuryMoney = (value: number, currency = "DOP") => {
+  const safe = Number.isFinite(value) ? value : 0;
+  return `${safe.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ${currencySuffix(currency)}`;
+};
 
 export const TreasuryPage = () => {
   const { t } = useTranslation();
-  const { language } = useLocale();
   const { activeWorkspaceId } = useWorkspace();
   const mutations = useTreasuryMutations();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [tab, setTab] = useState<Tab>("overview");
-  const [period, setPeriod] = useState<TreasuryPeriodPreset>("year");
+  const [period, setPeriod] = useState<TreasuryPeriodPreset>("fiscal");
   const [accountFilter, setAccountFilter] = useState<string>("");
   const [search, setSearch] = useState("");
   const [unclassifiedOnly, setUnclassifiedOnly] = useState(false);
@@ -89,6 +107,29 @@ export const TreasuryPage = () => {
   const reviewQueue = useReviewQueue(activeWorkspaceId);
   const projectPnl = useProjectPnl(activeWorkspaceId);
   const imports = useTreasuryImports(activeWorkspaceId, accountFilter || undefined);
+  const selectedAccount = useMemo(
+    () => accounts.data.find((account) => account.id === accountFilter) ?? null,
+    [accountFilter, accounts.data],
+  );
+  const periodOptions = useMemo(
+    () =>
+      periods.map((value) => ({
+        value,
+        label: t(`finance.treasury.period.${value}`),
+      })),
+    [t],
+  );
+  const accountOptions = useMemo(
+    () => [
+      { value: "", label: t("finance.treasury.filters.allAccounts") },
+      ...accounts.data.map((account) => ({
+        value: account.id,
+        label: `${account.accountLabel} · ${account.currency}`,
+      })),
+    ],
+    [accounts.data, t],
+  );
+  const formatMoney = formatTreasuryMoney;
 
   const kindLabel = (kind: TransactionKind | null | undefined) =>
     kind ? t(`finance.treasury.kinds.${kind}`, { defaultValue: kind }) : "—";
@@ -104,6 +145,13 @@ export const TreasuryPage = () => {
   const openAccount = (accountId: string) => {
     setAccountFilter(accountId);
     setTab("movements");
+  };
+
+  const backToOverview = () => {
+    setTab("overview");
+    setAccountFilter("");
+    setSearch("");
+    setUnclassifiedOnly(false);
   };
 
   const removeImport = async (importId: string) => {
@@ -265,7 +313,7 @@ export const TreasuryPage = () => {
             }}
           >
             {row.direction === "credit" ? "+" : "−"}
-            {formatCurrency(row.amount, row.currency, language)}
+            {formatMoney(row.amount, row.currency)}
           </strong>
         ),
       },
@@ -291,7 +339,7 @@ export const TreasuryPage = () => {
           ),
       },
     ],
-    [language, t],
+    [t],
   );
 
   return (
@@ -306,7 +354,11 @@ export const TreasuryPage = () => {
 
       <div className="page-stack-row">
         <SectionHeader eyebrow={t("finance.title")} title={t("finance.treasury.title")} titleTone="accent" />
-        <button className="ghost-control is-active" onClick={() => setShowAccountForm((v) => !v)} type="button">
+        <button
+          className={`ghost-control${showAccountForm ? " is-active" : ""}`}
+          onClick={() => setShowAccountForm((v) => !v)}
+          type="button"
+        >
           <Plus size={13} />
           <span>{t("finance.treasury.actions.newAccount")}</span>
         </button>
@@ -349,53 +401,48 @@ export const TreasuryPage = () => {
 
       {tab === "overview" ? (
         <>
-          <div className="surface-card-actions" style={{ gap: 6 }}>
-            {periods.map((value) => (
-              <button
-                className={`ghost-control${period === value ? " is-active" : ""}`}
-                key={value}
-                onClick={() => setPeriod(value)}
-                type="button"
-              >
-                {t(`finance.treasury.period.${value}`)}
-              </button>
-            ))}
-          </div>
+          <SurfaceCard className="treasury-hero-card">
+            <div className="treasury-hero-topline">
+              <div>
+                <span className="finance-period-active-pill">{snap?.activePeriodLabel ?? t("finance.treasury.period.fiscal")}</span>
+                <h3>{t("finance.treasury.overview.title")}</h3>
+              </div>
+              <label className="compact-filter-field treasury-period-picker">
+                <span>{t("finance.treasury.overview.window")}</span>
+                <CompactSelect<TreasuryPeriodPreset>
+                  ariaLabel={t("finance.treasury.overview.window")}
+                  onChange={setPeriod}
+                  options={periodOptions}
+                  value={period}
+                />
+              </label>
+            </div>
 
-          <SurfaceCard className="quotes-summary-card">
-            <div className="quotes-summary-grid">
-              <div className="quotes-summary-tile">
+            <div className="treasury-kpi-grid">
+              <div className="treasury-kpi-tile treasury-kpi-income">
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.income")}</span>
-                <strong className="quotes-summary-tile-value">
-                  {formatCurrency(snap?.totalIncome ?? 0, "DOP", language)}
-                </strong>
+                <strong className="treasury-money-value">{formatMoney(snap?.totalIncome ?? 0)}</strong>
               </div>
-              <div className="quotes-summary-tile">
+              <div className="treasury-kpi-tile treasury-kpi-expense">
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.expense")}</span>
-                <strong className="quotes-summary-tile-value">
-                  {formatCurrency(snap?.totalExpense ?? 0, "DOP", language)}
-                </strong>
+                <strong className="treasury-money-value">{formatMoney(snap?.totalExpense ?? 0)}</strong>
               </div>
-              <div className="quotes-summary-tile">
+              <div className={`treasury-kpi-tile ${(snap?.net ?? 0) >= 0 ? "treasury-kpi-income" : "treasury-kpi-expense"}`}>
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.net")}</span>
-                <strong className="quotes-summary-tile-value">
-                  {formatCurrency(snap?.net ?? 0, "DOP", language)}
-                </strong>
+                <strong className="treasury-money-value">{formatMoney(snap?.net ?? 0)}</strong>
               </div>
-              <div className="quotes-summary-tile">
+              <div className="treasury-kpi-tile treasury-kpi-deductible">
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.deductible")}</span>
-                <strong className="quotes-summary-tile-value">
-                  {formatCurrency(snap?.totalDeductibleExpense ?? 0, "DOP", language)}
-                </strong>
+                <strong className="treasury-money-value">{formatMoney(snap?.totalDeductibleExpense ?? 0)}</strong>
               </div>
-              <div className="quotes-summary-tile">
+              <div className="treasury-kpi-tile treasury-kpi-neutral">
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.unclassified")}</span>
-                <strong className="quotes-summary-tile-value">{snap?.unclassifiedCount ?? 0}</strong>
+                <strong className="treasury-money-value">{snap?.unclassifiedCount ?? 0}</strong>
               </div>
             </div>
           </SurfaceCard>
 
-          <SurfaceCard>
+          <SurfaceCard className="treasury-accounts-card">
             <h3 className="section-subtitle">{t("finance.treasury.accounts.title")}</h3>
             {accounts.data.length === 0 ? (
               <GuidedEmptyState
@@ -403,25 +450,35 @@ export const TreasuryPage = () => {
                 title={t("finance.treasury.accounts.emptyTitle")}
               />
             ) : (
-              <div className="quotes-summary-grid">
+              <div className="treasury-account-grid">
                 {accounts.data.map((account) => (
                   <button
-                    className="quotes-summary-tile quotes-summary-tile--button"
+                    className="treasury-account-tile"
                     key={account.id}
                     onClick={() => openAccount(account.id)}
-                    style={{ textAlign: "left", cursor: "pointer" }}
                     title={t("finance.treasury.accounts.openHint")}
                     type="button"
                   >
-                    <span className="quotes-summary-tile-label">
-                      {account.accountLabel} · {account.currency}
+                    <span className="treasury-account-heading">
+                      <span className="treasury-bank-avatar">
+                        {bankLogoByName[account.bankName] ? (
+                          <img alt="" src={bankLogoByName[account.bankName]} />
+                        ) : (
+                          <Banknote size={18} />
+                        )}
+                      </span>
+                      <span>
+                        <span className="treasury-account-name">{account.accountLabel}</span>
+                        <small>{account.currency} · {t(`finance.treasury.banks.${account.bankName}`, { defaultValue: account.bankName })}</small>
+                      </span>
                     </span>
-                    <strong className="quotes-summary-tile-value">
-                      {formatCurrency(account.currentBalance ?? account.openingBalance, account.currency, language)}
+                    <strong className="treasury-account-balance">
+                      {formatMoney(account.currentBalance ?? account.openingBalance, account.currency)}
                     </strong>
-                    <small className="text-muted" style={{ marginTop: 4 }}>
+                    <span className="treasury-account-meta">
                       {t("finance.treasury.accounts.movementCount", { count: account.transactionCount })}
-                    </small>
+                      <ArrowUpRight size={13} />
+                    </span>
                     <span
                       className="ghost-control"
                       onClick={(event) => {
@@ -431,7 +488,7 @@ export const TreasuryPage = () => {
                       role="button"
                       style={{ marginTop: 8 }}
                     >
-                      <Upload size={12} />
+                      <Download size={12} />
                       <span>{t("finance.treasury.actions.import")}</span>
                     </span>
                   </button>
@@ -443,22 +500,30 @@ export const TreasuryPage = () => {
       ) : null}
 
       {tab === "movements" ? (
-        <SurfaceCard>
-          <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap" }}>
+        <SurfaceCard className="treasury-detail-card">
+          <div className="treasury-detail-header">
+            <button className="ghost-control" onClick={backToOverview} type="button">
+              <ArrowLeft size={13} />
+              <span>{t("finance.treasury.actions.backToOverview")}</span>
+            </button>
+            <div className="cell-stack">
+              <strong>{selectedAccount?.accountLabel ?? t("finance.treasury.movements.title")}</strong>
+              <small className="text-muted">
+                {selectedAccount ? `${selectedAccount.currency} · ${t(`finance.treasury.banks.${selectedAccount.bankName}`, { defaultValue: selectedAccount.bankName })}` : t("finance.treasury.filters.allAccounts")}
+              </small>
+            </div>
+          </div>
+
+          <div className="surface-card-actions treasury-filter-bar">
             <label className="compact-filter-field">
               <span>{t("finance.treasury.filters.account")}</span>
-              <select
-                className="compact-filter-select"
-                onChange={(event) => setAccountFilter(event.target.value)}
+              <CompactSelect<string>
+                ariaLabel={t("finance.treasury.filters.account")}
+                onChange={setAccountFilter}
+                options={accountOptions}
+                popupMinWidth={240}
                 value={accountFilter}
-              >
-                <option value="">{t("finance.treasury.filters.allAccounts")}</option>
-                {accounts.data.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.accountLabel}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label className="compact-filter-field">
               <span>{t("finance.treasury.filters.unclassified")}</span>
@@ -484,7 +549,7 @@ export const TreasuryPage = () => {
               }}
               type="button"
             >
-              <Upload size={13} />
+              <Download size={13} />
               <span>{t("finance.treasury.actions.import")}</span>
             </button>
           </div>
@@ -554,7 +619,7 @@ export const TreasuryPage = () => {
           ) : (
             <div className="cell-stack" style={{ gap: 10 }}>
               {reviewQueue.data.map((row) => (
-                <ReviewRow key={row.transactionId} language={language} onApply={applyReview} row={row} t={t} />
+                <ReviewRow key={row.transactionId} onApply={applyReview} row={row} t={t} />
               ))}
             </div>
           )}
@@ -577,19 +642,19 @@ export const TreasuryPage = () => {
                   key: "income",
                   label: t("finance.treasury.kpi.income"),
                   align: "right" as const,
-                  render: (row) => formatCurrency(row.income, "DOP", language),
+                  render: (row) => formatMoney(row.income),
                 },
                 {
                   key: "expense",
                   label: t("finance.treasury.kpi.expense"),
                   align: "right" as const,
-                  render: (row) => formatCurrency(row.expense, "DOP", language),
+                  render: (row) => formatMoney(row.expense),
                 },
                 {
                   key: "net",
                   label: t("finance.treasury.kpi.net"),
                   align: "right" as const,
-                  render: (row) => formatCurrency(row.net, "DOP", language),
+                  render: (row) => formatMoney(row.net),
                 },
                 {
                   key: "margin",
@@ -643,23 +708,34 @@ const AccountForm = ({
     currency: "DOP",
     openingBalance: 0,
   });
+  const bankOptions = useMemo(
+    () =>
+      bankNames.map((name) => ({
+        value: name,
+        label: t(`finance.treasury.banks.${name}`, { defaultValue: name }),
+      })),
+    [t],
+  );
+  const currencyOptions = useMemo(
+    () => [
+      { value: "DOP", label: "DOP" },
+      { value: "USD", label: "USD" },
+      { value: "EUR", label: "EUR" },
+    ],
+    [],
+  );
 
   return (
-    <SurfaceCard>
-      <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+    <SurfaceCard className="treasury-account-form-card">
+      <div className="treasury-account-form-grid">
         <label className="compact-filter-field">
           <span>{t("finance.treasury.account.bank")}</span>
-          <select
-            className="compact-filter-select"
-            onChange={(event) => setDraft((d) => ({ ...d, bankName: event.target.value as BankName }))}
+          <CompactSelect<BankName>
+            ariaLabel={t("finance.treasury.account.bank")}
+            onChange={(bankName) => setDraft((d) => ({ ...d, bankName }))}
+            options={bankOptions}
             value={draft.bankName}
-          >
-            {bankNames.map((name) => (
-              <option key={name} value={name}>
-                {t(`finance.treasury.banks.${name}`, { defaultValue: name })}
-              </option>
-            ))}
-          </select>
+          />
         </label>
         <label className="compact-filter-field">
           <span>{t("finance.treasury.account.label")}</span>
@@ -679,15 +755,12 @@ const AccountForm = ({
         </label>
         <label className="compact-filter-field">
           <span>{t("finance.treasury.account.currency")}</span>
-          <select
-            className="compact-filter-select"
-            onChange={(event) => setDraft((d) => ({ ...d, currency: event.target.value }))}
+          <CompactSelect<string>
+            ariaLabel={t("finance.treasury.account.currency")}
+            onChange={(currency) => setDraft((d) => ({ ...d, currency }))}
+            options={currencyOptions}
             value={draft.currency}
-          >
-            <option value="DOP">DOP</option>
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-          </select>
+          />
         </label>
         <label className="compact-filter-field">
           <span>{t("finance.treasury.account.openingBalance")}</span>
@@ -698,17 +771,19 @@ const AccountForm = ({
             value={draft.openingBalance}
           />
         </label>
-        <button
-          className="ghost-control is-active"
-          disabled={!draft.accountLabel.trim()}
-          onClick={() => onSave(draft)}
-          type="button"
-        >
-          {t("common.save", { defaultValue: "Save" })}
-        </button>
-        <button className="ghost-control" onClick={onCancel} type="button">
-          {t("common.cancel", { defaultValue: "Cancel" })}
-        </button>
+        <div className="treasury-account-form-actions">
+          <button
+            className="ghost-control is-active"
+            disabled={!draft.accountLabel.trim()}
+            onClick={() => onSave(draft)}
+            type="button"
+          >
+            {t("common.save", { defaultValue: "Save" })}
+          </button>
+          <button className="ghost-control" onClick={onCancel} type="button">
+            {t("common.cancel", { defaultValue: "Cancel" })}
+          </button>
+        </div>
       </div>
     </SurfaceCard>
   );
@@ -716,12 +791,10 @@ const AccountForm = ({
 
 const ReviewRow = ({
   row,
-  language,
   onApply,
   t,
 }: {
   row: ReviewQueueRow;
-  language: string;
   onApply: (row: ReviewQueueRow, deductible: number) => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) => {
@@ -731,7 +804,7 @@ const ReviewRow = ({
       <div className="cell-stack" style={{ flex: 1, minWidth: 220 }}>
         <strong>{row.concept || row.rawDescription || "—"}</strong>
         <small className="text-muted">
-          {row.txnDate} · {row.bankAccountLabel} · {formatCurrency(row.amount, row.currency, language)}
+          {row.txnDate} · {row.bankAccountLabel} · {formatTreasuryMoney(row.amount, row.currency)}
         </small>
       </div>
       <label className="compact-filter-field">
