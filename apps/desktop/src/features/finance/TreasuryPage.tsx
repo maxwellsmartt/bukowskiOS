@@ -990,15 +990,19 @@ export const TreasuryPage = () => {
     </div>
     <ConfirmDialog
       body={t("finance.treasury.classify.applySimilarBody", {
+        defaultValue:
+          "There are {{count}} unclassified movements with the same description. You can mark all of them as {{kind}} and remember the rule for future imports.",
         kind: pendingRule ? kindLabel(pendingRule.kind) : "",
         count: pendingRule?.preview.matchCount ?? 0,
       })}
-      cancelLabel={t("finance.treasury.classify.onlyThis")}
-      confirmLabel={t("finance.treasury.classify.applySimilar")}
+      cancelLabel={t("finance.treasury.classify.onlyThis", { defaultValue: "Only this one" })}
+      confirmLabel={t("finance.treasury.classify.applySimilar", { defaultValue: "Apply to all" })}
       details={
         pendingRule ? (
           <div className="cell-stack">
-            <span className="confirm-dialog-details-label">{t("finance.treasury.classify.matchPattern")}</span>
+            <span className="confirm-dialog-details-label">
+              {t("finance.treasury.classify.matchPattern", { defaultValue: "Exact match" })}
+            </span>
             <strong>{pendingRule.preview.matchPattern}</strong>
             {pendingRule.preview.sampleDescriptions.length > 0 ? (
               <small className="text-muted">{pendingRule.preview.sampleDescriptions.slice(0, 2).join(" · ")}</small>
@@ -1010,7 +1014,7 @@ export const TreasuryPage = () => {
       isSubmitting={isApplyingRule}
       onCancel={() => void applyPendingRule(false)}
       onConfirm={() => void applyPendingRule(true)}
-      title={t("finance.treasury.classify.applySimilarTitle")}
+      title={t("finance.treasury.classify.applySimilarTitle", { defaultValue: "Apply to similar movements" })}
     />
     </>
   );
