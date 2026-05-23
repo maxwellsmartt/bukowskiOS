@@ -5,6 +5,7 @@ import type {
   AddManualTransactionsCommand,
   AnnotateTransactionCommand,
   BankAccountMutationResult,
+  CorrectTransactionCommand,
   DeleteImportCommand,
   ImportStatementCommand,
   ImportStatementResult,
@@ -470,6 +471,101 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
         transactionId: input.importId,
         repeated: false,
         summary: "Import batch removed.",
+      };
+    },
+
+    correctTransaction(input: CorrectTransactionCommand): TransactionMutationResult {
+      const existing = receiptHelpers.getExistingReceipt(input.commandId);
+      if (existing?.outcome_status === "success") {
+        return {
+          commandId: input.commandId,
+          transactionId: input.transactionId,
+          repeated: true,
+          summary: "Transaction correction already applied.",
+        };
+      }
+      if (existing?.outcome_status === "failed") {
+        throw new Error(buildFailedCommandMessage("transaction correction", existing.error_message));
+      }
+
+      const current = db
+        .prepare(`SELECT * FROM bank_transactions WHERE id = ? AND workspace_id = ? LIMIT 1`)
+        .get(input.transactionId, input.workspaceId) as Record<string, unknown> | undefined;
+      if (!current) throw new Error("Transaction not found for this workspace.");
+
+      const next = {
+        txnDate: input.txnDate?.trim() || (current.txn_date as string),
+        valueDate: input.valueDate === undefined ? (current.value_date as string | null) : input.valueDate?.trim() || null,
+        rawDescription:
+          input.rawDescription === undefined ? (current.raw_description as string | null) : input.rawDescription?.trim() || null,
+        reference: input.reference === undefined ? (current.reference as string | null) : input.reference?.trim() || null,
+        serial: input.serial === undefined ? (current.serial as string | null) : input.serial?.trim() || null,
+        amount: input.amount === undefined ? Number(current.amount ?? 0) : round2(input.amount),
+        direction: input.direction ?? (current.direction as string),
+        runningBalance:
+          input.runningBalance === undefined
+            ? current.running_balance == null
+              ? null
+              : Number(current.running_balance)
+            : input.runningBalance == null
+              ? null
+              : round2(input.runningBalance),
+      };
+      if (next.amount < 0) throw new Error("Transaction amount cannot be negative.");
+      if (next.direction !== "credit" && next.direction !== "debit") {
+        throw new Error("Transaction direction must be debit or credit.");
+      }
+
+      const now = new Date().toISOString();
+      db.exec("BEGIN");
+      try {
+        db.prepare(
+          `UPDATE bank_transactions
+           SET txn_date = ?, value_date = ?, raw_description = ?, reference = ?, serial = ?,
+               amount = ?, direction = ?, running_balance = ?
+           WHERE id = ? AND workspace_id = ?`,
+        ).run(
+          next.txnDate,
+          next.valueDate,
+          next.rawDescription,
+          next.reference,
+          next.serial,
+          next.amount,
+          next.direction,
+          next.runningBalance,
+          input.transactionId,
+          input.workspaceId,
+        );
+        enqueueOutbox(
+          db,
+          input.workspaceId,
+          "bank_transaction",
+          input.transactionId,
+          {
+            correction: next,
+            notes: input.notes?.trim() || null,
+          },
+          `sync-${input.commandId}`,
+          now,
+        );
+        recordReceipt(input, now, "success", null);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        recordReceipt(
+          input,
+          now,
+          "failed",
+          error instanceof Error ? error.message : "Transaction correction failed.",
+        );
+        throw error;
+      }
+
+      return {
+        commandId: input.commandId,
+        transactionId: input.transactionId,
+        repeated: false,
+        summary: "Transaction corrected.",
       };
     },
 

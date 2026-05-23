@@ -33,6 +33,7 @@ import {
   importStatementSchema,
   addManualTransactionsSchema,
   deleteImportSchema,
+  correctTransactionSchema,
   annotateTransactionSchema,
   setAllocationsSchema,
   reviewReimbursementSchema,
@@ -357,6 +358,9 @@ type RegisterFoundationIpcOptions = {
     ) => import("@contracts").ImportStatementResult;
     deleteImport: (
       input: import("@contracts").DeleteImportCommand,
+    ) => import("@contracts").TransactionMutationResult;
+    correctTransaction: (
+      input: import("@contracts").CorrectTransactionCommand,
     ) => import("@contracts").TransactionMutationResult;
     annotateTransaction: (
       input: import("@contracts").AnnotateTransactionCommand,
@@ -2220,6 +2224,15 @@ export const registerFoundationIpc = ({
       requiredPermission: "treasury.import",
     });
     return treasuryMutations.deleteImport(input);
+  });
+  safeHandle(ipcChannels.treasury.correctTransaction, correctTransactionSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "correct treasury transaction",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return treasuryMutations.correctTransaction(input);
   });
   safeHandle(
     ipcChannels.treasury.annotateTransaction,

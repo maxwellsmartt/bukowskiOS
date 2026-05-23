@@ -209,6 +209,7 @@ export const ipcChannels = {
     importStatement: "bukowskiTreasury:importStatement",
     addManualTransactions: "bukowskiTreasury:addManualTransactions",
     deleteImport: "bukowskiTreasury:deleteImport",
+    correctTransaction: "bukowskiTreasury:correctTransaction",
     annotateTransaction: "bukowskiTreasury:annotateTransaction",
     setAllocations: "bukowskiTreasury:setAllocations",
     reviewReimbursement: "bukowskiTreasury:reviewReimbursement",

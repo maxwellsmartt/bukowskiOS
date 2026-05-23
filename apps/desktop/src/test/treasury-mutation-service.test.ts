@@ -189,6 +189,51 @@ describe("treasury mutation service", () => {
     cleanup();
   });
 
+  it("applies audited transaction corrections idempotently", () => {
+    const { cleanup, database } = createTestDatabase("treasury-correct-transaction");
+    const mutations = createTreasuryMutationService(database);
+    const reads = createTreasuryReadService(database);
+    mutations.upsertBankAccount(account("cmd-acct-correct"));
+    mutations.importStatement({
+      commandId: "cmd-import-correct",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-correct",
+      sourceFormat: "csv",
+      rows: [{ txnDate: "2026-04-01", rawDescription: "Bad amount", amount: 100, direction: "debit" }],
+    });
+    const [txn] = reads.listTransactions({ workspaceId });
+
+    const result = mutations.correctTransaction({
+      commandId: "cmd-correct-txn",
+      workspaceId,
+      ...baseChannel,
+      transactionId: txn.id,
+      txnDate: "2026-04-02",
+      rawDescription: "Corrected amount",
+      amount: 250,
+      direction: "credit",
+    });
+    expect(result.repeated).toBe(false);
+
+    const repeated = mutations.correctTransaction({
+      commandId: "cmd-correct-txn",
+      workspaceId,
+      ...baseChannel,
+      transactionId: txn.id,
+      amount: 999,
+      direction: "debit",
+    });
+    expect(repeated.repeated).toBe(true);
+
+    const [updated] = reads.listTransactions({ workspaceId });
+    expect(updated.txnDate).toBe("2026-04-02");
+    expect(updated.rawDescription).toBe("Corrected amount");
+    expect(updated.amount).toBe(250);
+    expect(updated.direction).toBe("credit");
+    cleanup();
+  });
+
   it("rejects allocations that exceed the transaction amount", () => {
     const { cleanup, database } = createTestDatabase("treasury-alloc-cap");
     const mutations = createTreasuryMutationService(database);

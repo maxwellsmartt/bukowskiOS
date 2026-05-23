@@ -1406,21 +1406,34 @@
       "actions": {
         "newAccount": "Nueva cuenta",
         "import": "Importar estado",
-        "backToOverview": "Volver al resumen"
+        "backToOverview": "Volver al resumen",
+        "addRow": "Agregar movimiento"
       },
       "filters": {
         "account": "Cuenta",
         "allAccounts": "Todas las cuentas",
-        "unclassified": "Solo sin clasificar"
+        "unclassified": "Solo sin clasificar",
+        "period": "Periodo",
+        "allDates": "Todas las fechas",
+        "thisMonth": "Este mes",
+        "customDates": "Rango",
+        "from": "Desde",
+        "to": "Hasta"
       },
       "columns": {
         "date": "Fecha",
         "account": "Cuenta",
         "description": "Descripción",
         "amount": "Monto",
+        "direction": "Dirección",
+        "reference": "Referencia",
         "kind": "Tipo",
         "project": "Proyecto",
         "margin": "Margen"
+      },
+      "directions": {
+        "credit": "Entrada",
+        "debit": "Salida"
       },
       "accounts": {
         "title": "Cuentas",
@@ -1433,7 +1446,12 @@
       "movements": {
         "title": "Detalle de movimientos",
         "emptyTitle": "Sin movimientos",
-        "emptyBody": "Importa un estado de cuenta (CSV del Banco Popular, XLSX de Santa Cruz) o agrega movimientos manualmente."
+        "emptyBody": "Importa un estado de cuenta (CSV del Banco Popular, XLSX de Santa Cruz) o agrega movimientos manualmente.",
+        "edit": "Editar movimiento",
+        "corrected": "Movimiento corregido.",
+        "correctFailed": "No se pudo corregir el movimiento.",
+        "added": "Movimiento agregado.",
+        "addFailed": "No se pudo agregar el movimiento."
       },
       "review": {
         "title": "Reembolsos pendientes de revisión",
@@ -1489,6 +1507,12 @@
       "imports": {
         "title": "Historial de importaciones",
         "summary": "{{inserted}} importados, {{duplicates}} duplicados",
+        "dedupeHint": "Los duplicados se detectan por cuenta, fecha, monto, dirección, descripción, referencia, serial y balance corrido. Importar suma movimientos nuevos; no sustituye lo existente.",
+        "period": "Periodo {{start}} → {{end}}",
+        "noPeriod": "Sin periodo detectado",
+        "created": "Importado {{date}}",
+        "inserted": "{{count}} nuevos",
+        "duplicates": "{{count}} duplicados omitidos",
         "delete": "Eliminar este lote de importación",
         "confirmDelete": "¿Eliminar este lote y sus movimientos? No se puede deshacer.",
         "deleted": "Lote de importación eliminado.",

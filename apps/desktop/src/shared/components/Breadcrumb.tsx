@@ -40,6 +40,7 @@ const leafLabelKeys: Record<string, string> = {
   "/projects": "shell.nav.projects.projects",
   "/projects/schedule": "projects.schedule.title",
   "/finance": "shell.nav.finance.overview",
+  "/finance/treasury": "shell.nav.finance.treasury",
   "/finance/cost-links": "shell.nav.finance.reviewQueue",
   "/finance/entries": "shell.nav.finance.entries",
   "/finance/quotes": "shell.nav.finance.quotes",

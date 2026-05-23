@@ -15736,6 +15736,19 @@ input[type="number"] {
   border-color: rgba(155, 176, 196, 0.14);
 }
 
+.treasury-new-account-button {
+  background: rgba(57, 158, 103, 0.94);
+  border-color: rgba(97, 219, 149, 0.7);
+  color: #fff;
+}
+
+.treasury-new-account-button:hover,
+.treasury-new-account-button.is-active {
+  background: rgba(67, 178, 116, 1);
+  border-color: rgba(133, 235, 174, 0.9);
+  color: #fff;
+}
+
 .treasury-hero-card {
   background: rgba(255, 255, 255, 0.025);
 }
@@ -15914,6 +15927,7 @@ input[type="number"] {
 .treasury-account-form-card {
   background: rgba(255, 255, 255, 0.02);
   border-color: rgba(214, 173, 112, 0.14);
+  padding: 12px;
 }
 
 .treasury-account-form-grid {
@@ -15931,7 +15945,8 @@ input[type="number"] {
 
 .treasury-account-form-grid .field-input,
 .treasury-account-form-grid .compact-select-trigger {
-  min-height: 42px;
+  height: 36px;
+  min-height: 36px;
 }
 
 .treasury-account-form-actions {
@@ -15940,6 +15955,174 @@ input[type="number"] {
   gap: 8px;
   justify-content: flex-end;
   white-space: nowrap;
+}
+
+.treasury-action-save {
+  background: rgba(57, 158, 103, 0.92);
+  border-color: rgba(97, 219, 149, 0.58);
+  color: #fff;
+}
+
+.treasury-action-save:hover:not(:disabled) {
+  background: rgba(67, 178, 116, 1);
+  border-color: rgba(133, 235, 174, 0.8);
+  color: #fff;
+}
+
+.treasury-action-save:disabled {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.treasury-action-cancel {
+  border-color: rgba(245, 112, 112, 0.22);
+  color: rgba(255, 172, 172, 0.94);
+}
+
+.treasury-action-cancel:hover {
+  background: rgba(245, 112, 112, 0.08);
+  border-color: rgba(245, 112, 112, 0.42);
+  color: rgba(255, 210, 210, 0.98);
+}
+
+.treasury-manual-form-card {
+  background: rgba(255, 255, 255, 0.018);
+  border-color: rgba(126, 183, 178, 0.18);
+  margin: 10px 0 14px;
+  padding: 12px;
+}
+
+.treasury-manual-form-grid {
+  align-items: end;
+  display: grid;
+  gap: 10px 12px;
+  grid-template-columns: minmax(220px, 1.1fr) 140px minmax(120px, 0.55fr) 130px minmax(220px, 1.2fr) auto;
+}
+
+.treasury-manual-form-grid .field-input,
+.treasury-manual-form-grid .compact-select-trigger {
+  height: 36px;
+  min-height: 36px;
+}
+
+.treasury-manual-account {
+  grid-column: 1;
+}
+
+.treasury-manual-date {
+  grid-column: 2;
+}
+
+.treasury-manual-direction {
+  grid-column: 3;
+}
+
+.treasury-manual-amount {
+  grid-column: 4;
+}
+
+.treasury-manual-description {
+  grid-column: 1 / span 3;
+  min-width: 280px;
+}
+
+.treasury-manual-reference {
+  grid-column: 4 / span 2;
+  min-width: 180px;
+}
+
+.treasury-manual-form-grid .treasury-account-form-actions {
+  grid-column: 6;
+  justify-self: end;
+}
+
+.treasury-import-history {
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 8px;
+  margin: 12px 0 16px;
+  padding: 12px;
+}
+
+.treasury-import-history-header {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.treasury-import-list {
+  display: grid;
+  gap: 6px;
+}
+
+.treasury-import-row {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 1fr) auto 32px;
+  padding: 9px 10px;
+}
+
+.treasury-import-stats {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.treasury-import-stats span {
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: var(--font-2xs, 11px);
+  padding: 4px 8px;
+}
+
+.treasury-table-amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.treasury-table-amount.is-positive {
+  color: rgba(55, 190, 105, 0.98);
+}
+
+.treasury-table-amount.is-negative {
+  color: rgba(245, 112, 112, 0.96);
+}
+
+.treasury-table-amount.is-muted {
+  color: var(--text-muted);
+}
+
+.treasury-table-input {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 9px;
+}
+
+.treasury-inline-amount-edit {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 96px minmax(90px, 1fr);
+}
+
+.treasury-inline-amount-edit .compact-select-trigger {
+  height: 32px;
+  min-height: 32px;
+}
+
+.treasury-row-actions {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.icon-ghost-control.is-success {
+  color: rgba(97, 219, 149, 0.96);
 }
 
 @media (max-width: 760px) {
@@ -15962,6 +16145,22 @@ input[type="number"] {
     grid-template-columns: 1fr;
   }
 
+  .treasury-manual-form-grid,
+  .treasury-import-row {
+    grid-template-columns: 1fr;
+  }
+
+  .treasury-manual-account,
+  .treasury-manual-date,
+  .treasury-manual-direction,
+  .treasury-manual-amount,
+  .treasury-manual-description,
+  .treasury-manual-reference,
+  .treasury-manual-form-grid .treasury-account-form-actions {
+    grid-column: 1;
+    min-width: 0;
+  }
+
   .treasury-account-form-actions {
     justify-content: flex-start;
   }
@@ -15970,6 +16169,21 @@ input[type="number"] {
 @media (min-width: 761px) and (max-width: 1180px) {
   .treasury-account-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .treasury-manual-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .treasury-manual-account,
+  .treasury-manual-date,
+  .treasury-manual-direction,
+  .treasury-manual-amount,
+  .treasury-manual-description,
+  .treasury-manual-reference,
+  .treasury-manual-form-grid .treasury-account-form-actions {
+    grid-column: auto;
+    min-width: 0;
   }
 
   .treasury-account-form-actions {

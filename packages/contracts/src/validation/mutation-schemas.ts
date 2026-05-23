@@ -1435,6 +1435,25 @@ export const deleteImportSchema = z
   })
   .strict();
 
+export const correctTransactionSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    transactionId: nonEmptyString,
+    txnDate: optionalTrimmedString,
+    valueDate: nullableOrOptionalString,
+    rawDescription: nullableOrOptionalString,
+    reference: nullableOrOptionalString,
+    serial: nullableOrOptionalString,
+    amount: z.number().finite().min(0).optional(),
+    direction: transactionDirectionSchema.optional(),
+    runningBalance: z.number().finite().nullable().optional(),
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
 export const annotateTransactionSchema = z
   .object({
     commandId: nonEmptyString,

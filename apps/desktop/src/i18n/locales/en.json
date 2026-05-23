@@ -1404,21 +1404,34 @@
       "actions": {
         "newAccount": "New account",
         "import": "Import statement",
-        "backToOverview": "Back to overview"
+        "backToOverview": "Back to overview",
+        "addRow": "Add movement"
       },
       "filters": {
         "account": "Account",
         "allAccounts": "All accounts",
-        "unclassified": "Unclassified only"
+        "unclassified": "Unclassified only",
+        "period": "Period",
+        "allDates": "All dates",
+        "thisMonth": "This month",
+        "customDates": "Range",
+        "from": "From",
+        "to": "To"
       },
       "columns": {
         "date": "Date",
         "account": "Account",
         "description": "Description",
         "amount": "Amount",
+        "direction": "Direction",
+        "reference": "Reference",
         "kind": "Type",
         "project": "Project",
         "margin": "Margin"
+      },
+      "directions": {
+        "credit": "Inflow",
+        "debit": "Outflow"
       },
       "accounts": {
         "title": "Accounts",
@@ -1431,7 +1444,12 @@
       "movements": {
         "title": "Movement detail",
         "emptyTitle": "No movements",
-        "emptyBody": "Import a bank statement (CSV from Banco Popular, XLSX from Santa Cruz) or add movements manually."
+        "emptyBody": "Import a bank statement (CSV from Banco Popular, XLSX from Santa Cruz) or add movements manually.",
+        "edit": "Edit movement",
+        "corrected": "Movement corrected.",
+        "correctFailed": "Could not correct the movement.",
+        "added": "Movement added.",
+        "addFailed": "Could not add the movement."
       },
       "review": {
         "title": "Reimbursements awaiting review",
@@ -1487,6 +1505,12 @@
       "imports": {
         "title": "Import history",
         "summary": "{{inserted}} imported, {{duplicates}} duplicates",
+        "dedupeHint": "Duplicates are detected by account, date, amount, direction, description, reference, serial and running balance. Imports add new movements; they do not replace existing data.",
+        "period": "Period {{start}} → {{end}}",
+        "noPeriod": "No detected period",
+        "created": "Imported {{date}}",
+        "inserted": "{{count}} new",
+        "duplicates": "{{count}} duplicates skipped",
         "delete": "Delete this import batch",
         "confirmDelete": "Delete this import batch and its movements? This cannot be undone.",
         "deleted": "Import batch removed.",

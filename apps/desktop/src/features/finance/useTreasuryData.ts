@@ -5,6 +5,7 @@ import type {
   BankAccountRow,
   BankStatementImportRow,
   BankTransactionRow,
+  CorrectTransactionCommand,
   ImportStatementCommand,
   LinkTransactionCommand,
   ProjectPnlRow,
@@ -257,6 +258,10 @@ export const useTreasuryMutations = () =>
       async deleteImport(input: { commandId: string; workspaceId: string; actorType: "user"; sourceChannel: "desktop"; importId: string }) {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.deleteImport(input);
+      },
+      async correctTransaction(input: CorrectTransactionCommand): Promise<TransactionMutationResult> {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.correctTransaction(input);
       },
       async annotate(input: AnnotateTransactionCommand): Promise<TransactionMutationResult> {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");

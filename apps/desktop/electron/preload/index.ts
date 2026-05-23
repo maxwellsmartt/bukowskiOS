@@ -580,6 +580,10 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.deleteImport, input) as Promise<
       import("@contracts").TransactionMutationResult
     >,
+  correctTransaction: (input: import("@contracts").CorrectTransactionCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.correctTransaction, input) as Promise<
+      import("@contracts").TransactionMutationResult
+    >,
   annotateTransaction: (input: import("@contracts").AnnotateTransactionCommand) =>
     ipcRenderer.invoke(ipcChannels.treasury.annotateTransaction, input) as Promise<
       import("@contracts").TransactionMutationResult

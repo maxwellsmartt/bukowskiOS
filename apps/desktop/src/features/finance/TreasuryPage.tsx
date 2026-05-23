@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpRight, Banknote, Download, Landmark, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Banknote, Check, Download, Edit3, Landmark, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import type {
   BankName,
   BankTransactionRow,
   ReviewQueueRow,
+  TransactionDirection,
   TransactionKind,
   TreasuryPeriodPreset,
 } from "@contracts";
@@ -35,6 +36,15 @@ import {
 } from "./useTreasuryData";
 
 type Tab = "overview" | "movements" | "review" | "projects";
+type MovementDateFilter = "all" | "month" | "custom";
+type TransactionDraft = {
+  txnDate: string;
+  rawDescription: string;
+  reference: string;
+  amount: number;
+  direction: TransactionDirection;
+  runningBalance: string;
+};
 
 const transactionKinds: TransactionKind[] = [
   "income",
@@ -71,6 +81,22 @@ const formatTreasuryMoney = (value: number, currency = "DOP") => {
     maximumFractionDigits: 2,
   })} ${currencySuffix(currency)}`;
 };
+const monthStart = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+};
+const monthEnd = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+};
+const transactionDraftFromRow = (row: BankTransactionRow): TransactionDraft => ({
+  txnDate: row.txnDate,
+  rawDescription: row.rawDescription ?? "",
+  reference: row.reference ?? "",
+  amount: row.amount,
+  direction: row.direction,
+  runningBalance: row.runningBalance == null ? "" : String(row.runningBalance),
+});
 
 export const TreasuryPage = () => {
   const { t } = useTranslation();
@@ -81,9 +107,15 @@ export const TreasuryPage = () => {
   const [tab, setTab] = useState<Tab>("overview");
   const [period, setPeriod] = useState<TreasuryPeriodPreset>("fiscal");
   const [accountFilter, setAccountFilter] = useState<string>("");
+  const [dateFilter, setDateFilter] = useState<MovementDateFilter>("all");
+  const [dateFrom, setDateFrom] = useState(monthStart);
+  const [dateTo, setDateTo] = useState(monthEnd);
   const [search, setSearch] = useState("");
   const [unclassifiedOnly, setUnclassifiedOnly] = useState(false);
   const [showAccountForm, setShowAccountForm] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<TransactionDraft | null>(null);
   const [importBankName, setImportBankName] = useState<BankName>("popular");
   const [importAccountId, setImportAccountId] = useState<string>("");
   const [busy, setBusy] = useState(false);
@@ -97,11 +129,13 @@ export const TreasuryPage = () => {
       () => ({
         workspaceId: activeWorkspaceId,
         bankAccountId: accountFilter || undefined,
+        dateFrom: dateFilter === "all" ? undefined : dateFrom,
+        dateTo: dateFilter === "all" ? undefined : dateTo,
         search: search.trim() || undefined,
         unclassifiedOnly: unclassifiedOnly || undefined,
         limit: 500,
       }),
-      [activeWorkspaceId, accountFilter, search, unclassifiedOnly],
+      [activeWorkspaceId, accountFilter, dateFilter, dateFrom, dateTo, search, unclassifiedOnly],
     ),
   );
   const reviewQueue = useReviewQueue(activeWorkspaceId);
@@ -129,6 +163,14 @@ export const TreasuryPage = () => {
     ],
     [accounts.data, t],
   );
+  const dateFilterOptions = useMemo(
+    () => [
+      { value: "all" as const, label: t("finance.treasury.filters.allDates") },
+      { value: "month" as const, label: t("finance.treasury.filters.thisMonth") },
+      { value: "custom" as const, label: t("finance.treasury.filters.customDates") },
+    ],
+    [t],
+  );
   const formatMoney = formatTreasuryMoney;
 
   const kindLabel = (kind: TransactionKind | null | undefined) =>
@@ -152,6 +194,41 @@ export const TreasuryPage = () => {
     setAccountFilter("");
     setSearch("");
     setUnclassifiedOnly(false);
+  };
+
+  const beginEdit = (row: BankTransactionRow) => {
+    setEditingId(row.id);
+    setEditDraft(transactionDraftFromRow(row));
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft(null);
+  };
+
+  const saveEdit = async (row: BankTransactionRow) => {
+    if (!editDraft) return;
+    try {
+      await mutations.correctTransaction({
+        commandId: newCommandId("treasury-correct"),
+        workspaceId: activeWorkspaceId,
+        actorType: "user",
+        sourceChannel: "desktop",
+        transactionId: row.id,
+        txnDate: editDraft.txnDate,
+        rawDescription: editDraft.rawDescription,
+        reference: editDraft.reference,
+        amount: editDraft.amount,
+        direction: editDraft.direction,
+        runningBalance: editDraft.runningBalance.trim() ? Number(editDraft.runningBalance) : null,
+        notes: "Manual correction from treasury table.",
+      });
+      toast.success(t("finance.treasury.movements.corrected"));
+      cancelEdit();
+      refreshAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("finance.treasury.movements.correctFailed"));
+    }
   };
 
   const removeImport = async (importId: string) => {
@@ -279,7 +356,22 @@ export const TreasuryPage = () => {
 
   const movementColumns = useMemo(
     () => [
-      { key: "date", label: t("finance.treasury.columns.date"), render: (row: BankTransactionRow) => row.txnDate },
+      {
+        key: "date",
+        label: t("finance.treasury.columns.date"),
+        width: 130,
+        render: (row: BankTransactionRow) =>
+          editingId === row.id && editDraft ? (
+            <input
+              className="field-input treasury-table-input"
+              onChange={(event) => setEditDraft((draft) => (draft ? { ...draft, txnDate: event.target.value } : draft))}
+              type="date"
+              value={editDraft.txnDate}
+            />
+          ) : (
+            row.txnDate
+          ),
+      },
       {
         key: "account",
         label: t("finance.treasury.columns.account"),
@@ -288,34 +380,62 @@ export const TreasuryPage = () => {
       {
         key: "description",
         label: t("finance.treasury.columns.description"),
-        render: (row: BankTransactionRow) => (
-          <div className="cell-stack">
-            <span>{row.annotation?.concept || row.rawDescription || "—"}</span>
-            {row.annotation?.counterparty ? (
-              <small className="text-muted">{row.annotation.counterparty}</small>
-            ) : null}
-          </div>
-        ),
+        minWidth: 300,
+        render: (row: BankTransactionRow) =>
+          editingId === row.id && editDraft ? (
+            <input
+              className="field-input treasury-table-input"
+              onChange={(event) =>
+                setEditDraft((draft) => (draft ? { ...draft, rawDescription: event.target.value } : draft))
+              }
+              value={editDraft.rawDescription}
+            />
+          ) : (
+            <div className="cell-stack">
+              <span>{row.annotation?.concept || row.rawDescription || "—"}</span>
+              {row.annotation?.counterparty ? (
+                <small className="text-muted">{row.annotation.counterparty}</small>
+              ) : null}
+            </div>
+          ),
       },
       {
         key: "amount",
         label: t("finance.treasury.columns.amount"),
         align: "right" as const,
-        render: (row: BankTransactionRow) => (
-          <strong
-            style={{
-              fontVariantNumeric: "tabular-nums",
-              color: row.excludedFromTotals
-                ? "var(--text-muted)"
-                : row.direction === "credit"
-                  ? "var(--status-success-text, #15803d)"
-                  : "inherit",
-            }}
-          >
-            {row.direction === "credit" ? "+" : "−"}
-            {formatMoney(row.amount, row.currency)}
-          </strong>
-        ),
+        minWidth: 180,
+        render: (row: BankTransactionRow) =>
+          editingId === row.id && editDraft ? (
+            <div className="treasury-inline-amount-edit">
+              <CompactSelect<TransactionDirection>
+                ariaLabel={t("finance.treasury.columns.direction")}
+                onChange={(direction) => setEditDraft((draft) => (draft ? { ...draft, direction } : draft))}
+                options={[
+                  { value: "credit", label: t("finance.treasury.directions.credit") },
+                  { value: "debit", label: t("finance.treasury.directions.debit") },
+                ]}
+                value={editDraft.direction}
+              />
+              <input
+                className="field-input treasury-table-input"
+                min={0}
+                onChange={(event) =>
+                  setEditDraft((draft) => (draft ? { ...draft, amount: Number(event.target.value) || 0 } : draft))
+                }
+                type="number"
+                value={editDraft.amount}
+              />
+            </div>
+          ) : (
+            <strong
+              className={`treasury-table-amount ${
+                row.excludedFromTotals ? "is-muted" : row.direction === "credit" ? "is-positive" : "is-negative"
+              }`}
+            >
+              {row.direction === "credit" ? "+" : "−"}
+              {formatMoney(row.amount, row.currency)}
+            </strong>
+          ),
       },
       {
         key: "kind",
@@ -338,8 +458,35 @@ export const TreasuryPage = () => {
             </select>
           ),
       },
+      {
+        key: "actions",
+        label: "",
+        align: "right" as const,
+        width: 96,
+        hideable: false,
+        render: (row: BankTransactionRow) =>
+          editingId === row.id ? (
+            <span className="treasury-row-actions">
+              <button className="icon-ghost-control is-success" onClick={() => saveEdit(row)} type="button">
+                <Check size={13} />
+              </button>
+              <button className="icon-ghost-control" onClick={cancelEdit} type="button">
+                <X size={13} />
+              </button>
+            </span>
+          ) : (
+            <button
+              className="icon-ghost-control"
+              onClick={() => beginEdit(row)}
+              title={t("finance.treasury.movements.edit")}
+              type="button"
+            >
+              <Edit3 size={13} />
+            </button>
+          ),
+      },
     ],
-    [t],
+    [editDraft, editingId, t],
   );
 
   return (
@@ -355,7 +502,7 @@ export const TreasuryPage = () => {
       <div className="page-stack-row">
         <SectionHeader eyebrow={t("finance.title")} title={t("finance.treasury.title")} titleTone="accent" />
         <button
-          className={`ghost-control${showAccountForm ? " is-active" : ""}`}
+          className={`ghost-control treasury-new-account-button${showAccountForm ? " is-active" : ""}`}
           onClick={() => setShowAccountForm((v) => !v)}
           type="button"
         >
@@ -526,6 +673,28 @@ export const TreasuryPage = () => {
               />
             </label>
             <label className="compact-filter-field">
+              <span>{t("finance.treasury.filters.period")}</span>
+              <CompactSelect<MovementDateFilter>
+                ariaLabel={t("finance.treasury.filters.period")}
+                onChange={setDateFilter}
+                options={dateFilterOptions}
+                popupMinWidth={180}
+                value={dateFilter}
+              />
+            </label>
+            {dateFilter !== "all" ? (
+              <>
+                <label className="compact-filter-field">
+                  <span>{t("finance.treasury.filters.from")}</span>
+                  <input className="field-input" onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
+                </label>
+                <label className="compact-filter-field">
+                  <span>{t("finance.treasury.filters.to")}</span>
+                  <input className="field-input" onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
+                </label>
+              </>
+            ) : null}
+            <label className="compact-filter-field">
               <span>{t("finance.treasury.filters.unclassified")}</span>
               <input
                 checked={unclassifiedOnly}
@@ -542,6 +711,15 @@ export const TreasuryPage = () => {
             />
             <button
               className="ghost-control"
+              disabled={accounts.data.length === 0}
+              onClick={() => setShowManualForm((value) => !value)}
+              type="button"
+            >
+              <Plus size={13} />
+              <span>{t("finance.treasury.actions.addRow")}</span>
+            </button>
+            <button
+              className="ghost-control"
               disabled={accounts.data.length === 0 || busy}
               onClick={() => {
                 const account = accounts.data.find((a) => a.id === accountFilter) ?? accounts.data[0];
@@ -554,27 +732,72 @@ export const TreasuryPage = () => {
             </button>
           </div>
 
+          {showManualForm ? (
+            <ManualTransactionForm
+              accounts={accounts.data}
+              defaultAccountId={accountFilter || accounts.data[0]?.id || ""}
+              onCancel={() => setShowManualForm(false)}
+              onSave={async (draft) => {
+                try {
+                  await mutations.addManualTransactions({
+                    commandId: newCommandId("treasury-manual"),
+                    workspaceId: activeWorkspaceId,
+                    actorType: "user",
+                    sourceChannel: "desktop",
+                    bankAccountId: draft.bankAccountId,
+                    sourceFormat: "manual",
+                    rows: [
+                      {
+                        txnDate: draft.txnDate,
+                        rawDescription: draft.rawDescription,
+                        reference: draft.reference || null,
+                        amount: draft.amount,
+                        direction: draft.direction,
+                      },
+                    ],
+                    notes: "Manual treasury row.",
+                  });
+                  toast.success(t("finance.treasury.movements.added"));
+                  setShowManualForm(false);
+                  refreshAll();
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : t("finance.treasury.movements.addFailed"));
+                }
+              }}
+            />
+          ) : null}
+
           {imports.data.length > 0 ? (
-            <div className="treasury-import-history" style={{ margin: "8px 0 14px" }}>
-              <h4 className="section-subtitle" style={{ marginBottom: 6 }}>
-                {t("finance.treasury.imports.title")}
-              </h4>
-              <div className="cell-stack" style={{ gap: 4 }}>
+            <div className="treasury-import-history">
+              <div className="treasury-import-history-header">
+                <div>
+                  <h4 className="section-subtitle">{t("finance.treasury.imports.title")}</h4>
+                  <small className="text-muted">{t("finance.treasury.imports.dedupeHint")}</small>
+                </div>
+              </div>
+              <div className="treasury-import-list">
                 {imports.data.map((batch) => (
                   <div
-                    className="surface-card-actions"
+                    className="treasury-import-row"
                     key={batch.id}
-                    style={{ gap: 8, alignItems: "center", justifyContent: "space-between" }}
                   >
-                    <small className="text-muted">
-                      {batch.originalFilename || batch.sourceFormat.toUpperCase()} ·{" "}
-                      {t("finance.treasury.imports.summary", {
-                        inserted: batch.insertedCount,
-                        duplicates: batch.duplicateCount,
-                      })}
-                      {batch.periodStart ? ` · ${batch.periodStart} → ${batch.periodEnd ?? "?"}` : ""} ·{" "}
-                      {batch.createdAt.slice(0, 10)}
-                    </small>
+                    <div className="cell-stack">
+                      <strong>{batch.originalFilename || batch.sourceFormat.toUpperCase()}</strong>
+                      <small className="text-muted">
+                        {batch.periodStart
+                          ? t("finance.treasury.imports.period", {
+                              start: batch.periodStart,
+                              end: batch.periodEnd ?? "?",
+                            })
+                          : t("finance.treasury.imports.noPeriod")}
+                        {" · "}
+                        {t("finance.treasury.imports.created", { date: batch.createdAt.slice(0, 10) })}
+                      </small>
+                    </div>
+                    <div className="treasury-import-stats">
+                      <span>{t("finance.treasury.imports.inserted", { count: batch.insertedCount })}</span>
+                      <span>{t("finance.treasury.imports.duplicates", { count: batch.duplicateCount })}</span>
+                    </div>
                     <button
                       className="icon-ghost-control"
                       onClick={() => removeImport(batch.id)}
@@ -693,6 +916,124 @@ type AccountDraft = {
   openingBalance: number;
 };
 
+type ManualTransactionDraft = {
+  bankAccountId: string;
+  txnDate: string;
+  rawDescription: string;
+  reference: string;
+  amount: number;
+  direction: TransactionDirection;
+};
+
+const ManualTransactionForm = ({
+  accounts,
+  defaultAccountId,
+  onCancel,
+  onSave,
+}: {
+  accounts: BankAccountRow[];
+  defaultAccountId: string;
+  onCancel: () => void;
+  onSave: (draft: ManualTransactionDraft) => void;
+}) => {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<ManualTransactionDraft>({
+    bankAccountId: defaultAccountId,
+    txnDate: new Date().toISOString().slice(0, 10),
+    rawDescription: "",
+    reference: "",
+    amount: 0,
+    direction: "debit",
+  });
+  const accountOptions = useMemo(
+    () => accounts.map((account) => ({ value: account.id, label: `${account.accountLabel} · ${account.currency}` })),
+    [accounts],
+  );
+  const directionOptions = useMemo(
+    () => [
+      { value: "credit" as const, label: t("finance.treasury.directions.credit") },
+      { value: "debit" as const, label: t("finance.treasury.directions.debit") },
+    ],
+    [t],
+  );
+
+  return (
+    <SurfaceCard className="treasury-manual-form-card">
+      <div className="treasury-manual-form-grid">
+        <label className="compact-filter-field treasury-manual-account">
+          <span>{t("finance.treasury.filters.account")}</span>
+          <CompactSelect<string>
+            ariaLabel={t("finance.treasury.filters.account")}
+            onChange={(bankAccountId) => setDraft((current) => ({ ...current, bankAccountId }))}
+            options={accountOptions}
+            popupMinWidth={240}
+            value={draft.bankAccountId}
+          />
+        </label>
+        <label className="compact-filter-field treasury-manual-date">
+          <span>{t("finance.treasury.columns.date")}</span>
+          <input
+            className="field-input"
+            onChange={(event) => setDraft((current) => ({ ...current, txnDate: event.target.value }))}
+            type="date"
+            value={draft.txnDate}
+          />
+        </label>
+        <label className="compact-filter-field treasury-manual-direction">
+          <span>{t("finance.treasury.columns.direction")}</span>
+          <CompactSelect<TransactionDirection>
+            ariaLabel={t("finance.treasury.columns.direction")}
+            onChange={(direction) => setDraft((current) => ({ ...current, direction }))}
+            options={directionOptions}
+            value={draft.direction}
+          />
+        </label>
+        <label className="compact-filter-field treasury-manual-amount">
+          <span>{t("finance.treasury.columns.amount")}</span>
+          <input
+            className="field-input"
+            min={0}
+            onChange={(event) => setDraft((current) => ({ ...current, amount: Number(event.target.value) || 0 }))}
+            type="number"
+            value={draft.amount}
+          />
+        </label>
+        <label className="compact-filter-field treasury-manual-description">
+          <span>{t("finance.treasury.columns.description")}</span>
+          <input
+            className="field-input"
+            onChange={(event) => setDraft((current) => ({ ...current, rawDescription: event.target.value }))}
+            value={draft.rawDescription}
+          />
+        </label>
+        <label className="compact-filter-field treasury-manual-reference">
+          <span>{t("finance.treasury.columns.reference")}</span>
+          <input
+            className="field-input"
+            onChange={(event) => setDraft((current) => ({ ...current, reference: event.target.value }))}
+            value={draft.reference}
+          />
+        </label>
+        <div className="treasury-account-form-actions">
+          <button
+            className="ghost-control treasury-action-save"
+            disabled={!draft.bankAccountId || !draft.txnDate || !draft.rawDescription.trim() || draft.amount <= 0}
+            onClick={() => onSave(draft)}
+            type="button"
+          >
+            <Check size={13} />
+            {t("finance.treasury.actions.addRow")}
+          </button>
+          <button className="ghost-control treasury-action-cancel" onClick={onCancel} type="button">
+            <X size={13} />
+            {t("common.cancel", { defaultValue: "Cancel" })}
+          </button>
+        </div>
+      </div>
+    </SurfaceCard>
+  );
+};
+
 const AccountForm = ({
   onCancel,
   onSave,
@@ -773,14 +1114,16 @@ const AccountForm = ({
         </label>
         <div className="treasury-account-form-actions">
           <button
-            className="ghost-control is-active"
+            className="ghost-control treasury-action-save"
             disabled={!draft.accountLabel.trim()}
             onClick={() => onSave(draft)}
             type="button"
           >
+            <Check size={13} />
             {t("common.save", { defaultValue: "Save" })}
           </button>
-          <button className="ghost-control" onClick={onCancel} type="button">
+          <button className="ghost-control treasury-action-cancel" onClick={onCancel} type="button">
+            <X size={13} />
             {t("common.cancel", { defaultValue: "Cancel" })}
           </button>
         </div>

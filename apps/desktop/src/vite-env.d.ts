@@ -444,6 +444,9 @@ declare global {
       deleteImport: (
         input: import("@contracts").DeleteImportCommand,
       ) => Promise<import("@contracts").TransactionMutationResult>;
+      correctTransaction: (
+        input: import("@contracts").CorrectTransactionCommand,
+      ) => Promise<import("@contracts").TransactionMutationResult>;
       annotateTransaction: (
         input: import("@contracts").AnnotateTransactionCommand,
       ) => Promise<import("@contracts").TransactionMutationResult>;

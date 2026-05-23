@@ -124,6 +124,23 @@ export type DeleteImportCommand = {
   importId: string;
 };
 
+export type CorrectTransactionCommand = {
+  commandId: string;
+  workspaceId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+  transactionId: string;
+  txnDate?: string;
+  valueDate?: string | null;
+  rawDescription?: string | null;
+  reference?: string | null;
+  serial?: string | null;
+  amount?: number;
+  direction?: TransactionDirection;
+  runningBalance?: number | null;
+  notes?: string | null;
+};
+
 /* ----------------------------------------------------------------------- */
 /* Classification / annotation                                              */
 /* ----------------------------------------------------------------------- */
