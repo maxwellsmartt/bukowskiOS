@@ -546,7 +546,7 @@ export const TreasuryPage = () => {
       {
         key: "date",
         label: t("finance.treasury.columns.date"),
-        width: 130,
+        width: 118,
         render: (row: BankTransactionRow) =>
           editingId === row.id && editDraft ? (
             <input
@@ -556,13 +556,18 @@ export const TreasuryPage = () => {
               value={editDraft.txnDate}
             />
           ) : (
-            row.txnDate
+            <span className="treasury-date-chip">{row.txnDate}</span>
           ),
       },
       {
         key: "account",
         label: t("finance.treasury.columns.account"),
-        render: (row: BankTransactionRow) => row.bankAccountLabel,
+        minWidth: 170,
+        render: (row: BankTransactionRow) => (
+          <span className="treasury-account-cell" title={row.bankAccountLabel}>
+            {row.bankAccountLabel}
+          </span>
+        ),
       },
       {
         key: "description",
@@ -580,8 +585,11 @@ export const TreasuryPage = () => {
           ) : (
             <div className="cell-stack treasury-description-cell">
               <span className="treasury-description-primary">{row.annotation?.concept || row.rawDescription || "—"}</span>
-              {row.annotation?.counterparty ? (
-                <small className="text-muted">{row.annotation.counterparty}</small>
+              {row.annotation?.counterparty || row.reference ? (
+                <small className="treasury-description-meta">
+                  {row.annotation?.counterparty ? <span>{row.annotation.counterparty}</span> : null}
+                  {row.reference ? <span>{row.reference}</span> : null}
+                </small>
               ) : null}
             </div>
           ),
@@ -590,7 +598,7 @@ export const TreasuryPage = () => {
         key: "amount",
         label: t("finance.treasury.columns.amount"),
         align: "right" as const,
-        minWidth: 180,
+        minWidth: 160,
         render: (row: BankTransactionRow) =>
           editingId === row.id && editDraft ? (
             <div className="treasury-inline-amount-edit">
@@ -627,7 +635,7 @@ export const TreasuryPage = () => {
       {
         key: "kind",
         label: t("finance.treasury.columns.kind"),
-        minWidth: 160,
+        minWidth: 148,
         render: (row: BankTransactionRow) => (
           <CompactSelect<TransactionKind | "">
             ariaLabel={t("finance.treasury.columns.kind")}
@@ -645,15 +653,25 @@ export const TreasuryPage = () => {
         key: "actions",
         label: "",
         align: "right" as const,
-        width: 96,
+        width: 76,
         hideable: false,
         render: (row: BankTransactionRow) =>
           editingId === row.id ? (
             <span className="treasury-row-actions">
-              <button className="icon-ghost-control is-success" onClick={() => saveEdit(row)} type="button">
+              <button
+                aria-label={t("common.save", { defaultValue: "Save" })}
+                className="icon-ghost-control is-success"
+                onClick={() => saveEdit(row)}
+                type="button"
+              >
                 <Check size={13} />
               </button>
-              <button className="icon-ghost-control" onClick={cancelEdit} type="button">
+              <button
+                aria-label={t("common.cancel", { defaultValue: "Cancel" })}
+                className="icon-ghost-control"
+                onClick={cancelEdit}
+                type="button"
+              >
                 <X size={13} />
               </button>
             </span>
@@ -661,7 +679,7 @@ export const TreasuryPage = () => {
             <button
               className="icon-ghost-control"
               onClick={() => beginEdit(row)}
-              title={t("finance.treasury.movements.edit")}
+              aria-label={t("finance.treasury.movements.edit")}
               type="button"
             >
               <Edit3 size={13} />

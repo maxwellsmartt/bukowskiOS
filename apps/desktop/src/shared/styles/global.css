@@ -16263,6 +16263,14 @@ input[type="number"] {
   border-radius: 0;
 }
 
+.treasury-table-shell .data-table tbody td {
+  height: 48px;
+}
+
+.treasury-table-shell .data-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.026);
+}
+
 .treasury-table-toolbar {
   align-items: center;
   background: rgba(255, 255, 255, 0.018);
@@ -16555,11 +16563,14 @@ input[type="number"] {
 }
 
 .treasury-table-amount {
+  display: inline-block;
   font-variant-numeric: tabular-nums;
+  min-width: 132px;
+  text-align: right;
 }
 
 .treasury-description-cell {
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -16572,14 +16583,58 @@ input[type="number"] {
   white-space: nowrap;
 }
 
+.treasury-description-meta {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.treasury-description-meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.treasury-description-meta span + span {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding-left: 6px;
+}
+
+.treasury-date-chip,
+.treasury-account-cell {
+  align-items: center;
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.treasury-date-chip {
+  background: rgba(255, 255, 255, 0.024);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 999px;
+  color: rgba(226, 232, 240, 0.86);
+  font-size: 11px;
+  height: 24px;
+  padding: 0 8px;
+}
+
+.treasury-account-cell {
+  color: rgba(226, 232, 240, 0.78);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .treasury-kind-select {
-  min-width: 126px;
+  min-width: 118px;
   border-radius: 999px;
   font-size: var(--font-xs, 12px);
   font-weight: var(--weight-medium, 500);
-  height: 34px;
-  min-height: 34px;
-  padding-inline: 13px 10px;
+  height: 32px;
+  min-height: 32px;
+  padding-inline: 12px 9px;
   width: 100%;
 }
 
@@ -16652,7 +16707,15 @@ input[type="number"] {
 .treasury-row-actions {
   align-items: center;
   display: inline-flex;
-  gap: 4px;
+  gap: 3px;
+  justify-content: flex-end;
+  opacity: 0.72;
+  transition: opacity 120ms ease;
+}
+
+.treasury-table-shell .data-table tbody tr:hover .treasury-row-actions,
+.treasury-row-actions:focus-within {
+  opacity: 1;
 }
 
 .icon-ghost-control.is-success {
