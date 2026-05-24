@@ -16724,6 +16724,61 @@ input[type="number"] {
   padding-left: 6px;
 }
 
+.treasury-suggestion-chip {
+  align-items: center;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.026);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 1 auto;
+  font: inherit;
+  gap: 5px;
+  height: 22px;
+  max-width: min(260px, 100%);
+  min-width: 0;
+  padding: 0 8px;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.treasury-suggestion-chip span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: var(--weight-semibold, 600);
+  text-transform: uppercase;
+}
+
+.treasury-suggestion-chip strong {
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 11px;
+  font-weight: var(--weight-semibold, 600);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.treasury-suggestion-chip.is-positive {
+  background: rgba(57, 158, 103, 0.1);
+  border-color: rgba(97, 219, 149, 0.22);
+}
+
+.treasury-suggestion-chip.is-negative {
+  background: rgba(245, 112, 112, 0.07);
+  border-color: rgba(245, 112, 112, 0.18);
+}
+
+.treasury-suggestion-chip.is-neutral {
+  background: rgba(214, 179, 122, 0.09);
+  border-color: rgba(214, 179, 122, 0.22);
+}
+
+.treasury-suggestion-chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
 .treasury-date-chip,
 .treasury-account-cell {
   align-items: center;

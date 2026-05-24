@@ -56,7 +56,16 @@ type TreasuryReportCurrency = "DOP" | "USD";
 type PendingClassificationRule = {
   row: BankTransactionRow;
   kind: TransactionKind;
+  expenseCategory?: string | null;
   preview: CounterpartyRulePreview;
+};
+type TreasuryClassificationSuggestion = {
+  kind: TransactionKind;
+  expenseCategory?: string;
+  labelKey?: string;
+  labelDefault: string;
+  reasonKey: string;
+  reasonDefault: string;
 };
 type TransactionDraft = {
   txnDate: string;
@@ -139,6 +148,103 @@ const formatAxisCurrency = (value: number, currency = "DOP") => {
 };
 
 const normalizeCategoryKey = (value: string) => value.trim().replace(/\s+/g, "_").toLowerCase();
+const normalizedMovementText = (row: BankTransactionRow) =>
+  [row.rawDescription, row.reference, row.annotation?.counterparty]
+    .filter(Boolean)
+    .join(" ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+
+const includesAny = (text: string, patterns: string[]) => patterns.some((pattern) => text.includes(pattern));
+
+const inferTreasurySuggestion = (row: BankTransactionRow): TreasuryClassificationSuggestion | null => {
+  if (row.annotation?.txnKind) return null;
+  const text = normalizedMovementText(row);
+  if (!text.trim()) return null;
+
+  if (includesAny(text, ["DGII", "PAGO IMPUESTO", "PAG IMPUESTO"])) {
+    return {
+      kind: "tax",
+      expenseCategory: "taxes",
+      labelKey: "finance.treasury.categories.taxes",
+      labelDefault: "Taxes",
+      reasonKey: "finance.treasury.classify.suggestionReasons.tax",
+      reasonDefault: "Tax wording detected",
+    };
+  }
+  if (includesAny(text, ["PAG TSS", " TSS ", "TESORERIA SEGURIDAD SOCIAL"])) {
+    return {
+      kind: "tss",
+      expenseCategory: "social_security",
+      labelKey: "finance.treasury.categories.social_security",
+      labelDefault: "Social security (TSS)",
+      reasonKey: "finance.treasury.classify.suggestionReasons.tss",
+      reasonDefault: "TSS wording detected",
+    };
+  }
+  if (includesAny(text, ["COMISION", "COMISIONES", "POR 1000", "1.5 X 1000", "1.5 POR 1000"])) {
+    return {
+      kind: "bank_fee",
+      expenseCategory: "bank_fees",
+      labelKey: "finance.treasury.categories.bank_fees",
+      labelDefault: "Bank fees",
+      reasonKey: "finance.treasury.classify.suggestionReasons.bankFee",
+      reasonDefault: "Bank fee wording detected",
+    };
+  }
+  if (includesAny(text, ["PAGO TC", "TARJETA", "VISA", "MASTERCARD", "AMEX"])) {
+    return {
+      kind: "expense",
+      expenseCategory: "credit_card",
+      labelKey: "finance.treasury.categories.credit_card",
+      labelDefault: "Credit card",
+      reasonKey: "finance.treasury.classify.suggestionReasons.creditCard",
+      reasonDefault: "Card payment wording detected",
+    };
+  }
+  if (includesAny(text, ["HONORARIO", "HONORARIOS", "TECNICO", "TECNICOS", "CREW", "OPERADOR", "GAFFER", "CAMAROGRAFO"])) {
+    return {
+      kind: "expense",
+      expenseCategory: "crew_fees",
+      labelKey: "finance.treasury.categories.crew_fees",
+      labelDefault: "Crew fees",
+      reasonKey: "finance.treasury.classify.suggestionReasons.crewFees",
+      reasonDefault: "Crew or fee wording detected",
+    };
+  }
+  if (includesAny(text, ["SERVICIO", "SERVICIOS", "FACTURA", "SUPLIDOR", "CLARO", "ALTICE", "EDESUR", "EDENORTE", "EDEESTE"])) {
+    return {
+      kind: "expense",
+      expenseCategory: "services",
+      labelKey: "finance.treasury.categories.services",
+      labelDefault: "Service payments",
+      reasonKey: "finance.treasury.classify.suggestionReasons.services",
+      reasonDefault: "Service/vendor wording detected",
+    };
+  }
+  if (includesAny(text, ["PRESTAMO", "FINANCIAMIENTO", "CUOTA PREST", "PAGO PREST"])) {
+    return {
+      kind: "expense",
+      expenseCategory: "loan_financing",
+      labelKey: "finance.treasury.categories.loan_financing",
+      labelDefault: "Loans and financing",
+      reasonKey: "finance.treasury.classify.suggestionReasons.loan",
+      reasonDefault: "Loan wording detected",
+    };
+  }
+  if (includesAny(text, ["PAGO INTERESES", "COMPENSACION POR BALANCE"])) {
+    return {
+      kind: "interest",
+      expenseCategory: "interest_income",
+      labelKey: "finance.treasury.categories.interest_income",
+      labelDefault: "Interest",
+      reasonKey: "finance.treasury.classify.suggestionReasons.interest",
+      reasonDefault: "Interest wording detected",
+    };
+  }
+  return null;
+};
 
 const TreasuryChartTooltip = ({
   active,
@@ -275,6 +381,10 @@ export const TreasuryPage = () => {
       defaultValue: kindLabel(category as TransactionKind),
     });
   };
+  const suggestionLabel = (suggestion: TreasuryClassificationSuggestion) =>
+    suggestion.labelKey ? t(suggestion.labelKey, { defaultValue: suggestion.labelDefault }) : kindLabel(suggestion.kind);
+  const suggestionReason = (suggestion: TreasuryClassificationSuggestion) =>
+    t(suggestion.reasonKey, { defaultValue: suggestion.reasonDefault });
   const kindToneClass = (kind: TransactionKind | null | undefined) => {
     switch (kind) {
       case "income":
@@ -490,6 +600,40 @@ export const TreasuryPage = () => {
     }
   };
 
+  const applySuggestedClassification = async (row: BankTransactionRow, suggestion: TreasuryClassificationSuggestion) => {
+    const baseCommand = {
+      workspaceId: activeWorkspaceId,
+      actorType: "user" as const,
+      sourceChannel: "desktop" as const,
+      transactionId: row.id,
+      txnKind: suggestion.kind,
+      expenseCategory: suggestion.expenseCategory ?? null,
+      isInternalTransfer: suggestion.kind === "transfer" || suggestion.kind === "fx_exchange",
+    };
+    try {
+      const preview = row.rawDescription?.trim()
+        ? await mutations.previewClassificationRule({
+            workspaceId: activeWorkspaceId,
+            transactionId: row.id,
+            matchType: "exact",
+          })
+        : null;
+      if (preview && preview.matchCount > 1) {
+        setPendingRule({ row, kind: suggestion.kind, expenseCategory: suggestion.expenseCategory ?? null, preview });
+        return;
+      }
+      await mutations.annotate({
+        commandId: newCommandId("treasury-suggest-classify"),
+        ...baseCommand,
+      });
+      toast.success(t("finance.treasury.classify.saved"));
+      transactions.refresh();
+      overview.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("finance.treasury.classify.failed"));
+    }
+  };
+
   const applyPendingRule = async (applyToAll: boolean) => {
     if (!pendingRule) return;
     const baseCommand = {
@@ -498,6 +642,7 @@ export const TreasuryPage = () => {
       sourceChannel: "desktop" as const,
       transactionId: pendingRule.row.id,
       txnKind: pendingRule.kind,
+      expenseCategory: pendingRule.expenseCategory ?? null,
       isInternalTransfer: pendingRule.kind === "transfer" || pendingRule.kind === "fx_exchange",
     };
     setIsApplyingRule(true);
@@ -653,15 +798,32 @@ export const TreasuryPage = () => {
               value={editDraft.rawDescription}
             />
           ) : (
-            <div className="cell-stack treasury-description-cell">
-              <span className="treasury-description-primary">{row.annotation?.concept || row.rawDescription || "—"}</span>
-              {row.annotation?.counterparty || row.reference ? (
-                <small className="treasury-description-meta">
-                  {row.annotation?.counterparty ? <span>{row.annotation.counterparty}</span> : null}
-                  {row.reference ? <span>{row.reference}</span> : null}
-                </small>
-              ) : null}
-            </div>
+            (() => {
+              const suggestion = inferTreasurySuggestion(row);
+              return (
+                <div className="cell-stack treasury-description-cell">
+                  <span className="treasury-description-primary">{row.annotation?.concept || row.rawDescription || "—"}</span>
+                  {row.annotation?.counterparty || row.reference || suggestion ? (
+                    <small className="treasury-description-meta">
+                      {row.annotation?.counterparty ? <span>{row.annotation.counterparty}</span> : null}
+                      {row.reference ? <span>{row.reference}</span> : null}
+                      {suggestion ? (
+                        <button
+                          className={`treasury-suggestion-chip ${kindToneClass(suggestion.kind)}`}
+                          data-table-row-action
+                          onClick={() => void applySuggestedClassification(row, suggestion)}
+                          title={suggestionReason(suggestion)}
+                          type="button"
+                        >
+                          <span>{t("finance.treasury.classify.suggested", { defaultValue: "Suggested" })}</span>
+                          <strong>{suggestionLabel(suggestion)}</strong>
+                        </button>
+                      ) : null}
+                    </small>
+                  ) : null}
+                </div>
+              );
+            })()
           ),
       },
       {
