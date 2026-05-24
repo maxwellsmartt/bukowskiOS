@@ -123,9 +123,10 @@ const transactionDraftFromRow = (row: BankTransactionRow): TransactionDraft => (
 const chartPalette = ["#d6b37a", "#7eb7b2", "#c88d7f", "#92a7c1", "#a29cd8", "#8ca772", "#d7a0b0", "#b7c482"];
 const formatAxisCurrency = (value: number, currency = "DOP") => {
   const prefix = currencySuffix(currency);
-  if (Math.abs(value) >= 1_000_000) return `${prefix}${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `${prefix}${(value / 1_000).toFixed(0)}k`;
-  return `${prefix}${Math.round(value)}`;
+  const spacer = prefix.endsWith("$") ? "" : " ";
+  if (Math.abs(value) >= 1_000_000) return `${prefix}${spacer}${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${prefix}${spacer}${(value / 1_000).toFixed(0)}k`;
+  return `${prefix}${spacer}${Math.round(value)}`;
 };
 
 const normalizeCategoryKey = (value: string) => value.trim().replace(/\s+/g, "_").toLowerCase();
@@ -724,53 +725,59 @@ export const TreasuryPage = () => {
                 <span className="finance-period-active-pill">{snap?.activePeriodLabel ?? t("finance.treasury.period.fiscal")}</span>
                 <h3>{t("finance.treasury.overview.title")}</h3>
               </div>
-              <label className="compact-filter-field treasury-period-picker">
-                <span>{t("finance.treasury.overview.window")}</span>
-                <CompactSelect<TreasuryPeriodPreset>
-                  ariaLabel={t("finance.treasury.overview.window")}
-                  onChange={setPeriod}
-                  options={periodOptions}
-                  value={period}
-                />
-              </label>
-              <div className="compact-filter-field treasury-currency-picker">
-                <span>{t("finance.treasury.overview.currency")}</span>
-                <div aria-label={t("finance.treasury.overview.currency")} className="treasury-chart-toggle" role="group">
-                  {(["DOP", "USD"] as TreasuryReportCurrency[]).map((currency) => (
-                    <button
-                      aria-pressed={overviewCurrency === currency}
-                      className={overviewCurrency === currency ? "active" : ""}
-                      key={currency}
-                      onClick={() => setOverviewCurrency(currency)}
-                      type="button"
-                    >
-                      {currency}
-                    </button>
-                  ))}
+              <div className="treasury-overview-controls">
+                <label className="compact-filter-field treasury-period-picker">
+                  <span>{t("finance.treasury.overview.window")}</span>
+                  <CompactSelect<TreasuryPeriodPreset>
+                    ariaLabel={t("finance.treasury.overview.window")}
+                    onChange={setPeriod}
+                    options={periodOptions}
+                    value={period}
+                  />
+                </label>
+                <div className="compact-filter-field treasury-currency-picker">
+                  <span>{t("finance.treasury.overview.currency")}</span>
+                  <div aria-label={t("finance.treasury.overview.currency")} className="treasury-chart-toggle" role="group">
+                    {(["DOP", "USD"] as TreasuryReportCurrency[]).map((currency) => (
+                      <button
+                        aria-pressed={overviewCurrency === currency}
+                        className={overviewCurrency === currency ? "active" : ""}
+                        key={currency}
+                        onClick={() => setOverviewCurrency(currency)}
+                        type="button"
+                      >
+                        {currency}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="treasury-kpi-grid">
-              <div className="treasury-kpi-tile treasury-kpi-income">
-                <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.income")}</span>
-                <strong className="treasury-money-value">{formatMoney(snap?.totalIncome ?? 0, moneyCurrency)}</strong>
+            <div className="treasury-kpi-layout">
+              <div className="treasury-kpi-primary-grid">
+                <div className="treasury-kpi-tile treasury-kpi-income">
+                  <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.income")}</span>
+                  <strong className="treasury-money-value">{formatMoney(snap?.totalIncome ?? 0, moneyCurrency)}</strong>
+                </div>
+                <div className="treasury-kpi-tile treasury-kpi-expense">
+                  <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.expense")}</span>
+                  <strong className="treasury-money-value">{formatMoney(snap?.totalExpense ?? 0, moneyCurrency)}</strong>
+                </div>
+                <div className="treasury-kpi-tile treasury-kpi-net">
+                  <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.net")}</span>
+                  <strong className="treasury-money-value">{formatMoney(snap?.net ?? 0, moneyCurrency)}</strong>
+                </div>
               </div>
-              <div className="treasury-kpi-tile treasury-kpi-expense">
-                <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.expense")}</span>
-                <strong className="treasury-money-value">{formatMoney(snap?.totalExpense ?? 0, moneyCurrency)}</strong>
-              </div>
-              <div className="treasury-kpi-tile treasury-kpi-net">
-                <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.net")}</span>
-                <strong className="treasury-money-value">{formatMoney(snap?.net ?? 0, moneyCurrency)}</strong>
-              </div>
-              <div className="treasury-kpi-tile treasury-kpi-deductible">
-                <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.deductible")}</span>
-                <strong className="treasury-money-value">{formatMoney(snap?.totalDeductibleExpense ?? 0, moneyCurrency)}</strong>
-              </div>
-              <div className="treasury-kpi-tile treasury-kpi-neutral">
-                <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.unclassified")}</span>
-                <strong className="treasury-money-value">{snap?.unclassifiedCount ?? 0}</strong>
+              <div className="treasury-kpi-secondary-grid">
+                <div className="treasury-kpi-tile treasury-kpi-secondary treasury-kpi-deductible">
+                  <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.deductible")}</span>
+                  <strong className="treasury-money-value">{formatMoney(snap?.totalDeductibleExpense ?? 0, moneyCurrency)}</strong>
+                </div>
+                <div className="treasury-kpi-tile treasury-kpi-secondary treasury-kpi-neutral">
+                  <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.unclassified")}</span>
+                  <strong className="treasury-money-value">{snap?.unclassifiedCount ?? 0}</strong>
+                </div>
               </div>
             </div>
           </SurfaceCard>
@@ -940,9 +947,6 @@ export const TreasuryPage = () => {
         <SurfaceCard className="treasury-detail-card">
           <div className="treasury-movements-header">
             <div className="treasury-movements-title-stack">
-              <span className="finance-period-active-pill">
-                {selectedAccount ? selectedAccount.accountLabel : t("finance.treasury.filters.allAccounts")}
-              </span>
               <h3>{t("finance.treasury.movements.title")}</h3>
               <div className="treasury-movements-meta">
                 <span>

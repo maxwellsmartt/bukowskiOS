@@ -15959,19 +15959,42 @@ input[type="number"] {
   margin: 8px 0 0;
 }
 
+.treasury-overview-controls {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .treasury-period-picker {
   min-width: 180px;
 }
 
-.treasury-kpi-grid,
+.treasury-kpi-layout,
+.treasury-kpi-primary-grid,
+.treasury-kpi-secondary-grid,
 .treasury-account-grid {
   display: grid;
   gap: 8px;
+}
+
+.treasury-kpi-layout,
+.treasury-account-grid {
   margin-top: 14px;
 }
 
-.treasury-kpi-grid {
-  grid-template-columns: repeat(auto-fit, minmax(164px, 1fr));
+.treasury-kpi-layout {
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.38fr);
+}
+
+.treasury-kpi-primary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.treasury-kpi-secondary-grid {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .treasury-account-grid {
@@ -16003,6 +16026,16 @@ input[type="number"] {
   gap: 7px;
   min-height: 94px;
   padding: 12px;
+}
+
+.treasury-kpi-secondary {
+  gap: 4px;
+  min-height: 43px;
+  padding: 9px 10px;
+}
+
+.treasury-kpi-secondary .treasury-money-value {
+  font-size: 16px;
 }
 
 .treasury-kpi-income {
@@ -16130,22 +16163,25 @@ input[type="number"] {
 
 .treasury-movements-header {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
 }
 
 .treasury-movements-title-stack {
   display: grid;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
 }
 
 .treasury-movements-title-stack h3 {
   margin: 0;
   color: var(--text-primary);
-  font-size: var(--font-lg, 18px);
+  font-size: 22px;
+  font-weight: var(--weight-bold, 700);
   line-height: 1.15;
 }
 
@@ -16542,12 +16578,26 @@ input[type="number"] {
   color: rgba(97, 219, 149, 0.96);
 }
 
+@media (max-width: 1180px) {
+  .treasury-kpi-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .treasury-kpi-secondary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 760px) {
   .treasury-hero-topline,
   .treasury-detail-header,
   .treasury-movements-header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .treasury-overview-controls {
+    justify-content: stretch;
   }
 
   .treasury-segmented-tabs,
@@ -16565,6 +16615,7 @@ input[type="number"] {
   .treasury-segmented-tab,
   .treasury-movement-actions .ghost-control,
   .treasury-table-toolbar .compact-filter-field,
+  .treasury-overview-controls .compact-filter-field,
   .treasury-table-search {
     flex: 1 1 100%;
     min-width: 0;
@@ -16576,6 +16627,11 @@ input[type="number"] {
 
   .treasury-period-picker {
     min-width: 0;
+  }
+
+  .treasury-kpi-primary-grid,
+  .treasury-kpi-secondary-grid {
+    grid-template-columns: 1fr;
   }
 
   .treasury-money-value,
