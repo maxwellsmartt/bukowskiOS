@@ -133,6 +133,7 @@ export type TreasuryOverviewQuery = {
   period: TreasuryPeriodPreset;
   customStartDate?: string | null;
   customEndDate?: string | null;
+  reportCurrency?: string | null;
 };
 
 export type TreasuryMonthlyPoint = {
@@ -150,6 +151,9 @@ export type TreasuryCategoryBreakdown = {
 
 export type TreasuryOverviewSnapshot = {
   activePeriodLabel: string;
+  reportCurrency: string;
+  conversionRate: number | null;
+  conversionMissingCount: number;
   /** Real income (excludes transfers/fx and internal transfers). */
   totalIncome: number;
   totalExpense: number;

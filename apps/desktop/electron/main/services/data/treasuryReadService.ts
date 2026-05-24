@@ -36,8 +36,45 @@ const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 1
 const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
 const resolveWorkspaceId = (workspaceId?: string | null) =>
   workspaceId?.trim() || DEFAULT_WORKSPACE_ID;
+const normalizeCurrency = (value: string | null | undefined, fallback = "DOP") =>
+  (value?.trim().toUpperCase() || fallback).slice(0, 8);
 const normalizeRuleText = (value: string | null | undefined) =>
   (value ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+
+const latestConversionRate = (
+  db: DatabaseSync,
+  workspaceId: string,
+  fromCurrency: string,
+  toCurrency: string,
+): number | null => {
+  const from = normalizeCurrency(fromCurrency);
+  const to = normalizeCurrency(toCurrency);
+  if (from === to) return 1;
+
+  const direct = db
+    .prepare(
+      `SELECT rate
+       FROM exchange_rates
+       WHERE workspace_id = ? AND base_currency = ? AND quote_currency = ?
+       ORDER BY effective_date DESC, created_at DESC
+       LIMIT 1`,
+    )
+    .get(workspaceId, from, to) as { rate: number } | undefined;
+  if (direct?.rate && Number(direct.rate) > 0) return Number(direct.rate);
+
+  const inverse = db
+    .prepare(
+      `SELECT rate
+       FROM exchange_rates
+       WHERE workspace_id = ? AND base_currency = ? AND quote_currency = ?
+       ORDER BY effective_date DESC, created_at DESC
+       LIMIT 1`,
+    )
+    .get(workspaceId, to, from) as { rate: number } | undefined;
+  if (inverse?.rate && Number(inverse.rate) > 0) return 1 / Number(inverse.rate);
+
+  return null;
+};
 
 const resolveWindow = (query?: TreasuryOverviewQuery) => {
   const now = new Date();
@@ -367,25 +404,41 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
       const ws = resolveWorkspaceId(query.workspaceId);
       const window = resolveWindow(query);
       const accounts = this.getAccounts(ws);
+      const reportCurrency = query.reportCurrency ? normalizeCurrency(query.reportCurrency) : "";
+      const shouldConvert = reportCurrency.length > 0;
+      const conversionRateCache = new Map<string, number | null>();
+      const convertAmount = (amount: number, currency: string) => {
+        if (!shouldConvert) return { amount, missing: false };
+        const sourceCurrency = normalizeCurrency(currency, reportCurrency);
+        const cacheKey = `${sourceCurrency}:${reportCurrency}`;
+        if (!conversionRateCache.has(cacheKey)) {
+          conversionRateCache.set(cacheKey, latestConversionRate(db, ws, sourceCurrency, reportCurrency));
+        }
+        const rate = conversionRateCache.get(cacheKey);
+        if (!rate) return { amount, missing: true };
+        return { amount: amount * rate, missing: false };
+      };
 
       const rows = (
         window.startDate && window.endDate
           ? db
               .prepare(
-                `SELECT t.txn_date, t.amount, t.direction,
+                `SELECT t.txn_date, t.amount, t.direction, acc.currency,
                         a.txn_kind, a.is_internal_transfer, a.deductible_amount,
                         a.expense_category, a.reimbursement_status, a.transaction_id AS a_transaction_id
                  FROM bank_transactions t
+                 JOIN bank_accounts acc ON acc.id = t.bank_account_id
                  LEFT JOIN transaction_annotations a ON a.transaction_id = t.id
                  WHERE t.workspace_id = ? AND t.txn_date >= ? AND t.txn_date <= ?`,
               )
               .all(ws, window.startDate, window.endDate)
           : db
               .prepare(
-                `SELECT t.txn_date, t.amount, t.direction,
+                `SELECT t.txn_date, t.amount, t.direction, acc.currency,
                         a.txn_kind, a.is_internal_transfer, a.deductible_amount,
                         a.expense_category, a.reimbursement_status, a.transaction_id AS a_transaction_id
                  FROM bank_transactions t
+                 JOIN bank_accounts acc ON acc.id = t.bank_account_id
                  LEFT JOIN transaction_annotations a ON a.transaction_id = t.id
                  WHERE t.workspace_id = ?`,
               )
@@ -398,11 +451,14 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
       let excludedTransferTotal = 0;
       let unclassifiedCount = 0;
       let pendingReviewCount = 0;
+      let conversionMissingCount = 0;
       const monthlyMap = new Map<string, { income: number; expense: number }>();
       const categoryMap = new Map<string, number>();
 
       for (const row of rows) {
-        const amount = Number(row.amount ?? 0);
+        const rawAmount = Number(row.amount ?? 0);
+        const converted = convertAmount(rawAmount, row.currency as string);
+        const amount = converted.amount;
         const direction = row.direction as TransactionDirection;
         const annotation = row.a_transaction_id == null ? null : mapAnnotation(row);
         const excluded = isExcluded(annotation);
@@ -411,6 +467,7 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
 
         if (!annotation || !annotation.txnKind) unclassifiedCount += 1;
         if (annotation?.reimbursementStatus === "pending") pendingReviewCount += 1;
+        if (converted.missing) conversionMissingCount += 1;
 
         if (excluded) {
           excludedTransferTotal += amount;
@@ -450,6 +507,9 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
 
       return {
         activePeriodLabel: window.label,
+        reportCurrency: shouldConvert ? reportCurrency : "mixed",
+        conversionRate: shouldConvert ? conversionRateCache.get(`USD:${reportCurrency}`) ?? null : null,
+        conversionMissingCount,
         totalIncome: round2(totalIncome),
         totalExpense: round2(totalExpense),
         net: round2(totalIncome - totalExpense),

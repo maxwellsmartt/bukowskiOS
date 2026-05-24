@@ -1387,9 +1387,12 @@
       "overview": {
         "title": "Cash pulse",
         "window": "Window",
+        "currency": "Reporting currency",
         "flowTitle": "Income vs expense",
         "flowEmpty": "Classify movements to see the monthly income and expense flow.",
+        "legend": "Legend",
         "netLabel": "Net",
+        "conversionMissing": "{{count}} movements do not have an available rate to read them in {{currency}}.",
         "categoryTitle": "Expense by category",
         "categoryEmpty": "Classify expenses to see how spend breaks down by category.",
         "expenseTotal": "Total expense"

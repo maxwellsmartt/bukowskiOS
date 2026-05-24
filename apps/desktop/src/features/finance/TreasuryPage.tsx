@@ -53,6 +53,7 @@ import {
 
 type Tab = "overview" | "movements" | "review" | "projects";
 type MovementDateFilter = "all" | "month" | "custom";
+type TreasuryReportCurrency = "DOP" | "USD";
 type PendingClassificationRule = {
   row: BankTransactionRow;
   kind: TransactionKind;
@@ -120,20 +121,23 @@ const transactionDraftFromRow = (row: BankTransactionRow): TransactionDraft => (
 });
 
 const chartPalette = ["#d6b37a", "#7eb7b2", "#c88d7f", "#92a7c1", "#a29cd8", "#8ca772", "#d7a0b0", "#b7c482"];
-const formatAxisCurrency = (value: number) => {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
-  return `$${Math.round(value)}`;
+const formatAxisCurrency = (value: number, currency = "DOP") => {
+  const prefix = currencySuffix(currency);
+  if (Math.abs(value) >= 1_000_000) return `${prefix}${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${prefix}${(value / 1_000).toFixed(0)}k`;
+  return `${prefix}${Math.round(value)}`;
 };
 
 const normalizeCategoryKey = (value: string) => value.trim().replace(/\s+/g, "_").toLowerCase();
 
 const TreasuryChartTooltip = ({
   active,
+  currency = "DOP",
   label,
   payload,
 }: {
   active?: boolean;
+  currency?: string;
   label?: string;
   payload?: Array<{ color?: string; name?: string; payload?: { label?: string }; value?: number | string }>;
 }) => {
@@ -146,7 +150,7 @@ const TreasuryChartTooltip = ({
           <span className="finance-chart-tooltip-dot" style={{ background: entry.color ?? "rgba(255,255,255,0.6)" }} />
           <span>
             {entry.payload?.label ?? entry.name ? `${entry.payload?.label ?? entry.name}: ` : ""}
-            {typeof entry.value === "number" ? formatTreasuryMoney(entry.value) : String(entry.value ?? "—")}
+            {typeof entry.value === "number" ? formatTreasuryMoney(entry.value, currency) : String(entry.value ?? "—")}
           </span>
         </div>
       ))}
@@ -178,10 +182,14 @@ export const TreasuryPage = () => {
   const [importBankName, setImportBankName] = useState<BankName>("popular");
   const [importAccountId, setImportAccountId] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [overviewCurrency, setOverviewCurrency] = useState<TreasuryReportCurrency>("DOP");
 
   const accounts = useBankAccounts(activeWorkspaceId);
   const overview = useTreasuryOverview(
-    useMemo(() => ({ workspaceId: activeWorkspaceId, period }), [activeWorkspaceId, period]),
+    useMemo(
+      () => ({ workspaceId: activeWorkspaceId, period, reportCurrency: overviewCurrency }),
+      [activeWorkspaceId, overviewCurrency, period],
+    ),
   );
   const transactions = useTreasuryTransactions(
     useMemo(
@@ -471,6 +479,7 @@ export const TreasuryPage = () => {
   };
 
   const snap = overview.data;
+  const moneyCurrency = snap?.reportCurrency && snap.reportCurrency !== "mixed" ? snap.reportCurrency : overviewCurrency;
   const categoryChartData = useMemo(() => {
     if (!snap?.expenseByCategory.length) return [];
     const total = snap.expenseByCategory.reduce((sum, row) => sum + row.amount, 0) || 1;
@@ -704,24 +713,40 @@ export const TreasuryPage = () => {
                   value={period}
                 />
               </label>
+              <div className="compact-filter-field treasury-currency-picker">
+                <span>{t("finance.treasury.overview.currency")}</span>
+                <div aria-label={t("finance.treasury.overview.currency")} className="treasury-chart-toggle" role="group">
+                  {(["DOP", "USD"] as TreasuryReportCurrency[]).map((currency) => (
+                    <button
+                      aria-pressed={overviewCurrency === currency}
+                      className={overviewCurrency === currency ? "active" : ""}
+                      key={currency}
+                      onClick={() => setOverviewCurrency(currency)}
+                      type="button"
+                    >
+                      {currency}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="treasury-kpi-grid">
               <div className="treasury-kpi-tile treasury-kpi-income">
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.income")}</span>
-                <strong className="treasury-money-value">{formatMoney(snap?.totalIncome ?? 0)}</strong>
+                <strong className="treasury-money-value">{formatMoney(snap?.totalIncome ?? 0, moneyCurrency)}</strong>
               </div>
               <div className="treasury-kpi-tile treasury-kpi-expense">
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.expense")}</span>
-                <strong className="treasury-money-value">{formatMoney(snap?.totalExpense ?? 0)}</strong>
+                <strong className="treasury-money-value">{formatMoney(snap?.totalExpense ?? 0, moneyCurrency)}</strong>
               </div>
               <div className={`treasury-kpi-tile ${(snap?.net ?? 0) >= 0 ? "treasury-kpi-income" : "treasury-kpi-expense"}`}>
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.net")}</span>
-                <strong className="treasury-money-value">{formatMoney(snap?.net ?? 0)}</strong>
+                <strong className="treasury-money-value">{formatMoney(snap?.net ?? 0, moneyCurrency)}</strong>
               </div>
               <div className="treasury-kpi-tile treasury-kpi-deductible">
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.deductible")}</span>
-                <strong className="treasury-money-value">{formatMoney(snap?.totalDeductibleExpense ?? 0)}</strong>
+                <strong className="treasury-money-value">{formatMoney(snap?.totalDeductibleExpense ?? 0, moneyCurrency)}</strong>
               </div>
               <div className="treasury-kpi-tile treasury-kpi-neutral">
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.unclassified")}</span>
@@ -732,7 +757,19 @@ export const TreasuryPage = () => {
 
           <div className="treasury-charts-grid">
             <SurfaceCard className="treasury-chart-card">
-              <h3 className="section-subtitle">{t("finance.treasury.overview.flowTitle")}</h3>
+              <div className="treasury-chart-heading">
+                <h3 className="section-subtitle">{t("finance.treasury.overview.flowTitle")}</h3>
+                <div className="treasury-flow-legend" aria-label={t("finance.treasury.overview.legend")}>
+                  <span><i style={{ background: "#7eb7b2" }} />{t("finance.treasury.kpi.income")}</span>
+                  <span><i style={{ background: "#c88d7f" }} />{t("finance.treasury.kpi.expense")}</span>
+                  <span><i className="line" />{t("finance.treasury.overview.netLabel")}</span>
+                </div>
+              </div>
+              {snap?.conversionMissingCount ? (
+                <p className="treasury-chart-note">
+                  {t("finance.treasury.overview.conversionMissing", { count: snap.conversionMissingCount, currency: moneyCurrency })}
+                </p>
+              ) : null}
               {snap && snap.monthly.length > 0 ? (
                 <div className="finance-chart-shell">
                   <ResponsiveContainer height={260} width="100%">
@@ -742,11 +779,11 @@ export const TreasuryPage = () => {
                       <YAxis
                         axisLine={false}
                         stroke="rgba(255,255,255,0.44)"
-                        tickFormatter={formatAxisCurrency}
+                        tickFormatter={(value) => formatAxisCurrency(Number(value), moneyCurrency)}
                         tickLine={false}
                         width={78}
                       />
-                      <Tooltip content={<TreasuryChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                      <Tooltip content={<TreasuryChartTooltip currency={moneyCurrency} />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
                       <Bar dataKey="income" fill="#7eb7b2" name={t("finance.treasury.kpi.income")} radius={[8, 8, 0, 0]} />
                       <Bar dataKey="expense" fill="#c88d7f" name={t("finance.treasury.kpi.expense")} radius={[8, 8, 0, 0]} />
                       <Line
@@ -790,12 +827,12 @@ export const TreasuryPage = () => {
                               <Cell fill={chartPalette[index % chartPalette.length] ?? "#d6b37a"} key={row.category} />
                             ))}
                           </Pie>
-                          <Tooltip content={<TreasuryChartTooltip />} />
+                          <Tooltip content={<TreasuryChartTooltip currency={moneyCurrency} />} />
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="finance-donut-center">
                         <span>{t("finance.treasury.overview.expenseTotal")}</span>
-                        <strong>{formatAxisCurrency(snap.totalExpense)}</strong>
+                        <strong>{formatAxisCurrency(snap.totalExpense, moneyCurrency)}</strong>
                       </div>
                     </div>
                     <div className="finance-pie-legend">
@@ -806,7 +843,7 @@ export const TreasuryPage = () => {
                             style={{ background: chartPalette[index % chartPalette.length] ?? "#d6b37a" }}
                           />
                           <span className="finance-pie-legend-label">{row.label}</span>
-                          <span className="finance-pie-legend-amount">{formatMoney(row.amount)}</span>
+                          <span className="finance-pie-legend-amount">{formatMoney(row.amount, moneyCurrency)}</span>
                           <span className="finance-pie-legend-percent">{row.percentage}%</span>
                         </div>
                       ))}

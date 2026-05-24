@@ -145,7 +145,7 @@ export const useTreasuryOverview = (query: TreasuryOverviewQuery) => {
     return () => {
       cancelled = true;
     };
-  }, [query.workspaceId, query.period, query.customStartDate, query.customEndDate, version, refreshVersion]);
+  }, [query.workspaceId, query.period, query.customStartDate, query.customEndDate, query.reportCurrency, version, refreshVersion]);
 
   return { data, isLoading, error, refresh };
 };

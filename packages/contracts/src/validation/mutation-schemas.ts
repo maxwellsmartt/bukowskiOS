@@ -1630,6 +1630,7 @@ export const treasuryOverviewQuerySchema = z
     period: z.enum(["month", "quarter", "year", "fiscal", "all", "custom"]),
     customStartDate: optionalTrimmedString,
     customEndDate: optionalTrimmedString,
+    reportCurrency: optionalTrimmedString,
   })
   .strict();
 

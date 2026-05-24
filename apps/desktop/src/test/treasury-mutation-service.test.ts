@@ -136,6 +136,82 @@ describe("treasury mutation service", () => {
     cleanup();
   });
 
+  it("converts treasury overview totals into the requested reporting currency", () => {
+    const { cleanup, database } = createTestDatabase("treasury-overview-currency");
+    const mutations = createTreasuryMutationService(database);
+    const reads = createTreasuryReadService(database);
+
+    mutations.upsertBankAccount(account("cmd-acct-dop"));
+    mutations.upsertBankAccount(account("cmd-acct-usd-report", {
+      accountLabel: "Popular USD",
+      accountNumberFull: "123456789",
+      currency: "USD",
+    }));
+    database
+      .prepare(
+        `INSERT INTO exchange_rates (
+          id, workspace_id, base_currency, quote_currency, rate, rate_type,
+          source, source_label, effective_date, fetched_at, created_by_user_id,
+          notes, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        "rate-usd-dop-treasury",
+        workspaceId,
+        "USD",
+        "DOP",
+        60,
+        "sell",
+        "manual",
+        "Manual",
+        "2026-01-01",
+        null,
+        null,
+        null,
+        "2026-01-01T00:00:00.000Z",
+      );
+
+    mutations.importStatement({
+      commandId: "cmd-import-dop-report",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-dop",
+      sourceFormat: "csv",
+      rows: [{ txnDate: "2026-01-03", rawDescription: "DOP expense", amount: 6000, direction: "debit" }],
+    });
+    mutations.importStatement({
+      commandId: "cmd-import-usd-report",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-usd-report",
+      sourceFormat: "csv",
+      rows: [{ txnDate: "2026-01-04", rawDescription: "USD expense", amount: 100, direction: "debit" }],
+    });
+
+    const dop = reads.getOverview({
+      workspaceId,
+      period: "custom",
+      customStartDate: "2026-01-01",
+      customEndDate: "2026-01-31",
+      reportCurrency: "DOP",
+    });
+    expect(dop.totalExpense).toBe(12000);
+    expect(dop.reportCurrency).toBe("DOP");
+    expect(dop.conversionMissingCount).toBe(0);
+
+    const usd = reads.getOverview({
+      workspaceId,
+      period: "custom",
+      customStartDate: "2026-01-01",
+      customEndDate: "2026-01-31",
+      reportCurrency: "USD",
+    });
+    expect(usd.totalExpense).toBe(200);
+    expect(usd.reportCurrency).toBe("USD");
+    expect(usd.conversionMissingCount).toBe(0);
+    cleanup();
+  });
+
   it("auto-classifies bank fees by description", () => {
     const { cleanup, database } = createTestDatabase("treasury-bank-fee");
     const mutations = createTreasuryMutationService(database);

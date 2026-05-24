@@ -1389,9 +1389,12 @@
       "overview": {
         "title": "Pulso de caja",
         "window": "Ventana",
+        "currency": "Moneda de lectura",
         "flowTitle": "Ingresos vs gastos",
         "flowEmpty": "Clasifica movimientos para ver el flujo mensual de ingresos y gastos.",
+        "legend": "Leyenda",
         "netLabel": "Neto",
+        "conversionMissing": "{{count}} movimientos no tienen tasa disponible para leerlos en {{currency}}.",
         "categoryTitle": "Gasto por categoría",
         "categoryEmpty": "Clasifica gastos para ver el desglose por categoría.",
         "expenseTotal": "Total gastos"

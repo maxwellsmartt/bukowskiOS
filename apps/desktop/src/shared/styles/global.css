@@ -4849,6 +4849,78 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   min-height: 280px;
 }
 
+.treasury-chart-heading {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.treasury-flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.treasury-flow-legend span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.treasury-flow-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.treasury-flow-legend i.line {
+  width: 18px;
+  height: 3px;
+  border-radius: 999px;
+  background: #d6b37a;
+}
+
+.treasury-chart-toggle {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+}
+
+.treasury-chart-toggle button {
+  min-width: 44px;
+  height: 30px;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.treasury-chart-toggle button:last-child {
+  border-right: 0;
+}
+
+.treasury-chart-toggle button.active {
+  background: rgba(214, 179, 122, 0.16);
+  color: var(--text-primary);
+}
+
+.treasury-chart-note {
+  margin: -4px 0 8px;
+  color: #d6b37a;
+  font-size: 12px;
+}
+
 .finance-chart-shell-pie {
   min-height: 286px;
 }
