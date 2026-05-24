@@ -33,7 +33,6 @@ import { CompactSelect } from "@shared/components/CompactSelect";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { SectionHeader } from "@shared/components/SectionHeader";
-import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import bancoPopularLogo from "@shared/assets/inbox/logos/banco popular dominicano-logo.jpg";
@@ -102,6 +101,16 @@ const formatTreasuryMoney = (value: number, currency = "DOP") => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })} ${currencySuffix(currency)}`;
+};
+const formatSignedTreasuryMoney = (
+  value: number,
+  currency = "DOP",
+  polarity: "auto" | "positive" | "negative" = "auto",
+) => {
+  const safe = Number.isFinite(value) ? value : 0;
+  const sign =
+    polarity === "positive" ? "+" : polarity === "negative" ? "−" : safe > 0 ? "+" : safe < 0 ? "−" : "";
+  return `${sign}${formatTreasuryMoney(Math.abs(safe), currency)}`;
 };
 const monthStart = () => {
   const now = new Date();
@@ -243,6 +252,16 @@ export const TreasuryPage = () => {
 
   const kindLabel = (kind: TransactionKind | null | undefined) =>
     kind ? t(`finance.treasury.kinds.${kind}`, { defaultValue: kind }) : "—";
+  const kindOptions = useMemo(
+    () => [
+      { value: "" as const, label: t("finance.treasury.classify.placeholder") },
+      ...transactionKinds.map((kind) => ({
+        value: kind,
+        label: t(`finance.treasury.kinds.${kind}`, { defaultValue: kind }),
+      })),
+    ],
+    [t],
+  );
   const categoryLabel = (category: string | null | undefined) => {
     if (!category) return t("finance.treasury.categories.uncategorized");
     return t(`finance.treasury.categories.${normalizeCategoryKey(category)}`, {
@@ -608,23 +627,19 @@ export const TreasuryPage = () => {
       {
         key: "kind",
         label: t("finance.treasury.columns.kind"),
-        render: (row: BankTransactionRow) =>
-          row.excludedFromTotals ? (
-            <StatusBadge tone="neutral">{kindLabel(row.annotation?.txnKind) }</StatusBadge>
-          ) : (
-            <select
-              className={`compact-filter-select treasury-kind-select ${kindToneClass(row.annotation?.txnKind)}`}
-              onChange={(event) => classify(row, event.target.value as TransactionKind)}
-              value={row.annotation?.txnKind ?? ""}
-            >
-              <option value="">{t("finance.treasury.classify.placeholder")}</option>
-              {transactionKinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {kindLabel(kind)}
-                </option>
-              ))}
-            </select>
-          ),
+        minWidth: 160,
+        render: (row: BankTransactionRow) => (
+          <CompactSelect<TransactionKind | "">
+            ariaLabel={t("finance.treasury.columns.kind")}
+            className={`treasury-kind-select ${kindToneClass(row.annotation?.txnKind)}`}
+            onChange={(next) => {
+              if (next) classify(row, next);
+            }}
+            options={kindOptions}
+            popupMinWidth={190}
+            value={row.annotation?.txnKind ?? ""}
+          />
+        ),
       },
       {
         key: "actions",
@@ -758,21 +773,27 @@ export const TreasuryPage = () => {
               <div className="treasury-kpi-primary-grid">
                 <div className="treasury-kpi-tile treasury-kpi-income">
                   <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.income")}</span>
-                  <strong className="treasury-money-value">{formatMoney(snap?.totalIncome ?? 0, moneyCurrency)}</strong>
+                  <strong className="treasury-money-value">
+                    {formatSignedTreasuryMoney(snap?.totalIncome ?? 0, moneyCurrency, "positive")}
+                  </strong>
                 </div>
                 <div className="treasury-kpi-tile treasury-kpi-expense">
                   <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.expense")}</span>
-                  <strong className="treasury-money-value">{formatMoney(snap?.totalExpense ?? 0, moneyCurrency)}</strong>
+                  <strong className="treasury-money-value">
+                    {formatSignedTreasuryMoney(snap?.totalExpense ?? 0, moneyCurrency, "negative")}
+                  </strong>
                 </div>
                 <div className="treasury-kpi-tile treasury-kpi-net">
                   <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.net")}</span>
-                  <strong className="treasury-money-value">{formatMoney(snap?.net ?? 0, moneyCurrency)}</strong>
+                  <strong className="treasury-money-value">{formatSignedTreasuryMoney(snap?.net ?? 0, moneyCurrency)}</strong>
                 </div>
               </div>
               <div className="treasury-kpi-secondary-grid">
                 <div className="treasury-kpi-tile treasury-kpi-secondary treasury-kpi-deductible">
                   <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.deductible")}</span>
-                  <strong className="treasury-money-value">{formatMoney(snap?.totalDeductibleExpense ?? 0, moneyCurrency)}</strong>
+                  <strong className="treasury-money-value">
+                    {formatSignedTreasuryMoney(snap?.totalDeductibleExpense ?? 0, moneyCurrency, "negative")}
+                  </strong>
                 </div>
                 <div className="treasury-kpi-tile treasury-kpi-secondary treasury-kpi-neutral">
                   <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.unclassified")}</span>
@@ -802,13 +823,20 @@ export const TreasuryPage = () => {
                   <ResponsiveContainer height={260} width="100%">
                     <BarChart data={snap.monthly} margin={{ top: 10, right: 12, left: 10, bottom: 2 }}>
                       <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
-                      <XAxis axisLine={false} dataKey="month" stroke="rgba(255,255,255,0.48)" tickLine={false} />
+                      <XAxis
+                        axisLine={false}
+                        dataKey="month"
+                        stroke="rgba(255,255,255,0.48)"
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                      />
                       <YAxis
                         axisLine={false}
                         stroke="rgba(255,255,255,0.44)"
+                        tick={{ fontSize: 11 }}
                         tickFormatter={(value) => formatAxisCurrency(Number(value), moneyCurrency)}
                         tickLine={false}
-                        width={78}
+                        width={70}
                       />
                       <Tooltip content={<TreasuryChartTooltip currency={moneyCurrency} />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
                       <Bar dataKey="income" fill="#7eb7b2" name={t("finance.treasury.kpi.income")} radius={[8, 8, 0, 0]} />

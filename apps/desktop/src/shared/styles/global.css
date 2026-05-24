@@ -4857,10 +4857,16 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   margin-bottom: 10px;
 }
 
+.treasury-chart-heading .section-subtitle,
+.treasury-chart-card > .section-subtitle {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
 .treasury-flow-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   justify-content: flex-end;
 }
 
@@ -4869,7 +4875,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   gap: 6px;
   align-items: center;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -4895,15 +4901,15 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .treasury-chart-toggle button {
-  min-width: 44px;
-  height: 30px;
+  min-width: 38px;
+  height: 26px;
   border: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .treasury-chart-toggle button:last-child {
@@ -15963,12 +15969,35 @@ input[type="number"] {
   align-items: end;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   justify-content: flex-end;
 }
 
+.treasury-overview-controls .compact-filter-field {
+  gap: 4px;
+}
+
+.treasury-overview-controls .compact-filter-field > span {
+  font-size: 9px;
+  letter-spacing: 0.075em;
+}
+
+.treasury-overview-controls .compact-select-trigger {
+  font-size: 11px;
+  height: 28px;
+  min-height: 28px;
+  padding-left: 10px;
+  padding-right: 8px;
+}
+
+.treasury-hero-card .finance-period-active-pill {
+  font-size: 11px;
+  min-height: 24px;
+  padding: 0 10px;
+}
+
 .treasury-period-picker {
-  min-width: 180px;
+  min-width: 146px;
 }
 
 .treasury-kpi-layout,
@@ -16512,30 +16541,46 @@ input[type="number"] {
   border-radius: 999px;
   font-size: var(--font-xs, 12px);
   font-weight: var(--weight-medium, 500);
+  height: 34px;
+  min-height: 34px;
+  padding-inline: 13px 10px;
+  width: 100%;
 }
 
 .treasury-kind-select.is-positive {
   border-color: rgba(97, 219, 149, 0.24);
   background: rgba(57, 158, 103, 0.1);
-  color: rgba(166, 239, 196, 0.96);
 }
 
 .treasury-kind-select.is-negative {
   border-color: rgba(245, 112, 112, 0.2);
   background: rgba(245, 112, 112, 0.075);
-  color: rgba(255, 180, 180, 0.96);
 }
 
 .treasury-kind-select.is-neutral {
   border-color: rgba(214, 179, 122, 0.24);
   background: rgba(214, 179, 122, 0.09);
-  color: rgba(230, 204, 158, 0.96);
 }
 
 .treasury-kind-select.is-muted {
   border-color: rgba(151, 164, 185, 0.2);
   background: rgba(151, 164, 185, 0.07);
-  color: var(--text-secondary);
+}
+
+.treasury-kind-select,
+.treasury-kind-select .compact-select-trigger-label {
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.treasury-kind-select svg {
+  color: rgba(255, 255, 255, 0.72);
+  flex: 0 0 auto;
+  transition: transform 140ms ease, color 140ms ease;
+}
+
+.treasury-kind-select[aria-expanded="true"] svg {
+  color: rgba(255, 255, 255, 0.94);
+  transform: rotate(180deg);
 }
 
 .treasury-table-amount.is-positive {
