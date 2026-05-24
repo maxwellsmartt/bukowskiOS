@@ -16135,18 +16135,20 @@ input[type="number"] {
 }
 
 .treasury-review-ratio {
-  margin-top: 4px;
-  height: 6px;
+  margin-top: 5px;
+  height: 3px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
+  max-width: 460px;
 }
 
 .treasury-review-ratio-fill {
   display: block;
   height: 100%;
   border-radius: 999px;
-  transition: width 0.2s ease;
+  opacity: 0.65;
+  transition: width 0.25s ease;
 }
 
 .treasury-review-ratio-fill.is-success {
@@ -16159,6 +16161,30 @@ input[type="number"] {
 
 .treasury-review-ratio-fill.is-critical {
   background: #c88d7f;
+}
+
+/* Keep the deductible input the same pill size/height as the row buttons. */
+.treasury-review-deductible {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.treasury-review-deductible > span {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.treasury-review-deductible .field-input {
+  width: 116px;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  text-align: right;
 }
 
 .treasury-review-ratio-legend {
