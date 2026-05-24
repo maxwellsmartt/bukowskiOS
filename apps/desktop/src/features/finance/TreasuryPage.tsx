@@ -296,6 +296,8 @@ export const TreasuryPage = () => {
   const [editDraft, setEditDraft] = useState<TransactionDraft | null>(null);
   const [pendingRule, setPendingRule] = useState<PendingClassificationRule | null>(null);
   const [isApplyingRule, setIsApplyingRule] = useState(false);
+  const [pendingImportDelete, setPendingImportDelete] = useState<string | null>(null);
+  const [isDeletingImport, setIsDeletingImport] = useState(false);
   const [importBankName, setImportBankName] = useState<BankName>("popular");
   const [importAccountId, setImportAccountId] = useState<string>("");
   const [busy, setBusy] = useState(false);
@@ -468,20 +470,24 @@ export const TreasuryPage = () => {
     }
   };
 
-  const removeImport = async (importId: string) => {
-    if (!window.confirm(t("finance.treasury.imports.confirmDelete"))) return;
+  const confirmRemoveImport = async () => {
+    if (!pendingImportDelete) return;
+    setIsDeletingImport(true);
     try {
       await mutations.deleteImport({
         commandId: newCommandId("treasury-del-import"),
         workspaceId: activeWorkspaceId,
         actorType: "user",
         sourceChannel: "desktop",
-        importId,
+        importId: pendingImportDelete,
       });
       toast.success(t("finance.treasury.imports.deleted"));
+      setPendingImportDelete(null);
       refreshAll();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("finance.treasury.imports.deleteFailed"));
+    } finally {
+      setIsDeletingImport(false);
     }
   };
 
@@ -1346,7 +1352,7 @@ export const TreasuryPage = () => {
                         </div>
                         <button
                           className="icon-ghost-control"
-                          onClick={() => removeImport(batch.id)}
+                          onClick={() => setPendingImportDelete(batch.id)}
                           title={t("finance.treasury.imports.delete")}
                           type="button"
                         >
@@ -1626,6 +1632,17 @@ export const TreasuryPage = () => {
       onConfirm={() => void applyPendingRule(true)}
       title={t("finance.treasury.classify.applySimilarTitle", { defaultValue: "Apply to similar movements" })}
     />
+    <ConfirmDialog
+      body={t("finance.treasury.imports.confirmDelete")}
+      cancelLabel={t("common.cancel", { defaultValue: "Cancel" })}
+      confirmLabel={t("finance.treasury.imports.delete", { defaultValue: "Delete" })}
+      tone="danger"
+      isOpen={Boolean(pendingImportDelete)}
+      isSubmitting={isDeletingImport}
+      onCancel={() => setPendingImportDelete(null)}
+      onConfirm={() => void confirmRemoveImport()}
+      title={t("finance.treasury.imports.confirmDeleteTitle", { defaultValue: "Delete import batch" })}
+    />
     </>
   );
 };
@@ -1867,7 +1884,10 @@ const ReviewRow = ({
   onApply: (row: ReviewQueueRow, deductible: number) => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) => {
-  const [deductible, setDeductible] = useState<number>(row.deductibleAmount ?? row.amount);
+  // The deductible can never exceed the expense itself (DGII can only accept up
+  // to the claimed amount) and is never negative — clamp on entry.
+  const clampDeductible = (value: number) => Math.min(Math.max(value, 0), row.amount);
+  const [deductible, setDeductible] = useState<number>(clampDeductible(row.deductibleAmount ?? row.amount));
   return (
     <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
       <div className="cell-stack" style={{ flex: 1, minWidth: 220 }}>
@@ -1880,7 +1900,9 @@ const ReviewRow = ({
         <span>{t("finance.treasury.review.deductible")}</span>
         <input
           className="field-input"
-          onChange={(event) => setDeductible(Number(event.target.value) || 0)}
+          max={row.amount}
+          min={0}
+          onChange={(event) => setDeductible(clampDeductible(Number(event.target.value) || 0))}
           type="number"
           value={deductible}
         />
