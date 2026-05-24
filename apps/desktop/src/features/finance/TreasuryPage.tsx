@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, Landmark, Plus, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, Landmark, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -248,6 +248,26 @@ export const TreasuryPage = () => {
       defaultValue: kindLabel(category as TransactionKind),
     });
   };
+  const kindToneClass = (kind: TransactionKind | null | undefined) => {
+    switch (kind) {
+      case "income":
+      case "interest":
+        return "is-positive";
+      case "expense":
+      case "salary":
+      case "tax":
+      case "tss":
+      case "bank_fee":
+      case "owner_draw":
+        return "is-negative";
+      case "transfer":
+      case "fx_exchange":
+      case "reimbursement":
+        return "is-neutral";
+      default:
+        return "is-muted";
+    }
+  };
 
   const refreshAll = () => {
     accounts.refresh();
@@ -260,13 +280,6 @@ export const TreasuryPage = () => {
   const openAccount = (accountId: string) => {
     setAccountFilter(accountId);
     setTab("movements");
-  };
-
-  const backToOverview = () => {
-    setTab("overview");
-    setAccountFilter("");
-    setSearch("");
-    setUnclassifiedOnly(false);
   };
 
   const beginEdit = (row: BankTransactionRow) => {
@@ -480,6 +493,13 @@ export const TreasuryPage = () => {
 
   const snap = overview.data;
   const moneyCurrency = snap?.reportCurrency && snap.reportCurrency !== "mixed" ? snap.reportCurrency : overviewCurrency;
+  const importTotals = useMemo(
+    () => ({
+      duplicates: imports.data.reduce((sum, batch) => sum + batch.duplicateCount, 0),
+      inserted: imports.data.reduce((sum, batch) => sum + batch.insertedCount, 0),
+    }),
+    [imports.data],
+  );
   const categoryChartData = useMemo(() => {
     if (!snap?.expenseByCategory.length) return [];
     const total = snap.expenseByCategory.reduce((sum, row) => sum + row.amount, 0) || 1;
@@ -538,8 +558,8 @@ export const TreasuryPage = () => {
               value={editDraft.rawDescription}
             />
           ) : (
-            <div className="cell-stack">
-              <span>{row.annotation?.concept || row.rawDescription || "—"}</span>
+            <div className="cell-stack treasury-description-cell">
+              <span className="treasury-description-primary">{row.annotation?.concept || row.rawDescription || "—"}</span>
               {row.annotation?.counterparty ? (
                 <small className="text-muted">{row.annotation.counterparty}</small>
               ) : null}
@@ -592,7 +612,7 @@ export const TreasuryPage = () => {
             <StatusBadge tone="neutral">{kindLabel(row.annotation?.txnKind) }</StatusBadge>
           ) : (
             <select
-              className="compact-filter-select"
+              className={`compact-filter-select treasury-kind-select ${kindToneClass(row.annotation?.txnKind)}`}
               onChange={(event) => classify(row, event.target.value as TransactionKind)}
               value={row.annotation?.txnKind ?? ""}
             >
@@ -918,41 +938,45 @@ export const TreasuryPage = () => {
 
       {tab === "movements" ? (
         <SurfaceCard className="treasury-detail-card">
-          <div className="treasury-detail-header">
-            <button className="ghost-control" onClick={backToOverview} type="button">
-              <ArrowLeft size={13} />
-              <span>{t("finance.treasury.actions.backToOverview")}</span>
-            </button>
-            <div className="cell-stack">
-              <strong>{selectedAccount?.accountLabel ?? t("finance.treasury.movements.title")}</strong>
-              <small className="text-muted">
-                {selectedAccount ? `${selectedAccount.currency} · ${t(`finance.treasury.banks.${selectedAccount.bankName}`, { defaultValue: selectedAccount.bankName })}` : t("finance.treasury.filters.allAccounts")}
-              </small>
+          <div className="treasury-movements-header">
+            <div className="treasury-movements-title-stack">
+              <span className="finance-period-active-pill">
+                {selectedAccount ? selectedAccount.accountLabel : t("finance.treasury.filters.allAccounts")}
+              </span>
+              <h3>{t("finance.treasury.movements.title")}</h3>
+              <div className="treasury-movements-meta">
+                <span>
+                  {selectedAccount
+                    ? `${selectedAccount.currency} · ${t(`finance.treasury.banks.${selectedAccount.bankName}`, { defaultValue: selectedAccount.bankName })}`
+                    : t("finance.treasury.filters.allAccounts")}
+                </span>
+                <span>{t("finance.treasury.accounts.movementCount", { count: transactions.data.length })}</span>
+                {unclassifiedOnly ? <span>{t("finance.treasury.filters.unclassified")}</span> : null}
+              </div>
             </div>
-          </div>
-
-          <div className="treasury-movement-actions">
-            <button
-              className="ghost-control treasury-add-movement-button"
-              disabled={accounts.data.length === 0}
-              onClick={() => setShowManualForm((value) => !value)}
-              type="button"
-            >
-              <Plus size={13} />
-              <span>{t("finance.treasury.actions.addRow")}</span>
-            </button>
-            <button
-              className="ghost-control treasury-import-button"
-              disabled={accounts.data.length === 0 || busy}
-              onClick={() => {
-                const account = accounts.data.find((a) => a.id === accountFilter) ?? accounts.data[0];
-                if (account) triggerImport(account.id, account.bankName);
-              }}
-              type="button"
-            >
-              <Download size={13} />
-              <span>{t("finance.treasury.actions.import")}</span>
-            </button>
+            <div className="treasury-movement-actions">
+              <button
+                className="ghost-control treasury-add-movement-button"
+                disabled={accounts.data.length === 0}
+                onClick={() => setShowManualForm((value) => !value)}
+                type="button"
+              >
+                <Plus size={13} />
+                <span>{t("finance.treasury.actions.addRow")}</span>
+              </button>
+              <button
+                className="ghost-control treasury-import-button"
+                disabled={accounts.data.length === 0 || busy}
+                onClick={() => {
+                  const account = accounts.data.find((a) => a.id === accountFilter) ?? accounts.data[0];
+                  if (account) triggerImport(account.id, account.bankName);
+                }}
+                type="button"
+              >
+                <Download size={13} />
+                <span>{t("finance.treasury.actions.import")}</span>
+              </button>
+            </div>
           </div>
 
           {showManualForm ? (
@@ -997,15 +1021,13 @@ export const TreasuryPage = () => {
                 onClick={() => setImportHistoryOpen((value) => !value)}
                 type="button"
               >
-                <div>
-                  <h4 className="section-subtitle">{t("finance.treasury.imports.title")}</h4>
-                  <small className="text-muted">
-                    {t("finance.treasury.imports.summary", {
-                      inserted: imports.data.reduce((sum, batch) => sum + batch.insertedCount, 0),
-                      duplicates: imports.data.reduce((sum, batch) => sum + batch.duplicateCount, 0),
-                    })}
-                  </small>
-                </div>
+                <span className="treasury-import-history-title">{t("finance.treasury.imports.title")}</span>
+                <small className="text-muted">
+                  {t("finance.treasury.imports.summary", {
+                    inserted: importTotals.inserted,
+                    duplicates: importTotals.duplicates,
+                  })}
+                </small>
                 <span className="treasury-import-history-toggle">
                   <ChevronDown size={14} />
                 </span>
@@ -1054,6 +1076,12 @@ export const TreasuryPage = () => {
 
           <div className="treasury-table-shell">
             <div className="treasury-table-toolbar">
+              <input
+                className="field-input treasury-table-search"
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t("finance.treasury.searchPlaceholder")}
+                value={search}
+              />
               <label className="compact-filter-field">
                 <span>{t("finance.treasury.filters.account")}</span>
                 <CompactSelect<string>
@@ -1094,12 +1122,6 @@ export const TreasuryPage = () => {
                 />
                 <span>{t("finance.treasury.filters.unclassified")}</span>
               </label>
-              <input
-                className="field-input treasury-table-search"
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={t("finance.treasury.searchPlaceholder")}
-                value={search}
-              />
             </div>
 
           {transactions.isLoading && transactions.data.length === 0 ? (

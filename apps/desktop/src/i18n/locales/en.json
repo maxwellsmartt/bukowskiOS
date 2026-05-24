@@ -1452,7 +1452,7 @@
         "movementCount_other": "{{count}} movements"
       },
       "movements": {
-        "title": "Movement detail",
+        "title": "Movements",
         "emptyTitle": "No movements",
         "emptyBody": "Import a bank statement (CSV from Banco Popular, XLSX from Santa Cruz) or add movements manually.",
         "edit": "Edit movement",

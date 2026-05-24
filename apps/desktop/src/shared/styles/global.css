@@ -16128,12 +16128,51 @@ input[type="number"] {
   padding-bottom: 12px;
 }
 
+.treasury-movements-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.treasury-movements-title-stack {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.treasury-movements-title-stack h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-lg, 18px);
+  line-height: 1.15;
+}
+
+.treasury-movements-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.treasury-movements-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 999px;
+  padding: 0 8px;
+  color: var(--text-secondary);
+  font-size: var(--font-2xs, 11px);
+  line-height: 1;
+}
+
 .treasury-movement-actions {
   align-items: center;
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  margin-bottom: 10px;
+  margin-left: auto;
 }
 
 .treasury-add-movement-button {
@@ -16170,7 +16209,7 @@ input[type="number"] {
   border-bottom: 1px solid rgba(255, 255, 255, 0.065);
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 10px;
   padding: 10px 12px;
 }
 
@@ -16179,9 +16218,8 @@ input[type="number"] {
 }
 
 .treasury-table-search {
-  flex: 1 1 280px;
-  margin-left: auto;
-  min-width: 240px;
+  flex: 999 1 360px;
+  min-width: min(360px, 100%);
 }
 
 .treasury-unclassified-toggle {
@@ -16336,27 +16374,30 @@ input[type="number"] {
 .treasury-import-history {
   border: 1px solid rgba(255, 255, 255, 0.065);
   border-radius: 8px;
-  margin: 12px 0 16px;
+  margin: 8px 0 12px;
   overflow: hidden;
 }
 
 .treasury-import-history-header {
   align-items: center;
   appearance: none;
-  background: rgba(255, 255, 255, 0.018);
+  background: rgba(255, 255, 255, 0.014);
   border: 0;
   color: inherit;
   cursor: pointer;
-  display: flex;
+  display: grid;
   font: inherit;
-  justify-content: space-between;
-  padding: 10px 12px;
+  gap: 10px;
+  grid-template-columns: auto 1fr 28px;
+  padding: 7px 10px;
   text-align: left;
   width: 100%;
 }
 
-.treasury-import-history-header .section-subtitle {
-  margin: 0 0 3px;
+.treasury-import-history-title {
+  color: var(--text-secondary);
+  font-size: var(--font-xs, 12px);
+  font-weight: var(--weight-semibold, 600);
 }
 
 .treasury-import-history-toggle {
@@ -16416,6 +16457,51 @@ input[type="number"] {
   font-variant-numeric: tabular-nums;
 }
 
+.treasury-description-cell {
+  gap: 2px;
+  min-width: 0;
+}
+
+.treasury-description-primary {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.treasury-kind-select {
+  min-width: 126px;
+  border-radius: 999px;
+  font-size: var(--font-xs, 12px);
+  font-weight: var(--weight-medium, 500);
+}
+
+.treasury-kind-select.is-positive {
+  border-color: rgba(97, 219, 149, 0.24);
+  background: rgba(57, 158, 103, 0.1);
+  color: rgba(166, 239, 196, 0.96);
+}
+
+.treasury-kind-select.is-negative {
+  border-color: rgba(245, 112, 112, 0.2);
+  background: rgba(245, 112, 112, 0.075);
+  color: rgba(255, 180, 180, 0.96);
+}
+
+.treasury-kind-select.is-neutral {
+  border-color: rgba(214, 179, 122, 0.24);
+  background: rgba(214, 179, 122, 0.09);
+  color: rgba(230, 204, 158, 0.96);
+}
+
+.treasury-kind-select.is-muted {
+  border-color: rgba(151, 164, 185, 0.2);
+  background: rgba(151, 164, 185, 0.07);
+  color: var(--text-secondary);
+}
+
 .treasury-table-amount.is-positive {
   color: rgba(55, 190, 105, 0.98);
 }
@@ -16458,7 +16544,8 @@ input[type="number"] {
 
 @media (max-width: 760px) {
   .treasury-hero-topline,
-  .treasury-detail-header {
+  .treasury-detail-header,
+  .treasury-movements-header {
     align-items: stretch;
     flex-direction: column;
   }

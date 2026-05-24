@@ -1454,7 +1454,7 @@
         "movementCount_other": "{{count}} movimientos"
       },
       "movements": {
-        "title": "Detalle de movimientos",
+        "title": "Movimientos",
         "emptyTitle": "Sin movimientos",
         "emptyBody": "Importa un estado de cuenta (CSV del Banco Popular, XLSX de Santa Cruz) o agrega movimientos manualmente.",
         "edit": "Editar movimiento",
