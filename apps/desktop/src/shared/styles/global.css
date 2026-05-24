@@ -10744,9 +10744,9 @@ select.field-input {
   display: grid;
   place-items: center;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.055), transparent 24%),
-    radial-gradient(circle at 50% 50%, rgba(246, 188, 188, 0.035), transparent 18%),
-    rgba(3, 5, 7, 0.84);
+    radial-gradient(ellipse 64% 46% at 50% 48%, rgba(246, 188, 188, 0.028) 0%, rgba(246, 188, 188, 0.012) 42%, transparent 78%),
+    radial-gradient(ellipse 78% 56% at 52% 52%, rgba(154, 183, 229, 0.022) 0%, rgba(154, 183, 229, 0.008) 48%, transparent 84%),
+    linear-gradient(145deg, rgba(5, 6, 7, 0.96) 0%, rgba(8, 10, 13, 0.94) 58%, rgba(5, 6, 7, 0.96) 100%);
   backdrop-filter: blur(var(--blur-lg)) saturate(1.1);
   -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.1);
   animation: auth-blocking-fade-in 220ms ease-out;
@@ -16013,8 +16013,12 @@ input[type="number"] {
   border-color: rgba(218, 118, 118, 0.24);
 }
 
+.treasury-kpi-net {
+  border-color: rgba(214, 179, 122, 0.3);
+}
+
 .treasury-kpi-deductible {
-  border-color: rgba(126, 183, 178, 0.24);
+  border-color: rgba(151, 164, 185, 0.2);
 }
 
 .treasury-kpi-neutral {
@@ -16029,8 +16033,12 @@ input[type="number"] {
   color: rgba(255, 159, 159, 0.95);
 }
 
+.treasury-kpi-net .treasury-money-value {
+  color: rgba(214, 179, 122, 0.98);
+}
+
 .treasury-kpi-deductible .treasury-money-value {
-  color: rgba(135, 211, 207, 0.96);
+  color: rgba(185, 195, 210, 0.92);
 }
 
 .treasury-money-value,

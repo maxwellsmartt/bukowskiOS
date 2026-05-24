@@ -83,9 +83,9 @@ const createStartupHtml = () => {
         height: 100%;
         margin: 0;
         background:
-          radial-gradient(circle at 50% 50%, rgba(255,255,255,0.055), transparent 24%),
-          radial-gradient(circle at 50% 50%, rgba(246,188,188,0.035), transparent 18%),
-          #050607;
+          radial-gradient(ellipse 64% 46% at 50% 48%, rgba(246,188,188,0.028) 0%, rgba(246,188,188,0.012) 42%, transparent 78%),
+          radial-gradient(ellipse 78% 56% at 52% 52%, rgba(154,183,229,0.022) 0%, rgba(154,183,229,0.008) 48%, transparent 84%),
+          linear-gradient(145deg, #050607 0%, #080a0d 58%, #050607 100%);
         color: #f4f7fb;
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
         overflow: hidden;

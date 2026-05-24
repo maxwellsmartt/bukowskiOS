@@ -740,7 +740,7 @@ export const TreasuryPage = () => {
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.expense")}</span>
                 <strong className="treasury-money-value">{formatMoney(snap?.totalExpense ?? 0, moneyCurrency)}</strong>
               </div>
-              <div className={`treasury-kpi-tile ${(snap?.net ?? 0) >= 0 ? "treasury-kpi-income" : "treasury-kpi-expense"}`}>
+              <div className="treasury-kpi-tile treasury-kpi-net">
                 <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.net")}</span>
                 <strong className="treasury-money-value">{formatMoney(snap?.net ?? 0, moneyCurrency)}</strong>
               </div>
