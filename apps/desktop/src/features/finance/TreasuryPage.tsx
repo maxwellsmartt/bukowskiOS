@@ -817,6 +817,15 @@ export const TreasuryPage = () => {
     }
     return Array.from(byCurrency.entries()).map(([currency, totals]) => ({ currency, ...totals }));
   }, [reviewQueue.data]);
+  // Each currency gets its own Y axis so small-magnitude USD lines stay readable
+  // next to large DOP balances (left axis = first currency, right = second).
+  const balanceCurrencies = useMemo(() => {
+    const list = Array.from(new Set((snap?.balanceTrendAccounts ?? []).map((account) => account.currency)));
+    return list.map((currency, index) => ({
+      currency,
+      orientation: (index === 0 ? "left" : "right") as "left" | "right",
+    }));
+  }, [snap?.balanceTrendAccounts]);
 
   const movementColumns = useMemo(
     () => [
@@ -1290,14 +1299,19 @@ export const TreasuryPage = () => {
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                     />
-                    <YAxis
-                      axisLine={false}
-                      stroke="rgba(255,255,255,0.44)"
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(value) => formatAxisCurrency(Number(value))}
-                      tickLine={false}
-                      width={70}
-                    />
+                    {balanceCurrencies.map((axis) => (
+                      <YAxis
+                        axisLine={false}
+                        key={axis.currency}
+                        orientation={axis.orientation}
+                        stroke="rgba(255,255,255,0.44)"
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(value) => formatAxisCurrency(Number(value), axis.currency)}
+                        tickLine={false}
+                        width={70}
+                        yAxisId={axis.currency}
+                      />
+                    ))}
                     <Tooltip content={<TreasuryBalanceTooltip accounts={snap.balanceTrendAccounts} />} />
                     {snap.balanceTrendAccounts.map((account, index) => (
                       <Line
@@ -1309,6 +1323,7 @@ export const TreasuryPage = () => {
                         stroke={chartPalette[index % chartPalette.length]}
                         strokeWidth={2.2}
                         type="monotone"
+                        yAxisId={account.currency}
                       />
                     ))}
                   </LineChart>
