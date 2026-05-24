@@ -277,6 +277,20 @@ describe("treasury mutation service", () => {
     });
     expect(result.affectedCount).toBe(2);
 
+    const outboxRows = database
+      .prepare(
+        `SELECT entity_type, COUNT(*) AS count
+         FROM sync_outbox
+         WHERE id LIKE 'sync-rule%'
+         GROUP BY entity_type
+         ORDER BY entity_type`,
+      )
+      .all() as Array<{ entity_type: string; count: number }>;
+    expect(outboxRows).toEqual([
+      { entity_type: "counterparty_rule", count: 1 },
+      { entity_type: "transaction_annotation", count: 2 },
+    ]);
+
     const txns = reads.listTransactions({ workspaceId });
     const supplierA = txns.filter((txn) => txn.rawDescription === "PAGO RECURRENTE SUPLIDOR A");
     const supplierB = txns.find((txn) => txn.rawDescription === "PAGO RECURRENTE SUPLIDOR B");

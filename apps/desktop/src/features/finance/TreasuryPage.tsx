@@ -288,6 +288,7 @@ export const TreasuryPage = () => {
   const [dateTo, setDateTo] = useState(monthEnd);
   const [search, setSearch] = useState("");
   const [unclassifiedOnly, setUnclassifiedOnly] = useState(false);
+  const [suggestedOnly, setSuggestedOnly] = useState(false);
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
   const [importHistoryOpen, setImportHistoryOpen] = useState(false);
@@ -358,10 +359,14 @@ export const TreasuryPage = () => {
     [t],
   );
   const formatMoney = formatTreasuryMoney;
+  const visibleMovements = useMemo(
+    () => (suggestedOnly ? transactions.data.filter((row) => inferTreasurySuggestion(row)) : transactions.data),
+    [suggestedOnly, transactions.data],
+  );
   const selectedMovements = useMemo(() => {
     const selectedIds = new Set(selectedMovementIds);
-    return transactions.data.filter((row) => selectedIds.has(row.id));
-  }, [selectedMovementIds, transactions.data]);
+    return visibleMovements.filter((row) => selectedIds.has(row.id));
+  }, [selectedMovementIds, visibleMovements]);
 
   const kindLabel = (kind: TransactionKind | null | undefined) =>
     kind ? t(`finance.treasury.kinds.${kind}`, { defaultValue: kind }) : "—";
@@ -417,11 +422,11 @@ export const TreasuryPage = () => {
   useEffect(() => {
     setSelectedMovementIds((current) => {
       if (!current.length) return current;
-      const visibleIds = new Set(transactions.data.map((row) => row.id));
+      const visibleIds = new Set(visibleMovements.map((row) => row.id));
       const next = current.filter((id) => visibleIds.has(id));
       return next.length === current.length ? current : next;
     });
-  }, [transactions.data]);
+  }, [visibleMovements]);
 
   const openAccount = (accountId: string) => {
     setAccountFilter(accountId);
@@ -1230,8 +1235,9 @@ export const TreasuryPage = () => {
                     ? `${selectedAccount.currency} · ${t(`finance.treasury.banks.${selectedAccount.bankName}`, { defaultValue: selectedAccount.bankName })}`
                     : t("finance.treasury.filters.allAccounts")}
                 </span>
-                <span>{t("finance.treasury.accounts.movementCount", { count: transactions.data.length })}</span>
+                <span>{t("finance.treasury.accounts.movementCount", { count: visibleMovements.length })}</span>
                 {unclassifiedOnly ? <span>{t("finance.treasury.filters.unclassified")}</span> : null}
+                {suggestedOnly ? <span>{t("finance.treasury.filters.suggested")}</span> : null}
               </div>
             </div>
             <div className="treasury-movement-actions">
@@ -1404,6 +1410,14 @@ export const TreasuryPage = () => {
                   />
                   <span>{t("finance.treasury.filters.unclassified")}</span>
                 </label>
+                <label className="compact-filter-field treasury-unclassified-toggle treasury-suggested-toggle">
+                  <input
+                    checked={suggestedOnly}
+                    onChange={(event) => setSuggestedOnly(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>{t("finance.treasury.filters.suggested")}</span>
+                </label>
               </div>
             </div>
 
@@ -1475,10 +1489,18 @@ export const TreasuryPage = () => {
 
           {transactions.isLoading && transactions.data.length === 0 ? (
             <TableSkeleton rows={6} />
-          ) : transactions.data.length === 0 ? (
+          ) : visibleMovements.length === 0 ? (
             <GuidedEmptyState
-              body={t("finance.treasury.movements.emptyBody")}
-              title={t("finance.treasury.movements.emptyTitle")}
+              body={
+                suggestedOnly
+                  ? t("finance.treasury.movements.noSuggestedBody")
+                  : t("finance.treasury.movements.emptyBody")
+              }
+              title={
+                suggestedOnly
+                  ? t("finance.treasury.movements.noSuggestedTitle")
+                  : t("finance.treasury.movements.emptyTitle")
+              }
             />
           ) : (
             <DataTable<BankTransactionRow>
@@ -1486,7 +1508,7 @@ export const TreasuryPage = () => {
               getRowId={(row) => row.id}
               onSelectedRowIdsChange={setSelectedMovementIds}
               persistKey="treasury-movements-v1"
-              rows={transactions.data}
+              rows={visibleMovements}
               selectable
               selectedRowIds={selectedMovementIds}
             />

@@ -1014,6 +1014,39 @@ const createRuntime = (): LocalDatabaseRuntime => {
         const rows = selectAll("SELECT * FROM counterparty_rules WHERE id = ?", row.entity_id);
         return rows.length ? [{ table: "counterparty_rules", onConflict: "id", rows }] : [];
       }
+      case "collaborator_fee": {
+        const rows = selectAll("SELECT * FROM collaborator_fees WHERE id = ?", row.entity_id).map((r) =>
+          nullNonUuid(r, ["created_by_user_id", "updated_by_user_id"]),
+        );
+        return rows.length ? [{ table: "collaborator_fees", onConflict: "id", rows }] : [];
+      }
+      case "collaborator_payment": {
+        const batches = selectAll("SELECT * FROM collaborator_payment_batches WHERE id = ?", row.entity_id).map((r) =>
+          nullNonUuid(r, ["recorded_by_user_id"]),
+        );
+        if (!batches.length) return [];
+        const allocations = selectAll(
+          "SELECT * FROM collaborator_fee_payments WHERE payment_batch_id = ?",
+          row.entity_id,
+        );
+        const feeRows = allocations.length
+          ? selectAll(
+              `SELECT collaborator_fees.*
+               FROM collaborator_fees
+               JOIN collaborator_fee_payments ON collaborator_fee_payments.fee_id = collaborator_fees.id
+               WHERE collaborator_fee_payments.payment_batch_id = ?`,
+              row.entity_id,
+            ).map((r) => nullNonUuid(r, ["created_by_user_id", "updated_by_user_id"]))
+          : [];
+        const upserts: SupabaseDomainUpsert[] = [
+          { table: "collaborator_payment_batches", onConflict: "id", rows: batches },
+        ];
+        if (feeRows.length) upserts.unshift({ table: "collaborator_fees", onConflict: "id", rows: feeRows });
+        if (allocations.length) {
+          upserts.push({ table: "collaborator_fee_payments", onConflict: "id", rows: allocations });
+        }
+        return upserts;
+      }
       default:
         return null;
     }

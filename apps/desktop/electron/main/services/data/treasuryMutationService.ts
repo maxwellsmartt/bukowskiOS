@@ -834,6 +834,22 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           `sync-rule-${input.commandId}`,
           now,
         );
+        for (const match of matches) {
+          enqueueOutbox(
+            db,
+            input.workspaceId,
+            "transaction_annotation",
+            match.id,
+            {
+              source: "counterparty_rule",
+              ruleId,
+              txnKind: input.txnKind ?? null,
+              expenseCategory: input.expenseCategory ?? null,
+            },
+            `sync-rule-annotation-${input.commandId}-${match.id}`,
+            now,
+          );
+        }
         recordReceipt(input, now, "success", null);
         db.exec("COMMIT");
         return {
