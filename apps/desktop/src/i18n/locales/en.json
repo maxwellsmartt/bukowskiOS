@@ -3919,6 +3919,38 @@
         "rma_cases": {
           "label": "RMAs",
           "detail": "Manufacturer repair cases and linked assets"
+        },
+        "bank_accounts": {
+          "label": "Bank accounts",
+          "detail": "Treasury accounts and balances"
+        },
+        "bank_transactions": {
+          "label": "Bank movements",
+          "detail": "Imported statement rows"
+        },
+        "transaction_annotations": {
+          "label": "Classifications",
+          "detail": "Concept, category and deductible review"
+        },
+        "invoices": {
+          "label": "Invoices",
+          "detail": "Issued invoices, items and payments"
+        },
+        "quotes": {
+          "label": "Quotes",
+          "detail": "Quotes and their line items"
+        },
+        "collaborator_fees": {
+          "label": "Crew fees",
+          "detail": "Collaborator fees and payments"
+        },
+        "financial_entries": {
+          "label": "Finance entries",
+          "detail": "General ledger entries"
+        },
+        "currency_settings": {
+          "label": "Currency settings",
+          "detail": "NCF series and exchange-rate config"
         }
       },
       "coverageRowsLatest": "{{count}} rows in latest pull",

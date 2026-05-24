@@ -86,6 +86,14 @@ const INBOUND_COVERAGE = [
   "packing_slips",
   "incidents",
   "rma_cases",
+  "bank_accounts",
+  "bank_transactions",
+  "transaction_annotations",
+  "invoices",
+  "quotes",
+  "collaborator_fees",
+  "financial_entries",
+  "currency_settings",
 ] as const;
 
 type InboundCoverageId = (typeof INBOUND_COVERAGE)[number];

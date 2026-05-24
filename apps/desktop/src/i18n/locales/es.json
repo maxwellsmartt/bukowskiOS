@@ -3923,6 +3923,38 @@
         "rma_cases": {
           "label": "RMAs",
           "detail": "Casos de reparación de fabricante y equipos vinculados"
+        },
+        "bank_accounts": {
+          "label": "Cuentas bancarias",
+          "detail": "Cuentas de tesorería y saldos"
+        },
+        "bank_transactions": {
+          "label": "Movimientos bancarios",
+          "detail": "Filas importadas de los estados"
+        },
+        "transaction_annotations": {
+          "label": "Clasificaciones",
+          "detail": "Concepto, categoría y revisión de deducible"
+        },
+        "invoices": {
+          "label": "Facturas",
+          "detail": "Facturas emitidas, ítems y pagos"
+        },
+        "quotes": {
+          "label": "Cotizaciones",
+          "detail": "Cotizaciones y sus ítems"
+        },
+        "collaborator_fees": {
+          "label": "Honorarios de crew",
+          "detail": "Honorarios de colaboradores y pagos"
+        },
+        "financial_entries": {
+          "label": "Asientos financieros",
+          "detail": "Entradas del libro general"
+        },
+        "currency_settings": {
+          "label": "Config. de moneda",
+          "detail": "Series NCF y configuración de tasas"
         }
       },
       "coverageRowsLatest": "{{count}} filas en la última bajada",
