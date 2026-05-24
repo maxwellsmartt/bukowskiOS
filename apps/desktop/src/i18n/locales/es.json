@@ -1479,6 +1479,8 @@
         "emptyBody": "Aquí aparecerán los reembolsos y gastos pendientes de validación DGII.",
         "deductible": "Deducible",
         "claimed": "Reclamado",
+        "rejected": "Rechazado",
+        "ratioHint": "{{pct}}% del monto reclamado es deducible",
         "apply": "Guardar",
         "acceptFull": "Aceptar todo",
         "reject": "Rechazar",

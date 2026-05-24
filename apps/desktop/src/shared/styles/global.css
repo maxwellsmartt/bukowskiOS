@@ -16085,15 +16085,101 @@ input[type="number"] {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.treasury-review-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.treasury-review-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.treasury-review-row.is-success::before {
+  background: #6cc28f;
+}
+
+.treasury-review-row.is-warning::before {
+  background: #d6b37a;
+}
+
+.treasury-review-row.is-critical::before {
+  background: #c88d7f;
+}
+
 .treasury-review-row-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
+}
+
+.treasury-review-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.treasury-review-row-title > strong {
+  font-size: 14px;
 }
 
 .treasury-review-raw {
   opacity: 0.7;
+}
+
+.treasury-review-ratio {
+  margin-top: 4px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.treasury-review-ratio-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.treasury-review-ratio-fill.is-success {
+  background: #6cc28f;
+}
+
+.treasury-review-ratio-fill.is-warning {
+  background: #d6b37a;
+}
+
+.treasury-review-ratio-fill.is-critical {
+  background: #c88d7f;
+}
+
+.treasury-review-ratio-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.treasury-review-ratio-legend strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.treasury-review-ratio-legend .is-deductible strong {
+  color: #8fd3ab;
+}
+
+.treasury-review-ratio-legend .is-rejected strong {
+  color: #e0a89a;
 }
 
 .treasury-review-row-controls {

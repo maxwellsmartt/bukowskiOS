@@ -1477,6 +1477,8 @@
         "emptyBody": "Reimbursements and expenses pending DGII validation will appear here.",
         "deductible": "Deductible",
         "claimed": "Claimed",
+        "rejected": "Rejected",
+        "ratioHint": "{{pct}}% of the claimed amount is deductible",
         "apply": "Save",
         "acceptFull": "Accept full",
         "reject": "Reject",

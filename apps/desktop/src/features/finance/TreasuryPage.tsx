@@ -2084,21 +2084,42 @@ const ReviewRow = ({
       : deductible > 0
         ? t("finance.treasury.review.statusPartial")
         : t("finance.treasury.review.statusRejected");
+  const deductiblePct = row.amount > 0 ? Math.round((deductible / row.amount) * 100) : 0;
+  const rejected = Math.max(Math.round((row.amount - deductible + Number.EPSILON) * 100) / 100, 0);
   return (
-    <div className="treasury-review-row">
+    <div className={`treasury-review-row is-${resultTone}`}>
       <div className="treasury-review-row-main">
-        <strong>{row.concept || row.rawDescription || "—"}</strong>
+        <div className="treasury-review-row-title">
+          <strong>{row.concept || row.rawDescription || "—"}</strong>
+          <StatusBadge tone={resultTone}>{resultLabel}</StatusBadge>
+        </div>
         <small className="text-muted">
           {row.txnDate} · {row.bankAccountLabel}
           {row.counterparty ? ` · ${row.counterparty}` : ""}
         </small>
         {hasConcept ? <small className="text-muted treasury-review-raw">{row.rawDescription}</small> : null}
+        <div
+          aria-hidden="true"
+          className="treasury-review-ratio"
+          title={t("finance.treasury.review.ratioHint", { pct: deductiblePct })}
+        >
+          <span className={`treasury-review-ratio-fill is-${resultTone}`} style={{ width: `${deductiblePct}%` }} />
+        </div>
+        <div className="treasury-review-ratio-legend">
+          <span>
+            {t("finance.treasury.review.claimed")} <strong>{formatTreasuryMoney(row.amount, row.currency)}</strong>
+          </span>
+          <span className="is-deductible">
+            {t("finance.treasury.review.deductible")} <strong>{formatTreasuryMoney(deductible, row.currency)}</strong> · {deductiblePct}%
+          </span>
+          {rejected > 0 ? (
+            <span className="is-rejected">
+              {t("finance.treasury.review.rejected")} <strong>{formatTreasuryMoney(rejected, row.currency)}</strong>
+            </span>
+          ) : null}
+        </div>
       </div>
       <div className="treasury-review-row-controls">
-        <span className="treasury-review-claimed">
-          <small>{t("finance.treasury.review.claimed")}</small>
-          <strong>{formatTreasuryMoney(row.amount, row.currency)}</strong>
-        </span>
         <label className="compact-filter-field treasury-review-deductible">
           <span>{t("finance.treasury.review.deductible")}</span>
           <input
@@ -2110,7 +2131,6 @@ const ReviewRow = ({
             value={deductible}
           />
         </label>
-        <StatusBadge tone={resultTone}>{resultLabel}</StatusBadge>
       </div>
       <div className="treasury-review-row-actions">
         <button
