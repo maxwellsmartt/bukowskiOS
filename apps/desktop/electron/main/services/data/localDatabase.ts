@@ -190,6 +190,9 @@ type LocalDatabaseRuntime = {
   applyRemoteCollaboratorPaymentRows: (
     input: import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand,
   ) => import("@contracts").AppApplyRemoteCollaboratorPaymentRowsResult;
+  applyRemoteFinanceBusinessRows: (
+    input: import("@contracts").AppApplyRemoteFinanceBusinessRowsCommand,
+  ) => import("@contracts").AppApplyRemoteFinanceBusinessRowsResult;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -968,6 +971,19 @@ const createRuntime = (): LocalDatabaseRuntime => {
     }
     return next as T;
   };
+  const parseJsonColumn = <T extends Record<string, unknown>>(row: T, columns: string[]): T => {
+    const next: Record<string, unknown> = { ...row };
+    for (const column of columns) {
+      const value = next[column];
+      if (typeof value !== "string") continue;
+      try {
+        next[column] = JSON.parse(value) as unknown;
+      } catch {
+        next[column] = value;
+      }
+    }
+    return next as T;
+  };
   const selectAll = (sql: string, ...params: Array<string | number>) =>
     database.prepare(sql).all(...params) as Array<Record<string, unknown>>;
 
@@ -1011,7 +1027,14 @@ const createRuntime = (): LocalDatabaseRuntime => {
           "SELECT * FROM transaction_project_allocations WHERE transaction_id = ?",
           row.entity_id,
         );
-        return [{ table: "transaction_project_allocations", onConflict: "id", rows }];
+        return [
+          {
+            table: "transaction_project_allocations",
+            onConflict: "id",
+            rows,
+            deleteBeforeInsert: { column: "transaction_id", value: row.entity_id },
+          },
+        ];
       }
       case "transaction_link": {
         const rows = selectAll("SELECT * FROM transaction_links WHERE transaction_id = ?", row.entity_id);
@@ -1053,6 +1076,81 @@ const createRuntime = (): LocalDatabaseRuntime => {
           upserts.push({ table: "collaborator_fee_payments", onConflict: "id", rows: allocations });
         }
         return upserts;
+      }
+      case "currency_settings": {
+        const rows = selectAll("SELECT * FROM currency_settings WHERE id = ?", row.entity_id).map((r) =>
+          parseJsonColumn(r, ["enabled_currencies_json"]),
+        );
+        return rows.length ? [{ table: "currency_settings", onConflict: "workspace_id", rows }] : [];
+      }
+      case "exchange_rate": {
+        const rows = selectAll("SELECT * FROM exchange_rates WHERE id = ?", row.entity_id).map((r) =>
+          nullNonUuid(r, ["created_by_user_id"]),
+        );
+        return rows.length ? [{ table: "exchange_rates", onConflict: "id", rows }] : [];
+      }
+      case "quote": {
+        const quotes = selectAll("SELECT * FROM quotes WHERE id = ?", row.entity_id).map((r) =>
+          parseJsonColumn(nullNonUuid(r, ["created_by_user_id", "updated_by_user_id"]), ["exchange_rate_snapshot_json"]),
+        );
+        if (!quotes.length) return [];
+        const items = selectAll("SELECT * FROM quote_items WHERE quote_id = ?", row.entity_id).map((r) =>
+          parseJsonColumn(r, ["metadata_json"]),
+        );
+        const versions = selectAll("SELECT * FROM quote_versions WHERE quote_id = ?", row.entity_id).map((r) =>
+          parseJsonColumn(nullNonUuid(r, ["created_by_user_id"]), ["snapshot_json"]),
+        );
+        const upserts: SupabaseDomainUpsert[] = [{ table: "quotes", onConflict: "id", rows: quotes }];
+        upserts.push({
+          table: "quote_items",
+          onConflict: "id",
+          rows: items,
+          deleteBeforeInsert: { column: "quote_id", value: row.entity_id },
+        });
+        if (versions.length) upserts.push({ table: "quote_versions", onConflict: "id", rows: versions });
+        return upserts;
+      }
+      case "invoice": {
+        const invoices = selectAll("SELECT * FROM invoices WHERE id = ?", row.entity_id).map((r) =>
+          parseJsonColumn(nullNonUuid(r, ["created_by_user_id", "updated_by_user_id"]), ["exchange_rate_snapshot_json"]),
+        );
+        if (!invoices.length) return [];
+        const items = selectAll("SELECT * FROM invoice_items WHERE invoice_id = ?", row.entity_id).map((r) =>
+          parseJsonColumn(r, ["metadata_json"]),
+        );
+        const upserts: SupabaseDomainUpsert[] = [{ table: "invoices", onConflict: "id", rows: invoices }];
+        upserts.push({
+          table: "invoice_items",
+          onConflict: "id",
+          rows: items,
+          deleteBeforeInsert: { column: "invoice_id", value: row.entity_id },
+        });
+        return upserts;
+      }
+      case "invoice_payment": {
+        const payments = selectAll("SELECT * FROM invoice_payments WHERE id = ?", row.entity_id).map((r) =>
+          nullNonUuid(r, ["recorded_by_user_id"]),
+        );
+        if (!payments.length) return [];
+        const invoiceId = payments[0]?.invoice_id;
+        const invoices =
+          typeof invoiceId === "string"
+            ? selectAll("SELECT * FROM invoices WHERE id = ?", invoiceId).map((r) =>
+                parseJsonColumn(nullNonUuid(r, ["created_by_user_id", "updated_by_user_id"]), [
+                  "exchange_rate_snapshot_json",
+                ]),
+              )
+            : [];
+        const upserts: SupabaseDomainUpsert[] = [];
+        if (invoices.length) upserts.push({ table: "invoices", onConflict: "id", rows: invoices });
+        upserts.push({ table: "invoice_payments", onConflict: "id", rows: payments });
+        return upserts;
+      }
+      case "financial_entry": {
+        const rows = selectAll("SELECT * FROM financial_entries WHERE id = ?", row.entity_id).map((r) =>
+          nullNonUuid(r, ["created_by_user_id"]),
+        );
+        return rows.length ? [{ table: "financial_entries", onConflict: "id", rows }] : [];
       }
       default:
         return null;
@@ -1478,6 +1576,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
       createFinancialDomainPullService(database).applyRemoteTreasuryRows(input.workspaceId, input.table, input.rows),
     applyRemoteCollaboratorPaymentRows: (input: import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand) =>
       createFinancialDomainPullService(database).applyRemoteCollaboratorPaymentRows(input.workspaceId, input.table, input.rows),
+    applyRemoteFinanceBusinessRows: (input: import("@contracts").AppApplyRemoteFinanceBusinessRowsCommand) =>
+      createFinancialDomainPullService(database).applyRemoteFinanceBusinessRows(input.workspaceId, input.table, input.rows),
     runtimeDiagnostics,
     supportDiagnostics,
     userAdmin,

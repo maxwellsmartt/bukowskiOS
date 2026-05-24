@@ -7,6 +7,7 @@ import { useAutoLogout } from "@shared/hooks/useAutoLogout";
 import { useAssetSnapshotPull } from "@shared/hooks/useAssetSnapshotPull";
 import { useCatalogPull } from "@shared/hooks/useCatalogPull";
 import { useCollaboratorPaymentPull } from "@shared/hooks/useCollaboratorPaymentPull";
+import { useFinanceBusinessPull } from "@shared/hooks/useFinanceBusinessPull";
 import { useOperationalSnapshotPull } from "@shared/hooks/useOperationalSnapshotPull";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useTreasuryPull } from "@shared/hooks/useTreasuryPull";
@@ -52,6 +53,7 @@ export const AppShell = () => {
   useOperationalSnapshotPull();
   useTreasuryPull();
   useCollaboratorPaymentPull();
+  useFinanceBusinessPull();
   const [workspaceTransitionActive, setWorkspaceTransitionActive] = useState(false);
   const prevWorkspaceIdRef = useRef(activeWorkspaceId);
 

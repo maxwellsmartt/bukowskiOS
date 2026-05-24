@@ -526,4 +526,53 @@ describe("sync outbox worker service", () => {
     ]);
     expect(JSON.parse(String(requests[1]?.init.body))).toMatchObject({ id: "txn-1", import_id: "import-1" });
   });
+
+  it("can replace child domain rows before inserting the current remote projection", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveDomainUpserts: (row) =>
+        row.entity_type === "quote"
+          ? [
+              {
+                table: "quotes",
+                onConflict: "id",
+                rows: [{ id: row.entity_id, workspace_id: row.workspace_id, quote_number: "2026-0001" }],
+              },
+              {
+                table: "quote_items",
+                onConflict: "id",
+                deleteBeforeInsert: { column: "quote_id", value: row.entity_id },
+                rows: [{ id: "quote-1-item-001-0", quote_id: row.entity_id, title: "Current item" }],
+              },
+            ]
+          : null,
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(null, { status: 201 });
+      }) as typeof fetch,
+    });
+
+    await transport({
+      id: "outbox-quote-1",
+      workspace_id: "11111111-1111-4111-8111-111111111111",
+      entity_type: "quote",
+      entity_id: "quote-1",
+      event_id: null,
+      operation_type: "upsert",
+      payload_json: JSON.stringify({ quoteId: "quote-1" }),
+      attempt_count: 0,
+      created_at: "2026-04-12T18:00:00.000Z",
+      updated_at: "2026-04-12T18:01:00.000Z",
+    });
+
+    expect(requests.map((request) => `${request.init.method ?? "POST"} ${request.url}`)).toEqual([
+      "POST https://bukowski.test/rest/v1/quotes?on_conflict=id",
+      "DELETE https://bukowski.test/rest/v1/quote_items?quote_id=eq.quote-1",
+      "POST https://bukowski.test/rest/v1/quote_items?on_conflict=id",
+      "POST https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
+    ]);
+  });
 });

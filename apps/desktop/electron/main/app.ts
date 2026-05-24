@@ -393,6 +393,7 @@ app.whenReady().then(() => {
     applyRemoteOperationalSnapshots: localDatabase.applyRemoteOperationalSnapshots,
     applyRemoteTreasuryRows: localDatabase.applyRemoteTreasuryRows,
     applyRemoteCollaboratorPaymentRows: localDatabase.applyRemoteCollaboratorPaymentRows,
+    applyRemoteFinanceBusinessRows: localDatabase.applyRemoteFinanceBusinessRows,
   });
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,

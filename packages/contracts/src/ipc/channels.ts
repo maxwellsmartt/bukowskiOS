@@ -30,6 +30,7 @@ export const ipcChannels = {
     applyRemoteOperationalSnapshots: "bukowskiApp:applyRemoteOperationalSnapshots",
     applyRemoteTreasuryRows: "bukowskiApp:applyRemoteTreasuryRows",
     applyRemoteCollaboratorPaymentRows: "bukowskiApp:applyRemoteCollaboratorPaymentRows",
+    applyRemoteFinanceBusinessRows: "bukowskiApp:applyRemoteFinanceBusinessRows",
   },
   auth: {
     getStoredTokens: "bukowskiAuth:getStoredTokens",

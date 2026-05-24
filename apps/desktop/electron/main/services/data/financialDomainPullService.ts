@@ -18,6 +18,16 @@ export type CollaboratorPaymentPullTable =
   | "collaborator_payment_batches"
   | "collaborator_fee_payments";
 
+export type FinanceBusinessPullTable =
+  | "currency_settings"
+  | "quotes"
+  | "quote_items"
+  | "quote_versions"
+  | "invoices"
+  | "invoice_items"
+  | "invoice_payments"
+  | "financial_entries";
+
 export type FinancialDomainPullResult<TTable extends string> = {
   workspaceId: string;
   table: TTable;
@@ -48,7 +58,21 @@ const collaboratorEntityMap: Record<
   collaborator_fee_payments: { entityType: "collaborator_payment", entityIdColumn: "payment_batch_id", conflictColumns: ["id"] },
 };
 
-const tableCursorColumn: Record<TreasuryPullTable | CollaboratorPaymentPullTable, string> = {
+const financeBusinessEntityMap: Record<
+  FinanceBusinessPullTable,
+  { entityType: string; entityIdColumn: string; conflictColumns: string[] }
+> = {
+  currency_settings: { entityType: "currency_settings", entityIdColumn: "workspace_id", conflictColumns: ["workspace_id"] },
+  quotes: { entityType: "quote", entityIdColumn: "id", conflictColumns: ["id"] },
+  quote_items: { entityType: "quote", entityIdColumn: "quote_id", conflictColumns: ["id"] },
+  quote_versions: { entityType: "quote", entityIdColumn: "quote_id", conflictColumns: ["id"] },
+  invoices: { entityType: "invoice", entityIdColumn: "id", conflictColumns: ["id"] },
+  invoice_items: { entityType: "invoice", entityIdColumn: "invoice_id", conflictColumns: ["id"] },
+  invoice_payments: { entityType: "invoice_payment", entityIdColumn: "id", conflictColumns: ["id"] },
+  financial_entries: { entityType: "financial_entry", entityIdColumn: "id", conflictColumns: ["id"] },
+};
+
+const tableCursorColumn: Record<TreasuryPullTable | CollaboratorPaymentPullTable | FinanceBusinessPullTable, string> = {
   bank_accounts: "updated_at",
   bank_statement_imports: "created_at",
   bank_transactions: "created_at",
@@ -59,6 +83,14 @@ const tableCursorColumn: Record<TreasuryPullTable | CollaboratorPaymentPullTable
   collaborator_fees: "updated_at",
   collaborator_payment_batches: "created_at",
   collaborator_fee_payments: "created_at",
+  currency_settings: "updated_at",
+  quotes: "updated_at",
+  quote_items: "updated_at",
+  quote_versions: "created_at",
+  invoices: "updated_at",
+  invoice_items: "updated_at",
+  invoice_payments: "created_at",
+  financial_entries: "updated_at",
 };
 
 const toSqlInputValue = (value: unknown): SQLInputValue => {
@@ -86,6 +118,14 @@ const rowExists = (db: DatabaseSync, table: string, id: unknown) => {
   return Boolean(row);
 };
 
+const rowExistsByColumn = (db: DatabaseSync, table: string, column: string, value: unknown) => {
+  if (value === null || value === undefined || value === "") return false;
+  const row = db.prepare(`SELECT 1 AS found FROM ${table} WHERE ${column} = ? LIMIT 1`).get(toSqlInputValue(value)) as
+    | { found: number }
+    | undefined;
+  return Boolean(row);
+};
+
 const hasPendingOutbox = (
   db: DatabaseSync,
   workspaceId: string,
@@ -108,17 +148,45 @@ const hasPendingOutbox = (
   return row.count > 0;
 };
 
+const hasPendingInvoicePaymentForInvoice = (db: DatabaseSync, workspaceId: string, invoiceId: unknown) => {
+  if (invoiceId === null || invoiceId === undefined || invoiceId === "") return false;
+  const row = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM sync_outbox
+        WHERE workspace_id = ?
+          AND entity_type = 'invoice_payment'
+          AND status IN ('pending', 'processing', 'failed')
+          AND payload_json LIKE ?
+      `,
+    )
+    .get(workspaceId, `%"invoiceId":"${String(invoiceId)}"%`) as { count: number };
+  return row.count > 0;
+};
+
+const resolveOutboxEntityId = (
+  table: TreasuryPullTable | CollaboratorPaymentPullTable | FinanceBusinessPullTable,
+  workspaceId: string,
+  row: Record<string, unknown>,
+  entityIdColumn: string,
+) => {
+  if (table === "currency_settings") return `currency-settings-${workspaceId}`;
+  return row[entityIdColumn];
+};
+
 const readLocalCursor = (
   db: DatabaseSync,
-  table: TreasuryPullTable | CollaboratorPaymentPullTable,
+  table: TreasuryPullTable | CollaboratorPaymentPullTable | FinanceBusinessPullTable,
   row: Record<string, unknown>,
+  conflictColumns: string[] = ["id"],
 ) => {
   const cursorColumn = tableCursorColumn[table];
-  const conflictId = table === "transaction_annotations" ? row.transaction_id : row.id;
+  const conflictColumn = table === "transaction_annotations" ? "transaction_id" : conflictColumns[0] ?? "id";
+  const conflictId = row[conflictColumn];
   if (!conflictId) return null;
-  const idColumn = table === "transaction_annotations" ? "transaction_id" : "id";
   const result = db
-    .prepare(`SELECT ${cursorColumn} AS cursor_value FROM ${table} WHERE ${idColumn} = ? LIMIT 1`)
+    .prepare(`SELECT ${cursorColumn} AS cursor_value FROM ${table} WHERE ${conflictColumn} = ? LIMIT 1`)
     .get(toSqlInputValue(conflictId)) as { cursor_value?: string | null } | undefined;
   return typeof result?.cursor_value === "string" ? result.cursor_value : null;
 };
@@ -160,6 +228,17 @@ const ensureCrewMember = (db: DatabaseSync, workspaceId: string, crewMemberId: u
       ) VALUES (?, ?, ?, NULL, NULL, NULL, 'Created locally during collaborator payment sync; full crew catalog should hydrate later.', 1, ?, ?)
     `,
   ).run(crewId, workspaceId, `Remote collaborator ${crewId.slice(-6) || crewId}`, updatedAt, updatedAt);
+};
+
+const ensureUser = (db: DatabaseSync, userId: unknown, updatedAt: string) => {
+  if (!userId || rowExists(db, "users", userId)) return;
+  const id = String(userId);
+  db.prepare(
+    `
+      INSERT OR IGNORE INTO users (id, full_name, email, phone, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, NULL, 1, ?, ?)
+    `,
+  ).run(id, `Remote user ${id.slice(-6) || id}`, `${id}@remote.bukowskios.local`, updatedAt, updatedAt);
 };
 
 const sanitizeTreasuryRow = (
@@ -209,6 +288,56 @@ const sanitizeCollaboratorRow = (
   return next;
 };
 
+const sanitizeFinanceBusinessRow = (
+  db: DatabaseSync,
+  table: FinanceBusinessPullTable,
+  workspaceId: string,
+  row: Record<string, unknown>,
+): Record<string, unknown> | null => {
+  const next = toRecord(row);
+  const updatedAt = String(next.updated_at ?? next.created_at ?? new Date().toISOString());
+
+  if (table === "currency_settings") {
+    next.id = `currency-settings-${workspaceId}`;
+  }
+
+  if (table === "quotes") {
+    if (next.project_id && !rowExists(db, "projects", next.project_id)) next.project_id = null;
+    if (next.created_by_user_id) ensureUser(db, next.created_by_user_id, updatedAt);
+    if (next.updated_by_user_id) ensureUser(db, next.updated_by_user_id, updatedAt);
+  }
+
+  if (table === "quote_items" && !rowExists(db, "quotes", next.quote_id)) return null;
+  if (table === "quote_versions") {
+    if (!rowExists(db, "quotes", next.quote_id)) return null;
+    if (next.created_by_user_id) ensureUser(db, next.created_by_user_id, updatedAt);
+  }
+
+  if (table === "invoices") {
+    if (next.source_quote_id && !rowExists(db, "quotes", next.source_quote_id)) next.source_quote_id = null;
+    if (next.project_id && !rowExists(db, "projects", next.project_id)) next.project_id = null;
+    if (next.created_by_user_id) ensureUser(db, next.created_by_user_id, updatedAt);
+    if (next.updated_by_user_id) ensureUser(db, next.updated_by_user_id, updatedAt);
+  }
+
+  if (table === "invoice_items" && !rowExists(db, "invoices", next.invoice_id)) return null;
+  if (table === "invoice_payments") {
+    if (!rowExists(db, "invoices", next.invoice_id)) return null;
+    if (next.recorded_by_user_id) ensureUser(db, next.recorded_by_user_id, updatedAt);
+  }
+
+  if (table === "financial_entries") {
+    if (next.project_id && !rowExists(db, "projects", next.project_id)) next.project_id = null;
+    if (next.project_unit_id && !rowExists(db, "project_units", next.project_unit_id)) next.project_unit_id = null;
+    if (next.asset_id && !rowExists(db, "assets", next.asset_id)) next.asset_id = null;
+    if (next.incident_id && !rowExists(db, "incidents", next.incident_id)) next.incident_id = null;
+    next.created_by_user_id = next.created_by_user_id || "user-ops";
+    ensureUser(db, next.created_by_user_id, updatedAt);
+  }
+
+  return next;
+};
+
 const updateCursor = (
   db: DatabaseSync,
   workspaceId: string,
@@ -230,7 +359,7 @@ const updateCursor = (
   ).run(workspaceId, entityType, cursorAfter, appliedCount, errorMessage);
 };
 
-const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTable>(
+const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTable | FinanceBusinessPullTable>(
   db: DatabaseSync,
   workspaceId: string,
   table: TTable,
@@ -256,12 +385,16 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
       const cursorValue = String(rawRow[tableCursorColumn[table]] ?? "");
       if (cursorValue && (!result.cursorAfter || cursorValue > result.cursorAfter)) result.cursorAfter = cursorValue;
 
-      if (hasPendingOutbox(db, workspaceId, config.entityType, rawRow[config.entityIdColumn])) {
+      const outboxEntityId = resolveOutboxEntityId(table, workspaceId, rawRow, config.entityIdColumn);
+      if (
+        hasPendingOutbox(db, workspaceId, config.entityType, outboxEntityId) ||
+        (table === "invoices" && hasPendingInvoicePaymentForInvoice(db, workspaceId, outboxEntityId))
+      ) {
         result.skippedDueToOutboxCount += 1;
         continue;
       }
 
-      const localCursor = readLocalCursor(db, table, rawRow);
+      const localCursor = readLocalCursor(db, table, rawRow, config.conflictColumns);
       if (localCursor && cursorValue && localCursor >= cursorValue) {
         result.skippedDueToOlderCount += 1;
         continue;
@@ -310,6 +443,15 @@ export const createFinancialDomainPullService = (db: DatabaseSync) => ({
   ): FinancialDomainPullResult<CollaboratorPaymentPullTable> {
     return applyRows(db, workspaceId, table, rows, collaboratorEntityMap[table], (row) =>
       sanitizeCollaboratorRow(db, table, workspaceId, row),
+    );
+  },
+  applyRemoteFinanceBusinessRows(
+    workspaceId: string,
+    table: FinanceBusinessPullTable,
+    rows: Array<Record<string, unknown>>,
+  ): FinancialDomainPullResult<FinanceBusinessPullTable> {
+    return applyRows(db, workspaceId, table, rows, financeBusinessEntityMap[table], (row) =>
+      sanitizeFinanceBusinessRow(db, table, workspaceId, row),
     );
   },
 });

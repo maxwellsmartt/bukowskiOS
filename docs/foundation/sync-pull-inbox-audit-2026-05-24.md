@@ -35,7 +35,8 @@ Estado actualizado 2026-05-24:
 
 - Implementado pull local para Treasury y honorarios/pagos a colaboradores en `AppShell`.
 - Se agregaron contratos IPC, apply local idempotente con guard de outbox y tests de hidratación limpia.
-- Siguen pendientes quotes/invoices/finance entries/currency settings y catálogos fundacionales completos.
+- Implementado pull local y materialización remota para quotes, invoices, invoice payments, finance entries y currency settings.
+- Siguen pendientes catálogos fundacionales completos y estrategia de deletes/tombstones para algunos dominios.
 
 Antes de este slice existían tres pulls locales en `AppShell`:
 
@@ -71,11 +72,11 @@ No existe un pull genérico de `public.sync_outbox`, y eso es correcto por ahora
 | Treasury annotations / classifications | `transaction_annotation`, `counterparty_rule` | `transaction_annotations`, `counterparty_rules` | `useTreasuryPull` | OK parcial |
 | Treasury allocations / links | `transaction_allocations`, `transaction_link` | `transaction_project_allocations`, `transaction_links` | `useTreasuryPull` | OK parcial |
 | Collaborator fees/payments | `collaborator_fee`, `collaborator_payment` | Tablas remotas añadidas 2026-05-24 | `useCollaboratorPaymentPull` | OK parcial |
-| Quotes | `quote` outbox | Tabla remota existe, pero resolver no materializa | No hay pull quotes | Crítico |
-| Invoices | `invoice`, `invoice_payment` outbox | Tabla remota existe, pero resolver no materializa | No hay pull invoices | Crítico |
-| Finance entries | `financial_entry` outbox | No vi tabla Supabase `financial_entries` | No hay pull finance entries | Crítico |
-| Currency settings | `currency_settings` outbox | Tabla remota existe, pero resolver no materializa | No hay pull settings completo | Crítico |
-| Exchange rates | `exchange_rate` outbox | Tabla remota existe, pero resolver no materializa deletes/updates desde outbox | `useCatalogPull` baja `exchange_rates` | Medio |
+| Quotes | `quote` outbox | `quotes`, `quote_items`, `quote_versions` | `useFinanceBusinessPull` | OK parcial |
+| Invoices | `invoice`, `invoice_payment` outbox | `invoices`, `invoice_items`, `invoice_payments` | `useFinanceBusinessPull` | OK parcial |
+| Finance entries | `financial_entry` outbox | `financial_entries` | `useFinanceBusinessPull` | OK parcial |
+| Currency settings | `currency_settings` outbox | `currency_settings` | `useFinanceBusinessPull` | OK parcial |
+| Exchange rates | `exchange_rate` outbox | `exchange_rates` | `useCatalogPull` baja `exchange_rates` | OK parcial |
 
 ## Hallazgos por Severidad
 
@@ -90,9 +91,8 @@ Impacto real:
 Evidencia:
 
 - Los únicos hooks de pull local son catalog/asset/operational.
-- Ya existen `useTreasuryPull` y `useCollaboratorPaymentPull`.
-- No hay `useQuotePull`, `useInvoicePull` ni `useFinancePull`.
-- `resolveSupabaseDomainUpserts` cubre Treasury y collaborator fees/payments, pero no quotes/invoices/finance entries/currency settings.
+- Ya existen `useTreasuryPull`, `useCollaboratorPaymentPull` y `useFinanceBusinessPull`.
+- `resolveSupabaseDomainUpserts` cubre Treasury, collaborator fees/payments, quotes, invoices, finance entries, currency settings y exchange rates.
 
 Fix rápido aplicado:
 
@@ -126,16 +126,15 @@ Impacto real:
 - Una cotización/factura puede quedar registrada en `public.sync_outbox` remoto como log, pero no aparecer en `public.quotes`, `public.quote_items`, `public.invoices`, `public.invoice_items` o `public.invoice_payments`.
 - Aunque existan migrations Supabase para quotes/invoices, la ruta de push actual no las alimenta.
 
-Fix rápido recomendado:
+Fix rápido aplicado:
 
-- Extender `resolveSupabaseDomainUpserts`:
+- Extendido `resolveSupabaseDomainUpserts`:
   - `quote` -> upsert `quotes`, replace/upsert `quote_items`, upsert `quote_versions`.
   - `invoice` -> upsert `invoices`, replace/upsert `invoice_items`.
   - `invoice_payment` -> upsert `invoice_payments` + invoice actualizado.
 
-Fix estructural:
+Estado pendiente:
 
-- Implementar `quotePullService` e `invoicePullService`.
 - Para deletes, no depender sólo de payload `{ deleted: true }` si no existe estrategia remota clara: usar soft-delete/status cuando sea posible.
 
 ### Crítico: finance entries no tiene tabla remota visible
@@ -145,11 +144,11 @@ Impacto real:
 - `financial_entry` escribe outbox local, pero no hay tabla `public.financial_entries` en migrations Supabase.
 - Cualquier entrada manual de finanzas queda local o, como mucho, como log en `public.sync_outbox`.
 
-Fix rápido recomendado:
+Fix rápido aplicado:
 
-- Crear migration Supabase para `financial_entries` que refleje SQLite.
-- Agregar resolver en `resolveSupabaseDomainUpserts`.
-- Agregar pull service o incluirlo en `financeDomainPullService`.
+- Creada migration Supabase para `financial_entries` que refleja SQLite y agrega RLS/GRANT.
+- Agregado resolver en `resolveSupabaseDomainUpserts`.
+- Agregado pull en `useFinanceBusinessPull`.
 
 ### Crítico: currency settings outbox no materializa `currency_settings`
 
@@ -158,10 +157,10 @@ Impacto real:
 - Configuración de moneda, ITBIS default, validez de cotizaciones, imágenes de firma/sello/logo y secuencia NCF pueden no sincronizarse por outbox.
 - Invoices dependen de NCF y `currency_settings`; si otra máquina no recibe esa configuración, puede emitir o leer mal.
 
-Fix rápido recomendado:
+Fix rápido aplicado:
 
-- Agregar `currency_settings` al resolver de domain upserts.
-- Crear pull de `currency_settings` con guard fuerte: si hay outbox local pendiente, no sobreescribir.
+- Agregado `currency_settings` al resolver de domain upserts.
+- Creado pull de `currency_settings` con guard de outbox pendiente.
 
 ### Crítico: no hay pull Treasury
 
@@ -234,7 +233,7 @@ Por qué primero:
 
 Prioridad: alta.
 
-Estado: pendiente crítico.
+Estado: implementado.
 
 Incluye:
 

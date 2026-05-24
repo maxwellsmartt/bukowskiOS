@@ -41,6 +41,10 @@ export type SupabaseDomainUpsert = {
   table: string; // e.g. "bank_accounts"
   onConflict: string; // e.g. "id" or "transaction_id"
   rows: Array<Record<string, unknown>>;
+  deleteBeforeInsert?: {
+    column: string;
+    value: string;
+  };
 };
 
 export type SupabaseOutboxTransportOptions = {
@@ -97,6 +101,32 @@ const upsertSupabaseRow = async ({
   if (!response.ok) {
     const detail = await readErrorBody(response);
     throw new Error(`Supabase outbox push failed (${response.status}): ${detail}`);
+  }
+};
+
+const deleteSupabaseRows = async ({
+  accessToken,
+  anonKey,
+  endpoint,
+  fetchImpl,
+}: {
+  accessToken: string;
+  anonKey: string;
+  endpoint: string;
+  fetchImpl: typeof fetch;
+}) => {
+  const response = await fetchImpl(endpoint, {
+    method: "DELETE",
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken}`,
+      Prefer: "return=minimal",
+    },
+  });
+
+  if (!response.ok) {
+    const detail = await readErrorBody(response);
+    throw new Error(`Supabase domain delete failed (${response.status}): ${detail}`);
   }
 };
 
@@ -181,6 +211,15 @@ export const createSupabaseOutboxTransport = ({
       const domainUpserts = await resolveDomainUpserts(row);
       if (domainUpserts) {
         for (const upsert of domainUpserts) {
+          if (upsert.deleteBeforeInsert) {
+            const { column, value } = upsert.deleteBeforeInsert;
+            await deleteSupabaseRows({
+              accessToken,
+              anonKey,
+              endpoint: `${normalizedUrl}/rest/v1/${upsert.table}?${encodeURIComponent(column)}=eq.${encodeURIComponent(value)}`,
+              fetchImpl,
+            });
+          }
           for (const record of upsert.rows) {
             await upsertSupabaseRow({
               accessToken,

@@ -307,7 +307,7 @@ export const createCatalogPullService = (db: DatabaseSync) => {
 
       for (const row of rows) {
         try {
-          if (hasOutboxPendingForEntity(db, workspaceId, "exchange_rates" as CatalogEntityType, row.id)) {
+          if (hasOutboxPendingForEntity(db, workspaceId, "exchange_rate" as CatalogEntityType, row.id)) {
             result.skippedDueToOutboxCount += 1;
             continue;
           }

@@ -51,8 +51,9 @@ Fix aplicado:
 Se auditó la cobertura completa de pull/hidratación para instalaciones limpias:
 
 - Documento: [`sync-pull-inbox-audit-2026-05-24.md`](./sync-pull-inbox-audit-2026-05-24.md)
-- Hallazgo principal: catalog/asset/operational snapshots sí tienen pull local, pero Treasury, collaborator fees/payments, quotes, invoices, finance entries y currency settings todavía no hidratan una instalación limpia de forma completa.
-- Recomendación: antes de seguir con hardening visual de Treasury, implementar un pull financiero mínimo viable para Treasury + collaborator fees/payments.
+- Hallazgo principal inicial: catalog/asset/operational snapshots sí tenían pull local, pero Finance/Treasury no hidrataba una instalación limpia de forma completa.
+- Fix aplicado: Treasury, collaborator fees/payments, quotes, invoices, invoice payments, finance entries y currency settings ya tienen materialización remota y pull local por dominio.
+- Pendiente: catálogos fundacionales completos y estrategia explícita de deletes/tombstones para dominios donde no convenga hard delete.
 
 ## Qué no debemos hacer todavía
 - no abrir sync real antes de estabilizar identidad de workspace

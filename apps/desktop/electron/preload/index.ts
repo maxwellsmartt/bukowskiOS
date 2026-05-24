@@ -25,6 +25,8 @@ import type {
   AppActionResult,
   AppApplyRemoteCollaboratorPaymentRowsCommand,
   AppApplyRemoteCollaboratorPaymentRowsResult,
+  AppApplyRemoteFinanceBusinessRowsCommand,
+  AppApplyRemoteFinanceBusinessRowsResult,
   AppApplyRemoteAssetSnapshotsCommand,
   AppApplyRemoteAssetSnapshotsResult,
   AppApplyRemoteCatalogRowsCommand,
@@ -224,6 +226,10 @@ const bukowskiApp = {
   applyRemoteCollaboratorPaymentRows: (input: AppApplyRemoteCollaboratorPaymentRowsCommand) =>
     ipcRenderer.invoke(ipcChannels.app.applyRemoteCollaboratorPaymentRows, input) as Promise<
       AppApplyRemoteCollaboratorPaymentRowsResult
+    >,
+  applyRemoteFinanceBusinessRows: (input: AppApplyRemoteFinanceBusinessRowsCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.applyRemoteFinanceBusinessRows, input) as Promise<
+      AppApplyRemoteFinanceBusinessRowsResult
     >,
 };
 

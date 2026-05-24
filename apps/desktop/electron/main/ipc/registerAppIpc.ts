@@ -59,6 +59,9 @@ type RegisterAppIpcOptions = {
   applyRemoteCollaboratorPaymentRows: (
     input: import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand,
   ) => import("@contracts").AppApplyRemoteCollaboratorPaymentRowsResult;
+  applyRemoteFinanceBusinessRows: (
+    input: import("@contracts").AppApplyRemoteFinanceBusinessRowsCommand,
+  ) => import("@contracts").AppApplyRemoteFinanceBusinessRowsResult;
 };
 
 const remoteRecordSchema = z.record(z.string(), z.unknown());
@@ -190,6 +193,21 @@ const applyRemoteCollaboratorPaymentRowsSchema = z.object({
   rows: z.array(remoteRecordSchema),
 });
 
+const applyRemoteFinanceBusinessRowsSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  table: z.enum([
+    "currency_settings",
+    "quotes",
+    "quote_items",
+    "quote_versions",
+    "invoices",
+    "invoice_items",
+    "invoice_payments",
+    "financial_entries",
+  ]),
+  rows: z.array(remoteRecordSchema),
+});
+
 const backfillOperationalSnapshotsSchema = z.object({
   workspaceId: z.string().trim().min(1),
 });
@@ -287,6 +305,7 @@ export const registerAppIpc = ({
   applyRemoteOperationalSnapshots,
   applyRemoteTreasuryRows,
   applyRemoteCollaboratorPaymentRows,
+  applyRemoteFinanceBusinessRows,
 }: RegisterAppIpcOptions) => {
   safeHandleReadWithSchema(ipcChannels.app.getInfo, emptyReadArgsSchema, () => ({
     appName: "bukowskiOS",
@@ -545,5 +564,12 @@ export const registerAppIpc = ({
     (_event, input) =>
       applyRemoteCollaboratorPaymentRows(input as import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand),
     "The app could not apply remote collaborator payment rows.",
+  );
+  safeHandle(
+    ipcChannels.app.applyRemoteFinanceBusinessRows,
+    applyRemoteFinanceBusinessRowsSchema,
+    (_event, input) =>
+      applyRemoteFinanceBusinessRows(input as import("@contracts").AppApplyRemoteFinanceBusinessRowsCommand),
+    "The app could not apply remote finance business rows.",
   );
 };

@@ -291,4 +291,264 @@ describe("financialDomainPullService", () => {
 
     cleanup();
   });
+
+  it("hydrates finance business rows for quotes, invoices, currency settings and finance entries", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-financial-pull-business");
+    const workspaceId = "workspace-metadata";
+    const service = createFinancialDomainPullService(database);
+
+    expect(
+      service.applyRemoteFinanceBusinessRows(workspaceId, "currency_settings", [
+        {
+          id: "remote-currency-settings",
+          workspace_id: workspaceId,
+          base_currency: "DOP",
+          default_quote_currency: "USD",
+          enabled_currencies_json: ["DOP", "USD"],
+          default_rate_source: "manual",
+          default_rate_type: "manual",
+          default_itbis_rate: 0.18,
+          default_quote_validity_days: 30,
+          sirecine_number: "SIR-REMOTE",
+          workspace_logo_url: null,
+          workspace_seal_url: null,
+          workspace_signature_url: null,
+          ncf_series_active: "B01",
+          ncf_sequence_next: 10,
+          ncf_sequence_max: 100,
+          ncf_expires_at: "2026-12-31",
+          created_at: "2026-05-22T10:00:00.000Z",
+          updated_at: "2026-05-22T10:00:00.000Z",
+        },
+      ]).appliedCount,
+    ).toBe(1);
+
+    expect(
+      service.applyRemoteFinanceBusinessRows(workspaceId, "quotes", [
+        {
+          id: "quote-remote-001",
+          workspace_id: workspaceId,
+          quote_number: "2026-0001",
+          quote_year: 2026,
+          quote_sequence: 1,
+          status: "approved",
+          quote_date: "2026-05-22",
+          validity_days: 30,
+          valid_until: "2026-06-21",
+          client_id: null,
+          client_name_snapshot: "Remote Client",
+          client_rnc_snapshot: null,
+          production_company_id: null,
+          production_company_name_snapshot: null,
+          production_pur_snapshot: null,
+          workspace_sirecine_snapshot: "SIR-REMOTE",
+          attention_name: null,
+          attention_phone: null,
+          project_id: null,
+          project_name_snapshot: null,
+          production_name: "Remote Production",
+          description: "Remote quote",
+          package_title: "Standard",
+          currency: "USD",
+          base_currency: "DOP",
+          exchange_rate: 58.5,
+          exchange_rate_source: "manual",
+          exchange_rate_type: "manual",
+          exchange_rate_effective_date: "2026-05-22",
+          exchange_rate_snapshot_json: { source: "remote" },
+          tax_profile: "standard_itbis",
+          itbis_rate: 0.18,
+          tax_added_to_total: 1,
+          tax_notes: null,
+          subtotal_amount: 1000,
+          discount_amount: 0,
+          discount_rate: null,
+          tax_amount: 180,
+          total_amount: 1180,
+          base_currency_total_amount: 69030,
+          observations: null,
+          created_by_user_id: null,
+          updated_by_user_id: null,
+          created_by_actor_type: "user",
+          source_channel: "desktop",
+          sent_at: null,
+          approved_at: "2026-05-22T11:00:00.000Z",
+          rejected_at: null,
+          expired_at: null,
+          cancelled_at: null,
+          created_at: "2026-05-22T10:10:00.000Z",
+          updated_at: "2026-05-22T11:00:00.000Z",
+        },
+      ]).appliedCount,
+    ).toBe(1);
+
+    expect(
+      service.applyRemoteFinanceBusinessRows(workspaceId, "quote_items", [
+        {
+          id: "quote-remote-001-item-001-0",
+          workspace_id: workspaceId,
+          quote_id: "quote-remote-001",
+          sort_order: 1,
+          quantity: 1,
+          title: "Camera package",
+          description: null,
+          duration_value: null,
+          duration_unit: null,
+          unit_price: 1000,
+          line_subtotal: 1000,
+          discount_rate: null,
+          discount_amount: 0,
+          tax_behavior: "follows_quote",
+          tax_rate: null,
+          tax_amount: 180,
+          line_total: 1180,
+          notes: null,
+          metadata_json: { remote: true },
+          created_at: "2026-05-22T10:10:01.000Z",
+          updated_at: "2026-05-22T10:10:01.000Z",
+        },
+      ]).appliedCount,
+    ).toBe(1);
+
+    expect(
+      service.applyRemoteFinanceBusinessRows(workspaceId, "invoices", [
+        {
+          id: "invoice-remote-001",
+          workspace_id: workspaceId,
+          source_quote_id: "quote-remote-001",
+          invoice_number: "2026-0001",
+          invoice_year: 2026,
+          invoice_sequence: 1,
+          ncf: "B0100000010",
+          ncf_series: "B01",
+          ncf_sequence: 10,
+          status: "partially_paid",
+          issue_date: "2026-05-23",
+          due_date: "2026-06-22",
+          payment_terms_days: 30,
+          client_id: null,
+          client_name_snapshot: "Remote Client",
+          client_rnc_snapshot: null,
+          production_company_id: null,
+          production_company_name_snapshot: null,
+          production_pur_snapshot: null,
+          workspace_sirecine_snapshot: "SIR-REMOTE",
+          attention_name: null,
+          attention_phone: null,
+          project_id: null,
+          project_name_snapshot: null,
+          production_name: "Remote Production",
+          description: "Remote invoice",
+          package_title: "Standard",
+          currency: "USD",
+          base_currency: "DOP",
+          exchange_rate: 58.5,
+          exchange_rate_source: "manual",
+          exchange_rate_type: "manual",
+          exchange_rate_effective_date: "2026-05-22",
+          exchange_rate_snapshot_json: { source: "remote" },
+          tax_profile: "standard_itbis",
+          itbis_rate: 0.18,
+          tax_added_to_total: 1,
+          tax_notes: null,
+          subtotal_amount: 1000,
+          discount_amount: 0,
+          discount_rate: null,
+          tax_amount: 180,
+          total_amount: 1180,
+          base_currency_total_amount: 69030,
+          paid_amount: 500,
+          outstanding_amount: 680,
+          observations: null,
+          created_by_user_id: null,
+          updated_by_user_id: null,
+          created_by_actor_type: "user",
+          source_channel: "desktop",
+          issued_at: "2026-05-23T10:00:00.000Z",
+          cancelled_at: null,
+          voided_at: null,
+          fully_paid_at: null,
+          created_at: "2026-05-23T09:00:00.000Z",
+          updated_at: "2026-05-23T10:00:00.000Z",
+        },
+      ]).appliedCount,
+    ).toBe(1);
+
+    expect(
+      service.applyRemoteFinanceBusinessRows(workspaceId, "invoice_payments", [
+        {
+          id: "invoice-payment-remote-001",
+          workspace_id: workspaceId,
+          invoice_id: "invoice-remote-001",
+          paid_at: "2026-05-24",
+          amount: 500,
+          currency: "USD",
+          exchange_rate: 58.5,
+          base_currency_amount: 29250,
+          payment_method: "bank_transfer",
+          reference: "PAY-REMOTE",
+          notes: null,
+          recorded_by_user_id: null,
+          created_at: "2026-05-24T09:00:00.000Z",
+        },
+      ]).appliedCount,
+    ).toBe(1);
+
+    expect(
+      service.applyRemoteFinanceBusinessRows(workspaceId, "financial_entries", [
+        {
+          id: "finance-remote-001",
+          workspace_id: workspaceId,
+          entry_type: "expense",
+          category: "Services",
+          amount: 500,
+          currency: "USD",
+          exchange_rate: 58.5,
+          base_currency_amount: 29250,
+          status: "Approved",
+          project_id: null,
+          project_unit_id: null,
+          asset_id: null,
+          incident_id: null,
+          created_by_user_id: null,
+          entry_date: "2026-05-24",
+          description: "Remote finance entry",
+          notes: null,
+          created_at: "2026-05-24T10:00:00.000Z",
+          updated_at: "2026-05-24T10:00:00.000Z",
+        },
+      ]).appliedCount,
+    ).toBe(1);
+
+    const settings = database
+      .prepare(`SELECT id, default_quote_currency, enabled_currencies_json FROM currency_settings WHERE workspace_id = ?`)
+      .get(workspaceId) as { id: string; default_quote_currency: string; enabled_currencies_json: string };
+    expect(settings.id).toBe(`currency-settings-${workspaceId}`);
+    expect(settings.default_quote_currency).toBe("USD");
+    expect(JSON.parse(settings.enabled_currencies_json)).toEqual(["DOP", "USD"]);
+
+    const quoteItem = database
+      .prepare(`SELECT metadata_json FROM quote_items WHERE id = ?`)
+      .get("quote-remote-001-item-001-0") as { metadata_json: string };
+    expect(JSON.parse(quoteItem.metadata_json)).toEqual({ remote: true });
+
+    const invoice = database
+      .prepare(`SELECT status, paid_amount, outstanding_amount FROM invoices WHERE id = ?`)
+      .get("invoice-remote-001") as { status: string; paid_amount: number; outstanding_amount: number };
+    expect(invoice.status).toBe("partially_paid");
+    expect(invoice.paid_amount).toBe(500);
+    expect(invoice.outstanding_amount).toBe(680);
+
+    const payment = database
+      .prepare(`SELECT reference FROM invoice_payments WHERE id = ?`)
+      .get("invoice-payment-remote-001") as { reference: string };
+    expect(payment.reference).toBe("PAY-REMOTE");
+
+    const entry = database
+      .prepare(`SELECT created_by_user_id FROM financial_entries WHERE id = ?`)
+      .get("finance-remote-001") as { created_by_user_id: string };
+    expect(entry.created_by_user_id).toBe("user-ops");
+
+    cleanup();
+  });
 });

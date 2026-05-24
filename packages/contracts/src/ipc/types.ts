@@ -264,6 +264,16 @@ export type CollaboratorPaymentPullTable =
   | "collaborator_payment_batches"
   | "collaborator_fee_payments";
 
+export type FinanceBusinessPullTable =
+  | "currency_settings"
+  | "quotes"
+  | "quote_items"
+  | "quote_versions"
+  | "invoices"
+  | "invoice_items"
+  | "invoice_payments"
+  | "financial_entries";
+
 export type AppApplyRemoteFinancialRowsResult<TTable extends string = string> = {
   workspaceId: string;
   table: TTable;
@@ -291,6 +301,15 @@ export type AppApplyRemoteCollaboratorPaymentRowsCommand = {
 
 export type AppApplyRemoteCollaboratorPaymentRowsResult =
   AppApplyRemoteFinancialRowsResult<CollaboratorPaymentPullTable>;
+
+export type AppApplyRemoteFinanceBusinessRowsCommand = {
+  workspaceId: string;
+  table: FinanceBusinessPullTable;
+  rows: Array<Record<string, unknown>>;
+};
+
+export type AppApplyRemoteFinanceBusinessRowsResult =
+  AppApplyRemoteFinancialRowsResult<FinanceBusinessPullTable>;
 
 export type AppRemoteExchangeRateRow = {
   id: string;

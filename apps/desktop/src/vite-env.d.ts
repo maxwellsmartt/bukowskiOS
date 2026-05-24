@@ -25,6 +25,8 @@ import type {
   AppActionResult,
   AppApplyRemoteCollaboratorPaymentRowsCommand,
   AppApplyRemoteCollaboratorPaymentRowsResult,
+  AppApplyRemoteFinanceBusinessRowsCommand,
+  AppApplyRemoteFinanceBusinessRowsResult,
   AppApplyRemoteAssetSnapshotsCommand,
   AppApplyRemoteAssetSnapshotsResult,
   AppApplyRemoteCatalogRowsCommand,
@@ -194,6 +196,9 @@ declare global {
       applyRemoteCollaboratorPaymentRows: (
         input: AppApplyRemoteCollaboratorPaymentRowsCommand,
       ) => Promise<AppApplyRemoteCollaboratorPaymentRowsResult>;
+      applyRemoteFinanceBusinessRows: (
+        input: AppApplyRemoteFinanceBusinessRowsCommand,
+      ) => Promise<AppApplyRemoteFinanceBusinessRowsResult>;
     };
     bukowskiAuth?: {
       getStoredTokens: () => Promise<{
