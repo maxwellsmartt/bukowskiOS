@@ -474,4 +474,56 @@ describe("sync outbox worker service", () => {
       payload_json: { kind: "asset_created" },
     });
   });
+
+  it("materializes financial-domain rows to their real tables before acknowledging", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveDomainUpserts: (row) =>
+        row.entity_type === "bank_statement_import"
+          ? [
+              {
+                table: "bank_statement_imports",
+                onConflict: "id",
+                rows: [{ id: row.entity_id, workspace_id: row.workspace_id, source_format: "csv" }],
+              },
+              {
+                table: "bank_transactions",
+                onConflict: "id",
+                rows: [
+                  { id: "txn-1", import_id: row.entity_id, amount: 100, direction: "credit" },
+                  { id: "txn-2", import_id: row.entity_id, amount: 50, direction: "debit" },
+                ],
+              },
+            ]
+          : null,
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(null, { status: 201 });
+      }) as typeof fetch,
+    });
+
+    await transport({
+      id: "outbox-import-1",
+      workspace_id: "11111111-1111-4111-8111-111111111111",
+      entity_type: "bank_statement_import",
+      entity_id: "import-1",
+      event_id: null,
+      operation_type: "upsert",
+      payload_json: JSON.stringify({ sourceFormat: "csv" }),
+      attempt_count: 0,
+      created_at: "2026-04-12T18:00:00.000Z",
+      updated_at: "2026-04-12T18:01:00.000Z",
+    });
+
+    expect(requests.map((request) => request.url)).toEqual([
+      "https://bukowski.test/rest/v1/bank_statement_imports?on_conflict=id",
+      "https://bukowski.test/rest/v1/bank_transactions?on_conflict=id",
+      "https://bukowski.test/rest/v1/bank_transactions?on_conflict=id",
+      "https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
+    ]);
+    expect(JSON.parse(String(requests[1]?.init.body))).toMatchObject({ id: "txn-1", import_id: "import-1" });
+  });
 });

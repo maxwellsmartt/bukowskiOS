@@ -25,11 +25,18 @@ const expandHome = (p) => (p.startsWith("~") ? path.join(os.homedir(), p.slice(1
 
 const inputDir = expandHome(process.argv[2] || path.join(os.homedir(), "Downloads", "finance docs"));
 const outDir = expandHome(process.argv[3] || inputDir);
+// The bank's CSV export covers from this date onward, so the backfill must
+// stop just before it — the reconstructed PDF descriptions differ from the
+// CSV's, so dedupe_hash would NOT catch the overlap and rows would double up.
+// Emit only movements strictly BEFORE this ISO date. Override as argv[4].
+const backfillBeforeIso = process.argv[4] || "2026-02-21";
 
 if (!fs.existsSync(inputDir)) {
   console.error(`Input directory not found: ${inputDir}`);
   process.exit(1);
 }
+
+fs.mkdirSync(outDir, { recursive: true });
 
 // A money token like $45,966.70 or $45,966.70-  (trailing minus = debit).
 const MONEY = /\$[\d,]+\.\d{2}-?/g;
@@ -46,59 +53,82 @@ const isHeaderNoise = (line) =>
     line,
   );
 
+// pdftotext -layout groups each movement into a block separated by blank
+// lines. Inside a block exactly one line is the "anchor" (starts with a date
+// and ends with two money tokens: amount + running balance); the wrapped
+// description appears on lines BEFORE and/or AFTER the anchor. We parse per
+// block so the full description is captured regardless of where it wraps.
+const parseBlock = (blockLines) => {
+  const anchorIndex = blockLines.findIndex((line) => {
+    const monies = line.match(MONEY);
+    return DATE.test(line) && monies && monies.length >= 2;
+  });
+  if (anchorIndex < 0) return null;
+
+  const anchor = blockLines[anchorIndex];
+  const dateMatch = DATE.exec(anchor);
+  const monies = anchor.match(MONEY);
+  const { value: amount, negative } = parseMoney(monies[monies.length - 2]);
+  const { value: balance } = parseMoney(monies[monies.length - 1]);
+
+  // Reference = first longish digit run after the (two leading) dates.
+  const afterDates = anchor.replace(/^\s*\d{2}\/\d{2}\/\d{4}\s+\d{2}\/\d{2}\/\d{4}/, "");
+  const refMatch = afterDates.match(/\b(\d{3,})\b/);
+  const reference = refMatch ? refMatch[1] : "";
+
+  // Leftover description text sitting on the anchor line itself.
+  let onLine = afterDates;
+  const moneyIdx = onLine.search(MONEY);
+  if (moneyIdx >= 0) onLine = onLine.slice(0, moneyIdx);
+  if (reference) onLine = onLine.replace(reference, " ");
+  onLine = onLine.replace(/\s{2,}/g, " ").trim();
+
+  // Description fragments are every other (non-noise) line in the block.
+  const fragments = blockLines
+    .filter((_, index) => index !== anchorIndex)
+    .map((line) => line.trim())
+    .filter((line) => line && !isHeaderNoise(line));
+
+  const description = [...fragments.slice(0, fragments.length), onLine]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return {
+    txnDate: dateMatch[1],
+    reference,
+    serial: reference,
+    amount,
+    direction: negative ? "debit" : "credit",
+    balance,
+    description,
+  };
+};
+
 const parsePdf = (file) => {
   const text = execFileSync("pdftotext", ["-layout", file, "-"], { encoding: "utf8" });
   const lines = text.split(/\r?\n/);
   const rows = [];
-  let pendingAbove = [];
+  let block = [];
+
+  const flush = () => {
+    if (block.length) {
+      const parsed = parseBlock(block);
+      if (parsed) rows.push(parsed);
+    }
+    block = [];
+  };
 
   for (const rawLine of lines) {
     const line = rawLine.replace(/\s+$/, "");
     if (!line.trim()) {
-      pendingAbove = [];
+      flush();
       continue;
     }
-    const dateMatch = DATE.exec(line);
-    const monies = line.match(MONEY);
-    const isAnchor = dateMatch && monies && monies.length >= 2;
-
-    if (!isAnchor) {
-      // Continuation / description fragment. Skip repeated header rows.
-      if (!isHeaderNoise(line)) pendingAbove.push(line.trim());
-      continue;
-    }
-
-    const txnDate = dateMatch[1];
-    const balanceToken = monies[monies.length - 1];
-    const amountToken = monies[monies.length - 2];
-    const { value: amount, negative } = parseMoney(amountToken);
-    const { value: balance } = parseMoney(balanceToken);
-
-    // Reference = first longish digit run after the (two) dates.
-    const afterDates = line.replace(DATE, "").replace(/^\s*\d{2}\/\d{2}\/\d{4}\b/, "");
-    const refMatch = afterDates.match(/\b(\d{3,})\b/);
-    const reference = refMatch ? refMatch[1] : "";
-
-    // On-anchor description text = strip dates, the ref, and the trailing money.
-    let onLine = afterDates;
-    const moneyIdx = onLine.search(MONEY);
-    if (moneyIdx >= 0) onLine = onLine.slice(0, moneyIdx);
-    if (reference) onLine = onLine.replace(reference, " ");
-    onLine = onLine.replace(/\s{2,}/g, " ").trim();
-
-    const description = [...pendingAbove, onLine].filter(Boolean).join(" ").replace(/\s{2,}/g, " ").trim();
-    pendingAbove = [];
-
-    rows.push({
-      txnDate,
-      reference,
-      serial: reference,
-      amount,
-      direction: negative ? "debit" : "credit",
-      balance,
-      description,
-    });
+    block.push(line);
   }
+  flush();
   return rows;
 };
 
@@ -155,7 +185,9 @@ for (const name of pdfs) {
   console.log(`  ${rows.length} movements`);
 }
 
-for (const [currency, rows] of Object.entries(groups)) {
+for (const [currency, allRows] of Object.entries(groups)) {
+  // Drop anything the bank CSV already covers to avoid duplicate imports.
+  const rows = allRows.filter((r) => toIsoSort(r.txnDate) < backfillBeforeIso);
   if (rows.length === 0) continue;
   rows.sort((a, b) => toIsoSort(a.txnDate).localeCompare(toIsoSort(b.txnDate)));
   const accountHint = currency === "USD" ? "000000000000819426362" : "000000000000788565075";

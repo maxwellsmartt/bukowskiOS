@@ -125,6 +125,10 @@ export const parseBancoPopularCsv = (text: string): ParsedStatement => {
       const dateRaw = get("fecha");
       const amountRaw = get("monto");
       if (!dateRaw || !amountRaw) continue;
+      // Skip repeated header / footer rows (some BPD exports repeat the column
+      // header mid-file): only keep records whose date field is an actual date.
+      const isRealDate = /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(dateRaw) || /^\d{4}-\d{2}-\d{2}/.test(dateRaw);
+      if (!isRealDate) continue;
 
       const isCredit = /^(cr|cré|cre)/i.test(shortDesc);
       const amount = Math.abs(parseNumber(amountRaw));

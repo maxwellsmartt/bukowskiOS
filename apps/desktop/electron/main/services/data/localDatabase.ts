@@ -15,7 +15,7 @@ import {
   type EnsureLocalWorkspaceInput,
 } from "@contracts";
 import { foundationMigrations } from "@db";
-import { createSupabaseOutboxTransport } from "@sync";
+import { createSupabaseOutboxTransport, type SupabaseDomainUpsert } from "@sync";
 
 import { createAssistantGatewayService } from "../ai/assistantGatewayService";
 import { createAssistantMemoryService } from "../ai/assistantMemoryService";
@@ -945,6 +945,80 @@ const createRuntime = (): LocalDatabaseRuntime => {
     };
   };
 
+  // Materialize a financial-domain outbox row into its real Supabase table(s).
+  // The local SQLite schema mirrors the Supabase tables 1:1 (including INTEGER
+  // 0/1 flags — Supabase stores these as integer, NOT boolean, so we send the
+  // raw value). The only fix-ups: user-id columns are uuid on Supabase but can
+  // hold non-uuid seed values locally (e.g. "user-ops"), so we null those when
+  // they are not valid uuids. Returns null for entity types this resolver does
+  // not own (assets / operational handled elsewhere).
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const nullNonUuid = <T extends Record<string, unknown>>(row: T, columns: string[]): T => {
+    const next: Record<string, unknown> = { ...row };
+    for (const column of columns) {
+      const value = next[column];
+      if (typeof value === "string" && !UUID_RE.test(value)) next[column] = null;
+    }
+    return next as T;
+  };
+  const selectAll = (sql: string, ...params: Array<string | number>) =>
+    database.prepare(sql).all(...params) as Array<Record<string, unknown>>;
+
+  const resolveSupabaseDomainUpserts = (
+    row: { entity_type: string; entity_id: string },
+  ): SupabaseDomainUpsert[] | null => {
+    switch (row.entity_type) {
+      case "bank_account": {
+        const rows = selectAll("SELECT * FROM bank_accounts WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "bank_accounts", onConflict: "id", rows }] : [];
+      }
+      case "bank_statement_import": {
+        // The import path enqueues ONE outbox row per batch (not per txn), so
+        // pushing an import also pushes every transaction it inserted.
+        const imports = selectAll("SELECT * FROM bank_statement_imports WHERE id = ?", row.entity_id).map(
+          (r) => nullNonUuid(r, ["imported_by_user_id"]),
+        );
+        if (!imports.length) return []; // deleted locally — nothing to materialize
+        const txns = selectAll("SELECT * FROM bank_transactions WHERE import_id = ?", row.entity_id);
+        const upserts: SupabaseDomainUpsert[] = [
+          { table: "bank_statement_imports", onConflict: "id", rows: imports },
+        ];
+        if (txns.length) upserts.push({ table: "bank_transactions", onConflict: "id", rows: txns });
+        return upserts;
+      }
+      case "bank_transaction": {
+        const rows = selectAll("SELECT * FROM bank_transactions WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "bank_transactions", onConflict: "id", rows }] : [];
+      }
+      case "transaction_annotation": {
+        const rows = selectAll(
+          "SELECT * FROM transaction_annotations WHERE transaction_id = ?",
+          row.entity_id,
+        ).map((r) => nullNonUuid(r, ["reviewed_by_user_id", "classified_by_user_id"]));
+        return rows.length
+          ? [{ table: "transaction_annotations", onConflict: "transaction_id", rows }]
+          : [];
+      }
+      case "transaction_allocations": {
+        const rows = selectAll(
+          "SELECT * FROM transaction_project_allocations WHERE transaction_id = ?",
+          row.entity_id,
+        );
+        return [{ table: "transaction_project_allocations", onConflict: "id", rows }];
+      }
+      case "transaction_link": {
+        const rows = selectAll("SELECT * FROM transaction_links WHERE transaction_id = ?", row.entity_id);
+        return [{ table: "transaction_links", onConflict: "id", rows }];
+      }
+      case "counterparty_rule": {
+        const rows = selectAll("SELECT * FROM counterparty_rules WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "counterparty_rules", onConflict: "id", rows }] : [];
+      }
+      default:
+        return null;
+    }
+  };
+
   const supabaseTokenStore = createSupabaseTokenStore();
   const operationalSnapshots = createOperationalSnapshotService(database);
   const workspaceAccess = createWorkspaceAccessGuard({
@@ -961,6 +1035,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
           getAccessToken: async () => (await supabaseTokenStore.getTokens()).accessToken,
           resolveAssetSnapshot: resolveSupabaseAssetSnapshot,
           resolveOperationalSnapshot: (row) => operationalSnapshots.resolveSnapshot(row),
+          resolveDomainUpserts: resolveSupabaseDomainUpserts,
         })
       : undefined,
   });

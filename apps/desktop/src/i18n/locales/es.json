@@ -1388,7 +1388,12 @@
       },
       "overview": {
         "title": "Pulso de caja",
-        "window": "Ventana"
+        "window": "Ventana",
+        "flowTitle": "Ingresos vs gastos",
+        "flowEmpty": "Clasifica movimientos para ver el flujo mensual de ingresos y gastos.",
+        "netLabel": "Neto",
+        "categoryTitle": "Gasto por categoría",
+        "categoryEmpty": "Clasifica gastos para ver el desglose por categoría."
       },
       "period": {
         "month": "Mes",

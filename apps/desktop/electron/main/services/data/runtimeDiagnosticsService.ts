@@ -31,6 +31,24 @@ const buildFingerprint = (input: RecordRuntimeErrorInput) =>
     normalizeText(input.message).slice(0, 160),
   ].join(":");
 
+// Transient stdio/socket write failures (a closed terminal pipe in dev, a
+// killed parent) used to be captured and then re-thrown by the logger, which
+// re-entered the global error handlers and flooded the DB with millions of
+// rows. We never persist these — they carry no diagnostic value.
+const isTransientStreamNoise = (input: RecordRuntimeErrorInput) => {
+  const haystack = `${input.errorName} ${input.message}`.toUpperCase();
+  return (
+    haystack.includes("EPIPE") ||
+    haystack.includes("EIO") ||
+    haystack.includes("ECONNRESET")
+  );
+};
+
+// Per-fingerprint throttle: at most one persisted row per window. Bursts are
+// collapsed into a single row whose context records how many were suppressed.
+const THROTTLE_WINDOW_MS = 10_000;
+const throttleState = new Map<string, { windowStartMs: number; suppressed: number }>();
+
 type RuntimeSupportEventSummary = {
   id: string;
   occurredAt: string;
@@ -163,9 +181,42 @@ export const createRuntimeDiagnosticsService = (db: DatabaseSync) => ({
   },
 
   recordRuntimeError(input: RecordRuntimeErrorInput) {
+    const fingerprint = buildFingerprint(input);
+
+    // Never let diagnostics capture become the thing that crashes (or floods)
+    // the app. Any failure below is swallowed so a broken logger/pipe cannot
+    // re-enter the global error handlers.
+    try {
+      if (isTransientStreamNoise(input)) {
+        return { id: null, fingerprint, createdAt: new Date().toISOString(), suppressed: true };
+      }
+
+      const nowMs = Date.now();
+      const state = throttleState.get(fingerprint);
+      if (state && nowMs - state.windowStartMs < THROTTLE_WINDOW_MS) {
+        state.suppressed += 1;
+        return { id: null, fingerprint, createdAt: new Date().toISOString(), suppressed: true };
+      }
+      const suppressedSincePrevious = state?.suppressed ?? 0;
+      throttleState.set(fingerprint, { windowStartMs: nowMs, suppressed: 0 });
+
+      return this.persistRuntimeError(input, fingerprint, suppressedSincePrevious);
+    } catch {
+      return { id: null, fingerprint, createdAt: new Date().toISOString(), suppressed: true };
+    }
+  },
+
+  persistRuntimeError(
+    input: RecordRuntimeErrorInput,
+    fingerprint: string,
+    suppressedSincePrevious: number,
+  ) {
     const id = `runtime-error-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const createdAt = new Date().toISOString();
-    const fingerprint = buildFingerprint(input);
+    const context = {
+      ...(input.context ?? {}),
+      ...(suppressedSincePrevious > 0 ? { suppressedSincePrevious } : {}),
+    };
 
     db.prepare(
       `
@@ -194,7 +245,7 @@ export const createRuntimeDiagnosticsService = (db: DatabaseSync) => ({
       input.message,
       input.stack ?? null,
       fingerprint,
-      input.context ? JSON.stringify(input.context) : null,
+      Object.keys(context).length ? JSON.stringify(context) : null,
       input.threadId ?? null,
       createdAt,
     );

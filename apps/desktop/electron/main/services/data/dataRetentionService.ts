@@ -12,19 +12,28 @@ export type DataRetentionSummary = {
   archivedMemoryEntries: number;
   deletedSentOutboxRows: number;
   deletedRuntimeErrorRows: number;
+  deletedAgentActivityRows: number;
   deletedChatThreads: number;
   deletedAttachmentFiles: number;
   deletedMemoryEvents: number;
+  vacuumed: boolean;
 };
 
 type DataRetentionArgs = {
   chatSoftDeleteDays?: number;
   sentOutboxDays?: number;
   runtimeErrorDays?: number;
+  runtimeErrorMaxRows?: number;
+  agentActivityDays?: number;
+  agentActivityMaxRows?: number;
   memoryLowConfidenceDays?: number;
   memoryMinConfidence?: number;
   memoryEventsDays?: number;
 };
+
+// Once a single pass removes more than this many rows, reclaim the freed pages
+// with VACUUM — deletes alone leave the file size untouched in SQLite.
+const VACUUM_THRESHOLD_ROWS = 50_000;
 
 const subtractDays = (value: string, days: number) => {
   const date = new Date(value);
@@ -39,7 +48,9 @@ export const summarizeDataRetention = (summary: DataRetentionSummary) => {
     summary.deletedChatThreads ? `${summary.deletedChatThreads} deleted threads purged` : null,
     summary.deletedAttachmentFiles ? `${summary.deletedAttachmentFiles} attachment files cleaned` : null,
     summary.deletedRuntimeErrorRows ? `${summary.deletedRuntimeErrorRows} runtime errors trimmed` : null,
+    summary.deletedAgentActivityRows ? `${summary.deletedAgentActivityRows} activity events trimmed` : null,
     summary.deletedMemoryEvents ? `${summary.deletedMemoryEvents} memory events trimmed` : null,
+    summary.vacuumed ? "database compacted" : null,
   ].filter((value): value is string => Boolean(value));
 
   return parts.length ? parts.join(" · ") : "Nothing to purge in this pass.";
@@ -54,6 +65,9 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
       const chatCutoff = subtractDays(now, Math.max(30, args?.chatSoftDeleteDays ?? 90));
       const sentOutboxCutoff = subtractDays(now, Math.max(7, args?.sentOutboxDays ?? 30));
       const runtimeErrorCutoff = subtractDays(now, Math.max(14, args?.runtimeErrorDays ?? 90));
+      const runtimeErrorMaxRows = Math.max(1000, args?.runtimeErrorMaxRows ?? 5000);
+      const agentActivityCutoff = subtractDays(now, Math.max(14, args?.agentActivityDays ?? 90));
+      const agentActivityMaxRows = Math.max(2000, args?.agentActivityMaxRows ?? 20000);
       const memoryCutoff = subtractDays(now, Math.max(7, args?.memoryLowConfidenceDays ?? 30));
       const memoryEventCutoff = subtractDays(now, Math.max(14, args?.memoryEventsDays ?? 120));
       const memoryMinConfidence = args?.memoryMinConfidence ?? 0.5;
@@ -112,7 +126,7 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
         .run(DEFAULT_WORKSPACE_ID, sentOutboxCutoff).changes,
       );
 
-      const deletedRuntimeErrorRows = Number(
+      const deletedRuntimeErrorByAge = Number(
         db
         .prepare(
           `
@@ -123,6 +137,56 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
         )
         .run(DEFAULT_WORKSPACE_ID, runtimeErrorCutoff).changes,
       );
+
+      // Hard cap: even within the retention window a runaway error burst can
+      // bloat the file, so keep only the newest N rows per workspace.
+      const deletedRuntimeErrorByCap = Number(
+        db
+        .prepare(
+          `
+            DELETE FROM runtime_error_events
+            WHERE workspace_id = ?
+              AND id NOT IN (
+                SELECT id FROM runtime_error_events
+                WHERE workspace_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+              )
+          `,
+        )
+        .run(DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_ID, runtimeErrorMaxRows).changes,
+      );
+      const deletedRuntimeErrorRows = deletedRuntimeErrorByAge + deletedRuntimeErrorByCap;
+
+      const deletedAgentActivityByAge = Number(
+        db
+        .prepare(
+          `
+            DELETE FROM agent_activity_events
+            WHERE workspace_id = ?
+              AND created_at < ?
+          `,
+        )
+        .run(DEFAULT_WORKSPACE_ID, agentActivityCutoff).changes,
+      );
+
+      const deletedAgentActivityByCap = Number(
+        db
+        .prepare(
+          `
+            DELETE FROM agent_activity_events
+            WHERE workspace_id = ?
+              AND id NOT IN (
+                SELECT id FROM agent_activity_events
+                WHERE workspace_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+              )
+          `,
+        )
+        .run(DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_ID, agentActivityMaxRows).changes,
+      );
+      const deletedAgentActivityRows = deletedAgentActivityByAge + deletedAgentActivityByCap;
 
       const deletedMemoryEvents = Number(
         db
@@ -149,13 +213,31 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
         .run(DEFAULT_WORKSPACE_ID, chatCutoff).changes,
       );
 
+      const totalDeleted =
+        deletedSentOutboxRows +
+        deletedRuntimeErrorRows +
+        deletedAgentActivityRows +
+        deletedMemoryEvents +
+        deletedChatThreads;
+      let vacuumed = false;
+      if (totalDeleted >= VACUUM_THRESHOLD_ROWS) {
+        try {
+          db.exec("VACUUM;");
+          vacuumed = true;
+        } catch {
+          // VACUUM is best-effort space reclamation; never fail the pass on it.
+        }
+      }
+
       return {
         archivedMemoryEntries,
         deletedSentOutboxRows,
         deletedRuntimeErrorRows,
+        deletedAgentActivityRows,
         deletedChatThreads,
         deletedAttachmentFiles,
         deletedMemoryEvents,
+        vacuumed,
       };
     },
   };

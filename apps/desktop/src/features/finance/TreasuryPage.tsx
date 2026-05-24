@@ -2,6 +2,20 @@ import { ArrowLeft, ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3,
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import type {
   BankAccountRow,
@@ -104,6 +118,39 @@ const transactionDraftFromRow = (row: BankTransactionRow): TransactionDraft => (
   direction: row.direction,
   runningBalance: row.runningBalance == null ? "" : String(row.runningBalance),
 });
+
+const chartPalette = ["#d6b37a", "#7eb7b2", "#92a7c1", "#c88d7f", "#a29cd8", "#8ca772"];
+const formatAxisCurrency = (value: number) => {
+  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
+  return `$${Math.round(value)}`;
+};
+
+const TreasuryChartTooltip = ({
+  active,
+  label,
+  payload,
+}: {
+  active?: boolean;
+  label?: string;
+  payload?: Array<{ color?: string; name?: string; value?: number | string }>;
+}) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="finance-chart-tooltip">
+      {label ? <strong>{label}</strong> : null}
+      {payload.map((entry, index) => (
+        <div className="finance-chart-tooltip-row" key={`${entry.name}-${index}`}>
+          <span className="finance-chart-tooltip-dot" style={{ background: entry.color ?? "rgba(255,255,255,0.6)" }} />
+          <span>
+            {entry.name ? `${entry.name}: ` : ""}
+            {typeof entry.value === "number" ? formatTreasuryMoney(entry.value) : String(entry.value ?? "—")}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export const TreasuryPage = () => {
   const { t } = useTranslation();
@@ -654,6 +701,91 @@ export const TreasuryPage = () => {
               </div>
             </div>
           </SurfaceCard>
+
+          <div className="treasury-charts-grid">
+            <SurfaceCard className="treasury-chart-card">
+              <h3 className="section-subtitle">{t("finance.treasury.overview.flowTitle")}</h3>
+              {snap && snap.monthly.length > 0 ? (
+                <div className="finance-chart-shell">
+                  <ResponsiveContainer height={260} width="100%">
+                    <BarChart data={snap.monthly} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis axisLine={false} dataKey="month" stroke="rgba(255,255,255,0.48)" tickLine={false} />
+                      <YAxis
+                        axisLine={false}
+                        stroke="rgba(255,255,255,0.44)"
+                        tickFormatter={formatAxisCurrency}
+                        tickLine={false}
+                        width={58}
+                      />
+                      <Tooltip content={<TreasuryChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                      <Bar dataKey="income" fill="#7eb7b2" name={t("finance.treasury.kpi.income")} radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="expense" fill="#c88d7f" name={t("finance.treasury.kpi.expense")} radius={[8, 8, 0, 0]} />
+                      <Line
+                        dataKey="net"
+                        dot={{ r: 3, fill: "#d6b37a" }}
+                        name={t("finance.treasury.overview.netLabel")}
+                        stroke="#d6b37a"
+                        strokeWidth={2.4}
+                        type="monotone"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <GuidedEmptyState
+                  body={t("finance.treasury.overview.flowEmpty")}
+                  title={t("finance.treasury.overview.flowTitle")}
+                />
+              )}
+            </SurfaceCard>
+
+            <SurfaceCard className="treasury-chart-card">
+              <h3 className="section-subtitle">{t("finance.treasury.overview.categoryTitle")}</h3>
+              {snap && snap.expenseByCategory.length > 0 ? (
+                <div className="finance-chart-shell finance-chart-shell-pie">
+                  <ResponsiveContainer height={260} width="100%">
+                    <PieChart>
+                      <Pie
+                        data={snap.expenseByCategory}
+                        dataKey="amount"
+                        innerRadius={56}
+                        nameKey="category"
+                        outerRadius={90}
+                        paddingAngle={2}
+                      >
+                        {snap.expenseByCategory.map((row, index) => (
+                          <Cell fill={chartPalette[index % chartPalette.length] ?? "#d6b37a"} key={row.category} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<TreasuryChartTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="finance-pie-legend">
+                    {snap.expenseByCategory.map((row, index) => (
+                      <div className="finance-pie-legend-row" key={row.category}>
+                        <span
+                          className="finance-pie-legend-swatch"
+                          style={{ background: chartPalette[index % chartPalette.length] ?? "#d6b37a" }}
+                        />
+                        <span className="finance-pie-legend-label">
+                          {kindLabel(row.category as TransactionKind)}
+                        </span>
+                        <span className="finance-pie-legend-meta">
+                          {formatMoney(row.amount)} · {row.percentage}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <GuidedEmptyState
+                  body={t("finance.treasury.overview.categoryEmpty")}
+                  title={t("finance.treasury.overview.categoryTitle")}
+                />
+              )}
+            </SurfaceCard>
+          </div>
 
           <SurfaceCard className="treasury-accounts-card">
             <h3 className="section-subtitle">{t("finance.treasury.accounts.title")}</h3>

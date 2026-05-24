@@ -1386,7 +1386,12 @@
       },
       "overview": {
         "title": "Cash pulse",
-        "window": "Window"
+        "window": "Window",
+        "flowTitle": "Income vs expense",
+        "flowEmpty": "Classify movements to see the monthly income and expense flow.",
+        "netLabel": "Net",
+        "categoryTitle": "Expense by category",
+        "categoryEmpty": "Classify expenses to see how spend breaks down by category."
       },
       "period": {
         "month": "Month",

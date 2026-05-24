@@ -216,7 +216,13 @@ const attachWindowRuntimeTelemetry = (
 const attachProcessRuntimeTelemetry = (
   runtimeDiagnostics: ReturnType<typeof initializeLocalDatabase>["runtimeDiagnostics"],
 ) => {
-  process.on("uncaughtException", (error) => {
+  const isTransientPipeError = (error: NodeJS.ErrnoException) =>
+    error.code === "EPIPE" || error.code === "EIO" || error.code === "ECONNRESET";
+
+  process.on("uncaughtException", (error: NodeJS.ErrnoException) => {
+    if (isTransientPipeError(error)) {
+      return;
+    }
     logger.error("Main process uncaught exception.", error);
     runtimeDiagnostics.recordRuntimeError({
       sourceKind: "main",
@@ -230,6 +236,9 @@ const attachProcessRuntimeTelemetry = (
 
   process.on("unhandledRejection", (reason) => {
     const error = reason instanceof Error ? reason : new Error(String(reason));
+    if (isTransientPipeError(error as NodeJS.ErrnoException)) {
+      return;
+    }
     logger.error("Main process unhandled rejection.", error);
     runtimeDiagnostics.recordRuntimeError({
       sourceKind: "main",
@@ -241,6 +250,22 @@ const attachProcessRuntimeTelemetry = (
     });
   });
 };
+
+// Writing to a closed stdout/stderr pipe (terminal closed in dev, parent
+// process killed) emits EPIPE/EIO. Without a listener Node re-throws it as an
+// uncaughtException, which our error handler logs — writing to the same dead
+// pipe — re-throwing again in an unbounded loop. Swallowing these at the
+// source breaks that spiral. (Real diagnostics still go to the log file.)
+const swallowStreamPipeErrors = (stream: NodeJS.WriteStream) => {
+  stream.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EPIPE" || error.code === "EIO" || error.code === "ECONNRESET") {
+      return;
+    }
+    throw error;
+  });
+};
+swallowStreamPipeErrors(process.stdout);
+swallowStreamPipeErrors(process.stderr);
 
 app.setName("bukowskiOS");
 app.setPath("userData", path.join(app.getPath("appData"), "@bukowski/desktop"));

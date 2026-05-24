@@ -34,6 +34,15 @@ export type SupabaseOperationalSnapshotRecord = {
   deleted_at?: string | null;
 };
 
+// A direct upsert of one or more rows into a real Supabase table. Used for
+// domain entities (treasury, invoices, …) whose tables mirror the local
+// SQLite schema 1:1, so the resolver can hand back ready-to-POST records.
+export type SupabaseDomainUpsert = {
+  table: string; // e.g. "bank_accounts"
+  onConflict: string; // e.g. "id" or "transaction_id"
+  rows: Array<Record<string, unknown>>;
+};
+
 export type SupabaseOutboxTransportOptions = {
   supabaseUrl: string;
   anonKey: string;
@@ -42,6 +51,11 @@ export type SupabaseOutboxTransportOptions = {
   resolveOperationalSnapshot?: (
     row: SupabaseOutboxTransportRow,
   ) => Promise<SupabaseOperationalSnapshotRecord | null> | SupabaseOperationalSnapshotRecord | null;
+  // Materializes a financial-domain outbox row into its real Supabase table(s).
+  // Returns null for entity types it doesn't handle (so other resolvers run).
+  resolveDomainUpserts?: (
+    row: SupabaseOutboxTransportRow,
+  ) => Promise<SupabaseDomainUpsert[] | null> | SupabaseDomainUpsert[] | null;
   fetchImpl?: typeof fetch;
 };
 
@@ -92,6 +106,7 @@ export const createSupabaseOutboxTransport = ({
   getAccessToken,
   resolveAssetSnapshot,
   resolveOperationalSnapshot,
+  resolveDomainUpserts,
   fetchImpl = fetch,
 }: SupabaseOutboxTransportOptions) => {
   const normalizedUrl = normalizeUrl(supabaseUrl);
@@ -160,6 +175,23 @@ export const createSupabaseOutboxTransport = ({
         payload: snapshot,
         fetchImpl,
       });
+    }
+
+    if (resolveDomainUpserts) {
+      const domainUpserts = await resolveDomainUpserts(row);
+      if (domainUpserts) {
+        for (const upsert of domainUpserts) {
+          for (const record of upsert.rows) {
+            await upsertSupabaseRow({
+              accessToken,
+              anonKey,
+              endpoint: `${normalizedUrl}/rest/v1/${upsert.table}?on_conflict=${upsert.onConflict}`,
+              payload: record,
+              fetchImpl,
+            });
+          }
+        }
+      }
     }
 
     await upsertSupabaseRow({

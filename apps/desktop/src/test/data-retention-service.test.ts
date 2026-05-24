@@ -127,4 +127,34 @@ describe("data retention service", () => {
 
     cleanup();
   });
+
+  it("purges stale agent activity events while keeping recent ones", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-retention-activity");
+
+    const insertActivity = database.prepare(
+      `
+        INSERT INTO agent_activity_events (
+          id, workspace_id, agent_id, run_id, kind, title, body, tone, source, details_json, created_at
+        ) VALUES (?, ?, NULL, NULL, 'runtime_error_captured', 'storm', 'storm', 'critical', 'system', NULL, ?)
+      `,
+    );
+    insertActivity.run("activity-old", DEFAULT_WORKSPACE_ID, "2025-01-01T00:00:00.000Z");
+    insertActivity.run("activity-recent", DEFAULT_WORKSPACE_ID, "2026-04-11T00:00:00.000Z");
+
+    const retention = createDataRetentionService(database, { now: () => "2026-04-12T12:00:00.000Z" });
+    const summary = retention.run();
+
+    const oldActivity = database
+      .prepare("SELECT id FROM agent_activity_events WHERE id = 'activity-old'")
+      .get() as { id: string } | undefined;
+    const recentActivity = database
+      .prepare("SELECT id FROM agent_activity_events WHERE id = 'activity-recent'")
+      .get() as { id: string } | undefined;
+
+    expect(summary.deletedAgentActivityRows).toBe(1);
+    expect(oldActivity).toBeUndefined();
+    expect(recentActivity?.id).toBe("activity-recent");
+
+    cleanup();
+  });
 });

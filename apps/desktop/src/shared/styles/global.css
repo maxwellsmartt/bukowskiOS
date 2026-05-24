@@ -15831,6 +15831,16 @@ input[type="number"] {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+.treasury-charts-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.treasury-chart-card .section-subtitle {
+  margin-bottom: 4px;
+}
+
 .treasury-kpi-tile,
 .treasury-account-tile {
   appearance: none;
