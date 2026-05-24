@@ -250,6 +250,48 @@ export type AppApplyRemoteOperationalSnapshotsResult = {
   cursorAfter: string | null;
 };
 
+export type TreasuryPullTable =
+  | "bank_accounts"
+  | "bank_statement_imports"
+  | "bank_transactions"
+  | "transaction_annotations"
+  | "transaction_project_allocations"
+  | "transaction_links"
+  | "counterparty_rules";
+
+export type CollaboratorPaymentPullTable =
+  | "collaborator_fees"
+  | "collaborator_payment_batches"
+  | "collaborator_fee_payments";
+
+export type AppApplyRemoteFinancialRowsResult<TTable extends string = string> = {
+  workspaceId: string;
+  table: TTable;
+  appliedCount: number;
+  skippedDueToOutboxCount: number;
+  skippedDueToOlderCount: number;
+  skippedDueToDependencyCount: number;
+  errors: string[];
+  cursorAfter: string | null;
+};
+
+export type AppApplyRemoteTreasuryRowsCommand = {
+  workspaceId: string;
+  table: TreasuryPullTable;
+  rows: Array<Record<string, unknown>>;
+};
+
+export type AppApplyRemoteTreasuryRowsResult = AppApplyRemoteFinancialRowsResult<TreasuryPullTable>;
+
+export type AppApplyRemoteCollaboratorPaymentRowsCommand = {
+  workspaceId: string;
+  table: CollaboratorPaymentPullTable;
+  rows: Array<Record<string, unknown>>;
+};
+
+export type AppApplyRemoteCollaboratorPaymentRowsResult =
+  AppApplyRemoteFinancialRowsResult<CollaboratorPaymentPullTable>;
+
 export type AppRemoteExchangeRateRow = {
   id: string;
   workspace_id: string;

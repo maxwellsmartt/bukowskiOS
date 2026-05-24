@@ -42,6 +42,7 @@ import { createOperationalSnapshotService } from "./operationalSnapshotService";
 import { applyAdminFoundationMigration, bootstrapAdminFoundation } from "./adminFoundationBootstrap";
 import { createCatalogMutationService } from "./catalogMutationService";
 import { createCatalogPullService } from "./catalogPullService";
+import { createFinancialDomainPullService } from "./financialDomainPullService";
 import { applyConnectorFoundationMigration, bootstrapConnectorFoundation } from "./connectorFoundationBootstrap";
 import { applyCrewCatalogFoundationMigration } from "./crewCatalogFoundationBootstrap";
 import { createDataRetentionService, summarizeDataRetention } from "./dataRetentionService";
@@ -183,6 +184,12 @@ type LocalDatabaseRuntime = {
   applyRemoteOperationalSnapshots: (
     input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand,
   ) => import("@contracts").AppApplyRemoteOperationalSnapshotsResult;
+  applyRemoteTreasuryRows: (
+    input: import("@contracts").AppApplyRemoteTreasuryRowsCommand,
+  ) => import("@contracts").AppApplyRemoteTreasuryRowsResult;
+  applyRemoteCollaboratorPaymentRows: (
+    input: import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand,
+  ) => import("@contracts").AppApplyRemoteCollaboratorPaymentRowsResult;
 };
 
 let runtime: LocalDatabaseRuntime | null = null;
@@ -1467,6 +1474,10 @@ const createRuntime = (): LocalDatabaseRuntime => {
       createAssetSnapshotPullService(database).applyRemoteSnapshots(input.workspaceId, input.assets, input.states),
     applyRemoteOperationalSnapshots: (input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand) =>
       operationalSnapshots.applyRemoteSnapshots(input.workspaceId, input.entityType, input.rows),
+    applyRemoteTreasuryRows: (input: import("@contracts").AppApplyRemoteTreasuryRowsCommand) =>
+      createFinancialDomainPullService(database).applyRemoteTreasuryRows(input.workspaceId, input.table, input.rows),
+    applyRemoteCollaboratorPaymentRows: (input: import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand) =>
+      createFinancialDomainPullService(database).applyRemoteCollaboratorPaymentRows(input.workspaceId, input.table, input.rows),
     runtimeDiagnostics,
     supportDiagnostics,
     userAdmin,

@@ -23,10 +23,14 @@ import type {
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppActionResult,
+  AppApplyRemoteCollaboratorPaymentRowsCommand,
+  AppApplyRemoteCollaboratorPaymentRowsResult,
   AppApplyRemoteAssetSnapshotsCommand,
   AppApplyRemoteAssetSnapshotsResult,
   AppApplyRemoteCatalogRowsCommand,
   AppApplyRemoteCatalogRowsResult,
+  AppApplyRemoteTreasuryRowsCommand,
+  AppApplyRemoteTreasuryRowsResult,
   AppDiagnosticsSnapshot,
   AppExportResult,
   AppInfo,
@@ -184,6 +188,12 @@ declare global {
       applyRemoteOperationalSnapshots: (
         input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand,
       ) => Promise<import("@contracts").AppApplyRemoteOperationalSnapshotsResult>;
+      applyRemoteTreasuryRows: (
+        input: AppApplyRemoteTreasuryRowsCommand,
+      ) => Promise<AppApplyRemoteTreasuryRowsResult>;
+      applyRemoteCollaboratorPaymentRows: (
+        input: AppApplyRemoteCollaboratorPaymentRowsCommand,
+      ) => Promise<AppApplyRemoteCollaboratorPaymentRowsResult>;
     };
     bukowskiAuth?: {
       getStoredTokens: () => Promise<{

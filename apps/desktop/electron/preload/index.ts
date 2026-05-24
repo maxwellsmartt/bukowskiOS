@@ -23,10 +23,14 @@ import type {
   AssignMoveAssetsInput,
   AssignMoveAssetsResult,
   AppActionResult,
+  AppApplyRemoteCollaboratorPaymentRowsCommand,
+  AppApplyRemoteCollaboratorPaymentRowsResult,
   AppApplyRemoteAssetSnapshotsCommand,
   AppApplyRemoteAssetSnapshotsResult,
   AppApplyRemoteCatalogRowsCommand,
   AppApplyRemoteCatalogRowsResult,
+  AppApplyRemoteTreasuryRowsCommand,
+  AppApplyRemoteTreasuryRowsResult,
   AppDiagnosticsSnapshot,
   AppExportResult,
   AppInfo,
@@ -214,6 +218,12 @@ const bukowskiApp = {
   applyRemoteOperationalSnapshots: (input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand) =>
     ipcRenderer.invoke(ipcChannels.app.applyRemoteOperationalSnapshots, input) as Promise<
       import("@contracts").AppApplyRemoteOperationalSnapshotsResult
+    >,
+  applyRemoteTreasuryRows: (input: AppApplyRemoteTreasuryRowsCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.applyRemoteTreasuryRows, input) as Promise<AppApplyRemoteTreasuryRowsResult>,
+  applyRemoteCollaboratorPaymentRows: (input: AppApplyRemoteCollaboratorPaymentRowsCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.applyRemoteCollaboratorPaymentRows, input) as Promise<
+      AppApplyRemoteCollaboratorPaymentRowsResult
     >,
 };
 

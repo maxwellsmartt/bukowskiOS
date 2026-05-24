@@ -6,8 +6,10 @@ import { AppRoutes } from "@app/routing/routes";
 import { useAutoLogout } from "@shared/hooks/useAutoLogout";
 import { useAssetSnapshotPull } from "@shared/hooks/useAssetSnapshotPull";
 import { useCatalogPull } from "@shared/hooks/useCatalogPull";
+import { useCollaboratorPaymentPull } from "@shared/hooks/useCollaboratorPaymentPull";
 import { useOperationalSnapshotPull } from "@shared/hooks/useOperationalSnapshotPull";
 import { useShellContext } from "@shared/hooks/useShellContext";
+import { useTreasuryPull } from "@shared/hooks/useTreasuryPull";
 import { notifyWorkspaceDataChanged } from "@shared/hooks/useWorkspaceDataRefresh";
 import { useSession } from "@app/providers/SessionProvider";
 import { useNotifications } from "@app/providers/NotificationsProvider";
@@ -48,6 +50,8 @@ export const AppShell = () => {
   useCatalogPull();
   useAssetSnapshotPull();
   useOperationalSnapshotPull();
+  useTreasuryPull();
+  useCollaboratorPaymentPull();
   const [workspaceTransitionActive, setWorkspaceTransitionActive] = useState(false);
   const prevWorkspaceIdRef = useRef(activeWorkspaceId);
 

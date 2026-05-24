@@ -53,7 +53,15 @@ type RegisterAppIpcOptions = {
   applyRemoteOperationalSnapshots: (
     input: import("@contracts").AppApplyRemoteOperationalSnapshotsCommand,
   ) => import("@contracts").AppApplyRemoteOperationalSnapshotsResult;
+  applyRemoteTreasuryRows: (
+    input: import("@contracts").AppApplyRemoteTreasuryRowsCommand,
+  ) => import("@contracts").AppApplyRemoteTreasuryRowsResult;
+  applyRemoteCollaboratorPaymentRows: (
+    input: import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand,
+  ) => import("@contracts").AppApplyRemoteCollaboratorPaymentRowsResult;
 };
+
+const remoteRecordSchema = z.record(z.string(), z.unknown());
 
 const applyRemoteCatalogRowsSchema = z.object({
   workspaceId: z.string().trim().min(1),
@@ -162,6 +170,26 @@ const applyRemoteOperationalSnapshotsSchema = z.object({
   ),
 });
 
+const applyRemoteTreasuryRowsSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  table: z.enum([
+    "bank_accounts",
+    "bank_statement_imports",
+    "bank_transactions",
+    "transaction_annotations",
+    "transaction_project_allocations",
+    "transaction_links",
+    "counterparty_rules",
+  ]),
+  rows: z.array(remoteRecordSchema),
+});
+
+const applyRemoteCollaboratorPaymentRowsSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  table: z.enum(["collaborator_fees", "collaborator_payment_batches", "collaborator_fee_payments"]),
+  rows: z.array(remoteRecordSchema),
+});
+
 const backfillOperationalSnapshotsSchema = z.object({
   workspaceId: z.string().trim().min(1),
 });
@@ -257,6 +285,8 @@ export const registerAppIpc = ({
   applyRemoteExchangeRates,
   applyRemoteAssetSnapshots,
   applyRemoteOperationalSnapshots,
+  applyRemoteTreasuryRows,
+  applyRemoteCollaboratorPaymentRows,
 }: RegisterAppIpcOptions) => {
   safeHandleReadWithSchema(ipcChannels.app.getInfo, emptyReadArgsSchema, () => ({
     appName: "bukowskiOS",
@@ -502,5 +532,18 @@ export const registerAppIpc = ({
     (_event, input) =>
       applyRemoteOperationalSnapshots(input as import("@contracts").AppApplyRemoteOperationalSnapshotsCommand),
     "The app could not apply remote operational snapshots.",
+  );
+  safeHandle(
+    ipcChannels.app.applyRemoteTreasuryRows,
+    applyRemoteTreasuryRowsSchema,
+    (_event, input) => applyRemoteTreasuryRows(input as import("@contracts").AppApplyRemoteTreasuryRowsCommand),
+    "The app could not apply remote treasury rows.",
+  );
+  safeHandle(
+    ipcChannels.app.applyRemoteCollaboratorPaymentRows,
+    applyRemoteCollaboratorPaymentRowsSchema,
+    (_event, input) =>
+      applyRemoteCollaboratorPaymentRows(input as import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand),
+    "The app could not apply remote collaborator payment rows.",
   );
 };

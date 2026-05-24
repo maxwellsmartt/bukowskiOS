@@ -31,7 +31,13 @@ El transport hace tres cosas:
 
 ### Pull / Hidratación
 
-Hoy existen tres pulls locales en `AppShell`:
+Estado actualizado 2026-05-24:
+
+- Implementado pull local para Treasury y honorarios/pagos a colaboradores en `AppShell`.
+- Se agregaron contratos IPC, apply local idempotente con guard de outbox y tests de hidratación limpia.
+- Siguen pendientes quotes/invoices/finance entries/currency settings y catálogos fundacionales completos.
+
+Antes de este slice existían tres pulls locales en `AppShell`:
 
 - `useCatalogPull`
 - `useAssetSnapshotPull`
@@ -60,11 +66,11 @@ No existe un pull genérico de `public.sync_outbox`, y eso es correcto por ahora
 | Packing slips | `packing_slip` snapshot | `operational_snapshots` | `useOperationalSnapshotPull` | OK parcial |
 | Incidents | `incident` snapshot + algunos outbox legacy | `operational_snapshots` | `useOperationalSnapshotPull` | OK parcial |
 | RMA cases | `rma_case` snapshot | `operational_snapshots` | `useOperationalSnapshotPull` | OK parcial |
-| Treasury bank accounts | `bank_account` | `bank_accounts` | No hay pull Treasury | Crítico |
-| Treasury imports / transactions | `bank_statement_import`, `bank_transaction` | `bank_statement_imports`, `bank_transactions` | No hay pull Treasury | Crítico |
-| Treasury annotations / classifications | `transaction_annotation`, `counterparty_rule` | `transaction_annotations`, `counterparty_rules` | No hay pull Treasury | Crítico |
-| Treasury allocations / links | `transaction_allocations`, `transaction_link` | `transaction_project_allocations`, `transaction_links` | No hay pull Treasury | Crítico |
-| Collaborator fees/payments | `collaborator_fee`, `collaborator_payment` | Tablas remotas añadidas 2026-05-24 | No hay pull collaborator payments | Crítico |
+| Treasury bank accounts | `bank_account` | `bank_accounts` | `useTreasuryPull` | OK parcial |
+| Treasury imports / transactions | `bank_statement_import`, `bank_transaction` | `bank_statement_imports`, `bank_transactions` | `useTreasuryPull` | OK parcial |
+| Treasury annotations / classifications | `transaction_annotation`, `counterparty_rule` | `transaction_annotations`, `counterparty_rules` | `useTreasuryPull` | OK parcial |
+| Treasury allocations / links | `transaction_allocations`, `transaction_link` | `transaction_project_allocations`, `transaction_links` | `useTreasuryPull` | OK parcial |
+| Collaborator fees/payments | `collaborator_fee`, `collaborator_payment` | Tablas remotas añadidas 2026-05-24 | `useCollaboratorPaymentPull` | OK parcial |
 | Quotes | `quote` outbox | Tabla remota existe, pero resolver no materializa | No hay pull quotes | Crítico |
 | Invoices | `invoice`, `invoice_payment` outbox | Tabla remota existe, pero resolver no materializa | No hay pull invoices | Crítico |
 | Finance entries | `financial_entry` outbox | No vi tabla Supabase `financial_entries` | No hay pull finance entries | Crítico |
@@ -84,12 +90,13 @@ Impacto real:
 Evidencia:
 
 - Los únicos hooks de pull local son catalog/asset/operational.
-- No hay `useTreasuryPull`, `useQuotePull`, `useInvoicePull`, `useCollaboratorPaymentPull` ni `useFinancePull`.
+- Ya existen `useTreasuryPull` y `useCollaboratorPaymentPull`.
+- No hay `useQuotePull`, `useInvoicePull` ni `useFinancePull`.
 - `resolveSupabaseDomainUpserts` cubre Treasury y collaborator fees/payments, pero no quotes/invoices/finance entries/currency settings.
 
-Fix rápido recomendado:
+Fix rápido aplicado:
 
-1. Implementar `useTreasuryPull` + `treasuryPullService` para:
+1. Implementado `useTreasuryPull` + `financialDomainPullService` para:
    - `bank_accounts`
    - `bank_statement_imports`
    - `bank_transactions`
@@ -97,7 +104,7 @@ Fix rápido recomendado:
    - `transaction_project_allocations`
    - `transaction_links`
    - `counterparty_rules`
-2. Implementar `useCollaboratorPaymentsPull` + service para:
+2. Implementado `useCollaboratorPaymentPull` + `financialDomainPullService` para:
    - `collaborator_fees`
    - `collaborator_payment_batches`
    - `collaborator_fee_payments`
@@ -163,9 +170,9 @@ Impacto real:
 - Ya tenemos schema Supabase para Treasury y push de importaciones/clasificaciones, pero otra máquina no baja esos datos.
 - Los “quick wins” de categorización masiva quedan atrapados en la máquina que hizo la clasificación.
 
-Fix recomendado para siguiente slice:
+Estado actualizado:
 
-- Pull de Treasury primero, antes de más UI visual.
+- Pull de Treasury implementado antes del hardening visual.
 - Orden de aplicación:
   1. `bank_accounts`
   2. `bank_statement_imports`
@@ -211,11 +218,13 @@ Fix recomendado:
 
 Prioridad: alta.
 
+Estado: implementado.
+
 Incluye:
 
-1. `treasuryPullService` + `useTreasuryPull`.
-2. `collaboratorPaymentPullService` + hook.
-3. Tests de instalación limpia simulada: DB A sube datos, DB B aplica rows remotos.
+1. `financialDomainPullService` + `useTreasuryPull`.
+2. `financialDomainPullService` + `useCollaboratorPaymentPull`.
+3. Tests de instalación limpia simulada aplicando rows remotos a SQLite local.
 
 Por qué primero:
 
@@ -224,6 +233,8 @@ Por qué primero:
 ### Slice 2 — Materialización de quotes/invoices/currency/finance entries
 
 Prioridad: alta.
+
+Estado: pendiente crítico.
 
 Incluye:
 

@@ -391,6 +391,8 @@ app.whenReady().then(() => {
     applyRemoteExchangeRates: localDatabase.applyRemoteExchangeRates,
     applyRemoteAssetSnapshots: localDatabase.applyRemoteAssetSnapshots,
     applyRemoteOperationalSnapshots: localDatabase.applyRemoteOperationalSnapshots,
+    applyRemoteTreasuryRows: localDatabase.applyRemoteTreasuryRows,
+    applyRemoteCollaboratorPaymentRows: localDatabase.applyRemoteCollaboratorPaymentRows,
   });
   registerFoundationIpc({
     foundationReads: localDatabase.foundationReads,
