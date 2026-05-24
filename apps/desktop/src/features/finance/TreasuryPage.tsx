@@ -772,44 +772,45 @@ export const TreasuryPage = () => {
               <h3 className="section-subtitle">{t("finance.treasury.overview.categoryTitle")}</h3>
               {snap && categoryChartData.length > 0 ? (
                 <div className="finance-chart-shell finance-chart-shell-pie">
-                  <div className="finance-donut-wrap">
-                    <ResponsiveContainer height={240} width="100%">
-                      <PieChart margin={{ top: 6, right: 8, bottom: 6, left: 8 }}>
-                        <Pie
-                          data={categoryChartData}
-                          dataKey="amount"
-                          innerRadius="58%"
-                          nameKey="label"
-                          outerRadius="82%"
-                          paddingAngle={1.5}
-                          stroke="rgba(15,18,24,0.9)"
-                          strokeWidth={2}
-                        >
-                          {categoryChartData.map((row, index) => (
-                            <Cell fill={chartPalette[index % chartPalette.length] ?? "#d6b37a"} key={row.category} />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<TreasuryChartTooltip />} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="finance-donut-center">
-                      <span>{t("finance.treasury.overview.expenseTotal")}</span>
-                      <strong>{formatAxisCurrency(snap.totalExpense)}</strong>
-                    </div>
-                  </div>
-                  <div className="finance-pie-legend">
-                    {categoryChartData.map((row, index) => (
-                      <div className="finance-pie-legend-row" key={row.category}>
-                        <span
-                          className="finance-pie-legend-swatch"
-                          style={{ background: chartPalette[index % chartPalette.length] ?? "#d6b37a" }}
-                        />
-                        <span className="finance-pie-legend-label">{row.label}</span>
-                        <span className="finance-pie-legend-meta">
-                          {formatMoney(row.amount)} · {row.percentage}%
-                        </span>
+                  <div className="finance-category-layout">
+                    <div className="finance-donut-wrap">
+                      <ResponsiveContainer height={268} width="100%">
+                        <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                          <Pie
+                            data={categoryChartData}
+                            dataKey="amount"
+                            innerRadius="55%"
+                            nameKey="label"
+                            outerRadius="92%"
+                            paddingAngle={1.5}
+                            stroke="rgba(15,18,24,0.92)"
+                            strokeWidth={2}
+                          >
+                            {categoryChartData.map((row, index) => (
+                              <Cell fill={chartPalette[index % chartPalette.length] ?? "#d6b37a"} key={row.category} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={<TreasuryChartTooltip />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="finance-donut-center">
+                        <span>{t("finance.treasury.overview.expenseTotal")}</span>
+                        <strong>{formatAxisCurrency(snap.totalExpense)}</strong>
                       </div>
-                    ))}
+                    </div>
+                    <div className="finance-pie-legend">
+                      {categoryChartData.map((row, index) => (
+                        <div className="finance-pie-legend-row" key={row.category}>
+                          <span
+                            className="finance-pie-legend-swatch"
+                            style={{ background: chartPalette[index % chartPalette.length] ?? "#d6b37a" }}
+                          />
+                          <span className="finance-pie-legend-label">{row.label}</span>
+                          <span className="finance-pie-legend-amount">{formatMoney(row.amount)}</span>
+                          <span className="finance-pie-legend-percent">{row.percentage}%</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ) : (
