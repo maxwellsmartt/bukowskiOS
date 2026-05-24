@@ -16269,12 +16269,16 @@ input[type="number"] {
   border-bottom: 1px solid rgba(255, 255, 255, 0.065);
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 10px;
+  gap: 10px 14px;
   padding: 10px 12px;
 }
 
 .treasury-table-toolbar .compact-filter-field {
   min-height: 34px;
+}
+
+.treasury-table-filter-select {
+  gap: 0;
 }
 
 .treasury-table-search {

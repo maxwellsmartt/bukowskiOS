@@ -1112,8 +1112,7 @@ export const TreasuryPage = () => {
                 placeholder={t("finance.treasury.searchPlaceholder")}
                 value={search}
               />
-              <label className="compact-filter-field">
-                <span>{t("finance.treasury.filters.account")}</span>
+              <label className="compact-filter-field treasury-table-filter-select">
                 <CompactSelect<string>
                   ariaLabel={t("finance.treasury.filters.account")}
                   onChange={setAccountFilter}
@@ -1122,8 +1121,7 @@ export const TreasuryPage = () => {
                   value={accountFilter}
                 />
               </label>
-              <label className="compact-filter-field">
-                <span>{t("finance.treasury.filters.period")}</span>
+              <label className="compact-filter-field treasury-table-filter-select">
                 <CompactSelect<MovementDateFilter>
                   ariaLabel={t("finance.treasury.filters.period")}
                   onChange={setDateFilter}
