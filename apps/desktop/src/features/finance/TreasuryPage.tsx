@@ -469,6 +469,27 @@ export const TreasuryPage = () => {
     }
   };
 
+  const previewSimilarClassification = async (row: BankTransactionRow, kind: TransactionKind) => {
+    if (!row.rawDescription?.trim()) {
+      toast.error(t("finance.treasury.classify.noDescription", { defaultValue: "This movement has no description to match." }));
+      return;
+    }
+    try {
+      const preview = await mutations.previewClassificationRule({
+        workspaceId: activeWorkspaceId,
+        transactionId: row.id,
+        matchType: "exact",
+      });
+      if (preview.matchCount <= 1) {
+        toast.info(t("finance.treasury.classify.noSimilar", { defaultValue: "No unclassified similar movements found." }));
+        return;
+      }
+      setPendingRule({ row, kind, preview });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("finance.treasury.classify.failed"));
+    }
+  };
+
   const applyPendingRule = async (applyToAll: boolean) => {
     if (!pendingRule) return;
     const baseCommand = {
@@ -1261,6 +1282,19 @@ export const TreasuryPage = () => {
                       : t("finance.treasury.classify.applyBulk", { defaultValue: "Apply type" })}
                   </span>
                 </button>
+                {selectedMovements.length === 1 && bulkKind ? (
+                  <button
+                    className="ghost-control treasury-similar-apply-button"
+                    disabled={isBulkClassifying}
+                    onClick={() => void previewSimilarClassification(selectedMovements[0], bulkKind)}
+                    type="button"
+                  >
+                    <Search size={13} />
+                    <span>
+                      {t("finance.treasury.classify.reviewSimilar", { defaultValue: "Review similar" })}
+                    </span>
+                  </button>
+                ) : null}
                 <button
                   className="ghost-control"
                   disabled={isBulkClassifying}
@@ -1373,7 +1407,7 @@ export const TreasuryPage = () => {
     <ConfirmDialog
       body={t("finance.treasury.classify.applySimilarBody", {
         defaultValue:
-          "There are {{count}} unclassified movements with the same description. You can mark all of them as {{kind}} and remember the rule for future imports.",
+          "There are {{count}} unclassified movements with the same description. Applying this will classify them as {{kind}} and remember the rule for future imports.",
         kind: pendingRule ? kindLabel(pendingRule.kind) : "",
         count: pendingRule?.preview.matchCount ?? 0,
       })}
@@ -1381,13 +1415,23 @@ export const TreasuryPage = () => {
       confirmLabel={t("finance.treasury.classify.applySimilar", { defaultValue: "Apply to all" })}
       details={
         pendingRule ? (
-          <div className="cell-stack">
-            <span className="confirm-dialog-details-label">
-              {t("finance.treasury.classify.matchPattern", { defaultValue: "Exact match" })}
-            </span>
-            <strong>{pendingRule.preview.matchPattern}</strong>
+          <div className="treasury-similar-preview">
+            <div className="treasury-similar-preview-stat">
+              <strong>{pendingRule.preview.matchCount}</strong>
+              <span>{t("finance.treasury.classify.unclassifiedMatches", { defaultValue: "unclassified matches" })}</span>
+            </div>
+            <div className="treasury-similar-preview-pattern">
+              <span className="confirm-dialog-details-label">
+                {t("finance.treasury.classify.matchPattern", { defaultValue: "Exact match" })}
+              </span>
+              <strong>{pendingRule.preview.matchPattern}</strong>
+            </div>
             {pendingRule.preview.sampleDescriptions.length > 0 ? (
-              <small className="text-muted">{pendingRule.preview.sampleDescriptions.slice(0, 2).join(" · ")}</small>
+              <ul className="treasury-similar-preview-list">
+                {pendingRule.preview.sampleDescriptions.slice(0, 3).map((description) => (
+                  <li key={description}>{description}</li>
+                ))}
+              </ul>
             ) : null}
           </div>
         ) : null
