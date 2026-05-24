@@ -15966,20 +15966,15 @@ input[type="number"] {
 }
 
 .treasury-overview-controls {
-  align-items: end;
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 14px;
   justify-content: flex-end;
 }
 
 .treasury-overview-controls .compact-filter-field {
-  gap: 4px;
-}
-
-.treasury-overview-controls .compact-filter-field > span {
-  font-size: 9px;
-  letter-spacing: 0.075em;
+  gap: 0;
 }
 
 .treasury-overview-controls .compact-select-trigger {

@@ -742,7 +742,6 @@ export const TreasuryPage = () => {
               </div>
               <div className="treasury-overview-controls">
                 <label className="compact-filter-field treasury-period-picker">
-                  <span>{t("finance.treasury.overview.window")}</span>
                   <CompactSelect<TreasuryPeriodPreset>
                     ariaLabel={t("finance.treasury.overview.window")}
                     onChange={setPeriod}
@@ -751,7 +750,6 @@ export const TreasuryPage = () => {
                   />
                 </label>
                 <div className="compact-filter-field treasury-currency-picker">
-                  <span>{t("finance.treasury.overview.currency")}</span>
                   <div aria-label={t("finance.treasury.overview.currency")} className="treasury-chart-toggle" role="group">
                     {(["DOP", "USD"] as TreasuryReportCurrency[]).map((currency) => (
                       <button
