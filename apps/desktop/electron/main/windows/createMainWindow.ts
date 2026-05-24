@@ -14,11 +14,38 @@ type CreateMainWindowOptions = {
 };
 
 export const loadMainWindowContent = (window: BrowserWindow, devServerUrl: string | undefined, rendererDist: string) => {
+  const rendererIndexPath = path.join(rendererDist, "index.html");
+  const loadBuiltRenderer = () => {
+    if (window.isDestroyed()) {
+      return Promise.resolve();
+    }
+
+    return window.loadFile(rendererIndexPath).catch((error: unknown) => {
+      if (window.isDestroyed()) {
+        return;
+      }
+
+      throw error;
+    });
+  };
+
   if (devServerUrl) {
-    return window.loadURL(devServerUrl);
+    return window.loadURL(devServerUrl).catch((error: unknown) => {
+      if (window.isDestroyed()) {
+        return;
+      }
+      if (!fs.existsSync(rendererIndexPath)) {
+        throw error;
+      }
+
+      console.warn(
+        `[desktop] Dev renderer ${devServerUrl} was unavailable; loading built renderer from ${rendererIndexPath}.`,
+      );
+      return loadBuiltRenderer();
+    });
   }
 
-  return window.loadFile(path.join(rendererDist, "index.html"));
+  return loadBuiltRenderer();
 };
 
 const escapeHtmlAttribute = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");

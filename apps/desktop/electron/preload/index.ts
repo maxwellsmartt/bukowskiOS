@@ -62,6 +62,7 @@ import type {
   CreateAssetCommand,
   CreateCatalogEntityInput,
   CreateFinancialEntryCommand,
+  CreateCollaboratorFeeCommand,
   CreateDraftRunFromChatCommand,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
@@ -75,6 +76,12 @@ import type {
   DeleteProjectInput,
   DeleteProjectUnitInput,
   FinanceEntryListQuery,
+  CollaboratorFeeListQuery,
+  CollaboratorFeeRow,
+  CollaboratorFeeDetail,
+  CollaboratorFeeSummary,
+  CollaboratorFeeSuggestion,
+  CollaboratorFeeMutationResult,
   FinanceOverviewQuery,
   FinanceEntryMutationResult,
   FinanceCostLinkRow,
@@ -126,6 +133,10 @@ import type {
   UpdateAssetCommand,
   UpdateCatalogEntityInput,
   UpdateFinancialEntryCommand,
+  UpdateCollaboratorFeeCommand,
+  ApproveCollaboratorFeeCommand,
+  CancelCollaboratorFeeCommand,
+  RecordCollaboratorPaymentCommand,
   UpdateAgentCommand,
   UpdateAppUserCommand,
   UpdateProjectInput,
@@ -399,6 +410,24 @@ const bukowskiFinance = {
     ipcRenderer.invoke(ipcChannels.finance.create, input) as Promise<FinanceEntryMutationResult>,
   update: (input: UpdateFinancialEntryCommand) =>
     ipcRenderer.invoke(ipcChannels.finance.update, input) as Promise<FinanceEntryMutationResult>,
+  listCollaboratorFees: (query?: CollaboratorFeeListQuery) =>
+    ipcRenderer.invoke(ipcChannels.finance.listCollaboratorFees, query) as Promise<CollaboratorFeeRow[]>,
+  getCollaboratorFeeDetail: (workspaceId: string, feeId: string) =>
+    ipcRenderer.invoke(ipcChannels.finance.getCollaboratorFeeDetail, { workspaceId, feeId }) as Promise<CollaboratorFeeDetail | null>,
+  getCollaboratorFeeSummary: (workspaceId: string, projectId?: string | null) =>
+    ipcRenderer.invoke(ipcChannels.finance.getCollaboratorFeeSummary, { workspaceId, projectId: projectId ?? null }) as Promise<CollaboratorFeeSummary>,
+  suggestCollaboratorFees: (input: { workspaceId: string; projectId?: string | null; crewMemberId?: string | null }) =>
+    ipcRenderer.invoke(ipcChannels.finance.suggestCollaboratorFees, input) as Promise<CollaboratorFeeSuggestion[]>,
+  createCollaboratorFee: (input: CreateCollaboratorFeeCommand) =>
+    ipcRenderer.invoke(ipcChannels.finance.createCollaboratorFee, input) as Promise<CollaboratorFeeMutationResult>,
+  updateCollaboratorFee: (input: UpdateCollaboratorFeeCommand) =>
+    ipcRenderer.invoke(ipcChannels.finance.updateCollaboratorFee, input) as Promise<CollaboratorFeeMutationResult>,
+  approveCollaboratorFee: (input: ApproveCollaboratorFeeCommand) =>
+    ipcRenderer.invoke(ipcChannels.finance.approveCollaboratorFee, input) as Promise<CollaboratorFeeMutationResult>,
+  cancelCollaboratorFee: (input: CancelCollaboratorFeeCommand) =>
+    ipcRenderer.invoke(ipcChannels.finance.cancelCollaboratorFee, input) as Promise<CollaboratorFeeMutationResult>,
+  recordCollaboratorPayment: (input: RecordCollaboratorPaymentCommand) =>
+    ipcRenderer.invoke(ipcChannels.finance.recordCollaboratorPayment, input) as Promise<CollaboratorFeeMutationResult>,
 };
 
 const bukowskiCurrency = {

@@ -6,7 +6,7 @@ import { ArrowUpRight, Pencil, Plus, Save, X } from "lucide-react";
 import { useSession } from "@app/providers/SessionProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
-import { useFinanceEntries } from "@features/finance/useFinanceData";
+import { useCollaboratorFeeSummary, useFinanceEntries } from "@features/finance/useFinanceData";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { HelpHint } from "@shared/components/HelpHint";
@@ -87,6 +87,7 @@ export const ProjectBudgetPage = () => {
     sortBy: "date",
     sortDirection: "desc",
   });
+  const { data: collaboratorSummary } = useCollaboratorFeeSummary(projectId);
 
   const cloudEnabled = Boolean(supabase) && !isLocalFallback;
   const [budgetTarget, setBudgetTarget] = useState<number | null>(null);
@@ -359,6 +360,33 @@ export const ProjectBudgetPage = () => {
                 <span className="summary-label">{t("projects.budget.spend.entriesOnProject")}</span>
                 <span className="summary-value">{projectEntries.length}</span>
               </div>
+            </div>
+          </SurfaceCard>
+
+          <SurfaceCard className="project-scroll-card" title="Honorarios de crew">
+            <div className="project-budget-grid">
+              <div className="summary-row">
+                <span className="summary-label">Pendiente</span>
+                <span className="summary-value">{formatCurrency(collaboratorSummary.pendingAmount, currency)}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Aprobado</span>
+                <span className="summary-value">{formatCurrency(collaboratorSummary.approvedAmount, currency)}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Pagado este mes</span>
+                <span className="summary-value">{formatCurrency(collaboratorSummary.paidThisMonth, currency)}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Con balance</span>
+                <span className="summary-value">{collaboratorSummary.collaboratorsWithBalance}</span>
+              </div>
+            </div>
+            <div className="surface-card-actions" style={{ justifyContent: "flex-end", marginTop: 12 }}>
+              <button className="ghost-control" onClick={() => navigate("/finance/collaborators")} type="button">
+                <ArrowUpRight size={14} />
+                <span>Abrir honorarios</span>
+              </button>
             </div>
           </SurfaceCard>
         </div>

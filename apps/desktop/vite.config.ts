@@ -52,6 +52,17 @@ const appendImageSource = (policy: string, source: string | null) => {
   return policy.replace(imgRegex, (m) => `${m} ${source}`);
 };
 
+const toWebSocketOrigin = (value: string | undefined) => {
+  const origin = toHttpsOrigin(value);
+  return origin ? origin.replace(/^https:/, "wss:") : null;
+};
+
+const trustedRemoteImageOrigins = [
+  "https://lh3.googleusercontent.com",
+  "https://avatars.githubusercontent.com",
+  "https://secure.gravatar.com",
+];
+
 const rendererManualChunks = (id: string) => {
   if (!id.includes("node_modules")) return undefined;
   if (id.includes("bwip-js")) return "vendor-barcodes";
@@ -66,7 +77,11 @@ export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, rootDir, "VITE_");
   const supabaseOrigin = toHttpsOrigin(env.VITE_SUPABASE_URL);
   let htmlCsp = appendConnectSource(env.VITE_HTML_CSP ?? "", supabaseOrigin);
+  htmlCsp = appendConnectSource(htmlCsp, toWebSocketOrigin(env.VITE_SUPABASE_URL));
   htmlCsp = appendImageSource(htmlCsp, supabaseOrigin);
+  for (const imageOrigin of trustedRemoteImageOrigins) {
+    htmlCsp = appendImageSource(htmlCsp, imageOrigin);
+  }
   const htmlCspPlugin: Plugin = {
     name: "bukowski-html-csp",
     transformIndexHtml: {

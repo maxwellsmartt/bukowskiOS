@@ -1,5 +1,6 @@
 import type { OverviewMetric } from "./overview-queries";
 import type { ListSortDirection } from "./list-controls-queries";
+import type { CollaboratorFeeStatus } from "../commands/finance-commands";
 
 export type FinanceOverviewPeriodPreset = "month" | "quarter" | "year" | "custom";
 
@@ -67,6 +68,109 @@ export type FinanceEntryListQuery = {
   search?: string;
   sortBy: FinanceEntrySortField;
   sortDirection: ListSortDirection;
+};
+
+export type CollaboratorFeeSortField =
+  | "expectedDate"
+  | "crew"
+  | "project"
+  | "feeType"
+  | "amount"
+  | "outstanding"
+  | "status";
+
+export type CollaboratorFeeListQuery = {
+  workspaceId?: string;
+  search?: string;
+  sortBy: CollaboratorFeeSortField;
+  sortDirection: ListSortDirection;
+  status?: CollaboratorFeeStatus | "all";
+  projectId?: string | null;
+  crewMemberId?: string | null;
+};
+
+export type CollaboratorFeeRow = {
+  id: string;
+  workspaceId: string;
+  crewMemberId: string;
+  crewMemberName: string;
+  projectId: string | null;
+  projectName: string | null;
+  projectUnitId: string | null;
+  projectUnitName: string | null;
+  departmentId: string | null;
+  departmentName: string | null;
+  sourceAssignmentId: string | null;
+  feeType: string;
+  description: string | null;
+  agreedAmount: number;
+  paidAmount: number;
+  outstandingAmount: number;
+  currency: string;
+  exchangeRate: number | null;
+  baseCurrencyAmount: number | null;
+  status: CollaboratorFeeStatus;
+  expectedPaymentDate: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CollaboratorPaymentRow = {
+  id: string;
+  paymentBatchId: string;
+  feeId: string;
+  paidAt: string;
+  amount: number;
+  currency: string;
+  paymentMethod: string | null;
+  reference: string | null;
+  notes: string | null;
+  createdAt: string;
+};
+
+export type CollaboratorFeeDetail = CollaboratorFeeRow & {
+  payments: CollaboratorPaymentRow[];
+};
+
+export type CollaboratorFeeSummary = {
+  pendingAmount: number;
+  approvedAmount: number;
+  paidThisMonth: number;
+  collaboratorsWithBalance: number;
+  byCollaborator: Array<{
+    crewMemberId: string;
+    crewMemberName: string;
+    pendingAmount: number;
+    paidAmount: number;
+    currency: string;
+  }>;
+  byProject: Array<{
+    projectId: string | null;
+    projectName: string;
+    pendingAmount: number;
+    paidAmount: number;
+    currency: string;
+  }>;
+};
+
+export type CollaboratorFeeSuggestion = {
+  suggestionId: string;
+  crewMemberId: string;
+  crewMemberName: string;
+  projectId: string;
+  projectName: string;
+  projectUnitId: string;
+  projectUnitName: string;
+  departmentId: string | null;
+  departmentName: string | null;
+  sourceAssignmentId: string;
+  roleLabel: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  feeType: string;
+  description: string;
+  currency: string;
 };
 
 export type FinanceOverviewSnapshot = {

@@ -33,6 +33,23 @@ const financeEntrySchema = z
     notes: optionalNullableString,
   })
   .strict();
+const collaboratorFeeSchema = z
+  .object({
+    crewMemberId: nonEmptyString,
+    projectId: optionalNullableString,
+    projectUnitId: optionalNullableString,
+    departmentId: optionalNullableString,
+    sourceAssignmentId: optionalNullableString,
+    feeType: nonEmptyString,
+    description: optionalNullableString,
+    agreedAmount: z.number().finite().positive(),
+    currency: nonEmptyString,
+    exchangeRate: z.number().finite().positive().nullable().optional(),
+    baseCurrencyAmount: z.number().finite().nonnegative().nullable().optional(),
+    expectedPaymentDate: optionalNullableString,
+    notes: optionalNullableString,
+  })
+  .strict();
 
 export const createAgentSchema = z
   .object({
@@ -464,6 +481,59 @@ export const createFinancialEntrySchema = financeEntrySchema.extend({
 export const updateFinancialEntrySchema = createFinancialEntrySchema.extend({
   entryId: nonEmptyString,
 });
+
+export const createCollaboratorFeeSchema = collaboratorFeeSchema
+  .extend({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
+export const updateCollaboratorFeeSchema = createCollaboratorFeeSchema.extend({
+  feeId: nonEmptyString,
+});
+
+export const approveCollaboratorFeeSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    feeId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
+
+export const cancelCollaboratorFeeSchema = approveCollaboratorFeeSchema.extend({
+  reason: optionalNullableString,
+});
+
+export const recordCollaboratorPaymentSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    crewMemberId: nonEmptyString,
+    paidAt: nonEmptyString,
+    currency: nonEmptyString,
+    exchangeRate: z.number().finite().positive().nullable().optional(),
+    paymentMethod: optionalNullableString,
+    reference: optionalNullableString,
+    notes: optionalNullableString,
+    allocations: z
+      .array(
+        z
+          .object({
+            feeId: nonEmptyString,
+            amount: z.number().finite().positive(),
+          })
+          .strict(),
+      )
+      .min(1),
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+  })
+  .strict();
 
 export const createPackingSlipSchema = z
   .object({

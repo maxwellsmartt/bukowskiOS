@@ -33,6 +33,7 @@ const AssetLicensesPage = lazyPage(() => import("@features/assets/AssetLicensesP
 const AssetsPage = lazyPage(() => import("@features/assets/AssetsPage"), "AssetsPage");
 const CompareView = lazyPage(() => import("@features/compare/CompareView"), "CompareView");
 const FinanceCostLinksPage = lazyPage(() => import("@features/finance/FinanceCostLinksPage"), "FinanceCostLinksPage");
+const CollaboratorFeesPage = lazyPage(() => import("@features/finance/CollaboratorFeesPage"), "CollaboratorFeesPage");
 const FinanceEntriesPage = lazyPage(() => import("@features/finance/FinanceEntriesPage"), "FinanceEntriesPage");
 const FinanceOverviewPage = lazyPage(() => import("@features/finance/FinanceOverviewPage"), "FinanceOverviewPage");
 const InvoiceDetailPage = lazyPage(() => import("@features/finance/InvoiceDetailPage"), "InvoiceDetailPage");
@@ -74,6 +75,7 @@ const routeElements = {
   "/compare": <CompareView />,
   "/finance": <FinanceOverviewPage />,
   "/finance/cost-links": <FinanceCostLinksPage />,
+  "/finance/collaborators": <CollaboratorFeesPage />,
   "/finance/entries": <FinanceEntriesPage />,
   "/finance/invoices": <InvoicesPage />,
   "/finance/invoices/new": <InvoiceEditorPage />,

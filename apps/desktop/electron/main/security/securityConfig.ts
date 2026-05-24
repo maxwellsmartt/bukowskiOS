@@ -99,6 +99,12 @@ export const buildContentSecurityPolicy = (
     if (origin && !connectSources.includes(origin)) {
       connectSources.push(origin);
     }
+    if (origin) {
+      const realtimeOrigin = origin.replace(/^https:/, "wss:");
+      if (!connectSources.includes(realtimeOrigin)) {
+        connectSources.push(realtimeOrigin);
+      }
+    }
     // Same origins also serve user-uploaded images (avatars, workspace
     // branding, attachments) via Supabase Storage public buckets.
     if (origin && !imageSources.includes(origin)) {

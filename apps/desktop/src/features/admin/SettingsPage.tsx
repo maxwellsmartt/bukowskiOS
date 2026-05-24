@@ -87,7 +87,23 @@ const roleCoverageGroups = [
   { id: "incidents", keys: ["incidents.read", "incidents.create"] },
   { id: "rma", keys: ["rma.read", "rma.create"] },
   { id: "packing", keys: ["packing-slips.read", "packing-slips.create"] },
-  { id: "finance", keys: ["finance.read"] },
+  {
+    id: "finance",
+    keys: [
+      "finance.read",
+      "quotes.read",
+      "quotes.create",
+      "quotes.edit",
+      "quotes.export",
+      "invoices.read",
+      "invoices.create",
+      "invoices.record_payment",
+      "currency.manage_rates",
+      "crew_fees.read",
+      "crew_fees.manage",
+      "crew_payments.record",
+    ],
+  },
 ] as const;
 
 type RoleCoverageId = (typeof roleCoverageGroups)[number]["id"];
@@ -157,6 +173,17 @@ const permissionLabelOverrides: Record<string, string> = {
   "packing-slips.read": "View packing slips",
   "packing-slips.create": "Issue packing slips",
   "finance.read": "View finance",
+  "quotes.read": "View quotes",
+  "quotes.create": "Create quotes",
+  "quotes.edit": "Edit quotes",
+  "quotes.export": "Export quotes",
+  "invoices.read": "View invoices",
+  "invoices.create": "Create invoices",
+  "invoices.record_payment": "Record invoice payments",
+  "currency.manage_rates": "Manage currency settings",
+  "crew_fees.read": "View crew fees",
+  "crew_fees.manage": "Manage crew fees",
+  "crew_payments.record": "Record crew payments",
   "rma.read": "View RMAs",
   "rma.create": "Create RMAs",
   "users.invite": "Invite users",
@@ -169,6 +196,10 @@ const permissionGroupForKey = (key: string) => {
   if (key.startsWith("incidents.")) return "Incidents";
   if (key.startsWith("packing-slips.")) return "Packing";
   if (key.startsWith("finance.")) return "Finance";
+  if (key.startsWith("quotes.")) return "Finance";
+  if (key.startsWith("invoices.")) return "Finance";
+  if (key.startsWith("currency.")) return "Finance";
+  if (key.startsWith("crew_fees.") || key.startsWith("crew_payments.")) return "Finance";
   if (key.startsWith("rma.")) return "RMA";
   if (key.startsWith("users.")) return "Team";
   return "Other";

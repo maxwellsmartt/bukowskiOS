@@ -59,6 +59,7 @@ export const financeSubnav: NavItem[] = [
   { label: "shell.nav.finance.treasury", path: "/finance/treasury", icon: Wallet },
   { label: "shell.nav.finance.quotes", path: "/finance/quotes", icon: FileText },
   { label: "shell.nav.finance.invoices", path: "/finance/invoices", icon: ScrollText },
+  { label: "shell.nav.finance.collaborators", path: "/finance/collaborators", icon: Wallet },
   { label: "shell.nav.finance.entries", path: "/finance/entries", icon: ScrollText },
   { label: "shell.nav.finance.reviewQueue", path: "/finance/cost-links", icon: ClipboardList },
 ];

@@ -56,6 +56,8 @@ import { createTreasuryReadService } from "./treasuryReadService";
 import { createQuoteMutationService } from "./quoteMutationService";
 import { createQuoteReadService } from "./quoteReadService";
 import { createFinanceMutationService } from "./financeMutationService";
+import { createCollaboratorFeeMutationService } from "./collaboratorFeeMutationService";
+import { createCollaboratorFeeReadService, type CollaboratorFeeReadService } from "./collaboratorFeeReadService";
 import { applyOperationalFilesMigration, createFileUploadService, type FileUploadService } from "./fileUploadService";
 import { createIncidentMutationService } from "./incidentMutationService";
 import { createPackingMutationService } from "./packingMutationService";
@@ -93,6 +95,7 @@ type CatalogMutationService = ReturnType<typeof createCatalogMutationService>;
 type AssetMutationService = ReturnType<typeof createAssetMutationService>;
 type IncidentMutationService = ReturnType<typeof createIncidentMutationService>;
 type FinanceMutationService = ReturnType<typeof createFinanceMutationService>;
+type CollaboratorFeeMutationService = ReturnType<typeof createCollaboratorFeeMutationService>;
 type CurrencyMutationService = ReturnType<typeof createCurrencyMutationService>;
 type CurrencyReadService = ReturnType<typeof createCurrencyReadService>;
 type QuoteMutationServiceType = ReturnType<typeof createQuoteMutationService>;
@@ -133,6 +136,8 @@ type LocalDatabaseRuntime = {
   assetMutations: AssetMutationService;
   incidentMutations: IncidentMutationService;
   financeMutations: FinanceMutationService;
+  collaboratorFeeMutations: CollaboratorFeeMutationService;
+  collaboratorFeeReads: CollaboratorFeeReadService;
   currencyMutations: CurrencyMutationService;
   currencyReads: CurrencyReadService;
   currencyRateProviders: CurrencyRateProviderService;
@@ -1058,6 +1063,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
   const assetMutations = createAssetMutationService(database);
   const incidentMutations = createIncidentMutationService(database);
   const financeMutations = createFinanceMutationService(database);
+  const collaboratorFeeMutations = createCollaboratorFeeMutationService(database);
+  const collaboratorFeeReads = createCollaboratorFeeReadService(database);
   const currencyMutations = createCurrencyMutationService(database);
   const currencyReads = createCurrencyReadService(database);
   const currencyRateProviders = createCurrencyRateProviderService({
@@ -1316,6 +1323,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
     workspaceAccess,
     incidentMutations,
     financeMutations,
+    collaboratorFeeMutations,
+    collaboratorFeeReads,
     currencyMutations,
     currencyReads,
     currencyRateProviders,

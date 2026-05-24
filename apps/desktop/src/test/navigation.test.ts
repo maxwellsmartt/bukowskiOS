@@ -23,10 +23,12 @@ describe("foundation navigation shell", () => {
       "shell.nav.finance.treasury",
       "shell.nav.finance.quotes",
       "shell.nav.finance.invoices",
+      "shell.nav.finance.collaborators",
       "shell.nav.finance.entries",
       "shell.nav.finance.reviewQueue",
     ]);
     expect(appRoutes.some((route) => route.path === "/finance/treasury")).toBe(true);
+    expect(appRoutes.some((route) => route.path === "/finance/collaborators")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/finance/entries")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/finance/invoices")).toBe(true);
     expect(appRoutes.some((route) => route.path === "/finance/invoices/new")).toBe(true);

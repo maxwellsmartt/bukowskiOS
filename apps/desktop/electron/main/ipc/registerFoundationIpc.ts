@@ -14,6 +14,7 @@ import {
   createAssistantThreadSchema,
   createCatalogEntitySchema,
   createConnectorLinkTokenSchema,
+  createCollaboratorFeeSchema,
   deleteCatalogEntitiesSchema,
   createDraftRunFromChatSchema,
   createExchangeRateSchema,
@@ -26,9 +27,15 @@ import {
   deleteExchangeRateSchema,
   duplicateQuoteSchema,
   cancelInvoiceSchema,
+  cancelCollaboratorFeeSchema,
+  collaboratorFeeDetailReadArgsSchema,
+  collaboratorFeeListReadArgsSchema,
+  collaboratorFeeSummaryReadArgsSchema,
+  collaboratorFeeSuggestionsReadArgsSchema,
   invoiceDetailReadArgsSchema,
   invoiceListReadArgsSchema,
   issueInvoiceSchema,
+  approveCollaboratorFeeSchema,
   upsertBankAccountSchema,
   importStatementSchema,
   addManualTransactionsSchema,
@@ -79,6 +86,7 @@ import {
   projectListReadArgsSchema,
   catalogListReadArgsSchema,
   recordInvoicePaymentSchema,
+  recordCollaboratorPaymentSchema,
   renumberInvoiceSchema,
   renumberQuoteSchema,
   recordRuntimeErrorSchema,
@@ -110,6 +118,7 @@ import {
   updateCatalogEntitySchema,
   updateIncidentSchema,
   updateFinancialEntrySchema,
+  updateCollaboratorFeeSchema,
   updateInvoiceSchema,
   updateProjectSchema,
   updateProjectUnitSchema,
@@ -155,6 +164,7 @@ import type {
   CreateAssetCommand,
   CreateCatalogEntityInput,
   CreateFinancialEntryCommand,
+  CreateCollaboratorFeeCommand,
   CreatePackingSlipCommand,
   CreateProjectBlueprintInput,
   CreateRmaCaseCommand,
@@ -166,6 +176,8 @@ import type {
   DeleteProjectInput,
   DeleteProjectUnitInput,
   FinanceEntryListQuery,
+  CollaboratorFeeListQuery,
+  CollaboratorFeeMutationResult,
   FinanceOverviewQuery,
   FinanceEntryMutationResult,
   FileUploadMutationResult,
@@ -188,6 +200,10 @@ import type {
   UpdateAssetCommand,
   UpdateCatalogEntityInput,
   UpdateFinancialEntryCommand,
+  UpdateCollaboratorFeeCommand,
+  ApproveCollaboratorFeeCommand,
+  CancelCollaboratorFeeCommand,
+  RecordCollaboratorPaymentCommand,
   UpdateIncidentCommand,
   UpdateProjectInput,
   UpdateProjectUnitInput,
@@ -261,6 +277,19 @@ type RegisterFoundationIpcOptions = {
   financeMutations: {
     createEntry: (input: CreateFinancialEntryCommand) => FinanceEntryMutationResult;
     updateEntry: (input: UpdateFinancialEntryCommand) => FinanceEntryMutationResult;
+  };
+  collaboratorFeeMutations: {
+    createFee: (input: CreateCollaboratorFeeCommand) => CollaboratorFeeMutationResult;
+    updateFee: (input: UpdateCollaboratorFeeCommand) => CollaboratorFeeMutationResult;
+    approveFee: (input: ApproveCollaboratorFeeCommand) => CollaboratorFeeMutationResult;
+    cancelFee: (input: CancelCollaboratorFeeCommand) => CollaboratorFeeMutationResult;
+    recordPayment: (input: RecordCollaboratorPaymentCommand) => CollaboratorFeeMutationResult;
+  };
+  collaboratorFeeReads: {
+    listFees: (query?: CollaboratorFeeListQuery) => unknown;
+    getFeeDetail: (workspaceId: string, feeId: string) => unknown;
+    getSummary: (input: { workspaceId: string; projectId?: string | null }) => unknown;
+    suggestFromAssignments: (input: { workspaceId: string; projectId?: string | null; crewMemberId?: string | null }) => unknown;
   };
   currencyMutations: {
     upsertSettings: (
@@ -536,6 +565,8 @@ export const registerFoundationIpc = ({
   fileUploads,
   incidentMutations,
   financeMutations,
+  collaboratorFeeMutations,
+  collaboratorFeeReads,
   currencyMutations,
   currencyReads,
   currencyRateProviders,
@@ -1723,6 +1754,109 @@ export const registerFoundationIpc = ({
   safeHandle(ipcChannels.finance.update, updateFinancialEntrySchema, async (_event, input) => {
     await workspaceAccess.assertFinanceEntryAccess(input.entryId, "update finance entries", "write", "finance.read");
     return financeMutations.updateEntry(input);
+  });
+
+  safeHandleReadWithSchema(
+    ipcChannels.finance.listCollaboratorFees,
+    collaboratorFeeListReadArgsSchema,
+    async (_event, query: CollaboratorFeeListQuery | undefined) => {
+      const workspaceId = requireWorkspaceId(query, "load collaborator fees");
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId,
+        action: "load collaborator fees",
+        accessLevel: "read",
+        requiredPermission: "crew_fees.read",
+      });
+      return collaboratorFeeReads.listFees(query);
+    },
+    "The app could not load collaborator fees.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.finance.getCollaboratorFeeDetail,
+    collaboratorFeeDetailReadArgsSchema,
+    async (_event, query: { workspaceId: string; feeId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load collaborator fee detail",
+        accessLevel: "read",
+        requiredPermission: "crew_fees.read",
+      });
+      return collaboratorFeeReads.getFeeDetail(query.workspaceId, query.feeId);
+    },
+    "The app could not load collaborator fee detail.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.finance.getCollaboratorFeeSummary,
+    collaboratorFeeSummaryReadArgsSchema,
+    async (_event, query: { workspaceId: string; projectId?: string | null }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load collaborator payment summary",
+        accessLevel: "read",
+        requiredPermission: "crew_fees.read",
+      });
+      return collaboratorFeeReads.getSummary(query);
+    },
+    "The app could not load collaborator payment summary.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.finance.suggestCollaboratorFees,
+    collaboratorFeeSuggestionsReadArgsSchema,
+    async (_event, query: { workspaceId: string; projectId?: string | null; crewMemberId?: string | null }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "suggest collaborator fees",
+        accessLevel: "read",
+        requiredPermission: "crew_fees.manage",
+      });
+      return collaboratorFeeReads.suggestFromAssignments(query);
+    },
+    "The app could not suggest collaborator fees.",
+  );
+  safeHandle(ipcChannels.finance.createCollaboratorFee, createCollaboratorFeeSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "create collaborator fees",
+      accessLevel: "write",
+      requiredPermission: "crew_fees.manage",
+    });
+    return collaboratorFeeMutations.createFee(input);
+  });
+  safeHandle(ipcChannels.finance.updateCollaboratorFee, updateCollaboratorFeeSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update collaborator fees",
+      accessLevel: "write",
+      requiredPermission: "crew_fees.manage",
+    });
+    return collaboratorFeeMutations.updateFee(input);
+  });
+  safeHandle(ipcChannels.finance.approveCollaboratorFee, approveCollaboratorFeeSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "approve collaborator fees",
+      accessLevel: "write",
+      requiredPermission: "crew_fees.manage",
+    });
+    return collaboratorFeeMutations.approveFee(input);
+  });
+  safeHandle(ipcChannels.finance.cancelCollaboratorFee, cancelCollaboratorFeeSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "cancel collaborator fees",
+      accessLevel: "write",
+      requiredPermission: "crew_fees.manage",
+    });
+    return collaboratorFeeMutations.cancelFee(input);
+  });
+  safeHandle(ipcChannels.finance.recordCollaboratorPayment, recordCollaboratorPaymentSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "record collaborator payments",
+      accessLevel: "write",
+      requiredPermission: "crew_payments.record",
+    });
+    return collaboratorFeeMutations.recordPayment(input);
   });
 
   safeHandleReadWithSchema(

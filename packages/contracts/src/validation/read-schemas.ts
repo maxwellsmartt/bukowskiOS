@@ -63,6 +63,8 @@ const projectSortFieldSchema = z.enum([
 ]);
 
 const financeEntrySortFieldSchema = z.enum(["date", "type", "category", "reference", "project", "amount", "status"]);
+const collaboratorFeeSortFieldSchema = z.enum(["expectedDate", "crew", "project", "feeType", "amount", "outstanding", "status"]);
+const collaboratorFeeStatusSchema = z.enum(["draft", "approved", "scheduled", "partially_paid", "paid", "cancelled", "all"]);
 const financeOverviewPeriodSchema = z.enum(["month", "quarter", "year", "custom"]);
 const catalogEntityTypeSchema = z.enum(["location", "department", "crew", "client", "production_company", "manufacturer", "category", "kit"]);
 const catalogSortFieldSchema = z.enum([
@@ -168,6 +170,37 @@ export const financeEntryListQuerySchema = z.object({
 });
 
 export const financeEntryListReadArgsSchema = z.tuple([financeEntryListQuerySchema.optional()]);
+
+export const collaboratorFeeListQuerySchema = z.object({
+  workspaceId: nonEmptyId.optional(),
+  search: boundedSearch.optional(),
+  sortBy: collaboratorFeeSortFieldSchema,
+  sortDirection: sortDirectionSchema,
+  status: collaboratorFeeStatusSchema.optional(),
+  projectId: nonEmptyId.nullable().optional(),
+  crewMemberId: nonEmptyId.nullable().optional(),
+});
+
+export const collaboratorFeeListReadArgsSchema = z.tuple([collaboratorFeeListQuerySchema.optional()]);
+export const collaboratorFeeDetailReadArgsSchema = z.tuple([
+  z.object({
+    workspaceId: nonEmptyId,
+    feeId: nonEmptyId,
+  }),
+]);
+export const collaboratorFeeSummaryReadArgsSchema = z.tuple([
+  z.object({
+    workspaceId: nonEmptyId,
+    projectId: nonEmptyId.nullable().optional(),
+  }),
+]);
+export const collaboratorFeeSuggestionsReadArgsSchema = z.tuple([
+  z.object({
+    workspaceId: nonEmptyId,
+    projectId: nonEmptyId.nullable().optional(),
+    crewMemberId: nonEmptyId.nullable().optional(),
+  }),
+]);
 
 export const financeOverviewQuerySchema = z
   .object({

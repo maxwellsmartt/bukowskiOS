@@ -168,6 +168,19 @@ const attachWindowRuntimeTelemetry = (
   window: BrowserWindow,
   runtimeDiagnostics: ReturnType<typeof initializeLocalDatabase>["runtimeDiagnostics"],
 ) => {
+  window.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+    const payload = {
+      level,
+      line,
+      sourceId,
+      message,
+    };
+
+    if (level >= 2) {
+      logger.warn("Renderer console message.", payload);
+    }
+  });
+
   window.webContents.on("render-process-gone", (_event, details) => {
     runtimeDiagnostics.recordRuntimeError({
       sourceKind: "webcontents",
@@ -364,6 +377,8 @@ app.whenReady().then(() => {
     fileUploads: localDatabase.fileUploads,
     incidentMutations: localDatabase.incidentMutations,
     financeMutations: localDatabase.financeMutations,
+    collaboratorFeeMutations: localDatabase.collaboratorFeeMutations,
+    collaboratorFeeReads: localDatabase.collaboratorFeeReads,
     currencyMutations: localDatabase.currencyMutations,
     currencyReads: localDatabase.currencyReads,
     currencyRateProviders: localDatabase.currencyRateProviders,
@@ -683,13 +698,21 @@ app.whenReady().then(() => {
     runtimeDiagnostics: localDatabase.runtimeDiagnostics,
   });
   const rendererLoadStartedAt = Date.now();
-  void loadMainWindowContent(mainWindow, devServerUrl, rendererDist);
   mainWindow.webContents.once("did-finish-load", () => {
     logger.info("Renderer finished loading.", {
       durationMs: Date.now() - rendererLoadStartedAt,
       startupDurationMs: Date.now() - startupStartedAt,
     });
     flushPendingDeepLinks();
+  });
+  void loadMainWindowContent(mainWindow, devServerUrl, rendererDist).catch((error: unknown) => {
+    logger.error("Renderer failed to load.", {
+      durationMs: Date.now() - rendererLoadStartedAt,
+      startupDurationMs: Date.now() - startupStartedAt,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
   });
 
   app.on("activate", () => {

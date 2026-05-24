@@ -23,6 +23,7 @@ describe("security config", () => {
 
     expect(policy).toContain("https://api.openai.com");
     expect(policy).toContain("https://jmxkejpdklrrzhvzjlqm.supabase.co");
+    expect(policy).toContain("wss://jmxkejpdklrrzhvzjlqm.supabase.co");
     expect(policy).toContain("https://lh3.googleusercontent.com");
     expect(policy).toContain("https://avatars.githubusercontent.com");
     expect(policy).toContain("http://localhost:5173");

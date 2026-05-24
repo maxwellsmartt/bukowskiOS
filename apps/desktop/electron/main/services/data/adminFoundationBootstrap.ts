@@ -23,6 +23,9 @@ const operationalPermissions = [
   ["perm-invoices-cancel", "invoices.cancel", "Cancel invoices", "Cancel invoices before payment"],
   ["perm-invoices-record-payment", "invoices.record_payment", "Record invoice payments", "Register payments against invoices"],
   ["perm-invoices-export", "invoices.export", "Export invoices", "Generate invoice PDFs"],
+  ["perm-crew-fees-read", "crew_fees.read", "Read crew fees", "View collaborator fees and payment history"],
+  ["perm-crew-fees-manage", "crew_fees.manage", "Manage crew fees", "Create, edit, approve and cancel collaborator fees"],
+  ["perm-crew-payments-record", "crew_payments.record", "Record crew payments", "Record outbound payments to collaborators"],
 ] as const;
 
 const operationalRoles = [
@@ -52,6 +55,9 @@ const operationalRolePermissions = [
   ["role-admin", "perm-invoices-cancel"],
   ["role-admin", "perm-invoices-record-payment"],
   ["role-admin", "perm-invoices-export"],
+  ["role-admin", "perm-crew-fees-read"],
+  ["role-admin", "perm-crew-fees-manage"],
+  ["role-admin", "perm-crew-payments-record"],
   ["role-crew", "perm-projects-read"],
   ["role-crew", "perm-assets-read"],
   ["role-crew", "perm-incidents-read"],
@@ -70,6 +76,7 @@ const operationalRolePermissions = [
   ["role-finance-viewer", "perm-finance-read"],
   ["role-finance-viewer", "perm-invoices-read"],
   ["role-finance-viewer", "perm-invoices-export"],
+  ["role-finance-viewer", "perm-crew-fees-read"],
   ["role-maintenance", "perm-assets-read"],
   ["role-maintenance", "perm-incidents-read"],
   ["role-maintenance", "perm-incidents-create"],

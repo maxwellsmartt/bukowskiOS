@@ -306,6 +306,37 @@ declare global {
       openDocument: (fileId: string) => Promise<void>;
       create: (input: CreateFinancialEntryCommand) => Promise<FinanceEntryMutationResult>;
       update: (input: UpdateFinancialEntryCommand) => Promise<FinanceEntryMutationResult>;
+      listCollaboratorFees: (
+        query?: import("@contracts").CollaboratorFeeListQuery,
+      ) => Promise<import("@contracts").CollaboratorFeeRow[]>;
+      getCollaboratorFeeDetail: (
+        workspaceId: string,
+        feeId: string,
+      ) => Promise<import("@contracts").CollaboratorFeeDetail | null>;
+      getCollaboratorFeeSummary: (
+        workspaceId: string,
+        projectId?: string | null,
+      ) => Promise<import("@contracts").CollaboratorFeeSummary>;
+      suggestCollaboratorFees: (input: {
+        workspaceId: string;
+        projectId?: string | null;
+        crewMemberId?: string | null;
+      }) => Promise<import("@contracts").CollaboratorFeeSuggestion[]>;
+      createCollaboratorFee: (
+        input: import("@contracts").CreateCollaboratorFeeCommand,
+      ) => Promise<import("@contracts").CollaboratorFeeMutationResult>;
+      updateCollaboratorFee: (
+        input: import("@contracts").UpdateCollaboratorFeeCommand,
+      ) => Promise<import("@contracts").CollaboratorFeeMutationResult>;
+      approveCollaboratorFee: (
+        input: import("@contracts").ApproveCollaboratorFeeCommand,
+      ) => Promise<import("@contracts").CollaboratorFeeMutationResult>;
+      cancelCollaboratorFee: (
+        input: import("@contracts").CancelCollaboratorFeeCommand,
+      ) => Promise<import("@contracts").CollaboratorFeeMutationResult>;
+      recordCollaboratorPayment: (
+        input: import("@contracts").RecordCollaboratorPaymentCommand,
+      ) => Promise<import("@contracts").CollaboratorFeeMutationResult>;
     };
     bukowskiCurrency?: {
       getSettings: (workspaceId: string) => Promise<import("@contracts").CurrencySettingsRow>;
