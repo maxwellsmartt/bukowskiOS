@@ -1391,7 +1391,8 @@
         "flowEmpty": "Classify movements to see the monthly income and expense flow.",
         "netLabel": "Net",
         "categoryTitle": "Expense by category",
-        "categoryEmpty": "Classify expenses to see how spend breaks down by category."
+        "categoryEmpty": "Classify expenses to see how spend breaks down by category.",
+        "expenseTotal": "Total expense"
       },
       "period": {
         "month": "Month",
@@ -1515,6 +1516,21 @@
         "interest": "Interest",
         "owner_draw": "Owner draw",
         "other": "Other"
+      },
+      "categories": {
+        "uncategorized": "Unclassified",
+        "crew_fees": "Crew fees",
+        "services": "Service payments",
+        "taxes": "Taxes",
+        "social_security": "Social security (TSS)",
+        "bank_fees": "Bank fees",
+        "credit_card": "Credit card",
+        "loan_financing": "Loans and financing",
+        "production_income": "Production income",
+        "interest_income": "Interest",
+        "internal_transfer": "Internal transfers",
+        "other_expenses": "Other expenses",
+        "other_small": "Other small"
       },
       "imports": {
         "title": "Import history",

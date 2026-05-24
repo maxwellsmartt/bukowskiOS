@@ -1393,7 +1393,8 @@
         "flowEmpty": "Clasifica movimientos para ver el flujo mensual de ingresos y gastos.",
         "netLabel": "Neto",
         "categoryTitle": "Gasto por categoría",
-        "categoryEmpty": "Clasifica gastos para ver el desglose por categoría."
+        "categoryEmpty": "Clasifica gastos para ver el desglose por categoría.",
+        "expenseTotal": "Total gastos"
       },
       "period": {
         "month": "Mes",
@@ -1517,6 +1518,21 @@
         "interest": "Intereses",
         "owner_draw": "Retiro de socio",
         "other": "Otro"
+      },
+      "categories": {
+        "uncategorized": "Sin clasificar",
+        "crew_fees": "Pagos honorarios",
+        "services": "Pagos servicios",
+        "taxes": "Impuestos",
+        "social_security": "Seguridad social (TSS)",
+        "bank_fees": "Comisiones bancarias",
+        "credit_card": "Tarjeta de crédito",
+        "loan_financing": "Préstamos y financiamiento",
+        "production_income": "Ingresos de producción",
+        "interest_income": "Intereses",
+        "internal_transfer": "Transferencias internas",
+        "other_expenses": "Otros gastos",
+        "other_small": "Otros menores"
       },
       "imports": {
         "title": "Historial de importaciones",

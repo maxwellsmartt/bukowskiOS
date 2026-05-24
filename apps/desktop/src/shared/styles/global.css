@@ -4850,7 +4850,34 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .finance-chart-shell-pie {
-  min-height: 320px;
+  min-height: 340px;
+}
+
+.finance-donut-wrap {
+  position: relative;
+  min-height: 240px;
+}
+
+.finance-donut-center {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: grid;
+  width: 112px;
+  transform: translate(-50%, -50%);
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.2;
+  pointer-events: none;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.finance-donut-center strong {
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.1;
+  text-transform: none;
 }
 
 .finance-chart-tooltip {
@@ -4889,6 +4916,9 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 164px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .finance-pie-legend-row {
@@ -4901,11 +4931,18 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .finance-pie-legend-label {
   color: var(--text-primary);
   font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .finance-pie-legend-meta {
   color: var(--text-secondary);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .finance-period-toolbar {
