@@ -1490,7 +1490,8 @@
       "import": {
         "noRows": "No se encontraron movimientos en el archivo.",
         "failed": "No se pudo importar el estado de cuenta.",
-        "mismatch": "Este archivo parece de la cuenta {{fileAccount}} ({{fileCurrency}}), pero lo estás importando en \"{{accountLabel}}\" ({{accountCurrency}}). ¿Importar de todos modos?"
+        "mismatch": "Este archivo parece de la cuenta {{fileAccount}} ({{fileCurrency}}), pero lo estás importando en \"{{accountLabel}}\" ({{accountCurrency}}). ¿Importar de todos modos?",
+        "mismatchBlocked": "Import bloqueado: el archivo parece de la cuenta {{fileAccount}} ({{fileCurrency}}), pero seleccionaste \"{{accountLabel}}\" ({{accountCurrency}}). Elige o crea la cuenta bancaria correcta."
       },
       "classify": {
         "placeholder": "Clasificar…",

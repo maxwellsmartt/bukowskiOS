@@ -1488,7 +1488,8 @@
       "import": {
         "noRows": "No movements were found in the file.",
         "failed": "Could not import the statement.",
-        "mismatch": "This file looks like account {{fileAccount}} ({{fileCurrency}}), but you're importing into \"{{accountLabel}}\" ({{accountCurrency}}). Import anyway?"
+        "mismatch": "This file looks like account {{fileAccount}} ({{fileCurrency}}), but you're importing into \"{{accountLabel}}\" ({{accountCurrency}}). Import anyway?",
+        "mismatchBlocked": "Import blocked: this file looks like account {{fileAccount}} ({{fileCurrency}}), but you selected \"{{accountLabel}}\" ({{accountCurrency}}). Choose or create the correct bank account."
       },
       "classify": {
         "placeholder": "Classify…",

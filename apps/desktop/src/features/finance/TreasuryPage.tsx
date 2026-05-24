@@ -334,15 +334,15 @@ export const TreasuryPage = () => {
           !target.accountNumberFull.includes(parsed.accountNumber) &&
           !parsed.accountNumber.includes(target.accountNumberFull);
         if (currencyMismatch || numberMismatch) {
-          const proceed = window.confirm(
-            t("finance.treasury.import.mismatch", {
+          toast.error(
+            t("finance.treasury.import.mismatchBlocked", {
               fileCurrency: parsed.currencyHint ?? "?",
               fileAccount: parsed.accountNumber ?? "?",
               accountLabel: target.accountLabel,
               accountCurrency: target.currency,
             }),
           );
-          if (!proceed) return;
+          return;
         }
       }
       const result = await mutations.importStatement({
