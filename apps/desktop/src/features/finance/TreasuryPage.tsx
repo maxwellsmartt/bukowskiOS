@@ -1,4 +1,4 @@
-import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, Landmark, Plus, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, Landmark, Plus, Search, Trash2, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -1106,50 +1106,55 @@ export const TreasuryPage = () => {
 
           <div className="treasury-table-shell">
             <div className="treasury-table-toolbar">
-              <input
-                className="field-input treasury-table-search"
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={t("finance.treasury.searchPlaceholder")}
-                value={search}
-              />
-              <label className="compact-filter-field treasury-table-filter-select">
-                <CompactSelect<string>
-                  ariaLabel={t("finance.treasury.filters.account")}
-                  onChange={setAccountFilter}
-                  options={accountOptions}
-                  popupMinWidth={240}
-                  value={accountFilter}
-                />
-              </label>
-              <label className="compact-filter-field treasury-table-filter-select">
-                <CompactSelect<MovementDateFilter>
-                  ariaLabel={t("finance.treasury.filters.period")}
-                  onChange={setDateFilter}
-                  options={dateFilterOptions}
-                  popupMinWidth={180}
-                  value={dateFilter}
-                />
-              </label>
-              {dateFilter !== "all" ? (
-                <>
-                  <label className="compact-filter-field">
-                    <span>{t("finance.treasury.filters.from")}</span>
-                    <input className="field-input" onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
-                  </label>
-                  <label className="compact-filter-field">
-                    <span>{t("finance.treasury.filters.to")}</span>
-                    <input className="field-input" onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
-                  </label>
-                </>
-              ) : null}
-              <label className="compact-filter-field treasury-unclassified-toggle">
+              <div className="treasury-table-search-wrap">
+                <Search aria-hidden="true" size={14} />
                 <input
-                  checked={unclassifiedOnly}
-                  onChange={(event) => setUnclassifiedOnly(event.target.checked)}
-                  type="checkbox"
+                  className="field-input treasury-table-search"
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={t("finance.treasury.searchPlaceholder")}
+                  value={search}
                 />
-                <span>{t("finance.treasury.filters.unclassified")}</span>
-              </label>
+              </div>
+              <div className="treasury-table-filter-group">
+                <label className="compact-filter-field treasury-table-filter-select">
+                  <CompactSelect<string>
+                    ariaLabel={t("finance.treasury.filters.account")}
+                    onChange={setAccountFilter}
+                    options={accountOptions}
+                    popupMinWidth={240}
+                    value={accountFilter}
+                  />
+                </label>
+                <label className="compact-filter-field treasury-table-filter-select">
+                  <CompactSelect<MovementDateFilter>
+                    ariaLabel={t("finance.treasury.filters.period")}
+                    onChange={setDateFilter}
+                    options={dateFilterOptions}
+                    popupMinWidth={180}
+                    value={dateFilter}
+                  />
+                </label>
+                {dateFilter !== "all" ? (
+                  <>
+                    <label className="compact-filter-field treasury-table-date-filter">
+                      <span>{t("finance.treasury.filters.from")}</span>
+                      <input className="field-input" onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
+                    </label>
+                    <label className="compact-filter-field treasury-table-date-filter">
+                      <span>{t("finance.treasury.filters.to")}</span>
+                      <input className="field-input" onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
+                    </label>
+                  </>
+                ) : null}
+                <label className="compact-filter-field treasury-unclassified-toggle">
+                  <input
+                    checked={unclassifiedOnly}
+                    onChange={(event) => setUnclassifiedOnly(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>{t("finance.treasury.filters.unclassified")}</span>
+                </label>
+              </div>
             </div>
 
           {transactions.isLoading && transactions.data.length === 0 ? (

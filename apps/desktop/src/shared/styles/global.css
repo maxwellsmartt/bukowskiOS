@@ -16270,6 +16270,7 @@ input[type="number"] {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 14px;
+  justify-content: space-between;
   padding: 10px 12px;
 }
 
@@ -16281,9 +16282,35 @@ input[type="number"] {
   gap: 0;
 }
 
-.treasury-table-search {
+.treasury-table-filter-group {
+  align-items: center;
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.treasury-table-search-wrap {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
   flex: 999 1 360px;
   min-width: min(360px, 100%);
+  position: relative;
+}
+
+.treasury-table-search-wrap svg {
+  left: 11px;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+
+.treasury-table-search {
+  min-width: 0;
+  padding-left: 32px;
+  width: 100%;
 }
 
 .treasury-unclassified-toggle {
@@ -16291,11 +16318,21 @@ input[type="number"] {
   border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: 999px;
   min-height: 34px;
-  padding: 0 10px;
+  padding: 0 9px;
+  transition: background 120ms ease, border-color 120ms ease;
 }
 
 .treasury-unclassified-toggle input {
   accent-color: rgba(97, 219, 149, 0.9);
+}
+
+.treasury-unclassified-toggle:has(input:checked) {
+  background: rgba(214, 179, 122, 0.1);
+  border-color: rgba(214, 179, 122, 0.24);
+}
+
+.treasury-table-date-filter .field-input {
+  min-height: 34px;
 }
 
 .treasury-filter-bar {
@@ -16646,6 +16683,7 @@ input[type="number"] {
 
   .treasury-segmented-tabs,
   .treasury-movement-actions,
+  .treasury-table-filter-group,
   .treasury-table-toolbar {
     align-items: stretch;
     width: 100%;
@@ -16660,6 +16698,7 @@ input[type="number"] {
   .treasury-movement-actions .ghost-control,
   .treasury-table-toolbar .compact-filter-field,
   .treasury-overview-controls .compact-filter-field,
+  .treasury-table-search-wrap,
   .treasury-table-search {
     flex: 1 1 100%;
     min-width: 0;
