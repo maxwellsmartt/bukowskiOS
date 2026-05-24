@@ -1,5 +1,5 @@
 import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, Landmark, Plus, Search, Trash2, X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
@@ -193,6 +193,9 @@ export const TreasuryPage = () => {
   const [importAccountId, setImportAccountId] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [overviewCurrency, setOverviewCurrency] = useState<TreasuryReportCurrency>("DOP");
+  const [selectedMovementIds, setSelectedMovementIds] = useState<string[]>([]);
+  const [bulkKind, setBulkKind] = useState<TransactionKind | "">("");
+  const [isBulkClassifying, setIsBulkClassifying] = useState(false);
 
   const accounts = useBankAccounts(activeWorkspaceId);
   const overview = useTreasuryOverview(
@@ -249,6 +252,10 @@ export const TreasuryPage = () => {
     [t],
   );
   const formatMoney = formatTreasuryMoney;
+  const selectedMovements = useMemo(() => {
+    const selectedIds = new Set(selectedMovementIds);
+    return transactions.data.filter((row) => selectedIds.has(row.id));
+  }, [selectedMovementIds, transactions.data]);
 
   const kindLabel = (kind: TransactionKind | null | undefined) =>
     kind ? t(`finance.treasury.kinds.${kind}`, { defaultValue: kind }) : "—";
@@ -296,6 +303,15 @@ export const TreasuryPage = () => {
     reviewQueue.refresh();
     imports.refresh();
   };
+
+  useEffect(() => {
+    setSelectedMovementIds((current) => {
+      if (!current.length) return current;
+      const visibleIds = new Set(transactions.data.map((row) => row.id));
+      const next = current.filter((id) => visibleIds.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [transactions.data]);
 
   const openAccount = (accountId: string) => {
     setAccountFilter(accountId);
@@ -486,6 +502,39 @@ export const TreasuryPage = () => {
       toast.error(error instanceof Error ? error.message : t("finance.treasury.classify.failed"));
     } finally {
       setIsApplyingRule(false);
+    }
+  };
+
+  const applyBulkClassification = async () => {
+    if (!bulkKind || selectedMovements.length === 0) return;
+    setIsBulkClassifying(true);
+    try {
+      for (const row of selectedMovements) {
+        await mutations.annotate({
+          commandId: newCommandId("treasury-bulk-classify"),
+          workspaceId: activeWorkspaceId,
+          actorType: "user",
+          sourceChannel: "desktop",
+          transactionId: row.id,
+          txnKind: bulkKind,
+          isInternalTransfer: bulkKind === "transfer" || bulkKind === "fx_exchange",
+        });
+      }
+      toast.success(
+        t("finance.treasury.classify.bulkSaved", {
+          count: selectedMovements.length,
+          kind: kindLabel(bulkKind),
+          defaultValue: "{{count}} movements marked as {{kind}}.",
+        }),
+      );
+      setSelectedMovementIds([]);
+      setBulkKind("");
+      transactions.refresh();
+      overview.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("finance.treasury.classify.failed"));
+    } finally {
+      setIsBulkClassifying(false);
     }
   };
 
@@ -1175,6 +1224,59 @@ export const TreasuryPage = () => {
               </div>
             </div>
 
+          {selectedMovements.length > 0 ? (
+            <div className="treasury-bulk-classify-bar" role="status">
+              <div className="treasury-bulk-classify-copy">
+                <strong>
+                  {t("finance.treasury.classify.selectedCount", {
+                    count: selectedMovements.length,
+                    defaultValue: "{{count}} selected",
+                  })}
+                </strong>
+                <span>
+                  {t("finance.treasury.classify.bulkHint", {
+                    defaultValue: "Apply one Type to the selected movements.",
+                  })}
+                </span>
+              </div>
+              <div className="treasury-bulk-classify-actions">
+                <CompactSelect<TransactionKind | "">
+                  ariaLabel={t("finance.treasury.columns.kind")}
+                  className={`treasury-kind-select treasury-bulk-kind-select ${kindToneClass(bulkKind || null)}`}
+                  onChange={setBulkKind}
+                  options={kindOptions}
+                  popupMinWidth={190}
+                  value={bulkKind}
+                />
+                <button
+                  className="ghost-control treasury-bulk-apply-button"
+                  disabled={!bulkKind || isBulkClassifying}
+                  onClick={() => void applyBulkClassification()}
+                  type="button"
+                >
+                  <Check size={13} />
+                  <span>
+                    {isBulkClassifying
+                      ? t("common.saving")
+                      : t("finance.treasury.classify.applyBulk", { defaultValue: "Apply type" })}
+                  </span>
+                </button>
+                <button
+                  className="ghost-control"
+                  disabled={isBulkClassifying}
+                  onClick={() => {
+                    setSelectedMovementIds([]);
+                    setBulkKind("");
+                  }}
+                  type="button"
+                >
+                  <X size={13} />
+                  <span>{t("common.cancel")}</span>
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {transactions.isLoading && transactions.data.length === 0 ? (
             <TableSkeleton rows={6} />
           ) : transactions.data.length === 0 ? (
@@ -1186,8 +1288,11 @@ export const TreasuryPage = () => {
             <DataTable<BankTransactionRow>
               columns={movementColumns}
               getRowId={(row) => row.id}
+              onSelectedRowIdsChange={setSelectedMovementIds}
               persistKey="treasury-movements-v1"
               rows={transactions.data}
+              selectable
+              selectedRowIds={selectedMovementIds}
             />
           )}
           {transactions.error ? <div className="form-inline-error">{transactions.error}</div> : null}

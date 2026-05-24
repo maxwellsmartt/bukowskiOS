@@ -16343,6 +16343,60 @@ input[type="number"] {
   min-height: 34px;
 }
 
+.treasury-bulk-classify-bar {
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(214, 179, 122, 0.1), rgba(126, 183, 178, 0.055)),
+    rgba(255, 255, 255, 0.018);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.065);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  justify-content: space-between;
+  padding: 9px 12px;
+}
+
+.treasury-bulk-classify-copy {
+  display: grid;
+  gap: 2px;
+  min-width: min(280px, 100%);
+}
+
+.treasury-bulk-classify-copy strong {
+  color: var(--text-primary);
+  font-size: var(--font-sm, 13px);
+  line-height: 1.2;
+}
+
+.treasury-bulk-classify-copy span {
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 11px);
+}
+
+.treasury-bulk-classify-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.treasury-bulk-kind-select {
+  width: 156px;
+}
+
+.treasury-bulk-apply-button {
+  background: rgba(57, 158, 103, 0.16);
+  border-color: rgba(97, 219, 149, 0.28);
+  color: rgba(198, 248, 218, 0.96);
+}
+
+.treasury-bulk-apply-button:hover:not(:disabled) {
+  background: rgba(57, 158, 103, 0.24);
+  border-color: rgba(97, 219, 149, 0.42);
+  color: #fff;
+}
+
 .treasury-filter-bar {
   flex-wrap: wrap;
   gap: 8px;
@@ -16746,6 +16800,7 @@ input[type="number"] {
 
   .treasury-segmented-tabs,
   .treasury-movement-actions,
+  .treasury-bulk-classify-actions,
   .treasury-table-filter-group,
   .treasury-table-toolbar {
     align-items: stretch;
@@ -16753,12 +16808,15 @@ input[type="number"] {
   }
 
   .treasury-segmented-tabs,
-  .treasury-movement-actions {
+  .treasury-movement-actions,
+  .treasury-bulk-classify-actions {
     flex-wrap: wrap;
   }
 
   .treasury-segmented-tab,
   .treasury-movement-actions .ghost-control,
+  .treasury-bulk-classify-actions .ghost-control,
+  .treasury-bulk-kind-select,
   .treasury-table-toolbar .compact-filter-field,
   .treasury-overview-controls .compact-filter-field,
   .treasury-table-search-wrap,
