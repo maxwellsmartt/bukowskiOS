@@ -1157,6 +1157,42 @@ const createRuntime = (): LocalDatabaseRuntime => {
     }
   };
 
+  // Maps a delete-operation outbox row to the Supabase rows to remove. Children
+  // are listed before parents because bank_transactions.import_id is ON DELETE
+  // SET NULL (not cascade), so deleting only the import would orphan its rows.
+  const resolveSupabaseDomainDeletes = (row: {
+    entity_type: string;
+    entity_id: string;
+  }): Array<{ table: string; column: string; value: string }> | null => {
+    switch (row.entity_type) {
+      case "bank_statement_import":
+        return [
+          { table: "bank_transactions", column: "import_id", value: row.entity_id },
+          { table: "bank_statement_imports", column: "id", value: row.entity_id },
+        ];
+      case "bank_account":
+        return [{ table: "bank_accounts", column: "id", value: row.entity_id }];
+      case "bank_transaction":
+        return [{ table: "bank_transactions", column: "id", value: row.entity_id }];
+      case "transaction_annotation":
+        return [{ table: "transaction_annotations", column: "transaction_id", value: row.entity_id }];
+      case "transaction_link":
+        return [{ table: "transaction_links", column: "id", value: row.entity_id }];
+      case "counterparty_rule":
+        return [{ table: "counterparty_rules", column: "id", value: row.entity_id }];
+      case "invoice":
+        return [{ table: "invoices", column: "id", value: row.entity_id }];
+      case "quote":
+        return [{ table: "quotes", column: "id", value: row.entity_id }];
+      case "collaborator_fee":
+        return [{ table: "collaborator_fees", column: "id", value: row.entity_id }];
+      case "financial_entry":
+        return [{ table: "financial_entries", column: "id", value: row.entity_id }];
+      default:
+        return null;
+    }
+  };
+
   const supabaseTokenStore = createSupabaseTokenStore();
   const operationalSnapshots = createOperationalSnapshotService(database);
   const workspaceAccess = createWorkspaceAccessGuard({
@@ -1174,6 +1210,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
           resolveAssetSnapshot: resolveSupabaseAssetSnapshot,
           resolveOperationalSnapshot: (row) => operationalSnapshots.resolveSnapshot(row),
           resolveDomainUpserts: resolveSupabaseDomainUpserts,
+          resolveDomainDeletes: resolveSupabaseDomainDeletes,
         })
       : undefined,
   });

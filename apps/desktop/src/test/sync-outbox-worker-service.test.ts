@@ -575,4 +575,50 @@ describe("sync outbox worker service", () => {
       "POST https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
     ]);
   });
+
+  it("propagates a local deletion by removing the cloud rows (delete op)", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    let upsertResolverCalled = false;
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveDomainUpserts: () => {
+        upsertResolverCalled = true;
+        return null;
+      },
+      resolveDomainDeletes: (row) =>
+        row.entity_type === "bank_statement_import"
+          ? [
+              { table: "bank_transactions", column: "import_id", value: row.entity_id },
+              { table: "bank_statement_imports", column: "id", value: row.entity_id },
+            ]
+          : null,
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(null, { status: 200 });
+      }) as typeof fetch,
+    });
+
+    await transport({
+      id: "outbox-del-1",
+      workspace_id: "11111111-1111-4111-8111-111111111111",
+      entity_type: "bank_statement_import",
+      entity_id: "import-9",
+      event_id: null,
+      operation_type: "delete",
+      payload_json: JSON.stringify({ deleted: true }),
+      attempt_count: 0,
+      created_at: "2026-04-12T18:00:00.000Z",
+      updated_at: "2026-04-12T18:01:00.000Z",
+    });
+
+    expect(requests.map((request) => `${request.init.method ?? "POST"} ${request.url}`)).toEqual([
+      "DELETE https://bukowski.test/rest/v1/bank_transactions?import_id=eq.import-9",
+      "DELETE https://bukowski.test/rest/v1/bank_statement_imports?id=eq.import-9",
+      "POST https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
+    ]);
+    // Delete ops must not run the upsert resolvers (no resurrecting rows).
+    expect(upsertResolverCalled).toBe(false);
+  });
 });

@@ -55,6 +55,7 @@ const enqueueOutbox = (
   payload: unknown,
   syncId: string,
   now: string,
+  operationType: "upsert" | "delete" = "upsert",
 ) => {
   db.prepare(
     `
@@ -62,9 +63,9 @@ const enqueueOutbox = (
         id, workspace_id, entity_type, entity_id, operation_type,
         payload_json, status, attempt_count, last_error, next_retry_at,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'upsert', ?, 'pending', 0, NULL, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, NULL, ?, ?, ?)
     `,
-  ).run(syncId, workspaceId, entityType, entityId, JSON.stringify(payload), now, now, now);
+  ).run(syncId, workspaceId, entityType, entityId, operationType, JSON.stringify(payload), now, now, now);
 };
 
 const computeDedupeHash = (bankAccountId: string, row: ParsedBankTransaction) => {
@@ -495,6 +496,7 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           { deleted: true },
           `sync-${input.commandId}`,
           now,
+          "delete",
         );
         recordReceipt(input, now, "success", null);
         db.exec("COMMIT");

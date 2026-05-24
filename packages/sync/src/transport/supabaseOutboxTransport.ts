@@ -60,7 +60,19 @@ export type SupabaseOutboxTransportOptions = {
   resolveDomainUpserts?: (
     row: SupabaseOutboxTransportRow,
   ) => Promise<SupabaseDomainUpsert[] | null> | SupabaseDomainUpsert[] | null;
+  // For a delete-operation outbox row, returns the Supabase rows to remove so a
+  // local deletion propagates to the cloud (and won't be left as an orphan).
+  // Order matters: list children before parents when FKs don't cascade.
+  resolveDomainDeletes?: (
+    row: SupabaseOutboxTransportRow,
+  ) => Promise<SupabaseDomainDelete[] | null> | SupabaseDomainDelete[] | null;
   fetchImpl?: typeof fetch;
+};
+
+export type SupabaseDomainDelete = {
+  table: string;
+  column: string;
+  value: string;
 };
 
 const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "");
@@ -137,9 +149,34 @@ export const createSupabaseOutboxTransport = ({
   resolveAssetSnapshot,
   resolveOperationalSnapshot,
   resolveDomainUpserts,
+  resolveDomainDeletes,
   fetchImpl = fetch,
 }: SupabaseOutboxTransportOptions) => {
   const normalizedUrl = normalizeUrl(supabaseUrl);
+
+  const recordOutboxRow = async (row: SupabaseOutboxTransportRow, accessToken: string, payload: unknown) => {
+    await upsertSupabaseRow({
+      accessToken,
+      anonKey,
+      endpoint: `${normalizedUrl}/rest/v1/sync_outbox?on_conflict=id`,
+      payload: {
+        id: row.id,
+        workspace_id: row.workspace_id,
+        entity_type: row.entity_type,
+        entity_id: row.entity_id,
+        event_id: row.event_id,
+        operation_type: row.operation_type,
+        payload_json: payload,
+        status: "sent",
+        attempt_count: row.attempt_count,
+        last_error: null,
+        next_retry_at: null,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+      fetchImpl,
+    });
+  };
 
   return async (row: SupabaseOutboxTransportRow) => {
     const accessToken = await getAccessToken();
@@ -156,6 +193,22 @@ export const createSupabaseOutboxTransport = ({
 
     if (payload === null || typeof payload !== "object") {
       throw new Error("Outbox payload must be a JSON object.");
+    }
+
+    // Delete-propagation: a local deletion removes the matching cloud rows so a
+    // second machine's pull won't resurrect them. We skip the upsert resolvers.
+    if (row.operation_type === "delete") {
+      const deletes = resolveDomainDeletes ? (await resolveDomainDeletes(row)) ?? [] : [];
+      for (const target of deletes) {
+        await deleteSupabaseRows({
+          accessToken,
+          anonKey,
+          endpoint: `${normalizedUrl}/rest/v1/${target.table}?${encodeURIComponent(target.column)}=eq.${encodeURIComponent(target.value)}`,
+          fetchImpl,
+        });
+      }
+      await recordOutboxRow(row, accessToken, payload);
+      return;
     }
 
     if (row.entity_type === "asset_event" && resolveAssetSnapshot) {
@@ -233,26 +286,6 @@ export const createSupabaseOutboxTransport = ({
       }
     }
 
-    await upsertSupabaseRow({
-      accessToken,
-      anonKey,
-      endpoint: `${normalizedUrl}/rest/v1/sync_outbox?on_conflict=id`,
-      payload: {
-        id: row.id,
-        workspace_id: row.workspace_id,
-        entity_type: row.entity_type,
-        entity_id: row.entity_id,
-        event_id: row.event_id,
-        operation_type: row.operation_type,
-        payload_json: payload,
-        status: "sent",
-        attempt_count: row.attempt_count,
-        last_error: null,
-        next_retry_at: null,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-      },
-      fetchImpl,
-    });
+    await recordOutboxRow(row, accessToken, payload);
   };
 };
