@@ -46,6 +46,14 @@ Fix aplicado:
 - Packing Slip reintenta cuando falta project/unit y upsertea items por `(packing_slip_id, asset_id)`.
 - Verificación: `corepack pnpm --filter @bukowski/desktop test -- operational-snapshot-service`, `typecheck` y `build` pasan.
 
+## Actualización 2026-05-24
+
+Se auditó la cobertura completa de pull/hidratación para instalaciones limpias:
+
+- Documento: [`sync-pull-inbox-audit-2026-05-24.md`](./sync-pull-inbox-audit-2026-05-24.md)
+- Hallazgo principal: catalog/asset/operational snapshots sí tienen pull local, pero Treasury, collaborator fees/payments, quotes, invoices, finance entries y currency settings todavía no hidratan una instalación limpia de forma completa.
+- Recomendación: antes de seguir con hardening visual de Treasury, implementar un pull financiero mínimo viable para Treasury + collaborator fees/payments.
+
 ## Qué no debemos hacer todavía
 - no abrir sync real antes de estabilizar identidad de workspace
 - no mezclar transporte remoto con lógica de dominio
