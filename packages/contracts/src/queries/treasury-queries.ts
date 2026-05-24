@@ -141,6 +141,8 @@ export type TreasuryMonthlyPoint = {
   income: number;
   expense: number;
   net: number;
+  /** Portion of the month's expense accepted as fiscally deductible. */
+  deductible: number;
 };
 
 export type TreasuryCategoryBreakdown = {

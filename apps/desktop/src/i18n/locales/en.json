@@ -1395,7 +1395,11 @@
         "conversionMissing": "{{count}} movements do not have an available rate to read them in {{currency}}.",
         "categoryTitle": "Expense by category",
         "categoryEmpty": "Classify expenses to see how spend breaks down by category.",
-        "expenseTotal": "Total expense"
+        "expenseTotal": "Total expense",
+        "deductibleTitle": "Deductible vs non-deductible",
+        "deductibleLabel": "Deductible",
+        "nonDeductibleLabel": "Non-deductible",
+        "deductibleEmpty": "Review expenses to see how much is fiscally deductible each month."
       },
       "period": {
         "month": "Month",

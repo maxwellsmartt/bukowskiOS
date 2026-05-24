@@ -1397,7 +1397,11 @@
         "conversionMissing": "{{count}} movimientos no tienen tasa disponible para leerlos en {{currency}}.",
         "categoryTitle": "Gasto por categoría",
         "categoryEmpty": "Clasifica gastos para ver el desglose por categoría.",
-        "expenseTotal": "Total gastos"
+        "expenseTotal": "Total gastos",
+        "deductibleTitle": "Deducible vs no deducible",
+        "deductibleLabel": "Deducible",
+        "nonDeductibleLabel": "No deducible",
+        "deductibleEmpty": "Revisa gastos para ver cuánto es deducible fiscalmente cada mes."
       },
       "period": {
         "month": "Mes",

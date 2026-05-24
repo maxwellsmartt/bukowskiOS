@@ -452,7 +452,7 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
       let unclassifiedCount = 0;
       let pendingReviewCount = 0;
       let conversionMissingCount = 0;
-      const monthlyMap = new Map<string, { income: number; expense: number }>();
+      const monthlyMap = new Map<string, { income: number; expense: number; deductible: number }>();
       const categoryMap = new Map<string, number>();
 
       for (const row of rows) {
@@ -463,7 +463,7 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
         const annotation = row.a_transaction_id == null ? null : mapAnnotation(row);
         const excluded = isExcluded(annotation);
         const monthKey = String(row.txn_date).slice(0, 7);
-        const bucket = monthlyMap.get(monthKey) ?? { income: 0, expense: 0 };
+        const bucket = monthlyMap.get(monthKey) ?? { income: 0, expense: 0, deductible: 0 };
 
         if (!annotation || !annotation.txnKind) unclassifiedCount += 1;
         if (annotation?.reimbursementStatus === "pending") pendingReviewCount += 1;
@@ -477,9 +477,14 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
         } else {
           totalExpense += amount;
           bucket.expense += amount;
+          // Convert the reviewed deductible the same way as the expense so it
+          // stays consistent with the (possibly currency-converted) totals.
           const deductible =
-            annotation?.deductibleAmount != null ? annotation.deductibleAmount : amount;
+            annotation?.deductibleAmount != null
+              ? convertAmount(annotation.deductibleAmount, row.currency as string).amount
+              : amount;
           totalDeductibleExpense += deductible;
+          bucket.deductible += deductible;
           const category =
             annotation?.expenseCategory || annotation?.txnKind || "uncategorized";
           categoryMap.set(category, (categoryMap.get(category) ?? 0) + amount);
@@ -494,6 +499,7 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
           income: round2(value.income),
           expense: round2(value.expense),
           net: round2(value.income - value.expense),
+          deductible: round2(value.deductible),
         }));
 
       const expenseTotalForPct = totalExpense || 1;

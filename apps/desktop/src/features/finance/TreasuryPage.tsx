@@ -766,6 +766,15 @@ export const TreasuryPage = () => {
     }
     return rows;
   }, [snap?.expenseByCategory, t]);
+  const deductibleChartData = useMemo(() => {
+    if (!snap?.monthly.length) return [];
+    return snap.monthly.map((point) => ({
+      month: point.month,
+      deductible: point.deductible,
+      nonDeductible: Math.max(Math.round((point.expense - point.deductible + Number.EPSILON) * 100) / 100, 0),
+    }));
+  }, [snap?.monthly]);
+  const hasDeductibleData = deductibleChartData.some((p) => p.deductible > 0 || p.nonDeductible > 0);
 
   const movementColumns = useMemo(
     () => [
@@ -1168,6 +1177,48 @@ export const TreasuryPage = () => {
                 <GuidedEmptyState
                   body={t("finance.treasury.overview.categoryEmpty")}
                   title={t("finance.treasury.overview.categoryTitle")}
+                />
+              )}
+            </SurfaceCard>
+
+            <SurfaceCard className="treasury-chart-card">
+              <div className="treasury-chart-heading">
+                <h3 className="section-subtitle">{t("finance.treasury.overview.deductibleTitle")}</h3>
+                <div className="treasury-flow-legend" aria-label={t("finance.treasury.overview.legend")}>
+                  <span><i style={{ background: "#7eb7b2" }} />{t("finance.treasury.overview.deductibleLabel")}</span>
+                  <span><i style={{ background: "#5a6072" }} />{t("finance.treasury.overview.nonDeductibleLabel")}</span>
+                </div>
+              </div>
+              {hasDeductibleData ? (
+                <div className="finance-chart-shell">
+                  <ResponsiveContainer height={260} width="100%">
+                    <BarChart data={deductibleChartData} margin={{ top: 10, right: 12, left: 10, bottom: 2 }}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis
+                        axisLine={false}
+                        dataKey="month"
+                        stroke="rgba(255,255,255,0.48)"
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        stroke="rgba(255,255,255,0.44)"
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(value) => formatAxisCurrency(Number(value), moneyCurrency)}
+                        tickLine={false}
+                        width={70}
+                      />
+                      <Tooltip content={<TreasuryChartTooltip currency={moneyCurrency} />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                      <Bar dataKey="deductible" fill="#7eb7b2" name={t("finance.treasury.overview.deductibleLabel")} radius={[0, 0, 0, 0]} stackId="exp" />
+                      <Bar dataKey="nonDeductible" fill="#5a6072" name={t("finance.treasury.overview.nonDeductibleLabel")} radius={[8, 8, 0, 0]} stackId="exp" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <GuidedEmptyState
+                  body={t("finance.treasury.overview.deductibleEmpty")}
+                  title={t("finance.treasury.overview.deductibleTitle")}
                 />
               )}
             </SurfaceCard>
