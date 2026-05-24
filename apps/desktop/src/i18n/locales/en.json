@@ -1399,7 +1399,9 @@
         "deductibleTitle": "Deductible vs non-deductible",
         "deductibleLabel": "Deductible",
         "nonDeductibleLabel": "Non-deductible",
-        "deductibleEmpty": "Review expenses to see how much is fiscally deductible each month."
+        "deductibleEmpty": "Review expenses to see how much is fiscally deductible each month.",
+        "balanceTitle": "Cash balance by account",
+        "balanceEmpty": "Import movements to see how each account's balance evolves."
       },
       "period": {
         "month": "Month",

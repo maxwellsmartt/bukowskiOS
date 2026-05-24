@@ -151,6 +151,19 @@ export type TreasuryCategoryBreakdown = {
   percentage: number;
 };
 
+/** One bank account plotted as its own balance line (kept in its own currency). */
+export type TreasuryBalanceSeries = {
+  accountId: string;
+  label: string;
+  currency: string;
+};
+
+/** Closing balance per account for a given month. Keyed by accountId. */
+export type TreasuryBalancePoint = {
+  month: string;
+  [accountId: string]: number | string;
+};
+
 export type TreasuryOverviewSnapshot = {
   activePeriodLabel: string;
   reportCurrency: string;
@@ -168,6 +181,9 @@ export type TreasuryOverviewSnapshot = {
   accounts: BankAccountRow[];
   monthly: TreasuryMonthlyPoint[];
   expenseByCategory: TreasuryCategoryBreakdown[];
+  /** Per-account closing-balance trend (one series per account, own currency). */
+  balanceTrend: TreasuryBalancePoint[];
+  balanceTrendAccounts: TreasuryBalanceSeries[];
 };
 
 export type ReviewQueueRow = {

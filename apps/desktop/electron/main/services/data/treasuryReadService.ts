@@ -511,6 +511,73 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
           percentage: round2((amount / expenseTotalForPct) * 100),
         }));
 
+      // Per-account closing-balance trend. One series per account, each kept in
+      // its own currency (no conversion): balance = opening + cumulative signed
+      // amount. We sum ALL movements (incl. transfers) up to each month end so
+      // each account's real cash position is reflected.
+      const trendRows = (
+        window.endDate
+          ? db
+              .prepare(
+                `SELECT bank_account_id, substr(txn_date, 1, 7) AS ym,
+                        SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END) AS net
+                 FROM bank_transactions
+                 WHERE workspace_id = ? AND txn_date <= ?
+                 GROUP BY bank_account_id, ym`,
+              )
+              .all(ws, window.endDate)
+          : db
+              .prepare(
+                `SELECT bank_account_id, substr(txn_date, 1, 7) AS ym,
+                        SUM(CASE WHEN direction = 'credit' THEN amount ELSE -amount END) AS net
+                 FROM bank_transactions
+                 WHERE workspace_id = ?
+                 GROUP BY bank_account_id, ym`,
+              )
+              .all(ws)
+      ) as Array<{ bank_account_id: string; ym: string; net: number }>;
+
+      const netByAccountMonth = new Map<string, Map<string, number>>();
+      for (const trendRow of trendRows) {
+        const perMonth = netByAccountMonth.get(trendRow.bank_account_id) ?? new Map<string, number>();
+        perMonth.set(trendRow.ym, Number(trendRow.net ?? 0));
+        netByAccountMonth.set(trendRow.bank_account_id, perMonth);
+      }
+      const startYm = window.startDate ? window.startDate.slice(0, 7) : null;
+      const endYm = window.endDate ? window.endDate.slice(0, 7) : null;
+      const monthsInWindow = Array.from(
+        new Set(
+          trendRows
+            .filter((r) => (!startYm || r.ym >= startYm) && (!endYm || r.ym <= endYm))
+            .map((r) => r.ym),
+        ),
+      ).sort();
+      const balanceByAccount = new Map<string, number>();
+      for (const account of accounts) {
+        let baseline = account.openingBalance;
+        const perMonth = netByAccountMonth.get(account.id);
+        if (perMonth && startYm) {
+          for (const [ym, net] of perMonth) if (ym < startYm) baseline += net;
+        }
+        balanceByAccount.set(account.id, baseline);
+      }
+      const balanceTrend = monthsInWindow.map((ym) => {
+        for (const account of accounts) {
+          const net = netByAccountMonth.get(account.id)?.get(ym) ?? 0;
+          balanceByAccount.set(account.id, (balanceByAccount.get(account.id) ?? 0) + net);
+        }
+        const point: { month: string; [accountId: string]: number | string } = {
+          month: format(new Date(`${ym}-01T00:00:00Z`), "MMM yyyy"),
+        };
+        for (const account of accounts) point[account.id] = round2(balanceByAccount.get(account.id) ?? 0);
+        return point;
+      });
+      const balanceTrendAccounts = accounts.map((account) => ({
+        accountId: account.id,
+        label: account.accountLabel,
+        currency: account.currency,
+      }));
+
       return {
         activePeriodLabel: window.label,
         reportCurrency: shouldConvert ? reportCurrency : "mixed",
@@ -526,6 +593,8 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
         accounts,
         monthly,
         expenseByCategory,
+        balanceTrend,
+        balanceTrendAccounts,
       };
     },
 

@@ -274,6 +274,37 @@ const TreasuryChartTooltip = ({
   );
 };
 
+const TreasuryBalanceTooltip = ({
+  active,
+  accounts = [],
+  label,
+  payload,
+}: {
+  active?: boolean;
+  accounts?: Array<{ accountId: string; label: string; currency: string }>;
+  label?: string;
+  payload?: Array<{ color?: string; dataKey?: string; value?: number | string }>;
+}) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="finance-chart-tooltip">
+      {label ? <strong>{label}</strong> : null}
+      {payload.map((entry, index) => {
+        const meta = accounts.find((account) => account.accountId === entry.dataKey);
+        return (
+          <div className="finance-chart-tooltip-row" key={`${entry.dataKey}-${index}`}>
+            <span className="finance-chart-tooltip-dot" style={{ background: entry.color ?? "rgba(255,255,255,0.6)" }} />
+            <span>
+              {meta ? `${meta.label}: ` : ""}
+              {typeof entry.value === "number" ? formatTreasuryMoney(entry.value, meta?.currency) : String(entry.value ?? "—")}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 export const TreasuryPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
@@ -1223,6 +1254,62 @@ export const TreasuryPage = () => {
               )}
             </SurfaceCard>
           </div>
+
+          <SurfaceCard className="treasury-chart-card treasury-balance-trend-card">
+            <div className="treasury-chart-heading">
+              <h3 className="section-subtitle">{t("finance.treasury.overview.balanceTitle")}</h3>
+              <div className="treasury-flow-legend" aria-label={t("finance.treasury.overview.legend")}>
+                {(snap?.balanceTrendAccounts ?? []).map((account, index) => (
+                  <span key={account.accountId}>
+                    <i style={{ background: chartPalette[index % chartPalette.length] }} />
+                    {account.label} · {account.currency}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {snap && snap.balanceTrend.length > 0 ? (
+              <div className="finance-chart-shell">
+                <ResponsiveContainer height={260} width="100%">
+                  <LineChart data={snap.balanceTrend} margin={{ top: 10, right: 12, left: 10, bottom: 2 }}>
+                    <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis
+                      axisLine={false}
+                      dataKey="month"
+                      stroke="rgba(255,255,255,0.48)"
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      stroke="rgba(255,255,255,0.44)"
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(value) => formatAxisCurrency(Number(value))}
+                      tickLine={false}
+                      width={70}
+                    />
+                    <Tooltip content={<TreasuryBalanceTooltip accounts={snap.balanceTrendAccounts} />} />
+                    {snap.balanceTrendAccounts.map((account, index) => (
+                      <Line
+                        connectNulls
+                        dataKey={account.accountId}
+                        dot={false}
+                        key={account.accountId}
+                        name={account.label}
+                        stroke={chartPalette[index % chartPalette.length]}
+                        strokeWidth={2.2}
+                        type="monotone"
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <GuidedEmptyState
+                body={t("finance.treasury.overview.balanceEmpty")}
+                title={t("finance.treasury.overview.balanceTitle")}
+              />
+            )}
+          </SurfaceCard>
 
           <SurfaceCard className="treasury-accounts-card">
             <h3 className="section-subtitle">{t("finance.treasury.accounts.title")}</h3>

@@ -1401,7 +1401,9 @@
         "deductibleTitle": "Deducible vs no deducible",
         "deductibleLabel": "Deducible",
         "nonDeductibleLabel": "No deducible",
-        "deductibleEmpty": "Revisa gastos para ver cuánto es deducible fiscalmente cada mes."
+        "deductibleEmpty": "Revisa gastos para ver cuánto es deducible fiscalmente cada mes.",
+        "balanceTitle": "Saldo de caja por cuenta",
+        "balanceEmpty": "Importa movimientos para ver cómo evoluciona el saldo de cada cuenta."
       },
       "period": {
         "month": "Mes",
