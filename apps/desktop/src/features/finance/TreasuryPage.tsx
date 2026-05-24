@@ -33,6 +33,7 @@ import { CompactSelect } from "@shared/components/CompactSelect";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { SectionHeader } from "@shared/components/SectionHeader";
+import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import bancoPopularLogo from "@shared/assets/inbox/logos/banco popular dominicano-logo.jpg";
@@ -806,6 +807,16 @@ export const TreasuryPage = () => {
     }));
   }, [snap?.monthly]);
   const hasDeductibleData = deductibleChartData.some((p) => p.deductible > 0 || p.nonDeductible > 0);
+  const reviewSummary = useMemo(() => {
+    const byCurrency = new Map<string, { claimed: number; deductible: number }>();
+    for (const row of reviewQueue.data) {
+      const bucket = byCurrency.get(row.currency) ?? { claimed: 0, deductible: 0 };
+      bucket.claimed += row.amount;
+      bucket.deductible += row.deductibleAmount ?? row.amount;
+      byCurrency.set(row.currency, bucket);
+    }
+    return Array.from(byCurrency.entries()).map(([currency, totals]) => ({ currency, ...totals }));
+  }, [reviewQueue.data]);
 
   const movementColumns = useMemo(
     () => [
@@ -1663,15 +1674,39 @@ export const TreasuryPage = () => {
       ) : null}
 
       {tab === "review" ? (
-        <SurfaceCard>
-          <h3 className="section-subtitle">{t("finance.treasury.review.title")}</h3>
+        <SurfaceCard className="treasury-review-card">
+          <div className="treasury-review-header">
+            <div className="cell-stack">
+              <h3 className="section-subtitle">{t("finance.treasury.review.title")}</h3>
+              <small className="text-muted">{t("finance.treasury.review.subtitle")}</small>
+            </div>
+            {reviewQueue.data.length > 0 ? (
+              <div className="treasury-review-summary">
+                <div className="treasury-review-summary-tile">
+                  <span>{t("finance.treasury.review.summaryPending")}</span>
+                  <strong>{reviewQueue.data.length}</strong>
+                </div>
+                {reviewSummary.map((summary) => (
+                  <div className="treasury-review-summary-tile" key={summary.currency}>
+                    <span>{t("finance.treasury.review.summaryClaimed")} · {summary.currency}</span>
+                    <strong>{formatMoney(summary.claimed, summary.currency)}</strong>
+                    <small className="text-muted">
+                      {t("finance.treasury.review.summaryDeductible", {
+                        value: formatMoney(summary.deductible, summary.currency),
+                      })}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
           {reviewQueue.data.length === 0 ? (
             <GuidedEmptyState
               body={t("finance.treasury.review.emptyBody")}
               title={t("finance.treasury.review.emptyTitle")}
             />
           ) : (
-            <div className="cell-stack" style={{ gap: 10 }}>
+            <div className="treasury-review-list">
               {reviewQueue.data.map((row) => (
                 <ReviewRow key={row.transactionId} onApply={applyReview} row={row} t={t} />
               ))}
@@ -2026,28 +2061,69 @@ const ReviewRow = ({
   // to the claimed amount) and is never negative — clamp on entry.
   const clampDeductible = (value: number) => Math.min(Math.max(value, 0), row.amount);
   const [deductible, setDeductible] = useState<number>(clampDeductible(row.deductibleAmount ?? row.amount));
+  const hasConcept = Boolean(row.concept && row.rawDescription && row.concept !== row.rawDescription);
+  const resultTone = deductible >= row.amount ? "success" : deductible > 0 ? "warning" : "critical";
+  const resultLabel =
+    deductible >= row.amount
+      ? t("finance.treasury.review.statusAccepted")
+      : deductible > 0
+        ? t("finance.treasury.review.statusPartial")
+        : t("finance.treasury.review.statusRejected");
   return (
-    <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-      <div className="cell-stack" style={{ flex: 1, minWidth: 220 }}>
+    <div className="treasury-review-row">
+      <div className="treasury-review-row-main">
         <strong>{row.concept || row.rawDescription || "—"}</strong>
         <small className="text-muted">
-          {row.txnDate} · {row.bankAccountLabel} · {formatTreasuryMoney(row.amount, row.currency)}
+          {row.txnDate} · {row.bankAccountLabel}
+          {row.counterparty ? ` · ${row.counterparty}` : ""}
         </small>
+        {hasConcept ? <small className="text-muted treasury-review-raw">{row.rawDescription}</small> : null}
       </div>
-      <label className="compact-filter-field">
-        <span>{t("finance.treasury.review.deductible")}</span>
-        <input
-          className="field-input"
-          max={row.amount}
-          min={0}
-          onChange={(event) => setDeductible(clampDeductible(Number(event.target.value) || 0))}
-          type="number"
-          value={deductible}
-        />
-      </label>
-      <button className="ghost-control is-active" onClick={() => onApply(row, deductible)} type="button">
-        {t("finance.treasury.review.apply")}
-      </button>
+      <div className="treasury-review-row-controls">
+        <span className="treasury-review-claimed">
+          <small>{t("finance.treasury.review.claimed")}</small>
+          <strong>{formatTreasuryMoney(row.amount, row.currency)}</strong>
+        </span>
+        <label className="compact-filter-field treasury-review-deductible">
+          <span>{t("finance.treasury.review.deductible")}</span>
+          <input
+            className="field-input"
+            max={row.amount}
+            min={0}
+            onChange={(event) => setDeductible(clampDeductible(Number(event.target.value) || 0))}
+            type="number"
+            value={deductible}
+          />
+        </label>
+        <StatusBadge tone={resultTone}>{resultLabel}</StatusBadge>
+      </div>
+      <div className="treasury-review-row-actions">
+        <button
+          className="ghost-control"
+          onClick={() => {
+            setDeductible(row.amount);
+            onApply(row, row.amount);
+          }}
+          type="button"
+        >
+          <Check size={13} />
+          {t("finance.treasury.review.acceptFull")}
+        </button>
+        <button
+          className="ghost-control"
+          onClick={() => {
+            setDeductible(0);
+            onApply(row, 0);
+          }}
+          type="button"
+        >
+          <X size={13} />
+          {t("finance.treasury.review.reject")}
+        </button>
+        <button className="ghost-control is-active" onClick={() => onApply(row, deductible)} type="button">
+          {t("finance.treasury.review.apply")}
+        </button>
+      </div>
     </div>
   );
 };

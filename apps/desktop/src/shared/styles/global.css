@@ -16031,6 +16031,110 @@ input[type="number"] {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
+/* --- Accountant review queue --- */
+.treasury-review-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.treasury-review-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.treasury-review-summary-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  min-width: 120px;
+}
+
+.treasury-review-summary-tile > span {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.treasury-review-summary-tile > strong {
+  font-size: 16px;
+}
+
+.treasury-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.treasury-review-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.treasury-review-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.treasury-review-raw {
+  opacity: 0.7;
+}
+
+.treasury-review-row-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.treasury-review-claimed {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+}
+
+.treasury-review-claimed > small {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.treasury-review-deductible {
+  min-width: 120px;
+}
+
+.treasury-review-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .treasury-review-row {
+    grid-template-columns: 1fr;
+  }
+  .treasury-review-row-controls,
+  .treasury-review-row-actions {
+    justify-content: flex-start;
+  }
+}
+
 .treasury-chart-card .section-subtitle {
   margin-bottom: 4px;
 }
