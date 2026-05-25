@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
@@ -9,6 +10,13 @@ import type {
 } from "@contracts";
 
 const defaultActorUserId = "user-ops";
+
+const uuidFromStableKey = (key: string) => {
+  const hex = createHash("sha256").update(key).digest("hex").slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+};
+
+const exchangeRateIdForCommand = (commandId: string) => uuidFromStableKey(`exchange-rate:${commandId}`);
 
 const buildFailedCommandMessage = (label: string, previousError?: string | null) =>
   previousError
@@ -41,15 +49,16 @@ const enqueueOutbox = (
   payload: unknown,
   syncId: string,
   now: string,
+  operationType: "upsert" | "delete" = "upsert",
 ) => {
   db.prepare(
     `
       INSERT INTO sync_outbox (
         id, workspace_id, entity_type, entity_id, event_id, operation_type,
         payload_json, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, NULL, 'upsert', ?, 'pending', ?, ?)
+      ) VALUES (?, ?, ?, ?, NULL, ?, ?, 'pending', ?, ?)
     `,
-  ).run(syncId, workspaceId, entityType, entityId, JSON.stringify(payload), now, now);
+  ).run(syncId, workspaceId, entityType, entityId, operationType, JSON.stringify(payload), now, now);
 };
 
 export const createCurrencyMutationService = (db: DatabaseSync) => ({
@@ -212,7 +221,7 @@ export const createCurrencyMutationService = (db: DatabaseSync) => ({
     if (existing?.outcome_status === "success") {
       return {
         commandId: input.commandId,
-        rateId: `rate-${input.commandId}`,
+        rateId: exchangeRateIdForCommand(input.commandId),
         repeated: true,
         summary: "Exchange rate already saved.",
       };
@@ -231,7 +240,7 @@ export const createCurrencyMutationService = (db: DatabaseSync) => ({
     }
 
     const now = new Date().toISOString();
-    const rateId = `rate-${input.commandId}`;
+    const rateId = exchangeRateIdForCommand(input.commandId);
 
     db.exec("BEGIN");
     try {
@@ -345,6 +354,7 @@ export const createCurrencyMutationService = (db: DatabaseSync) => ({
         { deleted: true },
         `sync-${input.commandId}`,
         now,
+        "delete",
       );
 
       receiptHelpers.insertReceipt.run(

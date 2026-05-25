@@ -1150,7 +1150,8 @@ export const TreasuryPage = () => {
       {
         key: "date",
         label: t("finance.treasury.columns.date"),
-        width: 118,
+        width: 108,
+        minWidth: 96,
         render: (row: BankTransactionRow) =>
           editingId === row.id && editDraft ? (
             <input
@@ -1166,7 +1167,8 @@ export const TreasuryPage = () => {
       {
         key: "account",
         label: t("finance.treasury.columns.account"),
-        minWidth: 170,
+        width: 136,
+        minWidth: 118,
         render: (row: BankTransactionRow) => (
           <span className="treasury-account-cell" title={row.bankAccountLabel}>
             {row.bankAccountLabel}
@@ -1176,7 +1178,8 @@ export const TreasuryPage = () => {
       {
         key: "description",
         label: t("finance.treasury.columns.description"),
-        minWidth: 300,
+        width: 420,
+        minWidth: 280,
         render: (row: BankTransactionRow) =>
           editingId === row.id && editDraft ? (
             <input
@@ -1219,7 +1222,8 @@ export const TreasuryPage = () => {
         key: "amount",
         label: t("finance.treasury.columns.amount"),
         align: "right" as const,
-        minWidth: 160,
+        width: 146,
+        minWidth: 128,
         render: (row: BankTransactionRow) =>
           editingId === row.id && editDraft ? (
             <div className="treasury-inline-amount-edit">
@@ -1256,7 +1260,8 @@ export const TreasuryPage = () => {
       {
         key: "kind",
         label: t("finance.treasury.columns.kind"),
-        minWidth: 148,
+        width: 132,
+        minWidth: 116,
         render: (row: BankTransactionRow) => (
           <CompactSelect<TransactionKind | "">
             ariaLabel={t("finance.treasury.columns.kind")}
@@ -1274,7 +1279,8 @@ export const TreasuryPage = () => {
         key: "actions",
         label: "",
         align: "right" as const,
-        width: 76,
+        width: 58,
+        minWidth: 52,
         hideable: false,
         render: (row: BankTransactionRow) =>
           editingId === row.id ? (
@@ -1391,6 +1397,10 @@ export const TreasuryPage = () => {
                 </label>
                 <div className="compact-filter-field treasury-currency-picker">
                   <div aria-label={t("finance.treasury.overview.currency")} className="treasury-chart-toggle" role="group">
+                    <span
+                      aria-hidden="true"
+                      className={`treasury-chart-toggle-indicator is-${overviewCurrency.toLowerCase()}`}
+                    />
                     {(["DOP", "USD"] as TreasuryReportCurrency[]).map((currency) => (
                       <button
                         aria-pressed={overviewCurrency === currency}
@@ -2022,7 +2032,7 @@ export const TreasuryPage = () => {
               columns={movementColumns}
               getRowId={(row) => row.id}
               onSelectedRowIdsChange={setSelectedMovementIds}
-              persistKey="treasury-movements-v1"
+              persistKey="treasury-movements-v2"
               rows={visibleMovements}
               selectable
               selectedRowIds={selectedMovementIds}

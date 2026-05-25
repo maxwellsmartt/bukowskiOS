@@ -291,10 +291,10 @@ export const AgentsMissionControlPage = () => {
                       </span>
                       <div className="mission-node-footer-status-row">
                         <span className={`mission-operational-pill mission-operational-pill-${data.supervisor.operationalState}`}>
-                          {t(`agents.shared.operationalState.`)}
+                          {t(`agents.shared.operationalState.${data.supervisor.operationalState}`)}
                         </span>
                         <span className={`mission-node-status mission-node-status-${data.supervisor.status}`}>
-                          {t(`agents.shared.agentStatus.`)}
+                          {t(`agents.shared.agentStatus.${data.supervisor.status}`)}
                         </span>
                       </div>
                     </div>
@@ -348,10 +348,10 @@ export const AgentsMissionControlPage = () => {
                           </span>
                           <div className="mission-node-footer-status-row">
                             <span className={`mission-operational-pill mission-operational-pill-${agent.operationalState}`}>
-                              {t(`agents.shared.operationalState.`)}
+                              {t(`agents.shared.operationalState.${agent.operationalState}`)}
                             </span>
                             <span className={`mission-node-status mission-node-status-${agent.status}`}>
-                              {t(`agents.shared.agentStatus.`)}
+                              {t(`agents.shared.agentStatus.${agent.status}`)}
                             </span>
                           </div>
                         </div>

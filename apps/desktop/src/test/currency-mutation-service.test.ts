@@ -91,6 +91,7 @@ describe("currency mutation service", () => {
 
     const list = reads.listRates("workspace-metadata", { baseCurrency: "USD", quoteCurrency: "DOP" });
     expect(list).toHaveLength(2);
+    expect(list.every((rate) => /^[0-9a-f-]{36}$/i.test(rate.id))).toBe(true);
     expect(list[0]?.effectiveDate).toBe("2026-05-01");
 
     const latest = reads.getLatestRate("workspace-metadata", "USD", "DOP");
@@ -228,6 +229,10 @@ describe("currency mutation service", () => {
     });
 
     expect(reads.getLatestRate("workspace-metadata", "EUR", "DOP")).toBeNull();
+    const outbox = database
+      .prepare("SELECT operation_type FROM sync_outbox WHERE entity_type = 'exchange_rate' AND entity_id = ? ORDER BY updated_at DESC LIMIT 1")
+      .get(created.rateId) as { operation_type: string };
+    expect(outbox.operation_type).toBe("delete");
 
     cleanup();
   });
