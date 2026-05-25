@@ -4,6 +4,7 @@ import type {
   AnnotateTransactionCommand,
   ApplyCounterpartyRuleCommand,
   ApplyCounterpartyRuleResult,
+  AppExportResult,
   BankAccountRow,
   BankStatementImportRow,
   BankTransactionRow,
@@ -16,10 +17,15 @@ import type {
   ReviewQueueRow,
   ReviewReimbursementCommand,
   SetAllocationsCommand,
+  TreasuryDeductibleLedger,
+  TreasuryDeductibleLedgerExportInput,
+  TreasuryDeductibleLedgerQuery,
   TransactionMutationResult,
   TreasuryOverviewQuery,
   TreasuryOverviewSnapshot,
   TreasuryTransactionListQuery,
+  TreasuryUndoPreview,
+  UndoTreasuryActionCommand,
   UpsertBankAccountCommand,
 } from "@contracts";
 import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
@@ -244,6 +250,76 @@ export const useProjectPnl = (workspaceId: string, dateFrom?: string, dateTo?: s
   return { data, isLoading };
 };
 
+export const useTreasuryUndoPreview = (workspaceId: string) => {
+  const [data, setData] = useState<TreasuryUndoPreview>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !workspaceId) {
+      setData(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    window.bukowskiTreasury
+      .undoPreview(workspaceId)
+      .then((preview) => {
+        if (!cancelled) setData(preview);
+      })
+      .catch(() => {
+        if (!cancelled) setData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, version, refreshVersion]);
+
+  return { data, isLoading, refresh };
+};
+
+export const useTreasuryDeductibleLedger = (query: TreasuryDeductibleLedgerQuery) => {
+  const [data, setData] = useState<TreasuryDeductibleLedger | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !query.workspaceId) {
+      setData(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    window.bukowskiTreasury
+      .deductibleLedger(query)
+      .then((ledger) => {
+        if (!cancelled) setData(ledger);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load deductible ledger.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [query.workspaceId, query.period, query.customStartDate, query.customEndDate, version, refreshVersion]);
+
+  return { data, isLoading, error, refresh };
+};
+
 export const useTreasuryMutations = () =>
   useMemo(
     () => ({
@@ -290,6 +366,14 @@ export const useTreasuryMutations = () =>
       async linkTransaction(input: LinkTransactionCommand): Promise<TransactionMutationResult> {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.linkTransaction(input);
+      },
+      async undoLastAction(input: UndoTreasuryActionCommand): Promise<TransactionMutationResult> {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.undoLastAction(input);
+      },
+      async exportDeductibleLedger(input: TreasuryDeductibleLedgerExportInput): Promise<AppExportResult> {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.exportDeductibleLedger(input);
       },
     }),
     [],

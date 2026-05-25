@@ -128,12 +128,62 @@ export type CounterpartyRulePreview = {
   sampleDescriptions: string[];
 };
 
+export type TreasuryUndoPreview = {
+  id: string;
+  kind: "annotation" | "annotation_bulk" | "allocations" | "transaction_correction" | "account" | "import_delete";
+  label: string;
+  createdAt: string;
+} | null;
+
 export type TreasuryOverviewQuery = {
   workspaceId?: string;
   period: TreasuryPeriodPreset;
   customStartDate?: string | null;
   customEndDate?: string | null;
   reportCurrency?: string | null;
+};
+
+export type TreasuryDeductibleLedgerQuery = {
+  workspaceId: string;
+  period: TreasuryPeriodPreset;
+  customStartDate?: string | null;
+  customEndDate?: string | null;
+};
+
+export type TreasuryDeductibleLedgerExportFormat = "csv" | "xlsx" | "pdf";
+
+export type TreasuryDeductibleLedgerExportInput = TreasuryDeductibleLedgerQuery & {
+  format: TreasuryDeductibleLedgerExportFormat;
+};
+
+export type TreasuryDeductibleLedgerRow = {
+  transactionId: string;
+  txnDate: string;
+  accountLabel: string;
+  currency: string;
+  rawDescription: string | null;
+  counterparty: string | null;
+  counterpartyRnc: string | null;
+  concept: string | null;
+  expenseCategory: string | null;
+  claimedAmount: number;
+  deductibleAmount: number;
+  rejectedAmount: number;
+  fiscalStatus: FiscalStatus;
+  supportDocFileId: string | null;
+  reference: string | null;
+};
+
+export type TreasuryDeductibleLedger = {
+  query: TreasuryDeductibleLedgerQuery;
+  activePeriodLabel: string;
+  rows: TreasuryDeductibleLedgerRow[];
+  totalsByCurrency: Array<{
+    currency: string;
+    claimedAmount: number;
+    deductibleAmount: number;
+    rejectedAmount: number;
+  }>;
 };
 
 export type TreasuryMonthlyPoint = {

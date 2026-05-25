@@ -617,6 +617,18 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.projectPnl, { workspaceId, dateFrom, dateTo }) as Promise<
       import("@contracts").ProjectPnlRow[]
     >,
+  undoPreview: (workspaceId: string) =>
+    ipcRenderer.invoke(ipcChannels.treasury.undoPreview, { workspaceId }) as Promise<
+      import("@contracts").TreasuryUndoPreview
+    >,
+  deductibleLedger: (query: import("@contracts").TreasuryDeductibleLedgerQuery) =>
+    ipcRenderer.invoke(ipcChannels.treasury.deductibleLedger, query) as Promise<
+      import("@contracts").TreasuryDeductibleLedger
+    >,
+  exportDeductibleLedger: (input: import("@contracts").TreasuryDeductibleLedgerExportInput) =>
+    ipcRenderer.invoke(ipcChannels.treasury.exportDeductibleLedger, input) as Promise<
+      import("@contracts").AppExportResult
+    >,
   importStatement: (input: import("@contracts").ImportStatementCommand) =>
     ipcRenderer.invoke(ipcChannels.treasury.importStatement, input) as Promise<
       import("@contracts").ImportStatementResult
@@ -651,6 +663,10 @@ const bukowskiTreasury = {
     >,
   linkTransaction: (input: import("@contracts").LinkTransactionCommand) =>
     ipcRenderer.invoke(ipcChannels.treasury.linkTransaction, input) as Promise<
+      import("@contracts").TransactionMutationResult
+    >,
+  undoLastAction: (input: import("@contracts").UndoTreasuryActionCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.undoLastAction, input) as Promise<
       import("@contracts").TransactionMutationResult
     >,
 };

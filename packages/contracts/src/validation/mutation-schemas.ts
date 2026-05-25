@@ -1597,6 +1597,16 @@ export const linkTransactionSchema = z
   })
   .strict();
 
+export const undoTreasuryActionSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    undoId: nullableOrOptionalString,
+  })
+  .strict();
+
 // Treasury — read schemas
 
 export const treasuryTransactionListQuerySchema = z
@@ -1634,6 +1644,19 @@ export const treasuryOverviewQuerySchema = z
   })
   .strict();
 
+export const treasuryDeductibleLedgerQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    period: z.enum(["month", "quarter", "year", "fiscal", "all", "custom"]),
+    customStartDate: optionalTrimmedString,
+    customEndDate: optionalTrimmedString,
+  })
+  .strict();
+
+export const treasuryDeductibleLedgerExportSchema = treasuryDeductibleLedgerQuerySchema.extend({
+  format: z.enum(["csv", "xlsx", "pdf"]),
+});
+
 export const treasuryAccountsQuerySchema = z
   .object({ workspaceId: nonEmptyString })
   .strict();
@@ -1646,6 +1669,8 @@ export const treasuryProjectPnlQuerySchema = z
   })
   .strict();
 
+export const treasuryUndoPreviewQuerySchema = z.object({ workspaceId: nonEmptyString }).strict();
+
 export const treasuryImportsQuerySchema = z
   .object({ workspaceId: nonEmptyString, bankAccountId: optionalTrimmedString })
   .strict();
@@ -1657,3 +1682,5 @@ export const counterpartyRulePreviewReadArgsSchema = z.tuple([counterpartyRulePr
 export const treasuryOverviewReadArgsSchema = z.tuple([treasuryOverviewQuerySchema]);
 export const treasuryReviewQueueReadArgsSchema = z.tuple([treasuryAccountsQuerySchema]);
 export const treasuryProjectPnlReadArgsSchema = z.tuple([treasuryProjectPnlQuerySchema]);
+export const treasuryUndoPreviewReadArgsSchema = z.tuple([treasuryUndoPreviewQuerySchema]);
+export const treasuryDeductibleLedgerReadArgsSchema = z.tuple([treasuryDeductibleLedgerQuerySchema]);

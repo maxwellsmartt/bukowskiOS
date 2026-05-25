@@ -4,6 +4,7 @@ import type { ParsedBankTransaction } from "@contracts";
 
 import { createTreasuryMutationService } from "../../electron/main/services/data/treasuryMutationService";
 import { createTreasuryReadService } from "../../electron/main/services/data/treasuryReadService";
+import { buildDeductibleLedgerCsv, buildDeductibleLedgerXlsx } from "../../electron/main/services/data/treasuryDeductibleLedgerExportService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
 const workspaceId = "workspace-metadata";
@@ -81,6 +82,20 @@ describe("treasury mutation service", () => {
 
     const txns = reads.listTransactions({ workspaceId });
     expect(txns).toHaveLength(3);
+    cleanup();
+  });
+
+  it("does not create an unsafe undo entry for a newly created bank account", () => {
+    const { cleanup, database } = createTestDatabase("treasury-account-create-no-undo");
+    const mutations = createTreasuryMutationService(database);
+
+    mutations.upsertBankAccount(account("cmd-acct-no-unsafe-undo"));
+
+    const undoCount = database
+      .prepare(`SELECT COUNT(*) AS count FROM treasury_undo_journal WHERE command_id = ?`)
+      .get("cmd-acct-no-unsafe-undo") as { count: number };
+    expect(undoCount.count).toBe(0);
+
     cleanup();
   });
 
@@ -511,6 +526,63 @@ describe("treasury mutation service", () => {
     cleanup();
   });
 
+  it("builds a deductible ledger with fiscal totals and exportable files", () => {
+    const { cleanup, database } = createTestDatabase("treasury-deductible-ledger");
+    const mutations = createTreasuryMutationService(database);
+    const reads = createTreasuryReadService(database);
+    mutations.upsertBankAccount(account("cmd-acct-ledger"));
+    mutations.importStatement({
+      commandId: "cmd-import-ledger",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-ledger",
+      sourceFormat: "csv",
+      rows: [
+        { txnDate: "2026-05-05", rawDescription: "Proveedor con RNC", amount: 10000, direction: "debit" },
+        { txnDate: "2026-05-06", rawDescription: "Cliente ingreso", amount: 15000, direction: "credit" },
+      ],
+    });
+    const [expense] = reads.listTransactions({ workspaceId, direction: "debit" });
+    mutations.annotateTransaction({
+      commandId: "cmd-ledger-annotate",
+      workspaceId,
+      ...baseChannel,
+      transactionId: expense.id,
+      txnKind: "expense",
+      concept: "Servicios técnicos",
+      counterparty: "Proveedor SRL",
+      counterpartyRnc: "131000000",
+      expenseCategory: "services",
+    });
+    mutations.reviewReimbursement({
+      commandId: "cmd-ledger-review",
+      workspaceId,
+      ...baseChannel,
+      transactionId: expense.id,
+      reimbursementStatus: "partial",
+      deductibleAmount: 7500,
+      fiscalStatus: "accepted",
+    });
+
+    const ledger = reads.getDeductibleLedger({ workspaceId, period: "all" });
+    expect(ledger.rows).toHaveLength(1);
+    expect(ledger.rows[0]).toMatchObject({
+      counterparty: "Proveedor SRL",
+      counterpartyRnc: "131000000",
+      concept: "Servicios técnicos",
+      claimedAmount: 10000,
+      deductibleAmount: 7500,
+      rejectedAmount: 2500,
+    });
+    expect(ledger.totalsByCurrency).toEqual([
+      { currency: "DOP", claimedAmount: 10000, deductibleAmount: 7500, rejectedAmount: 2500 },
+    ]);
+    expect(buildDeductibleLedgerCsv(ledger)).toContain("Proveedor SRL");
+    expect(buildDeductibleLedgerXlsx(ledger).length).toBeGreaterThan(1000);
+
+    cleanup();
+  });
+
   it("is idempotent on repeated import command ids", () => {
     const { cleanup, database } = createTestDatabase("treasury-idempotent");
     const mutations = createTreasuryMutationService(database);
@@ -528,6 +600,219 @@ describe("treasury mutation service", () => {
     const repeat = mutations.importStatement(input);
     expect(repeat.repeated).toBe(true);
     expect(reads.listTransactions({ workspaceId })).toHaveLength(3);
+    cleanup();
+  });
+
+  it("undoes treasury annotations and keeps a syncable blank annotation when no prior row existed", () => {
+    const { cleanup, database } = createTestDatabase("treasury-undo-annotation");
+    const mutations = createTreasuryMutationService(database);
+    const reads = createTreasuryReadService(database);
+    mutations.upsertBankAccount(account("cmd-acct-undo-ann"));
+    mutations.importStatement({
+      commandId: "cmd-import-undo-ann",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-undo-ann",
+      sourceFormat: "csv",
+      rows: [{ txnDate: "2026-05-01", rawDescription: "Pago proveedor puntual", amount: 12000, direction: "debit" }],
+    });
+    const [txn] = reads.listTransactions({ workspaceId });
+
+    mutations.annotateTransaction({
+      commandId: "cmd-annotate-undo-ann",
+      workspaceId,
+      ...baseChannel,
+      transactionId: txn.id,
+      txnKind: "tax",
+      concept: "ITBIS",
+      expenseCategory: "Taxes",
+    });
+    expect(reads.listTransactions({ workspaceId })[0].annotation?.txnKind).toBe("tax");
+
+    const undo = mutations.undoLastAction({
+      commandId: "cmd-undo-ann",
+      workspaceId,
+      ...baseChannel,
+    });
+    expect(undo.repeated).toBe(false);
+
+    const restored = reads.listTransactions({ workspaceId })[0];
+    expect(restored.annotation?.txnKind).toBeNull();
+    expect(restored.annotation?.concept).toBeNull();
+
+    const outbox = database
+      .prepare(
+        `SELECT entity_type, entity_id FROM sync_outbox WHERE id = ? LIMIT 1`,
+      )
+      .get("sync-cmd-undo-ann-annotation") as { entity_type: string; entity_id: string };
+    expect(outbox).toEqual({ entity_type: "transaction_annotation", entity_id: txn.id });
+
+    const undoRow = database
+      .prepare(`SELECT undone FROM treasury_undo_journal WHERE command_id = ? LIMIT 1`)
+      .get("cmd-annotate-undo-ann") as { undone: number };
+    expect(undoRow.undone).toBe(1);
+
+    cleanup();
+  });
+
+  it("previews and restores treasury allocations", () => {
+    const { cleanup, database } = createTestDatabase("treasury-undo-allocations");
+    const mutations = createTreasuryMutationService(database);
+    const reads = createTreasuryReadService(database);
+    mutations.upsertBankAccount(account("cmd-acct-undo-alloc"));
+    mutations.importStatement({
+      commandId: "cmd-import-undo-alloc",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-undo-alloc",
+      sourceFormat: "csv",
+      rows: [{ txnDate: "2026-05-03", rawDescription: "Rental split", amount: 1000, direction: "debit" }],
+    });
+    const [txn] = reads.listTransactions({ workspaceId });
+
+    mutations.setAllocations({
+      commandId: "cmd-alloc-original",
+      workspaceId,
+      ...baseChannel,
+      transactionId: txn.id,
+      allocations: [{ projectId: null, projectNameSnapshot: "Project A", amount: 1000 }],
+    });
+    mutations.setAllocations({
+      commandId: "cmd-alloc-revised",
+      workspaceId,
+      ...baseChannel,
+      transactionId: txn.id,
+      allocations: [
+        { projectId: null, projectNameSnapshot: "Project A", amount: 300 },
+        { projectId: null, projectNameSnapshot: "Project B", amount: 700 },
+      ],
+    });
+
+    expect(reads.getUndoPreview(workspaceId)).toMatchObject({
+      kind: "allocations",
+      label: txn.id,
+    });
+
+    mutations.undoLastAction({
+      commandId: "cmd-undo-alloc-revised",
+      workspaceId,
+      ...baseChannel,
+    });
+
+    const restored = reads.listTransactions({ workspaceId })[0].allocations;
+    expect(restored).toHaveLength(1);
+    expect(restored[0].projectNameSnapshot).toBe("Project A");
+    expect(restored[0].amount).toBe(1000);
+
+    cleanup();
+  });
+
+  it("undoes transaction corrections in stack order and keeps undo commands idempotent", () => {
+    const { cleanup, database } = createTestDatabase("treasury-undo-correction-stack");
+    const mutations = createTreasuryMutationService(database);
+    const reads = createTreasuryReadService(database);
+    mutations.upsertBankAccount(account("cmd-acct-undo-correct"));
+    mutations.importStatement({
+      commandId: "cmd-import-undo-correct",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-undo-correct",
+      sourceFormat: "csv",
+      rows: [{ txnDate: "2026-05-04", rawDescription: "Original row", amount: 100, direction: "debit" }],
+    });
+    const [txn] = reads.listTransactions({ workspaceId });
+
+    mutations.correctTransaction({
+      commandId: "cmd-correct-first",
+      workspaceId,
+      ...baseChannel,
+      transactionId: txn.id,
+      rawDescription: "First correction",
+      amount: 200,
+    });
+    mutations.correctTransaction({
+      commandId: "cmd-correct-second",
+      workspaceId,
+      ...baseChannel,
+      transactionId: txn.id,
+      rawDescription: "Second correction",
+      amount: 300,
+    });
+
+    const undoSecond = mutations.undoLastAction({
+      commandId: "cmd-undo-correct-second",
+      workspaceId,
+      ...baseChannel,
+    });
+    const repeatedUndoSecond = mutations.undoLastAction({
+      commandId: "cmd-undo-correct-second",
+      workspaceId,
+      ...baseChannel,
+    });
+    expect(undoSecond.repeated).toBe(false);
+    expect(repeatedUndoSecond.repeated).toBe(true);
+    expect(reads.listTransactions({ workspaceId })[0].rawDescription).toBe("First correction");
+    expect(reads.getUndoPreview(workspaceId)).toMatchObject({ kind: "transaction_correction" });
+
+    mutations.undoLastAction({
+      commandId: "cmd-undo-correct-first",
+      workspaceId,
+      ...baseChannel,
+    });
+    const restoredOriginal = reads.listTransactions({ workspaceId })[0];
+    expect(restoredOriginal.rawDescription).toBe("Original row");
+    expect(restoredOriginal.amount).toBe(100);
+
+    cleanup();
+  });
+
+  it("undoes a deleted import batch with transactions and human annotations", () => {
+    const { cleanup, database } = createTestDatabase("treasury-undo-import-delete");
+    const mutations = createTreasuryMutationService(database);
+    const reads = createTreasuryReadService(database);
+    mutations.upsertBankAccount(account("cmd-acct-undo-import"));
+    const imported = mutations.importStatement({
+      commandId: "cmd-import-undo-import",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-undo-import",
+      sourceFormat: "csv",
+      originalFilename: "popular-undo.csv",
+      rows: [{ txnDate: "2026-05-02", rawDescription: "Servicios Carlos", amount: 25000, direction: "debit" }],
+    });
+    const [txn] = reads.listTransactions({ workspaceId });
+    mutations.annotateTransaction({
+      commandId: "cmd-annotate-before-delete",
+      workspaceId,
+      ...baseChannel,
+      transactionId: txn.id,
+      txnKind: "expense",
+      concept: "Servicios",
+      expenseCategory: "Service payments",
+    });
+
+    mutations.deleteImport({
+      commandId: "cmd-delete-undo-import",
+      workspaceId,
+      ...baseChannel,
+      importId: imported.importId,
+    });
+    expect(reads.listTransactions({ workspaceId })).toHaveLength(0);
+
+    mutations.undoLastAction({
+      commandId: "cmd-undo-import-delete",
+      workspaceId,
+      ...baseChannel,
+    });
+    const restored = reads.listTransactions({ workspaceId });
+    expect(restored).toHaveLength(1);
+    expect(restored[0].annotation?.concept).toBe("Servicios");
+
+    const importOutbox = database
+      .prepare(`SELECT entity_type FROM sync_outbox WHERE id = ? LIMIT 1`)
+      .get("sync-cmd-undo-import-delete-import") as { entity_type: string };
+    expect(importOutbox.entity_type).toBe("bank_statement_import");
+
     cleanup();
   });
 });

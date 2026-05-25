@@ -1,4 +1,4 @@
-import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, Landmark, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, Landmark, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ import type {
   BankTransactionRow,
   CounterpartyRulePreview,
   ReviewQueueRow,
+  TreasuryDeductibleLedgerExportFormat,
   TransactionDirection,
   TransactionKind,
   TreasuryPeriodPreset,
@@ -49,6 +50,8 @@ import {
   useTreasuryMutations,
   useTreasuryOverview,
   useTreasuryTransactions,
+  useTreasuryUndoPreview,
+  useTreasuryDeductibleLedger,
 } from "./useTreasuryData";
 
 type Tab = "overview" | "movements" | "review" | "projects";
@@ -337,6 +340,10 @@ export const TreasuryPage = () => {
   const [selectedMovementIds, setSelectedMovementIds] = useState<string[]>([]);
   const [bulkKind, setBulkKind] = useState<TransactionKind | "">("");
   const [isBulkClassifying, setIsBulkClassifying] = useState(false);
+  const [isUndoingTreasuryAction, setIsUndoingTreasuryAction] = useState(false);
+  const [deductibleLedgerPeriod, setDeductibleLedgerPeriod] = useState<TreasuryPeriodPreset>("fiscal");
+  const [deductibleLedgerFormat, setDeductibleLedgerFormat] = useState<TreasuryDeductibleLedgerExportFormat>("xlsx");
+  const [isExportingDeductibleLedger, setIsExportingDeductibleLedger] = useState(false);
 
   const accounts = useBankAccounts(activeWorkspaceId);
   const overview = useTreasuryOverview(
@@ -362,6 +369,13 @@ export const TreasuryPage = () => {
   const reviewQueue = useReviewQueue(activeWorkspaceId);
   const projectPnl = useProjectPnl(activeWorkspaceId);
   const imports = useTreasuryImports(activeWorkspaceId, accountFilter || undefined);
+  const undoPreview = useTreasuryUndoPreview(activeWorkspaceId);
+  const deductibleLedger = useTreasuryDeductibleLedger(
+    useMemo(
+      () => ({ workspaceId: activeWorkspaceId, period: deductibleLedgerPeriod }),
+      [activeWorkspaceId, deductibleLedgerPeriod],
+    ),
+  );
   const selectedAccount = useMemo(
     () => accounts.data.find((account) => account.id === accountFilter) ?? null,
     [accountFilter, accounts.data],
@@ -451,6 +465,8 @@ export const TreasuryPage = () => {
     transactions.refresh();
     reviewQueue.refresh();
     imports.refresh();
+    undoPreview.refresh();
+    deductibleLedger.refresh();
   };
 
   useEffect(() => {
@@ -522,6 +538,49 @@ export const TreasuryPage = () => {
       setIsDeletingImport(false);
     }
   };
+
+  const undoLastTreasuryAction = async () => {
+    setIsUndoingTreasuryAction(true);
+    try {
+      const result = await mutations.undoLastAction({
+        commandId: newCommandId("treasury-undo"),
+        workspaceId: activeWorkspaceId,
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+      toast.success(t("finance.treasury.undo.done", { defaultValue: "Last treasury change undone." }), {
+        description: result.summary,
+      });
+      setSelectedMovementIds([]);
+      setBulkKind("");
+      cancelEdit();
+      refreshAll();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("finance.treasury.undo.failed", { defaultValue: "Could not undo the last treasury change." }),
+      );
+    } finally {
+      setIsUndoingTreasuryAction(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.key.toLowerCase() !== "z") return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tagName = target.tagName.toLowerCase();
+        if (target.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select") return;
+      }
+      if (tab !== "movements" || isUndoingTreasuryAction || !undoPreview.data) return;
+      event.preventDefault();
+      void undoLastTreasuryAction();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isUndoingTreasuryAction, tab, undoPreview.data]);
 
   /* --------------------------- Import handlers --------------------------- */
 
@@ -617,6 +676,7 @@ export const TreasuryPage = () => {
       toast.success(t("finance.treasury.classify.saved"));
       transactions.refresh();
       overview.refresh();
+      undoPreview.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("finance.treasury.classify.failed"));
     }
@@ -672,6 +732,7 @@ export const TreasuryPage = () => {
       toast.success(t("finance.treasury.classify.saved"));
       transactions.refresh();
       overview.refresh();
+      undoPreview.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("finance.treasury.classify.failed"));
     }
@@ -707,6 +768,7 @@ export const TreasuryPage = () => {
       setPendingRule(null);
       transactions.refresh();
       overview.refresh();
+      undoPreview.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("finance.treasury.classify.failed"));
     } finally {
@@ -740,6 +802,7 @@ export const TreasuryPage = () => {
       setBulkKind("");
       transactions.refresh();
       overview.refresh();
+      undoPreview.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("finance.treasury.classify.failed"));
     } finally {
@@ -764,8 +827,34 @@ export const TreasuryPage = () => {
       toast.success(t("finance.treasury.review.saved"));
       reviewQueue.refresh();
       overview.refresh();
+      undoPreview.refresh();
+      deductibleLedger.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("finance.treasury.review.failed"));
+    }
+  };
+
+  const exportDeductibleLedger = async () => {
+    setIsExportingDeductibleLedger(true);
+    try {
+      const result = await mutations.exportDeductibleLedger({
+        workspaceId: activeWorkspaceId,
+        period: deductibleLedgerPeriod,
+        format: deductibleLedgerFormat,
+      });
+      if (result.saved) {
+        toast.success(t("finance.treasury.review.ledgerExported", { defaultValue: "Deductible ledger exported" }), {
+          description: result.summary,
+        });
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("finance.treasury.review.ledgerExportFailed", { defaultValue: "Could not export the deductible ledger." }),
+      );
+    } finally {
+      setIsExportingDeductibleLedger(false);
     }
   };
 
@@ -1031,6 +1120,7 @@ export const TreasuryPage = () => {
               toast.success(t("finance.treasury.account.saved"));
               setShowAccountForm(false);
               accounts.refresh();
+              undoPreview.refresh();
             } catch (error) {
               toast.error(error instanceof Error ? error.message : t("finance.treasury.account.failed"));
             }
@@ -1412,6 +1502,32 @@ export const TreasuryPage = () => {
             </div>
             <div className="treasury-movement-actions">
               <button
+                className="ghost-control treasury-undo-button"
+                disabled={isUndoingTreasuryAction || !undoPreview.data}
+                onClick={() => void undoLastTreasuryAction()}
+                title={
+                  undoPreview.data
+                    ? t("finance.treasury.undo.hintWithLabel", {
+                        defaultValue: "Undo {{label}}",
+                        label: undoPreview.data.label,
+                      })
+                    : t("finance.treasury.undo.empty", { defaultValue: "No Treasury change to undo" })
+                }
+                type="button"
+              >
+                <RotateCcw size={13} />
+                <span>
+                  {isUndoingTreasuryAction
+                    ? t("common.saving")
+                    : undoPreview.data
+                      ? t("finance.treasury.undo.actionWithLabel", {
+                          defaultValue: "Undo: {{label}}",
+                          label: undoPreview.data.label,
+                        })
+                      : t("finance.treasury.undo.action", { defaultValue: "Undo" })}
+                </span>
+              </button>
+              <button
                 className="ghost-control treasury-add-movement-button"
                 disabled={accounts.data.length === 0}
                 onClick={() => setShowManualForm((value) => !value)}
@@ -1695,7 +1811,40 @@ export const TreasuryPage = () => {
               <h3 className="section-subtitle">{t("finance.treasury.review.title")}</h3>
               <small className="text-muted">{t("finance.treasury.review.subtitle")}</small>
             </div>
-            {reviewQueue.data.length > 0 ? (
+            <div className="treasury-review-export-controls">
+              <CompactSelect<TreasuryPeriodPreset>
+                ariaLabel={t("finance.treasury.overview.window")}
+                onChange={setDeductibleLedgerPeriod}
+                options={periodOptions}
+                popupMinWidth={170}
+                value={deductibleLedgerPeriod}
+              />
+              <CompactSelect<TreasuryDeductibleLedgerExportFormat>
+                ariaLabel={t("finance.treasury.review.ledgerFormat", { defaultValue: "Ledger format" })}
+                onChange={setDeductibleLedgerFormat}
+                options={[
+                  { value: "xlsx", label: "XLSX" },
+                  { value: "csv", label: "CSV" },
+                  { value: "pdf", label: "PDF" },
+                ]}
+                popupMinWidth={120}
+                value={deductibleLedgerFormat}
+              />
+              <button
+                className="ghost-control treasury-ledger-export-button"
+                disabled={isExportingDeductibleLedger || deductibleLedger.isLoading}
+                onClick={() => void exportDeductibleLedger()}
+                type="button"
+              >
+                <Download size={13} />
+                <span>
+                  {isExportingDeductibleLedger
+                    ? t("finance.treasury.review.exportingLedger", { defaultValue: "Exporting..." })
+                    : t("finance.treasury.review.exportLedger", { defaultValue: "Export ledger" })}
+                </span>
+              </button>
+            </div>
+            {reviewQueue.data.length > 0 || (deductibleLedger.data?.totalsByCurrency.length ?? 0) > 0 ? (
               <div className="treasury-review-summary">
                 <div className="treasury-review-summary-tile">
                   <span>{t("finance.treasury.review.summaryPending")}</span>
@@ -1708,6 +1857,18 @@ export const TreasuryPage = () => {
                     <small className="text-muted">
                       {t("finance.treasury.review.summaryDeductible", {
                         value: formatMoney(summary.deductible, summary.currency),
+                      })}
+                    </small>
+                  </div>
+                ))}
+                {deductibleLedger.data?.totalsByCurrency.map((summary) => (
+                  <div className="treasury-review-summary-tile" key={`ledger-${summary.currency}`}>
+                    <span>{t("finance.treasury.review.ledgerDeductible", { defaultValue: "Ledger deductible" })} · {summary.currency}</span>
+                    <strong>{formatMoney(summary.deductibleAmount, summary.currency)}</strong>
+                    <small className="text-muted">
+                      {t("finance.treasury.review.ledgerClaimed", {
+                        defaultValue: "Claimed {{value}}",
+                        value: formatMoney(summary.claimedAmount, summary.currency),
                       })}
                     </small>
                   </div>

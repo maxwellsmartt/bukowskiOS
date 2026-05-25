@@ -17,6 +17,7 @@ import type {
   SetAllocationsCommand,
   TransactionKind,
   TransactionMutationResult,
+  UndoTreasuryActionCommand,
   UpsertBankAccountCommand,
 } from "@contracts";
 
@@ -66,6 +67,109 @@ const enqueueOutbox = (
       ) VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, NULL, ?, ?, ?)
     `,
   ).run(syncId, workspaceId, entityType, entityId, operationType, JSON.stringify(payload), now, now, now);
+};
+
+// Records the BEFORE state of a reversible edit into the local undo journal so
+// the desktop app can offer multi-level Cmd+Z. `kind` drives how undo restores
+// it; `label` is the human detail (concept / account / movement) shown in the
+// toast. Called inside the mutation's transaction, before the change.
+const recordUndo = (
+  db: DatabaseSync,
+  workspaceId: string,
+  commandId: string,
+  kind: string,
+  label: string,
+  priorState: unknown,
+  now: string,
+) => {
+  db.prepare(
+    `INSERT INTO treasury_undo_journal (
+       id, workspace_id, command_id, kind, label, prior_state_json, created_at, undone
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+  ).run(
+    `undo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    workspaceId,
+    commandId,
+    kind,
+    label,
+    priorState == null ? null : JSON.stringify(priorState),
+    now,
+  );
+};
+
+// Restores a full snapshotted row into its table by primary key. The snapshot
+// rows are whole DB rows (all columns), so we can rebuild the INSERT generically
+// and let ON CONFLICT/REPLACE put the prior values back.
+const replaceRow = (db: DatabaseSync, table: string, row: Record<string, unknown>) => {
+  const columns = Object.keys(row);
+  if (columns.length === 0) return;
+  const placeholders = columns.map(() => "?").join(", ");
+  const quoted = columns.map((column) => `"${column}"`).join(", ");
+  db.prepare(`INSERT OR REPLACE INTO ${table} (${quoted}) VALUES (${placeholders})`).run(
+    ...columns.map((column) => row[column] as string | number | null),
+  );
+};
+
+const parseUndoState = (value: string | null): Record<string, unknown> => {
+  if (!value) return {};
+  const parsed = JSON.parse(value) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  return parsed as Record<string, unknown>;
+};
+
+const restoreBlankAnnotation = (db: DatabaseSync, workspaceId: string, transactionId: string, now: string) => {
+  db.prepare(
+    `
+      INSERT INTO transaction_annotations (
+        transaction_id, workspace_id, txn_kind, concept, counterparty,
+        counterparty_rnc, expense_category, is_internal_transfer,
+        reimbursement_status, claimed_amount, deductible_amount, fiscal_status,
+        reviewed_by_user_id, reviewed_at, support_doc_file_id, notes,
+        classified_by_user_id, updated_at
+      ) VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, 0, 'n/a', NULL, NULL, 'pending', NULL, NULL, NULL, NULL, NULL, ?)
+      ON CONFLICT(transaction_id) DO UPDATE SET
+        txn_kind = NULL,
+        concept = NULL,
+        counterparty = NULL,
+        counterparty_rnc = NULL,
+        expense_category = NULL,
+        is_internal_transfer = 0,
+        reimbursement_status = 'n/a',
+        claimed_amount = NULL,
+        deductible_amount = NULL,
+        fiscal_status = 'pending',
+        reviewed_by_user_id = NULL,
+        reviewed_at = NULL,
+        support_doc_file_id = NULL,
+        notes = NULL,
+        classified_by_user_id = NULL,
+        updated_at = excluded.updated_at
+    `,
+  ).run(transactionId, workspaceId, now);
+};
+
+const restoreAnnotation = (
+  db: DatabaseSync,
+  workspaceId: string,
+  transactionId: string,
+  prior: unknown,
+  now: string,
+) => {
+  if (prior && typeof prior === "object" && !Array.isArray(prior)) {
+    replaceRow(db, "transaction_annotations", prior as Record<string, unknown>);
+    return;
+  }
+  restoreBlankAnnotation(db, workspaceId, transactionId, now);
+};
+
+const restoreAllocations = (db: DatabaseSync, transactionId: string, prior: unknown) => {
+  db.prepare(`DELETE FROM transaction_project_allocations WHERE transaction_id = ?`).run(transactionId);
+  if (!Array.isArray(prior)) return;
+  for (const row of prior) {
+    if (row && typeof row === "object" && !Array.isArray(row)) {
+      replaceRow(db, "transaction_project_allocations", row as Record<string, unknown>);
+    }
+  }
 };
 
 const computeDedupeHash = (bankAccountId: string, row: ParsedBankTransaction) => {
@@ -379,6 +483,19 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
       const now = new Date().toISOString();
       db.exec("BEGIN");
       try {
+        const priorAccount = db.prepare(`SELECT * FROM bank_accounts WHERE id = ?`).get(bankAccountId) ?? null;
+        if (priorAccount) {
+          recordUndo(
+            db,
+            input.workspaceId,
+            input.commandId,
+            "account",
+            input.accountLabel.trim(),
+            { accountId: bankAccountId, prior: priorAccount },
+            now,
+          );
+        }
+
         db.prepare(
           `INSERT INTO bank_accounts (
              id, workspace_id, bank_name, account_label, account_number_masked,
@@ -475,9 +592,50 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
       db.exec("BEGIN");
       try {
         const found = db
-          .prepare(`SELECT id FROM bank_statement_imports WHERE id = ? AND workspace_id = ?`)
-          .get(input.importId, input.workspaceId);
+          .prepare(`SELECT * FROM bank_statement_imports WHERE id = ? AND workspace_id = ?`)
+          .get(input.importId, input.workspaceId) as Record<string, unknown> | undefined;
         if (!found) throw new Error("Import batch not found.");
+
+        // Snapshot the whole batch (import + its rows + the human layer + links)
+        // BEFORE the hard delete so undo can re-insert it verbatim and re-push.
+        const snapshotTxns = db
+          .prepare(`SELECT * FROM bank_transactions WHERE workspace_id = ? AND import_id = ?`)
+          .all(input.workspaceId, input.importId) as Array<Record<string, unknown>>;
+        const snapshotTxnIds = snapshotTxns.map((t) => t.id as string);
+        const idList = snapshotTxnIds.length
+          ? snapshotTxnIds.map(() => "?").join(", ")
+          : "''";
+        const snapshotAnnotations = snapshotTxnIds.length
+          ? (db
+              .prepare(`SELECT * FROM transaction_annotations WHERE transaction_id IN (${idList})`)
+              .all(...snapshotTxnIds) as Array<Record<string, unknown>>)
+          : [];
+        const snapshotAllocations = snapshotTxnIds.length
+          ? (db
+              .prepare(`SELECT * FROM transaction_project_allocations WHERE transaction_id IN (${idList})`)
+              .all(...snapshotTxnIds) as Array<Record<string, unknown>>)
+          : [];
+        const snapshotLinks = snapshotTxnIds.length
+          ? (db
+              .prepare(`SELECT * FROM transaction_links WHERE transaction_id IN (${idList})`)
+              .all(...snapshotTxnIds) as Array<Record<string, unknown>>)
+          : [];
+        recordUndo(
+          db,
+          input.workspaceId,
+          input.commandId,
+          "import_delete",
+          (found.original_filename as string | null) || (found.source_format as string) || input.importId,
+          {
+            import: found,
+            transactions: snapshotTxns,
+            annotations: snapshotAnnotations,
+            allocations: snapshotAllocations,
+            links: snapshotLinks,
+          },
+          now,
+        );
+
         // Remove the imported rows first (their annotations/allocations cascade),
         // then the batch — so a re-import of the same statement is clean.
         db.prepare(`DELETE FROM bank_transactions WHERE workspace_id = ? AND import_id = ?`).run(
@@ -563,6 +721,16 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
       const now = new Date().toISOString();
       db.exec("BEGIN");
       try {
+        recordUndo(
+          db,
+          input.workspaceId,
+          input.commandId,
+          "transaction_correction",
+          (current.raw_description as string | null) ?? input.transactionId,
+          { transactionId: input.transactionId, prior: current },
+          now,
+        );
+
         db.prepare(
           `UPDATE bank_transactions
            SET txn_date = ?, value_date = ?, raw_description = ?, reference = ?, serial = ?,
@@ -634,6 +802,18 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           .prepare(`SELECT id FROM bank_transactions WHERE id = ? AND workspace_id = ? LIMIT 1`)
           .get(input.transactionId, input.workspaceId);
         if (!txn) throw new Error("Transaction not found.");
+
+        const priorAnnotation =
+          db.prepare(`SELECT * FROM transaction_annotations WHERE transaction_id = ?`).get(input.transactionId) ?? null;
+        recordUndo(
+          db,
+          input.workspaceId,
+          input.commandId,
+          "annotation",
+          input.concept?.trim() || input.txnKind || input.transactionId,
+          { transactionId: input.transactionId, prior: priorAnnotation },
+          now,
+        );
 
         db.prepare(
           `INSERT INTO transaction_annotations (
@@ -779,6 +959,22 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           )
           .all(input.workspaceId, param) as Array<{ id: string }>;
 
+        if (matches.length > 0) {
+          const priorBulk = matches.map((match) => ({
+            transactionId: match.id,
+            prior: db.prepare(`SELECT * FROM transaction_annotations WHERE transaction_id = ?`).get(match.id) ?? null,
+          }));
+          recordUndo(
+            db,
+            input.workspaceId,
+            input.commandId,
+            "annotation_bulk",
+            String(matches.length),
+            { entries: priorBulk },
+            now,
+          );
+        }
+
         const upsertAnnotation = db.prepare(
           `INSERT INTO transaction_annotations (
              transaction_id, workspace_id, txn_kind, concept, counterparty,
@@ -904,6 +1100,19 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           throw new Error("Allocation total cannot exceed the transaction amount.");
         }
 
+        const priorAllocations = db
+          .prepare(`SELECT * FROM transaction_project_allocations WHERE transaction_id = ?`)
+          .all(input.transactionId);
+        recordUndo(
+          db,
+          input.workspaceId,
+          input.commandId,
+          "allocations",
+          input.transactionId,
+          { transactionId: input.transactionId, prior: priorAllocations },
+          now,
+        );
+
         db.prepare(`DELETE FROM transaction_project_allocations WHERE transaction_id = ?`).run(
           input.transactionId,
         );
@@ -979,6 +1188,18 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           .prepare(`SELECT id FROM bank_transactions WHERE id = ? AND workspace_id = ? LIMIT 1`)
           .get(input.transactionId, input.workspaceId);
         if (!txn) throw new Error("Transaction not found.");
+
+        const priorReviewAnnotation =
+          db.prepare(`SELECT * FROM transaction_annotations WHERE transaction_id = ?`).get(input.transactionId) ?? null;
+        recordUndo(
+          db,
+          input.workspaceId,
+          input.commandId,
+          "annotation",
+          input.transactionId,
+          { transactionId: input.transactionId, prior: priorReviewAnnotation },
+          now,
+        );
 
         // Upsert so a review can be recorded even if the row was never
         // classified through the normal flow.
@@ -1098,6 +1319,147 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
         repeated: false,
         summary: "Transaction linked.",
       };
+    },
+
+    undoLastAction(input: UndoTreasuryActionCommand): TransactionMutationResult {
+      const existing = receiptHelpers.getExistingReceipt(input.commandId);
+      if (existing?.outcome_status === "success") {
+        return {
+          commandId: input.commandId,
+          transactionId: input.undoId ?? "treasury-undo",
+          repeated: true,
+          summary: "Undo already applied.",
+        };
+      }
+      if (existing?.outcome_status === "failed") {
+        throw new Error(buildFailedCommandMessage("treasury undo", existing.error_message));
+      }
+
+      const now = new Date().toISOString();
+      db.exec("BEGIN");
+      try {
+        const undo = (input.undoId
+          ? db
+              .prepare(
+                `SELECT * FROM treasury_undo_journal WHERE workspace_id = ? AND id = ? AND undone = 0 LIMIT 1`,
+              )
+              .get(input.workspaceId, input.undoId)
+          : db
+              .prepare(
+                `SELECT * FROM treasury_undo_journal
+                 WHERE workspace_id = ? AND undone = 0
+                 ORDER BY created_at DESC, id DESC
+                 LIMIT 1`,
+              )
+              .get(input.workspaceId)) as
+          | { id: string; kind: string; label: string; prior_state_json: string | null }
+          | undefined;
+        if (!undo) throw new Error("No treasury action is available to undo.");
+
+        const state = parseUndoState(undo.prior_state_json);
+        let transactionId = undo.id;
+
+        if (undo.kind === "annotation") {
+          transactionId = String(state.transactionId ?? undo.id);
+          restoreAnnotation(db, input.workspaceId, transactionId, state.prior, now);
+          enqueueOutbox(db, input.workspaceId, "transaction_annotation", transactionId, { undoId: undo.id }, `sync-${input.commandId}-annotation`, now);
+        } else if (undo.kind === "annotation_bulk") {
+          const entries = Array.isArray(state.entries) ? state.entries : [];
+          for (const entry of entries) {
+            if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+            const entryState = entry as Record<string, unknown>;
+            const entryTransactionId = String(entryState.transactionId ?? "");
+            if (!entryTransactionId) continue;
+            restoreAnnotation(db, input.workspaceId, entryTransactionId, entryState.prior, now);
+            enqueueOutbox(
+              db,
+              input.workspaceId,
+              "transaction_annotation",
+              entryTransactionId,
+              { undoId: undo.id },
+              `sync-${input.commandId}-annotation-${entryTransactionId}`,
+              now,
+            );
+          }
+          transactionId = entries.length ? String((entries[0] as Record<string, unknown>).transactionId ?? undo.id) : undo.id;
+        } else if (undo.kind === "allocations") {
+          transactionId = String(state.transactionId ?? undo.id);
+          restoreAllocations(db, transactionId, state.prior);
+          enqueueOutbox(db, input.workspaceId, "transaction_allocations", transactionId, { undoId: undo.id }, `sync-${input.commandId}-allocations`, now);
+        } else if (undo.kind === "transaction_correction") {
+          transactionId = String(state.transactionId ?? undo.id);
+          if (!state.prior || typeof state.prior !== "object" || Array.isArray(state.prior)) {
+            throw new Error("Undo snapshot is missing the transaction state.");
+          }
+          replaceRow(db, "bank_transactions", state.prior as Record<string, unknown>);
+          enqueueOutbox(db, input.workspaceId, "bank_transaction", transactionId, { undoId: undo.id }, `sync-${input.commandId}-transaction`, now);
+        } else if (undo.kind === "import_delete") {
+          const importRow = state.import;
+          if (!importRow || typeof importRow !== "object" || Array.isArray(importRow)) {
+            throw new Error("Undo snapshot is missing the import state.");
+          }
+          replaceRow(db, "bank_statement_imports", importRow as Record<string, unknown>);
+          const transactions = Array.isArray(state.transactions) ? state.transactions : [];
+          const annotations = Array.isArray(state.annotations) ? state.annotations : [];
+          const allocations = Array.isArray(state.allocations) ? state.allocations : [];
+          const links = Array.isArray(state.links) ? state.links : [];
+          for (const row of transactions) {
+            if (row && typeof row === "object" && !Array.isArray(row)) replaceRow(db, "bank_transactions", row as Record<string, unknown>);
+          }
+          for (const row of annotations) {
+            if (row && typeof row === "object" && !Array.isArray(row)) replaceRow(db, "transaction_annotations", row as Record<string, unknown>);
+          }
+          for (const row of allocations) {
+            if (row && typeof row === "object" && !Array.isArray(row)) replaceRow(db, "transaction_project_allocations", row as Record<string, unknown>);
+          }
+          for (const row of links) {
+            if (row && typeof row === "object" && !Array.isArray(row)) replaceRow(db, "transaction_links", row as Record<string, unknown>);
+          }
+          const importId = String((importRow as Record<string, unknown>).id ?? undo.id);
+          transactionId = importId;
+          enqueueOutbox(db, input.workspaceId, "bank_statement_import", importId, { undoId: undo.id }, `sync-${input.commandId}-import`, now);
+          for (const row of annotations) {
+            const restoredTransactionId = String((row as Record<string, unknown>).transaction_id ?? "");
+            if (!restoredTransactionId) continue;
+            enqueueOutbox(db, input.workspaceId, "transaction_annotation", restoredTransactionId, { undoId: undo.id }, `sync-${input.commandId}-annotation-${restoredTransactionId}`, now);
+          }
+          for (const row of allocations) {
+            const restoredTransactionId = String((row as Record<string, unknown>).transaction_id ?? "");
+            if (!restoredTransactionId) continue;
+            enqueueOutbox(db, input.workspaceId, "transaction_allocations", restoredTransactionId, { undoId: undo.id }, `sync-${input.commandId}-allocations-${restoredTransactionId}`, now);
+          }
+          for (const row of links) {
+            const restoredTransactionId = String((row as Record<string, unknown>).transaction_id ?? "");
+            if (!restoredTransactionId) continue;
+            enqueueOutbox(db, input.workspaceId, "transaction_link", restoredTransactionId, { undoId: undo.id }, `sync-${input.commandId}-link-${restoredTransactionId}`, now);
+          }
+        } else if (undo.kind === "account") {
+          const accountId = String(state.accountId ?? undo.id);
+          transactionId = accountId;
+          if (state.prior && typeof state.prior === "object" && !Array.isArray(state.prior)) {
+            replaceRow(db, "bank_accounts", state.prior as Record<string, unknown>);
+          } else {
+            throw new Error("Undo snapshot is missing the account state.");
+          }
+          enqueueOutbox(db, input.workspaceId, "bank_account", accountId, { undoId: undo.id }, `sync-${input.commandId}-account`, now);
+        } else {
+          throw new Error(`Unsupported treasury undo kind: ${undo.kind}.`);
+        }
+
+        db.prepare(`UPDATE treasury_undo_journal SET undone = 1, undone_at = ? WHERE id = ?`).run(now, undo.id);
+        recordReceipt(input, now, "success", null);
+        db.exec("COMMIT");
+        return {
+          commandId: input.commandId,
+          transactionId,
+          repeated: false,
+          summary: `Undid ${undo.label}.`,
+        };
+      } catch (error) {
+        db.exec("ROLLBACK");
+        recordReceipt(input, now, "failed", error instanceof Error ? error.message : "Treasury undo failed.");
+        throw error;
+      }
     },
   };
 };

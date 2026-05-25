@@ -20,7 +20,10 @@ import {
   type TransactionKind,
   type TreasuryOverviewQuery,
   type TreasuryOverviewSnapshot,
+  type TreasuryDeductibleLedger,
+  type TreasuryDeductibleLedgerQuery,
   type TreasuryTransactionListQuery,
+  type TreasuryUndoPreview,
 } from "@contracts";
 import {
   endOfMonth,
@@ -720,6 +723,114 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
           marginPercent: entry.income > 0 ? round2((net / entry.income) * 100) : null,
         };
       });
+    },
+
+    getUndoPreview(workspaceId: string): TreasuryUndoPreview {
+      const ws = resolveWorkspaceId(workspaceId);
+      const row = db
+        .prepare(
+          `SELECT id, kind, label, created_at
+           FROM treasury_undo_journal
+           WHERE workspace_id = ? AND undone = 0
+           ORDER BY created_at DESC, id DESC
+           LIMIT 1`,
+        )
+        .get(ws) as
+        | {
+            id: string;
+            kind: NonNullable<TreasuryUndoPreview>["kind"];
+            label: string;
+            created_at: string;
+          }
+        | undefined;
+      if (!row) return null;
+      return {
+        id: row.id,
+        kind: row.kind,
+        label: row.label,
+        createdAt: row.created_at,
+      };
+    },
+
+    getDeductibleLedger(query: TreasuryDeductibleLedgerQuery): TreasuryDeductibleLedger {
+      const ws = resolveWorkspaceId(query.workspaceId);
+      const window = resolveWindow(query);
+      const conditions: string[] = [
+        "t.workspace_id = ?",
+        "t.direction = 'debit'",
+        "COALESCE(a.is_internal_transfer, 0) = 0",
+        "(a.txn_kind IS NULL OR a.txn_kind NOT IN ('transfer', 'fx_exchange'))",
+      ];
+      const params: Array<string | number> = [ws];
+      if (window.startDate) {
+        conditions.push("t.txn_date >= ?");
+        params.push(window.startDate);
+      }
+      if (window.endDate) {
+        conditions.push("t.txn_date <= ?");
+        params.push(window.endDate);
+      }
+
+      const rows = db
+        .prepare(
+          `SELECT t.id, t.txn_date, t.raw_description, t.reference, t.amount, t.currency,
+                  acc.account_label,
+                  a.concept, a.counterparty, a.counterparty_rnc, a.expense_category,
+                  a.claimed_amount, a.deductible_amount, a.fiscal_status, a.support_doc_file_id
+           FROM bank_transactions t
+           JOIN bank_accounts acc ON acc.id = t.bank_account_id
+           LEFT JOIN transaction_annotations a ON a.transaction_id = t.id
+           WHERE ${conditions.join(" AND ")}
+           ORDER BY t.txn_date ASC, t.created_at ASC`,
+        )
+        .all(...params) as Record<string, unknown>[];
+
+      const ledgerRows = rows.map((row) => {
+        const claimedAmount = round2(Number(row.claimed_amount ?? row.amount ?? 0));
+        const fiscalStatus = (row.fiscal_status as FiscalStatus | null) ?? "pending";
+        const deductibleAmount =
+          row.deductible_amount === null || row.deductible_amount === undefined
+            ? fiscalStatus === "rejected"
+              ? 0
+              : claimedAmount
+            : round2(Number(row.deductible_amount));
+        return {
+          transactionId: row.id as string,
+          txnDate: row.txn_date as string,
+          accountLabel: row.account_label as string,
+          currency: row.currency as string,
+          rawDescription: (row.raw_description as string | null) ?? null,
+          counterparty: (row.counterparty as string | null) ?? null,
+          counterpartyRnc: (row.counterparty_rnc as string | null) ?? null,
+          concept: (row.concept as string | null) ?? null,
+          expenseCategory: (row.expense_category as string | null) ?? null,
+          claimedAmount,
+          deductibleAmount,
+          rejectedAmount: round2(Math.max(claimedAmount - deductibleAmount, 0)),
+          fiscalStatus,
+          supportDocFileId: (row.support_doc_file_id as string | null) ?? null,
+          reference: (row.reference as string | null) ?? null,
+        };
+      });
+
+      const totals = new Map<string, { claimedAmount: number; deductibleAmount: number; rejectedAmount: number }>();
+      for (const row of ledgerRows) {
+        const bucket = totals.get(row.currency) ?? { claimedAmount: 0, deductibleAmount: 0, rejectedAmount: 0 };
+        bucket.claimedAmount = round2(bucket.claimedAmount + row.claimedAmount);
+        bucket.deductibleAmount = round2(bucket.deductibleAmount + row.deductibleAmount);
+        bucket.rejectedAmount = round2(bucket.rejectedAmount + row.rejectedAmount);
+        totals.set(row.currency, bucket);
+      }
+
+      return {
+        query: { ...query, workspaceId: ws },
+        activePeriodLabel: window.label,
+        rows: ledgerRows,
+        totalsByCurrency: Array.from(totals.entries()).map(([currency, totalsForCurrency]) => ({
+          currency,
+          ...totalsForCurrency,
+        })),
+      };
     },
   };
 };

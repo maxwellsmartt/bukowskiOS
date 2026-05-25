@@ -484,6 +484,13 @@ declare global {
         dateFrom?: string,
         dateTo?: string,
       ) => Promise<import("@contracts").ProjectPnlRow[]>;
+      undoPreview: (workspaceId: string) => Promise<import("@contracts").TreasuryUndoPreview>;
+      deductibleLedger: (
+        query: import("@contracts").TreasuryDeductibleLedgerQuery,
+      ) => Promise<import("@contracts").TreasuryDeductibleLedger>;
+      exportDeductibleLedger: (
+        input: import("@contracts").TreasuryDeductibleLedgerExportInput,
+      ) => Promise<import("@contracts").AppExportResult>;
       importStatement: (
         input: import("@contracts").ImportStatementCommand,
       ) => Promise<import("@contracts").ImportStatementResult>;
@@ -510,6 +517,9 @@ declare global {
       ) => Promise<import("@contracts").TransactionMutationResult>;
       linkTransaction: (
         input: import("@contracts").LinkTransactionCommand,
+      ) => Promise<import("@contracts").TransactionMutationResult>;
+      undoLastAction: (
+        input: import("@contracts").UndoTreasuryActionCommand,
       ) => Promise<import("@contracts").TransactionMutationResult>;
     };
     bukowskiCatalog?: {

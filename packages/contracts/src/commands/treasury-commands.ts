@@ -221,6 +221,14 @@ export type LinkTransactionCommand = {
   notes?: string | null;
 };
 
+export type UndoTreasuryActionCommand = {
+  commandId: string;
+  workspaceId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+  undoId?: string | null;
+};
+
 export type TransactionMutationResult = {
   commandId: string;
   transactionId: string;

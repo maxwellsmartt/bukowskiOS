@@ -219,6 +219,9 @@ export const ipcChannels = {
     overview: "bukowskiTreasury:overview",
     reviewQueue: "bukowskiTreasury:reviewQueue",
     projectPnl: "bukowskiTreasury:projectPnl",
+    undoPreview: "bukowskiTreasury:undoPreview",
+    deductibleLedger: "bukowskiTreasury:deductibleLedger",
+    exportDeductibleLedger: "bukowskiTreasury:exportDeductibleLedger",
     importStatement: "bukowskiTreasury:importStatement",
     addManualTransactions: "bukowskiTreasury:addManualTransactions",
     deleteImport: "bukowskiTreasury:deleteImport",
@@ -228,5 +231,6 @@ export const ipcChannels = {
     setAllocations: "bukowskiTreasury:setAllocations",
     reviewReimbursement: "bukowskiTreasury:reviewReimbursement",
     linkTransaction: "bukowskiTreasury:linkTransaction",
+    undoLastAction: "bukowskiTreasury:undoLastAction",
   },
 } as const;

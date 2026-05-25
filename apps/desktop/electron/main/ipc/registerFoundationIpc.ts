@@ -46,6 +46,7 @@ import {
   setAllocationsSchema,
   reviewReimbursementSchema,
   linkTransactionSchema,
+  undoTreasuryActionSchema,
   treasuryAccountsReadArgsSchema,
   treasuryImportsReadArgsSchema,
   treasuryTransactionListReadArgsSchema,
@@ -53,6 +54,9 @@ import {
   treasuryOverviewReadArgsSchema,
   treasuryReviewQueueReadArgsSchema,
   treasuryProjectPnlReadArgsSchema,
+  treasuryUndoPreviewReadArgsSchema,
+  treasuryDeductibleLedgerReadArgsSchema,
+  treasuryDeductibleLedgerExportSchema,
   restoreQuoteFromVersionSchema,
   exchangeRateListReadArgsSchema,
   latestExchangeRateReadArgsSchema,
@@ -216,6 +220,12 @@ import { ipcChannels } from "@contracts";
 import type { FoundationReadService } from "../services/data/foundationReadService";
 import type { WorkspaceAccessGuard } from "../services/auth/workspaceAccessGuard";
 import { safeHandle, safeHandleRead, safeHandleReadWithSchema } from "./ipcSafeHandler";
+import {
+  buildDeductibleLedgerCsv,
+  buildDeductibleLedgerFileBaseName,
+  buildDeductibleLedgerXlsx,
+  createDeductibleLedgerPdf,
+} from "../services/data/treasuryDeductibleLedgerExportService";
 
 type RegisterFoundationIpcOptions = {
   foundationReads: FoundationReadService;
@@ -408,6 +418,9 @@ type RegisterFoundationIpcOptions = {
     linkTransaction: (
       input: import("@contracts").LinkTransactionCommand,
     ) => import("@contracts").TransactionMutationResult;
+    undoLastAction: (
+      input: import("@contracts").UndoTreasuryActionCommand,
+    ) => import("@contracts").TransactionMutationResult;
   };
   treasuryReads: {
     getAccounts: (workspaceId: string) => import("@contracts").BankAccountRow[];
@@ -430,6 +443,10 @@ type RegisterFoundationIpcOptions = {
       dateFrom?: string,
       dateTo?: string,
     ) => import("@contracts").ProjectPnlRow[];
+    getUndoPreview: (workspaceId: string) => import("@contracts").TreasuryUndoPreview;
+    getDeductibleLedger: (
+      query: import("@contracts").TreasuryDeductibleLedgerQuery,
+    ) => import("@contracts").TreasuryDeductibleLedger;
   };
   exportQuotePdf: (
     workspaceId: string,
@@ -2341,6 +2358,74 @@ export const registerFoundationIpc = ({
     },
     "The app could not load project P&L.",
   );
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.undoPreview,
+    treasuryUndoPreviewReadArgsSchema,
+    async (_event, query: { workspaceId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "preview treasury undo",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.getUndoPreview(query.workspaceId);
+    },
+    "The app could not load the treasury undo preview.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.deductibleLedger,
+    treasuryDeductibleLedgerReadArgsSchema,
+    async (_event, query: import("@contracts").TreasuryDeductibleLedgerQuery) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load deductible expense ledger",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.getDeductibleLedger(query);
+    },
+    "The app could not load the deductible ledger.",
+  );
+  safeHandle(ipcChannels.treasury.exportDeductibleLedger, treasuryDeductibleLedgerExportSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "export deductible expense ledger",
+      accessLevel: "read",
+      requiredPermission: "treasury.transactions.read",
+    });
+    const ledger = treasuryReads.getDeductibleLedger(input);
+    const baseName = buildDeductibleLedgerFileBaseName(ledger);
+    const extension = input.format === "xlsx" ? "xlsx" : input.format === "pdf" ? "pdf" : "csv";
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "Export deductible expense ledger",
+      defaultPath: path.join(app.getPath("documents"), `${baseName}.${extension}`),
+      filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+    });
+
+    if (canceled || !filePath) {
+      return {
+        saved: false,
+        fileName: null,
+        savedPath: null,
+        summary: "Deductible ledger export cancelled.",
+      };
+    }
+
+    if (input.format === "xlsx") {
+      fs.writeFileSync(filePath, buildDeductibleLedgerXlsx(ledger));
+    } else if (input.format === "pdf") {
+      fs.writeFileSync(filePath, await createDeductibleLedgerPdf(ledger));
+    } else {
+      fs.writeFileSync(filePath, buildDeductibleLedgerCsv(ledger), "utf8");
+    }
+
+    return {
+      saved: true,
+      fileName: path.basename(filePath),
+      savedPath: filePath,
+      summary: `Exported ${ledger.rows.length} deductible ledger rows.`,
+    };
+  });
   safeHandle(ipcChannels.treasury.upsertAccount, upsertBankAccountSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({
       workspaceId: input.workspaceId,
@@ -2446,6 +2531,15 @@ export const registerFoundationIpc = ({
       requiredPermission: "treasury.transactions.classify",
     });
     return treasuryMutations.linkTransaction(input);
+  });
+  safeHandle(ipcChannels.treasury.undoLastAction, undoTreasuryActionSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "undo treasury action",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return treasuryMutations.undoLastAction(input);
   });
   safeHandleReadWithSchema(
     ipcChannels.quotes.exportPdf,
