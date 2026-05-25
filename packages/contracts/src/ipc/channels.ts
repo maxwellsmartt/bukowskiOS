@@ -222,6 +222,8 @@ export const ipcChannels = {
     undoPreview: "bukowskiTreasury:undoPreview",
     deductibleLedger: "bukowskiTreasury:deductibleLedger",
     exportDeductibleLedger: "bukowskiTreasury:exportDeductibleLedger",
+    dgiiReport: "bukowskiTreasury:dgiiReport",
+    exportDgiiReport: "bukowskiTreasury:exportDgiiReport",
     importStatement: "bukowskiTreasury:importStatement",
     addManualTransactions: "bukowskiTreasury:addManualTransactions",
     deleteImport: "bukowskiTreasury:deleteImport",

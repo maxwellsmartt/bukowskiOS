@@ -491,6 +491,10 @@ declare global {
       exportDeductibleLedger: (
         input: import("@contracts").TreasuryDeductibleLedgerExportInput,
       ) => Promise<import("@contracts").AppExportResult>;
+      dgiiReport: (query: import("@contracts").DgiiReportQuery) => Promise<import("@contracts").DgiiReport>;
+      exportDgiiReport: (
+        input: import("@contracts").DgiiReportExportInput,
+      ) => Promise<import("@contracts").AppExportResult>;
       importStatement: (
         input: import("@contracts").ImportStatementCommand,
       ) => Promise<import("@contracts").ImportStatementResult>;

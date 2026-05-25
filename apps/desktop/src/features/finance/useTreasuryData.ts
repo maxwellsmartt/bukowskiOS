@@ -17,6 +17,9 @@ import type {
   ReviewQueueRow,
   ReviewReimbursementCommand,
   SetAllocationsCommand,
+  DgiiReport,
+  DgiiReportExportInput,
+  DgiiReportQuery,
   TreasuryDeductibleLedger,
   TreasuryDeductibleLedgerExportInput,
   TreasuryDeductibleLedgerQuery,
@@ -374,6 +377,10 @@ export const useTreasuryMutations = () =>
       async exportDeductibleLedger(input: TreasuryDeductibleLedgerExportInput): Promise<AppExportResult> {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.exportDeductibleLedger(input);
+      },
+      async exportDgiiReport(input: DgiiReportExportInput): Promise<AppExportResult> {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.exportDgiiReport(input);
       },
     }),
     [],

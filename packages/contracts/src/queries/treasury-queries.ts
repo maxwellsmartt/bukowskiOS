@@ -198,6 +198,41 @@ export type TreasuryDeductibleLedger = {
   }>;
 };
 
+// --- DGII fiscal reports (606 purchases / 607 sales / 608 voided) ---------
+export type DgiiReportKind = "606" | "607" | "608";
+
+export type DgiiReportColumn = {
+  key: string;
+  label: string;
+  numeric?: boolean;
+};
+
+export type DgiiReportRow = Record<string, string | number | null>;
+
+export type DgiiReportQuery = {
+  workspaceId: string;
+  report: DgiiReportKind;
+  period: TreasuryPeriodPreset;
+  customStartDate?: string | null;
+  customEndDate?: string | null;
+};
+
+export type DgiiReportExportFormat = "csv" | "xlsx" | "pdf";
+
+export type DgiiReportExportInput = DgiiReportQuery & {
+  format: DgiiReportExportFormat;
+};
+
+export type DgiiReport = {
+  kind: DgiiReportKind;
+  title: string;
+  activePeriodLabel: string;
+  columns: DgiiReportColumn[];
+  rows: DgiiReportRow[];
+  totals: Array<{ label: string; value: string }>;
+  rowCount: number;
+};
+
 export type TreasuryMonthlyPoint = {
   month: string;
   income: number;

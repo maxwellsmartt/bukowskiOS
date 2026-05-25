@@ -1669,6 +1669,22 @@ export const treasuryDeductibleLedgerExportSchema = treasuryDeductibleLedgerQuer
   format: z.enum(["csv", "xlsx", "pdf"]),
 });
 
+export const dgiiReportQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    report: z.enum(["606", "607", "608"]),
+    period: z.enum(["month", "quarter", "year", "fiscal", "all", "custom"]),
+    customStartDate: optionalTrimmedString,
+    customEndDate: optionalTrimmedString,
+  })
+  .strict();
+
+export const dgiiReportExportSchema = dgiiReportQuerySchema.extend({
+  format: z.enum(["csv", "xlsx", "pdf"]),
+});
+
+export const dgiiReportReadArgsSchema = z.tuple([dgiiReportQuerySchema]);
+
 export const treasuryAccountsQuerySchema = z
   .object({ workspaceId: nonEmptyString })
   .strict();

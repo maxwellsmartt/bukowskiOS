@@ -57,6 +57,8 @@ import {
   treasuryUndoPreviewReadArgsSchema,
   treasuryDeductibleLedgerReadArgsSchema,
   treasuryDeductibleLedgerExportSchema,
+  dgiiReportReadArgsSchema,
+  dgiiReportExportSchema,
   restoreQuoteFromVersionSchema,
   exchangeRateListReadArgsSchema,
   latestExchangeRateReadArgsSchema,
@@ -226,6 +228,12 @@ import {
   buildDeductibleLedgerXlsx,
   createDeductibleLedgerPdf,
 } from "../services/data/treasuryDeductibleLedgerExportService";
+import {
+  buildDgiiReportCsv,
+  buildDgiiReportFileBaseName,
+  buildDgiiReportXlsx,
+  createDgiiReportPdf,
+} from "../services/data/dgiiReportExportService";
 
 type RegisterFoundationIpcOptions = {
   foundationReads: FoundationReadService;
@@ -447,6 +455,7 @@ type RegisterFoundationIpcOptions = {
     getDeductibleLedger: (
       query: import("@contracts").TreasuryDeductibleLedgerQuery,
     ) => import("@contracts").TreasuryDeductibleLedger;
+    getDgiiReport: (query: import("@contracts").DgiiReportQuery) => import("@contracts").DgiiReport;
   };
   exportQuotePdf: (
     workspaceId: string,
@@ -2424,6 +2433,55 @@ export const registerFoundationIpc = ({
       fileName: path.basename(filePath),
       savedPath: filePath,
       summary: `Exported ${ledger.rows.length} deductible ledger rows.`,
+    };
+  });
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.dgiiReport,
+    dgiiReportReadArgsSchema,
+    async (_event, query: import("@contracts").DgiiReportQuery) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load DGII fiscal report",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.getDgiiReport(query);
+    },
+    "The app could not load the DGII report.",
+  );
+  safeHandle(ipcChannels.treasury.exportDgiiReport, dgiiReportExportSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "export DGII fiscal report",
+      accessLevel: "read",
+      requiredPermission: "treasury.transactions.read",
+    });
+    const report = treasuryReads.getDgiiReport(input);
+    const baseName = buildDgiiReportFileBaseName(report);
+    const extension = input.format === "xlsx" ? "xlsx" : input.format === "pdf" ? "pdf" : "csv";
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: `Export ${report.title}`,
+      defaultPath: path.join(app.getPath("documents"), `${baseName}.${extension}`),
+      filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
+    });
+
+    if (canceled || !filePath) {
+      return { saved: false, fileName: null, savedPath: null, summary: "DGII report export cancelled." };
+    }
+
+    if (input.format === "xlsx") {
+      fs.writeFileSync(filePath, buildDgiiReportXlsx(report));
+    } else if (input.format === "pdf") {
+      fs.writeFileSync(filePath, await createDgiiReportPdf(report));
+    } else {
+      fs.writeFileSync(filePath, buildDgiiReportCsv(report), "utf8");
+    }
+
+    return {
+      saved: true,
+      fileName: path.basename(filePath),
+      savedPath: filePath,
+      summary: `Exported ${report.rowCount} ${report.kind} rows.`,
     };
   });
   safeHandle(ipcChannels.treasury.upsertAccount, upsertBankAccountSchema, async (_event, input) => {

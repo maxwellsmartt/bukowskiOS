@@ -9,6 +9,10 @@ import {
   type BankTransactionRow,
   type CounterpartyRulePreview,
   type CounterpartyRulePreviewQuery,
+  type DgiiReport,
+  type DgiiReportColumn,
+  type DgiiReportQuery,
+  type DgiiReportRow,
   type StatementSourceFormat,
   type FiscalStatus,
   type ProjectAllocationRow,
@@ -873,6 +877,164 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
           currency,
           ...totalsForCurrency,
         })),
+      };
+    },
+
+    // DGII fiscal reports: 606 (compras) reuses the deductible ledger; 607
+    // (ventas) and 608 (anulados) read from issued invoices.
+    getDgiiReport(query: DgiiReportQuery): DgiiReport {
+      const ws = resolveWorkspaceId(query.workspaceId);
+      const window = resolveWindow(query);
+      const fmt = (value: number, currency: string) =>
+        `${round2(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+
+      if (query.report === "606") {
+        const ledger = this.getDeductibleLedger({
+          workspaceId: ws,
+          period: query.period,
+          customStartDate: query.customStartDate ?? null,
+          customEndDate: query.customEndDate ?? null,
+        });
+        const columns: DgiiReportColumn[] = [
+          { key: "rnc", label: "RNC / Cédula" },
+          { key: "ncf", label: "NCF" },
+          { key: "dgiiType", label: "Tipo bienes/servicios" },
+          { key: "date", label: "Fecha comprobante" },
+          { key: "supplier", label: "Proveedor" },
+          { key: "claimed", label: "Monto facturado", numeric: true },
+          { key: "deductible", label: "Monto deducible", numeric: true },
+          { key: "withholdingType", label: "Tipo retención" },
+          { key: "withholdingAmount", label: "Monto retenido", numeric: true },
+          { key: "currency", label: "Moneda" },
+        ];
+        const rows: DgiiReportRow[] = ledger.rows.map((row) => ({
+          rnc: row.counterpartyRnc,
+          ncf: row.supplierNcf,
+          dgiiType: row.dgiiExpenseType,
+          date: row.txnDate,
+          supplier: row.counterparty ?? row.concept,
+          claimed: row.claimedAmount,
+          deductible: row.deductibleAmount,
+          withholdingType: row.withholdingType,
+          withholdingAmount: row.withholdingAmount,
+          currency: row.currency,
+        }));
+        return {
+          kind: "606",
+          title: "DGII 606 · Compras",
+          activePeriodLabel: window.label,
+          columns,
+          rows,
+          totals: ledger.totalsByCurrency.map((total) => ({
+            label: total.currency,
+            value: `deducible ${fmt(total.deductibleAmount, total.currency)} · facturado ${fmt(total.claimedAmount, total.currency)}`,
+          })),
+          rowCount: rows.length,
+        };
+      }
+
+      const conditions: string[] = ["workspace_id = ?"];
+      const params: Array<string | number> = [ws];
+      if (query.report === "608") {
+        conditions.push("voided_at IS NOT NULL");
+        if (window.startDate) {
+          conditions.push("substr(voided_at, 1, 10) >= ?");
+          params.push(window.startDate);
+        }
+        if (window.endDate) {
+          conditions.push("substr(voided_at, 1, 10) <= ?");
+          params.push(window.endDate);
+        }
+      } else {
+        conditions.push("voided_at IS NULL");
+        conditions.push("status <> 'draft'");
+        conditions.push("ncf IS NOT NULL");
+        if (window.startDate) {
+          conditions.push("issue_date >= ?");
+          params.push(window.startDate);
+        }
+        if (window.endDate) {
+          conditions.push("issue_date <= ?");
+          params.push(window.endDate);
+        }
+      }
+      const invoiceRows = db
+        .prepare(
+          `SELECT ncf, issue_date, voided_at, client_name_snapshot, client_rnc_snapshot,
+                  subtotal_amount, tax_amount, total_amount, currency, status
+           FROM invoices
+           WHERE ${conditions.join(" AND ")}
+           ORDER BY ${query.report === "608" ? "voided_at" : "issue_date"} ASC`,
+        )
+        .all(...params) as Record<string, unknown>[];
+
+      if (query.report === "607") {
+        const columns: DgiiReportColumn[] = [
+          { key: "rnc", label: "RNC cliente" },
+          { key: "ncf", label: "NCF" },
+          { key: "date", label: "Fecha comprobante" },
+          { key: "client", label: "Cliente" },
+          { key: "subtotal", label: "Monto facturado", numeric: true },
+          { key: "itbis", label: "ITBIS facturado", numeric: true },
+          { key: "total", label: "Total", numeric: true },
+          { key: "currency", label: "Moneda" },
+        ];
+        const rows: DgiiReportRow[] = invoiceRows.map((row) => ({
+          rnc: (row.client_rnc_snapshot as string | null) ?? null,
+          ncf: (row.ncf as string | null) ?? null,
+          date: row.issue_date as string,
+          client: row.client_name_snapshot as string,
+          subtotal: round2(Number(row.subtotal_amount ?? 0)),
+          itbis: round2(Number(row.tax_amount ?? 0)),
+          total: round2(Number(row.total_amount ?? 0)),
+          currency: row.currency as string,
+        }));
+        const byCurrency = new Map<string, { itbis: number; total: number }>();
+        for (const row of rows) {
+          const currency = String(row.currency);
+          const bucket = byCurrency.get(currency) ?? { itbis: 0, total: 0 };
+          bucket.itbis = round2(bucket.itbis + Number(row.itbis ?? 0));
+          bucket.total = round2(bucket.total + Number(row.total ?? 0));
+          byCurrency.set(currency, bucket);
+        }
+        return {
+          kind: "607",
+          title: "DGII 607 · Ventas",
+          activePeriodLabel: window.label,
+          columns,
+          rows,
+          totals: Array.from(byCurrency.entries()).map(([currency, bucket]) => ({
+            label: currency,
+            value: `total ${fmt(bucket.total, currency)} · ITBIS ${fmt(bucket.itbis, currency)}`,
+          })),
+          rowCount: rows.length,
+        };
+      }
+
+      const columns: DgiiReportColumn[] = [
+        { key: "ncf", label: "NCF anulado" },
+        { key: "voidedAt", label: "Fecha anulación" },
+        { key: "issueDate", label: "Fecha emisión" },
+        { key: "client", label: "Cliente" },
+        { key: "total", label: "Monto", numeric: true },
+        { key: "currency", label: "Moneda" },
+      ];
+      const rows: DgiiReportRow[] = invoiceRows.map((row) => ({
+        ncf: (row.ncf as string | null) ?? null,
+        voidedAt: ((row.voided_at as string | null) ?? "").slice(0, 10),
+        issueDate: row.issue_date as string,
+        client: row.client_name_snapshot as string,
+        total: round2(Number(row.total_amount ?? 0)),
+        currency: row.currency as string,
+      }));
+      return {
+        kind: "608",
+        title: "DGII 608 · Anulados",
+        activePeriodLabel: window.label,
+        columns,
+        rows,
+        totals: [{ label: "Anulados", value: String(rows.length) }],
+        rowCount: rows.length,
       };
     },
   };

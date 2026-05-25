@@ -1,4 +1,4 @@
-import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, Landmark, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, FileDown, Landmark, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -22,6 +22,8 @@ import type {
   BankName,
   BankTransactionRow,
   CounterpartyRulePreview,
+  DgiiReportExportFormat,
+  DgiiReportKind,
   ReviewQueueRow,
   TreasuryDeductibleLedgerExportFormat,
   TransactionDirection,
@@ -105,10 +107,57 @@ const transactionKinds: TransactionKind[] = [
 
 const bankNames: BankName[] = ["popular", "santa_cruz", "custom"];
 
+type SelectOption<T extends string = string> = {
+  value: T;
+  label: string;
+  description?: string;
+};
+
+const dgiiExpenseTypeOptions: ReadonlyArray<SelectOption<string>> = [
+  { value: "", label: "Sin especificar" },
+  { value: "01", label: "01 · Gastos de personal" },
+  { value: "02", label: "02 · Trabajos, suministros y servicios" },
+  { value: "03", label: "03 · Arrendamientos" },
+  { value: "04", label: "04 · Gastos de activos fijos" },
+  { value: "05", label: "05 · Gastos de representación" },
+  { value: "06", label: "06 · Otras deducciones admitidas" },
+  { value: "07", label: "07 · Gastos financieros" },
+  { value: "08", label: "08 · Gastos extraordinarios" },
+  { value: "09", label: "09 · Compras y gastos para costo de venta" },
+  { value: "10", label: "10 · Adquisiciones de activos" },
+  { value: "11", label: "11 · Gastos de seguro" },
+];
+
+const dgiiWithholdingTypeOptions: ReadonlyArray<SelectOption<string>> = [
+  { value: "", label: "Sin retención" },
+  { value: "01", label: "01 · Alquileres" },
+  { value: "02", label: "02 · Honorarios por servicios" },
+  { value: "03", label: "03 · Otras rentas" },
+  { value: "04", label: "04 · Otras rentas (rentas presuntas)" },
+  { value: "05", label: "05 · Intereses pagados a personas jurídicas residentes" },
+  { value: "06", label: "06 · Intereses pagados a personas físicas residentes" },
+  { value: "07", label: "07 · Retención por proveedores del Estado" },
+  { value: "08", label: "08 · Juegos telefónicos" },
+  { value: "09", label: "09 · Retenciones subsector ganadería bovina" },
+];
+
 const periods: TreasuryPeriodPreset[] = ["fiscal", "month", "quarter", "year", "all"];
 const bankLogoByName: Partial<Record<BankName, string>> = {
   popular: bancoPopularLogo,
   santa_cruz: bancoSantaCruzLogo,
+};
+const normalizeDgiiCode = (value: string | null | undefined) => {
+  const trimmed = value?.trim() ?? "";
+  const match = trimmed.match(/^(\d{1,2})/);
+  return match ? match[1].padStart(2, "0") : trimmed;
+};
+const withLegacySelectOption = (
+  options: ReadonlyArray<SelectOption<string>>,
+  value: string,
+  label: string,
+): ReadonlyArray<SelectOption<string>> => {
+  if (!value || options.some((option) => option.value === value)) return options;
+  return [...options, { value, label: `${value} · ${label}` }];
 };
 const currencySuffix = (currency: string) => {
   const normalized = currency.trim().toUpperCase();
@@ -351,6 +400,8 @@ export const TreasuryPage = () => {
   const [isUndoingTreasuryAction, setIsUndoingTreasuryAction] = useState(false);
   const [deductibleLedgerPeriod, setDeductibleLedgerPeriod] = useState<TreasuryPeriodPreset>("fiscal");
   const [deductibleLedgerFormat, setDeductibleLedgerFormat] = useState<TreasuryDeductibleLedgerExportFormat>("xlsx");
+  const [dgiiReportKind, setDgiiReportKind] = useState<DgiiReportKind>("606");
+  const [dgiiReportFormat, setDgiiReportFormat] = useState<DgiiReportExportFormat>("xlsx");
   const [reviewSearch, setReviewSearch] = useState("");
   const [reviewAccountFilter, setReviewAccountFilter] = useState("");
   const [reviewMissingNcfOnly, setReviewMissingNcfOnly] = useState(false);
@@ -358,6 +409,7 @@ export const TreasuryPage = () => {
   const [isBulkAccepting, setIsBulkAccepting] = useState(false);
   const [reviewLimit, setReviewLimit] = useState(40);
   const [isExportingDeductibleLedger, setIsExportingDeductibleLedger] = useState(false);
+  const [isExportingDgiiReport, setIsExportingDgiiReport] = useState(false);
 
   const accounts = useBankAccounts(activeWorkspaceId);
   const overview = useTreasuryOverview(
@@ -401,6 +453,22 @@ export const TreasuryPage = () => {
         label: t(`finance.treasury.period.${value}`),
       })),
     [t],
+  );
+  const dgiiReportOptions = useMemo(
+    () => [
+      { value: "606" as const, label: t("finance.treasury.review.dgii606", { defaultValue: "606 compras" }) },
+      { value: "607" as const, label: t("finance.treasury.review.dgii607", { defaultValue: "607 ventas" }) },
+      { value: "608" as const, label: t("finance.treasury.review.dgii608", { defaultValue: "608 anulados" }) },
+    ],
+    [t],
+  );
+  const exportFormatOptions = useMemo(
+    () => [
+      { value: "xlsx" as const, label: "XLSX" },
+      { value: "csv" as const, label: "CSV" },
+      { value: "pdf" as const, label: "PDF" },
+    ],
+    [],
   );
   const accountOptions = useMemo(
     () => [
@@ -909,6 +977,31 @@ export const TreasuryPage = () => {
       );
     } finally {
       setIsExportingDeductibleLedger(false);
+    }
+  };
+
+  const exportDgiiReport = async () => {
+    setIsExportingDgiiReport(true);
+    try {
+      const result = await mutations.exportDgiiReport({
+        workspaceId: activeWorkspaceId,
+        report: dgiiReportKind,
+        period: deductibleLedgerPeriod,
+        format: dgiiReportFormat,
+      });
+      if (result.saved) {
+        toast.success(t("finance.treasury.review.dgiiExported", { defaultValue: "Reporte DGII exportado" }), {
+          description: result.summary,
+        });
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("finance.treasury.review.dgiiExportFailed", { defaultValue: "No se pudo exportar el reporte DGII." }),
+      );
+    } finally {
+      setIsExportingDgiiReport(false);
     }
   };
 
@@ -1896,39 +1989,6 @@ export const TreasuryPage = () => {
               <h3 className="section-subtitle">{t("finance.treasury.review.title")}</h3>
               <small className="text-muted">{t("finance.treasury.review.subtitle")}</small>
             </div>
-            <div className="treasury-review-export-controls">
-              <CompactSelect<TreasuryPeriodPreset>
-                ariaLabel={t("finance.treasury.overview.window")}
-                onChange={setDeductibleLedgerPeriod}
-                options={periodOptions}
-                popupMinWidth={170}
-                value={deductibleLedgerPeriod}
-              />
-              <CompactSelect<TreasuryDeductibleLedgerExportFormat>
-                ariaLabel={t("finance.treasury.review.ledgerFormat", { defaultValue: "Ledger format" })}
-                onChange={setDeductibleLedgerFormat}
-                options={[
-                  { value: "xlsx", label: "XLSX" },
-                  { value: "csv", label: "CSV" },
-                  { value: "pdf", label: "PDF" },
-                ]}
-                popupMinWidth={120}
-                value={deductibleLedgerFormat}
-              />
-              <button
-                className="ghost-control treasury-ledger-export-button"
-                disabled={isExportingDeductibleLedger || deductibleLedger.isLoading}
-                onClick={() => void exportDeductibleLedger()}
-                type="button"
-              >
-                <Download size={13} />
-                <span>
-                  {isExportingDeductibleLedger
-                    ? t("finance.treasury.review.exportingLedger", { defaultValue: "Exporting..." })
-                    : t("finance.treasury.review.exportLedger", { defaultValue: "Export ledger" })}
-                </span>
-              </button>
-            </div>
             {reviewQueue.data.length > 0 || (deductibleLedger.data?.totalsByCurrency.length ?? 0) > 0 ? (
               <div className="treasury-review-summary">
                 <div className="treasury-review-summary-tile">
@@ -1969,43 +2029,111 @@ export const TreasuryPage = () => {
           ) : (
             <>
               <div className="treasury-review-toolbar">
-                <input
-                  className="field-input treasury-review-search"
-                  onChange={(event) => setReviewSearch(event.target.value)}
-                  placeholder={t("finance.treasury.review.searchPlaceholder", { defaultValue: "Search concept or supplier" })}
-                  value={reviewSearch}
-                />
-                <CompactSelect<string>
-                  ariaLabel={t("finance.treasury.filters.account")}
-                  onChange={setReviewAccountFilter}
-                  options={reviewAccountOptions}
-                  popupMinWidth={220}
-                  value={reviewAccountFilter}
-                />
-                <button
-                  className={`ghost-control treasury-review-ncf-filter${reviewMissingNcfOnly ? " is-active" : ""}`}
-                  onClick={() => setReviewMissingNcfOnly((value) => !value)}
-                  type="button"
-                >
-                  {t("finance.treasury.review.missingNcfFilter", { defaultValue: "Missing NCF" })}
-                  {reviewMissingNcfCount > 0 ? <span className="treasury-review-ncf-count">{reviewMissingNcfCount}</span> : null}
-                </button>
-                <span className="treasury-review-count text-muted">
-                  {t("finance.treasury.review.showing", {
-                    defaultValue: "{{shown}} of {{total}}",
-                    shown: filteredReviewRows.length,
-                    total: reviewQueue.data.length,
-                  })}
-                </span>
-                <button
-                  className="ghost-control treasury-review-bulk-accept"
-                  disabled={filteredReviewRows.length === 0 || isBulkAccepting}
-                  onClick={() => setBulkAcceptOpen(true)}
-                  type="button"
-                >
-                  <Check size={13} />
-                  {t("finance.treasury.review.acceptAllVisible", { defaultValue: "Accept all visible" })}
-                </button>
+                <div className="treasury-review-export-row">
+                  <div className="treasury-review-export-group">
+                    <span className="treasury-review-export-label">
+                      {t("finance.treasury.review.ledgerGroup", { defaultValue: "Ledger deducible" })}
+                    </span>
+                    <CompactSelect<TreasuryPeriodPreset>
+                      ariaLabel={t("finance.treasury.overview.window")}
+                      onChange={setDeductibleLedgerPeriod}
+                      options={periodOptions}
+                      popupMinWidth={170}
+                      value={deductibleLedgerPeriod}
+                    />
+                    <CompactSelect<TreasuryDeductibleLedgerExportFormat>
+                      ariaLabel={t("finance.treasury.review.ledgerFormat", { defaultValue: "Formato del ledger" })}
+                      onChange={setDeductibleLedgerFormat}
+                      options={exportFormatOptions}
+                      popupMinWidth={120}
+                      value={deductibleLedgerFormat}
+                    />
+                    <button
+                      className="ghost-control treasury-ledger-export-button"
+                      disabled={isExportingDeductibleLedger || deductibleLedger.isLoading}
+                      onClick={() => void exportDeductibleLedger()}
+                      type="button"
+                    >
+                      <FileDown size={13} />
+                      <span>
+                        {isExportingDeductibleLedger
+                          ? t("finance.treasury.review.exportingLedger", { defaultValue: "Exportando..." })
+                          : t("finance.treasury.review.exportLedger", { defaultValue: "Exportar ledger" })}
+                      </span>
+                    </button>
+                  </div>
+                  <div className="treasury-review-export-group">
+                    <span className="treasury-review-export-label">
+                      {t("finance.treasury.review.dgiiGroup", { defaultValue: "Reportes DGII" })}
+                    </span>
+                    <CompactSelect<DgiiReportKind>
+                      ariaLabel={t("finance.treasury.review.dgiiReport", { defaultValue: "Reporte DGII" })}
+                      onChange={setDgiiReportKind}
+                      options={dgiiReportOptions}
+                      popupMinWidth={140}
+                      value={dgiiReportKind}
+                    />
+                    <CompactSelect<DgiiReportExportFormat>
+                      ariaLabel={t("finance.treasury.review.dgiiFormat", { defaultValue: "Formato DGII" })}
+                      onChange={setDgiiReportFormat}
+                      options={exportFormatOptions}
+                      popupMinWidth={120}
+                      value={dgiiReportFormat}
+                    />
+                    <button
+                      className="ghost-control treasury-dgii-export-button"
+                      disabled={isExportingDgiiReport}
+                      onClick={() => void exportDgiiReport()}
+                      type="button"
+                    >
+                      <FileDown size={13} />
+                      <span>
+                        {isExportingDgiiReport
+                          ? t("finance.treasury.review.exportingDgii", { defaultValue: "Exportando..." })
+                          : t("finance.treasury.review.exportDgii", { defaultValue: "Exportar DGII" })}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+                <div className="treasury-review-filter-row">
+                  <input
+                    className="field-input treasury-review-search"
+                    onChange={(event) => setReviewSearch(event.target.value)}
+                    placeholder={t("finance.treasury.review.searchPlaceholder", { defaultValue: "Search concept or supplier" })}
+                    value={reviewSearch}
+                  />
+                  <CompactSelect<string>
+                    ariaLabel={t("finance.treasury.filters.account")}
+                    onChange={setReviewAccountFilter}
+                    options={reviewAccountOptions}
+                    popupMinWidth={220}
+                    value={reviewAccountFilter}
+                  />
+                  <button
+                    className={`ghost-control treasury-review-ncf-filter${reviewMissingNcfOnly ? " is-active" : ""}`}
+                    onClick={() => setReviewMissingNcfOnly((value) => !value)}
+                    type="button"
+                  >
+                    {t("finance.treasury.review.missingNcfFilter", { defaultValue: "Missing NCF" })}
+                    {reviewMissingNcfCount > 0 ? <span className="treasury-review-ncf-count">{reviewMissingNcfCount}</span> : null}
+                  </button>
+                  <span className="treasury-review-count text-muted">
+                    {t("finance.treasury.review.showing", {
+                      defaultValue: "{{shown}} of {{total}}",
+                      shown: filteredReviewRows.length,
+                      total: reviewQueue.data.length,
+                    })}
+                  </span>
+                  <button
+                    className="ghost-control treasury-review-bulk-accept"
+                    disabled={filteredReviewRows.length === 0 || isBulkAccepting}
+                    onClick={() => setBulkAcceptOpen(true)}
+                    type="button"
+                  >
+                    <Check size={13} />
+                    {t("finance.treasury.review.acceptAllVisible", { defaultValue: "Accept all visible" })}
+                  </button>
+                </div>
               </div>
               {filteredReviewRows.length === 0 ? (
                 <GuidedEmptyState
@@ -2405,12 +2533,22 @@ const ReviewRow = ({
   const [deductible, setDeductible] = useState<number>(clampDeductible(row.deductibleAmount ?? row.amount));
   const [fiscalDraft, setFiscalDraft] = useState<FiscalReviewDraft>({
     supplierNcf: row.supplierNcf ?? "",
-    dgiiExpenseType: row.dgiiExpenseType ?? "",
-    withholdingType: row.withholdingType ?? "",
+    dgiiExpenseType: normalizeDgiiCode(row.dgiiExpenseType),
+    withholdingType: normalizeDgiiCode(row.withholdingType),
     withholdingRate: row.withholdingRate == null ? "" : String(row.withholdingRate),
     withholdingAmount: row.withholdingAmount == null ? "" : String(row.withholdingAmount),
     fiscalPeriod: row.fiscalPeriod ?? row.txnDate.slice(0, 7),
   });
+  const expenseTypeOptions = withLegacySelectOption(
+    dgiiExpenseTypeOptions,
+    fiscalDraft.dgiiExpenseType,
+    t("finance.treasury.review.currentValue", { defaultValue: "valor actual" }),
+  );
+  const withholdingTypeOptions = withLegacySelectOption(
+    dgiiWithholdingTypeOptions,
+    fiscalDraft.withholdingType,
+    t("finance.treasury.review.currentValue", { defaultValue: "valor actual" }),
+  );
   const updateFiscalDraft = (patch: Partial<FiscalReviewDraft>) => setFiscalDraft((current) => ({ ...current, ...patch }));
   const hasFiscalData = Boolean(
     row.supplierNcf || row.withholdingType || row.withholdingAmount != null || row.dgiiExpenseType,
@@ -2488,18 +2626,20 @@ const ReviewRow = ({
           </label>
           <div className="treasury-review-row-actions">
             <button
-              className="ghost-control"
+              aria-label={t("finance.treasury.review.acceptRowHint", { defaultValue: "Aceptar esta fila al 100%" })}
+              className="ghost-control treasury-review-row-action is-accept"
               onClick={() => {
                 setDeductible(row.amount);
                 onApply(row, row.amount, fiscalDraft);
               }}
+              title={t("finance.treasury.review.acceptRowHint", { defaultValue: "Aceptar esta fila al 100%" })}
               type="button"
             >
               <Check size={13} />
               {t("finance.treasury.review.acceptFull")}
             </button>
             <button
-              className="ghost-control"
+              className="ghost-control treasury-review-row-action is-reject"
               onClick={() => {
                 setDeductible(0);
                 onApply(row, 0, fiscalDraft);
@@ -2509,7 +2649,8 @@ const ReviewRow = ({
               <X size={13} />
               {t("finance.treasury.review.reject")}
             </button>
-            <button className="ghost-control is-active" onClick={() => onApply(row, deductible, fiscalDraft)} type="button">
+            <button className="ghost-control treasury-review-row-action is-save" onClick={() => onApply(row, deductible, fiscalDraft)} type="button">
+              <Check size={13} />
               {t("finance.treasury.review.apply")}
             </button>
           </div>
@@ -2547,10 +2688,11 @@ const ReviewRow = ({
             </label>
             <label className="compact-filter-field treasury-review-fiscal-field">
               <span>{t("finance.treasury.review.dgiiType", { defaultValue: "DGII expense type" })}</span>
-              <input
-                className="field-input"
-                onChange={(event) => updateFiscalDraft({ dgiiExpenseType: event.target.value })}
-                placeholder="02-servicios"
+              <CompactSelect<string>
+                ariaLabel={t("finance.treasury.review.dgiiType", { defaultValue: "DGII expense type" })}
+                onChange={(value) => updateFiscalDraft({ dgiiExpenseType: value })}
+                options={expenseTypeOptions}
+                popupMinWidth={360}
                 value={fiscalDraft.dgiiExpenseType}
               />
             </label>
@@ -2565,10 +2707,11 @@ const ReviewRow = ({
             </label>
             <label className="compact-filter-field treasury-review-fiscal-field">
               <span>{t("finance.treasury.review.withholdingType", { defaultValue: "Withholding type" })}</span>
-              <input
-                className="field-input"
-                onChange={(event) => updateFiscalDraft({ withholdingType: event.target.value })}
-                placeholder="ISR"
+              <CompactSelect<string>
+                ariaLabel={t("finance.treasury.review.withholdingType", { defaultValue: "Withholding type" })}
+                onChange={(value) => updateFiscalDraft({ withholdingType: value })}
+                options={withholdingTypeOptions}
+                popupMinWidth={420}
                 value={fiscalDraft.withholdingType}
               />
             </label>

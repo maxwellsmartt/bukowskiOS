@@ -629,6 +629,10 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.exportDeductibleLedger, input) as Promise<
       import("@contracts").AppExportResult
     >,
+  dgiiReport: (query: import("@contracts").DgiiReportQuery) =>
+    ipcRenderer.invoke(ipcChannels.treasury.dgiiReport, query) as Promise<import("@contracts").DgiiReport>,
+  exportDgiiReport: (input: import("@contracts").DgiiReportExportInput) =>
+    ipcRenderer.invoke(ipcChannels.treasury.exportDgiiReport, input) as Promise<import("@contracts").AppExportResult>,
   importStatement: (input: import("@contracts").ImportStatementCommand) =>
     ipcRenderer.invoke(ipcChannels.treasury.importStatement, input) as Promise<
       import("@contracts").ImportStatementResult

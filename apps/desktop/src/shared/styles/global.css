@@ -16033,31 +16033,17 @@ input[type="number"] {
 
 /* --- Accountant review queue --- */
 .treasury-review-header {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(420px, 1.4fr);
   gap: 12px;
-  justify-content: space-between;
-  align-items: flex-start;
+  align-items: start;
   margin-bottom: 14px;
 }
 
 .treasury-review-summary {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
-}
-
-.treasury-review-export-controls {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.treasury-review-export-controls .compact-select-trigger {
-  height: 32px;
-  min-height: 32px;
 }
 
 .treasury-ledger-export-button {
@@ -16066,14 +16052,32 @@ input[type="number"] {
   color: rgba(216, 242, 239, 0.96);
 }
 
+.treasury-dgii-export-button {
+  background: rgba(214, 179, 122, 0.09);
+  border-color: rgba(214, 179, 122, 0.26);
+  color: rgba(245, 221, 183, 0.96);
+}
+
 .treasury-review-summary-tile {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: 10px 12px 11px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.025));
+  border: 1px solid rgba(255, 255, 255, 0.07);
   min-width: 120px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.treasury-review-summary-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: rgba(126, 183, 178, 0.42);
 }
 
 .treasury-review-summary-tile > span {
@@ -16084,29 +16088,81 @@ input[type="number"] {
 }
 
 .treasury-review-summary-tile > strong {
-  font-size: 16px;
+  font-size: 17px;
+  line-height: 1.15;
 }
 
 .treasury-review-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  gap: 10px;
   margin-bottom: 12px;
 }
 
+.treasury-review-filter-row {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(320px, 1.25fr) minmax(360px, 1.55fr) auto auto auto;
+  gap: 8px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.065);
+}
+
 .treasury-review-search {
-  flex: 1 1 240px;
-  min-width: 200px;
-  max-width: 360px;
   height: 34px;
   min-height: 34px;
+  min-width: 0;
   padding: 0 12px;
   border-radius: 999px;
 }
 
+.treasury-review-export-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.treasury-review-export-group {
+  display: grid;
+  align-items: center;
+  grid-template-columns: auto minmax(128px, 1fr) minmax(78px, 92px) auto;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.treasury-review-export-label {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  padding: 0 4px 0 6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.treasury-review-export-group .compact-select-trigger {
+  min-width: 0;
+  width: 100%;
+}
+
+.treasury-review-export-row .compact-select-trigger,
+.treasury-review-export-row .ghost-control {
+  min-height: 30px;
+  height: 30px;
+}
+
+.treasury-review-export-row .ghost-control {
+  padding-inline: 10px;
+}
+
 .treasury-review-ncf-filter {
   gap: 6px;
+  min-height: 34px;
+  white-space: nowrap;
 }
 
 .treasury-review-ncf-filter.is-active {
@@ -16130,12 +16186,15 @@ input[type="number"] {
 }
 
 .treasury-review-count {
-  margin-left: auto;
   font-size: 12px;
+  justify-self: end;
+  white-space: nowrap;
 }
 
 .treasury-review-bulk-accept {
   gap: 6px;
+  min-height: 34px;
+  white-space: nowrap;
 }
 
 .treasury-review-bulk-accept:not(:disabled) {
@@ -16329,6 +16388,32 @@ input[type="number"] {
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.treasury-review-row-action {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  gap: 5px;
+}
+
+.treasury-review-row-action.is-accept {
+  background: rgba(91, 145, 220, 0.1);
+  border-color: rgba(91, 145, 220, 0.36);
+  color: #a9c7f4;
+}
+
+.treasury-review-row-action.is-reject {
+  background: rgba(218, 118, 118, 0.1);
+  border-color: rgba(218, 118, 118, 0.34);
+  color: #efa9a9;
+}
+
+.treasury-review-row-action.is-save {
+  background: rgba(108, 194, 143, 0.12);
+  border-color: rgba(108, 194, 143, 0.38);
+  color: #9bd9b4;
 }
 
 /* Collapsible DGII fiscal section keeps the row scannable by default. */
@@ -17285,6 +17370,23 @@ input[type="number"] {
   .treasury-kpi-secondary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .treasury-review-header {
+    grid-template-columns: 1fr;
+  }
+
+  .treasury-review-filter-row {
+    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto auto auto;
+  }
+
+  .treasury-review-export-row {
+    grid-template-columns: 1fr;
+  }
+
+  .treasury-review-count {
+    justify-self: start;
+  }
+
 }
 
 @media (max-width: 760px) {
@@ -17297,6 +17399,19 @@ input[type="number"] {
 
   .treasury-overview-controls {
     justify-content: stretch;
+  }
+
+  .treasury-review-filter-row,
+  .treasury-review-export-row,
+  .treasury-review-export-group {
+    align-items: stretch;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .treasury-review-export-label {
+    padding: 0 2px;
   }
 
   .treasury-segmented-tabs,
