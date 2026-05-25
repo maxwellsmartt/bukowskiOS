@@ -16162,6 +16162,11 @@ input[type="number"] {
   gap: 8px;
 }
 
+.treasury-review-load-more {
+  align-self: center;
+  margin-top: 4px;
+}
+
 .treasury-review-row {
   position: relative;
   overflow: hidden;

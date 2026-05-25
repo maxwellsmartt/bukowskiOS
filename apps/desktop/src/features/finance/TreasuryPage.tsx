@@ -356,6 +356,7 @@ export const TreasuryPage = () => {
   const [reviewMissingNcfOnly, setReviewMissingNcfOnly] = useState(false);
   const [bulkAcceptOpen, setBulkAcceptOpen] = useState(false);
   const [isBulkAccepting, setIsBulkAccepting] = useState(false);
+  const [reviewLimit, setReviewLimit] = useState(40);
   const [isExportingDeductibleLedger, setIsExportingDeductibleLedger] = useState(false);
 
   const accounts = useBankAccounts(activeWorkspaceId);
@@ -985,6 +986,11 @@ export const TreasuryPage = () => {
     () => reviewQueue.data.filter(reviewIsMissingNcf).length,
     [reviewQueue.data],
   );
+  // Render the long queue incrementally so 400+ rows never paint at once.
+  useEffect(() => {
+    setReviewLimit(40);
+  }, [reviewSearch, reviewAccountFilter, reviewMissingNcfOnly]);
+  const visibleReviewRows = filteredReviewRows.slice(0, reviewLimit);
   // Each currency gets its own Y axis so small-magnitude USD lines stay readable
   // next to large DOP balances (left axis = first currency, right = second).
   const balanceCurrencies = useMemo(() => {
@@ -2008,7 +2014,7 @@ export const TreasuryPage = () => {
                 />
               ) : (
                 <div className="treasury-review-list">
-                  {filteredReviewRows.map((row) => (
+                  {visibleReviewRows.map((row) => (
                     <ReviewRow
                       key={row.transactionId}
                       missingNcf={reviewIsMissingNcf(row)}
@@ -2017,6 +2023,18 @@ export const TreasuryPage = () => {
                       t={t}
                     />
                   ))}
+                  {filteredReviewRows.length > visibleReviewRows.length ? (
+                    <button
+                      className="ghost-control treasury-review-load-more"
+                      onClick={() => setReviewLimit((value) => value + 40)}
+                      type="button"
+                    >
+                      {t("finance.treasury.review.loadMore", {
+                        defaultValue: "Show more ({{remaining}})",
+                        remaining: filteredReviewRows.length - visibleReviewRows.length,
+                      })}
+                    </button>
+                  ) : null}
                 </div>
               )}
             </>
@@ -2449,7 +2467,9 @@ const ReviewRow = ({
         </div>
         <div className="treasury-review-row-edit">
           <label className="compact-filter-field treasury-review-deductible">
-            <span>{t("finance.treasury.review.deductible")}</span>
+            <span>
+              {t("finance.treasury.review.deductible")} · {currencySuffix(row.currency)}
+            </span>
             <input
               className="field-input"
               max={row.amount}

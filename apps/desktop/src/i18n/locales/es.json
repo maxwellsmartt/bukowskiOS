@@ -1502,6 +1502,7 @@
         "bulkAcceptTitle": "Aceptar todo lo visible",
         "bulkAcceptBody": "¿Marcar los {{count}} movimientos visibles como deducibles al 100%? Se conservan los datos fiscales existentes.",
         "bulkAccepted": "Se aceptaron {{count}} reembolsos",
+        "loadMore": "Mostrar más ({{remaining}})",
         "saved": "Revisión guardada.",
         "failed": "No se pudo guardar la revisión."
       },
