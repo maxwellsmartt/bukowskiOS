@@ -765,7 +765,7 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
           `SELECT id, kind, label, created_at
            FROM treasury_undo_journal
            WHERE workspace_id = ? AND undone = 0
-           ORDER BY created_at DESC, id DESC
+           ORDER BY rowid DESC
            LIMIT 1`,
         )
         .get(ws) as

@@ -1402,9 +1402,12 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
               .get(input.workspaceId, input.undoId)
           : db
               .prepare(
+                // rowid is the definitive LIFO key: created_at only has
+                // millisecond resolution and the id suffix is random, so two
+                // edits in the same millisecond would otherwise pop out of order.
                 `SELECT * FROM treasury_undo_journal
                  WHERE workspace_id = ? AND undone = 0
-                 ORDER BY created_at DESC, id DESC
+                 ORDER BY rowid DESC
                  LIMIT 1`,
               )
               .get(input.workspaceId)) as
