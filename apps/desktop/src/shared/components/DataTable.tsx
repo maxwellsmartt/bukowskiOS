@@ -647,6 +647,7 @@ export const DataTable = <T = unknown,>({
                       aria-label={t("shared.dataTable.resizeColumn", { label: column.label })}
                       className="column-resizer"
                       onMouseDown={(event) => handleResizeStart(event, column.key)}
+                      onPointerDown={(event) => event.stopPropagation()}
                       title={t("shared.dataTable.resizeColumn", { label: column.label })}
                       type="button"
                     />

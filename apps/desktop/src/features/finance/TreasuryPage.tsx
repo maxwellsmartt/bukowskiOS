@@ -1168,7 +1168,7 @@ export const TreasuryPage = () => {
         key: "account",
         label: t("finance.treasury.columns.account"),
         width: 136,
-        minWidth: 118,
+        minWidth: 96,
         render: (row: BankTransactionRow) => (
           <span className="treasury-account-cell" title={row.bankAccountLabel}>
             {row.bankAccountLabel}
@@ -1179,7 +1179,7 @@ export const TreasuryPage = () => {
         key: "description",
         label: t("finance.treasury.columns.description"),
         width: 420,
-        minWidth: 280,
+        minWidth: 140,
         render: (row: BankTransactionRow) =>
           editingId === row.id && editDraft ? (
             <input
@@ -1223,7 +1223,7 @@ export const TreasuryPage = () => {
         label: t("finance.treasury.columns.amount"),
         align: "right" as const,
         width: 146,
-        minWidth: 128,
+        minWidth: 104,
         render: (row: BankTransactionRow) =>
           editingId === row.id && editDraft ? (
             <div className="treasury-inline-amount-edit">
@@ -1261,7 +1261,7 @@ export const TreasuryPage = () => {
         key: "kind",
         label: t("finance.treasury.columns.kind"),
         width: 132,
-        minWidth: 116,
+        minWidth: 100,
         render: (row: BankTransactionRow) => (
           <CompactSelect<TransactionKind | "">
             ariaLabel={t("finance.treasury.columns.kind")}
@@ -1509,7 +1509,9 @@ export const TreasuryPage = () => {
             </SurfaceCard>
 
             <SurfaceCard className="treasury-chart-card">
-              <h3 className="section-subtitle">{t("finance.treasury.overview.categoryTitle")}</h3>
+              <div className="treasury-chart-heading treasury-chart-heading-solo">
+                <h3 className="section-subtitle">{t("finance.treasury.overview.categoryTitle")}</h3>
+              </div>
               {snap && categoryChartData.length > 0 ? (
                 <div className="finance-chart-shell finance-chart-shell-pie">
                   <div className="finance-category-layout">

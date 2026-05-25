@@ -4856,6 +4856,11 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 10px;
+  min-height: 22px;
+}
+
+.treasury-chart-heading-solo {
+  justify-content: flex-start;
 }
 
 .treasury-chart-heading .section-subtitle,
@@ -4952,6 +4957,12 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .finance-chart-shell-pie {
   min-height: 286px;
   min-width: 0;
+}
+
+.treasury-chart-card > .guided-empty-state {
+  justify-content: center;
+  margin-top: 8px;
+  min-height: 80px;
 }
 
 .finance-category-layout {
@@ -6185,15 +6196,14 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   width: 2px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.14);
-  box-shadow: 4px 0 0 rgba(255, 255, 255, 0.08);
-  transition: background 120ms ease, box-shadow 120ms ease;
+  transition: background 120ms ease, width 120ms ease;
 }
 
 .data-table-column-resizable:hover .column-resizer::after,
 .data-table-column-resizing .column-resizer::after,
 .column-resizer:focus-visible::after {
   background: rgba(136, 181, 255, 0.9);
-  box-shadow: 4px 0 0 rgba(136, 181, 255, 0.42);
+  width: 3px;
 }
 
 .table-checkbox {
