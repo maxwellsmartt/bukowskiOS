@@ -1334,6 +1334,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     getRunsList: () => agentReads.getRunsList(),
     currencyReads,
     quoteReads,
+    treasuryReads,
     writeServices: {
       packing: packingMutations,
       projects: projectMutations,

@@ -4,6 +4,7 @@ import type { AgentRunRow } from "@contracts";
 import type { FoundationReadService } from "../data/foundationReadService";
 import type { CurrencyReadService } from "../data/currencyReadService";
 import type { QuoteReadService } from "../data/quoteReadService";
+import type { TreasuryReadService } from "../data/treasuryReadService";
 import { buildWriteToolDefinitions, type AgentWriteServices } from "./agentWriteTools";
 
 type ToolExecutionResult = {
@@ -190,6 +191,7 @@ export const createAgentToolRegistry = (
     getRunsList: () => AgentRunRow[];
     currencyReads?: CurrencyReadService;
     quoteReads?: QuoteReadService;
+    treasuryReads?: TreasuryReadService;
     writeServices?: AgentWriteServices;
   },
 ) => {
@@ -2027,6 +2029,243 @@ export const createAgentToolRegistry = (
             context: context ?? null,
             options,
           },
+        };
+      },
+    },
+    {
+      name: "get_treasury_overview",
+      description:
+        "Treasury cash overview for a period: real income, expense, net, deductible expense, unclassified count, and per-account balances. Use for questions about cash position, spending, or how much is fiscally deductible.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          period: { type: "string", enum: ["month", "quarter", "year", "fiscal", "all"], description: "Defaults to fiscal." },
+        },
+      },
+      execute: (args, context) => {
+        if (!options.treasuryReads) {
+          return { summary: "Treasury tools are not available on this device.", payload: { available: false } };
+        }
+        const period = (asOptionalString(args.period) ?? "fiscal") as
+          | "month"
+          | "quarter"
+          | "year"
+          | "fiscal"
+          | "all";
+        const snapshot = options.treasuryReads.getOverview({ workspaceId: context.workspaceId, period });
+        return {
+          summary: `Treasury ${snapshot.activePeriodLabel}: income ${snapshot.totalIncome}, expense ${snapshot.totalExpense}, net ${snapshot.net}, deductible ${snapshot.totalDeductibleExpense} (${snapshot.unclassifiedCount} unclassified).`,
+          payload: {
+            period: snapshot.activePeriodLabel,
+            reportCurrency: snapshot.reportCurrency,
+            totalIncome: snapshot.totalIncome,
+            totalExpense: snapshot.totalExpense,
+            net: snapshot.net,
+            totalDeductibleExpense: snapshot.totalDeductibleExpense,
+            unclassifiedCount: snapshot.unclassifiedCount,
+            pendingReviewCount: snapshot.pendingReviewCount,
+            monthly: snapshot.monthly,
+            expenseByCategory: snapshot.expenseByCategory,
+            accounts: snapshot.accounts.map((account) => ({
+              id: account.id,
+              label: account.accountLabel,
+              currency: account.currency,
+              bank: account.bankName,
+              balance: account.currentBalance ?? account.openingBalance,
+              movements: account.transactionCount,
+            })),
+          },
+        };
+      },
+    },
+    {
+      name: "list_bank_accounts",
+      description: "List treasury bank accounts with currency, bank, balance and movement count.",
+      parameters: { type: "object", additionalProperties: false, properties: {} },
+      execute: (_args, context) => {
+        if (!options.treasuryReads) {
+          return { summary: "Treasury tools are not available on this device.", payload: { items: [] } };
+        }
+        const accounts = options.treasuryReads.getAccounts(context.workspaceId).map((account) => ({
+          id: account.id,
+          label: account.accountLabel,
+          bank: account.bankName,
+          currency: account.currency,
+          balance: account.currentBalance ?? account.openingBalance,
+          movements: account.transactionCount,
+        }));
+        return {
+          summary: accounts.length ? `Found ${accounts.length} bank account(s).` : "No bank accounts yet.",
+          payload: { count: accounts.length, items: accounts },
+        };
+      },
+    },
+    {
+      name: "list_bank_movements",
+      description:
+        "List bank movements (transactions) with filters. Use unclassified_only to find movements that still need classification.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          bank_account_id: { type: "string" },
+          date_from: { type: "string", description: "YYYY-MM-DD" },
+          date_to: { type: "string", description: "YYYY-MM-DD" },
+          unclassified_only: { type: "boolean" },
+          search: { type: "string", description: "Match raw description, concept or counterparty." },
+          limit: { type: "number", description: "Defaults to 50, max 200." },
+        },
+      },
+      execute: (args, context) => {
+        if (!options.treasuryReads) {
+          return { summary: "Treasury tools are not available on this device.", payload: { items: [] } };
+        }
+        const rows = options.treasuryReads.listTransactions({
+          workspaceId: context.workspaceId,
+          bankAccountId: asOptionalString(args.bank_account_id) ?? undefined,
+          dateFrom: asOptionalString(args.date_from) ?? undefined,
+          dateTo: asOptionalString(args.date_to) ?? undefined,
+          unclassifiedOnly: args.unclassified_only === true || undefined,
+          search: asOptionalString(args.search) ?? undefined,
+          limit: Math.min(asInteger(args.limit, 50), 200),
+        });
+        const items = rows.map((row) => ({
+          id: row.id,
+          date: row.txnDate,
+          account: row.bankAccountLabel,
+          description: row.annotation?.concept || row.rawDescription,
+          counterparty: row.annotation?.counterparty ?? null,
+          amount: row.amount,
+          direction: row.direction,
+          currency: row.currency,
+          kind: row.annotation?.txnKind ?? null,
+          category: row.annotation?.expenseCategory ?? null,
+          excludedFromTotals: row.excludedFromTotals,
+        }));
+        return {
+          summary: `Found ${items.length} movement(s).`,
+          payload: { count: items.length, items },
+        };
+      },
+    },
+    {
+      name: "get_treasury_review_queue",
+      description:
+        "List reimbursements/expenses pending DGII deductible review (Jeannette's queue): claimed vs deductible amount and fiscal status.",
+      parameters: { type: "object", additionalProperties: false, properties: {} },
+      execute: (_args, context) => {
+        if (!options.treasuryReads) {
+          return { summary: "Treasury tools are not available on this device.", payload: { items: [] } };
+        }
+        const rows = options.treasuryReads.getReviewQueue(context.workspaceId).map((row) => ({
+          transactionId: row.transactionId,
+          date: row.txnDate,
+          account: row.bankAccountLabel,
+          concept: row.concept || row.rawDescription,
+          counterparty: row.counterparty ?? null,
+          amount: row.amount,
+          currency: row.currency,
+          deductibleAmount: row.deductibleAmount,
+          fiscalStatus: row.fiscalStatus,
+        }));
+        return {
+          summary: `${rows.length} movement(s) pending deductible review.`,
+          payload: { count: rows.length, items: rows },
+        };
+      },
+    },
+    {
+      name: "get_deductible_ledger",
+      description:
+        "Deductible expense ledger for a period (supplier, RNC, NCF, claimed, deductible, fiscal status). Use for DGII 606-style questions and totals.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          period: { type: "string", enum: ["month", "quarter", "year", "fiscal", "all"], description: "Defaults to fiscal." },
+        },
+      },
+      execute: (args, context) => {
+        if (!options.treasuryReads) {
+          return { summary: "Treasury tools are not available on this device.", payload: { items: [] } };
+        }
+        const period = (asOptionalString(args.period) ?? "fiscal") as
+          | "month"
+          | "quarter"
+          | "year"
+          | "fiscal"
+          | "all";
+        const ledger = options.treasuryReads.getDeductibleLedger({ workspaceId: context.workspaceId, period });
+        return {
+          summary: `${ledger.rows.length} deductible expense row(s) for ${ledger.activePeriodLabel}.`,
+          payload: {
+            period: ledger.activePeriodLabel,
+            count: ledger.rows.length,
+            totalsByCurrency: ledger.totalsByCurrency,
+            sample: ledger.rows.slice(0, 25).map((row) => ({
+              date: row.txnDate,
+              supplier: row.counterparty,
+              rnc: row.counterpartyRnc,
+              ncf: row.supplierNcf,
+              claimed: row.claimedAmount,
+              deductible: row.deductibleAmount,
+              fiscalStatus: row.fiscalStatus,
+              currency: row.currency,
+            })),
+          },
+        };
+      },
+    },
+    {
+      name: "get_dgii_report",
+      description: "Build a DGII fiscal report: 606 (purchases), 607 (sales) or 608 (voided). Returns totals and a sample of rows.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["report"],
+        properties: {
+          report: { type: "string", enum: ["606", "607", "608"] },
+          period: { type: "string", enum: ["month", "quarter", "year", "fiscal", "all"], description: "Defaults to fiscal." },
+        },
+      },
+      execute: (args, context) => {
+        if (!options.treasuryReads) {
+          return { summary: "Treasury tools are not available on this device.", payload: { rows: [] } };
+        }
+        const report = (asOptionalString(args.report) ?? "606") as "606" | "607" | "608";
+        const period = (asOptionalString(args.period) ?? "fiscal") as
+          | "month"
+          | "quarter"
+          | "year"
+          | "fiscal"
+          | "all";
+        const result = options.treasuryReads.getDgiiReport({ workspaceId: context.workspaceId, report, period });
+        return {
+          summary: `${result.title} (${result.activePeriodLabel}): ${result.rowCount} row(s).`,
+          payload: {
+            kind: result.kind,
+            period: result.activePeriodLabel,
+            rowCount: result.rowCount,
+            totals: result.totals,
+            columns: result.columns.map((column) => column.label),
+            sample: result.rows.slice(0, 25),
+          },
+        };
+      },
+    },
+    {
+      name: "get_project_pnl",
+      description: "Per-project profit and loss from treasury allocations (income, expense, net, margin).",
+      parameters: { type: "object", additionalProperties: false, properties: {} },
+      execute: (_args, context) => {
+        if (!options.treasuryReads) {
+          return { summary: "Treasury tools are not available on this device.", payload: { items: [] } };
+        }
+        const rows = options.treasuryReads.getProjectPnl(context.workspaceId);
+        return {
+          summary: `P&L for ${rows.length} project(s).`,
+          payload: { count: rows.length, items: rows },
         };
       },
     },
