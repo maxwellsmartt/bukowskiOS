@@ -16134,6 +16134,15 @@ input[type="number"] {
   font-size: 12px;
 }
 
+.treasury-review-bulk-accept {
+  gap: 6px;
+}
+
+.treasury-review-bulk-accept:not(:disabled) {
+  border-color: rgba(108, 194, 143, 0.45);
+  color: #8fd3ab;
+}
+
 .treasury-review-missing-ncf {
   display: inline-flex;
   align-items: center;

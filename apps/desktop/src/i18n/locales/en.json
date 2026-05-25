@@ -1496,6 +1496,10 @@
         "showing": "{{shown}} of {{total}}",
         "noMatchesTitle": "No matches",
         "noMatchesBody": "No movements match the current filters.",
+        "acceptAllVisible": "Accept all visible",
+        "bulkAcceptTitle": "Accept all visible",
+        "bulkAcceptBody": "Mark all {{count}} visible movements as fully deductible? Existing fiscal data is kept.",
+        "bulkAccepted": "Accepted {{count}} reimbursements",
         "saved": "Review saved.",
         "failed": "Could not save the review."
       },

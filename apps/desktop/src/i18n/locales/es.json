@@ -1498,6 +1498,10 @@
         "showing": "{{shown}} de {{total}}",
         "noMatchesTitle": "Sin coincidencias",
         "noMatchesBody": "Ningún movimiento coincide con los filtros actuales.",
+        "acceptAllVisible": "Aceptar todo lo visible",
+        "bulkAcceptTitle": "Aceptar todo lo visible",
+        "bulkAcceptBody": "¿Marcar los {{count}} movimientos visibles como deducibles al 100%? Se conservan los datos fiscales existentes.",
+        "bulkAccepted": "Se aceptaron {{count}} reembolsos",
         "saved": "Revisión guardada.",
         "failed": "No se pudo guardar la revisión."
       },

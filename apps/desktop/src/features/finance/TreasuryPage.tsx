@@ -354,6 +354,8 @@ export const TreasuryPage = () => {
   const [reviewSearch, setReviewSearch] = useState("");
   const [reviewAccountFilter, setReviewAccountFilter] = useState("");
   const [reviewMissingNcfOnly, setReviewMissingNcfOnly] = useState(false);
+  const [bulkAcceptOpen, setBulkAcceptOpen] = useState(false);
+  const [isBulkAccepting, setIsBulkAccepting] = useState(false);
   const [isExportingDeductibleLedger, setIsExportingDeductibleLedger] = useState(false);
 
   const accounts = useBankAccounts(activeWorkspaceId);
@@ -823,37 +825,65 @@ export const TreasuryPage = () => {
 
   /* --------------------------- Review handler ---------------------------- */
 
+  const submitReviewRow = (row: ReviewQueueRow, deductible: number, fiscalDraft?: FiscalReviewDraft) => {
+    const withholdingRate = fiscalDraft?.withholdingRate.trim() ? Number(fiscalDraft.withholdingRate) : null;
+    const withholdingAmount = fiscalDraft?.withholdingAmount.trim() ? Number(fiscalDraft.withholdingAmount) : null;
+    return mutations.reviewReimbursement({
+      commandId: newCommandId("treasury-review"),
+      workspaceId: activeWorkspaceId,
+      actorType: "user",
+      sourceChannel: "desktop",
+      transactionId: row.transactionId,
+      reimbursementStatus: deductible >= row.amount ? "accepted" : deductible > 0 ? "partial" : "rejected",
+      deductibleAmount: deductible,
+      supplierNcf: fiscalDraft?.supplierNcf.trim() || null,
+      dgiiExpenseType: fiscalDraft?.dgiiExpenseType.trim() || null,
+      withholdingType: fiscalDraft?.withholdingType.trim() || null,
+      withholdingRate,
+      withholdingAmount,
+      fiscalPeriod: fiscalDraft?.fiscalPeriod.trim() || null,
+      fiscalStatus: deductible > 0 ? "accepted" : "rejected",
+    });
+  };
+  const refreshAfterReview = () => {
+    reviewQueue.refresh();
+    overview.refresh();
+    undoPreview.refresh();
+    deductibleLedger.refresh();
+  };
+  // Keeps a row's already-captured fiscal data intact when bulk-accepting.
+  const fiscalDraftFromRow = (row: ReviewQueueRow): FiscalReviewDraft => ({
+    supplierNcf: row.supplierNcf ?? "",
+    dgiiExpenseType: row.dgiiExpenseType ?? "",
+    withholdingType: row.withholdingType ?? "",
+    withholdingRate: row.withholdingRate == null ? "" : String(row.withholdingRate),
+    withholdingAmount: row.withholdingAmount == null ? "" : String(row.withholdingAmount),
+    fiscalPeriod: row.fiscalPeriod ?? row.txnDate.slice(0, 7),
+  });
   const applyReview = async (row: ReviewQueueRow, deductible: number, fiscalDraft?: FiscalReviewDraft) => {
-    const withholdingRate = fiscalDraft?.withholdingRate.trim()
-      ? Number(fiscalDraft.withholdingRate)
-      : null;
-    const withholdingAmount = fiscalDraft?.withholdingAmount.trim()
-      ? Number(fiscalDraft.withholdingAmount)
-      : null;
     try {
-      await mutations.reviewReimbursement({
-        commandId: newCommandId("treasury-review"),
-        workspaceId: activeWorkspaceId,
-        actorType: "user",
-        sourceChannel: "desktop",
-        transactionId: row.transactionId,
-        reimbursementStatus: deductible >= row.amount ? "accepted" : deductible > 0 ? "partial" : "rejected",
-        deductibleAmount: deductible,
-        supplierNcf: fiscalDraft?.supplierNcf.trim() || null,
-        dgiiExpenseType: fiscalDraft?.dgiiExpenseType.trim() || null,
-        withholdingType: fiscalDraft?.withholdingType.trim() || null,
-        withholdingRate,
-        withholdingAmount,
-        fiscalPeriod: fiscalDraft?.fiscalPeriod.trim() || null,
-        fiscalStatus: deductible > 0 ? "accepted" : "rejected",
-      });
+      await submitReviewRow(row, deductible, fiscalDraft);
       toast.success(t("finance.treasury.review.saved"));
-      reviewQueue.refresh();
-      overview.refresh();
-      undoPreview.refresh();
-      deductibleLedger.refresh();
+      refreshAfterReview();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("finance.treasury.review.failed"));
+    }
+  };
+  const confirmBulkAccept = async () => {
+    setIsBulkAccepting(true);
+    let accepted = 0;
+    try {
+      for (const row of filteredReviewRows) {
+        await submitReviewRow(row, row.amount, fiscalDraftFromRow(row));
+        accepted += 1;
+      }
+      toast.success(t("finance.treasury.review.bulkAccepted", { defaultValue: "Accepted {{count}} reimbursements", count: accepted }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("finance.treasury.review.failed"));
+    } finally {
+      refreshAfterReview();
+      setIsBulkAccepting(false);
+      setBulkAcceptOpen(false);
     }
   };
 
@@ -1961,6 +1991,15 @@ export const TreasuryPage = () => {
                     total: reviewQueue.data.length,
                   })}
                 </span>
+                <button
+                  className="ghost-control treasury-review-bulk-accept"
+                  disabled={filteredReviewRows.length === 0 || isBulkAccepting}
+                  onClick={() => setBulkAcceptOpen(true)}
+                  type="button"
+                >
+                  <Check size={13} />
+                  {t("finance.treasury.review.acceptAllVisible", { defaultValue: "Accept all visible" })}
+                </button>
               </div>
               {filteredReviewRows.length === 0 ? (
                 <GuidedEmptyState
@@ -2085,6 +2124,19 @@ export const TreasuryPage = () => {
       onCancel={() => setPendingImportDelete(null)}
       onConfirm={() => void confirmRemoveImport()}
       title={t("finance.treasury.imports.confirmDeleteTitle", { defaultValue: "Delete import batch" })}
+    />
+    <ConfirmDialog
+      body={t("finance.treasury.review.bulkAcceptBody", {
+        defaultValue: "Mark all {{count}} visible movements as fully deductible? Existing fiscal data is kept.",
+        count: filteredReviewRows.length,
+      })}
+      cancelLabel={t("common.cancel", { defaultValue: "Cancel" })}
+      confirmLabel={t("finance.treasury.review.acceptAllVisible", { defaultValue: "Accept all visible" })}
+      isOpen={bulkAcceptOpen}
+      isSubmitting={isBulkAccepting}
+      onCancel={() => setBulkAcceptOpen(false)}
+      onConfirm={() => void confirmBulkAccept()}
+      title={t("finance.treasury.review.bulkAcceptTitle", { defaultValue: "Accept all visible" })}
     />
     </>
   );
