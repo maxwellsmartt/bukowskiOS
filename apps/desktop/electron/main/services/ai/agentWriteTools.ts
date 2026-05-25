@@ -1113,4 +1113,128 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
       return { summary: result.summary, payload: { transactionId, count: allocations.length } };
     },
   },
+  {
+    name: "create_bank_account",
+    description:
+      "Create a treasury bank account so statements can be imported into it. Requires approval. Use list_bank_accounts first to avoid duplicates.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["account_label", "currency"],
+      properties: {
+        bank_name: { type: "string", enum: ["popular", "santa_cruz", "custom"], description: "Defaults to custom." },
+        account_label: { type: "string" },
+        account_number: { type: "string" },
+        currency: { type: "string", description: "DOP, USD or EUR." },
+        opening_balance: { type: "number" },
+        notes: { type: "string" },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const accountLabel = asString(args.account_label);
+      if (!accountLabel) throw new Error("account_label is required.");
+      const bankName = (asString(args.bank_name) || "custom") as never;
+      const result = services.treasury.upsertBankAccount({
+        commandId: newCommandId("agent-account"),
+        workspaceId,
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+        bankName,
+        accountLabel,
+        accountNumberFull: asOptionalString(args.account_number) ?? null,
+        currency: (asOptionalString(args.currency) ?? "DOP").toUpperCase(),
+        openingBalance: asNumber(args.opening_balance) ?? 0,
+        notes: asOptionalString(args.notes) ?? null,
+      });
+      return { summary: result.summary, payload: { bankAccountId: result.bankAccountId } };
+    },
+  },
+  {
+    name: "review_deductible",
+    description:
+      "Accountant review: set the DGII-deductible amount and fiscal data (NCF, withholding) for an expense. Requires approval. deductible_amount cannot exceed the claimed amount.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["transaction_id", "deductible_amount"],
+      properties: {
+        transaction_id: { type: "string" },
+        deductible_amount: { type: "number" },
+        supplier_ncf: { type: "string" },
+        dgii_expense_type: { type: "string" },
+        withholding_type: { type: "string" },
+        withholding_rate: { type: "number" },
+        withholding_amount: { type: "number" },
+        fiscal_period: { type: "string", description: "YYYY-MM" },
+        notes: { type: "string" },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const transactionId = asString(args.transaction_id);
+      if (!transactionId) throw new Error("transaction_id is required.");
+      const deductibleAmount = asNumber(args.deductible_amount) ?? 0;
+      const result = services.treasury.reviewReimbursement({
+        commandId: newCommandId("agent-review"),
+        workspaceId,
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+        transactionId,
+        reimbursementStatus: deductibleAmount > 0 ? "accepted" : "rejected",
+        deductibleAmount,
+        supplierNcf: asOptionalString(args.supplier_ncf) ?? null,
+        dgiiExpenseType: asOptionalString(args.dgii_expense_type) ?? null,
+        withholdingType: asOptionalString(args.withholding_type) ?? null,
+        withholdingRate: asNumber(args.withholding_rate) ?? null,
+        withholdingAmount: asNumber(args.withholding_amount) ?? null,
+        fiscalPeriod: asOptionalString(args.fiscal_period) ?? null,
+        fiscalStatus: deductibleAmount > 0 ? "accepted" : "rejected",
+        notes: asOptionalString(args.notes) ?? null,
+      });
+      return { summary: result.summary, payload: { transactionId, deductibleAmount } };
+    },
+  },
+  {
+    name: "correct_movement",
+    description:
+      "Correct an imported bank movement's raw fields (date, description, amount, direction, reference). Requires approval. Reversible with Undo.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["transaction_id"],
+      properties: {
+        transaction_id: { type: "string" },
+        txn_date: { type: "string", description: "YYYY-MM-DD" },
+        raw_description: { type: "string" },
+        reference: { type: "string" },
+        amount: { type: "number" },
+        direction: { type: "string", enum: ["debit", "credit"] },
+        notes: { type: "string" },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const transactionId = asString(args.transaction_id);
+      if (!transactionId) throw new Error("transaction_id is required.");
+      const direction = asString(args.direction);
+      const result = services.treasury.correctTransaction({
+        commandId: newCommandId("agent-correct"),
+        workspaceId,
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+        transactionId,
+        txnDate: asOptionalString(args.txn_date),
+        rawDescription: asOptionalString(args.raw_description) ?? null,
+        reference: asOptionalString(args.reference) ?? null,
+        amount: asNumber(args.amount),
+        direction: direction === "debit" || direction === "credit" ? direction : undefined,
+        notes: asOptionalString(args.notes) ?? null,
+      });
+      return { summary: result.summary, payload: { transactionId, repeated: result.repeated } };
+    },
+  },
 ];
