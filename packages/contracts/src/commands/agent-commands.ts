@@ -91,7 +91,7 @@ export type AIGatewayToolContext = {
 
 export type AssistantGatewayAttachment = {
   id: string;
-  kind: "image";
+  kind: "image" | "document";
   name: string;
   mimeType: string;
   dataUrl: string;

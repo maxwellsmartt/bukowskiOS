@@ -12767,6 +12767,29 @@ select.field-input {
   text-overflow: ellipsis;
 }
 
+.assistant-chat-attachment-chip.is-image {
+  padding-left: 3px;
+}
+
+.assistant-chat-attachment-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.assistant-chat-attachment-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.assistant-chat-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
 .assistant-chat-attachment-remove {
   display: inline-flex;
   align-items: center;

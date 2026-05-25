@@ -391,17 +391,22 @@ const buildGatewayInput = (
   recentAssistantMessages: string[],
 ): string | Array<Record<string, unknown>> => {
   const attachments = request.attachments ?? [];
+  // Only images go into the multimodal vision blocks; CSV/XLSX/PDF are
+  // pre-extracted into the tool context and read via read_attached_document.
+  const imageAttachments = attachments.filter(
+    (attachment) => attachment.kind === "image" || isImageMime(attachment.mimeType),
+  );
   const trimmedMessage = request.message.trim();
   const payload = JSON.stringify({
     userMessage:
-      trimmedMessage || (attachments.length ? "Please review the attached image context for BukowskiOS." : ""),
+      trimmedMessage || (attachments.length ? "Please review the attached context for BukowskiOS." : ""),
     appContext: parseAppContextSummary(request),
     recentUserMessages,
     recentAssistantMessages,
     attachments: attachments.length ? summarizeAttachments(attachments) : [],
   });
 
-  if (!attachments.length) {
+  if (!imageAttachments.length) {
     return payload;
   }
 
@@ -410,7 +415,7 @@ const buildGatewayInput = (
       role: "user",
       content: [
         { type: "input_text", text: payload },
-        ...attachments.map((attachment) => ({
+        ...imageAttachments.map((attachment) => ({
           type: "input_image",
           image_url: attachment.dataUrl,
         })),

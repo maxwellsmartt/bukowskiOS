@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Ellipsis,
   ExternalLink,
+  FileText,
   LoaderCircle,
   Mic,
   PanelLeft,
@@ -81,6 +82,7 @@ type OptimisticAssistantMessage = {
 
 const maxImageAttachments = 3;
 const maxImageAttachmentBytes = 6 * 1024 * 1024;
+const maxDocumentAttachmentBytes = 15 * 1024 * 1024;
 const maxVoiceRecordingMs = 90_000;
 const voiceWaveformBarCount = 42;
 const silentVoiceLevels = Array.from({ length: voiceWaveformBarCount }, () => 0.08);
@@ -146,7 +148,7 @@ const formatVoiceDuration = (durationMs: number) => {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
-const formatAttachmentSummary = (count: number) => (count === 1 ? "Attached 1 image." : `Attached ${count} images.`);
+const formatAttachmentSummary = (count: number) => (count === 1 ? "Attached 1 file." : `Attached ${count} files.`);
 
 const getSessionSource = (session: AssistantChatSession): "app" | "telegram" => {
   if (session.contextKey.includes("connector=telegram")) {
@@ -317,20 +319,26 @@ const readFileAsDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
-const toImageAttachment = async (file: File): Promise<AssistantGatewayAttachment> => {
-  if (!file.type.startsWith("image/")) {
-    throw new Error("The chat currently supports image attachments only.");
-  }
+const DOC_EXTENSIONS = /\.(csv|xlsx|xls|pdf|txt)$/i;
+const DOC_MIME = /(csv|spreadsheet|excel|pdf|text\/plain)/i;
+const isSupportedAttachment = (file: File) =>
+  file.type.startsWith("image/") || DOC_MIME.test(file.type) || DOC_EXTENSIONS.test(file.name);
 
-  if (file.size > maxImageAttachmentBytes) {
-    throw new Error(`${file.name} exceeds the 6 MB limit for a single image.`);
+const toChatAttachment = async (file: File): Promise<AssistantGatewayAttachment> => {
+  const isImage = file.type.startsWith("image/");
+  if (!isSupportedAttachment(file)) {
+    throw new Error(`${file.name}: only images, CSV, XLSX, PDF or text files are supported.`);
+  }
+  const limit = isImage ? maxImageAttachmentBytes : maxDocumentAttachmentBytes;
+  if (file.size > limit) {
+    throw new Error(`${file.name} exceeds the ${Math.round(limit / (1024 * 1024))} MB limit.`);
   }
 
   return {
     id: `attachment-${file.name}-${file.lastModified.toString(36)}-${file.size.toString(36)}`,
-    kind: "image",
+    kind: isImage ? "image" : "document",
     name: file.name,
-    mimeType: file.type,
+    mimeType: file.type || "application/octet-stream",
     dataUrl: await readFileAsDataUrl(file),
   };
 };
@@ -1203,7 +1211,7 @@ export const GlobalAssistantChat = () => {
     const availableSlots = Math.max(0, maxImageAttachments - attachments.length);
 
     if (!availableSlots) {
-      setAttachmentError(`You can attach up to ${maxImageAttachments} images per message.`);
+      setAttachmentError(`You can attach up to ${maxImageAttachments} files per message.`);
       if (attachmentInputRef.current) {
         attachmentInputRef.current.value = "";
       }
@@ -1213,13 +1221,13 @@ export const GlobalAssistantChat = () => {
     const nextFiles = files.slice(0, availableSlots);
 
     try {
-      const nextAttachments = await Promise.all(nextFiles.map((file) => toImageAttachment(file)));
+      const nextAttachments = await Promise.all(nextFiles.map((file) => toChatAttachment(file)));
       setAttachments((current) => [...current, ...nextAttachments]);
       setAttachmentError(
-        files.length > nextFiles.length ? `Only ${availableSlots} images were attached to keep this message lightweight.` : null,
+        files.length > nextFiles.length ? `Only ${availableSlots} files were attached to keep this message lightweight.` : null,
       );
     } catch (error) {
-      setAttachmentError(getUserFacingErrorMessage(error, "I could not attach that image."));
+      setAttachmentError(getUserFacingErrorMessage(error, "I could not attach that file."));
     } finally {
       if (attachmentInputRef.current) {
         attachmentInputRef.current.value = "";
@@ -1706,9 +1714,9 @@ export const GlobalAssistantChat = () => {
                   value={message}
                 />
                 <button
-                  aria-label="Attach image"
+                  aria-label="Attach files"
                   className="assistant-chat-attach-button"
-                  data-tooltip="Attach image"
+                  data-tooltip="Attach files"
                   onClick={() => attachmentInputRef.current?.click()}
                   type="button"
                 >
@@ -1785,7 +1793,7 @@ export const GlobalAssistantChat = () => {
 
               <input
                 ref={attachmentInputRef}
-                accept="image/*"
+                accept="image/*,.csv,.xlsx,.xls,.pdf,.txt,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 className="assistant-chat-file-input"
                 multiple
                 onChange={handleAttachmentSelection}
@@ -1795,8 +1803,16 @@ export const GlobalAssistantChat = () => {
               {attachments.length ? (
                 <div className="assistant-chat-attachments">
                   {attachments.map((attachment) => (
-                    <span key={attachment.id} className="assistant-chat-attachment-chip">
-                      <span>{attachment.name}</span>
+                    <span
+                      key={attachment.id}
+                      className={`assistant-chat-attachment-chip is-${attachment.kind}`}
+                    >
+                      {attachment.kind === "image" ? (
+                        <img alt="" className="assistant-chat-attachment-thumb" src={attachment.dataUrl} />
+                      ) : (
+                        <FileText className="assistant-chat-attachment-icon" size={13} />
+                      )}
+                      <span className="assistant-chat-attachment-name">{attachment.name}</span>
                       <button
                         aria-label={`Remove ${attachment.name}`}
                         className="assistant-chat-attachment-remove"

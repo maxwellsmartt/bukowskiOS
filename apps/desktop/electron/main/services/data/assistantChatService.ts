@@ -54,6 +54,22 @@ const resolveAttachmentExtension = (mimeType: string) => {
     return "gif";
   }
 
+  if (mimeType.includes("pdf")) {
+    return "pdf";
+  }
+
+  if (mimeType.includes("csv")) {
+    return "csv";
+  }
+
+  if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) {
+    return "xlsx";
+  }
+
+  if (mimeType.startsWith("text/")) {
+    return "txt";
+  }
+
   return "bin";
 };
 
