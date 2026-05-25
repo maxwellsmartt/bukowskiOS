@@ -141,6 +141,11 @@ const dgiiWithholdingTypeOptions: ReadonlyArray<SelectOption<string>> = [
   { value: "09", label: "09 · Retenciones subsector ganadería bovina" },
 ];
 
+const DGII_OTHER_OPTION = "__other__";
+const recentDgiiExpenseTypeKey = "bukowski:treasury-review:recent-dgii-expense-types";
+const recentDgiiWithholdingTypeKey = "bukowski:treasury-review:recent-withholding-types";
+const maxRecentDgiiOptions = 4;
+
 const periods: TreasuryPeriodPreset[] = ["fiscal", "month", "quarter", "year", "all"];
 const bankLogoByName: Partial<Record<BankName, string>> = {
   popular: bancoPopularLogo,
@@ -158,6 +163,52 @@ const withLegacySelectOption = (
 ): ReadonlyArray<SelectOption<string>> => {
   if (!value || options.some((option) => option.value === value)) return options;
   return [...options, { value, label: `${value} · ${label}` }];
+};
+
+const readRecentDgiiOptions = (key: string) => {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]") as unknown;
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
+const pushRecentDgiiOption = (key: string, value: string) => {
+  const normalized = normalizeDgiiCode(value);
+  if (!normalized || normalized === DGII_OTHER_OPTION) return;
+  if (typeof window === "undefined") return;
+  try {
+    const next = [normalized, ...readRecentDgiiOptions(key).filter((item) => item !== normalized)].slice(0, maxRecentDgiiOptions);
+    window.localStorage.setItem(key, JSON.stringify(next));
+  } catch {
+    // Best effort only; the form still works without local recents.
+  }
+};
+
+const buildDgiiOptions = (
+  baseOptions: ReadonlyArray<SelectOption<string>>,
+  recentValues: ReadonlyArray<string>,
+  currentValue: string,
+  currentLabel: string,
+  otherLabel: string,
+  recentLabel: string,
+): ReadonlyArray<SelectOption<string>> => {
+  const withCurrent = withLegacySelectOption(baseOptions, currentValue, currentLabel);
+  const values = new Set<string>();
+  const recentOptions: SelectOption<string>[] = [];
+  for (const recentValue of recentValues) {
+    const value = normalizeDgiiCode(recentValue);
+    if (!value || values.has(value)) continue;
+    const option = withCurrent.find((candidate) => candidate.value === value);
+    if (!option) continue;
+    values.add(value);
+    recentOptions.push({ ...option, description: recentLabel });
+  }
+  const recentSet = new Set(recentOptions.map((option) => option.value));
+  const rest = withCurrent.filter((option) => !recentSet.has(option.value));
+  return [...recentOptions, ...rest, { value: DGII_OTHER_OPTION, label: otherLabel }];
 };
 const currencySuffix = (currency: string) => {
   const normalized = currency.trim().toUpperCase();
@@ -2539,17 +2590,49 @@ const ReviewRow = ({
     withholdingAmount: row.withholdingAmount == null ? "" : String(row.withholdingAmount),
     fiscalPeriod: row.fiscalPeriod ?? row.txnDate.slice(0, 7),
   });
-  const expenseTypeOptions = withLegacySelectOption(
-    dgiiExpenseTypeOptions,
-    fiscalDraft.dgiiExpenseType,
-    t("finance.treasury.review.currentValue", { defaultValue: "valor actual" }),
+  const [recentExpenseTypes, setRecentExpenseTypes] = useState<string[]>(() => readRecentDgiiOptions(recentDgiiExpenseTypeKey));
+  const [recentWithholdingTypes, setRecentWithholdingTypes] = useState<string[]>(() =>
+    readRecentDgiiOptions(recentDgiiWithholdingTypeKey),
   );
-  const withholdingTypeOptions = withLegacySelectOption(
+  const baseExpenseValues = useMemo(() => new Set(dgiiExpenseTypeOptions.map((option) => option.value)), []);
+  const baseWithholdingValues = useMemo(() => new Set(dgiiWithholdingTypeOptions.map((option) => option.value)), []);
+  const [manualExpenseType, setManualExpenseType] = useState(() =>
+    Boolean(fiscalDraft.dgiiExpenseType && !baseExpenseValues.has(fiscalDraft.dgiiExpenseType)),
+  );
+  const [manualWithholdingType, setManualWithholdingType] = useState(() =>
+    Boolean(fiscalDraft.withholdingType && !baseWithholdingValues.has(fiscalDraft.withholdingType)),
+  );
+  const currentValueLabel = t("finance.treasury.review.currentValue", { defaultValue: "valor actual" });
+  const recentValueLabel = t("finance.treasury.review.recentValue", { defaultValue: "Usado recientemente" });
+  const expenseTypeOptions = buildDgiiOptions(
+    dgiiExpenseTypeOptions,
+    recentExpenseTypes,
+    fiscalDraft.dgiiExpenseType,
+    currentValueLabel,
+    t("finance.treasury.review.otherManual", { defaultValue: "Otros · escribir manualmente" }),
+    recentValueLabel,
+  );
+  const withholdingTypeOptions = buildDgiiOptions(
     dgiiWithholdingTypeOptions,
+    recentWithholdingTypes,
     fiscalDraft.withholdingType,
-    t("finance.treasury.review.currentValue", { defaultValue: "valor actual" }),
+    currentValueLabel,
+    t("finance.treasury.review.otherManual", { defaultValue: "Otros · escribir manualmente" }),
+    recentValueLabel,
   );
   const updateFiscalDraft = (patch: Partial<FiscalReviewDraft>) => setFiscalDraft((current) => ({ ...current, ...patch }));
+  const rememberDgiiSelection = (kind: "expense" | "withholding", value: string) => {
+    const key = kind === "expense" ? recentDgiiExpenseTypeKey : recentDgiiWithholdingTypeKey;
+    pushRecentDgiiOption(key, value);
+    const next = readRecentDgiiOptions(key);
+    if (kind === "expense") setRecentExpenseTypes(next);
+    else setRecentWithholdingTypes(next);
+  };
+  const handleApply = (nextDeductible: number) => {
+    rememberDgiiSelection("expense", fiscalDraft.dgiiExpenseType);
+    rememberDgiiSelection("withholding", fiscalDraft.withholdingType);
+    onApply(row, nextDeductible, fiscalDraft);
+  };
   const hasFiscalData = Boolean(
     row.supplierNcf || row.withholdingType || row.withholdingAmount != null || row.dgiiExpenseType,
   );
@@ -2616,7 +2699,7 @@ const ReviewRow = ({
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  onApply(row, deductible, fiscalDraft);
+                  handleApply(deductible);
                 }
               }}
               title={t("finance.treasury.review.saveHint", { defaultValue: "Press Enter to save" })}
@@ -2630,7 +2713,7 @@ const ReviewRow = ({
               className="ghost-control treasury-review-row-action is-accept"
               onClick={() => {
                 setDeductible(row.amount);
-                onApply(row, row.amount, fiscalDraft);
+                handleApply(row.amount);
               }}
               title={t("finance.treasury.review.acceptRowHint", { defaultValue: "Aceptar esta fila al 100%" })}
               type="button"
@@ -2642,14 +2725,14 @@ const ReviewRow = ({
               className="ghost-control treasury-review-row-action is-reject"
               onClick={() => {
                 setDeductible(0);
-                onApply(row, 0, fiscalDraft);
+                handleApply(0);
               }}
               type="button"
             >
               <X size={13} />
               {t("finance.treasury.review.reject")}
             </button>
-            <button className="ghost-control treasury-review-row-action is-save" onClick={() => onApply(row, deductible, fiscalDraft)} type="button">
+            <button className="ghost-control treasury-review-row-action is-save" onClick={() => handleApply(deductible)} type="button">
               <Check size={13} />
               {t("finance.treasury.review.apply")}
             </button>
@@ -2688,13 +2771,42 @@ const ReviewRow = ({
             </label>
             <label className="compact-filter-field treasury-review-fiscal-field">
               <span>{t("finance.treasury.review.dgiiType", { defaultValue: "DGII expense type" })}</span>
-              <CompactSelect<string>
-                ariaLabel={t("finance.treasury.review.dgiiType", { defaultValue: "DGII expense type" })}
-                onChange={(value) => updateFiscalDraft({ dgiiExpenseType: value })}
-                options={expenseTypeOptions}
-                popupMinWidth={360}
-                value={fiscalDraft.dgiiExpenseType}
-              />
+              {manualExpenseType ? (
+                <div className="treasury-review-manual-field">
+                  <input
+                    className="field-input"
+                    onChange={(event) => updateFiscalDraft({ dgiiExpenseType: event.target.value })}
+                    placeholder={t("finance.treasury.review.manualTypePlaceholder", { defaultValue: "Escribir tipo" })}
+                    value={fiscalDraft.dgiiExpenseType}
+                  />
+                  <button
+                    className="ghost-control treasury-review-manual-toggle"
+                    onClick={() => {
+                      setManualExpenseType(false);
+                      updateFiscalDraft({ dgiiExpenseType: "" });
+                    }}
+                    type="button"
+                  >
+                    {t("finance.treasury.review.useList", { defaultValue: "Lista" })}
+                  </button>
+                </div>
+              ) : (
+                <CompactSelect<string>
+                  ariaLabel={t("finance.treasury.review.dgiiType", { defaultValue: "DGII expense type" })}
+                  onChange={(value) => {
+                    if (value === DGII_OTHER_OPTION) {
+                      setManualExpenseType(true);
+                      updateFiscalDraft({ dgiiExpenseType: "" });
+                      return;
+                    }
+                    rememberDgiiSelection("expense", value);
+                    updateFiscalDraft({ dgiiExpenseType: value });
+                  }}
+                  options={expenseTypeOptions}
+                  popupMinWidth={360}
+                  value={fiscalDraft.dgiiExpenseType}
+                />
+              )}
             </label>
             <label className="compact-filter-field treasury-review-fiscal-field">
               <span>{t("finance.treasury.review.period", { defaultValue: "Period" })}</span>
@@ -2707,13 +2819,42 @@ const ReviewRow = ({
             </label>
             <label className="compact-filter-field treasury-review-fiscal-field">
               <span>{t("finance.treasury.review.withholdingType", { defaultValue: "Withholding type" })}</span>
-              <CompactSelect<string>
-                ariaLabel={t("finance.treasury.review.withholdingType", { defaultValue: "Withholding type" })}
-                onChange={(value) => updateFiscalDraft({ withholdingType: value })}
-                options={withholdingTypeOptions}
-                popupMinWidth={420}
-                value={fiscalDraft.withholdingType}
-              />
+              {manualWithholdingType ? (
+                <div className="treasury-review-manual-field">
+                  <input
+                    className="field-input"
+                    onChange={(event) => updateFiscalDraft({ withholdingType: event.target.value })}
+                    placeholder={t("finance.treasury.review.manualTypePlaceholder", { defaultValue: "Escribir tipo" })}
+                    value={fiscalDraft.withholdingType}
+                  />
+                  <button
+                    className="ghost-control treasury-review-manual-toggle"
+                    onClick={() => {
+                      setManualWithholdingType(false);
+                      updateFiscalDraft({ withholdingType: "" });
+                    }}
+                    type="button"
+                  >
+                    {t("finance.treasury.review.useList", { defaultValue: "Lista" })}
+                  </button>
+                </div>
+              ) : (
+                <CompactSelect<string>
+                  ariaLabel={t("finance.treasury.review.withholdingType", { defaultValue: "Withholding type" })}
+                  onChange={(value) => {
+                    if (value === DGII_OTHER_OPTION) {
+                      setManualWithholdingType(true);
+                      updateFiscalDraft({ withholdingType: "" });
+                      return;
+                    }
+                    rememberDgiiSelection("withholding", value);
+                    updateFiscalDraft({ withholdingType: value });
+                  }}
+                  options={withholdingTypeOptions}
+                  popupMinWidth={420}
+                  value={fiscalDraft.withholdingType}
+                />
+              )}
             </label>
             <label className="compact-filter-field treasury-review-fiscal-field">
               <span>{t("finance.treasury.review.withholdingRate", { defaultValue: "Withholding %" })}</span>

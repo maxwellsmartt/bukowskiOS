@@ -1528,6 +1528,10 @@
         "dgiiExported": "DGII report exported",
         "dgiiExportFailed": "Could not export DGII report.",
         "currentValue": "current value",
+        "recentValue": "Recently used",
+        "otherManual": "Other · type manually",
+        "manualTypePlaceholder": "Type value",
+        "useList": "List",
         "saved": "Review saved.",
         "failed": "Could not save the review."
       },

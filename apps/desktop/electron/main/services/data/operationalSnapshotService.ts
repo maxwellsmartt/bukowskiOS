@@ -406,7 +406,16 @@ export const resolveOperationalSnapshot = (
           ? resolveIncidentSnapshot(db, row.workspace_id, row.entity_id)
           : resolveRmaSnapshot(db, row.workspace_id, row.entity_id);
 
-  if (!snapshot) return null;
+  if (!snapshot) {
+    return {
+      workspace_id: row.workspace_id,
+      entity_type: entityType,
+      entity_id: row.entity_id,
+      snapshot_json: {},
+      updated_at: row.updated_at,
+      deleted_at: row.updated_at,
+    };
+  }
 
   return {
     workspace_id: row.workspace_id,

@@ -16483,6 +16483,23 @@ input[type="number"] {
   border-radius: 8px;
 }
 
+.treasury-review-manual-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.treasury-review-manual-toggle {
+  min-height: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
 .treasury-chart-card .section-subtitle {
   margin-bottom: 4px;
 }

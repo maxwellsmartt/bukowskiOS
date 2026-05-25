@@ -164,6 +164,31 @@ describe("operational snapshot service", () => {
     }
   });
 
+  it("resolves a tombstone snapshot when an outbound operational entity no longer exists locally", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-tombstone");
+
+    try {
+      const service = createOperationalSnapshotService(database);
+      const snapshot = service.resolveSnapshot({
+        workspace_id: "workspace-metadata",
+        entity_type: "project",
+        entity_id: "project-already-removed",
+        updated_at: "2026-05-06T12:06:00.000Z",
+      });
+
+      expect(snapshot).toEqual({
+        workspace_id: "workspace-metadata",
+        entity_type: "project",
+        entity_id: "project-already-removed",
+        snapshot_json: {},
+        updated_at: "2026-05-06T12:06:00.000Z",
+        deleted_at: "2026-05-06T12:06:00.000Z",
+      });
+    } finally {
+      cleanup();
+    }
+  });
+
   it("upserts packing items by slip and asset when remote ids differ", () => {
     const { cleanup, database } = createTestDatabase("bukowski-operational-snapshot-packing-item");
 
