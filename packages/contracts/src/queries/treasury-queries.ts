@@ -46,6 +46,12 @@ export type TransactionAnnotationView = {
   counterparty: string | null;
   counterpartyRnc: string | null;
   expenseCategory: string | null;
+  supplierNcf: string | null;
+  dgiiExpenseType: string | null;
+  withholdingType: string | null;
+  withholdingRate: number | null;
+  withholdingAmount: number | null;
+  fiscalPeriod: string | null;
   isInternalTransfer: boolean;
   reimbursementStatus: ReimbursementStatus;
   claimedAmount: number | null;
@@ -166,6 +172,12 @@ export type TreasuryDeductibleLedgerRow = {
   counterpartyRnc: string | null;
   concept: string | null;
   expenseCategory: string | null;
+  supplierNcf: string | null;
+  dgiiExpenseType: string | null;
+  withholdingType: string | null;
+  withholdingRate: number | null;
+  withholdingAmount: number | null;
+  fiscalPeriod: string | null;
   claimedAmount: number;
   deductibleAmount: number;
   rejectedAmount: number;
@@ -248,6 +260,12 @@ export type ReviewQueueRow = {
   reimbursementStatus: ReimbursementStatus;
   claimedAmount: number | null;
   deductibleAmount: number | null;
+  supplierNcf: string | null;
+  dgiiExpenseType: string | null;
+  withholdingType: string | null;
+  withholdingRate: number | null;
+  withholdingAmount: number | null;
+  fiscalPeriod: string | null;
   fiscalStatus: FiscalStatus;
 };
 

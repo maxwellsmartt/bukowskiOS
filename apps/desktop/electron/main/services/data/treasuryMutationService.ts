@@ -123,16 +123,24 @@ const restoreBlankAnnotation = (db: DatabaseSync, workspaceId: string, transacti
       INSERT INTO transaction_annotations (
         transaction_id, workspace_id, txn_kind, concept, counterparty,
         counterparty_rnc, expense_category, is_internal_transfer,
+        supplier_ncf, dgii_expense_type, withholding_type,
+        withholding_rate, withholding_amount, fiscal_period,
         reimbursement_status, claimed_amount, deductible_amount, fiscal_status,
         reviewed_by_user_id, reviewed_at, support_doc_file_id, notes,
         classified_by_user_id, updated_at
-      ) VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, 0, 'n/a', NULL, NULL, 'pending', NULL, NULL, NULL, NULL, NULL, ?)
+      ) VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'n/a', NULL, NULL, 'pending', NULL, NULL, NULL, NULL, NULL, ?)
       ON CONFLICT(transaction_id) DO UPDATE SET
         txn_kind = NULL,
         concept = NULL,
         counterparty = NULL,
         counterparty_rnc = NULL,
         expense_category = NULL,
+        supplier_ncf = NULL,
+        dgii_expense_type = NULL,
+        withholding_type = NULL,
+        withholding_rate = NULL,
+        withholding_amount = NULL,
+        fiscal_period = NULL,
         is_internal_transfer = 0,
         reimbursement_status = 'n/a',
         claimed_amount = NULL,
@@ -819,15 +827,23 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           `INSERT INTO transaction_annotations (
              transaction_id, workspace_id, txn_kind, concept, counterparty,
              counterparty_rnc, expense_category, is_internal_transfer,
+             supplier_ncf, dgii_expense_type, withholding_type,
+             withholding_rate, withholding_amount, fiscal_period,
              reimbursement_status, claimed_amount, support_doc_file_id, notes,
              classified_by_user_id, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 'n/a'), ?, ?, ?, ?, ?)
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 'n/a'), ?, ?, ?, ?, ?)
            ON CONFLICT(transaction_id) DO UPDATE SET
              txn_kind = excluded.txn_kind,
              concept = excluded.concept,
              counterparty = excluded.counterparty,
              counterparty_rnc = excluded.counterparty_rnc,
              expense_category = excluded.expense_category,
+             supplier_ncf = excluded.supplier_ncf,
+             dgii_expense_type = excluded.dgii_expense_type,
+             withholding_type = excluded.withholding_type,
+             withholding_rate = excluded.withholding_rate,
+             withholding_amount = excluded.withholding_amount,
+             fiscal_period = excluded.fiscal_period,
              is_internal_transfer = excluded.is_internal_transfer,
              reimbursement_status = excluded.reimbursement_status,
              claimed_amount = excluded.claimed_amount,
@@ -844,6 +860,12 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           input.counterpartyRnc?.trim() || null,
           input.expenseCategory?.trim() || null,
           input.isInternalTransfer ? 1 : 0,
+          input.supplierNcf?.trim() || null,
+          input.dgiiExpenseType?.trim() || null,
+          input.withholdingType?.trim() || null,
+          input.withholdingRate != null ? round2(input.withholdingRate) : null,
+          input.withholdingAmount != null ? round2(input.withholdingAmount) : null,
+          input.fiscalPeriod?.trim() || null,
           input.reimbursementStatus ?? null,
           input.claimedAmount != null ? round2(input.claimedAmount) : null,
           input.supportDocFileId?.trim() || null,
@@ -979,15 +1001,23 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           `INSERT INTO transaction_annotations (
              transaction_id, workspace_id, txn_kind, concept, counterparty,
              counterparty_rnc, expense_category, is_internal_transfer,
+             supplier_ncf, dgii_expense_type, withholding_type,
+             withholding_rate, withholding_amount, fiscal_period,
              reimbursement_status, claimed_amount, support_doc_file_id, notes,
              classified_by_user_id, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 'n/a'), ?, ?, ?, ?, ?)
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 'n/a'), ?, ?, ?, ?, ?)
            ON CONFLICT(transaction_id) DO UPDATE SET
              txn_kind = excluded.txn_kind,
              concept = excluded.concept,
              counterparty = COALESCE(excluded.counterparty, transaction_annotations.counterparty),
              counterparty_rnc = COALESCE(excluded.counterparty_rnc, transaction_annotations.counterparty_rnc),
              expense_category = COALESCE(excluded.expense_category, transaction_annotations.expense_category),
+             supplier_ncf = COALESCE(excluded.supplier_ncf, transaction_annotations.supplier_ncf),
+             dgii_expense_type = COALESCE(excluded.dgii_expense_type, transaction_annotations.dgii_expense_type),
+             withholding_type = COALESCE(excluded.withholding_type, transaction_annotations.withholding_type),
+             withholding_rate = COALESCE(excluded.withholding_rate, transaction_annotations.withholding_rate),
+             withholding_amount = COALESCE(excluded.withholding_amount, transaction_annotations.withholding_amount),
+             fiscal_period = COALESCE(excluded.fiscal_period, transaction_annotations.fiscal_period),
              is_internal_transfer = excluded.is_internal_transfer,
              reimbursement_status = excluded.reimbursement_status,
              claimed_amount = COALESCE(excluded.claimed_amount, transaction_annotations.claimed_amount),
@@ -1008,6 +1038,12 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
             input.counterpartyRnc?.trim() || null,
             input.expenseCategory?.trim() || null,
             input.isInternalTransfer ? 1 : 0,
+            input.supplierNcf?.trim() || null,
+            input.dgiiExpenseType?.trim() || null,
+            input.withholdingType?.trim() || null,
+            input.withholdingRate != null ? round2(input.withholdingRate) : null,
+            input.withholdingAmount != null ? round2(input.withholdingAmount) : null,
+            input.fiscalPeriod?.trim() || null,
             input.reimbursementStatus ?? null,
             input.claimedAmount != null ? round2(input.claimedAmount) : null,
             input.supportDocFileId?.trim() || null,
@@ -1206,11 +1242,19 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
         db.prepare(
           `INSERT INTO transaction_annotations (
              transaction_id, workspace_id, reimbursement_status, deductible_amount,
-             fiscal_status, notes, reviewed_by_user_id, reviewed_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             supplier_ncf, dgii_expense_type, withholding_type, withholding_rate,
+             withholding_amount, fiscal_period, fiscal_status, notes,
+             reviewed_by_user_id, reviewed_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(transaction_id) DO UPDATE SET
              reimbursement_status = excluded.reimbursement_status,
              deductible_amount = excluded.deductible_amount,
+             supplier_ncf = COALESCE(excluded.supplier_ncf, transaction_annotations.supplier_ncf),
+             dgii_expense_type = COALESCE(excluded.dgii_expense_type, transaction_annotations.dgii_expense_type),
+             withholding_type = COALESCE(excluded.withholding_type, transaction_annotations.withholding_type),
+             withholding_rate = COALESCE(excluded.withholding_rate, transaction_annotations.withholding_rate),
+             withholding_amount = COALESCE(excluded.withholding_amount, transaction_annotations.withholding_amount),
+             fiscal_period = COALESCE(excluded.fiscal_period, transaction_annotations.fiscal_period),
              fiscal_status = excluded.fiscal_status,
              notes = COALESCE(excluded.notes, transaction_annotations.notes),
              reviewed_by_user_id = excluded.reviewed_by_user_id,
@@ -1221,6 +1265,12 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           input.workspaceId,
           input.reimbursementStatus,
           input.deductibleAmount != null ? round2(input.deductibleAmount) : null,
+          input.supplierNcf?.trim() || null,
+          input.dgiiExpenseType?.trim() || null,
+          input.withholdingType?.trim() || null,
+          input.withholdingRate != null ? round2(input.withholdingRate) : null,
+          input.withholdingAmount != null ? round2(input.withholdingAmount) : null,
+          input.fiscalPeriod?.trim() || null,
           input.fiscalStatus,
           input.notes?.trim() || null,
           defaultActorUserId,
@@ -1236,6 +1286,12 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           {
             reimbursementStatus: input.reimbursementStatus,
             deductibleAmount: input.deductibleAmount ?? null,
+            supplierNcf: input.supplierNcf?.trim() || null,
+            dgiiExpenseType: input.dgiiExpenseType?.trim() || null,
+            withholdingType: input.withholdingType?.trim() || null,
+            withholdingRate: input.withholdingRate ?? null,
+            withholdingAmount: input.withholdingAmount ?? null,
+            fiscalPeriod: input.fiscalPeriod?.trim() || null,
             fiscalStatus: input.fiscalStatus,
           },
           `sync-${input.commandId}`,

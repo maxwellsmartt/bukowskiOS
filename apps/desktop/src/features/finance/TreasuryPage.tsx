@@ -63,6 +63,14 @@ type PendingClassificationRule = {
   expenseCategory?: string | null;
   preview: CounterpartyRulePreview;
 };
+type FiscalReviewDraft = {
+  supplierNcf: string;
+  dgiiExpenseType: string;
+  withholdingType: string;
+  withholdingRate: string;
+  withholdingAmount: string;
+  fiscalPeriod: string;
+};
 type TreasuryClassificationSuggestion = {
   kind: TransactionKind;
   expenseCategory?: string;
@@ -812,7 +820,13 @@ export const TreasuryPage = () => {
 
   /* --------------------------- Review handler ---------------------------- */
 
-  const applyReview = async (row: ReviewQueueRow, deductible: number) => {
+  const applyReview = async (row: ReviewQueueRow, deductible: number, fiscalDraft?: FiscalReviewDraft) => {
+    const withholdingRate = fiscalDraft?.withholdingRate.trim()
+      ? Number(fiscalDraft.withholdingRate)
+      : null;
+    const withholdingAmount = fiscalDraft?.withholdingAmount.trim()
+      ? Number(fiscalDraft.withholdingAmount)
+      : null;
     try {
       await mutations.reviewReimbursement({
         commandId: newCommandId("treasury-review"),
@@ -822,6 +836,12 @@ export const TreasuryPage = () => {
         transactionId: row.transactionId,
         reimbursementStatus: deductible >= row.amount ? "accepted" : deductible > 0 ? "partial" : "rejected",
         deductibleAmount: deductible,
+        supplierNcf: fiscalDraft?.supplierNcf.trim() || null,
+        dgiiExpenseType: fiscalDraft?.dgiiExpenseType.trim() || null,
+        withholdingType: fiscalDraft?.withholdingType.trim() || null,
+        withholdingRate,
+        withholdingAmount,
+        fiscalPeriod: fiscalDraft?.fiscalPeriod.trim() || null,
         fiscalStatus: deductible > 0 ? "accepted" : "rejected",
       });
       toast.success(t("finance.treasury.review.saved"));
@@ -2230,13 +2250,22 @@ const ReviewRow = ({
   t,
 }: {
   row: ReviewQueueRow;
-  onApply: (row: ReviewQueueRow, deductible: number) => void;
+  onApply: (row: ReviewQueueRow, deductible: number, fiscalDraft: FiscalReviewDraft) => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) => {
   // The deductible can never exceed the expense itself (DGII can only accept up
   // to the claimed amount) and is never negative — clamp on entry.
   const clampDeductible = (value: number) => Math.min(Math.max(value, 0), row.amount);
   const [deductible, setDeductible] = useState<number>(clampDeductible(row.deductibleAmount ?? row.amount));
+  const [fiscalDraft, setFiscalDraft] = useState<FiscalReviewDraft>({
+    supplierNcf: row.supplierNcf ?? "",
+    dgiiExpenseType: row.dgiiExpenseType ?? "",
+    withholdingType: row.withholdingType ?? "",
+    withholdingRate: row.withholdingRate == null ? "" : String(row.withholdingRate),
+    withholdingAmount: row.withholdingAmount == null ? "" : String(row.withholdingAmount),
+    fiscalPeriod: row.fiscalPeriod ?? row.txnDate.slice(0, 7),
+  });
+  const updateFiscalDraft = (patch: Partial<FiscalReviewDraft>) => setFiscalDraft((current) => ({ ...current, ...patch }));
   const hasConcept = Boolean(row.concept && row.rawDescription && row.concept !== row.rawDescription);
   const resultTone = deductible >= row.amount ? "success" : deductible > 0 ? "warning" : "critical";
   const resultLabel =
@@ -2292,13 +2321,71 @@ const ReviewRow = ({
             value={deductible}
           />
         </label>
+        <div className="treasury-review-fiscal-grid">
+          <label className="compact-filter-field treasury-review-fiscal-field">
+            <span>{t("finance.treasury.review.ncf", { defaultValue: "NCF" })}</span>
+            <input
+              className="field-input"
+              onChange={(event) => updateFiscalDraft({ supplierNcf: event.target.value })}
+              placeholder="B0100000000"
+              value={fiscalDraft.supplierNcf}
+            />
+          </label>
+          <label className="compact-filter-field treasury-review-fiscal-field">
+            <span>{t("finance.treasury.review.dgiiType", { defaultValue: "DGII" })}</span>
+            <input
+              className="field-input"
+              onChange={(event) => updateFiscalDraft({ dgiiExpenseType: event.target.value })}
+              placeholder="02-servicios"
+              value={fiscalDraft.dgiiExpenseType}
+            />
+          </label>
+          <label className="compact-filter-field treasury-review-fiscal-field">
+            <span>{t("finance.treasury.review.period", { defaultValue: "Period" })}</span>
+            <input
+              className="field-input"
+              onChange={(event) => updateFiscalDraft({ fiscalPeriod: event.target.value })}
+              placeholder="2026-05"
+              value={fiscalDraft.fiscalPeriod}
+            />
+          </label>
+          <label className="compact-filter-field treasury-review-fiscal-field">
+            <span>{t("finance.treasury.review.withholdingType", { defaultValue: "W/H type" })}</span>
+            <input
+              className="field-input"
+              onChange={(event) => updateFiscalDraft({ withholdingType: event.target.value })}
+              placeholder="ISR"
+              value={fiscalDraft.withholdingType}
+            />
+          </label>
+          <label className="compact-filter-field treasury-review-fiscal-field">
+            <span>{t("finance.treasury.review.withholdingRate", { defaultValue: "W/H %" })}</span>
+            <input
+              className="field-input"
+              min={0}
+              onChange={(event) => updateFiscalDraft({ withholdingRate: event.target.value })}
+              type="number"
+              value={fiscalDraft.withholdingRate}
+            />
+          </label>
+          <label className="compact-filter-field treasury-review-fiscal-field">
+            <span>{t("finance.treasury.review.withholdingAmount", { defaultValue: "W/H amount" })}</span>
+            <input
+              className="field-input"
+              min={0}
+              onChange={(event) => updateFiscalDraft({ withholdingAmount: event.target.value })}
+              type="number"
+              value={fiscalDraft.withholdingAmount}
+            />
+          </label>
+        </div>
       </div>
       <div className="treasury-review-row-actions">
         <button
           className="ghost-control"
           onClick={() => {
             setDeductible(row.amount);
-            onApply(row, row.amount);
+            onApply(row, row.amount, fiscalDraft);
           }}
           type="button"
         >
@@ -2309,14 +2396,14 @@ const ReviewRow = ({
           className="ghost-control"
           onClick={() => {
             setDeductible(0);
-            onApply(row, 0);
+            onApply(row, 0, fiscalDraft);
           }}
           type="button"
         >
           <X size={13} />
           {t("finance.treasury.review.reject")}
         </button>
-        <button className="ghost-control is-active" onClick={() => onApply(row, deductible)} type="button">
+        <button className="ghost-control is-active" onClick={() => onApply(row, deductible, fiscalDraft)} type="button">
           {t("finance.treasury.review.apply")}
         </button>
       </div>

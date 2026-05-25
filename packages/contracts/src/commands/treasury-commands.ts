@@ -156,6 +156,12 @@ export type AnnotateTransactionCommand = {
   counterparty?: string | null;
   counterpartyRnc?: string | null;
   expenseCategory?: string | null;
+  supplierNcf?: string | null;
+  dgiiExpenseType?: string | null;
+  withholdingType?: string | null;
+  withholdingRate?: number | null;
+  withholdingAmount?: number | null;
+  fiscalPeriod?: string | null;
   isInternalTransfer?: boolean;
   reimbursementStatus?: ReimbursementStatus;
   claimedAmount?: number | null;
@@ -206,6 +212,12 @@ export type ReviewReimbursementCommand = {
   transactionId: string;
   reimbursementStatus: ReimbursementStatus;
   deductibleAmount?: number | null;
+  supplierNcf?: string | null;
+  dgiiExpenseType?: string | null;
+  withholdingType?: string | null;
+  withholdingRate?: number | null;
+  withholdingAmount?: number | null;
+  fiscalPeriod?: string | null;
   fiscalStatus: FiscalStatus;
   notes?: string | null;
 };

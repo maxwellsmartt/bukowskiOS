@@ -16095,7 +16095,7 @@ input[type="number"] {
 
 .treasury-review-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(260px, 1fr) minmax(360px, 640px) auto;
   gap: 12px;
   align-items: center;
   padding: 12px 14px;
@@ -16231,6 +16231,7 @@ input[type="number"] {
   display: flex;
   align-items: flex-end;
   gap: 12px;
+  min-width: 0;
 }
 
 .treasury-review-claimed {
@@ -16249,6 +16250,33 @@ input[type="number"] {
   min-width: 120px;
 }
 
+.treasury-review-fiscal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(104px, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.treasury-review-fiscal-field {
+  gap: 4px;
+  min-width: 0;
+}
+
+.treasury-review-fiscal-field > span {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.treasury-review-fiscal-field .field-input {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
 .treasury-review-row-actions {
   display: flex;
   gap: 6px;
@@ -16263,6 +16291,15 @@ input[type="number"] {
   .treasury-review-row-controls,
   .treasury-review-row-actions {
     justify-content: flex-start;
+  }
+
+  .treasury-review-row-controls {
+    flex-wrap: wrap;
+  }
+
+  .treasury-review-fiscal-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+    width: 100%;
   }
 }
 

@@ -513,12 +513,33 @@ describe("treasury mutation service", () => {
       transactionId: txn.id,
       reimbursementStatus: "partial",
       deductibleAmount: 15000,
+      supplierNcf: "B0100000999",
+      dgiiExpenseType: "01-personal",
+      withholdingType: "ISR",
+      withholdingRate: 10,
+      withholdingAmount: 1500,
+      fiscalPeriod: "2025-12",
       fiscalStatus: "accepted",
     });
 
     const [reviewed] = reads.listTransactions({ workspaceId });
     expect(reviewed.annotation?.deductibleAmount).toBe(15000);
     expect(reviewed.annotation?.reimbursementStatus).toBe("partial");
+    expect(reviewed.annotation?.supplierNcf).toBe("B0100000999");
+    expect(reviewed.annotation?.dgiiExpenseType).toBe("01-personal");
+    expect(reviewed.annotation?.withholdingType).toBe("ISR");
+    expect(reviewed.annotation?.withholdingRate).toBe(10);
+    expect(reviewed.annotation?.withholdingAmount).toBe(1500);
+    expect(reviewed.annotation?.fiscalPeriod).toBe("2025-12");
+    const [reviewQueueRow] = reads.getReviewQueue(workspaceId);
+    expect(reviewQueueRow).toMatchObject({
+      supplierNcf: "B0100000999",
+      dgiiExpenseType: "01-personal",
+      withholdingType: "ISR",
+      withholdingRate: 10,
+      withholdingAmount: 1500,
+      fiscalPeriod: "2025-12",
+    });
 
     const overview = reads.getOverview({ workspaceId, period: "custom", customStartDate: "2025-01-01", customEndDate: "2025-12-31" });
     expect(overview.totalExpense).toBe(20000);
@@ -553,6 +574,12 @@ describe("treasury mutation service", () => {
       counterparty: "Proveedor SRL",
       counterpartyRnc: "131000000",
       expenseCategory: "services",
+      supplierNcf: "B0100000001",
+      dgiiExpenseType: "02-servicios",
+      withholdingType: "isr",
+      withholdingRate: 10,
+      withholdingAmount: 1000,
+      fiscalPeriod: "2026-05",
     });
     mutations.reviewReimbursement({
       commandId: "cmd-ledger-review",
@@ -570,6 +597,12 @@ describe("treasury mutation service", () => {
       counterparty: "Proveedor SRL",
       counterpartyRnc: "131000000",
       concept: "Servicios técnicos",
+      supplierNcf: "B0100000001",
+      dgiiExpenseType: "02-servicios",
+      withholdingType: "isr",
+      withholdingRate: 10,
+      withholdingAmount: 1000,
+      fiscalPeriod: "2026-05",
       claimedAmount: 10000,
       deductibleAmount: 7500,
       rejectedAmount: 2500,
@@ -578,6 +611,7 @@ describe("treasury mutation service", () => {
       { currency: "DOP", claimedAmount: 10000, deductibleAmount: 7500, rejectedAmount: 2500 },
     ]);
     expect(buildDeductibleLedgerCsv(ledger)).toContain("Proveedor SRL");
+    expect(buildDeductibleLedgerCsv(ledger)).toContain("B0100000001");
     expect(buildDeductibleLedgerXlsx(ledger).length).toBeGreaterThan(1000);
 
     cleanup();

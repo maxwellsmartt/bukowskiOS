@@ -156,6 +156,18 @@ const mapAnnotation = (row: Record<string, unknown>): TransactionAnnotationView 
     counterparty: (row.counterparty as string | null) ?? null,
     counterpartyRnc: (row.counterparty_rnc as string | null) ?? null,
     expenseCategory: (row.expense_category as string | null) ?? null,
+    supplierNcf: (row.supplier_ncf as string | null) ?? null,
+    dgiiExpenseType: (row.dgii_expense_type as string | null) ?? null,
+    withholdingType: (row.withholding_type as string | null) ?? null,
+    withholdingRate:
+      row.withholding_rate === null || row.withholding_rate === undefined
+        ? null
+        : Number(row.withholding_rate),
+    withholdingAmount:
+      row.withholding_amount === null || row.withholding_amount === undefined
+        ? null
+        : Number(row.withholding_amount),
+    fiscalPeriod: (row.fiscal_period as string | null) ?? null,
     isInternalTransfer: Number(row.is_internal_transfer ?? 0) === 1,
     reimbursementStatus: (row.reimbursement_status as ReimbursementStatus) ?? "n/a",
     claimedAmount:
@@ -283,6 +295,8 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
           `SELECT t.*, acc.account_label AS account_label,
                   a.transaction_id AS a_transaction_id, a.txn_kind, a.concept, a.counterparty,
                   a.counterparty_rnc, a.expense_category, a.is_internal_transfer,
+                  a.supplier_ncf, a.dgii_expense_type, a.withholding_type,
+                  a.withholding_rate, a.withholding_amount, a.fiscal_period,
                   a.reimbursement_status, a.claimed_amount, a.deductible_amount,
                   a.fiscal_status, a.reviewed_by_user_id, a.reviewed_at,
                   a.support_doc_file_id, a.notes AS annotation_notes
@@ -641,7 +655,10 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
           `SELECT t.id AS transaction_id, acc.account_label, t.txn_date, t.raw_description,
                   t.amount, t.currency,
                   a.concept, a.counterparty, a.reimbursement_status,
-                  a.claimed_amount, a.deductible_amount, a.fiscal_status
+                  a.claimed_amount, a.deductible_amount,
+                  a.supplier_ncf, a.dgii_expense_type, a.withholding_type,
+                  a.withholding_rate, a.withholding_amount, a.fiscal_period,
+                  a.fiscal_status
            FROM bank_transactions t
            JOIN bank_accounts acc ON acc.id = t.bank_account_id
            JOIN transaction_annotations a ON a.transaction_id = t.id
@@ -670,6 +687,18 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
           row.deductible_amount === null || row.deductible_amount === undefined
             ? null
             : Number(row.deductible_amount),
+        supplierNcf: (row.supplier_ncf as string | null) ?? null,
+        dgiiExpenseType: (row.dgii_expense_type as string | null) ?? null,
+        withholdingType: (row.withholding_type as string | null) ?? null,
+        withholdingRate:
+          row.withholding_rate === null || row.withholding_rate === undefined
+            ? null
+            : Number(row.withholding_rate),
+        withholdingAmount:
+          row.withholding_amount === null || row.withholding_amount === undefined
+            ? null
+            : Number(row.withholding_amount),
+        fiscalPeriod: (row.fiscal_period as string | null) ?? null,
         fiscalStatus: (row.fiscal_status as FiscalStatus) ?? "pending",
       }));
     },
@@ -776,6 +805,8 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
           `SELECT t.id, t.txn_date, t.raw_description, t.reference, t.amount, t.currency,
                   acc.account_label,
                   a.concept, a.counterparty, a.counterparty_rnc, a.expense_category,
+                  a.supplier_ncf, a.dgii_expense_type, a.withholding_type,
+                  a.withholding_rate, a.withholding_amount, a.fiscal_period,
                   a.claimed_amount, a.deductible_amount, a.fiscal_status, a.support_doc_file_id
            FROM bank_transactions t
            JOIN bank_accounts acc ON acc.id = t.bank_account_id
@@ -804,6 +835,18 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
           counterpartyRnc: (row.counterparty_rnc as string | null) ?? null,
           concept: (row.concept as string | null) ?? null,
           expenseCategory: (row.expense_category as string | null) ?? null,
+          supplierNcf: (row.supplier_ncf as string | null) ?? null,
+          dgiiExpenseType: (row.dgii_expense_type as string | null) ?? null,
+          withholdingType: (row.withholding_type as string | null) ?? null,
+          withholdingRate:
+            row.withholding_rate === null || row.withholding_rate === undefined
+              ? null
+              : Number(row.withholding_rate),
+          withholdingAmount:
+            row.withholding_amount === null || row.withholding_amount === undefined
+              ? null
+              : Number(row.withholding_amount),
+          fiscalPeriod: (row.fiscal_period as string | null) ?? null,
           claimedAmount,
           deductibleAmount,
           rejectedAmount: round2(Math.max(claimedAmount - deductibleAmount, 0)),
