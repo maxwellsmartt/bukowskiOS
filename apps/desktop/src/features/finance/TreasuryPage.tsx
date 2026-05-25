@@ -2054,6 +2054,7 @@ export const TreasuryPage = () => {
           ) : (
             <DataTable<BankTransactionRow>
               columns={movementColumns}
+              fillRemainingColumnKey="actions"
               fitToColumnWidths
               getRowId={(row) => row.id}
               onSelectedRowIdsChange={setSelectedMovementIds}

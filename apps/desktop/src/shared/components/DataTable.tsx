@@ -51,6 +51,7 @@ type DataTableProps<T = unknown> = {
   controlsAddon?: ReactNode;
   pruneSelectionOnRowsChange?: boolean;
   fitToColumnWidths?: boolean;
+  fillRemainingColumnKey?: string;
 };
 
 const selectionColumnWidth = 44;
@@ -81,6 +82,7 @@ export const DataTable = <T = unknown,>({
   controlsAddon,
   pruneSelectionOnRowsChange = true,
   fitToColumnWidths = false,
+  fillRemainingColumnKey,
 }: DataTableProps<T>) => {
   const { t } = useTranslation();
   const defaultMinColumnWidth = 56;
@@ -111,6 +113,7 @@ export const DataTable = <T = unknown,>({
   });
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
   const [columnsMenuStyle, setColumnsMenuStyle] = useState<{ top: number; left: number; placement: "bottom" | "top" } | null>(null);
+  const [tableShellWidth, setTableShellWidth] = useState(0);
   const [reorderState, setReorderState] = useState<{ draggedKey: string | null; overKey: string | null }>({
     draggedKey: null,
     overKey: null,
@@ -194,6 +197,29 @@ export const DataTable = <T = unknown,>({
     const activeRow = tableShellRef.current.querySelector<HTMLTableRowElement>(`tr[data-row-id="${activeRowId}"]`);
     activeRow?.scrollIntoView({ block: "nearest" });
   }, [activeRowId, autoScrollToActiveRow, rows]);
+
+  useEffect(() => {
+    if (!fitToColumnWidths || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const tableShell = tableShellRef.current;
+
+    if (!tableShell) {
+      return;
+    }
+
+    const updateWidth = () => {
+      setTableShellWidth(tableShell.clientWidth);
+    };
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(tableShell);
+    updateWidth();
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [fitToColumnWidths]);
 
   useEffect(() => {
     if (!persistKey) {
@@ -320,8 +346,23 @@ export const DataTable = <T = unknown,>({
   const hideableColumns = columns.filter((column) => column.hideable !== false);
   const visibleHideableCount = visibleColumns.filter((column) => column.hideable !== false).length;
   const showColumnVisibilityControl = Boolean(persistKey) && hideableColumns.length > 1;
-  const tableWidth = visibleColumns.reduce(
+  const baseColumnWidths = visibleColumns.reduce<Record<string, number>>((accumulator, column) => {
+    accumulator[column.key] = columnWidths[column.key] ?? column.width ?? 160;
+    return accumulator;
+  }, {});
+  const baseTableWidth = visibleColumns.reduce(
     (totalWidth, column) => totalWidth + (columnWidths[column.key] ?? column.width ?? 160),
+    selectable ? selectionColumnWidth : 0,
+  );
+  const resolvedColumnWidths =
+    fitToColumnWidths && fillRemainingColumnKey && tableShellWidth > baseTableWidth
+      ? {
+          ...baseColumnWidths,
+          [fillRemainingColumnKey]: (baseColumnWidths[fillRemainingColumnKey] ?? 0) + tableShellWidth - baseTableWidth,
+        }
+      : baseColumnWidths;
+  const tableWidth = visibleColumns.reduce(
+    (totalWidth, column) => totalWidth + (resolvedColumnWidths[column.key] ?? column.width ?? 160),
     selectable ? selectionColumnWidth : 0,
   );
 
@@ -586,7 +627,7 @@ export const DataTable = <T = unknown,>({
         <colgroup>
           {selectable ? <col style={{ width: selectionColumnWidth, minWidth: selectionColumnWidth }} /> : null}
           {visibleColumns.map((column) => (
-            <col key={column.key} style={{ width: columnWidths[column.key], minWidth: column.minWidth ?? defaultMinColumnWidth }} />
+            <col key={column.key} style={{ width: resolvedColumnWidths[column.key], minWidth: column.minWidth ?? defaultMinColumnWidth }} />
           ))}
         </colgroup>
 
