@@ -2269,6 +2269,53 @@ export const createAgentToolRegistry = (
         };
       },
     },
+    {
+      name: "read_attached_document",
+      description:
+        "Read a document attached to the current chat message (CSV, XLSX, PDF or text) and return its extracted content so you can understand, summarize, classify or import it. Images are already visible to you directly — read them from the message. Omit 'name' when there is a single attachment.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: { type: "string", description: "Attachment file name. Omit to use the only/first document." },
+        },
+      },
+      execute: (args, context) => {
+        const documents = context.attachedDocuments ?? [];
+        if (!documents.length) {
+          return { summary: "No documents are attached to this message.", payload: { documents: [] } };
+        }
+        const name = asOptionalString(args.name);
+        const target = name
+          ? documents.find((doc) => doc.name.toLowerCase() === name.toLowerCase()) ??
+            documents.find((doc) => doc.name.toLowerCase().includes(name.toLowerCase()))
+          : documents.length === 1
+            ? documents[0]
+            : null;
+        if (!target) {
+          return {
+            summary: `Attached: ${documents.map((doc) => doc.name).join(", ")}. Specify which document to read.`,
+            payload: { documents: documents.map((doc) => ({ name: doc.name, kind: doc.kind })) },
+          };
+        }
+        if (target.kind === "image") {
+          return {
+            summary: `"${target.name}" is an image already visible to you in this message — read it directly.`,
+            payload: { name: target.name, kind: "image" },
+          };
+        }
+        return {
+          summary: `Read ${target.kind.toUpperCase()} "${target.name}" (${target.rowCount} rows${target.truncated ? ", truncated" : ""}).`,
+          payload: {
+            name: target.name,
+            kind: target.kind,
+            rowCount: target.rowCount,
+            truncated: target.truncated,
+            text: target.text,
+          },
+        };
+      },
+    },
   ];
 
   // Quote read tools (FinanceOps Quotes v1, FQ6) — read-only. The agent cannot

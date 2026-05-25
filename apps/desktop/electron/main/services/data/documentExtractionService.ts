@@ -80,12 +80,11 @@ const rowsToText = (rows: string[][], limit = 400) =>
     .map((row) => row.join(" | "))
     .join("\n");
 
-export const extractDocument = async (
-  storagePath: string,
+export const extractDocumentFromBuffer = async (
+  buffer: Buffer,
   mimeType: string,
   fileName: string,
 ): Promise<ExtractedDocument> => {
-  const buffer = fs.readFileSync(storagePath);
   const kind = resolveKind(mimeType, fileName);
 
   if (kind === "csv" || kind === "text") {
@@ -108,4 +107,23 @@ export const extractDocument = async (
   }
 
   return { kind: "unknown", text: "", rows: [], rowCount: 0, truncated: false };
+};
+
+export const extractDocument = async (
+  storagePath: string,
+  mimeType: string,
+  fileName: string,
+): Promise<ExtractedDocument> => extractDocumentFromBuffer(fs.readFileSync(storagePath), mimeType, fileName);
+
+const DATA_URL_RE = /^data:([^;]+);base64,(.+)$/;
+
+/** Extract from a base64 data URL (how chat attachments arrive at the gateway). */
+export const extractDocumentFromDataUrl = async (
+  dataUrl: string,
+  mimeType: string,
+  fileName: string,
+): Promise<ExtractedDocument> => {
+  const match = dataUrl.match(DATA_URL_RE);
+  const buffer = match ? Buffer.from(match[2] ?? "", "base64") : Buffer.from("");
+  return extractDocumentFromBuffer(buffer, match?.[1] || mimeType, fileName);
 };

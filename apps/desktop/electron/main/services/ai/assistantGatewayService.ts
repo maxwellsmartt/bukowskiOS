@@ -18,6 +18,7 @@ import type { AgentToolRegistry } from "./agentToolRegistry";
 import type { OpenAIProviderService } from "./openaiProviderService";
 import type { AssistantGatewaySessionStore } from "./assistantGatewaySessionStore";
 
+import { extractDocumentFromDataUrl } from "../data/documentExtractionService";
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { getDesktopLogger } from "../logger";
 
@@ -954,6 +955,39 @@ const buildAssetFastPathMessage = (payload: Record<string, unknown>, query: stri
   return [intro, ...lines].join("\n");
 };
 
+const isImageMime = (mimeType: string) => (mimeType || "").toLowerCase().startsWith("image/");
+
+// Pre-extracts attached documents (CSV/XLSX/PDF) into plain text/rows so the
+// synchronous tool loop can read them from context. Images carry no text — the
+// model sees them directly through the multimodal input.
+const extractAttachedDocuments = async (
+  attachments: AssistantGatewayRequest["attachments"],
+): Promise<AIGatewayToolContext["attachedDocuments"]> => {
+  if (!attachments?.length) return undefined;
+  const documents: NonNullable<AIGatewayToolContext["attachedDocuments"]> = [];
+  for (const attachment of attachments) {
+    if (isImageMime(attachment.mimeType)) {
+      documents.push({ name: attachment.name, kind: "image", mimeType: attachment.mimeType, text: "", rowCount: 0, truncated: false });
+      continue;
+    }
+    try {
+      const extracted = await extractDocumentFromDataUrl(attachment.dataUrl, attachment.mimeType, attachment.name);
+      documents.push({
+        name: attachment.name,
+        kind: extracted.kind,
+        mimeType: attachment.mimeType,
+        text: extracted.text,
+        rows: extracted.rows,
+        rowCount: extracted.rowCount,
+        truncated: extracted.truncated,
+      });
+    } catch {
+      documents.push({ name: attachment.name, kind: "unknown", mimeType: attachment.mimeType, text: "", rowCount: 0, truncated: false });
+    }
+  }
+  return documents;
+};
+
 const maybeRunFastPath = (
   request: AssistantGatewayRequest,
   toolRegistry: AgentToolRegistry,
@@ -1145,6 +1179,13 @@ export const createAssistantGatewayService = (
     },
   ): Promise<AssistantGatewayResponse> => {
     const workspaceId = request.workspaceId || request.context.workspaceId || defaultWorkspaceId;
+    // Enrich the tool context with the thread and pre-extracted documents so
+    // document tools can resolve attachments synchronously.
+    request.context = {
+      ...request.context,
+      threadId: request.threadId,
+      attachedDocuments: await extractAttachedDocuments(request.attachments),
+    };
     const fastPathResponse = maybeRunFastPath(request, options.toolRegistry);
     if (fastPathResponse) {
       options.sessionStore.writeResult(request.workspaceId, request.threadId, {

@@ -71,6 +71,22 @@ export type AIGatewayToolContext = {
   sourceExternalMessageId?: string | null;
   sourceActorUserId?: string | null;
   correlationId?: string | null;
+  /** Current chat thread, so document tools can scope to its attachments. */
+  threadId?: string | null;
+  /**
+   * Documents attached to the current turn, pre-extracted by the gateway so
+   * synchronous tools can read them. Images carry no text (the model sees them
+   * directly); CSV/XLSX/PDF carry extracted text/rows.
+   */
+  attachedDocuments?: Array<{
+    name: string;
+    kind: "csv" | "xlsx" | "pdf" | "text" | "image" | "unknown";
+    mimeType: string;
+    text: string;
+    rows?: string[][];
+    rowCount: number;
+    truncated: boolean;
+  }>;
 };
 
 export type AssistantGatewayAttachment = {
