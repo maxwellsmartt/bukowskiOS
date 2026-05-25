@@ -123,6 +123,121 @@ describe("financialDomainPullService", () => {
     cleanup();
   });
 
+  it("materializes pulled counterparty rules onto existing and future local transactions", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-financial-pull-counterparty-rules");
+    const workspaceId = "workspace-metadata";
+    const service = createFinancialDomainPullService(database);
+
+    service.applyRemoteTreasuryRows(workspaceId, "bank_accounts", [
+      {
+        id: "bank-rule-sync",
+        workspace_id: workspaceId,
+        bank_name: "popular",
+        account_label: "Popular DOP",
+        account_number_masked: null,
+        account_number_full: null,
+        currency: "DOP",
+        account_type: "checking",
+        opening_balance: 0,
+        opening_balance_date: null,
+        is_active: 1,
+        notes: null,
+        created_at: "2026-05-21T10:00:00.000Z",
+        updated_at: "2026-05-21T10:00:00.000Z",
+      },
+    ]);
+    service.applyRemoteTreasuryRows(workspaceId, "bank_transactions", [
+      {
+        id: "txn-rule-existing",
+        workspace_id: workspaceId,
+        bank_account_id: "bank-rule-sync",
+        import_id: null,
+        txn_date: "2026-05-21",
+        value_date: null,
+        raw_description: "DR PAGO TARJETA CREDITO",
+        reference: null,
+        serial: null,
+        amount: 1250,
+        direction: "debit",
+        running_balance: null,
+        currency: "DOP",
+        dedupe_hash: "rule-existing-hash",
+        created_at: "2026-05-21T10:01:00.000Z",
+      },
+    ]);
+
+    expect(
+      service.applyRemoteTreasuryRows(workspaceId, "counterparty_rules", [
+        {
+          id: "counterparty-rule-card-payment",
+          workspace_id: workspaceId,
+          match_pattern: "DR PAGO TARJETA CREDITO",
+          match_type: "exact",
+          default_kind: "expense",
+          default_category: "Tarjeta de crédito",
+          default_counterparty: "Banco Popular",
+          default_project_id: null,
+          priority: 0,
+          is_active: 1,
+          created_at: "2026-05-21T10:02:00.000Z",
+          updated_at: "2026-05-21T10:02:00.000Z",
+        },
+      ]).appliedCount,
+    ).toBe(1);
+
+    service.applyRemoteTreasuryRows(workspaceId, "bank_transactions", [
+      {
+        id: "txn-rule-future",
+        workspace_id: workspaceId,
+        bank_account_id: "bank-rule-sync",
+        import_id: null,
+        txn_date: "2026-05-22",
+        value_date: null,
+        raw_description: "DR PAGO TARJETA CREDITO",
+        reference: null,
+        serial: null,
+        amount: 2600,
+        direction: "debit",
+        running_balance: null,
+        currency: "DOP",
+        dedupe_hash: "rule-future-hash",
+        created_at: "2026-05-22T10:01:00.000Z",
+      },
+    ]);
+
+    const annotations = database
+      .prepare(
+        `
+          SELECT transaction_id, txn_kind, expense_category, counterparty
+          FROM transaction_annotations
+          WHERE transaction_id IN ('txn-rule-existing', 'txn-rule-future')
+          ORDER BY transaction_id
+        `,
+      )
+      .all() as Array<{ transaction_id: string; txn_kind: string; expense_category: string; counterparty: string }>;
+    expect(annotations).toEqual([
+      {
+        transaction_id: "txn-rule-existing",
+        txn_kind: "expense",
+        expense_category: "Tarjeta de crédito",
+        counterparty: "Banco Popular",
+      },
+      {
+        transaction_id: "txn-rule-future",
+        txn_kind: "expense",
+        expense_category: "Tarjeta de crédito",
+        counterparty: "Banco Popular",
+      },
+    ]);
+
+    const outboxCount = database
+      .prepare(`SELECT COUNT(*) AS count FROM sync_outbox WHERE entity_type = 'transaction_annotation'`)
+      .get() as { count: number };
+    expect(outboxCount.count).toBe(0);
+
+    cleanup();
+  });
+
   it("hydrates collaborator fees and payments, creating a placeholder crew member when needed", () => {
     const { cleanup, database } = createTestDatabase("bukowski-financial-pull-collaborators");
     const workspaceId = "workspace-metadata";

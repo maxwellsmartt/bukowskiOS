@@ -113,6 +113,7 @@ export const DataTable = <T = unknown,>({
     draggedKey: null,
     overKey: null,
   });
+  const [resizingColumnKey, setResizingColumnKey] = useState<string | null>(null);
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>(() => {
     const defaultKeys = columns.map((column) => column.key);
     const preferredDefaultKeys = defaultVisibleColumnKeys?.filter((key) => defaultKeys.includes(key)) ?? defaultKeys;
@@ -246,6 +247,7 @@ export const DataTable = <T = unknown,>({
 
     const handleMouseUp = () => {
       resizeStateRef.current = null;
+      setResizingColumnKey(null);
       document.body.style.removeProperty("cursor");
       document.body.style.removeProperty("user-select");
     };
@@ -423,6 +425,7 @@ export const DataTable = <T = unknown,>({
       startX: event.clientX,
       startWidth: columnWidths[columnKey] ?? 160,
     };
+    setResizingColumnKey(columnKey);
 
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
@@ -610,6 +613,8 @@ export const DataTable = <T = unknown,>({
                   column.align === "right" ? "align-right" : "",
                   sortState?.columnKey === column.key ? "data-table-sort-active" : "",
                   persistKey ? "data-table-column-reorderable" : "",
+                  column.resizable === false ? "" : "data-table-column-resizable",
+                  resizingColumnKey === column.key ? "data-table-column-resizing" : "",
                   reorderState.draggedKey === column.key ? "data-table-column-dragging" : "",
                   reorderState.overKey === column.key && reorderState.draggedKey !== column.key ? "data-table-column-drop-target" : "",
                 ]
@@ -642,6 +647,7 @@ export const DataTable = <T = unknown,>({
                       aria-label={t("shared.dataTable.resizeColumn", { label: column.label })}
                       className="column-resizer"
                       onMouseDown={(event) => handleResizeStart(event, column.key)}
+                      title={t("shared.dataTable.resizeColumn", { label: column.label })}
                       type="button"
                     />
                   )}

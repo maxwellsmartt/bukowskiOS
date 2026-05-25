@@ -6150,29 +6150,50 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   position: absolute;
   right: 0;
   top: 0;
-  width: 12px;
+  width: 16px;
   height: 100%;
   padding: 0;
   border: none;
   background: transparent;
   cursor: col-resize;
   z-index: 3;
+  transition: background 120ms ease;
+}
+
+.data-table-column-resizable .column-resizer {
+  opacity: 0.74;
+}
+
+.data-table-column-resizable:hover .column-resizer,
+.data-table-column-resizing .column-resizer {
+  background: rgba(115, 164, 255, 0.08);
+  opacity: 1;
 }
 
 .column-resizer:hover,
 .column-resizer:focus-visible {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(115, 164, 255, 0.12);
   outline: none;
 }
 
 .column-resizer::after {
   content: "";
   position: absolute;
-  top: 7px;
-  bottom: 7px;
-  left: 6px;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.06);
+  top: 8px;
+  bottom: 8px;
+  left: 7px;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 4px 0 0 rgba(255, 255, 255, 0.08);
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.data-table-column-resizable:hover .column-resizer::after,
+.data-table-column-resizing .column-resizer::after,
+.column-resizer:focus-visible::after {
+  background: rgba(136, 181, 255, 0.9);
+  box-shadow: 4px 0 0 rgba(136, 181, 255, 0.42);
 }
 
 .table-checkbox {

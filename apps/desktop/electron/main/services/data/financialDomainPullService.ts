@@ -1,6 +1,7 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 
 import { getDesktopLogger } from "../logger";
+import { materializeTreasuryCounterpartyRules } from "./treasuryCounterpartyRuleMaterializer";
 
 const logger = getDesktopLogger("financial-domain-pull-service");
 
@@ -414,6 +415,10 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
         result.errors.push(`${String(rawRow[config.entityIdColumn] ?? rawRow.id ?? table)}: ${message}`);
         logger.warn("Financial domain pull row failed.", { table, error: message });
       }
+    }
+
+    if ((table === "bank_transactions" || table === "counterparty_rules") && result.appliedCount > 0) {
+      materializeTreasuryCounterpartyRules(db, workspaceId);
     }
 
     updateCursor(db, workspaceId, table, result.cursorAfter, result.appliedCount, result.errors[0] ?? null);
