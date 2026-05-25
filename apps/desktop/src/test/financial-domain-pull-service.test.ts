@@ -84,6 +84,12 @@ describe("financialDomainPullService", () => {
           counterparty: "Carlos",
           counterparty_rnc: null,
           expense_category: "Service payments",
+          supplier_ncf: "B0100000456",
+          dgii_expense_type: "02-servicios",
+          withholding_type: "ISR",
+          withholding_rate: 10,
+          withholding_amount: 2500,
+          fiscal_period: "2026-05",
           is_internal_transfer: 0,
           reimbursement_status: "n/a",
           claimed_amount: 25000,
@@ -107,6 +113,12 @@ describe("financialDomainPullService", () => {
     expect(transactions).toHaveLength(1);
     expect(transactions[0]?.id).toBe("txn-remote-service-payment");
     expect(transactions[0]?.annotation?.expenseCategory).toBe("Service payments");
+    expect(transactions[0]?.annotation?.supplierNcf).toBe("B0100000456");
+    expect(transactions[0]?.annotation?.dgiiExpenseType).toBe("02-servicios");
+    expect(transactions[0]?.annotation?.withholdingType).toBe("ISR");
+    expect(transactions[0]?.annotation?.withholdingRate).toBe(10);
+    expect(transactions[0]?.annotation?.withholdingAmount).toBe(2500);
+    expect(transactions[0]?.annotation?.fiscalPeriod).toBe("2026-05");
 
     cleanup();
   });
