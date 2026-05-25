@@ -1490,6 +1490,12 @@
         "statusRejected": "Not deductible",
         "fiscalSection": "DGII fiscal data",
         "withholdingShort": "withholding",
+        "searchPlaceholder": "Search concept or supplier",
+        "missingNcfFilter": "Missing NCF",
+        "missingNcfFlag": "Missing NCF",
+        "showing": "{{shown}} of {{total}}",
+        "noMatchesTitle": "No matches",
+        "noMatchesBody": "No movements match the current filters.",
         "saved": "Review saved.",
         "failed": "Could not save the review."
       },

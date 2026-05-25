@@ -1492,6 +1492,12 @@
         "statusRejected": "No deducible",
         "fiscalSection": "Datos fiscales DGII",
         "withholdingShort": "retención",
+        "searchPlaceholder": "Buscar concepto o proveedor",
+        "missingNcfFilter": "Falta NCF",
+        "missingNcfFlag": "Falta NCF",
+        "showing": "{{shown}} de {{total}}",
+        "noMatchesTitle": "Sin coincidencias",
+        "noMatchesBody": "Ningún movimiento coincide con los filtros actuales.",
         "saved": "Revisión guardada.",
         "failed": "No se pudo guardar la revisión."
       },

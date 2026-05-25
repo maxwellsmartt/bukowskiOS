@@ -351,6 +351,9 @@ export const TreasuryPage = () => {
   const [isUndoingTreasuryAction, setIsUndoingTreasuryAction] = useState(false);
   const [deductibleLedgerPeriod, setDeductibleLedgerPeriod] = useState<TreasuryPeriodPreset>("fiscal");
   const [deductibleLedgerFormat, setDeductibleLedgerFormat] = useState<TreasuryDeductibleLedgerExportFormat>("xlsx");
+  const [reviewSearch, setReviewSearch] = useState("");
+  const [reviewAccountFilter, setReviewAccountFilter] = useState("");
+  const [reviewMissingNcfOnly, setReviewMissingNcfOnly] = useState(false);
   const [isExportingDeductibleLedger, setIsExportingDeductibleLedger] = useState(false);
 
   const accounts = useBankAccounts(activeWorkspaceId);
@@ -926,6 +929,32 @@ export const TreasuryPage = () => {
     }
     return Array.from(byCurrency.entries()).map(([currency, totals]) => ({ currency, ...totals }));
   }, [reviewQueue.data]);
+  // A deductible expense the DGII will accept must carry the supplier's NCF —
+  // surface the ones still missing it so Jeannette can triage them fast.
+  const reviewIsMissingNcf = (row: ReviewQueueRow) => !(row.supplierNcf ?? "").trim();
+  const reviewAccountOptions = useMemo(() => {
+    const labels = Array.from(new Set(reviewQueue.data.map((row) => row.bankAccountLabel))).sort();
+    return [
+      { value: "", label: t("finance.treasury.filters.allAccounts") },
+      ...labels.map((label) => ({ value: label, label })),
+    ];
+  }, [reviewQueue.data, t]);
+  const filteredReviewRows = useMemo(() => {
+    const needle = reviewSearch.trim().toLowerCase();
+    return reviewQueue.data.filter((row) => {
+      if (reviewAccountFilter && row.bankAccountLabel !== reviewAccountFilter) return false;
+      if (reviewMissingNcfOnly && !reviewIsMissingNcf(row)) return false;
+      if (needle) {
+        const haystack = `${row.concept ?? ""} ${row.counterparty ?? ""} ${row.rawDescription ?? ""}`.toLowerCase();
+        if (!haystack.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [reviewQueue.data, reviewSearch, reviewAccountFilter, reviewMissingNcfOnly]);
+  const reviewMissingNcfCount = useMemo(
+    () => reviewQueue.data.filter(reviewIsMissingNcf).length,
+    [reviewQueue.data],
+  );
   // Each currency gets its own Y axis so small-magnitude USD lines stay readable
   // next to large DOP balances (left axis = first currency, right = second).
   const balanceCurrencies = useMemo(() => {
@@ -1902,11 +1931,56 @@ export const TreasuryPage = () => {
               title={t("finance.treasury.review.emptyTitle")}
             />
           ) : (
-            <div className="treasury-review-list">
-              {reviewQueue.data.map((row) => (
-                <ReviewRow key={row.transactionId} onApply={applyReview} row={row} t={t} />
-              ))}
-            </div>
+            <>
+              <div className="treasury-review-toolbar">
+                <input
+                  className="field-input treasury-review-search"
+                  onChange={(event) => setReviewSearch(event.target.value)}
+                  placeholder={t("finance.treasury.review.searchPlaceholder", { defaultValue: "Search concept or supplier" })}
+                  value={reviewSearch}
+                />
+                <CompactSelect<string>
+                  ariaLabel={t("finance.treasury.filters.account")}
+                  onChange={setReviewAccountFilter}
+                  options={reviewAccountOptions}
+                  popupMinWidth={220}
+                  value={reviewAccountFilter}
+                />
+                <button
+                  className={`ghost-control treasury-review-ncf-filter${reviewMissingNcfOnly ? " is-active" : ""}`}
+                  onClick={() => setReviewMissingNcfOnly((value) => !value)}
+                  type="button"
+                >
+                  {t("finance.treasury.review.missingNcfFilter", { defaultValue: "Missing NCF" })}
+                  {reviewMissingNcfCount > 0 ? <span className="treasury-review-ncf-count">{reviewMissingNcfCount}</span> : null}
+                </button>
+                <span className="treasury-review-count text-muted">
+                  {t("finance.treasury.review.showing", {
+                    defaultValue: "{{shown}} of {{total}}",
+                    shown: filteredReviewRows.length,
+                    total: reviewQueue.data.length,
+                  })}
+                </span>
+              </div>
+              {filteredReviewRows.length === 0 ? (
+                <GuidedEmptyState
+                  body={t("finance.treasury.review.noMatchesBody", { defaultValue: "No movements match the current filters." })}
+                  title={t("finance.treasury.review.noMatchesTitle", { defaultValue: "No matches" })}
+                />
+              ) : (
+                <div className="treasury-review-list">
+                  {filteredReviewRows.map((row) => (
+                    <ReviewRow
+                      key={row.transactionId}
+                      missingNcf={reviewIsMissingNcf(row)}
+                      onApply={applyReview}
+                      row={row}
+                      t={t}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </SurfaceCard>
       ) : null}
@@ -2247,10 +2321,12 @@ const AccountForm = ({
 const ReviewRow = ({
   row,
   onApply,
+  missingNcf = false,
   t,
 }: {
   row: ReviewQueueRow;
   onApply: (row: ReviewQueueRow, deductible: number, fiscalDraft: FiscalReviewDraft) => void;
+  missingNcf?: boolean;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }) => {
   // The deductible can never exceed the expense itself (DGII can only accept up
@@ -2287,6 +2363,11 @@ const ReviewRow = ({
           <div className="treasury-review-row-title">
             <strong>{row.concept || row.rawDescription || "—"}</strong>
             <StatusBadge tone={resultTone}>{resultLabel}</StatusBadge>
+            {missingNcf && deductible > 0 ? (
+              <span className="treasury-review-missing-ncf">
+                {t("finance.treasury.review.missingNcfFlag", { defaultValue: "Missing NCF" })}
+              </span>
+            ) : null}
           </div>
           <small className="text-muted">
             {row.txnDate} · {row.bankAccountLabel}
