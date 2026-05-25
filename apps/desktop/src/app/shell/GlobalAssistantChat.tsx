@@ -489,14 +489,30 @@ const buildActionResultSummary = (state: AssistantChatSessionState, t: ReturnTyp
   return t("assistantChat.multipleEntitiesReady", { entities: labels.slice(0, -1).join(", "), last: labels.at(-1) });
 };
 
-const buildOperationalReceiptRows = (state: AssistantChatSessionState | null) => {
+const buildOperationalReceiptRows = (state: AssistantChatSessionState | null, limit?: number) => {
   const receipt = state?.operationalReceipt;
 
   if (!receipt) {
     return [];
   }
 
-  return [...receipt.blocked, ...receipt.pending, ...receipt.completed].slice(0, 5);
+  const rows = [...receipt.blocked, ...receipt.pending, ...receipt.completed];
+  return typeof limit === "number" ? rows.slice(0, limit) : rows;
+};
+
+const findLatestOperationalReceiptState = (session: AssistantChatSession | null) => {
+  if (!session) {
+    return null;
+  }
+
+  for (let index = session.messages.length - 1; index >= 0; index -= 1) {
+    const state = session.messages[index]?.state ?? null;
+    if (state?.operationalReceipt) {
+      return state;
+    }
+  }
+
+  return session.latestState?.operationalReceipt ? session.latestState : null;
 };
 
 const resolveApprovalToneClass = (decision: AssistantChatSessionState["approvalDecision"]) => {
@@ -603,6 +619,7 @@ export const GlobalAssistantChat = () => {
     readJsonPreference<ThreadSourceFilter>(uiPreferenceKeys.assistantChatThreadSourceFilter, "app"),
   );
   const [threadMenuState, setThreadMenuState] = useState<ThreadMenuState>(null);
+  const [receiptSessionId, setReceiptSessionId] = useState<string | null>(null);
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState<string>("");
   const [expandedMessageDetails, setExpandedMessageDetails] = useState<Record<string, boolean>>({});
@@ -651,6 +668,13 @@ export const GlobalAssistantChat = () => {
     () => sessions.find((session) => session.id === threadMenuState?.sessionId) ?? null,
     [sessions, threadMenuState?.sessionId],
   );
+  const threadMenuReceiptState = useMemo(() => findLatestOperationalReceiptState(threadMenuSession), [threadMenuSession]);
+  const receiptSession = useMemo(
+    () => sessions.find((session) => session.id === receiptSessionId) ?? null,
+    [receiptSessionId, sessions],
+  );
+  const receiptViewerState = useMemo(() => findLatestOperationalReceiptState(receiptSession), [receiptSession]);
+  const receiptViewerRows = useMemo(() => buildOperationalReceiptRows(receiptViewerState), [receiptViewerState]);
   const assistantFabUnreadCount = Math.max(0, unreadCount - dismissedFabUnreadCount);
 
   useEffect(() => {
@@ -714,6 +738,11 @@ export const GlobalAssistantChat = () => {
         return;
       }
 
+      if (receiptSessionId) {
+        setReceiptSessionId(null);
+        return;
+      }
+
       close();
     };
 
@@ -724,7 +753,7 @@ export const GlobalAssistantChat = () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [activeSelector, close, isOpen, threadMenuState]);
+  }, [activeSelector, close, isOpen, receiptSessionId, threadMenuState]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -744,6 +773,7 @@ export const GlobalAssistantChat = () => {
     setActionError(null);
     setActiveSelector(null);
     setThreadMenuState(null);
+    setReceiptSessionId(null);
     setExpandedMessageDetails({});
     setOptimisticAssistantMessage(null);
     setSelectedApproval(activeVisibleSession.preferredApprovalMode);
@@ -1244,8 +1274,8 @@ export const GlobalAssistantChat = () => {
       return;
     }
 
-    const menuWidth = 156;
-    const menuHeight = 142;
+    const menuWidth = 206;
+    const menuHeight = 178;
     const top = Math.min(
       Math.max(12, triggerRect.bottom - panelRect.top + 6),
       panelRect.height - menuHeight - 12,
@@ -1496,9 +1526,6 @@ export const GlobalAssistantChat = () => {
                 const isExpanded = expandedMessageDetails[entry.id] ?? false;
                 const messageActions = buildStateActions(messageState, t);
                 const resultLinks = messageState?.actionLinks ?? [];
-                const receipt = messageState?.operationalReceipt ?? null;
-                const receiptRows = buildOperationalReceiptRows(messageState);
-                const showReceipt = Boolean(receipt && (receiptRows.length || receipt.nextSteps.length));
                 const needsApproval = Boolean(messageState?.draftRunId && messageState.approvalDecision === "pending");
                 const approvalResolved = Boolean(
                   messageState?.draftRunId &&
@@ -1567,31 +1594,6 @@ export const GlobalAssistantChat = () => {
                             ))}
                           </div>
                         </div>
-                      </div>
-                    ) : null}
-
-                    {showReceipt && receipt ? (
-                      <div className="assistant-chat-receipt-card">
-                        <div className="assistant-chat-receipt-header">
-                          <span className="assistant-chat-result-eyebrow">{t("agents.runs.operationalReceipt")}</span>
-                          <strong>{receipt.summary}</strong>
-                        </div>
-                        {receiptRows.length ? (
-                          <div className="assistant-chat-receipt-items">
-                            {receiptRows.map((item, index) => (
-                              <div key={`${item.status}:${item.label}:${index}`} className="assistant-chat-receipt-item">
-                                <span className={`assistant-chat-receipt-dot assistant-chat-receipt-dot-${item.status}`} />
-                                <div>
-                                  <strong>{item.label}</strong>
-                                  {item.detail ? <p>{item.detail}</p> : null}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                        {receipt.nextSteps[0] ? (
-                          <p className="assistant-chat-receipt-next">{t("agents.runs.nextStep", { step: receipt.nextSteps[0] })}</p>
-                        ) : null}
                       </div>
                     ) : null}
 
@@ -1966,6 +1968,19 @@ export const GlobalAssistantChat = () => {
                   {t("assistantChat.actions.viewAgent")}
                 </button>
               ) : null}
+              {threadMenuReceiptState?.operationalReceipt ? (
+                <button
+                  className="assistant-chat-session-menu-item"
+                  onClick={() => {
+                    setReceiptSessionId(threadMenuState.sessionId);
+                    setThreadMenuState(null);
+                  }}
+                  type="button"
+                >
+                  <FileText size={13} />
+                  <span>{t("assistantChat.actions.viewOperationalReceipt")}</span>
+                </button>
+              ) : null}
               <button
                 className="assistant-chat-session-menu-item"
                 onClick={() => {
@@ -1991,6 +2006,55 @@ export const GlobalAssistantChat = () => {
                 <Trash2 size={13} />
                 <span>Delete thread</span>
               </button>
+            </div>
+          ) : null}
+
+          {receiptSession && receiptViewerState?.operationalReceipt ? (
+            <div
+              className="assistant-chat-receipt-modal-backdrop"
+              onMouseDown={() => setReceiptSessionId(null)}
+              role="presentation"
+            >
+              <section
+                aria-label={t("assistantChat.actions.viewOperationalReceipt")}
+                className="assistant-chat-receipt-modal"
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                <div className="assistant-chat-receipt-modal-header">
+                  <div>
+                    <span className="assistant-chat-result-eyebrow">{t("agents.runs.operationalReceipt")}</span>
+                    <strong>{receiptViewerState.operationalReceipt.summary}</strong>
+                    <p>{receiptSession.title}</p>
+                  </div>
+                  <button
+                    aria-label={t("assistantChat.actions.closeOperationalReceipt")}
+                    className="surface-card-action"
+                    data-tooltip={t("assistantChat.actions.closeOperationalReceipt")}
+                    onClick={() => setReceiptSessionId(null)}
+                    type="button"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+                {receiptViewerRows.length ? (
+                  <div className="assistant-chat-receipt-items">
+                    {receiptViewerRows.map((item, index) => (
+                      <div key={`${item.status}:${item.label}:${index}`} className="assistant-chat-receipt-item">
+                        <span className={`assistant-chat-receipt-dot assistant-chat-receipt-dot-${item.status}`} />
+                        <div>
+                          <strong>{item.label}</strong>
+                          {item.detail ? <p>{item.detail}</p> : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {receiptViewerState.operationalReceipt.nextSteps[0] ? (
+                  <p className="assistant-chat-receipt-next">
+                    {t("agents.runs.nextStep", { step: receiptViewerState.operationalReceipt.nextSteps[0] })}
+                  </p>
+                ) : null}
+              </section>
             </div>
           ) : null}
         </section>

@@ -2109,6 +2109,8 @@
     "actions": {
       "openRuns": "Open runs",
       "viewAgent": "View agent",
+      "viewOperationalReceipt": "View operational receipt",
+      "closeOperationalReceipt": "Close operational receipt",
       "threadActions": "Thread actions",
       "expandThreads": "Expand threads",
       "close": "Close assistant chat",

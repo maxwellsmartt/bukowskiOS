@@ -2113,6 +2113,8 @@
     "actions": {
       "openRuns": "Abrir runs",
       "viewAgent": "Ver agente",
+      "viewOperationalReceipt": "Ver recibo operativo",
+      "closeOperationalReceipt": "Cerrar recibo operativo",
       "threadActions": "Acciones del hilo",
       "expandThreads": "Expandir hilos",
       "close": "Cerrar chat del asistente",

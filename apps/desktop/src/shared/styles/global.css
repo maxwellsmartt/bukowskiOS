@@ -12041,7 +12041,7 @@ select.field-input {
 
 .assistant-chat-session-menu-popover {
   position: absolute;
-  min-width: 156px;
+  min-width: 206px;
   display: grid;
   gap: 2px;
   padding: 6px;
@@ -12626,6 +12626,54 @@ select.field-input {
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(115, 164, 255, 0.025)),
     rgba(255, 255, 255, 0.018);
+}
+
+.assistant-chat-receipt-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(5, 7, 10, 0.42);
+  backdrop-filter: blur(10px);
+  z-index: 10;
+}
+
+.assistant-chat-receipt-modal {
+  width: min(520px, 100%);
+  max-height: min(560px, calc(100vh - 96px));
+  overflow: auto;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    #171b20;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
+}
+
+.assistant-chat-receipt-modal-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.assistant-chat-receipt-modal-header strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.assistant-chat-receipt-modal-header p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .assistant-chat-receipt-header {
