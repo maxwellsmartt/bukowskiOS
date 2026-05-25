@@ -7,6 +7,7 @@ import { notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
 const POLL_INTERVAL_MS = 60_000;
 const PULL_BATCH_SIZE = 250;
+const MAX_PAGES_PER_TABLE = 6;
 
 const tableConfigs: Array<{ table: TreasuryPullTable; cursorColumn: string }> = [
   { table: "bank_accounts", cursorColumn: "updated_at" },
@@ -18,8 +19,12 @@ const tableConfigs: Array<{ table: TreasuryPullTable; cursorColumn: string }> = 
   { table: "counterparty_rules", cursorColumn: "updated_at" },
 ];
 
+const cursorVersions: Partial<Record<TreasuryPullTable, string>> = {
+  transaction_annotations: "v2",
+};
+
 const cursorKey = (workspaceId: string, table: TreasuryPullTable) =>
-  `bukowski:treasury-pull-cursor:${workspaceId}:${table}`;
+  `bukowski:treasury-pull-cursor:${workspaceId}:${table}:${cursorVersions[table] ?? "v1"}`;
 
 const readCursor = (key: string): string | null => {
   try {
@@ -65,34 +70,41 @@ export const useTreasuryPull = () => {
       try {
         for (const { table, cursorColumn } of tableConfigs) {
           const key = cursorKey(activeWorkspaceId, table);
-          const cursor = readCursor(key);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let query = (supabase as any)
-            .from(table)
-            .select("*")
-            .eq("workspace_id", activeWorkspaceId)
-            .order(cursorColumn, { ascending: true })
-            .limit(PULL_BATCH_SIZE);
+          let cursor = readCursor(key);
+          for (let page = 0; page < MAX_PAGES_PER_TABLE; page += 1) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let query = (supabase as any)
+              .from(table)
+              .select("*")
+              .eq("workspace_id", activeWorkspaceId)
+              .order(cursorColumn, { ascending: true })
+              .limit(PULL_BATCH_SIZE);
 
-          if (cursor) query = query.gt(cursorColumn, cursor);
-          const { data, error } = await query;
-          if (error) {
-            console.warn(`[treasury-pull] ${table} pull failed`, error);
-            continue;
-          }
+            if (cursor) query = query.gt(cursorColumn, cursor);
+            const { data, error } = await query;
+            if (error) {
+              console.warn(`[treasury-pull] ${table} pull failed`, error);
+              break;
+            }
 
-          const rows = (data ?? []) as Array<Record<string, unknown>>;
-          if (!rows.length) continue;
+            const rows = (data ?? []) as Array<Record<string, unknown>>;
+            if (!rows.length) break;
 
-          const result = await appApi.applyRemoteTreasuryRows({
-            workspaceId: activeWorkspaceId,
-            table,
-            rows,
-          });
-          if (result.cursorAfter) writeCursor(key, result.cursorAfter);
-          if (result.appliedCount > 0) appliedAny = true;
-          if (result.errors.length > 0) {
-            console.warn(`[treasury-pull] ${table} apply had errors`, result.errors);
+            const result = await appApi.applyRemoteTreasuryRows({
+              workspaceId: activeWorkspaceId,
+              table,
+              rows,
+            });
+            if (result.cursorAfter) {
+              cursor = result.cursorAfter;
+              writeCursor(key, result.cursorAfter);
+            }
+            if (result.appliedCount > 0) appliedAny = true;
+            if (result.errors.length > 0) {
+              console.warn(`[treasury-pull] ${table} apply had errors`, result.errors);
+              break;
+            }
+            if (!result.cursorAfter || rows.length < PULL_BATCH_SIZE) break;
           }
         }
 

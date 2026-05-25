@@ -384,7 +384,9 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
     for (const rawRow of rows) {
       if (rawRow.workspace_id !== workspaceId) continue;
       const cursorValue = String(rawRow[tableCursorColumn[table]] ?? "");
-      if (cursorValue && (!result.cursorAfter || cursorValue > result.cursorAfter)) result.cursorAfter = cursorValue;
+      const markCursorApplied = () => {
+        if (cursorValue && (!result.cursorAfter || cursorValue > result.cursorAfter)) result.cursorAfter = cursorValue;
+      };
 
       const outboxEntityId = resolveOutboxEntityId(table, workspaceId, rawRow, config.entityIdColumn);
       if (
@@ -398,6 +400,7 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
       const localCursor = readLocalCursor(db, table, rawRow, config.conflictColumns);
       if (localCursor && cursorValue && localCursor >= cursorValue) {
         result.skippedDueToOlderCount += 1;
+        markCursorApplied();
         continue;
       }
 
@@ -410,6 +413,7 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
       try {
         upsertRow(db, table, row, config.conflictColumns);
         result.appliedCount += 1;
+        markCursorApplied();
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown financial pull error.";
         result.errors.push(`${String(rawRow[config.entityIdColumn] ?? rawRow.id ?? table)}: ${message}`);

@@ -408,6 +408,7 @@ describe("financialDomainPullService", () => {
 
     expect(result.appliedCount).toBe(0);
     expect(result.skippedDueToOutboxCount).toBe(1);
+    expect(result.cursorAfter).toBeNull();
 
     const annotation = database
       .prepare(`SELECT txn_kind, concept, expense_category FROM transaction_annotations WHERE transaction_id = ?`)
@@ -415,6 +416,37 @@ describe("financialDomainPullService", () => {
     expect(annotation.txn_kind).toBe("expense");
     expect(annotation.concept).toBe("Local concept");
     expect(annotation.expense_category).toBe("Service payments");
+
+    cleanup();
+  });
+
+  it("keeps the treasury annotation cursor before rows with missing transaction dependencies", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-financial-pull-annotation-retry");
+    const workspaceId = "workspace-metadata";
+    const service = createFinancialDomainPullService(database);
+
+    const result = service.applyRemoteTreasuryRows(workspaceId, "transaction_annotations", [
+      {
+        transaction_id: "txn-not-pulled-yet",
+        workspace_id: workspaceId,
+        txn_kind: "expense",
+        concept: "Remote annotation should retry",
+        expense_category: "Services",
+        is_internal_transfer: 0,
+        reimbursement_status: "n/a",
+        fiscal_status: "pending",
+        updated_at: "2026-05-19T10:04:00.000Z",
+      },
+    ]);
+
+    expect(result.appliedCount).toBe(0);
+    expect(result.skippedDueToDependencyCount).toBe(1);
+    expect(result.cursorAfter).toBeNull();
+
+    const cursor = database
+      .prepare(`SELECT last_synced_at FROM sync_pull_cursors WHERE workspace_id = ? AND entity_type = 'transaction_annotations'`)
+      .get(workspaceId) as { last_synced_at: string | null } | undefined;
+    expect(cursor?.last_synced_at ?? null).toBeNull();
 
     cleanup();
   });
