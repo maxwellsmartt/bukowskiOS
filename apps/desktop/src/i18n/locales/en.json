@@ -1501,6 +1501,7 @@
         "bulkAcceptBody": "Mark all {{count}} visible movements as fully deductible? Existing fiscal data is kept.",
         "bulkAccepted": "Accepted {{count}} reimbursements",
         "loadMore": "Show more ({{remaining}})",
+        "saveHint": "Press Enter to save",
         "saved": "Review saved.",
         "failed": "Could not save the review."
       },

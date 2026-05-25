@@ -2475,6 +2475,13 @@ const ReviewRow = ({
               max={row.amount}
               min={0}
               onChange={(event) => setDeductible(clampDeductible(Number(event.target.value) || 0))}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  onApply(row, deductible, fiscalDraft);
+                }
+              }}
+              title={t("finance.treasury.review.saveHint", { defaultValue: "Press Enter to save" })}
               type="number"
               value={deductible}
             />
