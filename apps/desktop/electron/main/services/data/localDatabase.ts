@@ -1343,6 +1343,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
       assets: assetMutations,
       finance: financeMutations,
       quotes: quoteMutations,
+      treasury: treasuryMutations,
       projectLookup: {
         findByCode(workspaceId, code) {
           const row = database

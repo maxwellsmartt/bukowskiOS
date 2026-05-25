@@ -13,6 +13,7 @@ import type { createProjectMutationService } from "../data/projectMutationServic
 import type { createAssetMutationService } from "../data/assetMutationService";
 import type { createFinanceMutationService } from "../data/financeMutationService";
 import type { createQuoteMutationService } from "../data/quoteMutationService";
+import type { createTreasuryMutationService } from "../data/treasuryMutationService";
 
 type ProjectLookupService = {
   findByCode(workspaceId: string, code: string): { id: string; code: string; name: string; status: string } | null;
@@ -27,6 +28,7 @@ export type AgentWriteServices = {
   assets: ReturnType<typeof createAssetMutationService>;
   finance: ReturnType<typeof createFinanceMutationService>;
   quotes: ReturnType<typeof createQuoteMutationService>;
+  treasury: ReturnType<typeof createTreasuryMutationService>;
   projectLookup?: ProjectLookupService;
 };
 
@@ -970,6 +972,145 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
           contextSummary: asOptionalString(args.context_summary),
         },
       };
+    },
+  },
+  {
+    name: "classify_movement",
+    description:
+      "Classify a bank movement: set its kind (income, expense, transfer, fx_exchange, salary, reimbursement, tax, tss, bank_fee, interest, owner_draw, other), concept, counterparty, RNC and expense category. Applies immediately and is reversible with Undo (Cmd+Z). Use list_bank_movements first to get the movement id.",
+    requiresApproval: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["transaction_id"],
+      properties: {
+        transaction_id: { type: "string" },
+        kind: {
+          type: "string",
+          enum: ["income", "expense", "transfer", "fx_exchange", "salary", "reimbursement", "tax", "tss", "bank_fee", "interest", "owner_draw", "other"],
+        },
+        concept: { type: "string" },
+        counterparty: { type: "string" },
+        counterparty_rnc: { type: "string" },
+        expense_category: { type: "string" },
+        is_internal_transfer: { type: "boolean" },
+        notes: { type: "string" },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const transactionId = asString(args.transaction_id);
+      if (!transactionId) throw new Error("transaction_id is required.");
+      const result = services.treasury.annotateTransaction({
+        commandId: newCommandId("agent-classify"),
+        workspaceId,
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+        transactionId,
+        txnKind: (asOptionalString(args.kind) ?? null) as never,
+        concept: asOptionalString(args.concept) ?? null,
+        counterparty: asOptionalString(args.counterparty) ?? null,
+        counterpartyRnc: asOptionalString(args.counterparty_rnc) ?? null,
+        expenseCategory: asOptionalString(args.expense_category) ?? null,
+        isInternalTransfer: asBoolean(args.is_internal_transfer) ?? false,
+        notes: asOptionalString(args.notes) ?? null,
+      });
+      return { summary: result.summary, payload: { transactionId, repeated: result.repeated } };
+    },
+  },
+  {
+    name: "categorize_movements_by_rule",
+    description:
+      "Classify ALL unclassified movements that share the selected movement's description, and remember the rule for future imports. Applies immediately and is reversible with Undo. Use for recurring movements like TSS, DGII taxes or bank fees.",
+    requiresApproval: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["transaction_id", "kind"],
+      properties: {
+        transaction_id: { type: "string", description: "A representative movement whose description defines the rule." },
+        kind: {
+          type: "string",
+          enum: ["income", "expense", "transfer", "fx_exchange", "salary", "reimbursement", "tax", "tss", "bank_fee", "interest", "owner_draw", "other"],
+        },
+        expense_category: { type: "string" },
+        counterparty: { type: "string" },
+        match_type: { type: "string", enum: ["exact", "contains"], description: "Defaults to exact." },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const transactionId = asString(args.transaction_id);
+      if (!transactionId) throw new Error("transaction_id is required.");
+      const result = services.treasury.applyCounterpartyRule({
+        commandId: newCommandId("agent-rule"),
+        workspaceId,
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+        transactionId,
+        txnKind: (asOptionalString(args.kind) ?? null) as never,
+        expenseCategory: asOptionalString(args.expense_category) ?? null,
+        counterparty: asOptionalString(args.counterparty) ?? null,
+        matchType: asString(args.match_type) === "contains" ? "contains" : "exact",
+      });
+      return {
+        summary: result.summary,
+        payload: { ruleId: result.ruleId, affectedCount: result.affectedCount, matchPattern: result.matchPattern },
+      };
+    },
+  },
+  {
+    name: "set_project_allocations",
+    description:
+      "Split a movement's amount across one or more projects for per-project P&L. Replaces existing allocations. Applies immediately and is reversible with Undo. The allocation total cannot exceed the movement amount.",
+    requiresApproval: false,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["transaction_id", "allocations"],
+      properties: {
+        transaction_id: { type: "string" },
+        allocations: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["amount"],
+            properties: {
+              project_id: { type: "string" },
+              project_name: { type: "string" },
+              amount: { type: "number" },
+              percent: { type: "number" },
+              notes: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const transactionId = asString(args.transaction_id);
+      if (!transactionId) throw new Error("transaction_id is required.");
+      const rawAllocations = Array.isArray(args.allocations) ? args.allocations : [];
+      const allocations = rawAllocations.map((entry) => {
+        const allocation = entry as Record<string, unknown>;
+        return {
+          projectId: resolveOptionalProjectId(services, workspaceId, allocation.project_id),
+          projectNameSnapshot: asOptionalString(allocation.project_name) ?? null,
+          amount: asNumber(allocation.amount) ?? 0,
+          percent: asNumber(allocation.percent) ?? null,
+          notes: asOptionalString(allocation.notes) ?? null,
+        };
+      });
+      const result = services.treasury.setAllocations({
+        commandId: newCommandId("agent-alloc"),
+        workspaceId,
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+        transactionId,
+        allocations,
+      });
+      return { summary: result.summary, payload: { transactionId, count: allocations.length } };
     },
   },
 ];
