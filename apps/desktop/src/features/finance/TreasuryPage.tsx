@@ -1,4 +1,4 @@
-import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, FileDown, Landmark, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, FileDown, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -2302,12 +2302,6 @@ export const TreasuryPage = () => {
         </SurfaceCard>
       ) : null}
 
-      <SurfaceCard className="invoice-footnote-card">
-        <div className="invoice-footnote-content">
-          <Landmark size={15} />
-          <span>{t("finance.treasury.footnote")}</span>
-        </div>
-      </SurfaceCard>
     </div>
     <ConfirmDialog
       body={t("finance.treasury.classify.applySimilarBody", {

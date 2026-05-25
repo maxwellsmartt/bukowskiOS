@@ -1378,7 +1378,6 @@
     },
     "treasury": {
       "title": "Tesorería",
-      "footnote": "Los movimientos bancarios importados quedan inmutables; la clasificación, el reparto por proyecto y la revisión contable van encima. Los cambios de divisa y transferencias internas se excluyen de los totales de ingreso/gasto.",
       "searchPlaceholder": "Buscar descripción, concepto o contraparte…",
       "tabs": {
         "overview": "Resumen",

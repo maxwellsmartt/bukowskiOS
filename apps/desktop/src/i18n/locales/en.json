@@ -1376,7 +1376,6 @@
     },
     "treasury": {
       "title": "Treasury",
-      "footnote": "Imported bank movements stay immutable; classification, project splits and accountant review live on top. Currency exchanges and internal transfers are excluded from income/expense totals.",
       "searchPlaceholder": "Search description, concept or counterparty…",
       "tabs": {
         "overview": "Overview",
