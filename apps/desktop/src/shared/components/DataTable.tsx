@@ -50,6 +50,7 @@ type DataTableProps<T = unknown> = {
   autoScrollToActiveRow?: boolean;
   controlsAddon?: ReactNode;
   pruneSelectionOnRowsChange?: boolean;
+  fitToColumnWidths?: boolean;
 };
 
 const selectionColumnWidth = 44;
@@ -79,6 +80,7 @@ export const DataTable = <T = unknown,>({
   autoScrollToActiveRow = false,
   controlsAddon,
   pruneSelectionOnRowsChange = true,
+  fitToColumnWidths = false,
 }: DataTableProps<T>) => {
   const { t } = useTranslation();
   const defaultMinColumnWidth = 56;
@@ -318,6 +320,10 @@ export const DataTable = <T = unknown,>({
   const hideableColumns = columns.filter((column) => column.hideable !== false);
   const visibleHideableCount = visibleColumns.filter((column) => column.hideable !== false).length;
   const showColumnVisibilityControl = Boolean(persistKey) && hideableColumns.length > 1;
+  const tableWidth = visibleColumns.reduce(
+    (totalWidth, column) => totalWidth + (columnWidths[column.key] ?? column.width ?? 160),
+    selectable ? selectionColumnWidth : 0,
+  );
 
   const toggleRowSelection = (rowId: string, checked: boolean) => {
     if (checked) {
@@ -572,7 +578,11 @@ export const DataTable = <T = unknown,>({
           } as CSSProperties
         }
       >
-        <table ref={tableRef} className="data-table">
+        <table
+          ref={tableRef}
+          className="data-table"
+          style={fitToColumnWidths ? { minWidth: tableWidth, width: tableWidth } : undefined}
+        >
         <colgroup>
           {selectable ? <col style={{ width: selectionColumnWidth, minWidth: selectionColumnWidth }} /> : null}
           {visibleColumns.map((column) => (

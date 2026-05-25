@@ -1179,8 +1179,8 @@ export const TreasuryPage = () => {
       {
         key: "description",
         label: t("finance.treasury.columns.description"),
-        width: 420,
-        minWidth: 72,
+        width: 320,
+        minWidth: 56,
         render: (row: BankTransactionRow) =>
           editingId === row.id && editDraft ? (
             <input
@@ -2054,9 +2054,10 @@ export const TreasuryPage = () => {
           ) : (
             <DataTable<BankTransactionRow>
               columns={movementColumns}
+              fitToColumnWidths
               getRowId={(row) => row.id}
               onSelectedRowIdsChange={setSelectedMovementIds}
-              persistKey="treasury-movements-v2"
+              persistKey="treasury-movements-v3"
               rows={visibleMovements}
               selectable
               selectedRowIds={selectedMovementIds}
