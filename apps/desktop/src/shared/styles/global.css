@@ -16094,19 +16094,37 @@ input[type="number"] {
 }
 
 .treasury-review-row {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(360px, 640px) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.treasury-review-row {
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 14px 18px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.treasury-review-row:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.treasury-review-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.treasury-review-row-edit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .treasury-review-row::before {
@@ -16135,7 +16153,8 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 0;
+  min-width: 240px;
+  flex: 1 1 320px;
 }
 
 .treasury-review-row-title {
@@ -16227,34 +16246,62 @@ input[type="number"] {
   color: #e0a89a;
 }
 
-.treasury-review-row-controls {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  min-width: 0;
-}
-
-.treasury-review-claimed {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: right;
-}
-
-.treasury-review-claimed > small {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
 .treasury-review-deductible {
   min-width: 120px;
 }
 
+.treasury-review-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Collapsible DGII fiscal section keeps the row scannable by default. */
+.treasury-review-fiscal {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 10px;
+}
+
+.treasury-review-fiscal-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.treasury-review-fiscal-toggle:hover {
+  color: var(--text-primary);
+}
+
+.treasury-review-fiscal-toggle svg {
+  transition: transform 0.2s ease;
+}
+
+.treasury-review-fiscal.is-open .treasury-review-fiscal-toggle svg {
+  transform: rotate(180deg);
+}
+
+.treasury-review-fiscal-hint {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .treasury-review-fiscal-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(104px, 1fr));
-  gap: 8px;
-  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 12px;
+  margin-top: 10px;
 }
 
 .treasury-review-fiscal-field {
@@ -16270,37 +16317,11 @@ input[type="number"] {
 }
 
 .treasury-review-fiscal-field .field-input {
-  min-height: 30px;
-  height: 30px;
+  min-height: 32px;
+  height: 32px;
   padding: 0 10px;
   font-size: 12px;
   border-radius: 8px;
-}
-
-.treasury-review-row-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-@media (max-width: 900px) {
-  .treasury-review-row {
-    grid-template-columns: 1fr;
-  }
-  .treasury-review-row-controls,
-  .treasury-review-row-actions {
-    justify-content: flex-start;
-  }
-
-  .treasury-review-row-controls {
-    flex-wrap: wrap;
-  }
-
-  .treasury-review-fiscal-grid {
-    grid-template-columns: repeat(2, minmax(120px, 1fr));
-    width: 100%;
-  }
 }
 
 .treasury-chart-card .section-subtitle {

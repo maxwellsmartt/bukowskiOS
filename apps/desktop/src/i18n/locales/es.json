@@ -1490,6 +1490,8 @@
         "statusAccepted": "Deducible total",
         "statusPartial": "Deducible parcial",
         "statusRejected": "No deducible",
+        "fiscalSection": "Datos fiscales DGII",
+        "withholdingShort": "retención",
         "saved": "Revisión guardada.",
         "failed": "No se pudo guardar la revisión."
       },

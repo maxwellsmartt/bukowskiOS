@@ -1488,6 +1488,8 @@
         "statusAccepted": "Fully deductible",
         "statusPartial": "Partially deductible",
         "statusRejected": "Not deductible",
+        "fiscalSection": "DGII fiscal data",
+        "withholdingShort": "withholding",
         "saved": "Review saved.",
         "failed": "Could not save the review."
       },
