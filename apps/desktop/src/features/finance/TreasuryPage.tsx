@@ -1,5 +1,5 @@
 import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, FileDown, Landmark, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
@@ -57,6 +57,7 @@ import {
 } from "./useTreasuryData";
 
 type Tab = "overview" | "movements" | "review" | "projects";
+const treasuryTabs: Tab[] = ["overview", "movements", "review", "projects"];
 type MovementDateFilter = "all" | "month" | "custom";
 type TreasuryReportCurrency = "DOP" | "USD";
 type PendingClassificationRule = {
@@ -1363,8 +1364,13 @@ export const TreasuryPage = () => {
         />
       ) : null}
 
-      <div className="treasury-segmented-tabs" role="tablist">
-        {(["overview", "movements", "review", "projects"] as Tab[]).map((value) => (
+      <div
+        className="treasury-segmented-tabs"
+        role="tablist"
+        style={{ "--treasury-tab-index": treasuryTabs.indexOf(tab) } as CSSProperties}
+      >
+        <span aria-hidden="true" className="treasury-segmented-tabs-indicator" />
+        {treasuryTabs.map((value) => (
           <button
             aria-selected={tab === value}
             className="treasury-segmented-tab"
