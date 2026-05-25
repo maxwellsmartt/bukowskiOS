@@ -1641,9 +1641,9 @@ export const TreasuryPage = () => {
               </div>
             </div>
             {snap && snap.balanceTrend.length > 0 ? (
-              <div className="finance-chart-shell">
-                <ResponsiveContainer height={260} width="100%">
-                  <LineChart data={snap.balanceTrend} margin={{ top: 10, right: 12, left: 10, bottom: 2 }}>
+              <div className="finance-chart-shell treasury-balance-chart-shell">
+                <ResponsiveContainer height={300} width="100%">
+                  <LineChart data={snap.balanceTrend} margin={{ top: 24, right: 28, left: 10, bottom: 12 }}>
                     <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
                     <XAxis
                       axisLine={false}

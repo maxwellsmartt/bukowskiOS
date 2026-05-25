@@ -16195,6 +16195,15 @@ input[type="number"] {
   overflow: hidden;
 }
 
+.treasury-balance-trend-card {
+  min-height: 390px;
+}
+
+.treasury-balance-chart-shell {
+  min-height: 318px;
+  padding-top: 2px;
+}
+
 /* --- Accountant review queue --- */
 .treasury-review-header {
   align-items: center;

@@ -428,7 +428,7 @@ const loadSupervisorConfig = (db: DatabaseSync, workspaceId: string) =>
   db
     .prepare(
       `
-        SELECT id, agent_key, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
+        SELECT workspace_id, id, agent_key, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
         FROM agents
         WHERE workspace_id IN (?, ?)
           AND is_supervisor = 1
@@ -438,6 +438,7 @@ const loadSupervisorConfig = (db: DatabaseSync, workspaceId: string) =>
     )
     .get(workspaceId, defaultWorkspaceId, workspaceId) as
     | {
+        workspace_id: string;
         id: string;
         agent_key: string;
         provider_key: string;
@@ -1207,6 +1208,7 @@ export const createAssistantGatewayService = (
     const supervisor = loadSupervisorConfig(db, workspaceId);
     const supervisorProviderKey = supervisor?.provider_key ?? "openai";
     const supervisorModelKey = supervisor?.model_key ?? "openai:gpt-5.2";
+    const supervisorWorkspaceId = supervisor?.workspace_id ?? workspaceId;
 
     if (!supervisor) {
       return buildHumanErrorResponse(
@@ -1217,7 +1219,7 @@ export const createAssistantGatewayService = (
       );
     }
 
-    const supervisorProvider = loadProviderConfig(db, supervisorProviderKey, workspaceId);
+    const supervisorProvider = loadProviderConfig(db, supervisorProviderKey, supervisorWorkspaceId);
 
     if (!supervisorProvider) {
       return buildHumanErrorResponse(
@@ -1242,7 +1244,7 @@ export const createAssistantGatewayService = (
       );
     }
 
-    const supervisorApiKey = options.secretStore.getProviderSecret(workspaceId, supervisorProviderKey);
+    const supervisorApiKey = options.secretStore.getProviderSecret(supervisorWorkspaceId, supervisorProviderKey);
 
     if (!supervisorApiKey) {
       return buildHumanErrorResponse(

@@ -20,6 +20,7 @@ module.exports = {
     buildResources: "build",
   },
   files: ["dist/**", "dist-electron/**", "package.json"],
+  asarUnpack: ["dist/**"],
   extraResources: [
     {
       from: "src/shared/assets/inbox/logos/bukowskiOS-desktop-logo.png",

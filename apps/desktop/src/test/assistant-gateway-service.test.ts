@@ -78,6 +78,147 @@ describe("assistant gateway service", () => {
     cleanup();
   });
 
+  it("uses the supervisor workspace provider when the active workspace only has an empty provider shell", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-provider-fallback");
+    const activeWorkspaceId = "workspace-active-project";
+    const secrets = new Map<string, string>();
+    const secretStore = {
+      hasProviderSecret: (workspaceId: string, providerKey: string) => secrets.has(`${workspaceId}:${providerKey}`),
+      getProviderSecret: (workspaceId: string, providerKey: string) => secrets.get(`${workspaceId}:${providerKey}`) ?? null,
+      setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => {
+        secrets.set(`${workspaceId}:${providerKey}`, secret);
+      },
+      clearProviderSecret: (workspaceId: string, providerKey: string) => {
+        secrets.delete(`${workspaceId}:${providerKey}`);
+      },
+    };
+
+    const configMutations = createAgentMutationService(database, {
+      secretStore,
+      openaiProviderService: {
+        createResponse: async () => ({
+          ok: true as const,
+          responseId: "noop",
+          status: "completed",
+          outputText: "{}",
+          functionCalls: [],
+        }),
+        testConnection: async () => ({
+          ok: true as const,
+          status: "healthy" as const,
+          summary: "OpenAI responded successfully.",
+        }),
+      },
+      assistantGatewayService: {
+        sendMessage: async () => {
+          throw new Error("Not used while setting provider config.");
+        },
+        continueApprovedRun: async () => {
+          throw new Error("Not used while setting provider config.");
+        },
+      },
+    });
+
+    configMutations.saveAIProviderConfig({
+      commandId: "cmd-openai-config-default-workspace",
+      workspaceId: "workspace-metadata",
+      providerKey: "openai",
+      enabled: true,
+      apiKey: "sk-test",
+      defaultModelKey: "openai:gpt-5.4",
+      timeoutMs: 20000,
+      retryCount: 1,
+      baseUrl: "",
+    });
+
+    database
+      .prepare(
+        `
+          INSERT INTO workspaces (id, name, slug, base_currency, created_at, updated_at)
+          VALUES (?, 'Active Project Workspace', 'active-project-workspace', 'DOP', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `,
+      )
+      .run(activeWorkspaceId);
+
+    database
+      .prepare(
+        `
+          INSERT INTO ai_provider_configs (
+            id,
+            workspace_id,
+            provider_key,
+            display_name,
+            supports_live_requests,
+            enabled,
+            default_model_key,
+            fallback_model_key,
+            base_url,
+            timeout_ms,
+            retry_count,
+            status,
+            notes,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, 'openai', 'OpenAI', 1, 0, 'openai:gpt-5.4-mini', '', 'https://api.openai.com/v1', 30000, 1, 'not_configured', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `,
+      )
+      .run("provider-openai-active-shell", activeWorkspaceId);
+
+    let providerWasCalled = false;
+    const gateway = createAssistantGatewayService(database, {
+      secretStore,
+      sessionStore: createAssistantGatewaySessionStore(),
+      toolRegistry: createAgentToolRegistry(createFoundationReadService(database), {
+        getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+      }),
+      openaiProviderService: {
+        createResponse: async () => {
+          providerWasCalled = true;
+          return {
+            ok: true as const,
+            responseId: "resp-provider-fallback",
+            status: "completed",
+            outputText: JSON.stringify({
+              intent: "general_question",
+              target_agent: "supervisor-agent",
+              confidence: 0.9,
+              requires_approval: false,
+              tool_call_requested: false,
+              user_facing_summary: "Chat is configured.",
+              answer_kind: "informational",
+              draft_run_title: null,
+              draft_run_description: null,
+            }),
+            functionCalls: [],
+          };
+        },
+        testConnection: async () => ({
+          ok: true as const,
+          status: "healthy" as const,
+          summary: "OpenAI responded successfully.",
+        }),
+      },
+    });
+
+    const result = await gateway.sendMessage({
+      commandId: "cmd-chat-provider-fallback",
+      workspaceId: activeWorkspaceId,
+      threadId: "thread-provider-fallback",
+      message: "Hello",
+      context: {
+        workspaceId: activeWorkspaceId,
+        activePath: "/finance/treasury",
+        currentView: "Treasury",
+      },
+    });
+
+    expect(result.status).toBe("answered");
+    expect(providerWasCalled).toBe(true);
+
+    cleanup();
+  });
+
   it("sends image attachments to OpenAI as multimodal input", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-images");
     const secrets = new Map<string, string>();
