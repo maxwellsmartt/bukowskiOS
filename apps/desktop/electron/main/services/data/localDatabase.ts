@@ -52,6 +52,7 @@ import { createCurrencyReadService } from "./currencyReadService";
 import { applyQuoteAgentSourceMigration } from "./quoteAgentSourceBootstrap";
 import { createInvoiceMutationService } from "./invoiceMutationService";
 import { createInvoiceReadService } from "./invoiceReadService";
+import { applyTreasuryFoundationSelfHeal } from "./treasuryFoundationBootstrap";
 import { createTreasuryMutationService } from "./treasuryMutationService";
 import { createTreasuryReadService } from "./treasuryReadService";
 import { createQuoteMutationService } from "./quoteMutationService";
@@ -538,6 +539,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   }
 
   runStartupStep("apply tracked SQL migrations", () => applyTrackedSqlMigrations(database, foundationMigrations));
+  runStartupStep("self-heal treasury foundation schema", () => applyTreasuryFoundationSelfHeal(database));
   runStartupStep("apply admin foundation migration", () =>
     applyTrackedStep(database, "runtime_admin_foundation_v1", () => applyAdminFoundationMigration(database)),
   );
