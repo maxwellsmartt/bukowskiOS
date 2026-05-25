@@ -16031,6 +16031,7 @@ input[type="number"] {
 .treasury-segmented-tabs {
   --treasury-tab-count: 4;
   --treasury-tab-index: 0;
+  align-self: flex-start;
   align-items: center;
   background: rgba(10, 19, 29, 0.58);
   border: 1px solid rgba(93, 154, 218, 0.14);
@@ -16038,8 +16039,11 @@ input[type="number"] {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
   display: inline-grid;
   gap: 0;
+  grid-auto-rows: 1fr;
   grid-template-columns: repeat(var(--treasury-tab-count), minmax(104px, 1fr));
+  height: 36px;
   isolation: isolate;
+  min-height: 36px;
   overflow: hidden;
   padding: 3px;
   position: relative;
@@ -16062,18 +16066,24 @@ input[type="number"] {
 }
 
 .treasury-segmented-tab {
+  align-items: center;
   appearance: none;
   background: transparent;
   border: 0;
   border-radius: 999px;
   color: var(--text-secondary);
   cursor: pointer;
+  display: flex;
   font: inherit;
   font-size: var(--font-sm, 13px);
+  justify-content: center;
+  line-height: 1;
   min-height: 28px;
+  min-width: 0;
   padding: 0 12px;
   position: relative;
   transition: color 140ms ease;
+  white-space: nowrap;
   z-index: 1;
 }
 
@@ -17360,16 +17370,38 @@ input[type="number"] {
 
 .treasury-description-cell {
   gap: 4px;
+  max-width: 100%;
   min-width: 0;
+  overflow: hidden;
+  width: 100%;
 }
 
 .treasury-description-primary {
   display: block;
   max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   color: var(--text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.data-table tbody td:has(.treasury-description-cell) {
+  overflow: visible;
+}
+
+.data-table tbody td:has(.treasury-description-cell:hover) {
+  position: relative;
+  z-index: 5;
+}
+
+.treasury-description-primary[data-tooltip]::after,
+.treasury-description-meta span[data-tooltip]::after {
+  max-width: min(520px, 68vw);
+  min-width: min(220px, 68vw);
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
 }
 
 .treasury-description-meta {
@@ -17377,14 +17409,18 @@ input[type="number"] {
   color: var(--text-muted);
   display: flex;
   gap: 6px;
+  max-width: 100%;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
 }
 
 .treasury-description-meta span {
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .treasury-description-meta span + span {

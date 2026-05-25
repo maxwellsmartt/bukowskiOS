@@ -1180,7 +1180,7 @@ export const TreasuryPage = () => {
         key: "description",
         label: t("finance.treasury.columns.description"),
         width: 420,
-        minWidth: 140,
+        minWidth: 72,
         render: (row: BankTransactionRow) =>
           editingId === row.id && editDraft ? (
             <input
@@ -1193,13 +1193,29 @@ export const TreasuryPage = () => {
           ) : (
             (() => {
               const suggestion = inferTreasurySuggestion(row);
+              const descriptionText = row.annotation?.concept || row.rawDescription || "—";
+              const counterpartyText = row.annotation?.counterparty;
               return (
                 <div className="cell-stack treasury-description-cell">
-                  <span className="treasury-description-primary">{row.annotation?.concept || row.rawDescription || "—"}</span>
+                  <span
+                    className="treasury-description-primary"
+                    data-tooltip={descriptionText}
+                    title={descriptionText}
+                  >
+                    {descriptionText}
+                  </span>
                   {row.annotation?.counterparty || row.reference || suggestion ? (
                     <small className="treasury-description-meta">
-                      {row.annotation?.counterparty ? <span>{row.annotation.counterparty}</span> : null}
-                      {row.reference ? <span>{row.reference}</span> : null}
+                      {counterpartyText ? (
+                        <span data-tooltip={counterpartyText} title={counterpartyText}>
+                          {counterpartyText}
+                        </span>
+                      ) : null}
+                      {row.reference ? (
+                        <span data-tooltip={row.reference} title={row.reference}>
+                          {row.reference}
+                        </span>
+                      ) : null}
                       {suggestion ? (
                         <button
                           className={`treasury-suggestion-chip ${kindToneClass(suggestion.kind)}`}
