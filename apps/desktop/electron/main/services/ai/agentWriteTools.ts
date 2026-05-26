@@ -1,9 +1,11 @@
 import type {
   AIGatewayToolContext,
   CommandSourceChannel,
+  ParsedBankTransaction,
   QuoteItemDurationUnit,
   QuoteItemTaxBehavior,
   QuoteTaxProfile,
+  StatementSourceFormat,
 } from "@contracts";
 
 import type { createIncidentMutationService } from "../data/incidentMutationService";
@@ -1235,6 +1237,118 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
         notes: asOptionalString(args.notes) ?? null,
       });
       return { summary: result.summary, payload: { transactionId, repeated: result.repeated } };
+    },
+  },
+  {
+    name: "import_bank_statement",
+    description:
+      "Import bank statement movements into a treasury account. First read the attached statement with read_attached_document, map each line to a normalized row, then call this tool. Requires approval. Duplicates are detected automatically (re-importing the same movements is safe). The import is reversible via Undo / delete import.",
+    requiresApproval: true,
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["bank_account_id", "rows"],
+      properties: {
+        bank_account_id: { type: "string", description: "Target account id (use list_bank_accounts to resolve)." },
+        source_format: {
+          type: "string",
+          enum: ["csv", "xlsx", "pdf", "manual"],
+          description: "Format of the source document the rows came from. Defaults to manual.",
+        },
+        original_filename: { type: "string", description: "Source file name, for traceability." },
+        period_start: { type: "string", description: "Statement period start, YYYY-MM-DD." },
+        period_end: { type: "string", description: "Statement period end, YYYY-MM-DD." },
+        notes: { type: "string" },
+        rows: {
+          type: "array",
+          minItems: 1,
+          description: "Normalized statement movements, one per transaction line.",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["txn_date", "amount", "direction"],
+            properties: {
+              txn_date: { type: "string", description: "Posting date, YYYY-MM-DD." },
+              value_date: { type: "string", description: "Value date, YYYY-MM-DD." },
+              description: { type: "string", description: "Raw description / concept as it appears on the statement." },
+              reference: { type: "string" },
+              serial: { type: "string" },
+              amount: { type: "number", description: "Positive movement amount (sign comes from direction)." },
+              direction: { type: "string", enum: ["debit", "credit"], description: "debit = money out, credit = money in." },
+              running_balance: { type: "number", description: "Account balance after this movement, if shown." },
+            },
+          },
+        },
+      },
+    },
+    execute: (args, context) => {
+      const workspaceId = requireWorkspaceId(context);
+      const bankAccountId = asString(args.bank_account_id);
+      if (!bankAccountId) throw new Error("bank_account_id is required.");
+
+      const rawRows = Array.isArray(args.rows) ? args.rows : [];
+      if (!rawRows.length) throw new Error("At least one statement row is required.");
+
+      const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+      const rows: ParsedBankTransaction[] = rawRows.map((entry, index) => {
+        const row = (entry ?? {}) as Record<string, unknown>;
+        const txnDate = asString(row.txn_date);
+        if (!isoDate.test(txnDate)) {
+          throw new Error(`Row ${index + 1}: txn_date must be YYYY-MM-DD (got "${txnDate || "empty"}").`);
+        }
+        const amount = asNumber(row.amount);
+        if (amount === undefined) {
+          throw new Error(`Row ${index + 1}: amount must be a finite number.`);
+        }
+        const direction = asString(row.direction);
+        if (direction !== "debit" && direction !== "credit") {
+          throw new Error(`Row ${index + 1}: direction must be "debit" or "credit".`);
+        }
+        const valueDate = asOptionalString(row.value_date);
+        if (valueDate && !isoDate.test(valueDate)) {
+          throw new Error(`Row ${index + 1}: value_date must be YYYY-MM-DD when provided.`);
+        }
+        return {
+          txnDate,
+          valueDate: valueDate ?? null,
+          rawDescription: asOptionalString(row.description) ?? null,
+          reference: asOptionalString(row.reference) ?? null,
+          serial: asOptionalString(row.serial) ?? null,
+          amount: Math.abs(amount),
+          direction,
+          runningBalance: asNumber(row.running_balance) ?? null,
+        };
+      });
+
+      const sourceFormat = asString(args.source_format);
+      const normalizedFormat: StatementSourceFormat =
+        sourceFormat === "csv" || sourceFormat === "xlsx" || sourceFormat === "pdf" ? sourceFormat : "manual";
+
+      const result = services.treasury.importStatement({
+        commandId: newCommandId("agent-import"),
+        workspaceId,
+        actorType: "agent",
+        sourceChannel: resolveSourceChannel(context),
+        bankAccountId,
+        sourceFormat: normalizedFormat,
+        originalFilename: asOptionalString(args.original_filename) ?? null,
+        periodStart: asOptionalString(args.period_start) ?? null,
+        periodEnd: asOptionalString(args.period_end) ?? null,
+        rows,
+        notes: asOptionalString(args.notes) ?? null,
+      });
+
+      return {
+        summary: result.summary,
+        payload: {
+          importId: result.importId,
+          bankAccountId: result.bankAccountId,
+          rowCount: result.rowCount,
+          insertedCount: result.insertedCount,
+          duplicateCount: result.duplicateCount,
+          repeated: result.repeated,
+        },
+      };
     },
   },
 ];
