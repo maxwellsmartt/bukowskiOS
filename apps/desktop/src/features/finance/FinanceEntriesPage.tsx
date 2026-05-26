@@ -268,7 +268,6 @@ export const FinanceEntriesPage = () => {
             />
           }
           getRowId={(row) => row.id}
-          maxHeight="min(56vh, 620px)"
           onRowClick={(row) => {
             setEditingEntryId(row.id);
             setSubmitError(null);

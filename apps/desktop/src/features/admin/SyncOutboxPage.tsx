@@ -589,7 +589,6 @@ export const SyncOutboxPage = () => {
             <DataTable
               activeRowId={activeRowId}
               getRowId={(row) => row.id}
-              maxHeight="min(60vh, 680px)"
               onRowClick={(row) => setActiveRowId(row.id)}
               persistKey="sync-outbox"
               columns={[

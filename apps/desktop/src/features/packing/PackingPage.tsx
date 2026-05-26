@@ -139,7 +139,6 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             activeRowId={activePackingSlipId}
             autoScrollToActiveRow
             getRowId={(row) => row.id}
-            maxHeight="min(68vh, 720px)"
             onSortRequest={packingControls.handleColumnSortRequest}
             persistKey="packing-slips"
             columns={[

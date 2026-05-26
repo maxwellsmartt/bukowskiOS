@@ -249,7 +249,6 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           activeRowId={activeIncidentId}
           autoScrollToActiveRow
           getRowId={(row) => row.id}
-          maxHeight="min(60vh, 640px)"
           onRowClick={(row) => {
             setActiveIncidentId(row.id);
             setIncidentDetailError(null);

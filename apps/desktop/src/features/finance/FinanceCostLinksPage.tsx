@@ -23,7 +23,6 @@ export const FinanceCostLinksPage = () => {
       <SurfaceCard title={t("finance.costLinks.cardTitle")}>
         <DataTable
           getRowId={(row) => `${row.incident}-${row.asset}`}
-          maxHeight="min(60vh, 640px)"
           persistKey="finance-cost-links"
           columns={[
             {

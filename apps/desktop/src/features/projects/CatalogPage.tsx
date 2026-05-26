@@ -1144,7 +1144,6 @@ export const CatalogPage = () => {
             columns={activeTabConfig.columns}
             emptyMessage={t("catalog.empty.table", { entity: activeTabConfig.label.toLowerCase() })}
             getRowId={(row) => String(row.id)}
-            maxHeight="min(68vh, 760px)"
             onRowClick={(row) => setActivePreviewIds((current) => ({ ...current, [activeTab]: String(row.id) }))}
             onSelectedRowIdsChange={(rowIds) =>
               setSelectedIds((current) => ({

@@ -243,7 +243,6 @@ export const ProjectsPage = () => {
               />
             }
             getRowId={(row) => row.id}
-            maxHeight="min(72vh, 760px)"
             onRowClick={(row) => setActiveProjectId(row.id)}
             onRowDoubleClick={(row) => {
               if (row.isArchived) {

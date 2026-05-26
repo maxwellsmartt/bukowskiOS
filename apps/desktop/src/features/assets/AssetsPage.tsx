@@ -2058,7 +2058,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               />
             }
             getRowId={(row) => row.id}
-            maxHeight={isProjectMode ? "min(66vh, calc(100dvh - 390px), 900px)" : "min(58vh, calc(100dvh - 470px), 860px)"}
             onRowClick={(row) => setSelectedAssetId(row.id)}
             onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
             onSortRequest={assetControls.handleColumnSortRequest}
