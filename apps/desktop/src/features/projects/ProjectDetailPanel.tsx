@@ -303,6 +303,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
           ]}
           getRowId={(row) => row.id}
           emptyMessage={t("projects.detail.assets.empty")}
+          maxHeight="min(42vh, 440px)"
           onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
           persistKey="project-detail-assets"
           rows={data.assets}
@@ -348,6 +349,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
           ]}
           getRowId={(row) => row.id}
           emptyMessage={t("projects.detail.incidents.empty")}
+          maxHeight="min(42vh, 440px)"
           persistKey="project-detail-incidents"
           rows={data.incidents}
           shellClassName="table-shell-natural"

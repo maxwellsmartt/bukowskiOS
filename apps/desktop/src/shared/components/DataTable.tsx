@@ -81,13 +81,14 @@ export const DataTable = <T = unknown,>({
   autoScrollToActiveRow = false,
   controlsAddon,
   pruneSelectionOnRowsChange = true,
-  fitToColumnWidths = false,
   fillRemainingColumnKey,
 }: DataTableProps<T>) => {
   const { t } = useTranslation();
   const defaultMinColumnWidth = 56;
   const tableShellRef = useRef<HTMLDivElement | null>(null);
   const tableRef = useRef<HTMLTableElement | null>(null);
+  const colRefs = useRef<Record<string, HTMLTableColElement | null>>({});
+  const resizeRafRef = useRef<number | null>(null);
   const columnsMenuRef = useRef<HTMLDivElement | null>(null);
   const columnsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const resolvedRowIds = useMemo(
@@ -114,6 +115,7 @@ export const DataTable = <T = unknown,>({
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
   const [columnsMenuStyle, setColumnsMenuStyle] = useState<{ top: number; left: number; placement: "bottom" | "top" } | null>(null);
   const [tableShellWidth, setTableShellWidth] = useState(0);
+  const [autoMaxHeight, setAutoMaxHeight] = useState<string | null>(null);
   const [reorderState, setReorderState] = useState<{ draggedKey: string | null; overKey: string | null }>({
     draggedKey: null,
     overKey: null,
@@ -198,8 +200,10 @@ export const DataTable = <T = unknown,>({
     activeRow?.scrollIntoView({ block: "nearest" });
   }, [activeRowId, autoScrollToActiveRow, rows]);
 
+  // Track the shell width so columns can fill it (single, clean table; no
+  // spurious horizontal scroll). Runs for every table, not just opt-in ones.
   useEffect(() => {
-    if (!fitToColumnWidths || typeof ResizeObserver === "undefined") {
+    if (typeof ResizeObserver === "undefined") {
       return;
     }
 
@@ -219,7 +223,36 @@ export const DataTable = <T = unknown,>({
     return () => {
       observer.disconnect();
     };
-  }, [fitToColumnWidths]);
+  }, []);
+
+  // Adaptive height: when no explicit maxHeight is given, the table fills down
+  // to the bottom of the viewport and recomputes on resize, so every full-page
+  // table is the same single-scroll height regardless of screen resolution.
+  useEffect(() => {
+    if (maxHeight !== undefined || typeof window === "undefined") {
+      return;
+    }
+
+    const bottomGap = 24;
+    const recompute = () => {
+      const shell = tableShellRef.current;
+      if (!shell) {
+        return;
+      }
+      const top = shell.getBoundingClientRect().top;
+      const available = Math.max(220, window.innerHeight - top - bottomGap);
+      setAutoMaxHeight(`${Math.round(available)}px`);
+    };
+
+    recompute();
+    window.addEventListener("resize", recompute);
+    window.addEventListener("scroll", recompute, true);
+
+    return () => {
+      window.removeEventListener("resize", recompute);
+      window.removeEventListener("scroll", recompute, true);
+    };
+  }, [maxHeight, rows.length]);
 
   useEffect(() => {
     if (!persistKey) {
@@ -255,39 +288,14 @@ export const DataTable = <T = unknown,>({
     };
   }, [persistKey]);
 
-  useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      const resizeState = resizeStateRef.current;
-
-      if (!resizeState) {
-        return;
+  useEffect(
+    () => () => {
+      if (resizeRafRef.current != null) {
+        cancelAnimationFrame(resizeRafRef.current);
       }
-
-      const activeColumn = columns.find((column) => column.key === resizeState.columnKey);
-      const minWidth = activeColumn?.minWidth ?? defaultMinColumnWidth;
-      const nextWidth = Math.max(minWidth, resizeState.startWidth + (event.clientX - resizeState.startX));
-
-      setColumnWidths((currentWidths) => ({
-        ...currentWidths,
-        [resizeState.columnKey]: nextWidth,
-      }));
-    };
-
-    const handleMouseUp = () => {
-      resizeStateRef.current = null;
-      setResizingColumnKey(null);
-      document.body.style.removeProperty("cursor");
-      document.body.style.removeProperty("user-select");
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [columns]);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!columnsMenuOpen) {
@@ -354,13 +362,25 @@ export const DataTable = <T = unknown,>({
     (totalWidth, column) => totalWidth + (columnWidths[column.key] ?? column.width ?? 160),
     selectable ? selectionColumnWidth : 0,
   );
-  const resolvedColumnWidths =
-    fitToColumnWidths && fillRemainingColumnKey && tableShellWidth > baseTableWidth
-      ? {
-          ...baseColumnWidths,
-          [fillRemainingColumnKey]: (baseColumnWidths[fillRemainingColumnKey] ?? 0) + tableShellWidth - baseTableWidth,
-        }
-      : baseColumnWidths;
+  // Fill the shell width by default so tables read as one cohesive block: when
+  // the shell is wider than the columns, push the slack into the configured
+  // fill column, else spread it proportionally across resizable columns.
+  const widthSlack = tableShellWidth > 0 ? tableShellWidth - baseTableWidth : 0;
+  const resolvedColumnWidths = (() => {
+    if (widthSlack <= 0) {
+      return baseColumnWidths;
+    }
+    // Absorb the slack in a single column (the configured one, else the last
+    // visible) so resizing any other column doesn't shift its neighbours.
+    const fillKey =
+      fillRemainingColumnKey && baseColumnWidths[fillRemainingColumnKey] != null
+        ? fillRemainingColumnKey
+        : visibleColumns[visibleColumns.length - 1]?.key;
+    if (!fillKey || baseColumnWidths[fillKey] == null) {
+      return baseColumnWidths;
+    }
+    return { ...baseColumnWidths, [fillKey]: (baseColumnWidths[fillKey] ?? 0) + widthSlack };
+  })();
   const tableWidth = visibleColumns.reduce(
     (totalWidth, column) => totalWidth + (resolvedColumnWidths[column.key] ?? column.width ?? 160),
     selectable ? selectionColumnWidth : 0,
@@ -463,19 +483,67 @@ export const DataTable = <T = unknown,>({
     applyRowSelectionGesture(event, rowId, isSelected);
   };
 
-  const handleResizeStart = (event: ReactMouseEvent<HTMLButtonElement>, columnKey: string) => {
+  const handleResizeStart = (event: ReactPointerEvent<HTMLButtonElement>, columnKey: string) => {
     event.preventDefault();
     event.stopPropagation();
 
-    resizeStateRef.current = {
-      columnKey,
-      startX: event.clientX,
-      startWidth: columnWidths[columnKey] ?? 160,
-    };
-    setResizingColumnKey(columnKey);
+    const column = columns.find((item) => item.key === columnKey);
+    const minWidth = column?.minWidth ?? defaultMinColumnWidth;
+    const startX = event.clientX;
+    const startWidth = resolvedColumnWidths[columnKey] ?? columnWidths[columnKey] ?? 160;
+    const startTableWidth = tableRef.current?.getBoundingClientRect().width ?? tableWidth;
+    const resizer = event.currentTarget;
+    let latestWidth = startWidth;
 
+    resizeStateRef.current = { columnKey, startX, startWidth };
+    setResizingColumnKey(columnKey);
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
+    resizer.setPointerCapture(event.pointerId);
+
+    // During the drag we mutate the <col> and table width directly (no React
+    // state) so rows never re-render — the gesture feels fluid. We commit the
+    // final width to state (and persistence) on release.
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      latestWidth = Math.max(minWidth, startWidth + (moveEvent.clientX - startX));
+      if (resizeRafRef.current != null) {
+        return;
+      }
+      resizeRafRef.current = requestAnimationFrame(() => {
+        resizeRafRef.current = null;
+        const col = colRefs.current[columnKey];
+        if (col) {
+          col.style.width = `${latestWidth}px`;
+        }
+        if (tableRef.current) {
+          const nextTableWidth = startTableWidth + (latestWidth - startWidth);
+          tableRef.current.style.width = `${nextTableWidth}px`;
+          tableRef.current.style.minWidth = `${nextTableWidth}px`;
+        }
+      });
+    };
+
+    const finish = (endEvent: PointerEvent) => {
+      resizer.removeEventListener("pointermove", handlePointerMove);
+      resizer.removeEventListener("pointerup", finish);
+      resizer.removeEventListener("pointercancel", finish);
+      if (resizer.hasPointerCapture(endEvent.pointerId)) {
+        resizer.releasePointerCapture(endEvent.pointerId);
+      }
+      if (resizeRafRef.current != null) {
+        cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
+      resizeStateRef.current = null;
+      setResizingColumnKey(null);
+      document.body.style.removeProperty("cursor");
+      document.body.style.removeProperty("user-select");
+      setColumnWidths((currentWidths) => ({ ...currentWidths, [columnKey]: latestWidth }));
+    };
+
+    resizer.addEventListener("pointermove", handlePointerMove);
+    resizer.addEventListener("pointerup", finish);
+    resizer.addEventListener("pointercancel", finish);
   };
 
   const toggleColumnVisibility = (columnKey: string) => {
@@ -615,19 +683,26 @@ export const DataTable = <T = unknown,>({
         className={`table-shell${shellClassName ? ` ${shellClassName}` : ""}`}
         style={
           {
-            "--table-max-height": resolveMaxHeight(maxHeight),
+            "--table-max-height":
+              maxHeight !== undefined ? resolveMaxHeight(maxHeight) : autoMaxHeight ?? resolveMaxHeight(undefined),
           } as CSSProperties
         }
       >
         <table
           ref={tableRef}
           className="data-table"
-          style={fitToColumnWidths ? { minWidth: tableWidth, width: tableWidth } : undefined}
+          style={{ minWidth: tableWidth, width: tableWidth }}
         >
         <colgroup>
           {selectable ? <col style={{ width: selectionColumnWidth, minWidth: selectionColumnWidth }} /> : null}
           {visibleColumns.map((column) => (
-            <col key={column.key} style={{ width: resolvedColumnWidths[column.key], minWidth: column.minWidth ?? defaultMinColumnWidth }} />
+            <col
+              key={column.key}
+              ref={(element) => {
+                colRefs.current[column.key] = element;
+              }}
+              style={{ width: resolvedColumnWidths[column.key], minWidth: column.minWidth ?? defaultMinColumnWidth }}
+            />
           ))}
         </colgroup>
 
@@ -697,8 +772,7 @@ export const DataTable = <T = unknown,>({
                     <button
                       aria-label={t("shared.dataTable.resizeColumn", { label: column.label })}
                       className="column-resizer"
-                      onMouseDown={(event) => handleResizeStart(event, column.key)}
-                      onPointerDown={(event) => event.stopPropagation()}
+                      onPointerDown={(event) => handleResizeStart(event, column.key)}
                       title={t("shared.dataTable.resizeColumn", { label: column.label })}
                       type="button"
                     />
