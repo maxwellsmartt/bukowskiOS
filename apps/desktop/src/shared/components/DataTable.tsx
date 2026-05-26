@@ -236,7 +236,9 @@ export const DataTable = <T = unknown,>({
       return;
     }
 
-    const bottomGap = 16;
+    // Small breathing room below the table edge when there is no scroll
+    // container padding to lean on.
+    const fallbackGap = 16;
     const findScrollParent = (element: HTMLElement | null): HTMLElement | null => {
       let node = element?.parentElement ?? null;
       while (node) {
@@ -258,13 +260,19 @@ export const DataTable = <T = unknown,>({
       const scrollParent = findScrollParent(shell);
       let available: number;
       if (scrollParent) {
+        const parentStyle = window.getComputedStyle(scrollParent);
         const parentRect = scrollParent.getBoundingClientRect();
-        // Offset of the shell within the scroll container's content (stable
+        const borderTop = parseFloat(parentStyle.borderTopWidth) || 0;
+        const paddingBottom = parseFloat(parentStyle.paddingBottom) || 0;
+        // Offset of the shell within the scroll container's content box (stable
         // under scroll: shellRect.top falls and scrollTop rises in lockstep).
-        const offsetWithinContent = shellRect.top - parentRect.top + scrollParent.scrollTop;
-        available = scrollParent.clientHeight - offsetWithinContent - bottomGap;
+        const offsetWithinContent =
+          shellRect.top - parentRect.top + scrollParent.scrollTop - borderTop;
+        // Subtract the container's own bottom padding so the table edge lands
+        // exactly on the visible content bottom — no residual outer scroll.
+        available = scrollParent.clientHeight - offsetWithinContent - paddingBottom;
       } else {
-        available = window.innerHeight - shellRect.top - bottomGap;
+        available = window.innerHeight - shellRect.top - fallbackGap;
       }
       setAutoMaxHeight(`${Math.round(Math.max(220, available))}px`);
     };
