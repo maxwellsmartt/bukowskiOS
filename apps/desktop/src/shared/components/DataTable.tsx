@@ -225,32 +225,61 @@ export const DataTable = <T = unknown,>({
     };
   }, []);
 
-  // Adaptive height: when no explicit maxHeight is given, the table fills down
-  // to the bottom of the viewport and recomputes on resize, so every full-page
-  // table is the same single-scroll height regardless of screen resolution.
+  // Adaptive height: when no explicit maxHeight is given, the table fills the
+  // remaining space of its scroll container down to its visible bottom, so the
+  // page itself does not scroll — only the table does. We measure relative to
+  // the scroll container (its clientHeight minus the table's offset within the
+  // scrolled content) so the value is STABLE while scrolling: otherwise reading
+  // a live viewport top would make the table grow as the page scrolls.
   useEffect(() => {
     if (maxHeight !== undefined || typeof window === "undefined") {
       return;
     }
 
-    const bottomGap = 24;
+    const bottomGap = 16;
+    const findScrollParent = (element: HTMLElement | null): HTMLElement | null => {
+      let node = element?.parentElement ?? null;
+      while (node) {
+        const overflowY = window.getComputedStyle(node).overflowY;
+        if (overflowY === "auto" || overflowY === "scroll") {
+          return node;
+        }
+        node = node.parentElement;
+      }
+      return null;
+    };
+
     const recompute = () => {
       const shell = tableShellRef.current;
       if (!shell) {
         return;
       }
-      const top = shell.getBoundingClientRect().top;
-      const available = Math.max(220, window.innerHeight - top - bottomGap);
-      setAutoMaxHeight(`${Math.round(available)}px`);
+      const shellRect = shell.getBoundingClientRect();
+      const scrollParent = findScrollParent(shell);
+      let available: number;
+      if (scrollParent) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        // Offset of the shell within the scroll container's content (stable
+        // under scroll: shellRect.top falls and scrollTop rises in lockstep).
+        const offsetWithinContent = shellRect.top - parentRect.top + scrollParent.scrollTop;
+        available = scrollParent.clientHeight - offsetWithinContent - bottomGap;
+      } else {
+        available = window.innerHeight - shellRect.top - bottomGap;
+      }
+      setAutoMaxHeight(`${Math.round(Math.max(220, available))}px`);
     };
 
     recompute();
     window.addEventListener("resize", recompute);
-    window.addEventListener("scroll", recompute, true);
+    const scrollParent = findScrollParent(tableShellRef.current);
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(recompute) : null;
+    if (scrollParent) {
+      observer?.observe(scrollParent);
+    }
 
     return () => {
       window.removeEventListener("resize", recompute);
-      window.removeEventListener("scroll", recompute, true);
+      observer?.disconnect();
     };
   }, [maxHeight, rows.length]);
 
