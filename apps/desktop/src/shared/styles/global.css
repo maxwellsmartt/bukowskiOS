@@ -19140,8 +19140,26 @@ input[type="number"] {
 .invoice-filter-select.compact-select-trigger {
   flex: 0 0 auto;
   width: auto;
-  min-width: 190px;
-  max-width: 260px;
+  min-width: 132px;
+  max-width: 170px;
+  height: 28px;
+  font-size: var(--font-xs, 11px);
+}
+
+/* Single-project assignment select (default; chips are opt-in). */
+.invoice-project-select.compact-select-trigger {
+  width: auto;
+  min-width: 120px;
+  max-width: 190px;
+  height: 26px;
+  font-size: var(--font-xs, 11px);
+}
+
+/* Filters live inside the DataTable toolbar, on the columns-icon row. */
+.data-table-columns-extra-controls .invoice-inbox-filters {
+  margin: 0;
+  gap: 6px;
+  align-items: center;
 }
 
 /* Discrete "+" add-project trigger: a small square icon, no chevron. */

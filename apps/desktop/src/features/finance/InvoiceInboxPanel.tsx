@@ -78,6 +78,9 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const [uploaderFilter, setUploaderFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Rows the user explicitly switched to multi-project mode (chips). By
+  // default an invoice is assigned to a single project.
+  const [multiModeIds, setMultiModeIds] = useState<Set<string>>(new Set());
   const [members, setMembers] = useState<Member[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [editing, setEditing] = useState<InvoiceExtraction | null>(null);
@@ -286,6 +289,14 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     const next = row.projects
       .filter((p) => p.projectId && p.projectId !== projectId)
       .map((p) => ({ projectId: p.projectId as string, projectName: p.projectName }));
+    // Drop back to the clean single-select once a row no longer needs chips.
+    if (next.length <= 1) {
+      setMultiModeIds((prev) => {
+        const updated = new Set(prev);
+        updated.delete(row.id);
+        return updated;
+      });
+    }
     void setProjects_(row, next);
   };
 
@@ -382,31 +393,6 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
         />
       ) : (
         <>
-          <div className="invoice-inbox-filters">
-            <CompactSelect
-              className="invoice-filter-select"
-              ariaLabel={t("finance.treasury.invoices.filterUploader", { defaultValue: "Filtrar por usuario" })}
-              value={uploaderFilter}
-              onChange={setUploaderFilter}
-              options={uploaderOptions}
-            />
-            <CompactSelect
-              className="invoice-filter-select"
-              ariaLabel={t("finance.treasury.invoices.filterDate", { defaultValue: "Filtrar por fecha" })}
-              value={dateFilter}
-              onChange={setDateFilter}
-              options={dateOptions}
-            />
-            <label className="invoice-select-all">
-              <input
-                type="checkbox"
-                checked={selectedIds.size > 0 && selectedIds.size === filteredRows.length}
-                onChange={toggleSelectAll}
-              />
-              <span>{t("finance.treasury.invoices.selectAll", { defaultValue: "Seleccionar todo" })}</span>
-            </label>
-          </div>
-
           {selectedIds.size > 0 ? (
             <div className="invoice-batch-bar">
               <span className="invoice-batch-bar-label">
@@ -447,6 +433,32 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
             getRowId={(row) => row.id}
             persistKey="treasury-invoice-inbox-v2"
             rows={filteredRows}
+            controlsAddon={
+              <div className="invoice-inbox-filters">
+                <CompactSelect
+                  className="invoice-filter-select"
+                  ariaLabel={t("finance.treasury.invoices.filterUploader", { defaultValue: "Filtrar por usuario" })}
+                  value={uploaderFilter}
+                  onChange={setUploaderFilter}
+                  options={uploaderOptions}
+                />
+                <CompactSelect
+                  className="invoice-filter-select"
+                  ariaLabel={t("finance.treasury.invoices.filterDate", { defaultValue: "Filtrar por fecha" })}
+                  value={dateFilter}
+                  onChange={setDateFilter}
+                  options={dateOptions}
+                />
+                <label className="invoice-select-all">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size > 0 && selectedIds.size === filteredRows.length}
+                    onChange={toggleSelectAll}
+                  />
+                  <span>{t("finance.treasury.invoices.selectAll", { defaultValue: "Seleccionar todo" })}</span>
+                </label>
+              </div>
+            }
             columns={[
               {
                 key: "select",
@@ -517,15 +529,38 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
               },
               {
                 key: "projects",
-                label: t("finance.treasury.invoices.columns.projects", { defaultValue: "Proyectos" }),
-                render: (row) => (
-                  <div className="invoice-project-chips">
-                    {row.projects.length === 0 ? (
-                      <span className="invoice-general-tag">
-                        {t("finance.treasury.invoices.generalExpense", { defaultValue: "Gasto general" })}
-                      </span>
-                    ) : (
-                      row.projects.map((tag) => (
+                label: t("finance.treasury.invoices.columns.projects", { defaultValue: "Proyecto" }),
+                render: (row) => {
+                  const isMulti = multiModeIds.has(row.id) || row.projects.length > 1;
+                  if (!isMulti) {
+                    const current = row.projects[0]?.projectId ?? "";
+                    return (
+                      <CompactSelect
+                        className="invoice-project-select"
+                        ariaLabel={t("finance.treasury.invoices.columns.projects", { defaultValue: "Proyecto" })}
+                        value={current}
+                        onChange={(value) => {
+                          if (value === "__multi__") {
+                            setMultiModeIds((prev) => new Set(prev).add(row.id));
+                            return;
+                          }
+                          if (value === "") void setProjects_(row, []);
+                          else void setProjects_(row, [{ projectId: value, projectName: projectName.get(value) ?? null }]);
+                        }}
+                        options={[
+                          { value: "", label: t("finance.treasury.invoices.generalExpense", { defaultValue: "Gasto general" }) },
+                          ...projects.map((project) => ({ value: project.id, label: project.name })),
+                          {
+                            value: "__multi__",
+                            label: t("finance.treasury.invoices.multiProject", { defaultValue: "Varios proyectos…" }),
+                          },
+                        ]}
+                      />
+                    );
+                  }
+                  return (
+                    <div className="invoice-project-chips">
+                      {row.projects.map((tag) => (
                         <span className="invoice-project-chip" key={tag.projectId ?? tag.projectName ?? "?"}>
                           {tag.projectName ?? projectName.get(tag.projectId ?? "") ?? tag.projectId}
                           {tag.projectId ? (
@@ -534,26 +569,26 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                             </button>
                           ) : null}
                         </span>
-                      ))
-                    )}
-                    {projects.some((project) => !row.projects.some((p) => p.projectId === project.id)) ? (
-                      <CompactSelect
-                        className="invoice-project-add"
-                        ariaLabel={t("finance.treasury.invoices.addProject", { defaultValue: "Agregar proyecto" })}
-                        value=""
-                        onChange={(value) => {
-                          if (value) addProject(row, value);
-                        }}
-                        options={[
-                          { value: "", label: "+" },
-                          ...projects
-                            .filter((project) => !row.projects.some((p) => p.projectId === project.id))
-                            .map((project) => ({ value: project.id, label: project.name })),
-                        ]}
-                      />
-                    ) : null}
-                  </div>
-                ),
+                      ))}
+                      {projects.some((project) => !row.projects.some((p) => p.projectId === project.id)) ? (
+                        <CompactSelect
+                          className="invoice-project-add"
+                          ariaLabel={t("finance.treasury.invoices.addProject", { defaultValue: "Agregar proyecto" })}
+                          value=""
+                          onChange={(value) => {
+                            if (value) addProject(row, value);
+                          }}
+                          options={[
+                            { value: "", label: "+" },
+                            ...projects
+                              .filter((project) => !row.projects.some((p) => p.projectId === project.id))
+                              .map((project) => ({ value: project.id, label: project.name })),
+                          ]}
+                        />
+                      ) : null}
+                    </div>
+                  );
+                },
               },
               {
                 key: "match",
