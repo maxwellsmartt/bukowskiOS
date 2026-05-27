@@ -525,6 +525,21 @@ declare global {
       undoLastAction: (
         input: import("@contracts").UndoTreasuryActionCommand,
       ) => Promise<import("@contracts").TransactionMutationResult>;
+      invoiceInboxEnqueue: (
+        input: import("@contracts").EnqueueInvoiceBatchCommand,
+      ) => Promise<import("@contracts").EnqueueInvoiceBatchResult>;
+      invoiceInboxList: (
+        query: import("@contracts").InvoiceInboxListQuery,
+      ) => Promise<import("@contracts").InvoiceExtraction[]>;
+      invoiceInboxUpdate: (
+        input: import("@contracts").UpdateInvoiceExtractionCommand,
+      ) => Promise<import("@contracts").InvoiceExtractionMutationResult>;
+      invoiceInboxApply: (
+        input: import("@contracts").ApplyInvoiceExtractionCommand,
+      ) => Promise<import("@contracts").InvoiceExtractionMutationResult>;
+      invoiceInboxDismiss: (
+        input: import("@contracts").DismissInvoiceExtractionCommand,
+      ) => Promise<import("@contracts").InvoiceExtractionMutationResult>;
     };
     bukowskiCatalog?: {
       getSnapshot: (query?: CatalogListQuery) => Promise<CatalogSnapshot>;

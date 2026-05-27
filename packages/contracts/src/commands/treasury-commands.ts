@@ -247,3 +247,108 @@ export type TransactionMutationResult = {
   repeated: boolean;
   summary: string;
 };
+
+/* ----------------------------------------------------------------------- */
+/* Invoice Inbox — batch ingestion + vision/text extraction of expense docs */
+/* ----------------------------------------------------------------------- */
+
+export type InvoiceExtractionStatus =
+  | "pending"
+  | "processing"
+  | "extracted"
+  | "failed"
+  | "applied"
+  | "dismissed";
+
+/** One uploaded expense document (PNG/JPG/PDF) and its extracted fields. */
+export type InvoiceExtraction = {
+  id: string;
+  workspaceId: string;
+  batchId: string;
+  status: InvoiceExtractionStatus;
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  supplierName: string | null;
+  supplierRnc: string | null;
+  ncf: string | null;
+  invoiceDate: string | null;
+  subtotal: number | null;
+  itbis: number | null;
+  total: number | null;
+  currency: string | null;
+  dgiiExpenseType: string | null;
+  expenseCategory: string | null;
+  confidence: number | null;
+  rawText: string | null;
+  suggestedTransactionId: string | null;
+  matchConfidence: number | null;
+  appliedTransactionId: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** One file in an enqueue request — the renderer reads it as a base64 data URL. */
+export type InvoiceInboxFileInput = {
+  name: string;
+  mimeType: string;
+  dataUrl: string;
+};
+
+export type EnqueueInvoiceBatchCommand = {
+  workspaceId: string;
+  files: InvoiceInboxFileInput[];
+};
+
+export type EnqueueInvoiceBatchResult = {
+  batchId: string;
+  queuedCount: number;
+  skippedCount: number;
+  summary: string;
+};
+
+export type InvoiceInboxListQuery = {
+  workspaceId: string;
+  /** Optional: only this batch. */
+  batchId?: string | null;
+  /** Hide rows already applied/dismissed when false-y is the default UI. */
+  includeResolved?: boolean;
+};
+
+/** Patch the extracted fields a human corrected before applying. */
+export type UpdateInvoiceExtractionCommand = {
+  workspaceId: string;
+  extractionId: string;
+  supplierName?: string | null;
+  supplierRnc?: string | null;
+  ncf?: string | null;
+  invoiceDate?: string | null;
+  subtotal?: number | null;
+  itbis?: number | null;
+  total?: number | null;
+  currency?: string | null;
+  dgiiExpenseType?: string | null;
+  expenseCategory?: string | null;
+};
+
+/** Apply an extraction onto a chosen bank movement (human-approved write). */
+export type ApplyInvoiceExtractionCommand = {
+  workspaceId: string;
+  extractionId: string;
+  /** Movement to annotate; defaults to the suggested match when omitted. */
+  transactionId: string;
+  deductibleAmount?: number | null;
+  fiscalPeriod?: string | null;
+};
+
+export type InvoiceExtractionMutationResult = {
+  extractionId: string;
+  status: InvoiceExtractionStatus;
+  summary: string;
+};
+
+export type DismissInvoiceExtractionCommand = {
+  workspaceId: string;
+  extractionId: string;
+};

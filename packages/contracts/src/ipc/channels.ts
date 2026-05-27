@@ -234,5 +234,10 @@ export const ipcChannels = {
     reviewReimbursement: "bukowskiTreasury:reviewReimbursement",
     linkTransaction: "bukowskiTreasury:linkTransaction",
     undoLastAction: "bukowskiTreasury:undoLastAction",
+    invoiceInboxEnqueue: "bukowskiTreasury:invoiceInboxEnqueue",
+    invoiceInboxList: "bukowskiTreasury:invoiceInboxList",
+    invoiceInboxUpdate: "bukowskiTreasury:invoiceInboxUpdate",
+    invoiceInboxApply: "bukowskiTreasury:invoiceInboxApply",
+    invoiceInboxDismiss: "bukowskiTreasury:invoiceInboxDismiss",
   },
 } as const;

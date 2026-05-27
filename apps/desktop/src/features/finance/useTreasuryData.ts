@@ -30,6 +30,11 @@ import type {
   TreasuryUndoPreview,
   UndoTreasuryActionCommand,
   UpsertBankAccountCommand,
+  ApplyInvoiceExtractionCommand,
+  DismissInvoiceExtractionCommand,
+  EnqueueInvoiceBatchCommand,
+  InvoiceExtraction,
+  UpdateInvoiceExtractionCommand,
 } from "@contracts";
 import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
 
@@ -225,6 +230,41 @@ export const useReviewQueue = (workspaceId: string) => {
   return { data, isLoading, error, refresh };
 };
 
+export const useInvoiceInbox = (workspaceId: string, includeResolved = false) => {
+  const [data, setData] = useState<InvoiceExtraction[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !workspaceId) {
+      setData([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    window.bukowskiTreasury
+      .invoiceInboxList({ workspaceId, includeResolved })
+      .then((rows) => {
+        if (!cancelled) setData(rows);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load invoice inbox.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, includeResolved, version, refreshVersion]);
+
+  return { data, isLoading, error, refresh };
+};
+
 export const useProjectPnl = (workspaceId: string, dateFrom?: string, dateTo?: string) => {
   const [data, setData] = useState<ProjectPnlRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -381,6 +421,22 @@ export const useTreasuryMutations = () =>
       async exportDgiiReport(input: DgiiReportExportInput): Promise<AppExportResult> {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.exportDgiiReport(input);
+      },
+      async enqueueInvoices(input: EnqueueInvoiceBatchCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceInboxEnqueue(input);
+      },
+      async updateInvoiceExtraction(input: UpdateInvoiceExtractionCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceInboxUpdate(input);
+      },
+      async applyInvoiceExtraction(input: ApplyInvoiceExtractionCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceInboxApply(input);
+      },
+      async dismissInvoiceExtraction(input: DismissInvoiceExtractionCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceInboxDismiss(input);
       },
     }),
     [],

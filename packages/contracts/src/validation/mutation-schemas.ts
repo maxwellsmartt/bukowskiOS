@@ -1619,6 +1619,65 @@ export const undoTreasuryActionSchema = z
   })
   .strict();
 
+// Treasury — Invoice Inbox
+
+const invoiceInboxFileInputSchema = z
+  .object({
+    name: nonEmptyString,
+    mimeType: nonEmptyString,
+    dataUrl: nonEmptyString,
+  })
+  .strict();
+
+export const enqueueInvoiceBatchSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    files: z.array(invoiceInboxFileInputSchema).min(1).max(60),
+  })
+  .strict();
+
+export const invoiceInboxListQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    batchId: nullableOrOptionalString,
+    includeResolved: z.boolean().optional(),
+  })
+  .strict();
+
+export const updateInvoiceExtractionSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    extractionId: nonEmptyString,
+    supplierName: nullableOrOptionalString,
+    supplierRnc: nullableOrOptionalString,
+    ncf: nullableOrOptionalString,
+    invoiceDate: nullableOrOptionalString,
+    subtotal: z.number().finite().nullable().optional(),
+    itbis: z.number().finite().nullable().optional(),
+    total: z.number().finite().nullable().optional(),
+    currency: nullableOrOptionalString,
+    dgiiExpenseType: nullableOrOptionalString,
+    expenseCategory: nullableOrOptionalString,
+  })
+  .strict();
+
+export const applyInvoiceExtractionSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    extractionId: nonEmptyString,
+    transactionId: nonEmptyString,
+    deductibleAmount: z.number().finite().min(0).nullable().optional(),
+    fiscalPeriod: nullableOrOptionalString,
+  })
+  .strict();
+
+export const dismissInvoiceExtractionSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    extractionId: nonEmptyString,
+  })
+  .strict();
+
 // Treasury — read schemas
 
 export const treasuryTransactionListQuerySchema = z

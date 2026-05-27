@@ -1383,7 +1383,42 @@
         "overview": "Resumen",
         "movements": "Movimientos",
         "review": "Revisión contable",
+        "invoices": "Facturas",
         "projects": "Por proyecto"
+      },
+      "invoices": {
+        "title": "Bandeja de facturas",
+        "hint": "Arrastra facturas en PNG, JPG o PDF. Se clasifican automáticamente y proponen un movimiento; nada se aplica hasta que lo confirmes.",
+        "dropHere": "Haz clic o arrastra facturas aquí (PNG, JPG, PDF)",
+        "uploading": "Subiendo…",
+        "uploadFailed": "No se pudieron subir las facturas.",
+        "tooLarge": "Algún archivo supera el límite de 15 MB.",
+        "applyFailed": "No se pudo aplicar la factura.",
+        "dismissFailed": "No se pudo descartar.",
+        "emptyTitle": "Sin facturas en cola",
+        "emptyBody": "Aún no has subido facturas a esta bandeja.",
+        "apply": "Aplicar",
+        "applied": "Aplicado",
+        "columns": {
+          "document": "Documento",
+          "status": "Estado",
+          "supplier": "Proveedor",
+          "ncf": "NCF",
+          "date": "Fecha",
+          "total": "Total",
+          "itbis": "ITBIS",
+          "category": "Categoría",
+          "match": "Movimiento sugerido",
+          "actions": "Acciones"
+        },
+        "status": {
+          "pending": "En cola",
+          "processing": "Procesando",
+          "extracted": "Extraída",
+          "failed": "Error",
+          "applied": "Aplicada",
+          "dismissed": "Descartada"
+        }
       },
       "overview": {
         "title": "Pulso de caja",

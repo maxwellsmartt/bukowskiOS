@@ -43,6 +43,7 @@ import bancoPopularLogo from "@shared/assets/inbox/logos/banco popular dominican
 import bancoSantaCruzLogo from "@shared/assets/inbox/logos/banco santa cruz-logo.png";
 
 import { newCommandId } from "./quoteHelpers";
+import { InvoiceInboxPanel } from "./InvoiceInboxPanel";
 import { parseStatementFile } from "./treasury/bankStatementParsers";
 import {
   useBankAccounts,
@@ -56,8 +57,8 @@ import {
   useTreasuryDeductibleLedger,
 } from "./useTreasuryData";
 
-type Tab = "overview" | "movements" | "review" | "projects";
-const treasuryTabs: Tab[] = ["overview", "movements", "review", "projects"];
+type Tab = "overview" | "movements" | "review" | "invoices" | "projects";
+const treasuryTabs: Tab[] = ["overview", "movements", "review", "invoices", "projects"];
 type MovementDateFilter = "all" | "month" | "custom";
 type TreasuryReportCurrency = "DOP" | "USD";
 type PendingClassificationRule = {
@@ -2255,6 +2256,10 @@ export const TreasuryPage = () => {
             </>
           )}
         </SurfaceCard>
+      ) : null}
+
+      {tab === "invoices" ? (
+        <InvoiceInboxPanel workspaceId={activeWorkspaceId} formatMoney={formatMoney} />
       ) : null}
 
       {tab === "projects" ? (

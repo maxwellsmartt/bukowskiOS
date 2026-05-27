@@ -673,6 +673,26 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.undoLastAction, input) as Promise<
       import("@contracts").TransactionMutationResult
     >,
+  invoiceInboxEnqueue: (input: import("@contracts").EnqueueInvoiceBatchCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxEnqueue, input) as Promise<
+      import("@contracts").EnqueueInvoiceBatchResult
+    >,
+  invoiceInboxList: (query: import("@contracts").InvoiceInboxListQuery) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxList, query) as Promise<
+      import("@contracts").InvoiceExtraction[]
+    >,
+  invoiceInboxUpdate: (input: import("@contracts").UpdateInvoiceExtractionCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxUpdate, input) as Promise<
+      import("@contracts").InvoiceExtractionMutationResult
+    >,
+  invoiceInboxApply: (input: import("@contracts").ApplyInvoiceExtractionCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxApply, input) as Promise<
+      import("@contracts").InvoiceExtractionMutationResult
+    >,
+  invoiceInboxDismiss: (input: import("@contracts").DismissInvoiceExtractionCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxDismiss, input) as Promise<
+      import("@contracts").InvoiceExtractionMutationResult
+    >,
 };
 
 const bukowskiCatalog = {

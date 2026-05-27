@@ -47,6 +47,11 @@ import {
   reviewReimbursementSchema,
   linkTransactionSchema,
   undoTreasuryActionSchema,
+  enqueueInvoiceBatchSchema,
+  invoiceInboxListQuerySchema,
+  updateInvoiceExtractionSchema,
+  applyInvoiceExtractionSchema,
+  dismissInvoiceExtractionSchema,
   treasuryAccountsReadArgsSchema,
   treasuryImportsReadArgsSchema,
   treasuryTransactionListReadArgsSchema,
@@ -457,6 +462,23 @@ type RegisterFoundationIpcOptions = {
     ) => import("@contracts").TreasuryDeductibleLedger;
     getDgiiReport: (query: import("@contracts").DgiiReportQuery) => import("@contracts").DgiiReport;
   };
+  invoiceInbox: {
+    enqueue: (
+      input: import("@contracts").EnqueueInvoiceBatchCommand,
+    ) => Promise<import("@contracts").EnqueueInvoiceBatchResult>;
+    list: (
+      query: import("@contracts").InvoiceInboxListQuery,
+    ) => import("@contracts").InvoiceExtraction[];
+    update: (
+      input: import("@contracts").UpdateInvoiceExtractionCommand,
+    ) => import("@contracts").InvoiceExtractionMutationResult;
+    apply: (
+      input: import("@contracts").ApplyInvoiceExtractionCommand,
+    ) => import("@contracts").InvoiceExtractionMutationResult;
+    dismiss: (
+      input: import("@contracts").DismissInvoiceExtractionCommand,
+    ) => import("@contracts").InvoiceExtractionMutationResult;
+  };
   exportQuotePdf: (
     workspaceId: string,
     quoteId: string,
@@ -602,6 +624,7 @@ export const registerFoundationIpc = ({
   invoiceReads,
   treasuryMutations,
   treasuryReads,
+  invoiceInbox,
   exportInvoicePdf,
   exportQuotePdf,
   packingMutations,
@@ -2598,6 +2621,56 @@ export const registerFoundationIpc = ({
       requiredPermission: "treasury.transactions.classify",
     });
     return treasuryMutations.undoLastAction(input);
+  });
+  safeHandle(ipcChannels.treasury.invoiceInboxEnqueue, enqueueInvoiceBatchSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "enqueue invoice batch",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return invoiceInbox.enqueue(input);
+  });
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.invoiceInboxList,
+    invoiceInboxListQuerySchema,
+    async (_event, query: import("@contracts").InvoiceInboxListQuery) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load invoice inbox",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return invoiceInbox.list(query);
+    },
+    "The app could not load the invoice inbox.",
+  );
+  safeHandle(ipcChannels.treasury.invoiceInboxUpdate, updateInvoiceExtractionSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update invoice extraction",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return invoiceInbox.update(input);
+  });
+  safeHandle(ipcChannels.treasury.invoiceInboxApply, applyInvoiceExtractionSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "apply invoice extraction",
+      accessLevel: "write",
+      requiredPermission: "treasury.reimbursements.review",
+    });
+    return invoiceInbox.apply(input);
+  });
+  safeHandle(ipcChannels.treasury.invoiceInboxDismiss, dismissInvoiceExtractionSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "dismiss invoice extraction",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return invoiceInbox.dismiss(input);
   });
   safeHandleReadWithSchema(
     ipcChannels.quotes.exportPdf,

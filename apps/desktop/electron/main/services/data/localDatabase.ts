@@ -56,6 +56,8 @@ import { materializeTreasuryCounterpartyRules } from "./treasuryCounterpartyRule
 import { applyTreasuryFoundationSelfHeal } from "./treasuryFoundationBootstrap";
 import { createTreasuryMutationService } from "./treasuryMutationService";
 import { createTreasuryReadService } from "./treasuryReadService";
+import { createInvoiceInboxService } from "./invoiceInboxService";
+import { createInvoiceExtractionService } from "../ai/invoiceExtractionService";
 import { createQuoteMutationService } from "./quoteMutationService";
 import { createQuoteReadService } from "./quoteReadService";
 import { createFinanceMutationService } from "./financeMutationService";
@@ -150,6 +152,21 @@ type LocalDatabaseRuntime = {
   invoiceReads: InvoiceReadServiceType;
   treasuryMutations: TreasuryMutationServiceType;
   treasuryReads: TreasuryReadServiceType;
+  invoiceInbox: {
+    enqueue: (
+      input: import("@contracts").EnqueueInvoiceBatchCommand,
+    ) => Promise<import("@contracts").EnqueueInvoiceBatchResult>;
+    list: (query: import("@contracts").InvoiceInboxListQuery) => import("@contracts").InvoiceExtraction[];
+    update: (
+      input: import("@contracts").UpdateInvoiceExtractionCommand,
+    ) => import("@contracts").InvoiceExtractionMutationResult;
+    apply: (
+      input: import("@contracts").ApplyInvoiceExtractionCommand,
+    ) => import("@contracts").InvoiceExtractionMutationResult;
+    dismiss: (
+      input: import("@contracts").DismissInvoiceExtractionCommand,
+    ) => import("@contracts").InvoiceExtractionMutationResult;
+  };
   packingMutations: PackingMutationService;
   rmaMutations: RmaMutationService;
   agentMutations: AgentMutationService;
@@ -1477,6 +1494,63 @@ const createRuntime = (): LocalDatabaseRuntime => {
   const fileUploads = createFileUploadService(database, {
     userDataPath: app.getPath("userData"),
   });
+  const invoiceInboxService = createInvoiceInboxService(database, {
+    userDataPath: app.getPath("userData"),
+    treasuryMutations,
+  });
+  const invoiceExtractionService = createInvoiceExtractionService(database, {
+    secretStore,
+    openaiProviderService,
+    anthropicProviderService,
+  });
+  // Sequentially extract pending invoice documents in the background (one
+  // vision/text call per file) and refresh the renderer so the inbox shows
+  // progress. Fire-and-forget — failures are recorded per-row, never thrown.
+  const processInvoiceQueue = async (ids: string[], workspaceId: string) => {
+    for (const id of ids) {
+      try {
+        invoiceInboxService.setProcessing(id);
+        const file = invoiceInboxService.getFileBuffer(id);
+        if (!file) {
+          invoiceInboxService.recordFailure(id, "Archivo no encontrado en disco.");
+          continue;
+        }
+        const fields = await invoiceExtractionService.extract(
+          file.buffer,
+          file.mimeType,
+          file.fileName,
+          workspaceId,
+        );
+        const match = invoiceInboxService.autoMatch(workspaceId, fields);
+        invoiceInboxService.recordExtraction(id, fields, match);
+      } catch (error) {
+        invoiceInboxService.recordFailure(
+          id,
+          error instanceof Error ? error.message : "No se pudo extraer la factura.",
+        );
+      }
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send(ipcChannels.shell.appAction, {
+          type: "workspace-data-changed",
+          source: "invoice-inbox",
+          entities: ["invoice_extraction"],
+        });
+      }
+    }
+  };
+  const invoiceInbox = {
+    enqueue: async (input: import("@contracts").EnqueueInvoiceBatchCommand) => {
+      const { result, ids } = invoiceInboxService.enqueueBatch(input);
+      if (ids.length) {
+        void processInvoiceQueue(ids, input.workspaceId);
+      }
+      return result;
+    },
+    list: invoiceInboxService.list,
+    update: invoiceInboxService.update,
+    apply: invoiceInboxService.applyExtraction,
+    dismiss: invoiceInboxService.dismiss,
+  };
   const dataRetention = createDataRetentionService(database);
   assistantChatService.reconcileInterruptedThreads();
   void telegramConnectorService.start();
@@ -1590,6 +1664,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     invoiceReads,
     treasuryMutations,
     treasuryReads,
+    invoiceInbox,
     packingMutations,
     rmaMutations,
     applyRemoteCatalogRows: (input: {

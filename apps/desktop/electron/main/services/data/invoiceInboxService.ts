@@ -1,0 +1,476 @@
+import { randomUUID } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+
+import type { DatabaseSync } from "node:sqlite";
+
+import type {
+  ApplyInvoiceExtractionCommand,
+  DismissInvoiceExtractionCommand,
+  EnqueueInvoiceBatchCommand,
+  EnqueueInvoiceBatchResult,
+  InvoiceExtraction,
+  InvoiceExtractionMutationResult,
+  InvoiceExtractionStatus,
+  InvoiceInboxFileInput,
+  InvoiceInboxListQuery,
+  UpdateInvoiceExtractionCommand,
+} from "@contracts";
+
+import type { createTreasuryMutationService } from "./treasuryMutationService";
+
+const DATA_URL_RE = /^data:([^;]+);base64,(.+)$/;
+const ACCEPTED_MIME = /image\/(png|jpe?g|webp)|application\/pdf/i;
+const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+type TreasuryMutations = ReturnType<typeof createTreasuryMutationService>;
+
+export type InvoiceInboxServiceOptions = {
+  userDataPath: string;
+  treasuryMutations: TreasuryMutations;
+  now?: () => string;
+};
+
+/** Fields written by the extraction engine once a document is parsed. */
+export type InvoiceExtractionFields = {
+  supplierName: string | null;
+  supplierRnc: string | null;
+  ncf: string | null;
+  invoiceDate: string | null;
+  subtotal: number | null;
+  itbis: number | null;
+  total: number | null;
+  currency: string | null;
+  dgiiExpenseType: string | null;
+  expenseCategory: string | null;
+  confidence: number | null;
+  rawText: string | null;
+};
+
+export type InvoiceAutoMatch = {
+  transactionId: string;
+  confidence: number;
+};
+
+type ExtractionRow = {
+  id: string;
+  workspace_id: string;
+  batch_id: string;
+  status: string;
+  original_name: string;
+  storage_path: string;
+  mime_type: string;
+  byte_size: number;
+  supplier_name: string | null;
+  supplier_rnc: string | null;
+  ncf: string | null;
+  invoice_date: string | null;
+  subtotal: number | null;
+  itbis: number | null;
+  total: number | null;
+  currency: string | null;
+  dgii_expense_type: string | null;
+  expense_category: string | null;
+  confidence: number | null;
+  raw_text: string | null;
+  suggested_transaction_id: string | null;
+  match_confidence: number | null;
+  applied_transaction_id: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const ensureTable = (db: DatabaseSync) => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS invoice_extractions (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      batch_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      original_name TEXT NOT NULL,
+      storage_path TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      byte_size INTEGER NOT NULL DEFAULT 0,
+      supplier_name TEXT,
+      supplier_rnc TEXT,
+      ncf TEXT,
+      invoice_date TEXT,
+      subtotal REAL,
+      itbis REAL,
+      total REAL,
+      currency TEXT,
+      dgii_expense_type TEXT,
+      expense_category TEXT,
+      confidence REAL,
+      raw_text TEXT,
+      suggested_transaction_id TEXT,
+      match_confidence REAL,
+      applied_transaction_id TEXT,
+      error_message TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_invoice_extractions_workspace
+       ON invoice_extractions (workspace_id, status, created_at);`,
+  );
+};
+
+const mapRow = (row: ExtractionRow): InvoiceExtraction => ({
+  id: row.id,
+  workspaceId: row.workspace_id,
+  batchId: row.batch_id,
+  status: row.status as InvoiceExtractionStatus,
+  originalName: row.original_name,
+  mimeType: row.mime_type,
+  byteSize: row.byte_size,
+  supplierName: row.supplier_name,
+  supplierRnc: row.supplier_rnc,
+  ncf: row.ncf,
+  invoiceDate: row.invoice_date,
+  subtotal: row.subtotal,
+  itbis: row.itbis,
+  total: row.total,
+  currency: row.currency,
+  dgiiExpenseType: row.dgii_expense_type,
+  expenseCategory: row.expense_category,
+  confidence: row.confidence,
+  rawText: row.raw_text,
+  suggestedTransactionId: row.suggested_transaction_id,
+  matchConfidence: row.match_confidence,
+  appliedTransactionId: row.applied_transaction_id,
+  errorMessage: row.error_message,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const extensionFor = (mimeType: string, fileName: string): string => {
+  const lowerName = fileName.toLowerCase();
+  const match = lowerName.match(/\.(png|jpe?g|webp|pdf)$/);
+  if (match) return match[0];
+  const lowerMime = mimeType.toLowerCase();
+  if (lowerMime.includes("png")) return ".png";
+  if (lowerMime.includes("jpeg") || lowerMime.includes("jpg")) return ".jpg";
+  if (lowerMime.includes("webp")) return ".webp";
+  if (lowerMime.includes("pdf")) return ".pdf";
+  return ".bin";
+};
+
+const decodeDataUrl = (file: InvoiceInboxFileInput): { buffer: Buffer; mimeType: string } => {
+  const match = file.dataUrl.match(DATA_URL_RE);
+  const mimeType = match?.[1] || file.mimeType;
+  const buffer = match ? Buffer.from(match[2] ?? "", "base64") : Buffer.from("");
+  return { buffer, mimeType };
+};
+
+export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInboxServiceOptions) => {
+  ensureTable(db);
+  const now = () => options.now?.() ?? new Date().toISOString();
+
+  const getRow = (workspaceId: string, extractionId: string): ExtractionRow | undefined =>
+    db
+      .prepare(`SELECT * FROM invoice_extractions WHERE id = ? AND workspace_id = ? LIMIT 1`)
+      .get(extractionId, workspaceId) as ExtractionRow | undefined;
+
+  const touch = (id: string) => {
+    db.prepare(`UPDATE invoice_extractions SET updated_at = ? WHERE id = ?`).run(now(), id);
+  };
+
+  /**
+   * Persist files to disk + a pending row each. Unsupported/empty files are
+   * skipped (counted) rather than failing the whole batch.
+   */
+  const enqueueBatch = (
+    input: EnqueueInvoiceBatchCommand,
+  ): { result: EnqueueInvoiceBatchResult; ids: string[] } => {
+    const batchId = `inv-batch-${randomUUID()}`;
+    const directory = path.join(options.userDataPath, "invoice-inbox", input.workspaceId);
+    fs.mkdirSync(directory, { recursive: true });
+
+    const insert = db.prepare(
+      `INSERT INTO invoice_extractions (
+         id, workspace_id, batch_id, status, original_name, storage_path,
+         mime_type, byte_size, created_at, updated_at
+       ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
+    );
+
+    const ids: string[] = [];
+    let skipped = 0;
+    const timestamp = now();
+
+    for (const file of input.files) {
+      const { buffer, mimeType } = decodeDataUrl(file);
+      if (!buffer.length || !ACCEPTED_MIME.test(mimeType)) {
+        skipped += 1;
+        continue;
+      }
+      const id = `inv-${randomUUID()}`;
+      const storagePath = path.join(directory, `${id}${extensionFor(mimeType, file.name)}`);
+      fs.writeFileSync(storagePath, buffer);
+      insert.run(
+        id,
+        input.workspaceId,
+        batchId,
+        file.name.trim() || "factura",
+        storagePath,
+        mimeType,
+        buffer.length,
+        timestamp,
+        timestamp,
+      );
+      ids.push(id);
+    }
+
+    return {
+      ids,
+      result: {
+        batchId,
+        queuedCount: ids.length,
+        skippedCount: skipped,
+        summary:
+          ids.length > 0
+            ? `Encoladas ${ids.length} factura(s)${skipped ? `, ${skipped} omitida(s)` : ""}.`
+            : "No se encoló ninguna factura (formato no soportado).",
+      },
+    };
+  };
+
+  const list = (query: InvoiceInboxListQuery): InvoiceExtraction[] => {
+    const clauses = ["workspace_id = ?"];
+    const params: Array<string | number> = [query.workspaceId];
+    if (query.batchId) {
+      clauses.push("batch_id = ?");
+      params.push(query.batchId);
+    }
+    if (!query.includeResolved) {
+      clauses.push("status NOT IN ('dismissed')");
+    }
+    const rows = db
+      .prepare(
+        `SELECT * FROM invoice_extractions WHERE ${clauses.join(" AND ")} ORDER BY created_at DESC, rowid DESC`,
+      )
+      .all(...params) as ExtractionRow[];
+    return rows.map(mapRow);
+  };
+
+  const getFileBuffer = (id: string): { buffer: Buffer; mimeType: string; fileName: string } | null => {
+    const row = db
+      .prepare(`SELECT storage_path, mime_type, original_name FROM invoice_extractions WHERE id = ? LIMIT 1`)
+      .get(id) as { storage_path: string; mime_type: string; original_name: string } | undefined;
+    if (!row || !fs.existsSync(row.storage_path)) return null;
+    return { buffer: fs.readFileSync(row.storage_path), mimeType: row.mime_type, fileName: row.original_name };
+  };
+
+  const listPendingIds = (): string[] =>
+    (db.prepare(`SELECT id FROM invoice_extractions WHERE status = 'pending' ORDER BY created_at ASC`).all() as Array<{
+      id: string;
+    }>).map((r) => r.id);
+
+  const setProcessing = (id: string) => {
+    db.prepare(`UPDATE invoice_extractions SET status = 'processing', updated_at = ? WHERE id = ?`).run(now(), id);
+  };
+
+  const recordFailure = (id: string, message: string) => {
+    db.prepare(
+      `UPDATE invoice_extractions SET status = 'failed', error_message = ?, updated_at = ? WHERE id = ?`,
+    ).run(message.slice(0, 500), now(), id);
+  };
+
+  /**
+   * Suggest a debit bank movement that plausibly paid this invoice: same
+   * workspace, unclassified (no DGII type yet), amount within ~1% of total and
+   * posting date within ±7 days of the invoice date. Pure suggestion.
+   */
+  const autoMatch = (workspaceId: string, fields: InvoiceExtractionFields): InvoiceAutoMatch | null => {
+    if (fields.total == null || fields.total <= 0) return null;
+    const tolerance = Math.max(1, fields.total * 0.01);
+    const candidates = db
+      .prepare(
+        `SELECT t.id, t.txn_date, t.amount
+           FROM bank_transactions t
+           LEFT JOIN transaction_annotations a ON a.transaction_id = t.id
+          WHERE t.workspace_id = ?
+            AND t.direction = 'debit'
+            AND (a.dgii_expense_type IS NULL OR a.dgii_expense_type = '')
+            AND ABS(t.amount - ?) <= ?
+          LIMIT 50`,
+      )
+      .all(workspaceId, fields.total, tolerance) as Array<{ id: string; txn_date: string; amount: number }>;
+    if (!candidates.length) return null;
+
+    const invoiceTime = fields.invoiceDate ? Date.parse(fields.invoiceDate) : Number.NaN;
+    let best: InvoiceAutoMatch | null = null;
+    for (const candidate of candidates) {
+      const amountCloseness = 1 - Math.min(1, Math.abs(candidate.amount - fields.total) / tolerance);
+      let dateScore = 0.5;
+      if (!Number.isNaN(invoiceTime)) {
+        const candidateTime = Date.parse(candidate.txn_date);
+        if (!Number.isNaN(candidateTime)) {
+          const days = Math.abs(candidateTime - invoiceTime) / 86_400_000;
+          if (days > 7) continue;
+          dateScore = 1 - days / 7;
+        }
+      }
+      const confidence = round2(0.6 * amountCloseness + 0.4 * dateScore);
+      if (!best || confidence > best.confidence) {
+        best = { transactionId: candidate.id, confidence };
+      }
+    }
+    return best;
+  };
+
+  const recordExtraction = (id: string, fields: InvoiceExtractionFields, match: InvoiceAutoMatch | null) => {
+    db.prepare(
+      `UPDATE invoice_extractions SET
+         status = 'extracted',
+         supplier_name = ?, supplier_rnc = ?, ncf = ?, invoice_date = ?,
+         subtotal = ?, itbis = ?, total = ?, currency = ?,
+         dgii_expense_type = ?, expense_category = ?, confidence = ?, raw_text = ?,
+         suggested_transaction_id = ?, match_confidence = ?,
+         error_message = NULL, updated_at = ?
+       WHERE id = ?`,
+    ).run(
+      fields.supplierName,
+      fields.supplierRnc,
+      fields.ncf,
+      fields.invoiceDate,
+      fields.subtotal,
+      fields.itbis,
+      fields.total,
+      fields.currency,
+      fields.dgiiExpenseType,
+      fields.expenseCategory,
+      fields.confidence,
+      fields.rawText ? fields.rawText.slice(0, 8_000) : null,
+      match?.transactionId ?? null,
+      match?.confidence ?? null,
+      now(),
+      id,
+    );
+  };
+
+  const update = (input: UpdateInvoiceExtractionCommand): InvoiceExtractionMutationResult => {
+    const row = getRow(input.workspaceId, input.extractionId);
+    if (!row) throw new Error("Factura no encontrada.");
+    const next = {
+      supplier_name: input.supplierName !== undefined ? input.supplierName : row.supplier_name,
+      supplier_rnc: input.supplierRnc !== undefined ? input.supplierRnc : row.supplier_rnc,
+      ncf: input.ncf !== undefined ? input.ncf : row.ncf,
+      invoice_date: input.invoiceDate !== undefined ? input.invoiceDate : row.invoice_date,
+      subtotal: input.subtotal !== undefined ? input.subtotal : row.subtotal,
+      itbis: input.itbis !== undefined ? input.itbis : row.itbis,
+      total: input.total !== undefined ? input.total : row.total,
+      currency: input.currency !== undefined ? input.currency : row.currency,
+      dgii_expense_type: input.dgiiExpenseType !== undefined ? input.dgiiExpenseType : row.dgii_expense_type,
+      expense_category: input.expenseCategory !== undefined ? input.expenseCategory : row.expense_category,
+    };
+    db.prepare(
+      `UPDATE invoice_extractions SET
+         supplier_name = ?, supplier_rnc = ?, ncf = ?, invoice_date = ?,
+         subtotal = ?, itbis = ?, total = ?, currency = ?,
+         dgii_expense_type = ?, expense_category = ?, updated_at = ?
+       WHERE id = ?`,
+    ).run(
+      next.supplier_name,
+      next.supplier_rnc,
+      next.ncf,
+      next.invoice_date,
+      next.subtotal,
+      next.itbis,
+      next.total,
+      next.currency,
+      next.dgii_expense_type,
+      next.expense_category,
+      now(),
+      input.extractionId,
+    );
+    return { extractionId: input.extractionId, status: row.status as InvoiceExtractionStatus, summary: "Factura actualizada." };
+  };
+
+  const dismiss = (input: DismissInvoiceExtractionCommand): InvoiceExtractionMutationResult => {
+    const row = getRow(input.workspaceId, input.extractionId);
+    if (!row) throw new Error("Factura no encontrada.");
+    db.prepare(`UPDATE invoice_extractions SET status = 'dismissed', updated_at = ? WHERE id = ?`).run(
+      now(),
+      input.extractionId,
+    );
+    return { extractionId: input.extractionId, status: "dismissed", summary: "Factura descartada." };
+  };
+
+  /**
+   * Human-approved write: annotate the chosen movement with supplier/NCF/RNC +
+   * expense category, then set the DGII-deductible amount so it lands in the
+   * 606 deductible ledger. Both delegate to the treasury mutation service
+   * (idempotent, reversible via Undo). Marks the extraction `applied`.
+   */
+  const applyExtraction = (input: ApplyInvoiceExtractionCommand): InvoiceExtractionMutationResult => {
+    const row = getRow(input.workspaceId, input.extractionId);
+    if (!row) throw new Error("Factura no encontrada.");
+
+    const baseCommandId = `inv-apply-${input.extractionId}`;
+    const itbisNote = row.itbis != null ? `ITBIS ${row.itbis}` : null;
+    const ncfNote = row.ncf ? `NCF ${row.ncf}` : null;
+    const note = [ncfNote, itbisNote, "Aplicado desde bandeja de facturas"].filter(Boolean).join(" · ");
+
+    options.treasuryMutations.annotateTransaction({
+      commandId: `${baseCommandId}-annotate`,
+      workspaceId: input.workspaceId,
+      actorType: "user",
+      sourceChannel: "desktop",
+      transactionId: input.transactionId,
+      txnKind: "expense",
+      counterparty: row.supplier_name,
+      counterpartyRnc: row.supplier_rnc,
+      expenseCategory: row.expense_category,
+      supplierNcf: row.ncf,
+      dgiiExpenseType: row.dgii_expense_type,
+      notes: note,
+    });
+
+    const deductibleAmount =
+      input.deductibleAmount != null ? input.deductibleAmount : row.itbis ?? row.total ?? 0;
+    options.treasuryMutations.reviewReimbursement({
+      commandId: `${baseCommandId}-review`,
+      workspaceId: input.workspaceId,
+      actorType: "user",
+      sourceChannel: "desktop",
+      transactionId: input.transactionId,
+      reimbursementStatus: deductibleAmount > 0 ? "accepted" : "rejected",
+      deductibleAmount,
+      supplierNcf: row.ncf,
+      dgiiExpenseType: row.dgii_expense_type,
+      fiscalPeriod: input.fiscalPeriod ?? (row.invoice_date ? row.invoice_date.slice(0, 7) : null),
+      fiscalStatus: deductibleAmount > 0 ? "accepted" : "rejected",
+      notes: note,
+    });
+
+    db.prepare(
+      `UPDATE invoice_extractions SET status = 'applied', applied_transaction_id = ?, updated_at = ? WHERE id = ?`,
+    ).run(input.transactionId, now(), input.extractionId);
+
+    return {
+      extractionId: input.extractionId,
+      status: "applied",
+      summary: "Factura aplicada al movimiento y enviada al libro deducible.",
+    };
+  };
+
+  return {
+    enqueueBatch,
+    list,
+    getFileBuffer,
+    listPendingIds,
+    setProcessing,
+    recordExtraction,
+    recordFailure,
+    autoMatch,
+    update,
+    dismiss,
+    applyExtraction,
+    touch,
+  };
+};
+
+export type InvoiceInboxService = ReturnType<typeof createInvoiceInboxService>;

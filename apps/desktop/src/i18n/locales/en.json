@@ -1381,7 +1381,42 @@
         "overview": "Overview",
         "movements": "Movements",
         "review": "Accountant review",
+        "invoices": "Invoices",
         "projects": "By project"
+      },
+      "invoices": {
+        "title": "Invoice inbox",
+        "hint": "Drop invoices as PNG, JPG or PDF. They are auto-classified and a matching movement is proposed; nothing is applied until you confirm.",
+        "dropHere": "Click or drag invoices here (PNG, JPG, PDF)",
+        "uploading": "Uploading…",
+        "uploadFailed": "Could not upload the invoices.",
+        "tooLarge": "A file exceeds the 15 MB limit.",
+        "applyFailed": "Could not apply the invoice.",
+        "dismissFailed": "Could not dismiss.",
+        "emptyTitle": "No invoices queued",
+        "emptyBody": "You have not uploaded any invoices to this inbox yet.",
+        "apply": "Apply",
+        "applied": "Applied",
+        "columns": {
+          "document": "Document",
+          "status": "Status",
+          "supplier": "Supplier",
+          "ncf": "NCF",
+          "date": "Date",
+          "total": "Total",
+          "itbis": "ITBIS",
+          "category": "Category",
+          "match": "Suggested movement",
+          "actions": "Actions"
+        },
+        "status": {
+          "pending": "Queued",
+          "processing": "Processing",
+          "extracted": "Extracted",
+          "failed": "Failed",
+          "applied": "Applied",
+          "dismissed": "Dismissed"
+        }
       },
       "overview": {
         "title": "Cash pulse",
