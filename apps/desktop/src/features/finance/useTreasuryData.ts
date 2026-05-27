@@ -196,6 +196,30 @@ export const useTreasuryImports = (workspaceId: string, bankAccountId?: string) 
   return { data, isLoading, refresh };
 };
 
+export const useExpenseCategories = (workspaceId: string) => {
+  const [data, setData] = useState<string[]>([]);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !workspaceId) {
+      setData([]);
+      return;
+    }
+    let cancelled = false;
+    void window.bukowskiTreasury
+      .listExpenseCategories(workspaceId)
+      .then((rows) => {
+        if (!cancelled) setData(rows);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, refreshVersion]);
+
+  return data;
+};
+
 export const useReviewQueue = (workspaceId: string) => {
   const [data, setData] = useState<ReviewQueueRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);

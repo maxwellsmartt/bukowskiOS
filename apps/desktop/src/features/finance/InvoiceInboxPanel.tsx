@@ -12,6 +12,7 @@ import type {
 } from "@contracts";
 import { useSession } from "@app/providers/SessionProvider";
 import { CompactSelect } from "@shared/components/CompactSelect";
+import { CreatableSelect } from "@shared/components/CreatableSelect";
 import { DataTable } from "@shared/components/DataTable";
 import { DocumentPreviewModal } from "@shared/components/DocumentPreviewModal";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
@@ -19,7 +20,12 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
-import { useInvoiceInbox, useTreasuryTransactions, useTreasuryMutations } from "./useTreasuryData";
+import {
+  useExpenseCategories,
+  useInvoiceInbox,
+  useTreasuryTransactions,
+  useTreasuryMutations,
+} from "./useTreasuryData";
 
 const ACCEPTED = "image/png,image/jpeg,image/webp,application/pdf";
 const MAX_FILES = 60;
@@ -67,6 +73,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const { t } = useTranslation();
   const { user } = useSession();
   const inbox = useInvoiceInbox(workspaceId);
+  const expenseCategories = useExpenseCategories(workspaceId);
   const mutations = useTreasuryMutations();
   const transactions = useTreasuryTransactions(
     useMemo(() => ({ workspaceId, limit: 1000 }), [workspaceId]),
@@ -660,6 +667,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
       {editing ? (
         <InvoiceEditModal
           extraction={editing}
+          categories={expenseCategories}
           onClose={() => setEditing(null)}
           onSave={async (patch) => {
             try {
@@ -688,10 +696,12 @@ type EditPatch = Pick<
 
 const InvoiceEditModal = ({
   extraction,
+  categories,
   onClose,
   onSave,
 }: {
   extraction: InvoiceExtraction;
+  categories: string[];
   onClose: () => void;
   onSave: (patch: EditPatch) => void;
 }) => {
@@ -749,12 +759,23 @@ const InvoiceEditModal = ({
             {fields.map((field) => (
               <label key={field.key}>
                 <span>{field.label}</span>
-                <input
-                  className="field-input"
-                  inputMode={field.numeric ? "decimal" : undefined}
-                  value={form[field.key]}
-                  onChange={(event) => setForm((prev) => ({ ...prev, [field.key]: event.target.value }))}
-                />
+                {field.key === "expenseCategory" ? (
+                  <CreatableSelect
+                    ariaLabel={field.label}
+                    value={form.expenseCategory || null}
+                    options={categories}
+                    placeholder={t("finance.treasury.invoices.noCategory", { defaultValue: "Sin categoría" })}
+                    createLabel={(q) => t("finance.treasury.invoices.createCategory", { defaultValue: `Crear "${q}"`, query: q })}
+                    onChange={(next) => setForm((prev) => ({ ...prev, expenseCategory: next }))}
+                  />
+                ) : (
+                  <input
+                    className="field-input"
+                    inputMode={field.numeric ? "decimal" : undefined}
+                    value={form[field.key]}
+                    onChange={(event) => setForm((prev) => ({ ...prev, [field.key]: event.target.value }))}
+                  />
+                )}
               </label>
             ))}
           </div>

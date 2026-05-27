@@ -475,6 +475,7 @@ declare global {
         workspaceId: string,
         bankAccountId?: string,
       ) => Promise<import("@contracts").BankStatementImportRow[]>;
+      listExpenseCategories: (workspaceId: string) => Promise<string[]>;
       overview: (
         query: import("@contracts").TreasuryOverviewQuery,
       ) => Promise<import("@contracts").TreasuryOverviewSnapshot>;

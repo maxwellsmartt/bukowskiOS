@@ -216,6 +216,7 @@ export const ipcChannels = {
     listTransactions: "bukowskiTreasury:listTransactions",
     previewClassificationRule: "bukowskiTreasury:previewClassificationRule",
     listImports: "bukowskiTreasury:listImports",
+    listExpenseCategories: "bukowskiTreasury:listExpenseCategories",
     overview: "bukowskiTreasury:overview",
     reviewQueue: "bukowskiTreasury:reviewQueue",
     projectPnl: "bukowskiTreasury:projectPnl",

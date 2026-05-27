@@ -652,6 +652,28 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
       }));
     },
 
+    /**
+     * Distinct expense categories already used in the workspace (annotations +
+     * invoice extractions). Feeds the creatable category select: pick an
+     * existing one or type a new one (which then appears here next time).
+     */
+    listExpenseCategories(workspaceId: string): string[] {
+      const ws = resolveWorkspaceId(workspaceId);
+      const rows = db
+        .prepare(
+          `SELECT DISTINCT category FROM (
+             SELECT expense_category AS category FROM transaction_annotations
+               WHERE workspace_id = ? AND expense_category IS NOT NULL AND TRIM(expense_category) <> ''
+             UNION
+             SELECT expense_category AS category FROM invoice_extractions
+               WHERE workspace_id = ? AND expense_category IS NOT NULL AND TRIM(expense_category) <> ''
+           )
+           ORDER BY category COLLATE NOCASE ASC`,
+        )
+        .all(ws, ws) as Array<{ category: string }>;
+      return rows.map((row) => row.category);
+    },
+
     getReviewQueue(workspaceId: string): ReviewQueueRow[] {
       const ws = resolveWorkspaceId(workspaceId);
       const rows = db

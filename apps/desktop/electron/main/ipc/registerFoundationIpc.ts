@@ -55,6 +55,7 @@ import {
   applyInvoiceExtractionSchema,
   dismissInvoiceExtractionSchema,
   treasuryAccountsReadArgsSchema,
+  treasuryExpenseCategoriesReadArgsSchema,
   treasuryImportsReadArgsSchema,
   treasuryTransactionListReadArgsSchema,
   counterpartyRulePreviewReadArgsSchema,
@@ -458,6 +459,7 @@ type RegisterFoundationIpcOptions = {
       dateFrom?: string,
       dateTo?: string,
     ) => import("@contracts").ProjectPnlRow[];
+    listExpenseCategories: (workspaceId: string) => string[];
     getUndoPreview: (workspaceId: string) => import("@contracts").TreasuryUndoPreview;
     getDeductibleLedger: (
       query: import("@contracts").TreasuryDeductibleLedgerQuery,
@@ -2397,6 +2399,20 @@ export const registerFoundationIpc = ({
       return treasuryReads.getProjectPnl(query.workspaceId, query.dateFrom, query.dateTo);
     },
     "The app could not load project P&L.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.listExpenseCategories,
+    treasuryExpenseCategoriesReadArgsSchema,
+    async (_event, query: { workspaceId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load expense categories",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.listExpenseCategories(query.workspaceId);
+    },
+    "The app could not load expense categories.",
   );
   safeHandleReadWithSchema(
     ipcChannels.treasury.undoPreview,

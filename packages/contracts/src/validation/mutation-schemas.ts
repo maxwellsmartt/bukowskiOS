@@ -1790,6 +1790,7 @@ export const treasuryImportsQuerySchema = z
   .strict();
 
 export const treasuryAccountsReadArgsSchema = z.tuple([treasuryAccountsQuerySchema]);
+export const treasuryExpenseCategoriesReadArgsSchema = z.tuple([treasuryAccountsQuerySchema]);
 export const treasuryImportsReadArgsSchema = z.tuple([treasuryImportsQuerySchema]);
 export const treasuryTransactionListReadArgsSchema = z.tuple([treasuryTransactionListQuerySchema]);
 export const counterpartyRulePreviewReadArgsSchema = z.tuple([counterpartyRulePreviewQuerySchema]);
