@@ -260,6 +260,12 @@ export type InvoiceExtractionStatus =
   | "applied"
   | "dismissed";
 
+/** A project tag on an expense invoice (no amount split — pure tagging). */
+export type InvoiceExtractionProjectTag = {
+  projectId: string | null;
+  projectName: string | null;
+};
+
 /** One uploaded expense document (PNG/JPG/PDF) and its extracted fields. */
 export type InvoiceExtraction = {
   id: string;
@@ -271,6 +277,11 @@ export type InvoiceExtraction = {
   byteSize: number;
   uploadedByUserId: string | null;
   uploadedByName: string | null;
+  /** Who the expense actually belongs to (distinct from the uploader). */
+  linkedUserId: string | null;
+  linkedUserName: string | null;
+  /** Projects this expense is attributed to. Empty = company-general expense. */
+  projects: InvoiceExtractionProjectTag[];
   supplierName: string | null;
   supplierRnc: string | null;
   ncf: string | null;
@@ -321,6 +332,12 @@ export type InvoiceInboxListQuery = {
   includeResolved?: boolean;
 };
 
+/** A project tag input (name optional — the service snapshots it if absent). */
+export type InvoiceExtractionProjectInput = {
+  projectId: string;
+  projectName?: string | null;
+};
+
 /** Patch the extracted fields a human corrected before applying. */
 export type UpdateInvoiceExtractionCommand = {
   workspaceId: string;
@@ -335,6 +352,26 @@ export type UpdateInvoiceExtractionCommand = {
   currency?: string | null;
   dgiiExpenseType?: string | null;
   expenseCategory?: string | null;
+  /** Pass null to clear the linked user. Omit to leave unchanged. */
+  linkedUserId?: string | null;
+  linkedUserName?: string | null;
+  /** When provided, replaces the full set of project tags. */
+  projects?: InvoiceExtractionProjectInput[];
+};
+
+/** Assign the linked user and/or project tags to many invoices at once. */
+export type BulkLinkInvoiceExtractionsCommand = {
+  workspaceId: string;
+  extractionIds: string[];
+  /** Provided keys are applied; `linkedUserId: null` clears it. */
+  linkedUserId?: string | null;
+  linkedUserName?: string | null;
+  projects?: InvoiceExtractionProjectInput[];
+};
+
+export type BulkLinkInvoiceExtractionsResult = {
+  updatedCount: number;
+  summary: string;
 };
 
 /** Apply an extraction onto a chosen bank movement (human-approved write). */

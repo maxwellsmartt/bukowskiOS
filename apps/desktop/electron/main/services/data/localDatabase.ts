@@ -160,12 +160,18 @@ type LocalDatabaseRuntime = {
     update: (
       input: import("@contracts").UpdateInvoiceExtractionCommand,
     ) => import("@contracts").InvoiceExtractionMutationResult;
+    bulkLink: (
+      input: import("@contracts").BulkLinkInvoiceExtractionsCommand,
+    ) => import("@contracts").BulkLinkInvoiceExtractionsResult;
     apply: (
       input: import("@contracts").ApplyInvoiceExtractionCommand,
     ) => import("@contracts").InvoiceExtractionMutationResult;
     dismiss: (
       input: import("@contracts").DismissInvoiceExtractionCommand,
     ) => import("@contracts").InvoiceExtractionMutationResult;
+    getFileBuffer: (
+      id: string,
+    ) => { buffer: Buffer; mimeType: string; fileName: string } | null;
   };
   packingMutations: PackingMutationService;
   rmaMutations: RmaMutationService;
@@ -1573,8 +1579,10 @@ const createRuntime = (): LocalDatabaseRuntime => {
     },
     list: invoiceInboxService.list,
     update: invoiceInboxService.update,
+    bulkLink: invoiceInboxService.bulkLink,
     apply: invoiceInboxService.applyExtraction,
     dismiss: invoiceInboxService.dismiss,
+    getFileBuffer: invoiceInboxService.getFileBuffer,
   };
   const dataRetention = createDataRetentionService(database);
   assistantChatService.reconcileInterruptedThreads();

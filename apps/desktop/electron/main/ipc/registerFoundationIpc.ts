@@ -49,7 +49,9 @@ import {
   undoTreasuryActionSchema,
   enqueueInvoiceBatchSchema,
   invoiceInboxListReadArgsSchema,
+  invoiceInboxPreviewReadArgsSchema,
   updateInvoiceExtractionSchema,
+  bulkLinkInvoiceExtractionsSchema,
   applyInvoiceExtractionSchema,
   dismissInvoiceExtractionSchema,
   treasuryAccountsReadArgsSchema,
@@ -472,12 +474,18 @@ type RegisterFoundationIpcOptions = {
     update: (
       input: import("@contracts").UpdateInvoiceExtractionCommand,
     ) => import("@contracts").InvoiceExtractionMutationResult;
+    bulkLink: (
+      input: import("@contracts").BulkLinkInvoiceExtractionsCommand,
+    ) => import("@contracts").BulkLinkInvoiceExtractionsResult;
     apply: (
       input: import("@contracts").ApplyInvoiceExtractionCommand,
     ) => import("@contracts").InvoiceExtractionMutationResult;
     dismiss: (
       input: import("@contracts").DismissInvoiceExtractionCommand,
     ) => import("@contracts").InvoiceExtractionMutationResult;
+    getFileBuffer: (
+      id: string,
+    ) => { buffer: Buffer; mimeType: string; fileName: string } | null;
   };
   exportQuotePdf: (
     workspaceId: string,
@@ -2654,6 +2662,35 @@ export const registerFoundationIpc = ({
     });
     return invoiceInbox.update(input);
   });
+  safeHandle(ipcChannels.treasury.invoiceInboxBulkLink, bulkLinkInvoiceExtractionsSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "bulk link invoice extractions",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return invoiceInbox.bulkLink(input);
+  });
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.invoiceInboxPreview,
+    invoiceInboxPreviewReadArgsSchema,
+    async (_event, query: { workspaceId: string; extractionId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "preview invoice document",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      const file = invoiceInbox.getFileBuffer(query.extractionId);
+      if (!file) return null;
+      return {
+        fileName: file.fileName,
+        mimeType: file.mimeType,
+        dataUrl: `data:${file.mimeType};base64,${file.buffer.toString("base64")}`,
+      };
+    },
+    "The app could not load the invoice document.",
+  );
   safeHandle(ipcChannels.treasury.invoiceInboxApply, applyInvoiceExtractionSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({
       workspaceId: input.workspaceId,

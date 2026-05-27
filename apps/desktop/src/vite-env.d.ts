@@ -534,6 +534,13 @@ declare global {
       invoiceInboxUpdate: (
         input: import("@contracts").UpdateInvoiceExtractionCommand,
       ) => Promise<import("@contracts").InvoiceExtractionMutationResult>;
+      invoiceInboxBulkLink: (
+        input: import("@contracts").BulkLinkInvoiceExtractionsCommand,
+      ) => Promise<import("@contracts").BulkLinkInvoiceExtractionsResult>;
+      invoiceInboxPreview: (
+        workspaceId: string,
+        extractionId: string,
+      ) => Promise<{ fileName: string; mimeType: string; dataUrl: string } | null>;
       invoiceInboxApply: (
         input: import("@contracts").ApplyInvoiceExtractionCommand,
       ) => Promise<import("@contracts").InvoiceExtractionMutationResult>;

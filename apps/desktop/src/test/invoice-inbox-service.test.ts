@@ -154,6 +154,54 @@ describe("invoice inbox service", () => {
     cleanup();
   });
 
+  it("links a user and project tags, and bulk-links many invoices at once", () => {
+    const { cleanup, database } = createTestDatabase("invoice-inbox-link");
+    const treasuryMutations = createTreasuryMutationService(database);
+    const inbox = createInvoiceInboxService(database, {
+      userDataPath: makeUserDataPath(),
+      treasuryMutations,
+    });
+
+    const { ids } = inbox.enqueueBatch({
+      workspaceId,
+      files: [
+        { name: "a.png", mimeType: "image/png", dataUrl: PNG_DATA_URL },
+        { name: "b.png", mimeType: "image/png", dataUrl: PNG_DATA_URL },
+      ],
+    });
+    expect(ids).toHaveLength(2);
+
+    // Single update: link a user + two project tags.
+    inbox.update({
+      workspaceId,
+      extractionId: ids[0],
+      linkedUserId: "user-ivan",
+      linkedUserName: "Iván",
+      projects: [
+        { projectId: "project-shiver", projectName: "Shiver" },
+        { projectId: "project-netflix", projectName: "Netflix" },
+      ],
+    });
+    const single = inbox.list({ workspaceId }).find((row) => row.id === ids[0]);
+    expect(single?.linkedUserName).toBe("Iván");
+    expect(single?.projects.map((p) => p.projectId).sort()).toEqual(["project-netflix", "project-shiver"]);
+
+    // Bulk-link a user to both invoices.
+    const result = inbox.bulkLink({
+      workspaceId,
+      extractionIds: ids,
+      linkedUserId: "user-carlos",
+      linkedUserName: "Carlos",
+    });
+    expect(result.updatedCount).toBe(2);
+    const all = inbox.list({ workspaceId });
+    expect(all.every((row) => row.linkedUserName === "Carlos")).toBe(true);
+    // Project tags survive the user-only bulk update on the first invoice.
+    expect(all.find((row) => row.id === ids[0])?.projects).toHaveLength(2);
+
+    cleanup();
+  });
+
   it("skips unsupported attachments and never matches without a plausible movement", () => {
     const { cleanup, database } = createTestDatabase("invoice-inbox-skip");
     const treasuryMutations = createTreasuryMutationService(database);

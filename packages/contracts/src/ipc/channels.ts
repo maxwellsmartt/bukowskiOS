@@ -237,7 +237,9 @@ export const ipcChannels = {
     invoiceInboxEnqueue: "bukowskiTreasury:invoiceInboxEnqueue",
     invoiceInboxList: "bukowskiTreasury:invoiceInboxList",
     invoiceInboxUpdate: "bukowskiTreasury:invoiceInboxUpdate",
+    invoiceInboxBulkLink: "bukowskiTreasury:invoiceInboxBulkLink",
     invoiceInboxApply: "bukowskiTreasury:invoiceInboxApply",
     invoiceInboxDismiss: "bukowskiTreasury:invoiceInboxDismiss",
+    invoiceInboxPreview: "bukowskiTreasury:invoiceInboxPreview",
   },
 } as const;

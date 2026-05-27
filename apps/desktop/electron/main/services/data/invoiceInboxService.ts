@@ -6,11 +6,15 @@ import type { DatabaseSync } from "node:sqlite";
 
 import type {
   ApplyInvoiceExtractionCommand,
+  BulkLinkInvoiceExtractionsCommand,
+  BulkLinkInvoiceExtractionsResult,
   DismissInvoiceExtractionCommand,
   EnqueueInvoiceBatchCommand,
   EnqueueInvoiceBatchResult,
   InvoiceExtraction,
   InvoiceExtractionMutationResult,
+  InvoiceExtractionProjectInput,
+  InvoiceExtractionProjectTag,
   InvoiceExtractionStatus,
   InvoiceInboxFileInput,
   InvoiceInboxListQuery,
@@ -63,6 +67,8 @@ type ExtractionRow = {
   byte_size: number;
   uploaded_by_user_id: string | null;
   uploaded_by_name: string | null;
+  linked_user_id: string | null;
+  linked_user_name: string | null;
   supplier_name: string | null;
   supplier_rnc: string | null;
   ncf: string | null;
@@ -157,7 +163,7 @@ const ensureTable = (db: DatabaseSync) => {
   );
 };
 
-const mapRow = (row: ExtractionRow): InvoiceExtraction => ({
+const mapRow = (row: ExtractionRow, projects: InvoiceExtractionProjectTag[] = []): InvoiceExtraction => ({
   id: row.id,
   workspaceId: row.workspace_id,
   batchId: row.batch_id,
@@ -167,6 +173,9 @@ const mapRow = (row: ExtractionRow): InvoiceExtraction => ({
   byteSize: row.byte_size,
   uploadedByUserId: row.uploaded_by_user_id,
   uploadedByName: row.uploaded_by_name,
+  linkedUserId: row.linked_user_id,
+  linkedUserName: row.linked_user_name,
+  projects,
   supplierName: row.supplier_name,
   supplierRnc: row.supplier_rnc,
   ncf: row.ncf,
@@ -255,6 +264,61 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       .prepare(`SELECT * FROM invoice_extractions WHERE id = ? AND workspace_id = ? LIMIT 1`)
       .get(extractionId, workspaceId) as ExtractionRow | undefined;
 
+  const loadProjectsFor = (extractionIds: string[]): Map<string, InvoiceExtractionProjectTag[]> => {
+    const byId = new Map<string, InvoiceExtractionProjectTag[]>();
+    if (!extractionIds.length) return byId;
+    const placeholders = extractionIds.map(() => "?").join(", ");
+    const rows = db
+      .prepare(
+        `SELECT invoice_extraction_id, project_id, project_name_snapshot
+           FROM invoice_extraction_projects
+          WHERE invoice_extraction_id IN (${placeholders})
+          ORDER BY created_at ASC`,
+      )
+      .all(...extractionIds) as Array<{
+      invoice_extraction_id: string;
+      project_id: string | null;
+      project_name_snapshot: string | null;
+    }>;
+    for (const row of rows) {
+      const list = byId.get(row.invoice_extraction_id) ?? [];
+      list.push({ projectId: row.project_id, projectName: row.project_name_snapshot });
+      byId.set(row.invoice_extraction_id, list);
+    }
+    return byId;
+  };
+
+  /** Replace the full set of project tags for one extraction. */
+  const replaceProjects = (
+    workspaceId: string,
+    extractionId: string,
+    projects: InvoiceExtractionProjectInput[],
+  ) => {
+    db.prepare(`DELETE FROM invoice_extraction_projects WHERE invoice_extraction_id = ?`).run(extractionId);
+    if (!projects.length) return;
+    const insert = db.prepare(
+      `INSERT INTO invoice_extraction_projects (
+         id, workspace_id, invoice_extraction_id, project_id, project_name_snapshot, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?)`,
+    );
+    const timestamp = now();
+    const seen = new Set<string>();
+    for (const project of projects) {
+      const projectId = project.projectId?.trim();
+      if (!projectId || seen.has(projectId)) continue;
+      seen.add(projectId);
+      const name =
+        project.projectName?.trim() ||
+        (
+          db
+            .prepare(`SELECT name FROM projects WHERE id = ? LIMIT 1`)
+            .get(projectId) as { name: string } | undefined
+        )?.name ||
+        null;
+      insert.run(`inv-proj-${randomUUID()}`, workspaceId, extractionId, projectId, name, timestamp);
+    }
+  };
+
   const touch = (id: string) => {
     db.prepare(`UPDATE invoice_extractions SET updated_at = ? WHERE id = ?`).run(now(), id);
   };
@@ -336,7 +400,8 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
         `SELECT * FROM invoice_extractions WHERE ${clauses.join(" AND ")} ORDER BY created_at DESC, rowid DESC`,
       )
       .all(...params) as ExtractionRow[];
-    return rows.map(mapRow);
+    const projectsById = loadProjectsFor(rows.map((row) => row.id));
+    return rows.map((row) => mapRow(row, projectsById.get(row.id) ?? []));
   };
 
   const getFileBuffer = (id: string): { buffer: Buffer; mimeType: string; fileName: string } | null => {
@@ -451,12 +516,15 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       currency: input.currency !== undefined ? input.currency : row.currency,
       dgii_expense_type: input.dgiiExpenseType !== undefined ? input.dgiiExpenseType : row.dgii_expense_type,
       expense_category: input.expenseCategory !== undefined ? input.expenseCategory : row.expense_category,
+      linked_user_id: input.linkedUserId !== undefined ? input.linkedUserId : row.linked_user_id,
+      linked_user_name: input.linkedUserName !== undefined ? input.linkedUserName : row.linked_user_name,
     };
     db.prepare(
       `UPDATE invoice_extractions SET
          supplier_name = ?, supplier_rnc = ?, ncf = ?, invoice_date = ?,
          subtotal = ?, itbis = ?, total = ?, currency = ?,
-         dgii_expense_type = ?, expense_category = ?, updated_at = ?
+         dgii_expense_type = ?, expense_category = ?,
+         linked_user_id = ?, linked_user_name = ?, updated_at = ?
        WHERE id = ?`,
     ).run(
       next.supplier_name,
@@ -469,11 +537,48 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       next.currency,
       next.dgii_expense_type,
       next.expense_category,
+      next.linked_user_id,
+      next.linked_user_name,
       now(),
       input.extractionId,
     );
+    if (input.projects !== undefined) {
+      replaceProjects(input.workspaceId, input.extractionId, input.projects);
+    }
     enqueueOutbox(input.workspaceId, input.extractionId);
     return { extractionId: input.extractionId, status: row.status as InvoiceExtractionStatus, summary: "Factura actualizada." };
+  };
+
+  /** Assign linked user and/or project tags to many invoices at once. */
+  const bulkLink = (input: BulkLinkInvoiceExtractionsCommand): BulkLinkInvoiceExtractionsResult => {
+    let updatedCount = 0;
+    for (const extractionId of input.extractionIds) {
+      const row = getRow(input.workspaceId, extractionId);
+      if (!row) continue;
+      if (input.linkedUserId !== undefined || input.linkedUserName !== undefined) {
+        db.prepare(
+          `UPDATE invoice_extractions SET linked_user_id = ?, linked_user_name = ?, updated_at = ? WHERE id = ?`,
+        ).run(
+          input.linkedUserId !== undefined ? input.linkedUserId : row.linked_user_id,
+          input.linkedUserName !== undefined ? input.linkedUserName : row.linked_user_name,
+          now(),
+          extractionId,
+        );
+      }
+      if (input.projects !== undefined) {
+        replaceProjects(input.workspaceId, extractionId, input.projects);
+        db.prepare(`UPDATE invoice_extractions SET updated_at = ? WHERE id = ?`).run(now(), extractionId);
+      }
+      enqueueOutbox(input.workspaceId, extractionId);
+      updatedCount += 1;
+    }
+    return {
+      updatedCount,
+      summary:
+        updatedCount > 0
+          ? `Se actualizaron ${updatedCount} factura(s).`
+          : "No se actualizó ninguna factura.",
+    };
   };
 
   const dismiss = (input: DismissInvoiceExtractionCommand): InvoiceExtractionMutationResult => {
@@ -556,6 +661,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     recordFailure,
     autoMatch,
     update,
+    bulkLink,
     dismiss,
     applyExtraction,
     touch,

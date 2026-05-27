@@ -1660,6 +1660,31 @@ export const updateInvoiceExtractionSchema = z
     currency: nullableOrOptionalString,
     dgiiExpenseType: nullableOrOptionalString,
     expenseCategory: nullableOrOptionalString,
+    linkedUserId: nullableOrOptionalString,
+    linkedUserName: nullableOrOptionalString,
+    projects: z
+      .array(
+        z
+          .object({ projectId: nonEmptyString, projectName: nullableOrOptionalString })
+          .strict(),
+      )
+      .optional(),
+  })
+  .strict();
+
+export const bulkLinkInvoiceExtractionsSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    extractionIds: z.array(nonEmptyString).min(1).max(500),
+    linkedUserId: nullableOrOptionalString,
+    linkedUserName: nullableOrOptionalString,
+    projects: z
+      .array(
+        z
+          .object({ projectId: nonEmptyString, projectName: nullableOrOptionalString })
+          .strict(),
+      )
+      .optional(),
   })
   .strict();
 
@@ -1774,3 +1799,6 @@ export const treasuryProjectPnlReadArgsSchema = z.tuple([treasuryProjectPnlQuery
 export const treasuryUndoPreviewReadArgsSchema = z.tuple([treasuryUndoPreviewQuerySchema]);
 export const treasuryDeductibleLedgerReadArgsSchema = z.tuple([treasuryDeductibleLedgerQuerySchema]);
 export const invoiceInboxListReadArgsSchema = z.tuple([invoiceInboxListQuerySchema]);
+export const invoiceInboxPreviewReadArgsSchema = z.tuple([
+  z.object({ workspaceId: nonEmptyString, extractionId: nonEmptyString }).strict(),
+]);

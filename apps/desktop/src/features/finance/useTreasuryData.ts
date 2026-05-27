@@ -31,6 +31,7 @@ import type {
   UndoTreasuryActionCommand,
   UpsertBankAccountCommand,
   ApplyInvoiceExtractionCommand,
+  BulkLinkInvoiceExtractionsCommand,
   DismissInvoiceExtractionCommand,
   EnqueueInvoiceBatchCommand,
   InvoiceExtraction,
@@ -429,6 +430,14 @@ export const useTreasuryMutations = () =>
       async updateInvoiceExtraction(input: UpdateInvoiceExtractionCommand) {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.invoiceInboxUpdate(input);
+      },
+      async bulkLinkInvoices(input: BulkLinkInvoiceExtractionsCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceInboxBulkLink(input);
+      },
+      async previewInvoiceDocument(workspaceId: string, extractionId: string) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceInboxPreview(workspaceId, extractionId);
       },
       async applyInvoiceExtraction(input: ApplyInvoiceExtractionCommand) {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
