@@ -19137,7 +19137,7 @@ input[type="number"] {
 
 /* Invoice inbox filters + project add control (compact, single row) ========== */
 
-.invoice-inbox-filters > .invoice-filter-select {
+.invoice-filter-select.compact-select-trigger {
   flex: 0 0 auto;
   width: auto;
   min-width: 190px;
