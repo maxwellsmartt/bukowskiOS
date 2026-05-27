@@ -203,6 +203,7 @@ const applyRemoteFinanceBusinessRowsSchema = z.object({
     "invoices",
     "invoice_items",
     "invoice_payments",
+    "invoice_extractions",
     "financial_entries",
   ]),
   rows: z.array(remoteRecordSchema),

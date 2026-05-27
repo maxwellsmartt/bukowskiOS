@@ -119,6 +119,41 @@ describe("invoice inbox service", () => {
     cleanup();
   });
 
+  it("enqueues a sync_outbox row so invoices propagate across machines", () => {
+    const { cleanup, database } = createTestDatabase("invoice-inbox-sync");
+    const treasuryMutations = createTreasuryMutationService(database);
+    const inbox = createInvoiceInboxService(database, {
+      userDataPath: makeUserDataPath(),
+      treasuryMutations,
+    });
+
+    const { ids } = inbox.enqueueBatch({
+      workspaceId,
+      files: [{ name: "factura.png", mimeType: "image/png", dataUrl: PNG_DATA_URL }],
+    });
+    expect(ids).toHaveLength(1);
+
+    const outboxAfterEnqueue = database
+      .prepare(
+        `SELECT COUNT(*) AS count FROM sync_outbox WHERE entity_type = 'invoice_extraction' AND entity_id = ?`,
+      )
+      .get(ids[0]) as { count: number };
+    expect(outboxAfterEnqueue.count).toBeGreaterThan(0);
+
+    inbox.recordExtraction(ids[0], fields, null);
+    inbox.update({ workspaceId, extractionId: ids[0], expenseCategory: "Catering" });
+
+    const outboxAfterUpdates = database
+      .prepare(
+        `SELECT COUNT(*) AS count FROM sync_outbox WHERE entity_type = 'invoice_extraction' AND entity_id = ?`,
+      )
+      .get(ids[0]) as { count: number };
+    // enqueue + recordExtraction + update each enqueue a push.
+    expect(outboxAfterUpdates.count).toBeGreaterThanOrEqual(3);
+
+    cleanup();
+  });
+
   it("skips unsupported attachments and never matches without a plausible movement", () => {
     const { cleanup, database } = createTestDatabase("invoice-inbox-skip");
     const treasuryMutations = createTreasuryMutationService(database);

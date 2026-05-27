@@ -130,6 +130,31 @@ const ensureTable = (db: DatabaseSync) => {
   if (!columns.includes("uploaded_by_name")) {
     db.exec(`ALTER TABLE invoice_extractions ADD COLUMN uploaded_by_name TEXT`);
   }
+  // Iteration 2: who the expense really belongs to (distinct from uploader),
+  // the synced cloud object key for the file bytes, and the multi-project tags.
+  if (!columns.includes("linked_user_id")) {
+    db.exec(`ALTER TABLE invoice_extractions ADD COLUMN linked_user_id TEXT`);
+  }
+  if (!columns.includes("linked_user_name")) {
+    db.exec(`ALTER TABLE invoice_extractions ADD COLUMN linked_user_name TEXT`);
+  }
+  if (!columns.includes("storage_object_key")) {
+    db.exec(`ALTER TABLE invoice_extractions ADD COLUMN storage_object_key TEXT`);
+  }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS invoice_extraction_projects (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      invoice_extraction_id TEXT NOT NULL,
+      project_id TEXT,
+      project_name_snapshot TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_invoice_extraction_projects_extraction
+       ON invoice_extraction_projects (invoice_extraction_id);`,
+  );
 };
 
 const mapRow = (row: ExtractionRow): InvoiceExtraction => ({
@@ -185,6 +210,46 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
   ensureTable(db);
   const now = () => options.now?.() ?? new Date().toISOString();
 
+  /**
+   * Enqueue an `invoice_extraction` row into the shared sync outbox so it
+   * propagates to Supabase (and from there to other machines). The outbox
+   * worker's `resolveSupabaseDomainUpserts` materializes the row + its
+   * project tags. Best-effort: a missing/locked outbox never blocks the
+   * local write.
+   */
+  const enqueueOutbox = (workspaceIdOrNull: string | null, extractionId: string) => {
+    try {
+      const workspaceId =
+        workspaceIdOrNull ??
+        (
+          db
+            .prepare(`SELECT workspace_id FROM invoice_extractions WHERE id = ? LIMIT 1`)
+            .get(extractionId) as { workspace_id: string } | undefined
+        )?.workspace_id;
+      if (!workspaceId) return;
+      const timestamp = now();
+      db.prepare(
+        `INSERT INTO sync_outbox (
+           id, workspace_id, entity_type, entity_id, operation_type,
+           payload_json, status, attempt_count, last_error, next_retry_at,
+           created_at, updated_at
+         ) VALUES (?, ?, 'invoice_extraction', ?, 'upsert', ?, 'pending', 0, NULL, ?, ?, ?)`,
+      ).run(
+        `sync-inv-${extractionId}-${randomUUID().slice(0, 8)}`,
+        workspaceId,
+        extractionId,
+        JSON.stringify({ id: extractionId }),
+        timestamp,
+        timestamp,
+        timestamp,
+      );
+    } catch (error) {
+      // Sync is eventually-consistent; surface but don't fail the mutation.
+      // eslint-disable-next-line no-console
+      console.warn("[invoice-inbox] enqueueOutbox failed", error);
+    }
+  };
+
   const getRow = (workspaceId: string, extractionId: string): ExtractionRow | undefined =>
     db
       .prepare(`SELECT * FROM invoice_extractions WHERE id = ? AND workspace_id = ? LIMIT 1`)
@@ -238,6 +303,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
         timestamp,
         timestamp,
       );
+      enqueueOutbox(input.workspaceId, id);
       ids.push(id);
     }
 
@@ -294,6 +360,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     db.prepare(
       `UPDATE invoice_extractions SET status = 'failed', error_message = ?, updated_at = ? WHERE id = ?`,
     ).run(message.slice(0, 500), now(), id);
+    enqueueOutbox(null, id);
   };
 
   /**
@@ -367,6 +434,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       now(),
       id,
     );
+    enqueueOutbox(null, id);
   };
 
   const update = (input: UpdateInvoiceExtractionCommand): InvoiceExtractionMutationResult => {
@@ -404,6 +472,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       now(),
       input.extractionId,
     );
+    enqueueOutbox(input.workspaceId, input.extractionId);
     return { extractionId: input.extractionId, status: row.status as InvoiceExtractionStatus, summary: "Factura actualizada." };
   };
 
@@ -414,6 +483,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       now(),
       input.extractionId,
     );
+    enqueueOutbox(input.workspaceId, input.extractionId);
     return { extractionId: input.extractionId, status: "dismissed", summary: "Factura descartada." };
   };
 
@@ -467,6 +537,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     db.prepare(
       `UPDATE invoice_extractions SET status = 'applied', applied_transaction_id = ?, updated_at = ? WHERE id = ?`,
     ).run(input.transactionId, now(), input.extractionId);
+    enqueueOutbox(input.workspaceId, input.extractionId);
 
     return {
       extractionId: input.extractionId,

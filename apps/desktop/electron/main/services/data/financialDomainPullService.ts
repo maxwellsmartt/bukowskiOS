@@ -27,6 +27,7 @@ export type FinanceBusinessPullTable =
   | "invoices"
   | "invoice_items"
   | "invoice_payments"
+  | "invoice_extractions"
   | "financial_entries";
 
 export type FinancialDomainPullResult<TTable extends string> = {
@@ -70,6 +71,7 @@ const financeBusinessEntityMap: Record<
   invoices: { entityType: "invoice", entityIdColumn: "id", conflictColumns: ["id"] },
   invoice_items: { entityType: "invoice", entityIdColumn: "invoice_id", conflictColumns: ["id"] },
   invoice_payments: { entityType: "invoice_payment", entityIdColumn: "id", conflictColumns: ["id"] },
+  invoice_extractions: { entityType: "invoice_extraction", entityIdColumn: "id", conflictColumns: ["id"] },
   financial_entries: { entityType: "financial_entry", entityIdColumn: "id", conflictColumns: ["id"] },
 };
 
@@ -91,6 +93,7 @@ const tableCursorColumn: Record<TreasuryPullTable | CollaboratorPaymentPullTable
   invoices: "updated_at",
   invoice_items: "updated_at",
   invoice_payments: "created_at",
+  invoice_extractions: "updated_at",
   financial_entries: "updated_at",
 };
 
@@ -325,6 +328,17 @@ const sanitizeFinanceBusinessRow = (
   if (table === "invoice_payments") {
     if (!rowExists(db, "invoices", next.invoice_id)) return null;
     if (next.recorded_by_user_id) ensureUser(db, next.recorded_by_user_id, updatedAt);
+  }
+
+  if (table === "invoice_extractions") {
+    if (next.uploaded_by_user_id) ensureUser(db, next.uploaded_by_user_id, updatedAt);
+    if (next.linked_user_id) ensureUser(db, next.linked_user_id, updatedAt);
+    if (next.applied_transaction_id && !rowExists(db, "bank_transactions", next.applied_transaction_id)) {
+      next.applied_transaction_id = null;
+    }
+    if (next.suggested_transaction_id && !rowExists(db, "bank_transactions", next.suggested_transaction_id)) {
+      next.suggested_transaction_id = null;
+    }
   }
 
   if (table === "financial_entries") {

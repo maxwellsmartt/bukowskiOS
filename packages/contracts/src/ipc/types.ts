@@ -272,6 +272,7 @@ export type FinanceBusinessPullTable =
   | "invoices"
   | "invoice_items"
   | "invoice_payments"
+  | "invoice_extractions"
   | "financial_entries";
 
 export type AppApplyRemoteFinancialRowsResult<TTable extends string = string> = {

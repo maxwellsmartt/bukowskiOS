@@ -1173,6 +1173,26 @@ const createRuntime = (): LocalDatabaseRuntime => {
         );
         return rows.length ? [{ table: "financial_entries", onConflict: "id", rows }] : [];
       }
+      case "invoice_extraction": {
+        const rows = selectAll("SELECT * FROM invoice_extractions WHERE id = ?", row.entity_id).map((r) =>
+          nullNonUuid(r, ["uploaded_by_user_id", "linked_user_id"]),
+        );
+        if (!rows.length) return [];
+        const upserts: SupabaseDomainUpsert[] = [
+          { table: "invoice_extractions", onConflict: "id", rows },
+        ];
+        const projects = selectAll(
+          "SELECT * FROM invoice_extraction_projects WHERE invoice_extraction_id = ?",
+          row.entity_id,
+        );
+        upserts.push({
+          table: "invoice_extraction_projects",
+          onConflict: "id",
+          rows: projects,
+          deleteBeforeInsert: { column: "invoice_extraction_id", value: row.entity_id },
+        });
+        return upserts;
+      }
       default:
         return null;
     }
@@ -1209,6 +1229,11 @@ const createRuntime = (): LocalDatabaseRuntime => {
         return [{ table: "collaborator_fees", column: "id", value: row.entity_id }];
       case "financial_entry":
         return [{ table: "financial_entries", column: "id", value: row.entity_id }];
+      case "invoice_extraction":
+        return [
+          { table: "invoice_extraction_projects", column: "invoice_extraction_id", value: row.entity_id },
+          { table: "invoice_extractions", column: "id", value: row.entity_id },
+        ];
       default:
         return null;
     }

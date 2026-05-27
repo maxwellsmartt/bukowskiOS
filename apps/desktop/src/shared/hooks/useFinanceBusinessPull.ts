@@ -16,6 +16,7 @@ const tableConfigs: Array<{ table: FinanceBusinessPullTable; cursorColumn: strin
   { table: "invoices", cursorColumn: "updated_at" },
   { table: "invoice_items", cursorColumn: "updated_at" },
   { table: "invoice_payments", cursorColumn: "created_at" },
+  { table: "invoice_extractions", cursorColumn: "updated_at" },
   { table: "financial_entries", cursorColumn: "updated_at" },
 ];
 
