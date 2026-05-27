@@ -384,12 +384,14 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
         <>
           <div className="invoice-inbox-filters">
             <CompactSelect
+              className="invoice-filter-select"
               ariaLabel={t("finance.treasury.invoices.filterUploader", { defaultValue: "Filtrar por usuario" })}
               value={uploaderFilter}
               onChange={setUploaderFilter}
               options={uploaderOptions}
             />
             <CompactSelect
+              className="invoice-filter-select"
               ariaLabel={t("finance.treasury.invoices.filterDate", { defaultValue: "Filtrar por fecha" })}
               value={dateFilter}
               onChange={setDateFilter}
@@ -414,6 +416,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                 })}
               </span>
               <CompactSelect
+                className="invoice-filter-select"
                 ariaLabel={t("finance.treasury.invoices.batchAssignUser", { defaultValue: "Asignar usuario" })}
                 value=""
                 onChange={(value) => void bulkAssignUser(value)}
@@ -423,6 +426,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                 ]}
               />
               <CompactSelect
+                className="invoice-filter-select"
                 ariaLabel={t("finance.treasury.invoices.batchAddProject", { defaultValue: "Agregar proyecto" })}
                 value=""
                 onChange={(value) => {
@@ -532,19 +536,22 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                         </span>
                       ))
                     )}
-                    <CompactSelect
-                      ariaLabel={t("finance.treasury.invoices.addProject", { defaultValue: "Agregar proyecto" })}
-                      value=""
-                      onChange={(value) => {
-                        if (value) addProject(row, value);
-                      }}
-                      options={[
-                        { value: "", label: "+", },
-                        ...projects
-                          .filter((project) => !row.projects.some((p) => p.projectId === project.id))
-                          .map((project) => ({ value: project.id, label: project.name })),
-                      ]}
-                    />
+                    {projects.some((project) => !row.projects.some((p) => p.projectId === project.id)) ? (
+                      <CompactSelect
+                        className="invoice-project-add"
+                        ariaLabel={t("finance.treasury.invoices.addProject", { defaultValue: "Agregar proyecto" })}
+                        value=""
+                        onChange={(value) => {
+                          if (value) addProject(row, value);
+                        }}
+                        options={[
+                          { value: "", label: "+" },
+                          ...projects
+                            .filter((project) => !row.projects.some((p) => p.projectId === project.id))
+                            .map((project) => ({ value: project.id, label: project.name })),
+                        ]}
+                      />
+                    ) : null}
                   </div>
                 ),
               },

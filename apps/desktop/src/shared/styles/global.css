@@ -19134,3 +19134,46 @@ input[type="number"] {
   color: var(--text-muted);
   cursor: pointer;
 }
+
+/* Invoice inbox filters + project add control (compact, single row) ========== */
+
+.invoice-inbox-filters > .invoice-filter-select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 190px;
+  max-width: 260px;
+}
+
+/* Discrete "+" add-project trigger: a small square icon, no chevron. */
+.invoice-project-add.compact-select-trigger {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 6px;
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.invoice-project-add.compact-select-trigger:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+.invoice-project-add .compact-select-trigger-label {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 600;
+}
+.invoice-project-add > svg {
+  display: none; /* hide the chevron — the "+" label is the whole affordance */
+}
+
+.invoice-project-chips {
+  align-items: center;
+  min-height: 24px;
+}
+.invoice-project-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--hairline, rgba(255, 255, 255, 0.1));
+  color: var(--text-secondary, rgba(255, 255, 255, 0.78));
+}
