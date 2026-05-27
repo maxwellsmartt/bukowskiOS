@@ -272,6 +272,7 @@ export const createAnthropicProviderService = () => ({
           tools: input.toolChoice === "none" ? undefined : mapTools(input.tools),
           tool_choice: input.toolChoice === "none" ? undefined : mapToolChoice(input.toolChoice),
           max_tokens: input.maxOutputTokens ?? 800,
+          temperature: input.temperature,
         }),
       });
 

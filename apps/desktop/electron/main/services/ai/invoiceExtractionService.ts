@@ -14,6 +14,13 @@ const isPdfMime = (mimeType: string, fileName: string) =>
 
 const EXTRACTION_INSTRUCTIONS = `Eres un asistente contable dominicano experto en facturas de gasto (compras, 606 DGII).
 Extrae los datos de la factura adjunta y responde ÚNICAMENTE con un objeto JSON válido, sin texto extra ni \`\`\`.
+
+Reglas estrictas:
+- NUNCA inventes datos. Si un dato no aparece claramente, devuelve null.
+- Fechas SIEMPRE en formato ISO YYYY-MM-DD. En RD las facturas suelen venir como DD/MM/YYYY: conviértelas (ej. "05/03/2026" → "2026-03-05"). Si solo hay mes y año, usa el día 01.
+- Montos como número sin separador de miles ni símbolo. En RD el punto suele ser separador de miles y la coma decimal, pero también se usa el formato anglosajón: interpreta correctamente (ej. "1.234,56" y "1,234.56" valen 1234.56).
+- El ITBIS es el impuesto (normalmente 18%). total = subtotal + itbis cuando aplica; verifica la coherencia.
+
 Campos (usa null cuando no aparezca el dato):
 - supplierName: nombre/razón social del proveedor (string|null)
 - supplierRnc: RNC o cédula del proveedor, solo dígitos (string|null)
@@ -26,6 +33,21 @@ Campos (usa null cuando no aparezca el dato):
 - dgiiExpenseType: tipo de gasto DGII 01-11 si lo infieres (string|null)
 - expenseCategory: categoría de gasto en lenguaje natural (ej. "Combustible", "Alquiler", "Servicios") (string|null)
 - confidence: tu confianza global 0..1 (number)`;
+
+/** Normalize a model-supplied date string to ISO YYYY-MM-DD (best-effort). */
+const normalizeIsoDate = (value: string | null): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(trimmed);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  const dmy = /^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})$/.exec(trimmed);
+  if (dmy) {
+    const [, dd, mm, yyyyRaw] = dmy;
+    const yyyy = yyyyRaw.length === 2 ? `20${yyyyRaw}` : yyyyRaw;
+    return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  }
+  return trimmed;
+};
 
 const loadSupervisor = (db: DatabaseSync, workspaceId: string) =>
   db
@@ -88,7 +110,7 @@ const mapFields = (data: Record<string, unknown>, rawText: string): InvoiceExtra
     supplierName: toStringOrNull(data.supplierName),
     supplierRnc: toStringOrNull(data.supplierRnc)?.replace(/[^0-9]/g, "") || null,
     ncf: toStringOrNull(data.ncf),
-    invoiceDate: toStringOrNull(data.invoiceDate),
+    invoiceDate: normalizeIsoDate(toStringOrNull(data.invoiceDate)),
     subtotal: toNumberOrNull(data.subtotal),
     itbis: toNumberOrNull(data.itbis),
     total: toNumberOrNull(data.total),
@@ -134,52 +156,83 @@ export const createInvoiceExtractionService = (
         ? options.anthropicProviderService
         : options.openaiProviderService;
 
-    let input: string | Array<Record<string, unknown>>;
+    const isImage = isImageMime(mimeType);
     let pdfText = "";
-
-    if (isImageMime(mimeType)) {
-      const dataUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
-      input = [
-        {
-          role: "user",
-          content: [
-            { type: "input_text", text: EXTRACTION_INSTRUCTIONS },
-            { type: "input_image", image_url: dataUrl },
-          ],
-        },
-      ];
-    } else if (isPdfMime(mimeType, fileName)) {
+    if (!isImage) {
+      if (!isPdfMime(mimeType, fileName)) {
+        throw new Error(`Formato no soportado para extracción: ${mimeType}`);
+      }
       const extracted = await extractDocumentFromBuffer(buffer, mimeType, fileName);
       pdfText = extracted.text.trim();
       if (!pdfText) {
         throw new Error("PDF sin texto (escaneado): usa una imagen o un PDF digital con texto.");
       }
-      input = `${EXTRACTION_INSTRUCTIONS}\n\nTexto de la factura:\n${pdfText}`;
-    } else {
-      throw new Error(`Formato no soportado para extracción: ${mimeType}`);
+    }
+    const dataUrl = isImage ? `data:${mimeType};base64,${buffer.toString("base64")}` : "";
+
+    // Build the model input for a given instruction string. Images send the
+    // bitmap at high detail; PDFs send their extracted text.
+    const buildInput = (instructions: string): string | Array<Record<string, unknown>> =>
+      isImage
+        ? [
+            {
+              role: "user",
+              content: [
+                { type: "input_text", text: instructions },
+                { type: "input_image", image_url: dataUrl, detail: "high" },
+              ],
+            },
+          ]
+        : `${instructions}\n\nTexto de la factura:\n${pdfText}`;
+
+    // Deterministic single call (temperature 0) for a given instruction set.
+    const callModel = async (instructions: string): Promise<Record<string, unknown>> => {
+      const response = await providerService.createResponse(
+        {
+          apiKey,
+          baseUrl: provider.base_url,
+          defaultModelKey: model,
+          timeoutMs: Math.max(20_000, provider.timeout_ms),
+        },
+        {
+          model,
+          instructions: "Extrae datos de facturas y responde solo JSON.",
+          input: buildInput(instructions),
+          maxOutputTokens: 900,
+          temperature: 0,
+        },
+      );
+      if (!response.ok) {
+        throw new Error(response.summary || "El proveedor de IA no pudo procesar la factura.");
+      }
+      return parseJsonObject(response.outputText);
+    };
+
+    let fields = mapFields(await callModel(EXTRACTION_INSTRUCTIONS), isImage ? "" : pdfText);
+
+    // One targeted repair pass when the two most critical fields are missing —
+    // the date and total are exactly what users reported as inconsistent.
+    if (fields.total == null || fields.invoiceDate == null) {
+      try {
+        const repairInstructions = `${EXTRACTION_INSTRUCTIONS}\n\nIMPORTANTE: en el intento anterior faltó ${
+          [fields.total == null ? "el TOTAL" : null, fields.invoiceDate == null ? "la FECHA" : null]
+            .filter(Boolean)
+            .join(" y ")
+        }. Búscalo con cuidado en el documento (encabezado, pie, totales) y devuélvelo. No inventes; si de verdad no está, usa null.`;
+        const repaired = mapFields(await callModel(repairInstructions), isImage ? "" : pdfText);
+        fields = {
+          ...fields,
+          invoiceDate: fields.invoiceDate ?? repaired.invoiceDate,
+          total: fields.total ?? repaired.total,
+          subtotal: fields.subtotal ?? repaired.subtotal,
+          itbis: fields.itbis ?? repaired.itbis,
+        };
+      } catch {
+        // Keep the first-pass result if the repair call fails.
+      }
     }
 
-    const response = await providerService.createResponse(
-      {
-        apiKey,
-        baseUrl: provider.base_url,
-        defaultModelKey: model,
-        timeoutMs: Math.max(20_000, provider.timeout_ms),
-      },
-      {
-        model,
-        instructions: "Extrae datos de facturas y responde solo JSON.",
-        input,
-        maxOutputTokens: 700,
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(response.summary || "El proveedor de IA no pudo procesar la factura.");
-    }
-
-    const data = parseJsonObject(response.outputText);
-    return mapFields(data, isImageMime(mimeType) ? "" : pdfText);
+    return fields;
   };
 
   return { extract };

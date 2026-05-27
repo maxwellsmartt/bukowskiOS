@@ -42,6 +42,8 @@ export type OpenAIResponseCreateInput = {
   tools?: OpenAIResponseFunctionTool[];
   toolChoice?: "auto" | "none" | "required";
   maxOutputTokens?: number;
+  /** Sampling temperature. 0 = deterministic (used for data extraction). */
+  temperature?: number;
   textFormat?: Record<string, unknown>;
 };
 
@@ -245,6 +247,7 @@ export const createOpenAIProviderService = () => ({
           tools: input.tools,
           tool_choice: input.toolChoice,
           max_output_tokens: input.maxOutputTokens ?? 800,
+          temperature: input.temperature,
           parallel_tool_calls: false,
           text: input.textFormat ? { format: input.textFormat } : undefined,
         }),
