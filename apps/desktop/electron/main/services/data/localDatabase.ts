@@ -59,6 +59,7 @@ import { createTreasuryReadService } from "./treasuryReadService";
 import { createInvoiceInboxService } from "./invoiceInboxService";
 import { createInvoiceExtractionService } from "../ai/invoiceExtractionService";
 import { createSupabaseDocumentStorage } from "./supabaseDocumentStorageService";
+import { createAppSettingsStore } from "./appSettingsStore";
 import { createQuoteMutationService } from "./quoteMutationService";
 import { createQuoteReadService } from "./quoteReadService";
 import { createFinanceMutationService } from "./financeMutationService";
@@ -182,6 +183,12 @@ type LocalDatabaseRuntime = {
   supportDiagnostics: SupportDiagnosticsService;
   userAdmin: UserAdminService;
   fileUploads: FileUploadService;
+  appSettings: {
+    getDocumentsRoot: () => string;
+    getDocumentsRootSetting: () => string | null;
+    setDocumentsRoot: (next: string | null) => void;
+    defaultDocumentsRoot: () => string;
+  };
   getDiagnosticsSnapshot: () => AppDiagnosticsSnapshot;
   getSupportSnapshot: () => AppSupportSnapshot;
   createBackupNow: () => AppDiagnosticsSnapshot;
@@ -1523,8 +1530,10 @@ const createRuntime = (): LocalDatabaseRuntime => {
     getAppInfo,
     runtimeDiagnostics,
   });
+  const appSettings = createAppSettingsStore(app.getPath("userData"));
   const fileUploads = createFileUploadService(database, {
     userDataPath: app.getPath("userData"),
+    getStorageRoot: () => appSettings.getDocumentsRoot(),
   });
   const documentStorage = createSupabaseDocumentStorage({
     supabaseUrl: isSupabaseSyncEnabled() ? process.env.VITE_SUPABASE_URL : undefined,
@@ -1533,6 +1542,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   });
   const invoiceInboxService = createInvoiceInboxService(database, {
     userDataPath: app.getPath("userData"),
+    getStorageRoot: () => appSettings.getDocumentsRoot(),
     treasuryMutations,
     storage: documentStorage,
   });
@@ -1743,6 +1753,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     supportDiagnostics,
     userAdmin,
     fileUploads,
+    appSettings,
     getDiagnosticsSnapshot,
     getSupportSnapshot: () => supportDiagnostics.getSupportSnapshot(),
     createBackupNow,

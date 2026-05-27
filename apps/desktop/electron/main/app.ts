@@ -367,6 +367,7 @@ app.whenReady().then(() => {
   registerNotificationIpc();
   registerAppIpc({
     database: localDatabase.database,
+    appSettings: localDatabase.appSettings,
     getDiagnosticsSnapshot: localDatabase.getDiagnosticsSnapshot,
     getSupportSnapshot: localDatabase.getSupportSnapshot,
     getUsersSnapshot: (query) => localDatabase.userAdmin.getSnapshot(query),

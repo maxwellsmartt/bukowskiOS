@@ -15,6 +15,7 @@ import { useLocale } from "@shared/hooks/useLocale";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import { CurrencySettingsCard } from "./CurrencySettingsCard";
+import { DocumentsFolderCard } from "./DocumentsFolderCard";
 import { CustomRolesEditor } from "./CustomRolesEditor";
 import { InviteMemberDialog } from "./InviteMemberDialog";
 import { NcfSettingsCard } from "./NcfSettingsCard";
@@ -1241,6 +1242,15 @@ export const WorkspaceSettingsPage = () => {
         })}
       >
         <NcfSettingsCard />
+      </WorkspaceDisclosure>
+
+      <WorkspaceDisclosure
+        title={t("settings.workspace.sections.documentsFolder", { defaultValue: "Carpeta de documentos" })}
+        summary={t("settings.workspace.summaries.documentsFolder", {
+          defaultValue: "Dónde se guardan localmente facturas y documentos (carpeta iCloud/Drive opcional).",
+        })}
+      >
+        <DocumentsFolderCard />
       </WorkspaceDisclosure>
 
       <WorkspaceDisclosure

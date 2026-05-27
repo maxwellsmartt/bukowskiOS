@@ -11,6 +11,8 @@ const workspaceId = DEFAULT_WORKSPACE_ID;
 
 type FileUploadServiceOptions = {
   userDataPath: string;
+  /** Optional override for where new files are stored (configurable folder). */
+  getStorageRoot?: () => string;
   fileSystem?: Pick<typeof fs, "copyFileSync" | "existsSync" | "mkdirSync" | "readFileSync" | "statSync" | "unlinkSync">;
   shellApi?: Pick<typeof shell, "openPath">;
   now?: () => string;
@@ -115,7 +117,8 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
     }
 
     const now = options.now?.() ?? new Date().toISOString();
-    const rootDirectory = path.join(options.userDataPath, `${domain}-files`, workspaceId, entityId);
+    const storageRoot = options.getStorageRoot?.() || options.userDataPath;
+    const rootDirectory = path.join(storageRoot, `${domain}-files`, workspaceId, entityId);
     fileSystem.mkdirSync(rootDirectory, { recursive: true });
 
     if (domain === "asset") {

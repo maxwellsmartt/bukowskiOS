@@ -19,6 +19,12 @@ import { safeHandle, safeHandleReadWithSchema } from "./ipcSafeHandler";
 
 type RegisterAppIpcOptions = {
   database: DatabaseSync;
+  appSettings: {
+    getDocumentsRoot: () => string;
+    getDocumentsRootSetting: () => string | null;
+    setDocumentsRoot: (next: string | null) => void;
+    defaultDocumentsRoot: () => string;
+  };
   getDiagnosticsSnapshot: () => import("@contracts").AppDiagnosticsSnapshot;
   getSupportSnapshot: () => import("@contracts").AppSupportSnapshot;
   getUsersSnapshot: (query?: import("@contracts").AppUsersSnapshotQuery) => import("@contracts").AppUsersSnapshot;
@@ -280,6 +286,7 @@ const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) =
 
 export const registerAppIpc = ({
   database,
+  appSettings,
   getDiagnosticsSnapshot,
   getSupportSnapshot,
   getUsersSnapshot,
@@ -524,6 +531,33 @@ export const registerAppIpc = ({
     } catch (error) {
       throw sanitizeIpcError(error, "The app could not open that external link.");
     }
+  });
+
+  // Configurable local documents folder (per-machine; e.g. an iCloud folder).
+  const documentsRootInfo = () => ({
+    root: appSettings.getDocumentsRoot(),
+    isCustom: appSettings.getDocumentsRootSetting() != null,
+    defaultRoot: appSettings.defaultDocumentsRoot(),
+  });
+  ipcMain.handle(ipcChannels.app.getDocumentsRoot, (event) => {
+    assertTrustedIpcSender(event);
+    return documentsRootInfo();
+  });
+  ipcMain.handle(ipcChannels.app.chooseDocumentsRoot, async (event) => {
+    assertTrustedIpcSender(event);
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: "Carpeta de documentos",
+      properties: ["openDirectory", "createDirectory"],
+      defaultPath: appSettings.getDocumentsRoot(),
+    });
+    if (canceled || !filePaths[0]) return documentsRootInfo();
+    appSettings.setDocumentsRoot(filePaths[0]);
+    return documentsRootInfo();
+  });
+  ipcMain.handle(ipcChannels.app.resetDocumentsRoot, (event) => {
+    assertTrustedIpcSender(event);
+    appSettings.setDocumentsRoot(null);
+    return documentsRootInfo();
   });
 
   safeHandle(

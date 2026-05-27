@@ -209,6 +209,24 @@ const bukowskiApp = {
   exportSupportBundle: () => ipcRenderer.invoke(ipcChannels.app.exportSupportBundle) as Promise<AppExportResult>,
   exportRecentLogs: () => ipcRenderer.invoke(ipcChannels.app.exportRecentLogs) as Promise<AppExportResult>,
   openExternal: (url: string) => ipcRenderer.invoke(ipcChannels.app.openExternal, url) as Promise<void>,
+  getDocumentsRoot: () =>
+    ipcRenderer.invoke(ipcChannels.app.getDocumentsRoot) as Promise<{
+      root: string;
+      isCustom: boolean;
+      defaultRoot: string;
+    }>,
+  chooseDocumentsRoot: () =>
+    ipcRenderer.invoke(ipcChannels.app.chooseDocumentsRoot) as Promise<{
+      root: string;
+      isCustom: boolean;
+      defaultRoot: string;
+    }>,
+  resetDocumentsRoot: () =>
+    ipcRenderer.invoke(ipcChannels.app.resetDocumentsRoot) as Promise<{
+      root: string;
+      isCustom: boolean;
+      defaultRoot: string;
+    }>,
   applyRemoteCatalogRows: (input: AppApplyRemoteCatalogRowsCommand) =>
     ipcRenderer.invoke(ipcChannels.app.applyRemoteCatalogRows, input) as Promise<AppApplyRemoteCatalogRowsResult>,
   applyRemoteExchangeRates: (input: import("@contracts").AppApplyRemoteExchangeRatesCommand) =>

@@ -19235,3 +19235,23 @@ input[type="number"] {
   width: 12px;
   height: 12px;
 }
+
+/* Documents folder setting ================================================== */
+.documents-folder-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 11px);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--hairline-faint, rgba(255, 255, 255, 0.05));
+  font-size: var(--font-xs, 11px);
+  overflow: hidden;
+}
+.documents-folder-path code {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}

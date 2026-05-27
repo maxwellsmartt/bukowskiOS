@@ -32,6 +32,8 @@ type TreasuryMutations = ReturnType<typeof createTreasuryMutationService>;
 
 export type InvoiceInboxServiceOptions = {
   userDataPath: string;
+  /** Optional override for where new invoice files are stored. */
+  getStorageRoot?: () => string;
   treasuryMutations: TreasuryMutations;
   /** Optional cloud document storage so files sync across machines. */
   storage?: Pick<SupabaseDocumentStorage, "upload" | "download" | "enabled">;
@@ -335,7 +337,8 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     input: EnqueueInvoiceBatchCommand,
   ): { result: EnqueueInvoiceBatchResult; ids: string[] } => {
     const batchId = `inv-batch-${randomUUID()}`;
-    const directory = path.join(options.userDataPath, "invoice-inbox", input.workspaceId);
+    const storageRoot = options.getStorageRoot?.() || options.userDataPath;
+    const directory = path.join(storageRoot, "invoice-inbox", input.workspaceId);
     fs.mkdirSync(directory, { recursive: true });
 
     const insert = db.prepare(
