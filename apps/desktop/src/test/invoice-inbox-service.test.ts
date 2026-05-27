@@ -202,6 +202,46 @@ describe("invoice inbox service", () => {
     cleanup();
   });
 
+  it("uploads document bytes and downloads them on demand when the local file is missing", async () => {
+    const { cleanup, database } = createTestDatabase("invoice-inbox-storage");
+    const treasuryMutations = createTreasuryMutationService(database);
+    const cloud = new Map<string, Buffer>();
+    const storage = {
+      enabled: true,
+      upload: async (key: string, buffer: Buffer) => {
+        cloud.set(key, buffer);
+        return true;
+      },
+      download: async (key: string) => cloud.get(key) ?? null,
+    };
+    const inbox = createInvoiceInboxService(database, {
+      userDataPath: makeUserDataPath(),
+      treasuryMutations,
+      storage,
+    });
+
+    const { ids } = inbox.enqueueBatch({
+      workspaceId,
+      files: [{ name: "factura.png", mimeType: "image/png", dataUrl: PNG_DATA_URL }],
+    });
+    expect(ids).toHaveLength(1);
+
+    await inbox.uploadDocument(ids[0]);
+    expect(cloud.size).toBe(1);
+
+    // Simulate a second machine: the row synced but the local file is absent.
+    const row = database
+      .prepare(`SELECT storage_path FROM invoice_extractions WHERE id = ?`)
+      .get(ids[0]) as { storage_path: string };
+    rmSync(row.storage_path);
+
+    const file = await inbox.getFileBuffer(ids[0]);
+    expect(file).not.toBeNull();
+    expect(file?.buffer.length).toBeGreaterThan(0);
+
+    cleanup();
+  });
+
   it("skips unsupported attachments and never matches without a plausible movement", () => {
     const { cleanup, database } = createTestDatabase("invoice-inbox-skip");
     const treasuryMutations = createTreasuryMutationService(database);

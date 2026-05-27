@@ -58,6 +58,7 @@ import { createTreasuryMutationService } from "./treasuryMutationService";
 import { createTreasuryReadService } from "./treasuryReadService";
 import { createInvoiceInboxService } from "./invoiceInboxService";
 import { createInvoiceExtractionService } from "../ai/invoiceExtractionService";
+import { createSupabaseDocumentStorage } from "./supabaseDocumentStorageService";
 import { createQuoteMutationService } from "./quoteMutationService";
 import { createQuoteReadService } from "./quoteReadService";
 import { createFinanceMutationService } from "./financeMutationService";
@@ -171,7 +172,7 @@ type LocalDatabaseRuntime = {
     ) => import("@contracts").InvoiceExtractionMutationResult;
     getFileBuffer: (
       id: string,
-    ) => { buffer: Buffer; mimeType: string; fileName: string } | null;
+    ) => Promise<{ buffer: Buffer; mimeType: string; fileName: string } | null>;
   };
   packingMutations: PackingMutationService;
   rmaMutations: RmaMutationService;
@@ -1525,9 +1526,15 @@ const createRuntime = (): LocalDatabaseRuntime => {
   const fileUploads = createFileUploadService(database, {
     userDataPath: app.getPath("userData"),
   });
+  const documentStorage = createSupabaseDocumentStorage({
+    supabaseUrl: isSupabaseSyncEnabled() ? process.env.VITE_SUPABASE_URL : undefined,
+    bucket: "workspace-documents",
+    getAccessToken: async () => (await supabaseTokenStore.getTokens()).accessToken,
+  });
   const invoiceInboxService = createInvoiceInboxService(database, {
     userDataPath: app.getPath("userData"),
     treasuryMutations,
+    storage: documentStorage,
   });
   const invoiceExtractionService = createInvoiceExtractionService(database, {
     secretStore,
@@ -1541,11 +1548,14 @@ const createRuntime = (): LocalDatabaseRuntime => {
     for (const id of ids) {
       try {
         invoiceInboxService.setProcessing(id);
-        const file = invoiceInboxService.getFileBuffer(id);
+        const file = await invoiceInboxService.getFileBuffer(id);
         if (!file) {
           invoiceInboxService.recordFailure(id, "Archivo no encontrado en disco.");
           continue;
         }
+        // Push the bytes to cloud storage so teammates/other machines can
+        // open the document. Best-effort: never blocks extraction.
+        void invoiceInboxService.uploadDocument(id);
         const fields = await invoiceExtractionService.extract(
           file.buffer,
           file.mimeType,

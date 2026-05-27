@@ -22,6 +22,7 @@ import type {
 } from "@contracts";
 
 import type { createTreasuryMutationService } from "./treasuryMutationService";
+import type { SupabaseDocumentStorage } from "./supabaseDocumentStorageService";
 
 const DATA_URL_RE = /^data:([^;]+);base64,(.+)$/;
 const ACCEPTED_MIME = /image\/(png|jpe?g|webp)|application\/pdf/i;
@@ -32,6 +33,8 @@ type TreasuryMutations = ReturnType<typeof createTreasuryMutationService>;
 export type InvoiceInboxServiceOptions = {
   userDataPath: string;
   treasuryMutations: TreasuryMutations;
+  /** Optional cloud document storage so files sync across machines. */
+  storage?: Pick<SupabaseDocumentStorage, "upload" | "download" | "enabled">;
   now?: () => string;
 };
 
@@ -63,6 +66,7 @@ type ExtractionRow = {
   status: string;
   original_name: string;
   storage_path: string;
+  storage_object_key: string | null;
   mime_type: string;
   byte_size: number;
   uploaded_by_user_id: string | null;
@@ -336,9 +340,9 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
 
     const insert = db.prepare(
       `INSERT INTO invoice_extractions (
-         id, workspace_id, batch_id, status, original_name, storage_path,
+         id, workspace_id, batch_id, status, original_name, storage_path, storage_object_key,
          mime_type, byte_size, uploaded_by_user_id, uploaded_by_name, created_at, updated_at
-       ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     const ids: string[] = [];
@@ -352,7 +356,9 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
         continue;
       }
       const id = `inv-${randomUUID()}`;
-      const storagePath = path.join(directory, `${id}${extensionFor(mimeType, file.name)}`);
+      const extension = extensionFor(mimeType, file.name);
+      const storagePath = path.join(directory, `${id}${extension}`);
+      const storageObjectKey = `${input.workspaceId}/invoices/${id}${extension}`;
       fs.writeFileSync(storagePath, buffer);
       insert.run(
         id,
@@ -360,6 +366,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
         batchId,
         file.name.trim() || "factura",
         storagePath,
+        storageObjectKey,
         mimeType,
         buffer.length,
         input.uploadedByUserId?.trim() || null,
@@ -404,12 +411,50 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     return rows.map((row) => mapRow(row, projectsById.get(row.id) ?? []));
   };
 
-  const getFileBuffer = (id: string): { buffer: Buffer; mimeType: string; fileName: string } | null => {
+  const getFileBuffer = async (
+    id: string,
+  ): Promise<{ buffer: Buffer; mimeType: string; fileName: string } | null> => {
     const row = db
-      .prepare(`SELECT storage_path, mime_type, original_name FROM invoice_extractions WHERE id = ? LIMIT 1`)
-      .get(id) as { storage_path: string; mime_type: string; original_name: string } | undefined;
-    if (!row || !fs.existsSync(row.storage_path)) return null;
-    return { buffer: fs.readFileSync(row.storage_path), mimeType: row.mime_type, fileName: row.original_name };
+      .prepare(
+        `SELECT storage_path, storage_object_key, mime_type, original_name
+           FROM invoice_extractions WHERE id = ? LIMIT 1`,
+      )
+      .get(id) as
+      | { storage_path: string; storage_object_key: string | null; mime_type: string; original_name: string }
+      | undefined;
+    if (!row) return null;
+    if (row.storage_path && fs.existsSync(row.storage_path)) {
+      return { buffer: fs.readFileSync(row.storage_path), mimeType: row.mime_type, fileName: row.original_name };
+    }
+    // Not on this machine's disk (e.g. a teammate uploaded it): fetch the bytes
+    // from cloud storage and cache them locally for next time.
+    if (options.storage?.enabled && row.storage_object_key) {
+      const buffer = await options.storage.download(row.storage_object_key);
+      if (buffer) {
+        try {
+          fs.mkdirSync(path.dirname(row.storage_path), { recursive: true });
+          fs.writeFileSync(row.storage_path, buffer);
+        } catch {
+          /* caching is best-effort */
+        }
+        return { buffer, mimeType: row.mime_type, fileName: row.original_name };
+      }
+    }
+    return null;
+  };
+
+  /** Upload a document's bytes to cloud storage (best-effort, idempotent). */
+  const uploadDocument = async (id: string): Promise<void> => {
+    if (!options.storage?.enabled) return;
+    const row = db
+      .prepare(
+        `SELECT storage_path, storage_object_key, mime_type FROM invoice_extractions WHERE id = ? LIMIT 1`,
+      )
+      .get(id) as
+      | { storage_path: string; storage_object_key: string | null; mime_type: string }
+      | undefined;
+    if (!row?.storage_object_key || !row.storage_path || !fs.existsSync(row.storage_path)) return;
+    await options.storage.upload(row.storage_object_key, fs.readFileSync(row.storage_path), row.mime_type);
   };
 
   const listPendingIds = (): string[] =>
@@ -655,6 +700,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     enqueueBatch,
     list,
     getFileBuffer,
+    uploadDocument,
     listPendingIds,
     setProcessing,
     recordExtraction,

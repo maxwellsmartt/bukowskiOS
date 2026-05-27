@@ -485,7 +485,7 @@ type RegisterFoundationIpcOptions = {
     ) => import("@contracts").InvoiceExtractionMutationResult;
     getFileBuffer: (
       id: string,
-    ) => { buffer: Buffer; mimeType: string; fileName: string } | null;
+    ) => Promise<{ buffer: Buffer; mimeType: string; fileName: string } | null>;
   };
   exportQuotePdf: (
     workspaceId: string,
@@ -2681,7 +2681,7 @@ export const registerFoundationIpc = ({
         accessLevel: "read",
         requiredPermission: "treasury.transactions.read",
       });
-      const file = invoiceInbox.getFileBuffer(query.extractionId);
+      const file = await invoiceInbox.getFileBuffer(query.extractionId);
       if (!file) return null;
       return {
         fileName: file.fileName,
