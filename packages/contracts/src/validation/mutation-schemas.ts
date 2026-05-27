@@ -1633,6 +1633,8 @@ export const enqueueInvoiceBatchSchema = z
   .object({
     workspaceId: nonEmptyString,
     files: z.array(invoiceInboxFileInputSchema).min(1).max(60),
+    uploadedByUserId: nullableOrOptionalString,
+    uploadedByName: nullableOrOptionalString,
   })
   .strict();
 

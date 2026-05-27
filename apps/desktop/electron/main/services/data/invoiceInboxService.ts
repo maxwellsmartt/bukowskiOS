@@ -61,6 +61,8 @@ type ExtractionRow = {
   storage_path: string;
   mime_type: string;
   byte_size: number;
+  uploaded_by_user_id: string | null;
+  uploaded_by_name: string | null;
   supplier_name: string | null;
   supplier_rnc: string | null;
   ncf: string | null;
@@ -92,6 +94,8 @@ const ensureTable = (db: DatabaseSync) => {
       storage_path TEXT NOT NULL,
       mime_type TEXT NOT NULL,
       byte_size INTEGER NOT NULL DEFAULT 0,
+      uploaded_by_user_id TEXT,
+      uploaded_by_name TEXT,
       supplier_name TEXT,
       supplier_rnc TEXT,
       ncf TEXT,
@@ -116,6 +120,16 @@ const ensureTable = (db: DatabaseSync) => {
     `CREATE INDEX IF NOT EXISTS idx_invoice_extractions_workspace
        ON invoice_extractions (workspace_id, status, created_at);`,
   );
+  // Idempotent migration for inboxes created before uploader columns existed.
+  const columns = (db.prepare(`PRAGMA table_info(invoice_extractions)`).all() as Array<{ name: string }>).map(
+    (row) => row.name,
+  );
+  if (!columns.includes("uploaded_by_user_id")) {
+    db.exec(`ALTER TABLE invoice_extractions ADD COLUMN uploaded_by_user_id TEXT`);
+  }
+  if (!columns.includes("uploaded_by_name")) {
+    db.exec(`ALTER TABLE invoice_extractions ADD COLUMN uploaded_by_name TEXT`);
+  }
 };
 
 const mapRow = (row: ExtractionRow): InvoiceExtraction => ({
@@ -126,6 +140,8 @@ const mapRow = (row: ExtractionRow): InvoiceExtraction => ({
   originalName: row.original_name,
   mimeType: row.mime_type,
   byteSize: row.byte_size,
+  uploadedByUserId: row.uploaded_by_user_id,
+  uploadedByName: row.uploaded_by_name,
   supplierName: row.supplier_name,
   supplierRnc: row.supplier_rnc,
   ncf: row.ncf,
@@ -192,8 +208,8 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     const insert = db.prepare(
       `INSERT INTO invoice_extractions (
          id, workspace_id, batch_id, status, original_name, storage_path,
-         mime_type, byte_size, created_at, updated_at
-       ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
+         mime_type, byte_size, uploaded_by_user_id, uploaded_by_name, created_at, updated_at
+       ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     const ids: string[] = [];
@@ -217,6 +233,8 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
         storagePath,
         mimeType,
         buffer.length,
+        input.uploadedByUserId?.trim() || null,
+        input.uploadedByName?.trim() || null,
         timestamp,
         timestamp,
       );

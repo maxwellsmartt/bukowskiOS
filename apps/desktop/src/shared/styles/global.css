@@ -18919,6 +18919,13 @@ input[type="number"] {
   color: var(--text-primary);
 }
 
+.invoice-inbox-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: var(--space-sm, 12px);
+}
+
 .invoice-doc-cell {
   display: inline-flex;
   align-items: center;

@@ -33,7 +33,7 @@
       "finance": {
         "overview": "Overview",
         "quotes": "Quotes",
-        "invoices": "Invoices",
+        "invoices": "Billing",
         "collaborators": "Crew Payments",
         "entries": "Entries",
         "reviewQueue": "Review Queue",
@@ -1397,6 +1397,11 @@
         "emptyBody": "You have not uploaded any invoices to this inbox yet.",
         "apply": "Apply",
         "applied": "Applied",
+        "filterUploader": "Filter by uploader",
+        "filterDate": "Filter by date",
+        "allUploaders": "All uploaders",
+        "allDates": "All dates",
+        "unknownUploader": "No user",
         "columns": {
           "document": "Document",
           "status": "Status",
@@ -1406,6 +1411,8 @@
           "total": "Total",
           "itbis": "ITBIS",
           "category": "Category",
+          "uploadedBy": "Uploaded by",
+          "uploadedOn": "Uploaded on",
           "match": "Suggested movement",
           "actions": "Actions"
         },

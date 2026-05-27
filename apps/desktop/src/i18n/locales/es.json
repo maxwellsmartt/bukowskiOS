@@ -33,9 +33,9 @@
       "finance": {
         "overview": "Resumen",
         "quotes": "Cotizaciones",
-        "invoices": "Facturas",
+        "invoices": "Facturación",
         "collaborators": "Honorarios",
-        "entries": "Movimientos",
+        "entries": "Asientos",
         "reviewQueue": "Cola de revisión",
         "treasury": "Tesorería"
       },
@@ -1399,6 +1399,11 @@
         "emptyBody": "Aún no has subido facturas a esta bandeja.",
         "apply": "Aplicar",
         "applied": "Aplicado",
+        "filterUploader": "Filtrar por usuario",
+        "filterDate": "Filtrar por fecha",
+        "allUploaders": "Todos los usuarios",
+        "allDates": "Todas las fechas",
+        "unknownUploader": "Sin usuario",
         "columns": {
           "document": "Documento",
           "status": "Estado",
@@ -1408,6 +1413,8 @@
           "total": "Total",
           "itbis": "ITBIS",
           "category": "Categoría",
+          "uploadedBy": "Subido por",
+          "uploadedOn": "Subido el",
           "match": "Movimiento sugerido",
           "actions": "Acciones"
         },

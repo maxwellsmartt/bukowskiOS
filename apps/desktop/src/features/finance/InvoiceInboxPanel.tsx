@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import type { InvoiceExtraction, InvoiceInboxFileInput } from "@contracts";
+import { useSession } from "@app/providers/SessionProvider";
+import { CompactSelect } from "@shared/components/CompactSelect";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -52,6 +54,7 @@ type Props = {
 
 export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const { t } = useTranslation();
+  const { user } = useSession();
   const inbox = useInvoiceInbox(workspaceId);
   const mutations = useTreasuryMutations();
   const transactions = useTreasuryTransactions(
@@ -61,6 +64,8 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [uploaderFilter, setUploaderFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
 
   const txnLabel = useMemo(() => {
     const map = new Map<string, string>();
@@ -69,6 +74,42 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     }
     return map;
   }, [transactions.data]);
+
+  const uploaderOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const row of inbox.data) {
+      const key = row.uploadedByUserId ?? row.uploadedByName ?? "unknown";
+      if (!seen.has(key)) {
+        seen.set(key, row.uploadedByName ?? t("finance.treasury.invoices.unknownUploader", { defaultValue: "Sin usuario" }));
+      }
+    }
+    return [
+      { value: "all", label: t("finance.treasury.invoices.allUploaders", { defaultValue: "Todos los usuarios" }) },
+      ...Array.from(seen, ([value, label]) => ({ value, label })),
+    ];
+  }, [inbox.data, t]);
+
+  const dateOptions = useMemo(() => {
+    const seen = new Set<string>();
+    for (const row of inbox.data) {
+      seen.add(row.createdAt.slice(0, 10));
+    }
+    return [
+      { value: "all", label: t("finance.treasury.invoices.allDates", { defaultValue: "Todas las fechas" }) },
+      ...Array.from(seen)
+        .sort((a, b) => b.localeCompare(a))
+        .map((value) => ({ value, label: value })),
+    ];
+  }, [inbox.data, t]);
+
+  const filteredRows = useMemo(() => {
+    return inbox.data.filter((row) => {
+      const uploaderKey = row.uploadedByUserId ?? row.uploadedByName ?? "unknown";
+      const matchUploader = uploaderFilter === "all" || uploaderKey === uploaderFilter;
+      const matchDate = dateFilter === "all" || row.createdAt.slice(0, 10) === dateFilter;
+      return matchUploader && matchDate;
+    });
+  }, [inbox.data, uploaderFilter, dateFilter]);
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || !fileList.length) return;
@@ -82,7 +123,12 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     setIsUploading(true);
     try {
       const payload = await Promise.all(accepted.map(readFileAsDataUrl));
-      const result = await mutations.enqueueInvoices({ workspaceId, files: payload });
+      const result = await mutations.enqueueInvoices({
+        workspaceId,
+        files: payload,
+        uploadedByUserId: user?.id ?? null,
+        uploadedByName: user?.displayName ?? null,
+      });
       toast.success(result.summary);
       inbox.refresh();
     } catch (error) {
@@ -170,10 +216,25 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
           title={t("finance.treasury.invoices.emptyTitle", { defaultValue: "Sin facturas en cola" })}
         />
       ) : (
+        <>
+        <div className="invoice-inbox-filters">
+          <CompactSelect
+            ariaLabel={t("finance.treasury.invoices.filterUploader", { defaultValue: "Filtrar por usuario" })}
+            value={uploaderFilter}
+            onChange={setUploaderFilter}
+            options={uploaderOptions}
+          />
+          <CompactSelect
+            ariaLabel={t("finance.treasury.invoices.filterDate", { defaultValue: "Filtrar por fecha" })}
+            value={dateFilter}
+            onChange={setDateFilter}
+            options={dateOptions}
+          />
+        </div>
         <DataTable
           getRowId={(row) => row.id}
           persistKey="treasury-invoice-inbox-v1"
-          rows={inbox.data}
+          rows={filteredRows}
           columns={[
             {
               key: "document",
@@ -227,6 +288,17 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
               render: (row) => row.expenseCategory ?? "—",
             },
             {
+              key: "uploadedBy",
+              label: t("finance.treasury.invoices.columns.uploadedBy", { defaultValue: "Subido por" }),
+              render: (row) =>
+                row.uploadedByName ?? t("finance.treasury.invoices.unknownUploader", { defaultValue: "Sin usuario" }),
+            },
+            {
+              key: "uploadedOn",
+              label: t("finance.treasury.invoices.columns.uploadedOn", { defaultValue: "Subido el" }),
+              render: (row) => row.createdAt.slice(0, 10),
+            },
+            {
               key: "match",
               label: t("finance.treasury.invoices.columns.match", { defaultValue: "Movimiento sugerido" }),
               render: (row) =>
@@ -272,6 +344,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
             },
           ]}
         />
+        </>
       )}
     </SurfaceCard>
   );

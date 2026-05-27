@@ -269,6 +269,8 @@ export type InvoiceExtraction = {
   originalName: string;
   mimeType: string;
   byteSize: number;
+  uploadedByUserId: string | null;
+  uploadedByName: string | null;
   supplierName: string | null;
   supplierRnc: string | null;
   ncf: string | null;
@@ -299,6 +301,9 @@ export type InvoiceInboxFileInput = {
 export type EnqueueInvoiceBatchCommand = {
   workspaceId: string;
   files: InvoiceInboxFileInput[];
+  /** Who uploaded this batch — for grouping/filtering in the inbox. */
+  uploadedByUserId?: string | null;
+  uploadedByName?: string | null;
 };
 
 export type EnqueueInvoiceBatchResult = {
