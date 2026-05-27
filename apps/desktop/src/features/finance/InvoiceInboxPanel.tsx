@@ -598,6 +598,19 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                 },
               },
               {
+                key: "uploadedBy",
+                label: t("finance.treasury.invoices.columns.uploadedBy", { defaultValue: "Subido por" }),
+                render: (row) => (
+                  <div className="cell-stack">
+                    <span>
+                      {row.uploadedByName ??
+                        t("finance.treasury.invoices.unknownUploader", { defaultValue: "Sin usuario" })}
+                    </span>
+                    <small className="text-muted">{row.createdAt.slice(0, 10)}</small>
+                  </div>
+                ),
+              },
+              {
                 key: "match",
                 label: t("finance.treasury.invoices.columns.match", { defaultValue: "Movimiento sugerido" }),
                 render: (row) =>

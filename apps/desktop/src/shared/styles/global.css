@@ -19212,3 +19212,26 @@ input[type="number"] {
 .creatable-select-create .compact-select-option-label {
   color: var(--accent, #d6ad70);
 }
+
+/* Invoice inbox: compact row action buttons ================================= */
+
+.invoice-actions-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.invoice-actions-cell .action-row-button {
+  height: 24px;
+  padding: 0 8px;
+  font-size: var(--font-2xs, 10px);
+  gap: 3px;
+}
+.invoice-actions-cell .ghost-control.action-row-button {
+  width: 24px;
+  padding: 0;
+  justify-content: center;
+}
+.invoice-actions-cell .action-row-button svg {
+  width: 12px;
+  height: 12px;
+}

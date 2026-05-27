@@ -186,7 +186,12 @@ export const createInvoiceExtractionService = (
         : `${instructions}\n\nTexto de la factura:\n${pdfText}`;
 
     // Deterministic single call (temperature 0) for a given instruction set.
-    const callModel = async (instructions: string): Promise<Record<string, unknown>> => {
+    // Some newer/reasoning models reject `temperature`; if so, retry once
+    // without it rather than failing the whole extraction.
+    const callModel = async (
+      instructions: string,
+      useTemperature = true,
+    ): Promise<Record<string, unknown>> => {
       const response = await providerService.createResponse(
         {
           apiKey,
@@ -199,10 +204,13 @@ export const createInvoiceExtractionService = (
           instructions: "Extrae datos de facturas y responde solo JSON.",
           input: buildInput(instructions),
           maxOutputTokens: 900,
-          temperature: 0,
+          temperature: useTemperature ? 0 : undefined,
         },
       );
       if (!response.ok) {
+        if (useTemperature && /temperature/i.test(response.summary ?? "")) {
+          return callModel(instructions, false);
+        }
         throw new Error(response.summary || "El proveedor de IA no pudo procesar la factura.");
       }
       return parseJsonObject(response.outputText);
