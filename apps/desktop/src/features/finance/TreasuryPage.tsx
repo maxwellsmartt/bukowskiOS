@@ -2058,6 +2058,11 @@ export const TreasuryPage = () => {
               fillRemainingColumnKey="actions"
               fitToColumnWidths
               getRowId={(row) => row.id}
+              // Explicit maxHeight skips the adaptive-height measurement, whose
+              // ResizeObserver fed back on remount (the table grew the scroll
+              // container, which re-grew the table) producing the vertical
+              // "creeping" growth when re-entering the section.
+              maxHeight="calc(100vh - 360px)"
               onSelectedRowIdsChange={setSelectedMovementIds}
               persistKey="treasury-movements-v3"
               rows={visibleMovements}
