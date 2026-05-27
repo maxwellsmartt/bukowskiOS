@@ -48,7 +48,7 @@ import {
   linkTransactionSchema,
   undoTreasuryActionSchema,
   enqueueInvoiceBatchSchema,
-  invoiceInboxListQuerySchema,
+  invoiceInboxListReadArgsSchema,
   updateInvoiceExtractionSchema,
   applyInvoiceExtractionSchema,
   dismissInvoiceExtractionSchema,
@@ -2633,7 +2633,7 @@ export const registerFoundationIpc = ({
   });
   safeHandleReadWithSchema(
     ipcChannels.treasury.invoiceInboxList,
-    invoiceInboxListQuerySchema,
+    invoiceInboxListReadArgsSchema,
     async (_event, query: import("@contracts").InvoiceInboxListQuery) => {
       await workspaceAccess.assertWorkspaceAccess({
         workspaceId: query.workspaceId,

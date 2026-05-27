@@ -1773,3 +1773,4 @@ export const treasuryReviewQueueReadArgsSchema = z.tuple([treasuryAccountsQueryS
 export const treasuryProjectPnlReadArgsSchema = z.tuple([treasuryProjectPnlQuerySchema]);
 export const treasuryUndoPreviewReadArgsSchema = z.tuple([treasuryUndoPreviewQuerySchema]);
 export const treasuryDeductibleLedgerReadArgsSchema = z.tuple([treasuryDeductibleLedgerQuerySchema]);
+export const invoiceInboxListReadArgsSchema = z.tuple([invoiceInboxListQuerySchema]);

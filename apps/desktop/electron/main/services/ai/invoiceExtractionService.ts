@@ -1,12 +1,12 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { DEFAULT_WORKSPACE_ID } from "@contracts";
+
 import { extractDocumentFromBuffer } from "../data/documentExtractionService";
 import type { AISecretStore } from "./aiSecretStore";
 import type { AnthropicProviderService } from "./anthropicProviderService";
 import type { OpenAIProviderService } from "./openaiProviderService";
 import type { InvoiceExtractionFields } from "../data/invoiceInboxService";
-
-const DEFAULT_WORKSPACE_ID = "workspace-metadata-cine";
 
 const isImageMime = (mimeType: string) => /^image\/(png|jpe?g|webp)/i.test(mimeType.trim());
 const isPdfMime = (mimeType: string, fileName: string) =>
