@@ -527,6 +527,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                 label: t("finance.treasury.invoices.columns.linkedUser", { defaultValue: "Gasto de" }),
                 render: (row) => (
                   <CompactSelect
+                    className="invoice-row-select"
                     ariaLabel={t("finance.treasury.invoices.columns.linkedUser", { defaultValue: "Gasto de" })}
                     value={row.linkedUserId ?? UNASSIGNED}
                     onChange={(value) => void setLinkedUser(row, value)}
@@ -543,7 +544,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                     const current = row.projects[0]?.projectId ?? "";
                     return (
                       <CompactSelect
-                        className="invoice-project-select"
+                        className="invoice-row-select"
                         ariaLabel={t("finance.treasury.invoices.columns.projects", { defaultValue: "Proyecto" })}
                         value={current}
                         onChange={(value) => {
