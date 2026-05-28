@@ -19256,7 +19256,33 @@ input[type="number"] {
   font-variant-numeric: tabular-nums;
 }
 
-/* Treasury movements: full-height flex-fill so only the table scrolls ======== */
+/* Generic full-height table fill ============================================ */
+/* Make a list view fill its section so ONLY the table scrolls (no outer page
+   scroll, no growth-on-remount). Adopt by adding `page-stack--fill` to the page
+   root, `surface-card--fill` to the SurfaceCard wrapping the table, and passing
+   `fillParent` to the DataTable (which self-applies `data-table-stack--fill`).
+   Requires the shell to bound height (it does: .app-shell grid is 100vh). */
+.page-stack--fill {
+  flex: 1;
+  min-height: 0;
+}
+.surface-card--fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.data-table-stack--fill {
+  flex: 1;
+  min-height: 0;
+}
+.table-shell--fill {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+/* Treasury movements: full-height flex-fill (predates the generic classes). */
 .treasury-page-stack--fill {
   flex: 1;
   min-height: 0;
@@ -19270,11 +19296,6 @@ input[type="number"] {
 .treasury-page-stack--fill .treasury-detail-card .data-table-stack {
   flex: 1;
   min-height: 0;
-}
-.table-shell--fill {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
 }
 
 /* Invoice duplicate detection banner + resolve dialog ======================= */

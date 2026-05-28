@@ -705,7 +705,7 @@ export const DataTable = <T = unknown,>({
   };
 
   return (
-    <div className="data-table-stack">
+    <div className={`data-table-stack${fillParent ? " data-table-stack--fill" : ""}`}>
       {showColumnVisibilityControl ? (
         <div className="data-table-columns-trigger-shell">
           {controlsAddon ? <div className="data-table-columns-extra-controls">{controlsAddon}</div> : null}

@@ -156,7 +156,7 @@ export const InvoicesPage = () => {
   );
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--fill">
       <div className="page-stack-row">
         <SectionHeader eyebrow={t("finance.title")} title={t("finance.invoices.title")} titleTone="accent" />
         <button
@@ -198,7 +198,7 @@ export const InvoicesPage = () => {
         </div>
       </SurfaceCard>
 
-      <SurfaceCard>
+      <SurfaceCard className="surface-card--fill">
         <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap" }}>
           <label className="compact-filter-field quotes-status-filter">
             <span>{t("finance.invoices.filters.status")}</span>
@@ -250,6 +250,7 @@ export const InvoicesPage = () => {
         ) : (
           <DataTable<InvoiceRow>
             columns={columns}
+            fillParent
             getRowId={(row) => row.id}
             onRowDoubleClick={(row) => navigate(`/finance/invoices/${row.id}`)}
             persistKey="invoices-list-v1"
