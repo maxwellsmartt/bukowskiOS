@@ -26,6 +26,8 @@ const isElectronAppAvailable = () => typeof app !== "undefined" && app !== null;
 const redactText = (value: string) =>
   value
     .replace(/(Bearer\s+)[A-Za-z0-9._-]+/gi, "$1[redacted]")
+    // JWTs (Supabase access/refresh tokens): three base64url segments.
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[redacted-jwt]")
     .replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, "[redacted-secret]")
     .replace(/\bgh[pousr]_[A-Za-z0-9]{20,}\b/g, "[redacted-token]")
     .replace(/\b[A-Za-z0-9+/]{24,}={0,2}\b/g, "[redacted-value]");

@@ -19,10 +19,13 @@ test("desktop logger writes a local file and redacts sensitive values", async ()
   tempDirectories.push(logsDirectory);
   initializeDesktopLogger(logsDirectory);
 
+  const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.fakeSignatureValue123";
+
   const logger = getDesktopLogger("test");
   logger.info("Support check", {
     token: "Bearer super-secret-token-value",
     apiKey: "sk-12345678901234567890",
+    accessToken: jwt,
   });
 
   await new Promise((resolve) => setTimeout(resolve, 50));
@@ -34,4 +37,5 @@ test("desktop logger writes a local file and redacts sensitive values", async ()
   expect(content).toContain("Support check");
   expect(content).not.toContain("super-secret-token-value");
   expect(content).not.toContain("sk-12345678901234567890");
+  expect(content).not.toContain(jwt);
 });

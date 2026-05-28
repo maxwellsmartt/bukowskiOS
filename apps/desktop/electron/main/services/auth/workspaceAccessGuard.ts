@@ -245,6 +245,10 @@ export const createWorkspaceAccessGuard = ({
             },
           });
     } catch (error) {
+      // Offline tolerance for reads: the workspace was already proven to exist
+      // locally (assertLocalWorkspaceExists at the top), which only holds for
+      // workspaces this user is a member of — so a read here is for the user's
+      // own data. Unknown workspaces are already denied before this point.
       if (accessLevel === "read") {
         return;
       }

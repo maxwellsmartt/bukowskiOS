@@ -118,6 +118,32 @@ describe("workspace access guard", () => {
     cleanup();
   });
 
+  it("denies reads for unknown workspaces when Supabase is unreachable", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-access");
+    // Note: we do NOT insert the workspace locally.
+    const guard = createWorkspaceAccessGuard({
+      database,
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon-key",
+      getTokens: async () => ({ accessToken: createJwt({ sub: "user-remote", exp: 9_999_999_999 }) }),
+      fetchImpl: async () => {
+        throw new Error("network down");
+      },
+      now: () => 1_000,
+    });
+
+    await expect(
+      guard.assertWorkspaceAccess({
+        workspaceId: "workspace-not-local",
+        action: "load assets",
+        accessLevel: "read",
+        requiredPermission: "assets.read",
+      }),
+    ).rejects.toThrow(/not available on this device/i);
+
+    cleanup();
+  });
+
   it("resolves project, packing slip, incident and RMA workspace before checking access", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-workspace-access");
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify(true), { status: 200 }));
