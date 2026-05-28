@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { AgentCreatedBadge } from "@shared/components/AgentCreatedBadge";
+import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { useLocale } from "@shared/hooks/useLocale";
 
 const LONG_DATE_FORMAT: Intl.DateTimeFormatOptions = {
@@ -100,9 +101,30 @@ export const InboxPage = () => {
   const [editingReminderAt, setEditingReminderAt] = useState("");
   const [editingReminderRecurrenceRule, setEditingReminderRecurrenceRule] = useState("");
   const [editingReminderBody, setEditingReminderBody] = useState("");
+  const { confirm, confirmDialog } = useConfirmDialog();
   const openTodos = todos.filter((todo) => !todo.completedAt);
   const pendingReminders = reminders.filter((reminder) => !reminder.completedAt);
   const nextReminder = pendingReminders[0] ?? null;
+
+  const requestDeleteTodo = async (id: string, title: string) => {
+    const confirmed = await confirm({
+      title: t("inbox.confirmDeleteTodo.title", { defaultValue: "¿Eliminar esta tarea?" }),
+      body: t("inbox.confirmDeleteTodo.body", { defaultValue: "La tarea se eliminará permanentemente." }),
+      details: title,
+      confirmLabel: t("common.delete", { defaultValue: "Eliminar" }),
+    });
+    if (confirmed) await deleteTodo(id);
+  };
+
+  const requestDeleteReminder = async (id: string, title: string) => {
+    const confirmed = await confirm({
+      title: t("inbox.confirmDeleteReminder.title", { defaultValue: "¿Eliminar este recordatorio?" }),
+      body: t("inbox.confirmDeleteReminder.body", { defaultValue: "El recordatorio se eliminará permanentemente." }),
+      details: title,
+      confirmLabel: t("common.delete", { defaultValue: "Eliminar" }),
+    });
+    if (confirmed) await deleteReminder(id);
+  };
 
   const openNotification = async (item: (typeof items)[number]) => {
     if (!item.readAt) {
@@ -379,7 +401,7 @@ export const InboxPage = () => {
                               <button className="icon-ghost-control" data-tooltip={t("common.edit")} onClick={() => startEditingTodo(todo)} type="button">
                                 <Pencil size={14} />
                               </button>
-                              <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} onClick={() => void deleteTodo(todo.id)} type="button">
+                              <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} onClick={() => void requestDeleteTodo(todo.id, todo.title)} type="button">
                                 <Trash2 size={14} />
                               </button>
                             </span>
@@ -496,7 +518,7 @@ export const InboxPage = () => {
                               <button className="icon-ghost-control" data-tooltip={t("common.edit")} onClick={() => startEditingReminder(reminder)} type="button">
                                 <Pencil size={14} />
                               </button>
-                              <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} onClick={() => void deleteReminder(reminder.id)} type="button">
+                              <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} onClick={() => void requestDeleteReminder(reminder.id, reminder.title)} type="button">
                                 <Trash2 size={14} />
                               </button>
                             </span>
@@ -518,6 +540,7 @@ export const InboxPage = () => {
           )}
         </div>
       </section>
+      {confirmDialog}
     </section>
   );
 };

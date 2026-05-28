@@ -27,6 +27,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
+import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { uiPreferenceKeys } from "@shared/lib/preferences";
@@ -387,6 +388,7 @@ const CatalogCsvImportDialog = ({
 
 export const CatalogPage = () => {
   const { t } = useTranslation();
+  const { confirm: confirmDelete, confirmDialog: deleteConfirmDialog } = useConfirmDialog();
   const { refreshProjects } = useShellContext();
   const { activeWorkspaceId } = useWorkspace();
   const { data: projects } = useProjectsData();
@@ -840,6 +842,14 @@ export const CatalogPage = () => {
   };
 
   const handleDeleteCrewDocument = async (fileId: string) => {
+    const confirmed = await confirmDelete({
+      title: t("catalog.confirmRemoveDocument.title", { defaultValue: "¿Eliminar este documento?" }),
+      body: t("catalog.confirmRemoveDocument.body", {
+        defaultValue: "El documento se eliminará permanentemente.",
+      }),
+      confirmLabel: t("common.delete", { defaultValue: "Eliminar" }),
+    });
+    if (!confirmed) return;
     try {
       const result = await deleteCrewCatalogDocument(fileId);
       setCatalogActionMessage(result.summary);
@@ -1623,6 +1633,7 @@ export const CatalogPage = () => {
         title={t("catalog.deleteDialog.title", { entity: t(singularLabelKeyMap[activeTab]) })}
         tone="danger"
       />
+      {deleteConfirmDialog}
     </div>
   );
 };

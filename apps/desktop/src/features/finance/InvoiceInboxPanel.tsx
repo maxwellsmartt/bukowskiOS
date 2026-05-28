@@ -18,6 +18,7 @@ import { DocumentPreviewModal } from "@shared/components/DocumentPreviewModal";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { StatusBadge } from "@shared/components/StatusBadge";
+import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import {
@@ -74,6 +75,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const { user } = useSession();
   const inbox = useInvoiceInbox(workspaceId);
   const expenseCategories = useExpenseCategories(workspaceId);
+  const { confirm, confirmDialog } = useConfirmDialog();
   const mutations = useTreasuryMutations();
   const transactions = useTreasuryTransactions(
     useMemo(() => ({ workspaceId, limit: 1000 }), [workspaceId]),
@@ -246,6 +248,14 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   };
 
   const dismiss = async (row: InvoiceExtraction) => {
+    const confirmed = await confirm({
+      title: t("finance.treasury.invoices.dismissConfirmTitle", { defaultValue: "¿Descartar esta factura?" }),
+      body: t("finance.treasury.invoices.dismissConfirmBody", {
+        defaultValue: "La factura saldrá de la bandeja. Esta acción no se puede deshacer.",
+      }),
+      confirmLabel: t("finance.treasury.invoices.dismissConfirmAction", { defaultValue: "Descartar" }),
+    });
+    if (!confirmed) return;
     setBusyId(row.id);
     try {
       await mutations.dismissInvoiceExtraction({ workspaceId, extractionId: row.id });
@@ -667,6 +677,8 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
           />
         </>
       )}
+
+      {confirmDialog}
 
       <DocumentPreviewModal
         open={Boolean(preview)}

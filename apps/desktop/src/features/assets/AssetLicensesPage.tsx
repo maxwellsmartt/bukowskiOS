@@ -9,6 +9,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { useLocale } from "@shared/hooks/useLocale";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
@@ -125,6 +126,7 @@ const buildLicenseReminderTime = (expiresAt: string, reminderDaysBefore: number)
 
 export const AssetLicensesPage = () => {
   const { t } = useTranslation();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const { createReminder, deleteReminder, reminders, updateReminder } = useNotifications();
   const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
@@ -335,6 +337,15 @@ export const AssetLicensesPage = () => {
 
   const handleArchive = async (license: SoftwareLicenseRow) => {
     if (!window.bukowskiLicenses || !activeWorkspaceId) return;
+    const confirmed = await confirm({
+      title: t("assets.licenses.confirmRemove.title", { defaultValue: "¿Eliminar esta licencia?" }),
+      body: t("assets.licenses.confirmRemove.body", {
+        defaultValue: "Se quitará de la lista de licencias activas.",
+      }),
+      details: license.software_name,
+      confirmLabel: t("assets.licenses.confirmRemove.action", { defaultValue: "Eliminar" }),
+    });
+    if (!confirmed) return;
     try {
       await window.bukowskiLicenses.archive({ workspaceId: activeWorkspaceId, licenseId: license.id });
       const reminder = reminders.find((item) => item.title === buildLicenseReminderTitle(license.software_name));
@@ -727,6 +738,7 @@ export const AssetLicensesPage = () => {
           )}
         </SurfaceCard>
       </div>
+      {confirmDialog}
     </div>
   );
 };
