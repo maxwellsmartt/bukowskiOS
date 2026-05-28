@@ -26,6 +26,21 @@ type DataColumn<T> = {
   render: (row: T) => ReactNode;
 };
 
+/**
+ * A single entry in a row's right-click context menu. Modelled to map cleanly
+ * onto a future TanStack Table migration (row passed back to onSelect).
+ */
+export type DataTableRowAction<T> = {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  tone?: "default" | "danger";
+  disabled?: boolean;
+  /** Render a divider above this item. */
+  separatorBefore?: boolean;
+  onSelect: (row: T) => void;
+};
+
 type DataTableProps<T = unknown> = {
   columns: DataColumn<T>[];
   rows: T[];
@@ -59,6 +74,12 @@ type DataTableProps<T = unknown> = {
    * adaptive-measurement feedback loop that grew the table on remount.
    */
   fillParent?: boolean;
+  /**
+   * Build the right-click context menu for a row. Return an empty array (or
+   * omit the prop) to disable the menu for a given row. The native browser
+   * menu is suppressed only when at least one action is returned.
+   */
+  rowActions?: (row: T) => DataTableRowAction<T>[];
 };
 
 const selectionColumnWidth = 44;
@@ -90,6 +111,7 @@ export const DataTable = <T = unknown,>({
   pruneSelectionOnRowsChange = true,
   fillRemainingColumnKey,
   fillParent = false,
+  rowActions,
 }: DataTableProps<T>) => {
   const { t } = useTranslation();
   const defaultMinColumnWidth = 56;
@@ -122,6 +144,8 @@ export const DataTable = <T = unknown,>({
   });
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
   const [columnsMenuStyle, setColumnsMenuStyle] = useState<{ top: number; left: number; placement: "bottom" | "top" } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ row: T; rowId: string; x: number; y: number } | null>(null);
   const [tableShellWidth, setTableShellWidth] = useState(0);
   const [autoMaxHeight, setAutoMaxHeight] = useState<string | null>(null);
   const [reorderState, setReorderState] = useState<{ draggedKey: string | null; overKey: string | null }>({
@@ -385,6 +409,60 @@ export const DataTable = <T = unknown,>({
       window.removeEventListener("scroll", updateMenuPosition, true);
     };
   }, [columnsMenuOpen]);
+
+  // Row context menu: keep it inside the viewport and close on outside
+  // interaction, Escape, scroll or resize.
+  useEffect(() => {
+    if (!contextMenu) {
+      return;
+    }
+
+    const clampToViewport = () => {
+      const menu = contextMenuRef.current;
+      if (!menu) {
+        return;
+      }
+      const rect = menu.getBoundingClientRect();
+      const margin = 8;
+      let nextX = contextMenu.x;
+      let nextY = contextMenu.y;
+      if (rect.right > window.innerWidth - margin) {
+        nextX = Math.max(margin, window.innerWidth - rect.width - margin);
+      }
+      if (rect.bottom > window.innerHeight - margin) {
+        nextY = Math.max(margin, window.innerHeight - rect.height - margin);
+      }
+      if (nextX !== contextMenu.x || nextY !== contextMenu.y) {
+        setContextMenu((current) => (current ? { ...current, x: nextX, y: nextY } : current));
+      }
+    };
+
+    clampToViewport();
+
+    const close = () => setContextMenu(null);
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!contextMenuRef.current?.contains(event.target as Node)) {
+        close();
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        close();
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [contextMenu]);
 
   const allRowsSelected = resolvedRowIds.length > 0 && resolvedRowIds.every((rowId) => activeSelection.includes(rowId));
   const someRowsSelected =
@@ -851,6 +929,18 @@ export const DataTable = <T = unknown,>({
                     .join(" ")}
                   onClick={(event) => handleRowClick(event, row, rowId, isSelected)}
                   onDoubleClick={() => onRowDoubleClick?.(row)}
+                  onContextMenu={(event) => {
+                    if (!rowActions) {
+                      return;
+                    }
+                    const actions = rowActions(row);
+                    if (!actions.length) {
+                      return;
+                    }
+                    event.preventDefault();
+                    setColumnsMenuOpen(false);
+                    setContextMenu({ row, rowId, x: event.clientX, y: event.clientY });
+                  }}
                 >
                   {selectable ? (
                     <td className="data-table-select-cell" onClick={(event) => event.stopPropagation()}>
@@ -944,6 +1034,41 @@ export const DataTable = <T = unknown,>({
                     <span>{t("shared.dataTable.resetColumns")}</span>
                   </span>
                 </button>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+      {contextMenu && rowActions
+        ? createPortal(
+            <div
+              className="list-toolbar-menu list-toolbar-menu-bottom data-table-context-menu"
+              ref={contextMenuRef}
+              role="menu"
+              style={{ top: contextMenu.y, left: contextMenu.x }}
+            >
+              <div className="list-toolbar-menu-section">
+                {rowActions(contextMenu.row).map((action) => (
+                  <div key={action.key}>
+                    {action.separatorBefore ? <div className="list-toolbar-menu-divider" /> : null}
+                    <button
+                      className={`list-toolbar-menu-item${action.tone === "danger" ? " is-danger" : ""}`}
+                      disabled={action.disabled}
+                      onClick={() => {
+                        const { row } = contextMenu;
+                        setContextMenu(null);
+                        action.onSelect(row);
+                      }}
+                      role="menuitem"
+                      type="button"
+                    >
+                      <span className="list-toolbar-menu-item-copy">
+                        {action.icon ? <span aria-hidden>{action.icon}</span> : null}
+                        <span>{action.label}</span>
+                      </span>
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>,
             document.body,
