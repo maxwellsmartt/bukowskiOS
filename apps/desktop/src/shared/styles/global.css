@@ -19293,6 +19293,15 @@ input[type="number"] {
   display: flex;
   flex-direction: column;
 }
+/* The intermediate .treasury-table-shell wraps the toolbar + table; it must be
+   a bounded flex column too or the chain breaks and the inner .table-shell
+   loses its internal scroll (both axes). */
+.treasury-page-stack--fill .treasury-table-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .treasury-page-stack--fill .treasury-detail-card .data-table-stack {
   flex: 1;
   min-height: 0;
