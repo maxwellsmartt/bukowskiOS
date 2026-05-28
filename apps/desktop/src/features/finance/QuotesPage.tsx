@@ -430,6 +430,40 @@ export const QuotesPage = () => {
           <DataTable<QuoteRow>
             columns={columns}
             fillParent
+            rowActions={(row) => [
+              {
+                key: "open",
+                label: t("finance.quotes.actions.openEditor"),
+                icon: <Pencil size={14} />,
+                onSelect: (target) => navigate(`/finance/quotes/${target.id}`),
+              },
+              {
+                key: "pdf",
+                label: t("finance.quotes.actions.downloadPdf"),
+                icon: <Download size={14} />,
+                onSelect: (target) => void handleDownloadPdf(target),
+              },
+              {
+                key: "duplicate",
+                label: t("finance.quotes.actions.duplicate"),
+                icon: <Copy size={14} />,
+                onSelect: (target) => void handleDuplicate(target),
+              },
+              {
+                key: "invoice",
+                label: t("finance.quotes.actions.convertToInvoice"),
+                icon: <ReceiptText size={14} />,
+                onSelect: (target) => void handleConvertToInvoice(target),
+              },
+              {
+                key: "delete",
+                label: t("finance.quotes.actions.delete"),
+                icon: <Trash2 size={14} />,
+                tone: "danger",
+                separatorBefore: true,
+                onSelect: (target) => setPendingDeleteId(target.id),
+              },
+            ]}
             rows={data}
             persistKey="quotes-list-v1"
             getRowId={(row) => row.id}
