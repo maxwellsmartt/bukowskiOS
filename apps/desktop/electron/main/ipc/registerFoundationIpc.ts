@@ -1621,6 +1621,7 @@ export const registerFoundationIpc = ({
     ipcChannels.catalog.openCrewDocument,
     idReadArgsSchema,
     async (_event, fileId: string) => {
+      await workspaceAccess.assertCrewDocumentAccess(fileId, "open that crew document", "read");
       await fileUploads.openCrewDocument(fileId);
       return null;
     },
@@ -1629,7 +1630,10 @@ export const registerFoundationIpc = ({
   safeHandleReadWithSchema(
     ipcChannels.catalog.deleteCrewDocument,
     idReadArgsSchema,
-    async (_event, fileId: string) => fileUploads.deleteCrewDocument(fileId),
+    async (_event, fileId: string) => {
+      await workspaceAccess.assertCrewDocumentAccess(fileId, "remove that crew document", "write");
+      return fileUploads.deleteCrewDocument(fileId);
+    },
     "The app could not remove that crew document.",
   );
   safeHandleReadWithSchema(

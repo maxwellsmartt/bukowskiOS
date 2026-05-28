@@ -187,6 +187,21 @@ export const createWorkspaceAccessGuard = ({
     return row?.workspace_id ?? null;
   };
 
+  const getCrewDocumentWorkspaceId = (fileId: string) => {
+    const row = database
+      .prepare(
+        `
+          SELECT crew_members.workspace_id
+          FROM crew_documents
+          JOIN crew_members ON crew_members.id = crew_documents.crew_member_id
+          WHERE crew_documents.id = ?
+          LIMIT 1
+        `,
+      )
+      .get(fileId) as { workspace_id: string } | undefined;
+    return row?.workspace_id ?? null;
+  };
+
   const assertWorkspaceAccess = async ({
     workspaceId,
     action,
@@ -422,6 +437,21 @@ export const createWorkspaceAccessGuard = ({
 
       if (!workspaceId) {
         throw new Error("Incident file was not found.");
+      }
+
+      await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });
+    },
+
+    async assertCrewDocumentAccess(
+      fileId: string,
+      action: string,
+      accessLevel: WorkspaceAccessLevel = "read",
+      requiredPermission?: string,
+    ) {
+      const workspaceId = getCrewDocumentWorkspaceId(fileId);
+
+      if (!workspaceId) {
+        throw new Error("Crew document was not found.");
       }
 
       await assertWorkspaceAccess({ workspaceId, action, accessLevel, requiredPermission });

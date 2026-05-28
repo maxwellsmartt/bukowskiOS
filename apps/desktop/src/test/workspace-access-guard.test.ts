@@ -144,6 +144,44 @@ describe("workspace access guard", () => {
     cleanup();
   });
 
+  it("verifies the crew member workspace before opening or removing crew documents", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-access");
+    insertRemoteWorkspace(database);
+    database
+      .prepare(
+        `INSERT INTO crew_members (id, workspace_id, full_name, is_active, created_at, updated_at)
+         VALUES (?, ?, 'Remote Operator', 1, ?, ?)`,
+      )
+      .run("crew-remote-1", remoteWorkspaceId, "2026-04-24T00:00:00.000Z", "2026-04-24T00:00:00.000Z");
+    database
+      .prepare(
+        `INSERT INTO crew_documents (id, crew_member_id, file_type, original_name, uploaded_at)
+         VALUES (?, ?, 'document', 'cedula.pdf', ?)`,
+      )
+      .run("crew-doc-remote-1", "crew-remote-1", "2026-04-24T00:00:00.000Z");
+
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(false), { status: 200 }));
+    const guard = createWorkspaceAccessGuard({
+      database,
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon-key",
+      getTokens: async () => ({ accessToken: createJwt({ sub: "user-remote", exp: 9_999_999_999 }) }),
+      fetchImpl,
+      now: () => 1_000,
+    });
+
+    await expect(
+      guard.assertCrewDocumentAccess("crew-doc-remote-1", "remove that crew document", "write"),
+    ).rejects.toThrow(/permission|access|sign in/i);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+
+    await expect(
+      guard.assertCrewDocumentAccess("crew-doc-missing", "open that crew document", "read"),
+    ).rejects.toThrow(/crew document was not found/i);
+
+    cleanup();
+  });
+
   it("resolves project, packing slip, incident and RMA workspace before checking access", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-workspace-access");
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify(true), { status: 200 }));
