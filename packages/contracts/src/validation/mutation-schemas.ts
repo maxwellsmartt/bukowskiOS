@@ -1803,6 +1803,10 @@ export const invoiceInboxListReadArgsSchema = z.tuple([invoiceInboxListQuerySche
 export const invoiceInboxPreviewReadArgsSchema = z.tuple([
   z.object({ workspaceId: nonEmptyString, extractionId: nonEmptyString }).strict(),
 ]);
+export const invoiceInboxDuplicatesReadArgsSchema = z.tuple([
+  z.object({ workspaceId: nonEmptyString }).strict(),
+]);
+export const backfillInvoiceHashesSchema = z.object({ workspaceId: nonEmptyString }).strict();
 
 // ----------------------------------------------------------------------------
 // Software licenses (local-first)

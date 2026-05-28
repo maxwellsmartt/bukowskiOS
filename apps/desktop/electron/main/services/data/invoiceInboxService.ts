@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -153,6 +153,14 @@ const ensureTable = (db: DatabaseSync) => {
   if (!columns.includes("storage_object_key")) {
     db.exec(`ALTER TABLE invoice_extractions ADD COLUMN storage_object_key TEXT`);
   }
+  // Iteration 3: sha256 of the file bytes for exact cross-machine dedupe.
+  if (!columns.includes("content_hash")) {
+    db.exec(`ALTER TABLE invoice_extractions ADD COLUMN content_hash TEXT`);
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_invoice_extractions_content_hash
+       ON invoice_extractions (workspace_id, content_hash);`,
+  );
   db.exec(`
     CREATE TABLE IF NOT EXISTS invoice_extraction_projects (
       id TEXT PRIMARY KEY,
@@ -344,8 +352,8 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     const insert = db.prepare(
       `INSERT INTO invoice_extractions (
          id, workspace_id, batch_id, status, original_name, storage_path, storage_object_key,
-         mime_type, byte_size, uploaded_by_user_id, uploaded_by_name, created_at, updated_at
-       ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         mime_type, byte_size, content_hash, uploaded_by_user_id, uploaded_by_name, created_at, updated_at
+       ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     const ids: string[] = [];
@@ -362,6 +370,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       const extension = extensionFor(mimeType, file.name);
       const storagePath = path.join(directory, `${id}${extension}`);
       const storageObjectKey = `${input.workspaceId}/invoices/${id}${extension}`;
+      const contentHash = createHash("sha256").update(buffer).digest("hex");
       fs.writeFileSync(storagePath, buffer);
       insert.run(
         id,
@@ -372,6 +381,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
         storageObjectKey,
         mimeType,
         buffer.length,
+        contentHash,
         input.uploadedByUserId?.trim() || null,
         input.uploadedByName?.trim() || null,
         timestamp,
@@ -458,6 +468,62 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       | undefined;
     if (!row?.storage_object_key || !row.storage_path || !fs.existsSync(row.storage_path)) return;
     await options.storage.upload(row.storage_object_key, fs.readFileSync(row.storage_path), row.mime_type);
+  };
+
+  /**
+   * Backfill `content_hash` for rows uploaded before the column existed (and
+   * for rows pulled from other machines without it) so duplicate detection can
+   * see them. Pulls bytes from local disk or cloud storage. Best-effort,
+   * batched. Returns how many were hashed.
+   */
+  const backfillContentHashes = async (workspaceId: string, limit = 200): Promise<number> => {
+    const rows = db
+      .prepare(
+        `SELECT id FROM invoice_extractions
+           WHERE workspace_id = ? AND (content_hash IS NULL OR content_hash = '')
+           ORDER BY created_at DESC LIMIT ?`,
+      )
+      .all(workspaceId, limit) as Array<{ id: string }>;
+    let updated = 0;
+    for (const row of rows) {
+      const file = await getFileBuffer(row.id);
+      if (!file) continue;
+      const hash = createHash("sha256").update(file.buffer).digest("hex");
+      db.prepare(`UPDATE invoice_extractions SET content_hash = ? WHERE id = ?`).run(hash, row.id);
+      enqueueOutbox(workspaceId, row.id);
+      updated += 1;
+    }
+    return updated;
+  };
+
+  /**
+   * Groups of exact-duplicate invoices (same file bytes) that still need
+   * resolution — the cross-machine case (uploaded from two machines) and
+   * accidental re-uploads. Excludes already-dismissed rows.
+   */
+  const findDuplicateGroups = (workspaceId: string): Array<{ contentHash: string; items: InvoiceExtraction[] }> => {
+    const hashes = db
+      .prepare(
+        `SELECT content_hash FROM invoice_extractions
+           WHERE workspace_id = ? AND content_hash IS NOT NULL AND content_hash <> '' AND status <> 'dismissed'
+           GROUP BY content_hash HAVING COUNT(*) > 1`,
+      )
+      .all(workspaceId) as Array<{ content_hash: string }>;
+    if (!hashes.length) return [];
+    return hashes.map(({ content_hash }) => {
+      const rows = db
+        .prepare(
+          `SELECT * FROM invoice_extractions
+             WHERE workspace_id = ? AND content_hash = ? AND status <> 'dismissed'
+             ORDER BY created_at ASC, rowid ASC`,
+        )
+        .all(workspaceId, content_hash) as ExtractionRow[];
+      const projectsById = loadProjectsFor(rows.map((r) => r.id));
+      return {
+        contentHash: content_hash,
+        items: rows.map((r) => mapRow(r, projectsById.get(r.id) ?? [])),
+      };
+    });
   };
 
   const listPendingIds = (): string[] =>
@@ -704,6 +770,8 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     list,
     getFileBuffer,
     uploadDocument,
+    backfillContentHashes,
+    findDuplicateGroups,
     listPendingIds,
     setProcessing,
     recordExtraction,

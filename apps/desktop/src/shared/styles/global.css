@@ -19276,3 +19276,39 @@ input[type="number"] {
   min-height: 0;
   max-height: none;
 }
+
+/* Invoice duplicate detection banner + resolve dialog ======================= */
+.invoice-duplicate-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm, 11px);
+  background: rgba(255, 180, 90, 0.1);
+  border: 1px solid rgba(255, 180, 90, 0.32);
+  font-size: var(--font-sm, 13px);
+}
+.invoice-duplicate-group {
+  border: 1px solid var(--hairline-faint, rgba(255, 255, 255, 0.06));
+  border-radius: var(--radius-sm, 11px);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.invoice-duplicate-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-sm, 13px);
+  cursor: pointer;
+}
+.invoice-duplicate-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

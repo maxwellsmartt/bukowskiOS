@@ -359,6 +359,12 @@ export type UpdateInvoiceExtractionCommand = {
   projects?: InvoiceExtractionProjectInput[];
 };
 
+/** A group of exact-duplicate invoices (same file bytes) needing resolution. */
+export type InvoiceDuplicateGroup = {
+  contentHash: string;
+  items: InvoiceExtraction[];
+};
+
 /** Assign the linked user and/or project tags to many invoices at once. */
 export type BulkLinkInvoiceExtractionsCommand = {
   workspaceId: string;

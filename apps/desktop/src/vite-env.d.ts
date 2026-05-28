@@ -558,6 +558,10 @@ declare global {
         workspaceId: string,
         extractionId: string,
       ) => Promise<{ fileName: string; mimeType: string; dataUrl: string } | null>;
+      invoiceInboxDuplicates: (
+        workspaceId: string,
+      ) => Promise<import("@contracts").InvoiceDuplicateGroup[]>;
+      invoiceInboxBackfillHashes: (workspaceId: string) => Promise<number>;
       invoiceInboxApply: (
         input: import("@contracts").ApplyInvoiceExtractionCommand,
       ) => Promise<import("@contracts").InvoiceExtractionMutationResult>;

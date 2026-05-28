@@ -242,6 +242,30 @@ describe("invoice inbox service", () => {
     cleanup();
   });
 
+  it("detects exact-duplicate invoices by content hash across uploads", () => {
+    const { cleanup, database } = createTestDatabase("invoice-inbox-dedupe");
+    const treasuryMutations = createTreasuryMutationService(database);
+    const inbox = createInvoiceInboxService(database, {
+      userDataPath: makeUserDataPath(),
+      treasuryMutations,
+    });
+
+    // Same bytes uploaded twice (simulating home + office).
+    inbox.enqueueBatch({ workspaceId, files: [{ name: "casa.png", mimeType: "image/png", dataUrl: PNG_DATA_URL }] });
+    inbox.enqueueBatch({ workspaceId, files: [{ name: "oficina.png", mimeType: "image/png", dataUrl: PNG_DATA_URL }] });
+
+    const groups = inbox.findDuplicateGroups(workspaceId);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].items).toHaveLength(2);
+    expect(new Set(groups[0].items.map((i) => i.originalName))).toEqual(new Set(["casa.png", "oficina.png"]));
+
+    // Dismissing one collapses the group.
+    inbox.dismiss({ workspaceId, extractionId: groups[0].items[1].id });
+    expect(inbox.findDuplicateGroups(workspaceId)).toHaveLength(0);
+
+    cleanup();
+  });
+
   it("skips unsupported attachments and never matches without a plausible movement", () => {
     const { cleanup, database } = createTestDatabase("invoice-inbox-skip");
     const treasuryMutations = createTreasuryMutationService(database);

@@ -196,6 +196,35 @@ export const useTreasuryImports = (workspaceId: string, bankAccountId?: string) 
   return { data, isLoading, refresh };
 };
 
+export const useInvoiceDuplicates = (workspaceId: string) => {
+  const [data, setData] = useState<import("@contracts").InvoiceDuplicateGroup[]>([]);
+  const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !workspaceId) {
+      setData([]);
+      return;
+    }
+    let cancelled = false;
+    // Backfill content hashes (older / pulled rows) before grouping, then list.
+    void window.bukowskiTreasury
+      .invoiceInboxBackfillHashes(workspaceId)
+      .catch(() => 0)
+      .then(() => window.bukowskiTreasury?.invoiceInboxDuplicates(workspaceId))
+      .then((groups) => {
+        if (!cancelled && groups) setData(groups);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, version, refreshVersion]);
+
+  return { data, refresh };
+};
+
 export const useExpenseCategories = (workspaceId: string) => {
   const [data, setData] = useState<string[]>([]);
   const refreshVersion = useWorkspaceDataRefreshVersion();

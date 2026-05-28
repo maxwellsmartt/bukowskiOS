@@ -714,6 +714,12 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxPreview, { workspaceId, extractionId }) as Promise<
       { fileName: string; mimeType: string; dataUrl: string } | null
     >,
+  invoiceInboxDuplicates: (workspaceId: string) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxDuplicates, { workspaceId }) as Promise<
+      import("@contracts").InvoiceDuplicateGroup[]
+    >,
+  invoiceInboxBackfillHashes: (workspaceId: string) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxBackfillHashes, { workspaceId }) as Promise<number>,
   invoiceInboxApply: (input: import("@contracts").ApplyInvoiceExtractionCommand) =>
     ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxApply, input) as Promise<
       import("@contracts").InvoiceExtractionMutationResult

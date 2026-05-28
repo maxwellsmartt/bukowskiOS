@@ -175,6 +175,8 @@ type LocalDatabaseRuntime = {
     getFileBuffer: (
       id: string,
     ) => Promise<{ buffer: Buffer; mimeType: string; fileName: string } | null>;
+    findDuplicateGroups: (workspaceId: string) => import("@contracts").InvoiceDuplicateGroup[];
+    backfillContentHashes: (workspaceId: string, limit?: number) => Promise<number>;
   };
   packingMutations: PackingMutationService;
   rmaMutations: RmaMutationService;
@@ -1614,6 +1616,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
     apply: invoiceInboxService.applyExtraction,
     dismiss: invoiceInboxService.dismiss,
     getFileBuffer: invoiceInboxService.getFileBuffer,
+    findDuplicateGroups: invoiceInboxService.findDuplicateGroups,
+    backfillContentHashes: invoiceInboxService.backfillContentHashes,
   };
   const dataRetention = createDataRetentionService(database);
   assistantChatService.reconcileInterruptedThreads();

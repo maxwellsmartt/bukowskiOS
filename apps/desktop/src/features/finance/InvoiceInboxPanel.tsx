@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import type {
+  InvoiceDuplicateGroup,
   InvoiceExtraction,
   InvoiceExtractionProjectInput,
   InvoiceInboxFileInput,
@@ -23,6 +24,7 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 import {
   useExpenseCategories,
+  useInvoiceDuplicates,
   useInvoiceInbox,
   useTreasuryTransactions,
   useTreasuryMutations,
@@ -75,6 +77,8 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const { user } = useSession();
   const inbox = useInvoiceInbox(workspaceId);
   const expenseCategories = useExpenseCategories(workspaceId);
+  const duplicates = useInvoiceDuplicates(workspaceId);
+  const [showDuplicates, setShowDuplicates] = useState(false);
   const { confirm, confirmDialog } = useConfirmDialog();
   const mutations = useTreasuryMutations();
   const transactions = useTreasuryTransactions(
@@ -267,6 +271,24 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     }
   };
 
+  const resolveDuplicates = async (idsToDismiss: string[]) => {
+    try {
+      for (const id of idsToDismiss) {
+        await mutations.dismissInvoiceExtraction({ workspaceId, extractionId: id });
+      }
+      toast.success(
+        t("finance.treasury.invoices.duplicates.resolved", {
+          defaultValue: "Duplicados resueltos.",
+        }),
+      );
+      setShowDuplicates(false);
+      duplicates.refresh();
+      inbox.refresh();
+    } catch (error) {
+      toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.duplicates.failed", { defaultValue: "No se pudieron resolver los duplicados." })));
+    }
+  };
+
   const setLinkedUser = async (row: InvoiceExtraction, value: string) => {
     const member = members.find((m) => m.id === value);
     try {
@@ -402,6 +424,20 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
           onChange={(event) => void handleFiles(event.target.files)}
         />
       </button>
+
+      {duplicates.data.length > 0 ? (
+        <div className="invoice-duplicate-banner">
+          <span>
+            {t("finance.treasury.invoices.duplicates.banner", {
+              defaultValue: "Se detectaron facturas duplicadas ({{count}} grupo(s)).",
+              count: duplicates.data.length,
+            })}
+          </span>
+          <button className="action-primary-button" type="button" onClick={() => setShowDuplicates(true)}>
+            {t("finance.treasury.invoices.duplicates.review", { defaultValue: "Revisar" })}
+          </button>
+        </div>
+      ) : null}
 
       {inbox.data.length === 0 ? (
         <GuidedEmptyState
@@ -680,6 +716,15 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
 
       {confirmDialog}
 
+      {showDuplicates ? (
+        <InvoiceDuplicatesDialog
+          groups={duplicates.data}
+          formatMoney={formatMoney}
+          onClose={() => setShowDuplicates(false)}
+          onResolve={resolveDuplicates}
+        />
+      ) : null}
+
       <DocumentPreviewModal
         open={Boolean(preview)}
         onClose={() => setPreview(null)}
@@ -828,6 +873,99 @@ const InvoiceEditModal = ({
             }
           >
             {t("common.save", { defaultValue: "Guardar" })}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+};
+
+/* ------------------------------------------------------------------------- */
+/* Duplicate resolution dialog                                               */
+/* ------------------------------------------------------------------------- */
+
+const InvoiceDuplicatesDialog = ({
+  groups,
+  formatMoney,
+  onClose,
+  onResolve,
+}: {
+  groups: InvoiceDuplicateGroup[];
+  formatMoney: (value: number) => string;
+  onClose: () => void;
+  onResolve: (idsToDismiss: string[]) => void;
+}) => {
+  const { t } = useTranslation();
+  // Default keeper per group = the oldest (first) item.
+  const [keepers, setKeepers] = useState<Record<string, string>>(() =>
+    Object.fromEntries(groups.map((g) => [g.contentHash, g.items[0]?.id ?? ""])),
+  );
+
+  const idsToDismiss = groups.flatMap((g) =>
+    g.items.filter((item) => item.id !== keepers[g.contentHash]).map((item) => item.id),
+  );
+
+  return createPortal(
+    <div className="document-preview-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="document-preview-dialog"
+        style={{ width: "min(680px, 94vw)" }}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="document-preview-header">
+          <span className="document-preview-title">
+            {t("finance.treasury.invoices.duplicates.title", { defaultValue: "Resolver facturas duplicadas" })}
+          </span>
+          <button className="icon-ghost-control" onClick={onClose} type="button" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="document-preview-body" style={{ display: "block" }}>
+          <p className="surface-card-subtitle" style={{ marginBottom: 10 }}>
+            {t("finance.treasury.invoices.duplicates.help", {
+              defaultValue: "Elige cuál conservar en cada grupo; las demás se descartarán.",
+            })}
+          </p>
+          {groups.map((group) => (
+            <div className="invoice-duplicate-group" key={group.contentHash}>
+              {group.items.map((item) => (
+                <label className="invoice-duplicate-row" key={item.id}>
+                  <input
+                    type="radio"
+                    name={`keep-${group.contentHash}`}
+                    checked={keepers[group.contentHash] === item.id}
+                    onChange={() => setKeepers((prev) => ({ ...prev, [group.contentHash]: item.id }))}
+                  />
+                  <span className="invoice-duplicate-name">{item.originalName}</span>
+                  <span className="text-muted">
+                    {item.total != null ? formatMoney(item.total) : "—"} ·{" "}
+                    {item.uploadedByName ?? "—"} · {item.createdAt.slice(0, 10)}
+                  </span>
+                </label>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div
+          className="document-preview-header"
+          style={{ justifyContent: "flex-end", borderTop: "1px solid var(--hairline-faint, rgba(255,255,255,0.05))", borderBottom: 0 }}
+        >
+          <button className="ghost-control" type="button" onClick={onClose}>
+            {t("common.cancel", { defaultValue: "Cancelar" })}
+          </button>
+          <button
+            className="action-danger-button"
+            type="button"
+            disabled={idsToDismiss.length === 0}
+            onClick={() => onResolve(idsToDismiss)}
+          >
+            {t("finance.treasury.invoices.duplicates.apply", {
+              defaultValue: "Descartar {{count}} duplicado(s)",
+              count: idsToDismiss.length,
+            })}
           </button>
         </div>
       </div>

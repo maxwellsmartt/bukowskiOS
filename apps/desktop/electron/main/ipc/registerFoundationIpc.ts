@@ -50,6 +50,8 @@ import {
   enqueueInvoiceBatchSchema,
   invoiceInboxListReadArgsSchema,
   invoiceInboxPreviewReadArgsSchema,
+  invoiceInboxDuplicatesReadArgsSchema,
+  backfillInvoiceHashesSchema,
   updateInvoiceExtractionSchema,
   bulkLinkInvoiceExtractionsSchema,
   upsertSoftwareLicenseSchema,
@@ -492,6 +494,8 @@ type RegisterFoundationIpcOptions = {
     getFileBuffer: (
       id: string,
     ) => Promise<{ buffer: Buffer; mimeType: string; fileName: string } | null>;
+    findDuplicateGroups: (workspaceId: string) => import("@contracts").InvoiceDuplicateGroup[];
+    backfillContentHashes: (workspaceId: string, limit?: number) => Promise<number>;
   };
   softwareLicenses: {
     listLicenses: (workspaceId: string) => import("@contracts").SoftwareLicenseRow[];
@@ -2741,6 +2745,29 @@ export const registerFoundationIpc = ({
       requiredPermission: "treasury.transactions.classify",
     });
     return invoiceInbox.dismiss(input);
+  });
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.invoiceInboxDuplicates,
+    invoiceInboxDuplicatesReadArgsSchema,
+    async (_event, query: { workspaceId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load invoice duplicates",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return invoiceInbox.findDuplicateGroups(query.workspaceId);
+    },
+    "The app could not load invoice duplicates.",
+  );
+  safeHandle(ipcChannels.treasury.invoiceInboxBackfillHashes, backfillInvoiceHashesSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "backfill invoice hashes",
+      accessLevel: "read",
+      requiredPermission: "treasury.transactions.read",
+    });
+    return invoiceInbox.backfillContentHashes(input.workspaceId);
   });
 
   // Software licenses (local-first) ----------------------------------------
