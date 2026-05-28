@@ -209,6 +209,7 @@ const bukowskiApp = {
   exportSupportBundle: () => ipcRenderer.invoke(ipcChannels.app.exportSupportBundle) as Promise<AppExportResult>,
   exportRecentLogs: () => ipcRenderer.invoke(ipcChannels.app.exportRecentLogs) as Promise<AppExportResult>,
   openExternal: (url: string) => ipcRenderer.invoke(ipcChannels.app.openExternal, url) as Promise<void>,
+  writeClipboard: (text: string) => ipcRenderer.invoke(ipcChannels.app.writeClipboard, text) as Promise<void>,
   getDocumentsRoot: () =>
     ipcRenderer.invoke(ipcChannels.app.getDocumentsRoot) as Promise<{
       root: string;

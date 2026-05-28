@@ -11,6 +11,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { useLocale } from "@shared/hooks/useLocale";
+import { copyToClipboard } from "@shared/lib/clipboard";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 
 type LicenseDraft = {
@@ -423,7 +424,7 @@ export const AssetLicensesPage = () => {
   const handleCopyLicenseCode = async (license: SoftwareLicenseRow) => {
     if (!license.license_key) return;
     try {
-      await navigator.clipboard.writeText(license.license_key);
+      await copyToClipboard(license.license_key);
       setCopiedLicenseId(license.id);
       toast.success(t("assets.licenses.toasts.codeCopiedTitle"), license.software_name);
       window.setTimeout(() => setCopiedLicenseId((current) => (current === license.id ? null : current)), 1800);

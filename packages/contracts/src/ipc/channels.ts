@@ -23,6 +23,7 @@ export const ipcChannels = {
     exportSupportBundle: "bukowskiApp:exportSupportBundle",
     exportRecentLogs: "bukowskiApp:exportRecentLogs",
     openExternal: "bukowskiApp:openExternal",
+    writeClipboard: "bukowskiApp:writeClipboard",
     getDocumentsRoot: "bukowskiApp:getDocumentsRoot",
     chooseDocumentsRoot: "bukowskiApp:chooseDocumentsRoot",
     resetDocumentsRoot: "bukowskiApp:resetDocumentsRoot",

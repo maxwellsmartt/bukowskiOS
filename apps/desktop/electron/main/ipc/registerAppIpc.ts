@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, shell } from "electron";
+import { app, clipboard, dialog, ipcMain, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -531,6 +531,18 @@ export const registerAppIpc = ({
       return shell.openExternal(url);
     } catch (error) {
       throw sanitizeIpcError(error, "The app could not open that external link.");
+    }
+  });
+
+  // Reliable clipboard write via Electron (navigator.clipboard can be denied
+  // in packaged builds under file://). Renderer falls back to navigator only
+  // if this is unavailable.
+  ipcMain.handle(ipcChannels.app.writeClipboard, (event, text: unknown) => {
+    try {
+      assertTrustedIpcSender(event);
+      clipboard.writeText(typeof text === "string" ? text : String(text ?? ""));
+    } catch (error) {
+      throw sanitizeIpcError(error, "The app could not copy to the clipboard.");
     }
   });
 
