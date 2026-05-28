@@ -723,6 +723,25 @@ const bukowskiTreasury = {
     >,
 };
 
+const bukowskiLicenses = {
+  list: (workspaceId: string) =>
+    ipcRenderer.invoke(ipcChannels.licenses.list, { workspaceId }) as Promise<
+      import("@contracts").SoftwareLicenseRow[]
+    >,
+  upsert: (input: import("@contracts").UpsertSoftwareLicenseCommand) =>
+    ipcRenderer.invoke(ipcChannels.licenses.upsert, input) as Promise<
+      import("@contracts").SoftwareLicenseMutationResult
+    >,
+  archive: (input: import("@contracts").ArchiveSoftwareLicenseCommand) =>
+    ipcRenderer.invoke(ipcChannels.licenses.archive, input) as Promise<
+      import("@contracts").SoftwareLicenseMutationResult
+    >,
+  setSeats: (input: import("@contracts").SetLicenseSeatsCommand) =>
+    ipcRenderer.invoke(ipcChannels.licenses.setSeats, input) as Promise<
+      import("@contracts").SoftwareLicenseMutationResult
+    >,
+};
+
 const bukowskiCatalog = {
   getSnapshot: (query?: CatalogListQuery) => ipcRenderer.invoke(ipcChannels.catalog.getSnapshot, query) as Promise<CatalogSnapshot>,
   create: (input: CreateCatalogEntityInput) => ipcRenderer.invoke(ipcChannels.catalog.create, input) as Promise<CatalogSnapshot>,
@@ -800,5 +819,6 @@ contextBridge.exposeInMainWorld("bukowskiCurrency", bukowskiCurrency);
 contextBridge.exposeInMainWorld("bukowskiQuotes", bukowskiQuotes);
 contextBridge.exposeInMainWorld("bukowskiInvoices", bukowskiInvoices);
 contextBridge.exposeInMainWorld("bukowskiTreasury", bukowskiTreasury);
+contextBridge.exposeInMainWorld("bukowskiLicenses", bukowskiLicenses);
 contextBridge.exposeInMainWorld("bukowskiCatalog", bukowskiCatalog);
 contextBridge.exposeInMainWorld("bukowskiRma", bukowskiRma);

@@ -22,6 +22,7 @@ import treasurySchemaSql from "../migrations/0022_treasury_schema.sql?raw";
 import collaboratorPaymentsSql from "../migrations/0022_collaborator_payments.sql?raw";
 import treasuryUndoJournalSql from "../migrations/0023_treasury_undo_journal.sql?raw";
 import treasuryFiscalFieldsSql from "../migrations/0024_treasury_fiscal_fields.sql?raw";
+import softwareLicensesSql from "../migrations/0025_software_licenses.sql?raw";
 
 const foundationMigrations = [
   { version: "0001_foundation", sql: foundationCoreSql },
@@ -48,6 +49,7 @@ const foundationMigrations = [
   { version: "0022_collaborator_payments", sql: collaboratorPaymentsSql },
   { version: "0023_treasury_undo_journal", sql: treasuryUndoJournalSql },
   { version: "0024_treasury_fiscal_fields", sql: treasuryFiscalFieldsSql },
+  { version: "0025_software_licenses", sql: softwareLicensesSql },
 ] as const;
 
 const foundationMigrationSql = foundationMigrations.map((migration) => migration.sql).join("\n\n");

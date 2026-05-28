@@ -17,6 +17,7 @@ export * from "./commands/finance-currency-commands";
 export * from "./commands/quote-commands";
 export * from "./commands/invoice-commands";
 export * from "./commands/treasury-commands";
+export * from "./commands/software-license-commands";
 export * from "./commands/rma-commands";
 export * from "./commands/packing-commands";
 export * from "./commands/project-commands";

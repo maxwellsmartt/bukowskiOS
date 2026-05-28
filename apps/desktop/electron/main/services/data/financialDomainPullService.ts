@@ -28,7 +28,8 @@ export type FinanceBusinessPullTable =
   | "invoice_items"
   | "invoice_payments"
   | "invoice_extractions"
-  | "financial_entries";
+  | "financial_entries"
+  | "software_licenses";
 
 export type FinancialDomainPullResult<TTable extends string> = {
   workspaceId: string;
@@ -73,6 +74,7 @@ const financeBusinessEntityMap: Record<
   invoice_payments: { entityType: "invoice_payment", entityIdColumn: "id", conflictColumns: ["id"] },
   invoice_extractions: { entityType: "invoice_extraction", entityIdColumn: "id", conflictColumns: ["id"] },
   financial_entries: { entityType: "financial_entry", entityIdColumn: "id", conflictColumns: ["id"] },
+  software_licenses: { entityType: "software_license", entityIdColumn: "id", conflictColumns: ["id"] },
 };
 
 const tableCursorColumn: Record<TreasuryPullTable | CollaboratorPaymentPullTable | FinanceBusinessPullTable, string> = {
@@ -95,6 +97,7 @@ const tableCursorColumn: Record<TreasuryPullTable | CollaboratorPaymentPullTable
   invoice_payments: "created_at",
   invoice_extractions: "updated_at",
   financial_entries: "updated_at",
+  software_licenses: "updated_at",
 };
 
 const toSqlInputValue = (value: unknown): SQLInputValue => {

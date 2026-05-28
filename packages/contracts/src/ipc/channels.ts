@@ -213,6 +213,12 @@ export const ipcChannels = {
     renumber: "bukowskiInvoices:renumber",
     createFromQuote: "bukowskiInvoices:createFromQuote",
   },
+  licenses: {
+    list: "bukowskiLicenses:list",
+    upsert: "bukowskiLicenses:upsert",
+    archive: "bukowskiLicenses:archive",
+    setSeats: "bukowskiLicenses:setSeats",
+  },
   treasury: {
     listAccounts: "bukowskiTreasury:listAccounts",
     upsertAccount: "bukowskiTreasury:upsertAccount",

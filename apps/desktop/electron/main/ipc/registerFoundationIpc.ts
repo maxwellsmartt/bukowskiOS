@@ -52,6 +52,10 @@ import {
   invoiceInboxPreviewReadArgsSchema,
   updateInvoiceExtractionSchema,
   bulkLinkInvoiceExtractionsSchema,
+  upsertSoftwareLicenseSchema,
+  archiveSoftwareLicenseSchema,
+  setLicenseSeatsSchema,
+  softwareLicensesReadArgsSchema,
   applyInvoiceExtractionSchema,
   dismissInvoiceExtractionSchema,
   treasuryAccountsReadArgsSchema,
@@ -489,6 +493,18 @@ type RegisterFoundationIpcOptions = {
       id: string,
     ) => Promise<{ buffer: Buffer; mimeType: string; fileName: string } | null>;
   };
+  softwareLicenses: {
+    listLicenses: (workspaceId: string) => import("@contracts").SoftwareLicenseRow[];
+    upsertLicense: (
+      input: import("@contracts").UpsertSoftwareLicenseCommand,
+    ) => import("@contracts").SoftwareLicenseMutationResult;
+    archiveLicense: (
+      input: import("@contracts").ArchiveSoftwareLicenseCommand,
+    ) => import("@contracts").SoftwareLicenseMutationResult;
+    setSeats: (
+      input: import("@contracts").SetLicenseSeatsCommand,
+    ) => import("@contracts").SoftwareLicenseMutationResult;
+  };
   exportQuotePdf: (
     workspaceId: string,
     quoteId: string,
@@ -635,6 +651,7 @@ export const registerFoundationIpc = ({
   treasuryMutations,
   treasuryReads,
   invoiceInbox,
+  softwareLicenses,
   exportInvoicePdf,
   exportQuotePdf,
   packingMutations,
@@ -2725,6 +2742,50 @@ export const registerFoundationIpc = ({
     });
     return invoiceInbox.dismiss(input);
   });
+
+  // Software licenses (local-first) ----------------------------------------
+  safeHandleReadWithSchema(
+    ipcChannels.licenses.list,
+    softwareLicensesReadArgsSchema,
+    async (_event, query: { workspaceId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load licenses",
+        accessLevel: "read",
+        requiredPermission: "assets.read",
+      });
+      return softwareLicenses.listLicenses(query.workspaceId);
+    },
+    "The app could not load licenses.",
+  );
+  safeHandle(ipcChannels.licenses.upsert, upsertSoftwareLicenseSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "save license",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+    return softwareLicenses.upsertLicense(input);
+  });
+  safeHandle(ipcChannels.licenses.archive, archiveSoftwareLicenseSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "archive license",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+    return softwareLicenses.archiveLicense(input);
+  });
+  safeHandle(ipcChannels.licenses.setSeats, setLicenseSeatsSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "update license seats",
+      accessLevel: "write",
+      requiredPermission: "assets.manage",
+    });
+    return softwareLicenses.setSeats(input);
+  });
+
   safeHandleReadWithSchema(
     ipcChannels.quotes.exportPdf,
     quoteExportPdfReadArgsSchema,

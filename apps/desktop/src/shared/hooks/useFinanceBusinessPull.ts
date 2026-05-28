@@ -18,6 +18,7 @@ const tableConfigs: Array<{ table: FinanceBusinessPullTable; cursorColumn: strin
   { table: "invoice_payments", cursorColumn: "created_at" },
   { table: "invoice_extractions", cursorColumn: "updated_at" },
   { table: "financial_entries", cursorColumn: "updated_at" },
+  { table: "software_licenses", cursorColumn: "updated_at" },
 ];
 
 const cursorKey = (workspaceId: string, table: FinanceBusinessPullTable) =>

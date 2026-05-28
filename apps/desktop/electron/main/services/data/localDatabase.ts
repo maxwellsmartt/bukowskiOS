@@ -60,6 +60,7 @@ import { createInvoiceInboxService } from "./invoiceInboxService";
 import { createInvoiceExtractionService } from "../ai/invoiceExtractionService";
 import { createSupabaseDocumentStorage } from "./supabaseDocumentStorageService";
 import { createAppSettingsStore } from "./appSettingsStore";
+import { createSoftwareLicenseService } from "./softwareLicenseService";
 import { createQuoteMutationService } from "./quoteMutationService";
 import { createQuoteReadService } from "./quoteReadService";
 import { createFinanceMutationService } from "./financeMutationService";
@@ -183,6 +184,7 @@ type LocalDatabaseRuntime = {
   supportDiagnostics: SupportDiagnosticsService;
   userAdmin: UserAdminService;
   fileUploads: FileUploadService;
+  softwareLicenses: ReturnType<typeof createSoftwareLicenseService>;
   appSettings: {
     getDocumentsRoot: () => string;
     getDocumentsRootSetting: () => string | null;
@@ -1187,6 +1189,12 @@ const createRuntime = (): LocalDatabaseRuntime => {
         );
         return rows.length ? [{ table: "financial_entries", onConflict: "id", rows }] : [];
       }
+      case "software_license": {
+        const rows = selectAll("SELECT * FROM software_licenses WHERE id = ?", row.entity_id).map((r) =>
+          parseJsonColumn(r, ["seat_assignments"]),
+        );
+        return rows.length ? [{ table: "software_licenses", onConflict: "id", rows }] : [];
+      }
       case "invoice_extraction": {
         const rows = selectAll("SELECT * FROM invoice_extractions WHERE id = ?", row.entity_id).map((r) =>
           nullNonUuid(r, ["uploaded_by_user_id", "linked_user_id"]),
@@ -1248,6 +1256,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
           { table: "invoice_extraction_projects", column: "invoice_extraction_id", value: row.entity_id },
           { table: "invoice_extractions", column: "id", value: row.entity_id },
         ];
+      case "software_license":
+        return [{ table: "software_licenses", column: "id", value: row.entity_id }];
       default:
         return null;
     }
@@ -1531,6 +1541,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     runtimeDiagnostics,
   });
   const appSettings = createAppSettingsStore(app.getPath("userData"));
+  const softwareLicenses = createSoftwareLicenseService(database);
   const fileUploads = createFileUploadService(database, {
     userDataPath: app.getPath("userData"),
     getStorageRoot: () => appSettings.getDocumentsRoot(),
@@ -1754,6 +1765,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     userAdmin,
     fileUploads,
     appSettings,
+    softwareLicenses,
     getDiagnosticsSnapshot,
     getSupportSnapshot: () => supportDiagnostics.getSupportSnapshot(),
     createBackupNow,

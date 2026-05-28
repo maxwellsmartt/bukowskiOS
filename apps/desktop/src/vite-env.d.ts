@@ -463,6 +463,18 @@ declare global {
         commandId: string;
       }) => Promise<import("@contracts").InvoiceMutationResult>;
     };
+    bukowskiLicenses?: {
+      list: (workspaceId: string) => Promise<import("@contracts").SoftwareLicenseRow[]>;
+      upsert: (
+        input: import("@contracts").UpsertSoftwareLicenseCommand,
+      ) => Promise<import("@contracts").SoftwareLicenseMutationResult>;
+      archive: (
+        input: import("@contracts").ArchiveSoftwareLicenseCommand,
+      ) => Promise<import("@contracts").SoftwareLicenseMutationResult>;
+      setSeats: (
+        input: import("@contracts").SetLicenseSeatsCommand,
+      ) => Promise<import("@contracts").SoftwareLicenseMutationResult>;
+    };
     bukowskiTreasury?: {
       listAccounts: (workspaceId: string) => Promise<import("@contracts").BankAccountRow[]>;
       upsertAccount: (

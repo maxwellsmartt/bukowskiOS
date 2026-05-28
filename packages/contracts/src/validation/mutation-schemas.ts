@@ -1803,3 +1803,61 @@ export const invoiceInboxListReadArgsSchema = z.tuple([invoiceInboxListQuerySche
 export const invoiceInboxPreviewReadArgsSchema = z.tuple([
   z.object({ workspaceId: nonEmptyString, extractionId: nonEmptyString }).strict(),
 ]);
+
+// ----------------------------------------------------------------------------
+// Software licenses (local-first)
+// ----------------------------------------------------------------------------
+
+const softwareLicenseStatusSchema = z.enum([
+  "active",
+  "expiring",
+  "expired",
+  "permanent",
+  "archived",
+]);
+const softwareLicenseTypeSchema = z.enum([
+  "subscription",
+  "perpetual",
+  "trial",
+  "usage_based",
+  "web_service",
+  "other",
+]);
+
+export const upsertSoftwareLicenseSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    licenseId: nullableOrOptionalString,
+    softwareName: nonEmptyString,
+    vendor: nullableOrOptionalString,
+    status: softwareLicenseStatusSchema,
+    licenseType: softwareLicenseTypeSchema,
+    seatCount: z.number().int().min(0),
+    seatAssignments: z.array(z.string()),
+    licenseKey: nullableOrOptionalString,
+    accountEmail: nullableOrOptionalString,
+    startsAt: nullableOrOptionalString,
+    expiresAt: nullableOrOptionalString,
+    renewalUrl: nullableOrOptionalString,
+    paymentUrl: nullableOrOptionalString,
+    invoiceUrl: nullableOrOptionalString,
+    reminderDaysBefore: z.number().int().min(0),
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+export const archiveSoftwareLicenseSchema = z
+  .object({ workspaceId: nonEmptyString, licenseId: nonEmptyString })
+  .strict();
+
+export const setLicenseSeatsSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    licenseId: nonEmptyString,
+    seatAssignments: z.array(z.string()),
+  })
+  .strict();
+
+export const softwareLicensesReadArgsSchema = z.tuple([
+  z.object({ workspaceId: nonEmptyString }).strict(),
+]);

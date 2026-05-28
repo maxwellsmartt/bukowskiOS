@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, CreditCard, KeyRound, Pencil, Plus, ReceiptText, RefreshCw, Repeat2, Save, Trash2, UsersRound, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import type { SoftwareLicenseRow } from "@contracts";
 import { useNotifications } from "@app/providers/NotificationsProvider";
-import { useSession } from "@app/providers/SessionProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -11,27 +11,6 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useLocale } from "@shared/hooks/useLocale";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
-
-type SoftwareLicenseRow = {
-  id: string;
-  workspace_id: string;
-  software_name: string;
-  vendor: string | null;
-  status: "active" | "expiring" | "expired" | "permanent" | "archived";
-  license_type: "subscription" | "perpetual" | "trial" | "usage_based" | "web_service" | "other";
-  seat_count: number;
-  seat_assignments: string[] | null;
-  license_key: string | null;
-  account_email: string | null;
-  starts_at: string | null;
-  expires_at: string | null;
-  renewal_url: string | null;
-  payment_url: string | null;
-  invoice_url: string | null;
-  reminder_days_before: number;
-  notes: string | null;
-  updated_at: string;
-};
 
 type LicenseDraft = {
   softwareName: string;
@@ -146,7 +125,6 @@ const buildLicenseReminderTime = (expiresAt: string, reminderDaysBefore: number)
 
 export const AssetLicensesPage = () => {
   const { t } = useTranslation();
-  const { supabase, isLocalFallback } = useSession();
   const { createReminder, deleteReminder, reminders, updateReminder } = useNotifications();
   const toast = useToast();
   const { activeWorkspaceId } = useWorkspace();
@@ -166,24 +144,21 @@ export const AssetLicensesPage = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   const loadLicenses = async () => {
-    if (!supabase || isLocalFallback || !activeWorkspaceId) {
+    if (!window.bukowskiLicenses || !activeWorkspaceId) {
       setRows([]);
       return;
     }
 
     setIsLoading(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error: queryError } = await (supabase as any)
-        .from("software_licenses")
-        .select("*")
-        .eq("workspace_id", activeWorkspaceId)
-        .neq("status", "archived")
-        .order("expires_at", { ascending: true, nullsFirst: false })
-        .order("software_name", { ascending: true });
-
-      if (queryError) throw queryError;
-      setRows(((data ?? []) as SoftwareLicenseRow[]).map((row) => ({ ...row, seat_assignments: normalizeSeatAssignments(row.seat_assignments), status: deriveStatus(row) })));
+      const data = await window.bukowskiLicenses.list(activeWorkspaceId);
+      setRows(
+        data.map((row) => ({
+          ...row,
+          seat_assignments: normalizeSeatAssignments(row.seat_assignments),
+          status: deriveStatus(row),
+        })),
+      );
     } catch (nextError) {
       toast.error(t("assets.licenses.toasts.unavailableTitle"), getUserFacingErrorMessage(nextError, t("assets.licenses.toasts.unavailableBody")));
     } finally {
@@ -194,7 +169,7 @@ export const AssetLicensesPage = () => {
   useEffect(() => {
     void loadLicenses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWorkspaceId, isLocalFallback, supabase]);
+  }, [activeWorkspaceId]);
 
   const summary = useMemo(
     () => ({
@@ -295,7 +270,7 @@ export const AssetLicensesPage = () => {
   };
 
   const handleSave = async () => {
-    if (!supabase || !activeWorkspaceId) return;
+    if (!window.bukowskiLicenses || !activeWorkspaceId) return;
     if (!draft.softwareName.trim()) {
       toast.warning(t("assets.licenses.toasts.softwareRequiredTitle"), t("assets.licenses.toasts.softwareRequiredBody"));
       return;
@@ -303,39 +278,37 @@ export const AssetLicensesPage = () => {
 
     setIsSaving(true);
     try {
+      if (!window.bukowskiLicenses) throw new Error("Licenses bridge unavailable.");
       const previousLicense = editingLicenseId ? rows.find((row) => row.id === editingLicenseId) : null;
       const licenseType = draft.licenseType;
       const status = licenseType === "perpetual" ? "permanent" : "active";
-      const payload = {
-        workspace_id: activeWorkspaceId,
-        software_name: draft.softwareName.trim(),
+      const expiresAt = licenseType === "perpetual" || licenseType === "usage_based" ? null : toOptional(draft.expiresAt);
+      const reminderDaysBefore = Math.max(0, Number.parseInt(draft.reminderDaysBefore, 10) || 0);
+      const softwareName = draft.softwareName.trim();
+      await window.bukowskiLicenses.upsert({
+        workspaceId: activeWorkspaceId,
+        licenseId: editingLicenseId,
+        softwareName,
         vendor: toOptional(draft.vendor),
         status,
-        license_type: licenseType,
-        seat_count: Math.max(0, Number.parseInt(draft.seatCount, 10) || 0),
-        seat_assignments: parseSeatAssignments(draft.seatAssignments),
-        license_key: toOptional(draft.licenseKey),
-        account_email: toOptional(draft.accountEmail),
-        starts_at: licenseType === "perpetual" || licenseType === "trial" ? null : toOptional(draft.startsAt),
-        expires_at: licenseType === "perpetual" || licenseType === "usage_based" ? null : toOptional(draft.expiresAt),
-        renewal_url: toOptional(draft.renewalUrl),
-        payment_url: toOptional(draft.paymentUrl),
-        invoice_url: toOptional(draft.invoiceUrl),
-        reminder_days_before: Math.max(0, Number.parseInt(draft.reminderDaysBefore, 10) || 0),
+        licenseType,
+        seatCount: Math.max(0, Number.parseInt(draft.seatCount, 10) || 0),
+        seatAssignments: parseSeatAssignments(draft.seatAssignments),
+        licenseKey: toOptional(draft.licenseKey),
+        accountEmail: toOptional(draft.accountEmail),
+        startsAt: licenseType === "perpetual" || licenseType === "trial" ? null : toOptional(draft.startsAt),
+        expiresAt,
+        renewalUrl: toOptional(draft.renewalUrl),
+        paymentUrl: toOptional(draft.paymentUrl),
+        invoiceUrl: toOptional(draft.invoiceUrl),
+        reminderDaysBefore,
         notes: toOptional(draft.notes),
-        updated_at: new Date().toISOString(),
-      };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: saveError } = editingLicenseId
-        ? await (supabase as any).from("software_licenses").update(payload).eq("id", editingLicenseId).eq("workspace_id", activeWorkspaceId)
-        : await (supabase as any).from("software_licenses").insert(payload);
-
-      if (saveError) throw saveError;
+      });
       await syncLicenseReminder({
-        expiresAt: payload.expires_at,
+        expiresAt,
         previousSoftwareName: previousLicense?.software_name ?? null,
-        reminderDaysBefore: payload.reminder_days_before,
-        softwareName: payload.software_name,
+        reminderDaysBefore,
+        softwareName,
       }).catch((reminderError) => {
         toast.warning(t("assets.licenses.toasts.savedWithoutReminderTitle"), getUserFacingErrorMessage(reminderError, t("assets.licenses.toasts.savedWithoutReminderBody")));
       });
@@ -361,16 +334,9 @@ export const AssetLicensesPage = () => {
   };
 
   const handleArchive = async (license: SoftwareLicenseRow) => {
-    if (!supabase || !activeWorkspaceId) return;
+    if (!window.bukowskiLicenses || !activeWorkspaceId) return;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: archiveError } = await (supabase as any)
-        .from("software_licenses")
-        .update({ status: "archived", updated_at: new Date().toISOString() })
-        .eq("id", license.id)
-        .eq("workspace_id", activeWorkspaceId);
-
-      if (archiveError) throw archiveError;
+      await window.bukowskiLicenses.archive({ workspaceId: activeWorkspaceId, licenseId: license.id });
       const reminder = reminders.find((item) => item.title === buildLicenseReminderTitle(license.software_name));
       if (reminder) {
         await deleteReminder(reminder.id).catch(() => undefined);
@@ -412,7 +378,7 @@ export const AssetLicensesPage = () => {
   };
 
   const saveSeatAssignments = async (license: SoftwareLicenseRow) => {
-    if (!supabase || !activeWorkspaceId) return;
+    if (!window.bukowskiLicenses || !activeWorkspaceId) return;
     const assignments = compactSeatAssignments(seatEditorDraft);
     if (assignments.length > license.seat_count) {
       toast.warning(
@@ -428,19 +394,11 @@ export const AssetLicensesPage = () => {
 
     setSeatEditorBusyId(license.id);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: updatedLicense, error: updateError } = await (supabase as any)
-        .from("software_licenses")
-        .update({ seat_assignments: assignments, updated_at: new Date().toISOString() })
-        .eq("id", license.id)
-        .eq("workspace_id", activeWorkspaceId)
-        .select("id")
-        .maybeSingle();
-
-      if (updateError) throw updateError;
-      if (!updatedLicense) {
-        throw new Error(t("assets.licenses.toasts.seatAccessError"));
-      }
+      await window.bukowskiLicenses.setSeats({
+        workspaceId: activeWorkspaceId,
+        licenseId: license.id,
+        seatAssignments: assignments,
+      });
       toast.success(t("assets.licenses.toasts.seatsUpdatedTitle"), license.software_name);
       cancelSeatEdit();
       await loadLicenses();

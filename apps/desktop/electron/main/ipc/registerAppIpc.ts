@@ -211,6 +211,7 @@ const applyRemoteFinanceBusinessRowsSchema = z.object({
     "invoice_payments",
     "invoice_extractions",
     "financial_entries",
+    "software_licenses",
   ]),
   rows: z.array(remoteRecordSchema),
 });
