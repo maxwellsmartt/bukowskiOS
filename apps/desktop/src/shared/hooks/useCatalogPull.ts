@@ -41,13 +41,13 @@ const writeCursor = (key: string, value: string | null) => {
   }
 };
 
-const entityTables: CatalogPullEntityType[] = [
-  "asset_categories",
-  "locations",
-  "clients",
-  "manufacturers",
-  "production_companies",
-];
+// Only tables that have a foundational Supabase mirror are pulled. `clients`,
+// `manufacturers` and `production_companies` do not have remote tables yet
+// (see docs/foundation/sync-pull-inbox-audit-2026-05-24.md); querying them
+// returned PGRST205 ("table not found in schema cache") on every poll and
+// spammed the console with 404s. Re-add them here once their Supabase
+// migrations land. PGRST205 is also handled gracefully below as defense.
+const entityTables: CatalogPullEntityType[] = ["asset_categories", "locations"];
 const RATES_CURSOR_KEY = (workspaceId: string) =>
   `bukowski:catalog-pull-cursor:${workspaceId}:exchange_rates`;
 
@@ -104,7 +104,13 @@ export const useCatalogPull = () => {
 
           const { data, error } = await query;
           if (error) {
-            errorLogger.warn(`Catalog pull ${entityType} failed`, error);
+            // PGRST205 = table is not in the PostgREST schema cache (i.e. the
+            // remote table doesn't exist yet). That's expected for catalog
+            // entities still pending a Supabase mirror; skip quietly so we
+            // don't spam the console on every poll.
+            if ((error as { code?: string }).code !== "PGRST205") {
+              errorLogger.warn(`Catalog pull ${entityType} failed`, error);
+            }
             continue;
           }
 
