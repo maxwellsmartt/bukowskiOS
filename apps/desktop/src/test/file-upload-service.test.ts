@@ -36,6 +36,29 @@ describe("file upload service", () => {
     fs.rmSync(tempRoot, { force: true, recursive: true });
   });
 
+  it("skips re-attaching the exact same file (content-hash dedupe)", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-file-upload-dedupe");
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-file-dedupe-"));
+    const sourceFilePath = path.join(tempRoot, "fixture-asset.pdf");
+    fs.writeFileSync(sourceFilePath, "same-bytes");
+
+    const service = createFileUploadService(database, {
+      userDataPath: tempRoot,
+      shellApi: { openPath: vi.fn().mockResolvedValue("") },
+    });
+    const reads = createFoundationReadService(database);
+
+    const first = service.importAssetFiles("asset-legacy-rentman-1", [sourceFilePath]);
+    expect(first.uploadedCount).toBe(1);
+
+    const second = service.importAssetFiles("asset-legacy-rentman-1", [sourceFilePath]);
+    expect(second.uploadedCount).toBe(0);
+    expect(reads.getAssetDetail("asset-legacy-rentman-1").files).toHaveLength(1);
+
+    cleanup();
+    fs.rmSync(tempRoot, { force: true, recursive: true });
+  });
+
   it("exposes inline previews for attached asset images", () => {
     const { cleanup, database } = createTestDatabase("bukowski-file-upload-asset-images");
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-asset-images-"));

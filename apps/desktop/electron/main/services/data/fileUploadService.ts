@@ -98,6 +98,16 @@ export const applyOperationalFilesMigration = (db: DatabaseSync) => {
       deleted_at TEXT
     );
   `);
+  // I3b: content hash for same-machine upload dedupe (skip re-attaching the
+  // exact same file to the same entity).
+  ensureColumn(db, "asset_files", "content_hash", "TEXT");
+  ensureColumn(db, "incident_files", "content_hash", "TEXT");
+  ensureColumn(db, "financial_documents", "content_hash", "TEXT");
+  try {
+    ensureColumn(db, "crew_documents", "content_hash", "TEXT");
+  } catch {
+    // crew_documents is created by another bootstrap; column added there/later.
+  }
 };
 
 export const createFileUploadService = (db: DatabaseSync, options: FileUploadServiceOptions) => {
@@ -210,7 +220,29 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
             ) VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?, NULL)
           `);
 
+    const tableName =
+      domain === "asset"
+        ? "asset_files"
+        : domain === "incident"
+          ? "incident_files"
+          : domain === "finance"
+            ? "financial_documents"
+            : "crew_documents";
+    const entityColumn =
+      domain === "asset"
+        ? "asset_id"
+        : domain === "incident"
+          ? "incident_id"
+          : domain === "finance"
+            ? "financial_entry_id"
+            : "crew_member_id";
+    const existsByHash = db.prepare(
+      `SELECT 1 AS x FROM ${tableName} WHERE ${entityColumn} = ? AND content_hash = ? AND status <> 'deleted' LIMIT 1`,
+    );
+    const setHash = db.prepare(`UPDATE ${tableName} SET content_hash = ? WHERE id = ?`);
+
     let uploadedCount = 0;
+    let duplicateCount = 0;
 
     db.exec("BEGIN");
 
@@ -219,6 +251,12 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
         const originalName = path.basename(sourceFilePath);
         const mimeType = inferMimeType(sourceFilePath);
         const extension = path.extname(originalName);
+        // Skip re-attaching the exact same bytes to the same entity.
+        const contentHash = crypto.createHash("sha256").update(fileSystem.readFileSync(sourceFilePath)).digest("hex");
+        if (existsByHash.get(entityId, contentHash)) {
+          duplicateCount += 1;
+          return;
+        }
         const fileId = `${domain}-file-${crypto.randomUUID()}`;
         const storagePath = path.join(rootDirectory, `${fileId}${extension}`);
         const byteSize = fileSystem.statSync(sourceFilePath).size;
@@ -273,6 +311,7 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
           );
         }
 
+        setHash.run(contentHash, fileId);
         uploadedCount += 1;
       });
 
@@ -282,12 +321,15 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
       throw error;
     }
 
+    const dupNote = duplicateCount > 0 ? ` (${duplicateCount} duplicate(s) skipped)` : "";
     return {
       uploadedCount,
       summary:
         uploadedCount === 1
-          ? `Attached 1 ${domain} file.`
-          : `Attached ${uploadedCount} ${domain} files.`,
+          ? `Attached 1 ${domain} file${dupNote}.`
+          : uploadedCount === 0 && duplicateCount > 0
+            ? `No new files — ${duplicateCount} duplicate(s) skipped.`
+            : `Attached ${uploadedCount} ${domain} files${dupNote}.`,
     };
   };
 

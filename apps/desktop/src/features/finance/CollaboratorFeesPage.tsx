@@ -13,6 +13,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
+import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { useLocale } from "@shared/hooks/useLocale";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { useCatalogData, useProjectsRegistry } from "@features/projects/useProjectsData";
@@ -126,6 +127,7 @@ export const CollaboratorFeesPage = () => {
     }),
   });
 
+  const { confirm, confirmDialog } = useConfirmDialog();
   const { data, error: loadError, isLoading, reload } = useCollaboratorFees({
     ...controls.query,
     status: statusFilter,
@@ -193,6 +195,28 @@ export const CollaboratorFeesPage = () => {
     if (!draft.crewMemberId || !draft.feeType.trim() || !Number.isFinite(agreedAmount) || agreedAmount <= 0) {
       setError("Choose a collaborator, type and positive amount.");
       return;
+    }
+
+    // Duplicate guard (only when creating a new fee).
+    if (!draft.feeId) {
+      const existing = (data ?? []).find(
+        (fee) =>
+          fee.crewMemberId === draft.crewMemberId &&
+          fee.feeType.trim().toLowerCase() === draft.feeType.trim().toLowerCase() &&
+          Math.abs(fee.agreedAmount - agreedAmount) < 0.005 &&
+          (fee.projectId ?? "") === (draft.projectId || ""),
+      );
+      if (existing) {
+        const proceed = await confirm({
+          title: t("finance.collaboratorFees.confirmDuplicate.title", { defaultValue: "¿Honorario duplicado?" }),
+          body: t("finance.collaboratorFees.confirmDuplicate.body", {
+            defaultValue: "Ya existe un honorario con el mismo colaborador, tipo, monto y proyecto. ¿Crearlo de todos modos?",
+          }),
+          confirmLabel: t("finance.collaboratorFees.confirmDuplicate.action", { defaultValue: "Crear de todos modos" }),
+          tone: "default",
+        });
+        if (!proceed) return;
+      }
     }
 
     setIsSubmitting(true);
@@ -540,6 +564,7 @@ export const CollaboratorFeesPage = () => {
           persistKey="collaborator-fees"
         />
       </SurfaceCard>
+      {confirmDialog}
     </div>
   );
 };

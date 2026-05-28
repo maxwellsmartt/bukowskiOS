@@ -279,6 +279,30 @@ export const AssetLicensesPage = () => {
       return;
     }
 
+    // Duplicate guard (only when creating): same software + key/email already
+    // exists → ask before adding another.
+    if (!editingLicenseId) {
+      const name = draft.softwareName.trim().toLowerCase();
+      const key = (draft.licenseKey.trim() || draft.accountEmail.trim()).toLowerCase();
+      const existing = rows.find(
+        (row) =>
+          row.software_name.trim().toLowerCase() === name &&
+          ((row.license_key ?? row.account_email ?? "").trim().toLowerCase() === key),
+      );
+      if (existing) {
+        const proceed = await confirm({
+          title: t("assets.licenses.confirmDuplicate.title", { defaultValue: "¿Ya existe esta licencia?" }),
+          body: t("assets.licenses.confirmDuplicate.body", {
+            defaultValue: "Ya hay una licencia con el mismo software y clave/correo. ¿Crearla de todos modos?",
+          }),
+          details: existing.software_name,
+          confirmLabel: t("assets.licenses.confirmDuplicate.action", { defaultValue: "Crear de todos modos" }),
+          tone: "default",
+        });
+        if (!proceed) return;
+      }
+    }
+
     setIsSaving(true);
     try {
       if (!window.bukowskiLicenses) throw new Error("Licenses bridge unavailable.");
