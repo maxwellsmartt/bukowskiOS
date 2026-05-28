@@ -136,7 +136,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
   };
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--fill">
       <SectionHeader title={t("incidents.title")} />
 
       {error ? <div className="empty-state">{t("incidents.unavailable", { message: error })}</div> : null}
@@ -217,7 +217,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
         />
       ) : null}
 
-      <SurfaceCard title={t("incidents.cardTitle")}>
+      <SurfaceCard className="surface-card--fill" title={t("incidents.cardTitle")}>
         <ListToolbar
           activeSortLabel={
             incidentControls.activeSortOption
@@ -248,6 +248,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
         <DataTable
           activeRowId={activeIncidentId}
           autoScrollToActiveRow
+          fillParent
           getRowId={(row) => row.id}
           onRowClick={(row) => {
             setActiveIncidentId(row.id);

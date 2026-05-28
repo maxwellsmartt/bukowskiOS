@@ -332,7 +332,7 @@ export const QuotesPage = () => {
   const totalShown = data.length;
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--fill">
       <div className="page-stack-row">
         <SectionHeader
           eyebrow={t("finance.title")}
@@ -379,7 +379,7 @@ export const QuotesPage = () => {
         </SurfaceCard>
       ) : null}
 
-      <SurfaceCard>
+      <SurfaceCard className="surface-card--fill">
         <div className="surface-card-actions" style={{ gap: 8, flexWrap: "wrap" }}>
           <label className="compact-filter-field quotes-status-filter">
             <span>{t("finance.quotes.filters.status")}</span>
@@ -429,6 +429,7 @@ export const QuotesPage = () => {
         ) : (
           <DataTable<QuoteRow>
             columns={columns}
+            fillParent
             rows={data}
             persistKey="quotes-list-v1"
             getRowId={(row) => row.id}

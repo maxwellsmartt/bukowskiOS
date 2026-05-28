@@ -15,13 +15,14 @@ export const FinanceCostLinksPage = () => {
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--fill">
       <SectionHeader title={t("finance.costLinks.title")} />
 
       {error ? <div className="empty-state">{t("finance.costLinks.unavailable", { message: error })}</div> : null}
 
-      <SurfaceCard title={t("finance.costLinks.cardTitle")}>
+      <SurfaceCard className="surface-card--fill" title={t("finance.costLinks.cardTitle")}>
         <DataTable
+          fillParent
           getRowId={(row) => `${row.incident}-${row.asset}`}
           persistKey="finance-cost-links"
           columns={[

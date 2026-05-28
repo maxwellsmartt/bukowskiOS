@@ -117,7 +117,7 @@ export const FinanceEntriesPage = () => {
   };
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--fill">
       <SectionHeader title={t("finance.entries.title")} />
 
       {error ? <div className="empty-state">{t("finance.entries.unavailable", { message: error })}</div> : null}
@@ -218,7 +218,7 @@ export const FinanceEntriesPage = () => {
         />
       ) : null}
 
-      <SurfaceCard title={t("finance.entries.title")}>
+      <SurfaceCard className="surface-card--fill" title={t("finance.entries.title")}>
         <ListToolbar
           activeSortLabel={financeControls.activeSortOption?.label}
           onSearchValueChange={financeControls.setSearchValue}
@@ -237,6 +237,7 @@ export const FinanceEntriesPage = () => {
         ) : null}
         <DataTable
           activeRowId={editingEntryId}
+          fillParent
           emptyContent={
             <GuidedEmptyState
               title={financeControls.searchValue ? t("finance.entries.empty.noMatchesTitle") : t("finance.entries.empty.noEntriesTitle")}
