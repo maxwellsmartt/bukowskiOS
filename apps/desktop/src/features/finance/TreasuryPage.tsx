@@ -1337,7 +1337,7 @@ export const TreasuryPage = () => {
 
   return (
     <>
-    <div className="page-stack">
+    <div className={`page-stack${tab === "movements" ? " treasury-page-stack--fill" : ""}`}>
       <input
         accept=".csv,.xlsx,.xls"
         hidden
@@ -2058,11 +2058,10 @@ export const TreasuryPage = () => {
               fillRemainingColumnKey="actions"
               fitToColumnWidths
               getRowId={(row) => row.id}
-              // Explicit maxHeight skips the adaptive-height measurement, whose
-              // ResizeObserver fed back on remount (the table grew the scroll
-              // container, which re-grew the table) producing the vertical
-              // "creeping" growth when re-entering the section.
-              maxHeight="calc(100vh - 360px)"
+              // Flex-fill the movements card's remaining height (pure CSS, no
+              // measurement) so only the table scrolls and the page never gets
+              // an external scrollbar. The parent chain is bounded by the shell.
+              fillParent
               onSelectedRowIdsChange={setSelectedMovementIds}
               persistKey="treasury-movements-v3"
               rows={visibleMovements}

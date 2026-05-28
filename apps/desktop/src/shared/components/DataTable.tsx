@@ -52,6 +52,13 @@ type DataTableProps<T = unknown> = {
   pruneSelectionOnRowsChange?: boolean;
   fitToColumnWidths?: boolean;
   fillRemainingColumnKey?: string;
+  /**
+   * Fill the parent's remaining height via flexbox instead of measuring a
+   * scroll container. The parent must be a flex column with a bounded height;
+   * the table then scrolls internally and the page never scrolls. Avoids the
+   * adaptive-measurement feedback loop that grew the table on remount.
+   */
+  fillParent?: boolean;
 };
 
 const selectionColumnWidth = 44;
@@ -82,6 +89,7 @@ export const DataTable = <T = unknown,>({
   controlsAddon,
   pruneSelectionOnRowsChange = true,
   fillRemainingColumnKey,
+  fillParent = false,
 }: DataTableProps<T>) => {
   const { t } = useTranslation();
   const defaultMinColumnWidth = 56;
@@ -232,7 +240,7 @@ export const DataTable = <T = unknown,>({
   // scrolled content) so the value is STABLE while scrolling: otherwise reading
   // a live viewport top would make the table grow as the page scrolls.
   useEffect(() => {
-    if (maxHeight !== undefined || typeof window === "undefined") {
+    if (maxHeight !== undefined || fillParent || typeof window === "undefined") {
       return;
     }
 
@@ -289,7 +297,7 @@ export const DataTable = <T = unknown,>({
       window.removeEventListener("resize", recompute);
       observer?.disconnect();
     };
-  }, [maxHeight, rows.length]);
+  }, [maxHeight, fillParent, rows.length]);
 
   useEffect(() => {
     if (!persistKey) {
@@ -717,11 +725,14 @@ export const DataTable = <T = unknown,>({
       ) : null}
       <div
         ref={tableShellRef}
-        className={`table-shell${shellClassName ? ` ${shellClassName}` : ""}`}
+        className={`table-shell${fillParent ? " table-shell--fill" : ""}${shellClassName ? ` ${shellClassName}` : ""}`}
         style={
           {
-            "--table-max-height":
-              maxHeight !== undefined ? resolveMaxHeight(maxHeight) : autoMaxHeight ?? resolveMaxHeight(undefined),
+            "--table-max-height": fillParent
+              ? "none"
+              : maxHeight !== undefined
+                ? resolveMaxHeight(maxHeight)
+                : autoMaxHeight ?? resolveMaxHeight(undefined),
           } as CSSProperties
         }
       >

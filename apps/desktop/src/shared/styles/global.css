@@ -19255,3 +19255,24 @@ input[type="number"] {
   text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
 }
+
+/* Treasury movements: full-height flex-fill so only the table scrolls ======== */
+.treasury-page-stack--fill {
+  flex: 1;
+  min-height: 0;
+}
+.treasury-page-stack--fill .treasury-detail-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.treasury-page-stack--fill .treasury-detail-card .data-table-stack {
+  flex: 1;
+  min-height: 0;
+}
+.table-shell--fill {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
