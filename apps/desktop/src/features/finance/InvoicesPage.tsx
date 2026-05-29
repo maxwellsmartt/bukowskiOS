@@ -253,6 +253,14 @@ export const InvoicesPage = () => {
             fillParent
             getRowId={(row) => row.id}
             onRowDoubleClick={(row) => navigate(`/finance/invoices/${row.id}`)}
+            rowActions={(row) => [
+              {
+                key: "open",
+                label: t("finance.invoices.actions.view"),
+                icon: <Eye size={14} />,
+                onSelect: (target) => navigate(`/finance/invoices/${target.id}`),
+              },
+            ]}
             persistKey="invoices-list-v1"
             rows={data}
           />

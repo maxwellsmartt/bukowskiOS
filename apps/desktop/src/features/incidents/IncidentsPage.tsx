@@ -254,6 +254,16 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
             setActiveIncidentId(row.id);
             setIncidentDetailError(null);
           }}
+          rowActions={(row) => [
+            {
+              key: "open",
+              label: t("shared.dataTable.openDetail"),
+              onSelect: (target) => {
+                setActiveIncidentId(target.id);
+                setIncidentDetailError(null);
+              },
+            },
+          ]}
           onSortRequest={incidentControls.handleColumnSortRequest}
           persistKey="incidents-queue"
           columns={[

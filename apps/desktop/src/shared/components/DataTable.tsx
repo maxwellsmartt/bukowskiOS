@@ -835,7 +835,11 @@ export const DataTable = <T = unknown,>({
         <thead>
           <tr>
             {selectable ? (
-              <th className="data-table-select-cell">
+              <th
+                className="data-table-select-cell"
+                data-tooltip={t("shared.dataTable.selectionHint")}
+                title={t("shared.dataTable.selectionHint")}
+              >
                 <input
                   aria-label={t("shared.dataTable.selectAllRows")}
                   checked={allRowsSelected}

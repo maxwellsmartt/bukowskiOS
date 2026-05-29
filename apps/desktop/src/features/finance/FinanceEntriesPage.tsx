@@ -274,6 +274,17 @@ export const FinanceEntriesPage = () => {
             setSubmitError(null);
             setIsEditorOpen(true);
           }}
+          rowActions={(row) => [
+            {
+              key: "open",
+              label: t("shared.dataTable.openDetail"),
+              onSelect: (target) => {
+                setEditingEntryId(target.id);
+                setSubmitError(null);
+                setIsEditorOpen(true);
+              },
+            },
+          ]}
           onSortRequest={financeControls.handleColumnSortRequest}
           persistKey="finance-entries"
           columns={[

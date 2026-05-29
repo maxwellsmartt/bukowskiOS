@@ -1861,7 +1861,9 @@
       "resetColumns": "Reset columns",
       "resizeColumn": "Resize {{label}} column",
       "selectAllRows": "Select all rows",
-      "selectRow": "Select row {{index}}"
+      "selectRow": "Select row {{index}}",
+      "selectionHint": "Shift-click to select a range · ⌘/Alt-click to toggle individual rows",
+      "openDetail": "Open detail"
     },
     "scannable": {
       "noCode": "No scannable code is available yet.",

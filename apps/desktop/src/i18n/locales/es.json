@@ -1865,7 +1865,9 @@
       "resetColumns": "Restaurar columnas",
       "resizeColumn": "Ajustar columna {{label}}",
       "selectAllRows": "Seleccionar todas las filas",
-      "selectRow": "Seleccionar fila {{index}}"
+      "selectRow": "Seleccionar fila {{index}}",
+      "selectionHint": "Shift-clic para seleccionar un rango · ⌘/Alt-clic para alternar filas",
+      "openDetail": "Abrir detalle"
     },
     "scannable": {
       "noCode": "Aún no hay un código escaneable.",

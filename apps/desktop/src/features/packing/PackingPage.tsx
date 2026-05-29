@@ -196,6 +196,16 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               setActivePackingSlipId(row.id);
               setReturnError(null);
             }}
+            rowActions={(row) => [
+              {
+                key: "open",
+                label: t("shared.dataTable.openDetail"),
+                onSelect: (target) => {
+                  setActivePackingSlipId(target.id);
+                  setReturnError(null);
+                },
+              },
+            ]}
             onSelectedRowIdsChange={setSelectedRowIds}
           />
         </SurfaceCard>
