@@ -1128,6 +1128,18 @@ const createRuntime = (): LocalDatabaseRuntime => {
         );
         return rows.length ? [{ table: "exchange_rates", onConflict: "id", rows }] : [];
       }
+      case "client": {
+        const rows = selectAll("SELECT * FROM clients WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "clients", onConflict: "id", rows }] : [];
+      }
+      case "manufacturer": {
+        const rows = selectAll("SELECT * FROM manufacturers WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "manufacturers", onConflict: "id", rows }] : [];
+      }
+      case "production_company": {
+        const rows = selectAll("SELECT * FROM production_companies WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "production_companies", onConflict: "id", rows }] : [];
+      }
       case "quote": {
         const quotes = selectAll("SELECT * FROM quotes WHERE id = ?", row.entity_id).map((r) =>
           parseJsonColumn(nullNonUuid(r, ["created_by_user_id", "updated_by_user_id"]), ["exchange_rate_snapshot_json"]),
@@ -1260,6 +1272,12 @@ const createRuntime = (): LocalDatabaseRuntime => {
         ];
       case "software_license":
         return [{ table: "software_licenses", column: "id", value: row.entity_id }];
+      case "client":
+        return [{ table: "clients", column: "id", value: row.entity_id }];
+      case "manufacturer":
+        return [{ table: "manufacturers", column: "id", value: row.entity_id }];
+      case "production_company":
+        return [{ table: "production_companies", column: "id", value: row.entity_id }];
       default:
         return null;
     }

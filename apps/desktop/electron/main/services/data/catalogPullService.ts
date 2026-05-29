@@ -16,6 +16,14 @@ export type RemoteCatalogRow = {
   type?: string | null;
   is_active?: boolean | null;
   updated_at: string;
+  // Business-catalog fields (clients / manufacturers / production_companies).
+  contact_name?: string | null;
+  email?: string | null;
+  support_email?: string | null;
+  phone?: string | null;
+  rnc?: string | null;
+  pur?: string | null;
+  notes?: string | null;
 };
 
 export type CatalogPullResult = {
@@ -119,19 +127,103 @@ const upsertAssetCategories = (db: DatabaseSync, row: RemoteCatalogRow) => {
     );
 };
 
-const upsertGenericNamed = (db: DatabaseSync, table: CatalogEntityType, row: RemoteCatalogRow) => {
-  // Generic upsert for clients/manufacturers/production_companies (id, workspace_id, name, ...).
+const activeFlag = (row: RemoteCatalogRow) => (row.is_active === false ? 0 : 1);
+
+const upsertClients = (db: DatabaseSync, row: RemoteCatalogRow) => {
   db
     .prepare(
       `
-        INSERT INTO ${table} (id, workspace_id, name, updated_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO clients (id, workspace_id, name, contact_name, email, phone, rnc, notes, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM clients WHERE id = ?), ?), ?)
         ON CONFLICT(id) DO UPDATE SET
           name = excluded.name,
+          contact_name = excluded.contact_name,
+          email = excluded.email,
+          phone = excluded.phone,
+          rnc = excluded.rnc,
+          notes = excluded.notes,
+          is_active = excluded.is_active,
           updated_at = excluded.updated_at
       `,
     )
-    .run(row.id, row.workspace_id, row.name, row.updated_at);
+    .run(
+      row.id,
+      row.workspace_id,
+      row.name,
+      row.contact_name ?? null,
+      row.email ?? null,
+      row.phone ?? null,
+      row.rnc ?? null,
+      row.notes ?? null,
+      activeFlag(row),
+      row.id,
+      row.updated_at,
+      row.updated_at,
+    );
+};
+
+const upsertManufacturers = (db: DatabaseSync, row: RemoteCatalogRow) => {
+  db
+    .prepare(
+      `
+        INSERT INTO manufacturers (id, workspace_id, name, contact_name, support_email, phone, notes, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM manufacturers WHERE id = ?), ?), ?)
+        ON CONFLICT(id) DO UPDATE SET
+          name = excluded.name,
+          contact_name = excluded.contact_name,
+          support_email = excluded.support_email,
+          phone = excluded.phone,
+          notes = excluded.notes,
+          is_active = excluded.is_active,
+          updated_at = excluded.updated_at
+      `,
+    )
+    .run(
+      row.id,
+      row.workspace_id,
+      row.name,
+      row.contact_name ?? null,
+      row.support_email ?? null,
+      row.phone ?? null,
+      row.notes ?? null,
+      activeFlag(row),
+      row.id,
+      row.updated_at,
+      row.updated_at,
+    );
+};
+
+const upsertProductionCompanies = (db: DatabaseSync, row: RemoteCatalogRow) => {
+  db
+    .prepare(
+      `
+        INSERT INTO production_companies (id, workspace_id, name, contact_name, email, phone, pur, notes, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM production_companies WHERE id = ?), ?), ?)
+        ON CONFLICT(id) DO UPDATE SET
+          name = excluded.name,
+          contact_name = excluded.contact_name,
+          email = excluded.email,
+          phone = excluded.phone,
+          pur = excluded.pur,
+          notes = excluded.notes,
+          is_active = excluded.is_active,
+          updated_at = excluded.updated_at
+      `,
+    )
+    .run(
+      row.id,
+      row.workspace_id,
+      row.name,
+      row.contact_name ?? null,
+      row.email ?? null,
+      row.phone ?? null,
+      row.pur ?? null,
+      row.notes ?? null,
+      activeFlag(row),
+      row.id,
+      row.updated_at,
+      row.updated_at,
+    );
 };
 
 const applyOne = (db: DatabaseSync, entityType: CatalogEntityType, row: RemoteCatalogRow) => {
@@ -143,7 +235,15 @@ const applyOne = (db: DatabaseSync, entityType: CatalogEntityType, row: RemoteCa
     upsertAssetCategories(db, row);
     return;
   }
-  upsertGenericNamed(db, entityType, row);
+  if (entityType === "manufacturers") {
+    upsertManufacturers(db, row);
+    return;
+  }
+  if (entityType === "production_companies") {
+    upsertProductionCompanies(db, row);
+    return;
+  }
+  upsertClients(db, row);
 };
 
 const updateCursor = (

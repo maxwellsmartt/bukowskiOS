@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 import type {
@@ -361,9 +362,47 @@ const replaceKitAssets = (
   });
 };
 
+// Business catalogs that sync local-first to Supabase (clients/manufacturers/
+// production_companies). asset_categories/locations/kits/etc. are NOT here —
+// they either ship as a static seed or are not yet mirrored.
+const SYNCED_CATALOG_ENTITIES = new Set(["client", "manufacturer", "production_company"]);
+
 export const createCatalogMutationService = (db: DatabaseSync) => {
   const codeService = createCodeGenerationService(db);
   const csvService = createCatalogCsvService(db, codeService);
+
+  // Enqueue an outbound sync row for the synced business catalogs. No-op for
+  // entity types that don't mirror to Supabase. Runs inside the caller's
+  // transaction so the change and its outbox row commit atomically.
+  const enqueueCatalogOutbox = (
+    workspaceId: string,
+    entityType: string,
+    entityId: string,
+    operation: "upsert" | "delete",
+  ) => {
+    if (!SYNCED_CATALOG_ENTITIES.has(entityType)) {
+      return;
+    }
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO sync_outbox (
+         id, workspace_id, entity_type, entity_id, operation_type,
+         payload_json, status, attempt_count, last_error, next_retry_at,
+         created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, NULL, ?, ?, ?)`,
+    ).run(
+      `sync-${entityType}-${entityId}-${randomUUID().slice(0, 8)}`,
+      workspaceId,
+      entityType,
+      entityId,
+      operation,
+      JSON.stringify({ id: entityId }),
+      now,
+      now,
+      now,
+    );
+  };
+
   const service = {
     createEntity(input: CreateCatalogEntityInput) {
       const workspaceId = input.workspaceId;
@@ -447,6 +486,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const name = ensureValue(input.name, "Client name");
             assertUniqueClientName(db, workspaceId, name);
 
+            const clientId = `client-${slugify(name)}-${Date.now().toString(36)}`;
             db.prepare(
               `
                 INSERT INTO clients (
@@ -455,7 +495,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
               `,
             ).run(
-              `client-${slugify(name)}-${Date.now().toString(36)}`,
+              clientId,
               workspaceId,
               name,
               optionalValue(input.contactName),
@@ -466,6 +506,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               now,
               now,
             );
+            enqueueCatalogOutbox(workspaceId, "client", clientId, "upsert");
             break;
           }
 
@@ -473,6 +514,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const name = ensureValue(input.name, "Production company name");
             assertUniqueProductionCompanyName(db, workspaceId, name);
 
+            const companyId = `production-company-${slugify(name)}-${Date.now().toString(36)}`;
             db.prepare(
               `
                 INSERT INTO production_companies (
@@ -481,7 +523,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
               `,
             ).run(
-              `production-company-${slugify(name)}-${Date.now().toString(36)}`,
+              companyId,
               workspaceId,
               name,
               optionalValue(input.contactName),
@@ -492,6 +534,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               now,
               now,
             );
+            enqueueCatalogOutbox(workspaceId, "production_company", companyId, "upsert");
             break;
           }
 
@@ -499,6 +542,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             const name = ensureValue(input.name, "Manufacturer name");
             assertUniqueManufacturerName(db, workspaceId, name);
 
+            const manufacturerId = `manufacturer-${slugify(name)}-${Date.now().toString(36)}`;
             db.prepare(
               `
                 INSERT INTO manufacturers (
@@ -507,7 +551,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
                 VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
               `,
             ).run(
-              `manufacturer-${slugify(name)}-${Date.now().toString(36)}`,
+              manufacturerId,
               workspaceId,
               name,
               optionalValue(input.contactName),
@@ -517,6 +561,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               now,
               now,
             );
+            enqueueCatalogOutbox(workspaceId, "manufacturer", manufacturerId, "upsert");
             break;
           }
 
@@ -683,6 +728,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             }
 
             db.prepare("UPDATE projects SET client_name = ? WHERE client_id = ? AND workspace_id = ?").run(name, input.id, workspaceId);
+            enqueueCatalogOutbox(workspaceId, "client", input.id, "upsert");
             break;
           }
 
@@ -716,6 +762,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               input.id,
               workspaceId,
             );
+            enqueueCatalogOutbox(workspaceId, "production_company", input.id, "upsert");
             break;
           }
 
@@ -749,6 +796,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
               input.id,
               workspaceId,
             );
+            enqueueCatalogOutbox(workspaceId, "manufacturer", input.id, "upsert");
             break;
           }
 
@@ -848,6 +896,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             if (!result.changes) {
               throw new Error("Client not found.");
             }
+            enqueueCatalogOutbox(input.workspaceId, "client", input.id, "delete");
             break;
           }
           case "production_company": {
@@ -855,6 +904,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             if (!result.changes) {
               throw new Error("Production company not found.");
             }
+            enqueueCatalogOutbox(input.workspaceId, "production_company", input.id, "delete");
             break;
           }
           case "manufacturer": {
@@ -862,6 +912,7 @@ export const createCatalogMutationService = (db: DatabaseSync) => {
             if (!result.changes) {
               throw new Error("Manufacturer not found.");
             }
+            enqueueCatalogOutbox(input.workspaceId, "manufacturer", input.id, "delete");
             break;
           }
           case "category": {

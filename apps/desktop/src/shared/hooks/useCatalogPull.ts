@@ -41,13 +41,18 @@ const writeCursor = (key: string, value: string | null) => {
   }
 };
 
-// Only tables that have a foundational Supabase mirror are pulled. `clients`,
-// `manufacturers` and `production_companies` do not have remote tables yet
-// (see docs/foundation/sync-pull-inbox-audit-2026-05-24.md); querying them
-// returned PGRST205 ("table not found in schema cache") on every poll and
-// spammed the console with 404s. Re-add them here once their Supabase
-// migrations land. PGRST205 is also handled gracefully below as defense.
-const entityTables: CatalogPullEntityType[] = ["asset_categories", "locations"];
+// Catalog tables pulled from Supabase. clients/manufacturers/production_companies
+// gained their Supabase mirror + local-first sync in
+// 20260531120000_catalog_business_entities_sync. PGRST205 ("table not in schema
+// cache") is still handled gracefully below so a not-yet-migrated remote degrades
+// quietly instead of spamming 404s.
+const entityTables: CatalogPullEntityType[] = [
+  "asset_categories",
+  "locations",
+  "clients",
+  "manufacturers",
+  "production_companies",
+];
 const RATES_CURSOR_KEY = (workspaceId: string) =>
   `bukowski:catalog-pull-cursor:${workspaceId}:exchange_rates`;
 
