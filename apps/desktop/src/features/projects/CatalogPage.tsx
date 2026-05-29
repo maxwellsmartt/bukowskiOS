@@ -1037,7 +1037,7 @@ export const CatalogPage = () => {
         storageKey={uiPreferenceKeys.catalogSideRailWidth}
       >
         <SurfaceCard
-          className="catalog-surface-card"
+          className="catalog-surface-card rail-table-card"
           title={activeTabConfig.title}
           aside={
             <div className="surface-card-actions catalog-toolbar-actions">
@@ -1164,6 +1164,7 @@ export const CatalogPage = () => {
             onSortRequest={catalogControls.handleColumnSortRequest}
             persistKey={`catalog-${activeTab}`}
             rows={activeTabConfig.rows}
+            shellClassName="table-shell-fill"
             selectable
             selectedRowIds={selectedRowIds}
             sortState={

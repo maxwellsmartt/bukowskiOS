@@ -121,7 +121,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
         minWidth={320}
         storageKey={uiPreferenceKeys.splitSideRailWidth}
       >
-        <SurfaceCard title={t("packing.cardTitle")}>
+        <SurfaceCard className="rail-table-card" title={t("packing.cardTitle")}>
           <ListToolbar
             activeSortLabel={packingControls.activeSortOption ? t(packingControls.activeSortOption.label) : undefined}
             onSearchValueChange={packingControls.setSearchValue}
@@ -141,6 +141,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             getRowId={(row) => row.id}
             onSortRequest={packingControls.handleColumnSortRequest}
             persistKey="packing-slips"
+            shellClassName="table-shell-fill"
             columns={[
               { key: "number", label: t("packing.columns.slip"), width: 92, minWidth: 82, render: (row) => row.number },
               { key: "project", label: t("packing.columns.project"), width: 180, minWidth: 144, render: (row) => row.project },

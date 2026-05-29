@@ -19288,6 +19288,29 @@ input[type="number"] {
   max-height: none;
 }
 
+/* Table card inside a side-rail / split grid layout (align-items:start, so the
+   cell can't stretch). Give the card a bounded, viewport-relative height so its
+   DataTable scrolls internally instead of growing the page. Mirrors
+   .projects-registry-card; pair with shellClassName="table-shell-fill". */
+.rail-table-card {
+  min-height: min(74vh, 780px);
+  max-height: min(74vh, 780px);
+}
+.rail-table-card,
+.rail-table-card .data-table-stack {
+  display: flex;
+  flex-direction: column;
+}
+.rail-table-card .data-table-stack {
+  flex: 1;
+  min-height: 0;
+}
+.rail-table-card .table-shell-fill {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
 /* Row right-click context menu (reuses the toolbar menu look) ================ */
 .data-table-context-menu {
   position: fixed;
