@@ -433,15 +433,15 @@ export const QuotesPage = () => {
             rowActions={(row) => [
               {
                 key: "open",
-                label: t("finance.quotes.actions.openEditor"),
+                label: t("finance.quotes.actions.edit"),
                 icon: <Pencil size={14} />,
                 onSelect: (target) => navigate(`/finance/quotes/${target.id}`),
               },
               {
                 key: "pdf",
-                label: t("finance.quotes.actions.downloadPdf"),
+                label: t("finance.quotes.actions.exportPdf"),
                 icon: <Download size={14} />,
-                onSelect: (target) => void handleDownloadPdf(target),
+                onSelect: (target) => void handleExportPdf(target),
               },
               {
                 key: "duplicate",
@@ -451,9 +451,10 @@ export const QuotesPage = () => {
               },
               {
                 key: "invoice",
-                label: t("finance.quotes.actions.convertToInvoice"),
+                label: t("finance.quotes.actions.generateInvoice"),
                 icon: <ReceiptText size={14} />,
-                onSelect: (target) => void handleConvertToInvoice(target),
+                disabled: row.status !== "approved",
+                onSelect: (target) => void handleGenerateInvoice(target),
               },
               {
                 key: "delete",
@@ -461,7 +462,8 @@ export const QuotesPage = () => {
                 icon: <Trash2 size={14} />,
                 tone: "danger",
                 separatorBefore: true,
-                onSelect: (target) => setPendingDeleteId(target.id),
+                disabled: !isDeletable(row),
+                onSelect: (target) => setPendingDelete(target),
               },
             ]}
             rows={data}
