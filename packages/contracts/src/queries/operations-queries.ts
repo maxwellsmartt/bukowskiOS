@@ -272,6 +272,10 @@ export type CatalogCrewRow = {
   notes: string;
   isActive: boolean;
   linkedUserId: string | null;
+  defaultDailyRate: number | null;
+  defaultWeeklyRate: number | null;
+  defaultOvertimeRate: number | null;
+  rateCurrency: string | null;
   documents: CatalogCrewDocumentRow[];
   bankAccounts: CatalogCrewBankAccountRow[];
   activeAssignments: Array<{

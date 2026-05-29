@@ -112,6 +112,10 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
             COALESCE(phone, '') AS phone,
             COALESCE(notes, '') AS notes,
             crew_members.linked_user_id,
+            crew_members.default_daily_rate,
+            crew_members.default_weekly_rate,
+            crew_members.default_overtime_rate,
+            crew_members.rate_currency,
             crew_members.is_active
           FROM crew_members
           LEFT JOIN departments ON departments.id = crew_members.primary_department_id
@@ -130,6 +134,10 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       phone: string;
       notes: string;
       linked_user_id: string | null;
+      default_daily_rate: number | null;
+      default_weekly_rate: number | null;
+      default_overtime_rate: number | null;
+      rate_currency: string | null;
       is_active: number;
     }>;
 
@@ -598,6 +606,10 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
         notes: row.notes,
         isActive: Boolean(row.is_active),
         linkedUserId: row.linked_user_id,
+        defaultDailyRate: row.default_daily_rate,
+        defaultWeeklyRate: row.default_weekly_rate,
+        defaultOvertimeRate: row.default_overtime_rate,
+        rateCurrency: row.rate_currency,
         documents: crewDocumentsByMember.get(row.id) ?? [],
         bankAccounts: crewBankAccountsByMember.get(row.id) ?? [],
         activeAssignments: crewAssignmentsByMember.get(row.id) ?? [],
