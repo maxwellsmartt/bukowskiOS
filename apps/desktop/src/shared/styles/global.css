@@ -6378,9 +6378,11 @@ body.is-resizing-side-rail {
   flex-direction: column;
   gap: var(--space-md);
   min-width: 0;
+  /* Fill the bounded grid cell (.asset-list-layout is flex:1/min-height:0/
+     overflow:hidden, align-items:stretch) and scroll internally, instead of
+     sizing to content past the viewport with a magic max-height. */
   min-height: 0;
-  align-self: start;
-  max-height: calc(100dvh - 190px);
+  max-height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 2px;
