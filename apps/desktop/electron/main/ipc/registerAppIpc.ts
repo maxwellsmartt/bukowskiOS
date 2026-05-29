@@ -1,4 +1,4 @@
-import { app, clipboard, dialog, ipcMain, shell } from "electron";
+import { app, clipboard, dialog, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -14,8 +14,8 @@ import {
   updateAppUserSchema,
 } from "@contracts";
 import { ipcChannels } from "@contracts/ipc/channels";
-import { assertAllowedExternalUrl, assertTrustedIpcSender, sanitizeIpcError } from "../security/securityConfig";
-import { safeHandle, safeHandleReadWithSchema } from "./ipcSafeHandler";
+import { assertAllowedExternalUrl } from "../security/securityConfig";
+import { safeHandle, safeHandleRead, safeHandleReadWithSchema } from "./ipcSafeHandler";
 
 type RegisterAppIpcOptions = {
   database: DatabaseSync;
@@ -334,96 +334,69 @@ export const registerAppIpc = ({
     () => getLocalWorkspaces(),
     "The app could not load the local workspace cache.",
   );
-  ipcMain.handle(ipcChannels.app.createUser, (event, input) => {
-    try {
-      assertTrustedIpcSender(event);
-      const parsed = createAppUserSchema.parse(input);
-      return createUser(parsed);
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not create that user.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.updateUser, (event, input) => {
-    try {
-      assertTrustedIpcSender(event);
-      const parsed = updateAppUserSchema.parse(input);
-      return updateUser(parsed);
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not update that user.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.setUserActive, (event, input) => {
-    try {
-      assertTrustedIpcSender(event);
-      const parsed = setAppUserActiveSchema.parse(input);
-      return setUserActive(parsed);
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not change that user state.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.revokeTelegramLink, (event, input) => {
-    try {
-      assertTrustedIpcSender(event);
-      const parsed = revokeTelegramLinkSchema.parse(input);
-      return revokeTelegramLink(parsed);
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not revoke Telegram access for that user.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.deleteUser, (event, input) => {
-    try {
-      assertTrustedIpcSender(event);
-      const parsed = deleteAppUserSchema.parse(input);
-      return deleteUser(parsed);
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not remove that user.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.ensureLocalWorkspaces, (event, input) => {
-    try {
-      assertTrustedIpcSender(event);
-      const parsed = ensureLocalWorkspacesSchema.parse(input);
-      return {
-        summary: "Remote workspaces cached locally.",
-        diagnostics: ensureLocalWorkspaces(parsed),
-      };
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not cache remote workspaces locally.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.createBackup, (event) => {
-    try {
-      assertTrustedIpcSender(event);
-      return {
-        summary: "Backup created successfully.",
-        diagnostics: createBackupNow(),
-      };
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not create a backup.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.runIntegrityCheck, (event) => {
-    try {
-      assertTrustedIpcSender(event);
-      return {
-        summary: "Integrity check completed successfully.",
-        diagnostics: runIntegrityCheckNow(),
-      };
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not complete the integrity check.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.runLocalSync, async (event) => {
-    try {
-      assertTrustedIpcSender(event);
-      return {
-        summary: "Local sync pass completed.",
-        diagnostics: await runLocalSyncNow(),
-      };
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not complete the local sync pass.");
-    }
-  });
+  safeHandle(
+    ipcChannels.app.createUser,
+    createAppUserSchema,
+    (_event, input) => createUser(input),
+    "The app could not create that user.",
+  );
+  safeHandle(
+    ipcChannels.app.updateUser,
+    updateAppUserSchema,
+    (_event, input) => updateUser(input),
+    "The app could not update that user.",
+  );
+  safeHandle(
+    ipcChannels.app.setUserActive,
+    setAppUserActiveSchema,
+    (_event, input) => setUserActive(input),
+    "The app could not change that user state.",
+  );
+  safeHandle(
+    ipcChannels.app.revokeTelegramLink,
+    revokeTelegramLinkSchema,
+    (_event, input) => revokeTelegramLink(input),
+    "The app could not revoke Telegram access for that user.",
+  );
+  safeHandle(
+    ipcChannels.app.deleteUser,
+    deleteAppUserSchema,
+    (_event, input) => deleteUser(input),
+    "The app could not remove that user.",
+  );
+  safeHandle(
+    ipcChannels.app.ensureLocalWorkspaces,
+    ensureLocalWorkspacesSchema,
+    (_event, input) => ({
+      summary: "Remote workspaces cached locally.",
+      diagnostics: ensureLocalWorkspaces(input),
+    }),
+    "The app could not cache remote workspaces locally.",
+  );
+  safeHandleRead(
+    ipcChannels.app.createBackup,
+    () => ({
+      summary: "Backup created successfully.",
+      diagnostics: createBackupNow(),
+    }),
+    "The app could not create a backup.",
+  );
+  safeHandleRead(
+    ipcChannels.app.runIntegrityCheck,
+    () => ({
+      summary: "Integrity check completed successfully.",
+      diagnostics: runIntegrityCheckNow(),
+    }),
+    "The app could not complete the integrity check.",
+  );
+  safeHandleRead(
+    ipcChannels.app.runLocalSync,
+    async () => ({
+      summary: "Local sync pass completed.",
+      diagnostics: await runLocalSyncNow(),
+    }),
+    "The app could not complete the local sync pass.",
+  );
   safeHandleReadWithSchema(
     ipcChannels.app.getSyncOutboxRows,
     emptyReadArgsSchema,
@@ -436,28 +409,22 @@ export const registerAppIpc = ({
     () => getSyncPullCursors(),
     "The app could not load inbound sync status.",
   );
-  ipcMain.handle(ipcChannels.app.retrySyncOutboxRow, async (event, id: string) => {
-    try {
-      assertTrustedIpcSender(event);
-      return {
-        summary: "Sync row retried locally.",
-        diagnostics: await retrySyncOutboxRow(id),
-      };
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not retry that local sync row.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.retryAllFailedSyncOutboxRows, async (event) => {
-    try {
-      assertTrustedIpcSender(event);
-      return {
-        summary: "All failed sync rows were queued again locally.",
-        diagnostics: await retryAllFailedSyncOutboxRows(),
-      };
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not retry the failed local sync rows.");
-    }
-  });
+  safeHandleRead(
+    ipcChannels.app.retrySyncOutboxRow,
+    async (_event, id: string) => ({
+      summary: "Sync row retried locally.",
+      diagnostics: await retrySyncOutboxRow(id),
+    }),
+    "The app could not retry that local sync row.",
+  );
+  safeHandleRead(
+    ipcChannels.app.retryAllFailedSyncOutboxRows,
+    async () => ({
+      summary: "All failed sync rows were queued again locally.",
+      diagnostics: await retryAllFailedSyncOutboxRows(),
+    }),
+    "The app could not retry the failed local sync rows.",
+  );
   safeHandle(
     ipcChannels.app.backfillOperationalSnapshots,
     backfillOperationalSnapshotsSchema,
@@ -465,17 +432,14 @@ export const registerAppIpc = ({
       backfillOperationalSnapshots(input as import("@contracts").AppOperationalBackfillCommand),
     "The app could not backfill operational sync snapshots.",
   );
-  ipcMain.handle(ipcChannels.app.exportWorkspaceData, async (event) => {
-    try {
-      assertTrustedIpcSender(event);
-      return await exportDatabaseJson(database);
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not export local data.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.exportRecentLogs, async (event) => {
-    try {
-      assertTrustedIpcSender(event);
+  safeHandleRead(
+    ipcChannels.app.exportWorkspaceData,
+    async () => exportDatabaseJson(database),
+    "The app could not export local data.",
+  );
+  safeHandleRead(
+    ipcChannels.app.exportRecentLogs,
+    async () => {
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: "Export recent BukowskiOS logs",
         defaultPath: path.join(app.getPath("documents"), `bukowski-logs-${new Date().toISOString().slice(0, 10)}.txt`),
@@ -492,13 +456,12 @@ export const registerAppIpc = ({
       }
 
       return exportRecentLogs(filePath);
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not export recent logs.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.exportSupportBundle, async (event) => {
-    try {
-      assertTrustedIpcSender(event);
+    },
+    "The app could not export recent logs.",
+  );
+  safeHandleRead(
+    ipcChannels.app.exportSupportBundle,
+    async () => {
       const { canceled, filePaths } = await dialog.showOpenDialog({
         title: "Choose where to save the BukowskiOS support bundle",
         buttonLabel: "Save support bundle here",
@@ -520,31 +483,28 @@ export const registerAppIpc = ({
       );
 
       return exportSupportBundle(bundleDirectory);
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not export the support bundle.");
-    }
-  });
-  ipcMain.handle(ipcChannels.app.openExternal, (event, url: string) => {
-    try {
-      assertTrustedIpcSender(event);
+    },
+    "The app could not export the support bundle.",
+  );
+  safeHandleRead(
+    ipcChannels.app.openExternal,
+    (_event, url: string) => {
       assertAllowedExternalUrl(url);
       return shell.openExternal(url);
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not open that external link.");
-    }
-  });
+    },
+    "The app could not open that external link.",
+  );
 
   // Reliable clipboard write via Electron (navigator.clipboard can be denied
   // in packaged builds under file://). Renderer falls back to navigator only
   // if this is unavailable.
-  ipcMain.handle(ipcChannels.app.writeClipboard, (event, text: unknown) => {
-    try {
-      assertTrustedIpcSender(event);
+  safeHandleRead(
+    ipcChannels.app.writeClipboard,
+    (_event, text: unknown) => {
       clipboard.writeText(typeof text === "string" ? text : String(text ?? ""));
-    } catch (error) {
-      throw sanitizeIpcError(error, "The app could not copy to the clipboard.");
-    }
-  });
+    },
+    "The app could not copy to the clipboard.",
+  );
 
   // Configurable local documents folder (per-machine; e.g. an iCloud folder).
   const documentsRootInfo = () => ({
@@ -552,26 +512,33 @@ export const registerAppIpc = ({
     isCustom: appSettings.getDocumentsRootSetting() != null,
     defaultRoot: appSettings.defaultDocumentsRoot(),
   });
-  ipcMain.handle(ipcChannels.app.getDocumentsRoot, (event) => {
-    assertTrustedIpcSender(event);
-    return documentsRootInfo();
-  });
-  ipcMain.handle(ipcChannels.app.chooseDocumentsRoot, async (event) => {
-    assertTrustedIpcSender(event);
-    const { canceled, filePaths } = await dialog.showOpenDialog({
-      title: "Carpeta de documentos",
-      properties: ["openDirectory", "createDirectory"],
-      defaultPath: appSettings.getDocumentsRoot(),
-    });
-    if (canceled || !filePaths[0]) return documentsRootInfo();
-    appSettings.setDocumentsRoot(filePaths[0]);
-    return documentsRootInfo();
-  });
-  ipcMain.handle(ipcChannels.app.resetDocumentsRoot, (event) => {
-    assertTrustedIpcSender(event);
-    appSettings.setDocumentsRoot(null);
-    return documentsRootInfo();
-  });
+  safeHandleRead(
+    ipcChannels.app.getDocumentsRoot,
+    () => documentsRootInfo(),
+    "The app could not load the documents folder setting.",
+  );
+  safeHandleRead(
+    ipcChannels.app.chooseDocumentsRoot,
+    async () => {
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: "Carpeta de documentos",
+        properties: ["openDirectory", "createDirectory"],
+        defaultPath: appSettings.getDocumentsRoot(),
+      });
+      if (canceled || !filePaths[0]) return documentsRootInfo();
+      appSettings.setDocumentsRoot(filePaths[0]);
+      return documentsRootInfo();
+    },
+    "The app could not change the documents folder.",
+  );
+  safeHandleRead(
+    ipcChannels.app.resetDocumentsRoot,
+    () => {
+      appSettings.setDocumentsRoot(null);
+      return documentsRootInfo();
+    },
+    "The app could not reset the documents folder.",
+  );
 
   safeHandle(
     ipcChannels.app.applyRemoteCatalogRows,

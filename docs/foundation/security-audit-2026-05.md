@@ -76,7 +76,14 @@ no es una fuga cross-workspace. Se añadió comentario explicativo en el código
 un test (`denies reads for unknown workspaces when Supabase is unreachable`) que
 fija esta garantía. Las **escrituras** sí fallan cerradas offline.
 
-### H-4 · `deferred` · MED — Handlers IPC de admin sin `safeHandle` unificado
+### H-4 · `fixed` · MED — Handlers IPC de admin sin `safeHandle` unificado
+**Resuelto (O0-E1):** todos los `ipcMain.handle` crudos de `registerAppIpc.ts`
+(user-admin, documents-root, backup/integrity/sync, retries, exports,
+openExternal, writeClipboard) se migraron a `safeHandle`/`safeHandleRead`, que
+centralizan `assertTrustedIpcSender` + validación + `sanitizeIpcError`. Ya no
+quedan handlers crudos en ese archivo. (Hallazgo original abajo.)
+
+### H-4 (original) · MED — Handlers IPC de admin sin `safeHandle` unificado
 **Evidencia:** `registerAppIpc.ts` (`createUser`, `updateUser`, `setUserActive`,
 `revokeTelegramLink`, `deleteUser`, y los de documents-root) usan
 `ipcMain.handle` crudo en vez de `safeHandle`/`safeHandleReadWithSchema`.
