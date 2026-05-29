@@ -6231,6 +6231,12 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   text-align: right;
 }
 
+/* Right-aligned table columns are numeric (amounts, counts): use tabular
+   figures so digits line up across rows, regardless of per-cell markup. */
+.data-table .align-right {
+  font-variant-numeric: tabular-nums;
+}
+
 .identity-cell {
   display: flex;
   flex-direction: column;
