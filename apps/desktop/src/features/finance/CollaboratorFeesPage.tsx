@@ -557,6 +557,25 @@ export const CollaboratorFeesPage = () => {
           }
           getRowId={(row) => row.id}
           onRowClick={openEdit}
+          rowActions={(row) => [
+            { key: "edit", label: "Editar", onSelect: (target) => openEdit(target) },
+            {
+              key: "approve",
+              label: "Aprobar",
+              icon: <CheckCircle2 size={14} />,
+              disabled: row.status !== "draft",
+              onSelect: (target) => void handleApprove(target),
+            },
+            {
+              key: "cancel",
+              label: "Cancelar",
+              icon: <XCircle size={14} />,
+              tone: "danger",
+              separatorBefore: true,
+              disabled: row.status === "paid" || row.status === "cancelled" || row.paidAmount > 0,
+              onSelect: (target) => void handleCancel(target),
+            },
+          ]}
           onSelectedRowIdsChange={setSelectedRowIds}
           rows={data}
           selectable
