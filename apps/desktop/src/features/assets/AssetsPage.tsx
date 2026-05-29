@@ -2028,6 +2028,23 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             activeRowId={selectedAssetId}
             autoScrollToActiveRow
             columns={assetColumns}
+            rowActions={(row) => [
+              {
+                key: "open",
+                label: t("assets.quickPreview.openDetail"),
+                onSelect: (target) => navigate(`/assets/${target.id}`),
+              },
+              {
+                key: "edit",
+                label: t("assets.quickPreview.editAsset"),
+                icon: <SquarePen size={14} />,
+                onSelect: (target) => {
+                  setSelectedAssetId(target.id);
+                  setEditorMode("edit");
+                  setEditorError(null);
+                },
+              },
+            ]}
             defaultVisibleColumnKeys={assetDefaultColumnKeys}
             emptyContent={
               <GuidedEmptyState

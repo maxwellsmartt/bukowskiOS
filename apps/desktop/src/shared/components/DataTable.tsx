@@ -927,6 +927,14 @@ export const DataTable = <T = unknown,>({
                   ]
                     .filter(Boolean)
                     .join(" ")}
+                  onMouseDown={(event) => {
+                    // Shift/modifier-click for range or additive selection
+                    // would otherwise extend the browser's text selection across
+                    // cells. Suppress that default for selectable tables.
+                    if (selectable && (event.shiftKey || event.altKey || event.metaKey)) {
+                      event.preventDefault();
+                    }
+                  }}
                   onClick={(event) => handleRowClick(event, row, rowId, isSelected)}
                   onDoubleClick={() => onRowDoubleClick?.(row)}
                   onContextMenu={(event) => {
