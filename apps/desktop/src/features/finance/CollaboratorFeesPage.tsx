@@ -61,7 +61,8 @@ const emptyDraft: FeeDraft = {
 
 const statusTone = (status: CollaboratorFeeRow["status"]) => {
   if (status === "paid") return "success" as const;
-  if (status === "cancelled") return "critical" as const;
+  // Cancelled is a terminal-inactive state → neutral (polish audit decision).
+  if (status === "cancelled") return "neutral" as const;
   if (status === "draft") return "neutral" as const;
   if (status === "partially_paid" || status === "scheduled") return "warning" as const;
   return "info" as const;

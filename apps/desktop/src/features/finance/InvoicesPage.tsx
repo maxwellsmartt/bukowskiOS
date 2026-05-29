@@ -30,7 +30,9 @@ const allStatuses: Array<InvoiceStatus | "all"> = [
 const statusTone = (status: InvoiceStatus) => {
   if (status === "paid") return "success" as const;
   if (status === "issued" || status === "partially_paid") return "warning" as const;
-  if (status === "cancelled" || status === "void") return "critical" as const;
+  // `void` is a fiscal annulment → keep it critical; a plain `cancelled`
+  // invoice is a terminal-inactive state → neutral (see polish audit decision).
+  if (status === "void") return "critical" as const;
   return "neutral" as const;
 };
 
