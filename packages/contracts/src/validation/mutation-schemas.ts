@@ -1705,6 +1705,13 @@ export const dismissInvoiceExtractionSchema = z
   })
   .strict();
 
+export const retryInvoiceExtractionsSchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    extractionIds: z.array(nonEmptyString).min(1).max(500),
+  })
+  .strict();
+
 // Treasury — read schemas
 
 export const treasuryTransactionListQuerySchema = z

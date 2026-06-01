@@ -35,6 +35,7 @@ import type {
   DismissInvoiceExtractionCommand,
   EnqueueInvoiceBatchCommand,
   InvoiceExtraction,
+  RetryInvoiceExtractionsCommand,
   UpdateInvoiceExtractionCommand,
 } from "@contracts";
 import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
@@ -487,6 +488,10 @@ export const useTreasuryMutations = () =>
       async bulkLinkInvoices(input: BulkLinkInvoiceExtractionsCommand) {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.invoiceInboxBulkLink(input);
+      },
+      async retryInvoiceExtractions(input: RetryInvoiceExtractionsCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceInboxRetry(input);
       },
       async previewInvoiceDocument(workspaceId: string, extractionId: string) {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");

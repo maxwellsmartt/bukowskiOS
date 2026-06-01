@@ -400,3 +400,15 @@ export type DismissInvoiceExtractionCommand = {
   workspaceId: string;
   extractionId: string;
 };
+
+export type RetryInvoiceExtractionsCommand = {
+  workspaceId: string;
+  extractionIds: string[];
+};
+
+export type RetryInvoiceExtractionsResult = {
+  queuedCount: number;
+  skippedCount: number;
+  extractionIds: string[];
+  summary: string;
+};

@@ -1,4 +1,4 @@
-import { Check, FileText, Image as ImageIcon, Loader2, Pencil, Trash2, UploadCloud, X } from "lucide-react";
+import { Check, FileText, Image as ImageIcon, Loader2, Pencil, RotateCcw, Trash2, UploadCloud, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -21,6 +21,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { useCatalogData } from "@features/projects/useProjectsData";
 
 import {
   useExpenseCategories,
@@ -34,6 +35,7 @@ const ACCEPTED = "image/png,image/jpeg,image/webp,application/pdf";
 const MAX_FILES = 60;
 const MAX_BYTES = 15 * 1024 * 1024;
 const UNASSIGNED = "__unassigned__";
+const GENERAL_PROJECT = "__general_project__";
 
 const readFileAsDataUrl = (file: File): Promise<InvoiceInboxFileInput> =>
   new Promise((resolve, reject) => {
@@ -64,7 +66,6 @@ const statusTone = (status: InvoiceExtraction["status"]): "neutral" | "info" | "
   }
 };
 
-type Member = { id: string; name: string };
 type Project = { id: string; name: string };
 
 type Props = {
@@ -78,6 +79,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const inbox = useInvoiceInbox(workspaceId);
   const expenseCategories = useExpenseCategories(workspaceId);
   const duplicates = useInvoiceDuplicates(workspaceId);
+  const catalog = useCatalogData({ workspaceId, entityType: "crew", search: "", sortBy: "fullName", sortDirection: "asc" });
   const [showDuplicates, setShowDuplicates] = useState(false);
   const { confirm, confirmDialog } = useConfirmDialog();
   const mutations = useTreasuryMutations();
@@ -86,6 +88,8 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   );
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isBulkDismissing, setIsBulkDismissing] = useState(false);
+  const [isBulkRetrying, setIsBulkRetrying] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [uploaderFilter, setUploaderFilter] = useState<string>("all");
@@ -94,23 +98,15 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   // Rows the user explicitly switched to multi-project mode (chips). By
   // default an invoice is assigned to a single project.
   const [multiModeIds, setMultiModeIds] = useState<Set<string>>(new Set());
-  const [members, setMembers] = useState<Member[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [editing, setEditing] = useState<InvoiceExtraction | null>(null);
   const [preview, setPreview] = useState<{ id: string; name: string } | null>(null);
   const [previewData, setPreviewData] = useState<{ dataUrl: string; mimeType: string } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  // Workspace members (for "linked user") + projects (for project tags).
+  // Projects for project tags. "Gasto de" is sourced from catalog crew below.
   useEffect(() => {
     let cancelled = false;
-    void window.bukowskiApp
-      ?.getUsersSnapshot({ workspaceId })
-      .then((snapshot) => {
-        if (cancelled) return;
-        setMembers(snapshot.users.map((u) => ({ id: u.id, name: u.fullName || u.email })));
-      })
-      .catch(() => undefined);
     void window.bukowskiProjects
       ?.getList({ workspaceId, search: "", sortBy: "name", sortDirection: "asc" })
       .then((rows) => {
@@ -191,9 +187,14 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const memberOptions = useMemo(
     () => [
       { value: UNASSIGNED, label: t("finance.treasury.invoices.unassignedUser", { defaultValue: "Sin asignar" }) },
-      ...members.map((member) => ({ value: member.id, label: member.name })),
+      ...catalog.data.crewMembers
+        .filter((crew) => crew.isActive)
+        .map((crew) => ({
+          value: crew.id,
+          label: crew.roleLabel ? `${crew.fullName} · ${crew.roleLabel}` : crew.fullName,
+        })),
     ],
-    [members, t],
+    [catalog.data.crewMembers, t],
   );
 
   const filteredRows = useMemo(() => {
@@ -204,6 +205,15 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
       return matchUploader && matchDate;
     });
   }, [inbox.data, uploaderFilter, dateFilter]);
+  const selectedRowIdList = useMemo(() => Array.from(selectedIds), [selectedIds]);
+  const selectedRows = useMemo(
+    () => filteredRows.filter((row) => selectedIds.has(row.id)),
+    [filteredRows, selectedIds],
+  );
+  const retryableSelectedRows = useMemo(
+    () => selectedRows.filter((row) => row.status !== "processing" && row.status !== "applied" && row.status !== "dismissed"),
+    [selectedRows],
+  );
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || !fileList.length) return;
@@ -290,13 +300,13 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   };
 
   const setLinkedUser = async (row: InvoiceExtraction, value: string) => {
-    const member = members.find((m) => m.id === value);
+    const member = catalog.data.crewMembers.find((m) => m.id === value);
     try {
       await mutations.updateInvoiceExtraction({
         workspaceId,
         extractionId: row.id,
         linkedUserId: value === UNASSIGNED ? null : value,
-        linkedUserName: value === UNASSIGNED ? null : member?.name ?? null,
+        linkedUserName: value === UNASSIGNED ? null : member?.fullName ?? null,
       });
       inbox.refresh();
     } catch (error) {
@@ -339,29 +349,15 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     void setProjects_(row, next);
   };
 
-  const toggleSelected = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    setSelectedIds((prev) =>
-      prev.size === filteredRows.length ? new Set() : new Set(filteredRows.map((row) => row.id)),
-    );
-  };
-
   const bulkAssignUser = async (value: string) => {
-    const member = members.find((m) => m.id === value);
+    if (!value) return;
+    const member = catalog.data.crewMembers.find((m) => m.id === value);
     try {
       const result = await mutations.bulkLinkInvoices({
         workspaceId,
         extractionIds: Array.from(selectedIds),
         linkedUserId: value === UNASSIGNED ? null : value,
-        linkedUserName: value === UNASSIGNED ? null : member?.name ?? null,
+        linkedUserName: value === UNASSIGNED ? null : member?.fullName ?? null,
       });
       toast.success(result.summary);
       inbox.refresh();
@@ -370,17 +366,110 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     }
   };
 
-  const bulkAddProject = async (projectId: string) => {
+  const bulkDismissSelected = async () => {
+    const dismissableRows = selectedRows.filter((row) => row.status !== "applied" && row.status !== "dismissed");
+    const skippedCount = selectedRows.length - dismissableRows.length;
+
+    if (!dismissableRows.length) {
+      toast.info(
+        t("finance.treasury.invoices.batchDismissNone", {
+          defaultValue: "No hay facturas seleccionadas que se puedan descartar.",
+        }),
+      );
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: t("finance.treasury.invoices.batchDismissConfirmTitle", {
+        defaultValue: "¿Descartar facturas seleccionadas?",
+      }),
+      body: t("finance.treasury.invoices.batchDismissConfirmBody", {
+        defaultValue:
+          "Las facturas seleccionadas saldrán de la bandeja, pero quedarán en el historial local y en sync. Esta acción no borra archivos de forma destructiva.",
+        count: dismissableRows.length,
+      }),
+      details:
+        skippedCount > 0
+          ? t("finance.treasury.invoices.batchDismissSkipped", {
+              defaultValue: "{{count}} factura(s) aplicada(s) o ya descartada(s) se omitirán.",
+              count: skippedCount,
+            })
+          : undefined,
+      confirmLabel: t("finance.treasury.invoices.batchDismissAction", {
+        defaultValue: "Descartar {{count}}",
+        count: dismissableRows.length,
+      }),
+      cancelLabel: t("common.cancel", { defaultValue: "Cancelar" }),
+    });
+    if (!confirmed) return;
+
+    setIsBulkDismissing(true);
+    try {
+      for (const row of dismissableRows) {
+        await mutations.dismissInvoiceExtraction({ workspaceId, extractionId: row.id });
+      }
+      toast.success(
+        t("finance.treasury.invoices.batchDismissed", {
+          defaultValue: "{{count}} factura(s) descartada(s).",
+          count: dismissableRows.length,
+        }),
+      );
+      setSelectedIds(new Set());
+      inbox.refresh();
+    } catch (error) {
+      toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.dismissFailed", { defaultValue: "No se pudo descartar." })));
+    } finally {
+      setIsBulkDismissing(false);
+    }
+  };
+
+  const bulkSetProject = async (projectId: string) => {
+    if (!projectId) return;
+    const projectsPayload =
+      projectId === GENERAL_PROJECT ? [] : [{ projectId, projectName: projectName.get(projectId) ?? null }];
     try {
       const result = await mutations.bulkLinkInvoices({
         workspaceId,
         extractionIds: Array.from(selectedIds),
-        projects: [{ projectId, projectName: projectName.get(projectId) ?? null }],
+        projects: projectsPayload,
       });
       toast.success(result.summary);
       inbox.refresh();
     } catch (error) {
       toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.projectFailed", { defaultValue: "No se pudieron guardar los proyectos." })));
+    }
+  };
+
+  const retryRows = async (rows: InvoiceExtraction[]) => {
+    const retryableRows = rows.filter((row) => row.status !== "processing" && row.status !== "applied" && row.status !== "dismissed");
+    if (!retryableRows.length) {
+      toast.info(
+        t("finance.treasury.invoices.retryNone", {
+          defaultValue: "No hay facturas seleccionadas que se puedan reprocesar.",
+        }),
+      );
+      return;
+    }
+
+    const isBulk = retryableRows.length > 1;
+    if (isBulk) setIsBulkRetrying(true);
+    else setBusyId(retryableRows[0]?.id ?? null);
+
+    try {
+      const result = await mutations.retryInvoiceExtractions({
+        workspaceId,
+        extractionIds: retryableRows.map((row) => row.id),
+      });
+      toast.success(result.summary);
+      setSelectedIds(new Set());
+      inbox.refresh();
+    } catch (error) {
+      toast.error(
+        getUserFacingErrorMessage(error, t("finance.treasury.invoices.retryFailed", { defaultValue: "No se pudo reprocesar." })),
+      );
+    } finally {
+      if (isBulk) setIsBulkRetrying(false);
+      else setBusyId(null);
     }
   };
 
@@ -456,28 +545,53 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
               </span>
               <CompactSelect
                 className="invoice-filter-select"
-                ariaLabel={t("finance.treasury.invoices.batchAssignUser", { defaultValue: "Asignar usuario" })}
+                ariaLabel={t("finance.treasury.invoices.batchAssignUser", { defaultValue: "Asignar gasto de" })}
                 value=""
                 onChange={(value) => void bulkAssignUser(value)}
                 options={[
-                  { value: "", label: t("finance.treasury.invoices.batchAssignUser", { defaultValue: "Asignar usuario" }) },
+                  { value: "", label: t("finance.treasury.invoices.batchAssignUser", { defaultValue: "Gasto de…" }) },
                   ...memberOptions,
                 ]}
               />
               <CompactSelect
                 className="invoice-filter-select"
-                ariaLabel={t("finance.treasury.invoices.batchAddProject", { defaultValue: "Agregar proyecto" })}
+                ariaLabel={t("finance.treasury.invoices.batchAssignProject", { defaultValue: "Asignar proyecto" })}
                 value=""
                 onChange={(value) => {
-                  if (value) void bulkAddProject(value);
+                  void bulkSetProject(value);
                 }}
                 options={[
-                  { value: "", label: t("finance.treasury.invoices.batchAddProject", { defaultValue: "Agregar proyecto" }) },
+                  { value: "", label: t("finance.treasury.invoices.batchAssignProject", { defaultValue: "Proyecto…" }) },
+                  {
+                    value: GENERAL_PROJECT,
+                    label: t("finance.treasury.invoices.generalExpense", { defaultValue: "Gasto general" }),
+                    description: t("finance.treasury.invoices.batchGeneralExpenseHint", {
+                      defaultValue: "Quita el proyecto de las facturas seleccionadas.",
+                    }),
+                  },
                   ...projects.map((project) => ({ value: project.id, label: project.name })),
                 ]}
               />
               <button className="ghost-control" type="button" onClick={() => setSelectedIds(new Set())}>
                 {t("finance.treasury.invoices.clearSelection", { defaultValue: "Limpiar" })}
+              </button>
+              <button
+                className="ghost-control"
+                disabled={isBulkRetrying || retryableSelectedRows.length === 0}
+                onClick={() => void retryRows(selectedRows)}
+                type="button"
+              >
+                {isBulkRetrying ? <Loader2 className="spin" size={14} /> : <RotateCcw size={14} />}
+                {t("finance.treasury.invoices.batchRetry", { defaultValue: "Reprocesar selección" })}
+              </button>
+              <button
+                className="ghost-control invoice-batch-danger"
+                disabled={isBulkDismissing}
+                onClick={() => void bulkDismissSelected()}
+                type="button"
+              >
+                {isBulkDismissing ? <Loader2 className="spin" size={14} /> : <Trash2 size={14} />}
+                {t("finance.treasury.invoices.batchDismiss", { defaultValue: "Descartar selección" })}
               </button>
             </div>
           ) : null}
@@ -486,6 +600,9 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
             getRowId={(row) => row.id}
             persistKey="treasury-invoice-inbox-v2"
             rows={filteredRows}
+            selectable
+            selectedRowIds={selectedRowIdList}
+            onSelectedRowIdsChange={(nextIds) => setSelectedIds(new Set(nextIds))}
             controlsAddon={
               <div className="invoice-inbox-filters">
                 <CompactSelect
@@ -502,30 +619,9 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                   onChange={setDateFilter}
                   options={dateOptions}
                 />
-                <label className="invoice-select-all">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.size > 0 && selectedIds.size === filteredRows.length}
-                    onChange={toggleSelectAll}
-                  />
-                  <span>{t("finance.treasury.invoices.selectAll", { defaultValue: "Seleccionar todo" })}</span>
-                </label>
               </div>
             }
             columns={[
-              {
-                key: "select",
-                label: "",
-                width: 36,
-                render: (row) => (
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(row.id)}
-                    onChange={() => toggleSelected(row.id)}
-                    aria-label={t("finance.treasury.invoices.selectRow", { defaultValue: "Seleccionar" })}
-                  />
-                ),
-              },
               {
                 key: "document",
                 label: t("finance.treasury.invoices.columns.document", { defaultValue: "Documento" }),
@@ -683,6 +779,20 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                       title={t("finance.treasury.invoices.edit", { defaultValue: "Editar" })}
                     >
                       <Pencil size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-control action-row-button"
+                      disabled={
+                        busyId === row.id ||
+                        row.status === "processing" ||
+                        row.status === "applied" ||
+                        row.status === "dismissed"
+                      }
+                      onClick={() => void retryRows([row])}
+                      title={t("finance.treasury.invoices.retry", { defaultValue: "Reprocesar" })}
+                    >
+                      {busyId === row.id ? <Loader2 className="spin" size={14} /> : <RotateCcw size={14} />}
                     </button>
                     <button
                       type="button"

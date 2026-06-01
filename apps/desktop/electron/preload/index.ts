@@ -710,6 +710,10 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxBulkLink, input) as Promise<
       import("@contracts").BulkLinkInvoiceExtractionsResult
     >,
+  invoiceInboxRetry: (input: import("@contracts").RetryInvoiceExtractionsCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxRetry, input) as Promise<
+      import("@contracts").RetryInvoiceExtractionsResult
+    >,
   invoiceInboxPreview: (workspaceId: string, extractionId: string) =>
     ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxPreview, { workspaceId, extractionId }) as Promise<
       { fileName: string; mimeType: string; dataUrl: string } | null

@@ -66,6 +66,7 @@ const trustedRemoteImageOrigins = [
 const rendererManualChunks = (id: string) => {
   if (!id.includes("node_modules")) return undefined;
   if (id.includes("bwip-js")) return "vendor-barcodes";
+  if (id.includes("pdfjs-dist")) return "vendor-pdfjs";
   if (id.includes("recharts")) return "vendor-charts";
   if (id.includes("@supabase")) return "vendor-supabase";
   if (id.includes("lucide-react")) return "vendor-icons";
@@ -106,7 +107,7 @@ export default defineConfig(async ({ mode }) => {
           vite: {
             build: {
               rollupOptions: {
-                external: ["better-sqlite3", "bwip-js", "keytar", "qrcode", "pdfkit"],
+                external: ["@napi-rs/canvas", "better-sqlite3", "bwip-js", "keytar", "qrcode", "pdfkit"],
               },
             },
             define: {

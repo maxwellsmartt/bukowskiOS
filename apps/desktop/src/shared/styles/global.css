@@ -19035,6 +19035,35 @@ input[type="number"] {
   border-radius: 6px;
 }
 
+.document-preview-pdf-shell {
+  width: 100%;
+  min-height: 76vh;
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+
+.document-preview-pdf-pages {
+  width: 100%;
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  opacity: 0;
+}
+
+.document-preview-pdf-pages.is-ready {
+  opacity: 1;
+}
+
+.document-preview-pdf-page {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
+}
+
 .document-preview-status {
   color: var(--text-muted);
   font-size: var(--font-sm, 13px);
@@ -19117,6 +19146,17 @@ input[type="number"] {
 .invoice-batch-bar-label {
   font-size: var(--font-xs, 11px);
   font-weight: var(--weight-semibold, 600);
+}
+
+.invoice-batch-danger {
+  border-color: rgba(248, 113, 113, 0.32);
+  color: #fca5a5;
+}
+
+.invoice-batch-danger:hover:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.54);
+  background: rgba(248, 113, 113, 0.1);
+  color: #fecaca;
 }
 
 .invoice-edit-grid {
