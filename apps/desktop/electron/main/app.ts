@@ -1,5 +1,4 @@
 import { app, BrowserWindow, Menu, session } from "electron";
-import fs from "node:fs";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { format } from "date-fns";
@@ -69,28 +68,6 @@ const formatCategoryLabel = (value: string | null | undefined) => {
       .trim()
       .replace(/\b\w/g, (char) => char.toUpperCase())
   );
-};
-
-const fetchOptionalAssetBuffer = async (url: string | null | undefined): Promise<Buffer | null> => {
-  if (!url) return null;
-  try {
-    if (url.startsWith("data:")) {
-      const [, payload = ""] = url.split(",", 2);
-      return Buffer.from(payload, url.includes(";base64,") ? "base64" : "utf8");
-    }
-    if (url.startsWith("file://")) {
-      return fs.readFileSync(new URL(url));
-    }
-    if (path.isAbsolute(url) && fs.existsSync(url)) {
-      return fs.readFileSync(url);
-    }
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
-  } catch {
-    return null;
-  }
 };
 
 const createAppWindow = () =>
@@ -435,7 +412,11 @@ app.whenReady().then(() => {
     const overview = localDatabase.treasuryReads.getOverview(reportQuery);
     const collaboratorSummary = localDatabase.collaboratorFeeReads.getSummary({ workspaceId });
     const settings = localDatabase.currencyReads.getSettings(workspaceId);
-    const logoBuffer = await fetchOptionalAssetBuffer(settings.workspaceLogoUrl);
+    const logoBuffer = await localDatabase.workspaceBrandingAssets.resolveAssetBuffer(
+      workspaceId,
+      "logo",
+      settings.workspaceLogoUrl,
+    );
     const moneyCurrency = overview.reportCurrency === "mixed" ? "DOP" : overview.reportCurrency;
     const summaryParts = [
       `${formatReportMoney(overview.totalIncome, moneyCurrency)} en ingresos reales`,
@@ -579,7 +560,11 @@ app.whenReady().then(() => {
       const settings = localDatabase.currencyReads.getSettings(workspaceId);
       const { buildInvoicePdfPayload } = await import("./services/data/invoicePdfPayloadBuilder");
 
-      const logoBuffer = await fetchOptionalAssetBuffer(settings.workspaceLogoUrl);
+      const logoBuffer = await localDatabase.workspaceBrandingAssets.resolveAssetBuffer(
+        workspaceId,
+        "logo",
+        settings.workspaceLogoUrl,
+      );
       const sourceQuote = detail.sourceQuoteId
         ? localDatabase.quoteReads.getQuoteDetail(workspaceId, detail.sourceQuoteId)
         : null;
@@ -601,9 +586,9 @@ app.whenReady().then(() => {
       const { buildQuotePdfPayload } = await import("./services/data/quotePdfPayloadBuilder");
 
       const [logoBuffer, sealBuffer, signatureBuffer] = await Promise.all([
-        fetchOptionalAssetBuffer(settings.workspaceLogoUrl),
-        fetchOptionalAssetBuffer(settings.workspaceSealUrl),
-        fetchOptionalAssetBuffer(settings.workspaceSignatureUrl),
+        localDatabase.workspaceBrandingAssets.resolveAssetBuffer(workspaceId, "logo", settings.workspaceLogoUrl),
+        localDatabase.workspaceBrandingAssets.resolveAssetBuffer(workspaceId, "seal", settings.workspaceSealUrl),
+        localDatabase.workspaceBrandingAssets.resolveAssetBuffer(workspaceId, "signature", settings.workspaceSignatureUrl),
       ]);
 
       const payload = buildQuotePdfPayload({

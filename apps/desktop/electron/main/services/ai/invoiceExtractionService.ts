@@ -93,6 +93,34 @@ const toStringOrNull = (value: unknown): string | null => {
   return null;
 };
 
+const normalizeCurrencyCode = (value: string | null): string | null => {
+  const normalized = value?.trim().toUpperCase() ?? "";
+  if (!normalized) return null;
+  if (normalized === "RD" || normalized === "RD$" || normalized === "PESOS" || normalized === "PESO") return "DOP";
+  if (normalized === "US" || normalized === "US$" || normalized === "$" || normalized === "DOLLARS") return "USD";
+  return normalized;
+};
+
+const inferCurrency = (modelCurrency: string | null, supplierName: string | null, rawText: string): string | null => {
+  const normalizedModelCurrency = normalizeCurrencyCode(modelCurrency);
+  const text = `${supplierName ?? ""}\n${rawText}`.toLowerCase();
+  const hasExplicitUsd =
+    /\busd\b|us\$|u\.s\. dollars?|united states dollars?|\bdollars?\b/.test(text) ||
+    /(amount due|total due|balance due|total|invoice total)\s*\$/.test(text);
+  const hasExplicitDop = /\bdop\b|rd\$|pesos dominicanos?|itbis|rnc|ncf/.test(text);
+  const looksLikeInternationalUsdSupplier =
+    /(anthropic|openai|stripe|github|google|aws|amazon web services|adobe|figma|notion|vercel|netlify|cloudflare|apple)/.test(
+      text,
+    );
+
+  if (hasExplicitUsd && !hasExplicitDop) return "USD";
+  if (looksLikeInternationalUsdSupplier && /\$/.test(text)) return "USD";
+  if (normalizedModelCurrency) return normalizedModelCurrency;
+  if (hasExplicitDop) return "DOP";
+  if (hasExplicitUsd) return "USD";
+  return null;
+};
+
 /** Pull the first balanced JSON object out of a model reply (handles fences). */
 const parseJsonObject = (text: string): Record<string, unknown> => {
   const withoutFences = text.replace(/```(?:json)?/gi, "").trim();
@@ -106,15 +134,16 @@ const parseJsonObject = (text: string): Record<string, unknown> => {
 
 const mapFields = (data: Record<string, unknown>, rawText: string): InvoiceExtractionFields => {
   const confidence = toNumberOrNull(data.confidence);
+  const supplierName = toStringOrNull(data.supplierName);
   return {
-    supplierName: toStringOrNull(data.supplierName),
+    supplierName,
     supplierRnc: toStringOrNull(data.supplierRnc)?.replace(/[^0-9]/g, "") || null,
     ncf: toStringOrNull(data.ncf),
     invoiceDate: normalizeIsoDate(toStringOrNull(data.invoiceDate)),
     subtotal: toNumberOrNull(data.subtotal),
     itbis: toNumberOrNull(data.itbis),
     total: toNumberOrNull(data.total),
-    currency: toStringOrNull(data.currency)?.toUpperCase() || null,
+    currency: inferCurrency(toStringOrNull(data.currency), supplierName, rawText),
     dgiiExpenseType: toStringOrNull(data.dgiiExpenseType),
     expenseCategory: toStringOrNull(data.expenseCategory),
     confidence: confidence != null ? Math.max(0, Math.min(1, confidence)) : null,

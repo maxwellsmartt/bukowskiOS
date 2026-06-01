@@ -36,6 +36,17 @@ const MAX_FILES = 60;
 const MAX_BYTES = 15 * 1024 * 1024;
 const UNASSIGNED = "__unassigned__";
 const GENERAL_PROJECT = "__general_project__";
+const currencyOptions = [
+  { value: "DOP", label: "DOP" },
+  { value: "USD", label: "USD" },
+  { value: "EUR", label: "EUR" },
+];
+
+const formatInvoiceMoney = (value: number, currency: string | null | undefined) =>
+  `${value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ${(currency ?? "DOP").toUpperCase()}`;
 
 const readFileAsDataUrl = (file: File): Promise<InvoiceInboxFileInput> =>
   new Promise((resolve, reject) => {
@@ -320,6 +331,15 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
       inbox.refresh();
     } catch (error) {
       toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.projectFailed", { defaultValue: "No se pudieron guardar los proyectos." })));
+    }
+  };
+
+  const setCurrency = async (row: InvoiceExtraction, currency: string) => {
+    try {
+      await mutations.updateInvoiceExtraction({ workspaceId, extractionId: row.id, currency });
+      inbox.refresh();
+    } catch (error) {
+      toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.currencyFailed", { defaultValue: "No se pudo guardar la moneda." })));
     }
   };
 
@@ -657,7 +677,20 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                 key: "total",
                 label: t("finance.treasury.invoices.columns.total", { defaultValue: "Total" }),
                 align: "right" as const,
-                render: (row) => (row.total != null ? formatMoney(row.total) : "—"),
+                render: (row) => (row.total != null ? formatInvoiceMoney(row.total, row.currency) : "—"),
+              },
+              {
+                key: "currency",
+                label: t("finance.treasury.invoices.currency", { defaultValue: "Moneda" }),
+                render: (row) => (
+                  <CompactSelect
+                    className="invoice-currency-select"
+                    ariaLabel={t("finance.treasury.invoices.currency", { defaultValue: "Moneda" })}
+                    value={(row.currency ?? "DOP").toUpperCase()}
+                    onChange={(value) => void setCurrency(row, value)}
+                    options={currencyOptions}
+                  />
+                ),
               },
               {
                 key: "invoiceDate",
@@ -948,6 +981,13 @@ const InvoiceEditModal = ({
                     placeholder={t("finance.treasury.invoices.noCategory", { defaultValue: "Sin categoría" })}
                     createLabel={(q) => t("finance.treasury.invoices.createCategory", { defaultValue: `Crear "${q}"`, query: q })}
                     onChange={(next) => setForm((prev) => ({ ...prev, expenseCategory: next }))}
+                  />
+                ) : field.key === "currency" ? (
+                  <CompactSelect
+                    ariaLabel={field.label}
+                    value={form.currency || "DOP"}
+                    onChange={(next) => setForm((prev) => ({ ...prev, currency: next }))}
+                    options={currencyOptions}
                   />
                 ) : (
                   <input

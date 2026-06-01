@@ -6,11 +6,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -73,6 +70,12 @@ const formatAxisCurrency = (value: number, currency = "$") => {
 const normalizeCategoryKey = (value: string) => value.trim().replace(/\s+/g, "_").toLowerCase();
 
 const formatRateValue = (value: number | null) => (typeof value === "number" ? value.toFixed(2) : "—");
+
+const formatSummaryMoney = (value: number, currency: string) =>
+  `${value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ${currency}`;
 
 const RATE_TIMESTAMP_FORMAT: Intl.DateTimeFormatOptions = {
   dateStyle: "medium",
@@ -217,7 +220,7 @@ export const FinanceOverviewPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
   const toast = useToast();
-  const { formatDate, formatMoney } = useLocale();
+  const { formatDate } = useLocale();
   const formatRateTimestamp = (value: string | null | undefined) => {
     if (!value) return t("finance.overview.exchange.notRefreshed");
     return formatDate(value, RATE_TIMESTAMP_FORMAT) || value;
@@ -234,30 +237,22 @@ export const FinanceOverviewPage = () => {
   const isCustomRangeReady = period !== "custom" || (Boolean(customStartDate) && Boolean(customEndDate));
   const rateLimitStorageKey = `bukowski:fx-rate-limit:${activeWorkspaceId}:tasareal:${selectedFxCurrency}`;
 
-  const overviewQuery = useMemo<FinanceOverviewQuery>(
-    () =>
-      period === "custom" && !isCustomRangeReady
-        ? { period: "month", customStartDate: null, customEndDate: null }
-        : {
-            period,
-            customStartDate: period === "custom" ? customStartDate || null : null,
-            customEndDate: period === "custom" ? customEndDate || null : null,
-          },
-    [customEndDate, customStartDate, isCustomRangeReady, period],
-  );
-  const treasuryOverviewQuery = useMemo<TreasuryOverviewQuery>(
-    () =>
-      period === "custom" && !isCustomRangeReady
-        ? { workspaceId: activeWorkspaceId, period: "month", customStartDate: null, customEndDate: null, reportCurrency: "DOP" }
-        : {
-            workspaceId: activeWorkspaceId,
-            period,
-            customStartDate: period === "custom" ? customStartDate || null : null,
-            customEndDate: period === "custom" ? customEndDate || null : null,
-            reportCurrency: "DOP",
-          },
-    [activeWorkspaceId, customEndDate, customStartDate, isCustomRangeReady, period],
-  );
+  const overviewQuery = useMemo<FinanceOverviewQuery>(() => {
+    if (period === "custom") {
+      return isCustomRangeReady
+        ? { period, customStartDate, customEndDate }
+        : { period: "month" };
+    }
+    return { period };
+  }, [customEndDate, customStartDate, isCustomRangeReady, period]);
+  const treasuryOverviewQuery = useMemo<TreasuryOverviewQuery>(() => {
+    if (period === "custom") {
+      return isCustomRangeReady
+        ? { workspaceId: activeWorkspaceId, period, customStartDate, customEndDate, reportCurrency: "DOP" }
+        : { workspaceId: activeWorkspaceId, period: "month", reportCurrency: "DOP" };
+    }
+    return { workspaceId: activeWorkspaceId, period, reportCurrency: "DOP" };
+  }, [activeWorkspaceId, customEndDate, customStartDate, isCustomRangeReady, period]);
 
   const { data, error } = useFinanceOverview(overviewQuery);
   const treasuryOverview = useTreasuryOverview(treasuryOverviewQuery);
@@ -286,6 +281,19 @@ export const FinanceOverviewPage = () => {
     [t, treasurySnapshot?.expenseByCategory],
   );
   const hasCategorySpend = categoryChartRows.some((row) => row.amount > 0);
+  const categorySpendTotal = categoryChartRows.reduce((total, row) => total + row.amount, 0);
+  const categoryDonutGradient = useMemo(() => {
+    if (categorySpendTotal <= 0) return "conic-gradient(#2f3742 0% 100%)";
+    let cursor = 0;
+    return `conic-gradient(${categoryChartRows
+      .map((row, index) => {
+        const color = chartPalette[index % chartPalette.length] ?? "#d6b37a";
+        const start = cursor;
+        cursor += (row.amount / categorySpendTotal) * 100;
+        return `${color} ${start.toFixed(3)}% ${cursor.toFixed(3)}%`;
+      })
+      .join(", ")})`;
+  }, [categoryChartRows, categorySpendTotal]);
   const decisionSignals = useMemo(
     () =>
       [
@@ -307,7 +315,7 @@ export const FinanceOverviewPage = () => {
           id: "crew",
           tone: collaboratorSummary.data.pendingAmount > 0 ? "critical" : "success",
           label: t("finance.overview.decisions.crewPayables"),
-          value: formatMoney(collaboratorSummary.data.pendingAmount, "DOP"),
+          value: formatSummaryMoney(collaboratorSummary.data.pendingAmount, "DOP"),
           body: t("finance.overview.decisions.crewPayablesBody", {
             count: collaboratorSummary.data.collaboratorsWithBalance,
           }),
@@ -320,7 +328,7 @@ export const FinanceOverviewPage = () => {
           body: t("finance.overview.decisions.conversionBody"),
         },
       ] as const,
-    [collaboratorSummary.data, formatMoney, t, treasurySnapshot],
+    [collaboratorSummary.data, t, treasurySnapshot],
   );
 
   const exchangeRateRows = useMemo(() => {
@@ -586,31 +594,31 @@ export const FinanceOverviewPage = () => {
       <div className="finance-grid">
         <SurfaceCard>
           <span className="metric-value metric-tone-success">
-            {formatMoney(treasurySnapshot?.totalIncome ?? 0, treasuryCurrency)}
+            {formatSummaryMoney(treasurySnapshot?.totalIncome ?? 0, treasuryCurrency)}
           </span>
           <p className="metric-label">{t("finance.overview.liveMetrics.income")}</p>
         </SurfaceCard>
         <SurfaceCard>
           <span className="metric-value metric-tone-critical">
-            {formatMoney(treasurySnapshot?.totalExpense ?? 0, treasuryCurrency)}
+            {formatSummaryMoney(treasurySnapshot?.totalExpense ?? 0, treasuryCurrency)}
           </span>
           <p className="metric-label">{t("finance.overview.liveMetrics.expense")}</p>
         </SurfaceCard>
         <SurfaceCard>
           <span className={`metric-value metric-tone-${(treasurySnapshot?.net ?? 0) >= 0 ? "warning" : "critical"}`}>
-            {formatMoney(treasurySnapshot?.net ?? 0, treasuryCurrency)}
+            {formatSummaryMoney(treasurySnapshot?.net ?? 0, treasuryCurrency)}
           </span>
           <p className="metric-label">{t("finance.overview.liveMetrics.net")}</p>
         </SurfaceCard>
         <SurfaceCard>
           <span className="metric-value metric-tone-info">
-            {formatMoney(treasurySnapshot?.totalDeductibleExpense ?? 0, treasuryCurrency)}
+            {formatSummaryMoney(treasurySnapshot?.totalDeductibleExpense ?? 0, treasuryCurrency)}
           </span>
           <p className="metric-label">{t("finance.overview.liveMetrics.deductible")}</p>
         </SurfaceCard>
         <SurfaceCard>
           <span className={`metric-value metric-tone-${collaboratorSummary.data.pendingAmount > 0 ? "warning" : "success"}`}>
-            {formatMoney(collaboratorSummary.data.pendingAmount, "DOP")}
+            {formatSummaryMoney(collaboratorSummary.data.pendingAmount, "DOP")}
           </span>
           <p className="metric-label">{t("finance.overview.liveMetrics.crewPending")}</p>
         </SurfaceCard>
@@ -862,24 +870,18 @@ export const FinanceOverviewPage = () => {
           {treasuryOverview.isLoading ? (
             <TableSkeleton rows={5} />
           ) : hasCategorySpend ? (
-            <div className="finance-chart-shell finance-chart-shell-pie">
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie
-                    data={categoryChartRows}
-                    dataKey="amount"
-                    innerRadius={58}
-                    outerRadius={92}
-                    paddingAngle={2}
-                    nameKey="label"
-                  >
-                    {categoryChartRows.map((row, index) => (
-                      <Cell key={row.category} fill={chartPalette[index % chartPalette.length] ?? "#d6b37a"} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<ChartTooltip currency={treasuryCurrency} />} />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="finance-category-layout">
+              <div className="finance-donut-wrap">
+                <div
+                  aria-hidden="true"
+                  className="finance-donut-visual"
+                  style={{ background: categoryDonutGradient }}
+                />
+                <div className="finance-donut-center">
+                  {t("finance.treasury.overview.expenseTotal")}
+                  <strong>{formatSummaryMoney(categorySpendTotal, treasuryCurrency)}</strong>
+                </div>
+              </div>
 
               <div className="finance-pie-legend">
                 {categoryChartRows.map((row, index) => (
@@ -889,9 +891,8 @@ export const FinanceOverviewPage = () => {
                       style={{ background: chartPalette[index % chartPalette.length] ?? "#d6b37a" }}
                     />
                     <span className="finance-pie-legend-label">{row.label}</span>
-                    <span className="finance-pie-legend-meta">
-                      {formatMoney(row.amount, treasuryCurrency)} · {row.percentage}%
-                    </span>
+                    <span className="finance-pie-legend-amount">{formatSummaryMoney(row.amount, treasuryCurrency)}</span>
+                    <span className="finance-pie-legend-percent">{row.percentage}%</span>
                   </div>
                 ))}
               </div>

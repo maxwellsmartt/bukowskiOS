@@ -59,6 +59,7 @@ import { createTreasuryReadService } from "./treasuryReadService";
 import { createInvoiceInboxService } from "./invoiceInboxService";
 import { createInvoiceExtractionService } from "../ai/invoiceExtractionService";
 import { createSupabaseDocumentStorage } from "./supabaseDocumentStorageService";
+import { createWorkspaceBrandingAssetService, type WorkspaceBrandingAssetService } from "./workspaceBrandingAssetService";
 import { createAppSettingsStore } from "./appSettingsStore";
 import { createSoftwareLicenseService } from "./softwareLicenseService";
 import { createQuoteMutationService } from "./quoteMutationService";
@@ -148,6 +149,7 @@ type LocalDatabaseRuntime = {
   collaboratorFeeReads: CollaboratorFeeReadService;
   currencyMutations: CurrencyMutationService;
   currencyReads: CurrencyReadService;
+  workspaceBrandingAssets: WorkspaceBrandingAssetService;
   currencyRateProviders: CurrencyRateProviderService;
   quoteMutations: QuoteMutationServiceType;
   quoteReads: QuoteReadServiceType;
@@ -1574,6 +1576,16 @@ const createRuntime = (): LocalDatabaseRuntime => {
     bucket: "workspace-documents",
     getAccessToken: async () => (await supabaseTokenStore.getTokens()).accessToken,
   });
+  const brandingAssetStorage = createSupabaseDocumentStorage({
+    supabaseUrl: isSupabaseSyncEnabled() ? process.env.VITE_SUPABASE_URL : undefined,
+    bucket: "workspace-assets",
+    getAccessToken: async () => (await supabaseTokenStore.getTokens()).accessToken,
+  });
+  const workspaceBrandingAssets = createWorkspaceBrandingAssetService(database, {
+    userDataPath: app.getPath("userData"),
+    getStorageRoot: () => appSettings.getDocumentsRoot(),
+    storage: brandingAssetStorage,
+  });
   const invoiceInboxService = createInvoiceInboxService(database, {
     userDataPath: app.getPath("userData"),
     getStorageRoot: () => appSettings.getDocumentsRoot(),
@@ -1753,6 +1765,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     collaboratorFeeReads,
     currencyMutations,
     currencyReads,
+    workspaceBrandingAssets,
     currencyRateProviders,
     quoteMutations,
     quoteReads,
