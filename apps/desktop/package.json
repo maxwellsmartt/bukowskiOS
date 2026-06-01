@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@napi-rs/canvas": "0.1.100",
     "@supabase/supabase-js": "^2.103.2",
     "better-sqlite3": "^12.8.0",
     "bwip-js": "^4.9.0",

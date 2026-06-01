@@ -166,6 +166,9 @@ type LocalDatabaseRuntime = {
     bulkLink: (
       input: import("@contracts").BulkLinkInvoiceExtractionsCommand,
     ) => import("@contracts").BulkLinkInvoiceExtractionsResult;
+    retry: (
+      input: import("@contracts").RetryInvoiceExtractionsCommand,
+    ) => import("@contracts").RetryInvoiceExtractionsResult;
     apply: (
       input: import("@contracts").ApplyInvoiceExtractionCommand,
     ) => import("@contracts").InvoiceExtractionMutationResult;
@@ -1631,6 +1634,13 @@ const createRuntime = (): LocalDatabaseRuntime => {
     list: invoiceInboxService.list,
     update: invoiceInboxService.update,
     bulkLink: invoiceInboxService.bulkLink,
+    retry: (input: import("@contracts").RetryInvoiceExtractionsCommand) => {
+      const result = invoiceInboxService.retry(input);
+      if (result.extractionIds.length) {
+        void processInvoiceQueue(result.extractionIds, input.workspaceId);
+      }
+      return result;
+    },
     apply: invoiceInboxService.applyExtraction,
     dismiss: invoiceInboxService.dismiss,
     getFileBuffer: invoiceInboxService.getFileBuffer,

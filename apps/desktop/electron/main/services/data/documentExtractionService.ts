@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createRequire } from "node:module";
 
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -51,7 +52,58 @@ const parseXlsxRows = (buffer: Buffer): string[][] => {
   return grid.map((row) => row.map((cell) => (cell == null ? "" : String(cell))));
 };
 
+const normalizeExtractedPdfText = (value: string): string =>
+  value
+    .replace(/\u0000/g, "-")
+    .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/([A-Za-z0-9])\s*-\s*([A-Za-z0-9])/g, "$1-$2")
+    .trim();
+
+type CanvasPolyfillModule = {
+  DOMMatrix?: typeof globalThis.DOMMatrix;
+  ImageData?: typeof globalThis.ImageData;
+  Path2D?: typeof globalThis.Path2D;
+};
+
+type PdfJsWorkerGlobal = typeof globalThis & {
+  pdfjsWorker?: { WorkerMessageHandler?: unknown };
+};
+
+const ensurePdfJsNodePolyfills = () => {
+  if (globalThis.DOMMatrix && globalThis.ImageData && globalThis.Path2D) return;
+
+  try {
+    const require = createRequire(import.meta.url);
+    const canvas = require("@napi-rs/canvas") as CanvasPolyfillModule;
+    if (!globalThis.DOMMatrix && canvas.DOMMatrix) globalThis.DOMMatrix = canvas.DOMMatrix;
+    if (!globalThis.ImageData && canvas.ImageData) globalThis.ImageData = canvas.ImageData;
+    if (!globalThis.Path2D && canvas.Path2D) globalThis.Path2D = canvas.Path2D;
+  } catch {
+    // pdfjs-dist can still extract text from many PDFs without canvas APIs. If
+    // it needs one of these globals, the caller receives the original pdfjs
+    // error with context instead of failing at app startup.
+  }
+};
+
+let pdfWorkerSetupPromise: Promise<void> | null = null;
+
+const ensurePdfJsWorker = async () => {
+  const globalWithWorker = globalThis as PdfJsWorkerGlobal;
+  if (globalWithWorker.pdfjsWorker?.WorkerMessageHandler) return;
+
+  pdfWorkerSetupPromise ??= import("pdfjs-dist/legacy/build/pdf.worker.mjs").then((workerModule) => {
+    globalWithWorker.pdfjsWorker = {
+      WorkerMessageHandler: (workerModule as { WorkerMessageHandler?: unknown }).WorkerMessageHandler,
+    };
+  });
+
+  await pdfWorkerSetupPromise;
+};
+
 const extractPdfText = async (buffer: Buffer): Promise<string> => {
+  ensurePdfJsNodePolyfills();
+  await ensurePdfJsWorker();
   // Lazy ESM import of the legacy node build so the worker is optional.
   const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as {
     getDocument: (options: { data: Uint8Array; useSystemFonts?: boolean; isEvalSupported?: boolean }) => {
@@ -71,7 +123,7 @@ const extractPdfText = async (buffer: Buffer): Promise<string> => {
     const content = await page.getTextContent();
     pages.push(content.items.map((item) => item.str ?? "").join(" "));
   }
-  return pages.join("\n");
+  return normalizeExtractedPdfText(pages.join("\n"));
 };
 
 const rowsToText = (rows: string[][], limit = 400) =>

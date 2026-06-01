@@ -134,6 +134,7 @@ export const buildContentSecurityPolicy = (
     "font-src 'self' data:",
     `connect-src ${connectSources.join(" ")}`,
     "worker-src 'self' blob:",
+    "frame-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'none'",

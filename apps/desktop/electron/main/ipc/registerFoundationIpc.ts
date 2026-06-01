@@ -54,6 +54,7 @@ import {
   backfillInvoiceHashesSchema,
   updateInvoiceExtractionSchema,
   bulkLinkInvoiceExtractionsSchema,
+  retryInvoiceExtractionsSchema,
   upsertSoftwareLicenseSchema,
   archiveSoftwareLicenseSchema,
   setLicenseSeatsSchema,
@@ -485,6 +486,9 @@ type RegisterFoundationIpcOptions = {
     bulkLink: (
       input: import("@contracts").BulkLinkInvoiceExtractionsCommand,
     ) => import("@contracts").BulkLinkInvoiceExtractionsResult;
+    retry: (
+      input: import("@contracts").RetryInvoiceExtractionsCommand,
+    ) => import("@contracts").RetryInvoiceExtractionsResult;
     apply: (
       input: import("@contracts").ApplyInvoiceExtractionCommand,
     ) => import("@contracts").InvoiceExtractionMutationResult;
@@ -2711,6 +2715,15 @@ export const registerFoundationIpc = ({
       requiredPermission: "treasury.transactions.classify",
     });
     return invoiceInbox.bulkLink(input);
+  });
+  safeHandle(ipcChannels.treasury.invoiceInboxRetry, retryInvoiceExtractionsSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "retry invoice extraction",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return invoiceInbox.retry(input);
   });
   safeHandleReadWithSchema(
     ipcChannels.treasury.invoiceInboxPreview,

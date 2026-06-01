@@ -154,6 +154,45 @@ describe("invoice inbox service", () => {
     cleanup();
   });
 
+  it("retries failed or extracted invoices without requeueing applied/dismissed rows", () => {
+    const { cleanup, database } = createTestDatabase("invoice-inbox-retry");
+    const treasuryMutations = createTreasuryMutationService(database);
+    const inbox = createInvoiceInboxService(database, {
+      userDataPath: makeUserDataPath(),
+      treasuryMutations,
+    });
+
+    const { ids } = inbox.enqueueBatch({
+      workspaceId,
+      files: [
+        { name: "failed.png", mimeType: "image/png", dataUrl: PNG_DATA_URL },
+        { name: "extracted.png", mimeType: "image/png", dataUrl: PNG_DATA_URL },
+        { name: "dismissed.png", mimeType: "image/png", dataUrl: PNG_DATA_URL },
+      ],
+    });
+
+    inbox.recordFailure(ids[0], "DOMMatrix is not defined");
+    inbox.recordExtraction(ids[1], fields, { transactionId: "txn-test", confidence: 0.88 });
+    inbox.dismiss({ workspaceId, extractionId: ids[2] });
+
+    const result = inbox.retry({ workspaceId, extractionIds: ids });
+    expect(result.queuedCount).toBe(2);
+    expect(result.skippedCount).toBe(1);
+    expect(result.extractionIds).toEqual([ids[0], ids[1]]);
+
+    const rows = inbox.list({ workspaceId, includeResolved: true });
+    const retriedFailed = rows.find((row) => row.id === ids[0]);
+    const retriedExtracted = rows.find((row) => row.id === ids[1]);
+    const skippedDismissed = rows.find((row) => row.id === ids[2]);
+    expect(retriedFailed?.status).toBe("pending");
+    expect(retriedFailed?.errorMessage).toBeNull();
+    expect(retriedExtracted?.status).toBe("pending");
+    expect(retriedExtracted?.suggestedTransactionId).toBeNull();
+    expect(skippedDismissed?.status).toBe("dismissed");
+
+    cleanup();
+  });
+
   it("links a user and project tags, and bulk-links many invoices at once", () => {
     const { cleanup, database } = createTestDatabase("invoice-inbox-link");
     const treasuryMutations = createTreasuryMutationService(database);

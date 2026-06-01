@@ -18,6 +18,8 @@ import type {
   InvoiceExtractionStatus,
   InvoiceInboxFileInput,
   InvoiceInboxListQuery,
+  RetryInvoiceExtractionsCommand,
+  RetryInvoiceExtractionsResult,
   UpdateInvoiceExtractionCommand,
 } from "@contracts";
 
@@ -706,6 +708,53 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     return { extractionId: input.extractionId, status: "dismissed", summary: "Factura descartada." };
   };
 
+  const retry = (input: RetryInvoiceExtractionsCommand): RetryInvoiceExtractionsResult => {
+    const uniqueIds = Array.from(new Set(input.extractionIds));
+    if (!uniqueIds.length) {
+      return { queuedCount: 0, skippedCount: 0, extractionIds: [], summary: "No hay facturas para reintentar." };
+    }
+
+    const placeholders = uniqueIds.map(() => "?").join(", ");
+    const rows = db
+      .prepare(
+        `SELECT id, status
+           FROM invoice_extractions
+          WHERE workspace_id = ? AND id IN (${placeholders})`,
+      )
+      .all(input.workspaceId, ...uniqueIds) as Array<{ id: string; status: InvoiceExtractionStatus }>;
+
+    const retryable = rows
+      .filter((row) => row.status !== "processing" && row.status !== "applied" && row.status !== "dismissed")
+      .map((row) => row.id);
+
+    if (retryable.length) {
+      const retryPlaceholders = retryable.map(() => "?").join(", ");
+      db.prepare(
+        `UPDATE invoice_extractions
+            SET status = 'pending',
+                error_message = NULL,
+                suggested_transaction_id = NULL,
+                match_confidence = NULL,
+                updated_at = ?
+          WHERE workspace_id = ? AND id IN (${retryPlaceholders})`,
+      ).run(now(), input.workspaceId, ...retryable);
+      for (const id of retryable) {
+        enqueueOutbox(input.workspaceId, id);
+      }
+    }
+
+    const skippedCount = uniqueIds.length - retryable.length;
+    return {
+      queuedCount: retryable.length,
+      skippedCount,
+      extractionIds: retryable,
+      summary:
+        retryable.length > 0
+          ? `Se reintentará el procesamiento de ${retryable.length} factura(s).`
+          : "No hay facturas reintentables en la selección.",
+    };
+  };
+
   /**
    * Human-approved write: annotate the chosen movement with supplier/NCF/RNC +
    * expense category, then set the DGII-deductible amount so it lands in the
@@ -779,6 +828,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     autoMatch,
     update,
     bulkLink,
+    retry,
     dismiss,
     applyExtraction,
     touch,

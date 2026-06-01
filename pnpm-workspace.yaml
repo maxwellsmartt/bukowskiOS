@@ -3,6 +3,7 @@ packages:
   - packages/*
 
 onlyBuiltDependencies:
+  - '@napi-rs/canvas'
   - better-sqlite3
   - electron
   - esbuild

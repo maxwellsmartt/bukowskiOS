@@ -554,6 +554,9 @@ declare global {
       invoiceInboxBulkLink: (
         input: import("@contracts").BulkLinkInvoiceExtractionsCommand,
       ) => Promise<import("@contracts").BulkLinkInvoiceExtractionsResult>;
+      invoiceInboxRetry: (
+        input: import("@contracts").RetryInvoiceExtractionsCommand,
+      ) => Promise<import("@contracts").RetryInvoiceExtractionsResult>;
       invoiceInboxPreview: (
         workspaceId: string,
         extractionId: string,

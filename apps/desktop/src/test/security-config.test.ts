@@ -30,6 +30,7 @@ describe("security config", () => {
     expect(policy).toContain("ws://localhost:5173");
     expect(policy).toContain("'unsafe-inline'");
     expect(policy).toContain("'unsafe-eval'");
+    expect(policy).toContain("frame-src 'self' blob:");
     expect(policy).toContain("object-src 'none'");
   });
 
