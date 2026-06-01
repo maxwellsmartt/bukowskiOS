@@ -11,12 +11,15 @@ const currentDirPath = path.dirname(currentFilePath);
 
 const loadOptionalAssetBuffer = (relativePath: string) => {
   const normalizedRelativePath = relativePath.replace(/^apps\/desktop\//, "");
+  const resourcePath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
   const candidates = [
+    resourcePath ? path.resolve(resourcePath, path.basename(relativePath)) : null,
+    resourcePath ? path.resolve(resourcePath, normalizedRelativePath) : null,
     path.resolve(process.cwd(), relativePath),
     path.resolve(process.cwd(), normalizedRelativePath),
     path.resolve(currentDirPath, "../", normalizedRelativePath),
     path.resolve(currentDirPath, "../../", normalizedRelativePath),
-  ];
+  ].filter((candidate): candidate is string => Boolean(candidate));
 
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) return fs.readFileSync(candidate);

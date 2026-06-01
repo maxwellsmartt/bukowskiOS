@@ -127,34 +127,33 @@ test("document generation service creates a finance report pdf buffer", async ()
     periodLabel: "This quarter",
     generatedAt: "Generated 2026-04-12 21:02",
     workspaceLabel: "Internal alpha",
-    executiveSummary: "$24,200 tracked spend, $12,800 incident exposure and $6,000 reserve coverage in this quarter.",
-    metrics: [
-      { label: "Incident exposure", value: "$12,800" },
-      { label: "Replacement at risk", value: "$36,400" },
-      { label: "Tracked spend", value: "$24,200" },
-    ],
+    logoBuffer: null,
+    executiveSummary: "$42,000 income, $24,200 expense and $17,800 net movement in this quarter.",
     totals: [
-      { label: "Tracked spend", value: "$24,200", tone: "info" },
-      { label: "Incident exposure", value: "$12,800", tone: "critical" },
-      { label: "Reserve coverage", value: "$6,000", tone: "warning" },
-      { label: "Average burn rate", value: "$8,066", tone: "neutral" },
+      { label: "Income", value: "$42,000", tone: "success" },
+      { label: "Expense", value: "$24,200", tone: "critical" },
+      { label: "Net", value: "$17,800", tone: "warning" },
+      { label: "Deductible expense", value: "$20,000", tone: "info" },
+      { label: "Crew pending", value: "$6,000", tone: "warning" },
+      { label: "Transfers excluded", value: "$12,000", tone: "neutral" },
     ],
-    exposureByProject: [
-      { project: "Aurora Campaign", exposure: "$9,200", incidentCount: 3, assetsOut: "$18,000" },
-      { project: "Archipielado", exposure: "$3,600", incidentCount: 1, assetsOut: "$8,200" },
+    signals: [
+      { label: "Unclassified", value: "3", body: "Movements that still need a type.", tone: "warning" },
+      { label: "Fiscal review", value: "2", body: "Rows pending DGII review.", tone: "warning" },
+      { label: "Crew balances", value: "1", body: "Collaborators pending payment.", tone: "critical" },
+      { label: "Missing conversion", value: "0", body: "All movements can be read in the reporting currency.", tone: "success" },
+    ],
+    monthly: [
+      { month: "Jan 2026", income: "$12,000", expense: "$8,000", net: "$4,000" },
+      { month: "Feb 2026", income: "$30,000", expense: "$16,200", net: "$13,800" },
     ],
     categoryBreakdown: [
       { category: "Transport", amount: "$11,000", percentage: 45.5 },
       { category: "Repair", amount: "$7,800", percentage: 32.2 },
     ],
-    pendingCostLinks: [
-      {
-        incident: "Lens replacement",
-        project: "Aurora Campaign",
-        severity: "High",
-        costEstimate: "$3,600",
-        financialStatus: "Missing entry",
-      },
+    crewBalances: [
+      { collaborator: "Ana Guerrero", pending: "$4,000", paid: "$8,000" },
+      { collaborator: "Carlos Pena", pending: "$2,000", paid: "$5,000" },
     ],
   });
 

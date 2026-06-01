@@ -630,6 +630,8 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.overview, query) as Promise<
       import("@contracts").TreasuryOverviewSnapshot
     >,
+  exportOverviewPdf: (query: import("@contracts").TreasuryOverviewQuery) =>
+    ipcRenderer.invoke(ipcChannels.treasury.exportOverviewPdf, query) as Promise<import("@contracts").AppExportResult>,
   reviewQueue: (workspaceId: string) =>
     ipcRenderer.invoke(ipcChannels.treasury.reviewQueue, { workspaceId }) as Promise<
       import("@contracts").ReviewQueueRow[]

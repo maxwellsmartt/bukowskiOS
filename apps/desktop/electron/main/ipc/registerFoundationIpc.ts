@@ -67,6 +67,7 @@ import {
   treasuryTransactionListReadArgsSchema,
   counterpartyRulePreviewReadArgsSchema,
   treasuryOverviewReadArgsSchema,
+  treasuryOverviewQuerySchema,
   treasuryReviewQueueReadArgsSchema,
   treasuryProjectPnlReadArgsSchema,
   treasuryUndoPreviewReadArgsSchema,
@@ -552,6 +553,15 @@ type RegisterFoundationIpcOptions = {
       buffer: Buffer;
       targetFilePath: string;
     }>;
+  exportTreasuryOverviewPdf: (
+    query: import("@contracts").TreasuryOverviewQuery,
+    targetFilePath: string,
+  ) => Promise<{
+    fileName: string;
+    mimeType: "application/pdf";
+    buffer: Buffer;
+    targetFilePath: string;
+  }>;
   exportProjectBlueprintPdf: (
     input: CreateProjectBlueprintInput,
     targetFilePath: string,
@@ -664,6 +674,7 @@ export const registerFoundationIpc = ({
   exportQuotePdf,
   packingMutations,
   exportFinanceReportPdf,
+  exportTreasuryOverviewPdf,
   exportPackingSlipPdf,
   exportPackingSlipInsurancePdf,
   exportProjectBlueprintPdf,
@@ -2401,6 +2412,39 @@ export const registerFoundationIpc = ({
     },
     "The app could not load the treasury overview.",
   );
+  safeHandle(ipcChannels.treasury.exportOverviewPdf, treasuryOverviewQuerySchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId ?? "",
+      action: "export treasury overview",
+      accessLevel: "read",
+      requiredPermission: "treasury.transactions.read",
+    });
+    const overview = treasuryReads.getOverview(input);
+    const periodSlug = overview.activePeriodLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "summary";
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "Export treasury overview",
+      defaultPath: path.join(app.getPath("documents"), `treasury-overview-${periodSlug}.pdf`),
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+
+    if (canceled || !filePath) {
+      return {
+        saved: false,
+        fileName: null,
+        savedPath: null,
+        summary: "Treasury overview export cancelled.",
+      };
+    }
+
+    const pdf = await exportTreasuryOverviewPdf(input, filePath);
+    fs.writeFileSync(filePath, pdf.buffer);
+    return {
+      saved: true,
+      fileName: path.basename(filePath),
+      savedPath: filePath,
+      summary: `Exported treasury overview for ${overview.activePeriodLabel}.`,
+    };
+  });
   safeHandleReadWithSchema(
     ipcChannels.treasury.reviewQueue,
     treasuryReviewQueueReadArgsSchema,

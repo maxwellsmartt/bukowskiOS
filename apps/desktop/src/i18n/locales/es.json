@@ -868,6 +868,26 @@
         "exportPdf": "Exportar PDF",
         "exportingPdf": "Exportando PDF..."
       },
+      "treasuryUnavailable": "Tesorería no disponible: {{message}}",
+      "decisionTitle": "Señales para decidir",
+      "cashFlowTitle": "Ingresos vs gastos reales",
+      "liveMetrics": {
+        "income": "Ingreso real",
+        "expense": "Gasto real",
+        "net": "Neto",
+        "deductible": "Gasto deducible",
+        "crewPending": "Honorarios pendientes"
+      },
+      "decisions": {
+        "unclassified": "Sin clasificar",
+        "unclassifiedBody": "Movimientos que todavía no alimentan bien los gráficos ni reportes.",
+        "pendingReview": "Revisión fiscal",
+        "pendingReviewBody": "Gastos pendientes de aceptar, reducir o rechazar para DGII.",
+        "crewPayables": "Pagos a crew",
+        "crewPayablesBody": "{{count}} colaborador(es) con balance pendiente.",
+        "conversion": "Conversión",
+        "conversionBody": "Movimientos sin tasa para consolidar en moneda de reporte."
+      },
       "metrics": {
         "incidentExposure": "Exposición por incidentes",
         "replacementAtRisk": "Reposición en riesgo",
@@ -924,7 +944,17 @@
         "noTrendTitle": "Sin tendencia semanal todavía",
         "noTrendBody": "Actualiza tasas {{currency}} durante varios días para construir una lectura semanal desde snapshots verificados de TasaReal.",
         "noExposureTitle": "Sin exposición todavía",
-        "noExposureBody": "Cuando empiecen a llegar incidentes y reservas, este gráfico mostrará qué proyectos cargan más presión."
+        "noExposureBody": "Cuando empiecen a llegar incidentes y reservas, este gráfico mostrará qué proyectos cargan más presión.",
+        "noBurnTitle": "Sin burn registrado",
+        "noBurnBody": "Este gráfico aparecerá cuando existan salidas registradas en Finanzas dentro de la ventana seleccionada.",
+        "noCategoryTitle": "Sin mix de categorías",
+        "noCategoryBody": "Cuando clasifiques gastos reales, este bloque mostrará el peso de cada categoría.",
+        "noTreasuryFlowTitle": "Sin flujo real todavía",
+        "noTreasuryFlowBody": "Cuando existan movimientos de tesorería clasificados, este gráfico mostrará ingresos, gastos y neto por mes.",
+        "noExposureTableTitle": "Sin exposición operativa",
+        "noExposureTableBody": "La tabla aparecerá cuando algún proyecto tenga incidentes, equipos fuera o costos en riesgo.",
+        "noReviewQueueTitle": "Sin pendientes de revisión",
+        "noReviewQueueBody": "Los incidentes o costos que necesiten estimado financiero aparecerán aquí."
       },
       "help": {
         "exposure": "La exposición es el costo estimado total de incidentes abiertos y reservas en cada proyecto: dinero que podrías tener que cubrir si todo se resuelve mal.",
@@ -1431,6 +1461,10 @@
         "title": "Pulso de caja",
         "window": "Ventana",
         "currency": "Moneda de lectura",
+        "exportSummary": "Exportar resumen",
+        "exportingSummary": "Exportando...",
+        "exported": "Resumen de tesorería exportado",
+        "exportFailed": "No se pudo exportar el resumen de tesorería.",
         "flowTitle": "Ingresos vs gastos",
         "flowEmpty": "Clasifica movimientos para ver el flujo mensual de ingresos y gastos.",
         "legend": "Leyenda",

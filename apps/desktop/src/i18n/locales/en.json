@@ -866,6 +866,26 @@
         "exportPdf": "Export PDF",
         "exportingPdf": "Exporting PDF..."
       },
+      "treasuryUnavailable": "Treasury unavailable: {{message}}",
+      "decisionTitle": "Decision signals",
+      "cashFlowTitle": "Real income vs expense",
+      "liveMetrics": {
+        "income": "Real income",
+        "expense": "Real expense",
+        "net": "Net",
+        "deductible": "Deductible expense",
+        "crewPending": "Pending crew fees"
+      },
+      "decisions": {
+        "unclassified": "Unclassified",
+        "unclassifiedBody": "Movements that are not feeding charts and reports correctly yet.",
+        "pendingReview": "Fiscal review",
+        "pendingReviewBody": "Expenses pending approval, reduction or rejection for DGII.",
+        "crewPayables": "Crew payables",
+        "crewPayablesBody": "{{count}} collaborator(s) with pending balance.",
+        "conversion": "Conversion",
+        "conversionBody": "Movements missing a rate for consolidated reporting currency."
+      },
       "metrics": {
         "incidentExposure": "Incident exposure",
         "replacementAtRisk": "Replacement at risk",
@@ -922,7 +942,17 @@
         "noTrendTitle": "No weekly trend yet",
         "noTrendBody": "Refresh {{currency}} rates across several days to build a weekly view from verified TasaReal snapshots.",
         "noExposureTitle": "No exposure yet",
-        "noExposureBody": "Once incidents and reserves start landing, this chart will show which projects are carrying the most pressure."
+        "noExposureBody": "Once incidents and reserves start landing, this chart will show which projects are carrying the most pressure.",
+        "noBurnTitle": "No burn recorded",
+        "noBurnBody": "This chart will appear once Finance has outgoing entries inside the selected window.",
+        "noCategoryTitle": "No category mix",
+        "noCategoryBody": "Once real expenses are categorized, this block will show each category's weight.",
+        "noTreasuryFlowTitle": "No real flow yet",
+        "noTreasuryFlowBody": "Once treasury movements are classified, this chart will show monthly income, expense and net.",
+        "noExposureTableTitle": "No operational exposure",
+        "noExposureTableBody": "The table will appear once a project has incidents, checked-out assets, or cost at risk.",
+        "noReviewQueueTitle": "No review items",
+        "noReviewQueueBody": "Incidents or costs that need financial estimates will appear here."
       },
       "help": {
         "exposure": "Exposure is the total estimated cost of open incidents and reserves on each project: money you might still owe if everything resolves badly.",
@@ -1429,6 +1459,10 @@
         "title": "Cash pulse",
         "window": "Window",
         "currency": "Reporting currency",
+        "exportSummary": "Export summary",
+        "exportingSummary": "Exporting...",
+        "exported": "Treasury summary exported",
+        "exportFailed": "Could not export the treasury summary.",
         "flowTitle": "Income vs expense",
         "flowEmpty": "Classify movements to see the monthly income and expense flow.",
         "legend": "Legend",

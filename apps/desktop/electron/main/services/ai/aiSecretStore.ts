@@ -6,24 +6,59 @@ const secretFileName = "bukowski-ai-secrets.json";
 
 type SecretManifest = Record<string, string>;
 
+let manifestCache: SecretManifest | null = null;
+let encryptionAvailableCache: boolean | null = null;
+const decryptedSecretCache = new Map<string, string>();
+
 const getSecretFilePath = () => path.join(app.getPath("userData"), secretFileName);
 
+const isEncryptionAvailable = () => {
+  if (encryptionAvailableCache == null) {
+    encryptionAvailableCache = safeStorage.isEncryptionAvailable();
+  }
+
+  return encryptionAvailableCache;
+};
+
 const loadManifest = (): SecretManifest => {
+  if (manifestCache) {
+    return { ...manifestCache };
+  }
+
   const filePath = getSecretFilePath();
 
   if (!fs.existsSync(filePath)) {
+    manifestCache = {};
     return {};
   }
 
   try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8")) as SecretManifest;
+    manifestCache = JSON.parse(fs.readFileSync(filePath, "utf8")) as SecretManifest;
+    return { ...manifestCache };
   } catch {
+    manifestCache = {};
     return {};
   }
 };
 
 const saveManifest = (manifest: SecretManifest) => {
+  manifestCache = { ...manifest };
   fs.writeFileSync(getSecretFilePath(), JSON.stringify(manifest, null, 2), "utf8");
+};
+
+const getCachedSecret = (secretKey: string, encodedSecret: string) => {
+  const cached = decryptedSecretCache.get(secretKey);
+  if (cached) {
+    return cached;
+  }
+
+  if (!isEncryptionAvailable()) {
+    throw new Error("Secure local encryption is unavailable on this device.");
+  }
+
+  const decrypted = safeStorage.decryptString(Buffer.from(encodedSecret, "base64"));
+  decryptedSecretCache.set(secretKey, decrypted);
+  return decrypted;
 };
 
 const createSecretKey = (workspaceId: string, providerKey: string) => `${workspaceId}:${providerKey}`;
@@ -45,7 +80,7 @@ export type ConnectorSecretStore = AISecretStore & {
 
 export const createAISecretStore = (): ConnectorSecretStore => ({
   hasProviderSecret(workspaceId: string, providerKey: string) {
-    if (!safeStorage.isEncryptionAvailable()) {
+    if (!isEncryptionAvailable()) {
       return false;
     }
 
@@ -55,17 +90,14 @@ export const createAISecretStore = (): ConnectorSecretStore => ({
 
   getProviderSecret(workspaceId: string, providerKey: string) {
     const manifest = loadManifest();
-    const encodedSecret = manifest[createSecretKey(workspaceId, providerKey)];
+    const secretKey = createSecretKey(workspaceId, providerKey);
+    const encodedSecret = manifest[secretKey];
 
     if (!encodedSecret) {
       return null;
     }
 
-    if (!safeStorage.isEncryptionAvailable()) {
-      throw new Error("Secure local encryption is unavailable on this device.");
-    }
-
-    return safeStorage.decryptString(Buffer.from(encodedSecret, "base64"));
+    return getCachedSecret(secretKey, encodedSecret);
   },
 
   setProviderSecret(workspaceId: string, providerKey: string, secret: string) {
@@ -75,23 +107,27 @@ export const createAISecretStore = (): ConnectorSecretStore => ({
       throw new Error("Provider secret is required.");
     }
 
-    if (!safeStorage.isEncryptionAvailable()) {
+    if (!isEncryptionAvailable()) {
       throw new Error("Secure local encryption is unavailable on this device.");
     }
 
     const manifest = loadManifest();
-    manifest[createSecretKey(workspaceId, providerKey)] = safeStorage.encryptString(nextSecret).toString("base64");
+    const secretKey = createSecretKey(workspaceId, providerKey);
+    manifest[secretKey] = safeStorage.encryptString(nextSecret).toString("base64");
+    decryptedSecretCache.set(secretKey, nextSecret);
     saveManifest(manifest);
   },
 
   clearProviderSecret(workspaceId: string, providerKey: string) {
     const manifest = loadManifest();
-    delete manifest[createSecretKey(workspaceId, providerKey)];
+    const secretKey = createSecretKey(workspaceId, providerKey);
+    delete manifest[secretKey];
+    decryptedSecretCache.delete(secretKey);
     saveManifest(manifest);
   },
 
   hasConnectorSecret(workspaceId: string, connectorKey: string) {
-    if (!safeStorage.isEncryptionAvailable()) {
+    if (!isEncryptionAvailable()) {
       return false;
     }
 
@@ -101,17 +137,14 @@ export const createAISecretStore = (): ConnectorSecretStore => ({
 
   getConnectorSecret(workspaceId: string, connectorKey: string) {
     const manifest = loadManifest();
-    const encodedSecret = manifest[createConnectorSecretKey(workspaceId, connectorKey)];
+    const secretKey = createConnectorSecretKey(workspaceId, connectorKey);
+    const encodedSecret = manifest[secretKey];
 
     if (!encodedSecret) {
       return null;
     }
 
-    if (!safeStorage.isEncryptionAvailable()) {
-      throw new Error("Secure local encryption is unavailable on this device.");
-    }
-
-    return safeStorage.decryptString(Buffer.from(encodedSecret, "base64"));
+    return getCachedSecret(secretKey, encodedSecret);
   },
 
   setConnectorSecret(workspaceId: string, connectorKey: string, secret: string) {
@@ -121,18 +154,22 @@ export const createAISecretStore = (): ConnectorSecretStore => ({
       throw new Error("Connector secret is required.");
     }
 
-    if (!safeStorage.isEncryptionAvailable()) {
+    if (!isEncryptionAvailable()) {
       throw new Error("Secure local encryption is unavailable on this device.");
     }
 
     const manifest = loadManifest();
-    manifest[createConnectorSecretKey(workspaceId, connectorKey)] = safeStorage.encryptString(nextSecret).toString("base64");
+    const secretKey = createConnectorSecretKey(workspaceId, connectorKey);
+    manifest[secretKey] = safeStorage.encryptString(nextSecret).toString("base64");
+    decryptedSecretCache.set(secretKey, nextSecret);
     saveManifest(manifest);
   },
 
   clearConnectorSecret(workspaceId: string, connectorKey: string) {
     const manifest = loadManifest();
-    delete manifest[createConnectorSecretKey(workspaceId, connectorKey)];
+    const secretKey = createConnectorSecretKey(workspaceId, connectorKey);
+    delete manifest[secretKey];
+    decryptedSecretCache.delete(secretKey);
     saveManifest(manifest);
   },
 });

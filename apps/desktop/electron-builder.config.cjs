@@ -26,6 +26,10 @@ module.exports = {
       from: "src/shared/assets/inbox/logos/bukowskiOS-desktop-logo.png",
       to: "startup-logo.png",
     },
+    {
+      from: "src/shared/assets/inbox/logos/metadata-logo-black@2x.png",
+      to: "metadata-logo-black@2x.png",
+    },
   ],
   asar: true,
   npmRebuild: false,

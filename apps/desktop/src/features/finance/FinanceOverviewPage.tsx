@@ -22,13 +22,11 @@ import type {
   ExchangeRateRow,
   FinanceOverviewPeriodPreset,
   FinanceOverviewQuery,
+  TreasuryOverviewQuery,
 } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
-import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
-import { HelpHint } from "@shared/components/HelpHint";
-import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -39,7 +37,8 @@ import bancoCentralLogo from "@shared/assets/inbox/logos/banco-central-logo.png"
 import bancoPopularLogo from "@shared/assets/inbox/logos/banco popular dominicano-logo.jpg";
 import bancoSantaCruzLogo from "@shared/assets/inbox/logos/banco santa cruz-logo.png";
 
-import { exportFinanceReportPdf, useFinanceOverview } from "./useFinanceData";
+import { exportFinanceReportPdf, useCollaboratorFeeSummary, useFinanceOverview } from "./useFinanceData";
+import { useTreasuryOverview } from "./useTreasuryData";
 import { refreshCurrencyRates, useCurrencyRateProviderStatus, useExchangeRates } from "./useCurrencyData";
 import { newCommandId } from "./quoteHelpers";
 
@@ -58,17 +57,20 @@ const exchangeRateInstitutions: Array<{ label: string; logo: string; source: Cur
   { label: "Banco Santa Cruz", logo: bancoSantaCruzLogo, source: "banco_santa_cruz" },
 ];
 
-const formatAxisCurrency = (value: number) => {
+const formatAxisCurrency = (value: number, currency = "$") => {
+  const prefix = currency === "$" ? "$" : `${currency} `;
   if (value >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(1)}M`;
+    return `${prefix}${(value / 1_000_000).toFixed(1)}M`;
   }
 
   if (value >= 1_000) {
-    return `$${(value / 1_000).toFixed(0)}k`;
+    return `${prefix}${(value / 1_000).toFixed(0)}k`;
   }
 
-  return `$${Math.round(value)}`;
+  return `${prefix}${Math.round(value)}`;
 };
+
+const normalizeCategoryKey = (value: string) => value.trim().replace(/\s+/g, "_").toLowerCase();
 
 const formatRateValue = (value: number | null) => (typeof value === "number" ? value.toFixed(2) : "—");
 
@@ -156,18 +158,6 @@ const getRateDisplayCopy = (source: CurrencyRateSource, baseCurrency: "USD" | "E
   };
 };
 
-const financeMetricLabel = (label: string, t: TFunction) => {
-  const keyByLabel: Record<string, string> = {
-    "Incident exposure": "incidentExposure",
-    "Replacement at risk": "replacementAtRisk",
-    "Tracked spend": "trackedSpend",
-    "Missing estimates": "missingEstimates",
-    "Maintenance queue": "maintenanceQueue",
-  };
-  const key = keyByLabel[label];
-  return key ? t(`finance.overview.metrics.${key}`, { defaultValue: label }) : label;
-};
-
 const RateChartTooltip = ({
   active,
   label,
@@ -197,11 +187,13 @@ const RateChartTooltip = ({
 
 const ChartTooltip = ({
   active,
+  currency,
   label,
   payload,
 }: {
   active?: boolean;
   label?: string;
+  currency?: string;
   payload?: Array<{ color?: string; dataKey?: string; value?: number | string; payload?: Record<string, unknown> }>;
 }) => {
   if (!active || !payload?.length) {
@@ -214,7 +206,7 @@ const ChartTooltip = ({
       {payload.map((entry) => (
         <div key={`${entry.dataKey}-${entry.color}`} className="finance-chart-tooltip-row">
           <span className="finance-chart-tooltip-dot" style={{ background: entry.color ?? "rgba(255,255,255,0.6)" }} />
-          <span>{typeof entry.value === "number" ? formatAxisCurrency(entry.value) : String(entry.value ?? "—")}</span>
+          <span>{typeof entry.value === "number" ? formatAxisCurrency(entry.value, currency) : String(entry.value ?? "—")}</span>
         </div>
       ))}
     </div>
@@ -225,13 +217,12 @@ export const FinanceOverviewPage = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
   const toast = useToast();
-  const { formatDate } = useLocale();
+  const { formatDate, formatMoney } = useLocale();
   const formatRateTimestamp = (value: string | null | undefined) => {
     if (!value) return t("finance.overview.exchange.notRefreshed");
     return formatDate(value, RATE_TIMESTAMP_FORMAT) || value;
   };
   const formatRateTrendTime = (value: string) => formatDate(value, RATE_TREND_FORMAT) || value;
-  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [period, setPeriod] = useState<FinanceOverviewPeriodPreset>("month");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
@@ -254,8 +245,23 @@ export const FinanceOverviewPage = () => {
           },
     [customEndDate, customStartDate, isCustomRangeReady, period],
   );
+  const treasuryOverviewQuery = useMemo<TreasuryOverviewQuery>(
+    () =>
+      period === "custom" && !isCustomRangeReady
+        ? { workspaceId: activeWorkspaceId, period: "month", customStartDate: null, customEndDate: null, reportCurrency: "DOP" }
+        : {
+            workspaceId: activeWorkspaceId,
+            period,
+            customStartDate: period === "custom" ? customStartDate || null : null,
+            customEndDate: period === "custom" ? customEndDate || null : null,
+            reportCurrency: "DOP",
+          },
+    [activeWorkspaceId, customEndDate, customStartDate, isCustomRangeReady, period],
+  );
 
-  const { data, error, isLoading } = useFinanceOverview(overviewQuery);
+  const { data, error } = useFinanceOverview(overviewQuery);
+  const treasuryOverview = useTreasuryOverview(treasuryOverviewQuery);
+  const collaboratorSummary = useCollaboratorFeeSummary();
   const {
     data: exchangeRates,
     error: exchangeRatesError,
@@ -264,19 +270,58 @@ export const FinanceOverviewPage = () => {
   } = useExchangeRates(activeWorkspaceId, { baseCurrency: selectedFxCurrency, quoteCurrency: "DOP", limit: 200 });
   const { data: providerStatus, refresh: reloadProviderStatus } = useCurrencyRateProviderStatus(activeWorkspaceId);
 
-  const exposureChartRows = useMemo(
-    () =>
-      data.exposureByProject.map((row) => ({
-        incidentCount: row.incidentCount,
-        project: row.project,
-        value: row.exposureValue,
-      })),
-    [data.exposureByProject],
+  const treasurySnapshot = treasuryOverview.data;
+  const treasuryCurrency = treasurySnapshot?.reportCurrency && treasurySnapshot.reportCurrency !== "mixed" ? treasurySnapshot.reportCurrency : "DOP";
+  const hasTreasuryFlow = Boolean(
+    treasurySnapshot?.monthly.some((row) => row.income > 0 || row.expense > 0 || row.net !== 0),
   );
-
-  const categoryChartRows = data.categoryBreakdown.length
-    ? data.categoryBreakdown
-    : [{ category: t("finance.overview.empty.noTrackedSpend"), amount: "$0", amountValue: 0, percentage: 100 }];
+  const categoryChartRows = useMemo(
+    () =>
+      (treasurySnapshot?.expenseByCategory ?? []).map((row) => ({
+        ...row,
+        label: t(`finance.treasury.categories.${normalizeCategoryKey(row.category)}`, {
+          defaultValue: row.category.replace(/_/g, " "),
+        }),
+      })),
+    [t, treasurySnapshot?.expenseByCategory],
+  );
+  const hasCategorySpend = categoryChartRows.some((row) => row.amount > 0);
+  const decisionSignals = useMemo(
+    () =>
+      [
+        {
+          id: "unclassified",
+          tone: (treasurySnapshot?.unclassifiedCount ?? 0) > 0 ? "warning" : "success",
+          label: t("finance.overview.decisions.unclassified"),
+          value: String(treasurySnapshot?.unclassifiedCount ?? 0),
+          body: t("finance.overview.decisions.unclassifiedBody"),
+        },
+        {
+          id: "review",
+          tone: (treasurySnapshot?.pendingReviewCount ?? 0) > 0 ? "warning" : "success",
+          label: t("finance.overview.decisions.pendingReview"),
+          value: String(treasurySnapshot?.pendingReviewCount ?? 0),
+          body: t("finance.overview.decisions.pendingReviewBody"),
+        },
+        {
+          id: "crew",
+          tone: collaboratorSummary.data.pendingAmount > 0 ? "critical" : "success",
+          label: t("finance.overview.decisions.crewPayables"),
+          value: formatMoney(collaboratorSummary.data.pendingAmount, "DOP"),
+          body: t("finance.overview.decisions.crewPayablesBody", {
+            count: collaboratorSummary.data.collaboratorsWithBalance,
+          }),
+        },
+        {
+          id: "conversion",
+          tone: (treasurySnapshot?.conversionMissingCount ?? 0) > 0 ? "warning" : "success",
+          label: t("finance.overview.decisions.conversion"),
+          value: String(treasurySnapshot?.conversionMissingCount ?? 0),
+          body: t("finance.overview.decisions.conversionBody"),
+        },
+      ] as const,
+    [collaboratorSummary.data, formatMoney, t, treasurySnapshot],
+  );
 
   const exchangeRateRows = useMemo(() => {
     const rows = exchangeRateInstitutions.map((institution) => {
@@ -539,13 +584,54 @@ export const FinanceOverviewPage = () => {
       </SurfaceCard>
 
       <div className="finance-grid">
-        {data.metrics.map((metric) => (
-          <SurfaceCard key={metric.label}>
-            <span className={`metric-value metric-tone-${metric.tone}`}>{metric.value}</span>
-            <p className="metric-label">{financeMetricLabel(metric.label, t)}</p>
-          </SurfaceCard>
-        ))}
+        <SurfaceCard>
+          <span className="metric-value metric-tone-success">
+            {formatMoney(treasurySnapshot?.totalIncome ?? 0, treasuryCurrency)}
+          </span>
+          <p className="metric-label">{t("finance.overview.liveMetrics.income")}</p>
+        </SurfaceCard>
+        <SurfaceCard>
+          <span className="metric-value metric-tone-critical">
+            {formatMoney(treasurySnapshot?.totalExpense ?? 0, treasuryCurrency)}
+          </span>
+          <p className="metric-label">{t("finance.overview.liveMetrics.expense")}</p>
+        </SurfaceCard>
+        <SurfaceCard>
+          <span className={`metric-value metric-tone-${(treasurySnapshot?.net ?? 0) >= 0 ? "warning" : "critical"}`}>
+            {formatMoney(treasurySnapshot?.net ?? 0, treasuryCurrency)}
+          </span>
+          <p className="metric-label">{t("finance.overview.liveMetrics.net")}</p>
+        </SurfaceCard>
+        <SurfaceCard>
+          <span className="metric-value metric-tone-info">
+            {formatMoney(treasurySnapshot?.totalDeductibleExpense ?? 0, treasuryCurrency)}
+          </span>
+          <p className="metric-label">{t("finance.overview.liveMetrics.deductible")}</p>
+        </SurfaceCard>
+        <SurfaceCard>
+          <span className={`metric-value metric-tone-${collaboratorSummary.data.pendingAmount > 0 ? "warning" : "success"}`}>
+            {formatMoney(collaboratorSummary.data.pendingAmount, "DOP")}
+          </span>
+          <p className="metric-label">{t("finance.overview.liveMetrics.crewPending")}</p>
+        </SurfaceCard>
       </div>
+
+      <SurfaceCard title={t("finance.overview.decisionTitle")}>
+        <div className="finance-decision-grid">
+          {decisionSignals.map((signal) => (
+            <div className={`finance-decision-tile metric-tone-${signal.tone}`} key={signal.id}>
+              <span>{signal.label}</span>
+              <strong>{signal.value}</strong>
+              <p>{signal.body}</p>
+            </div>
+          ))}
+        </div>
+        {treasuryOverview.error ? (
+          <div className="action-feedback action-feedback-warning">
+            {t("finance.overview.treasuryUnavailable", { message: treasuryOverview.error })}
+          </div>
+        ) : null}
+      </SurfaceCard>
 
       <SurfaceCard
         title={t("finance.overview.exchange.title")}
@@ -733,100 +819,65 @@ export const FinanceOverviewPage = () => {
       </SurfaceCard>
 
       <div className="finance-dashboard-grid">
-        <SurfaceCard
-          title={t("finance.overview.exposureByProject")}
-          aside={
-            <HelpHint
-              body={t("finance.overview.help.exposure")}
-            />
-          }
-        >
-          {isLoading ? (
+        <SurfaceCard title={t("finance.overview.cashFlowTitle")}>
+          {treasuryOverview.isLoading ? (
             <TableSkeleton rows={5} />
-          ) : exposureChartRows.length ? (
+          ) : hasTreasuryFlow ? (
             <div className="finance-chart-shell">
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={exposureChartRows} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                <BarChart data={treasurySnapshot?.monthly ?? []} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
                   <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="project" stroke="rgba(255,255,255,0.48)" tickLine={false} axisLine={false} />
+                  <XAxis dataKey="month" stroke="rgba(255,255,255,0.48)" tickLine={false} axisLine={false} />
                   <YAxis
                     stroke="rgba(255,255,255,0.44)"
-                    tickFormatter={formatAxisCurrency}
+                    tickFormatter={(value) => formatAxisCurrency(Number(value), treasuryCurrency)}
                     tickLine={false}
                     axisLine={false}
                     width={58}
                   />
-                  <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-                  <Bar dataKey="value" radius={[10, 10, 0, 0]} fill="#d6b37a" />
+                  <Tooltip content={<ChartTooltip currency={treasuryCurrency} />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                  <Bar dataKey="income" name={t("finance.overview.liveMetrics.income")} radius={[8, 8, 0, 0]} fill="#7eb7b2" />
+                  <Bar dataKey="expense" name={t("finance.overview.liveMetrics.expense")} radius={[8, 8, 0, 0]} fill="#c88d7f" />
+                  <Line
+                    type="monotone"
+                    dataKey="net"
+                    name={t("finance.overview.liveMetrics.net")}
+                    stroke="#d6b37a"
+                    strokeWidth={2.4}
+                    dot={{ r: 3, fill: "#d6b37a" }}
+                    activeDot={{ r: 5 }}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
             <GuidedEmptyState
-              title={t("finance.overview.empty.noExposureTitle")}
-              body={t("finance.overview.empty.noExposureBody")}
+              title={t("finance.overview.empty.noTreasuryFlowTitle")}
+              body={t("finance.overview.empty.noTreasuryFlowBody")}
             />
-          )}
-        </SurfaceCard>
-
-        <SurfaceCard
-          title={t("finance.overview.monthlyBurn")}
-          aside={
-            <HelpHint
-              body={t("finance.overview.help.burn")}
-            />
-          }
-        >
-          {isLoading ? (
-            <TableSkeleton rows={5} />
-          ) : (
-            <div className="finance-chart-shell">
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={data.monthlyBurn} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="month" stroke="rgba(255,255,255,0.48)" tickLine={false} axisLine={false} />
-                  <YAxis
-                    stroke="rgba(255,255,255,0.44)"
-                    tickFormatter={formatAxisCurrency}
-                    tickLine={false}
-                    axisLine={false}
-                    width={58}
-                  />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Line
-                    type="monotone"
-                    dataKey="amountValue"
-                    stroke="#7eb7b2"
-                    strokeWidth={2.5}
-                    dot={{ r: 3, fill: "#7eb7b2" }}
-                    activeDot={{ r: 5 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
           )}
         </SurfaceCard>
 
         <SurfaceCard title={t("finance.overview.categoryMix")}>
-          {isLoading ? (
+          {treasuryOverview.isLoading ? (
             <TableSkeleton rows={5} />
-          ) : (
+          ) : hasCategorySpend ? (
             <div className="finance-chart-shell finance-chart-shell-pie">
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Pie
                     data={categoryChartRows}
-                    dataKey="amountValue"
+                    dataKey="amount"
                     innerRadius={58}
                     outerRadius={92}
                     paddingAngle={2}
-                    nameKey="category"
+                    nameKey="label"
                   >
                     {categoryChartRows.map((row, index) => (
                       <Cell key={row.category} fill={chartPalette[index % chartPalette.length] ?? "#d6b37a"} />
                     ))}
                   </Pie>
-                  <Tooltip content={<ChartTooltip />} />
+                  <Tooltip content={<ChartTooltip currency={treasuryCurrency} />} />
                 </PieChart>
               </ResponsiveContainer>
 
@@ -837,55 +888,22 @@ export const FinanceOverviewPage = () => {
                       className="finance-pie-legend-swatch"
                       style={{ background: chartPalette[index % chartPalette.length] ?? "#d6b37a" }}
                     />
-                    <span className="finance-pie-legend-label">{row.category}</span>
+                    <span className="finance-pie-legend-label">{row.label}</span>
                     <span className="finance-pie-legend-meta">
-                      {row.amount} · {row.percentage}%
+                      {formatMoney(row.amount, treasuryCurrency)} · {row.percentage}%
                     </span>
                   </div>
                 ))}
               </div>
             </div>
+          ) : (
+            <GuidedEmptyState
+              title={t("finance.overview.empty.noCategoryTitle")}
+              body={t("finance.overview.empty.noCategoryBody")}
+            />
           )}
         </SurfaceCard>
       </div>
-
-      <ResizableSideRailLayout className="split-layout" defaultWidth={420} maxWidth={640} minWidth={320} storageKey="finance-overview-side-rail-width">
-        <SurfaceCard title={t("finance.overview.exposureTable")}>
-          <DataTable
-            getRowId={(row) => row.project}
-            maxHeight="min(46vh, 520px)"
-            persistKey="finance-project-exposure"
-            columns={[
-              { key: "project", label: t("finance.overview.columns.project"), render: (row) => row.project },
-              { key: "exposure", label: t("finance.overview.columns.exposure"), render: (row) => row.exposure },
-              { key: "assetsOut", label: t("finance.overview.columns.assetsOut"), render: (row) => row.assetsOut },
-              { key: "incidentCount", label: t("finance.overview.columns.incidents"), align: "right", render: (row) => row.incidentCount },
-            ]}
-            rows={data.exposureByProject}
-            selectable
-            selectedRowIds={selectedRowIds}
-            onSelectedRowIdsChange={setSelectedRowIds}
-          />
-        </SurfaceCard>
-
-        <SurfaceCard title={t("finance.overview.reviewQueue")}>
-          <div className="queue-list">
-            {data.costLinks.map((row) => (
-              <div key={row.incident} className="queue-item">
-                <div className="identity-cell">
-                  <span className="identity-title">{row.incident}</span>
-                  <span className="identity-meta">
-                    {row.project} · {row.costEstimate}
-                  </span>
-                </div>
-                <StatusBadge tone={row.financialStatus === "Estimate missing" ? "warning" : "info"}>
-                  {row.financialStatus}
-                </StatusBadge>
-              </div>
-            ))}
-          </div>
-        </SurfaceCard>
-      </ResizableSideRailLayout>
     </div>
   );
 };

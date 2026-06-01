@@ -166,6 +166,13 @@ export const useTreasuryOverview = (query: TreasuryOverviewQuery) => {
   return { data, isLoading, error, refresh };
 };
 
+export const exportTreasuryOverviewPdf = async (query: TreasuryOverviewQuery): Promise<AppExportResult> => {
+  if (!window.bukowskiTreasury) {
+    throw new Error("Treasury bridge unavailable");
+  }
+  return window.bukowskiTreasury.exportOverviewPdf(query);
+};
+
 export const useTreasuryImports = (workspaceId: string, bankAccountId?: string) => {
   const [data, setData] = useState<BankStatementImportRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);

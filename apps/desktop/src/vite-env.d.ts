@@ -495,6 +495,9 @@ declare global {
       overview: (
         query: import("@contracts").TreasuryOverviewQuery,
       ) => Promise<import("@contracts").TreasuryOverviewSnapshot>;
+      exportOverviewPdf: (
+        query: import("@contracts").TreasuryOverviewQuery,
+      ) => Promise<import("@contracts").AppExportResult>;
       reviewQueue: (workspaceId: string) => Promise<import("@contracts").ReviewQueueRow[]>;
       projectPnl: (
         workspaceId: string,

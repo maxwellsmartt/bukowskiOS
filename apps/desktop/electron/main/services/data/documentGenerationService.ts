@@ -53,33 +53,34 @@ type FinanceReportPdfPayload = {
   periodLabel: string;
   generatedAt: string;
   workspaceLabel: string;
+  logoBuffer?: Buffer | null;
   executiveSummary: string;
-  metrics: Array<{
+  signals: Array<{
     label: string;
     value: string;
+    body: string;
+    tone?: "info" | "warning" | "critical" | "neutral" | "success";
+  }>;
+  monthly: Array<{
+    month: string;
+    income: string;
+    expense: string;
+    net: string;
+  }>;
+  crewBalances: Array<{
+    collaborator: string;
+    pending: string;
+    paid: string;
   }>;
   totals: Array<{
     label: string;
     value: string;
-    tone?: "info" | "warning" | "critical" | "neutral";
-  }>;
-  exposureByProject: Array<{
-    project: string;
-    exposure: string;
-    incidentCount: number;
-    assetsOut: string;
+    tone?: "info" | "warning" | "critical" | "neutral" | "success";
   }>;
   categoryBreakdown: Array<{
     category: string;
     amount: string;
     percentage: number;
-  }>;
-  pendingCostLinks: Array<{
-    incident: string;
-    project: string;
-    severity: string;
-    costEstimate: string;
-    financialStatus: string;
   }>;
 };
 
@@ -253,12 +254,15 @@ const currentDirPath = path.dirname(currentFilePath);
 
 const loadOptionalAssetBuffer = (relativePath: string) => {
   const normalizedRelativePath = relativePath.replace(/^apps\/desktop\//, "");
+  const resourcePath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
   const candidates = [
+    resourcePath ? path.resolve(resourcePath, path.basename(relativePath)) : null,
+    resourcePath ? path.resolve(resourcePath, normalizedRelativePath) : null,
     path.resolve(process.cwd(), relativePath),
     path.resolve(process.cwd(), normalizedRelativePath),
     path.resolve(currentDirPath, "../", normalizedRelativePath),
     path.resolve(currentDirPath, "../../", normalizedRelativePath),
-  ];
+  ].filter((candidate): candidate is string => Boolean(candidate));
 
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
@@ -956,6 +960,7 @@ export const createDocumentGenerationService = () => ({
         critical: "#b94f52",
         info: "#5176b9",
         neutral: "#596273",
+        success: "#4f8f6a",
         warning: "#a1723a",
       } as const;
 
@@ -977,6 +982,42 @@ export const createDocumentGenerationService = () => ({
         });
 
         cursorY += 76;
+      }
+    };
+
+    const drawSignalCards = (rows: FinanceReportPdfPayload["signals"]) => {
+      const cardWidth = Math.floor((pageWidth - columnGap) / 2);
+      const toneMap = {
+        critical: "#b94f52",
+        info: "#5176b9",
+        neutral: "#596273",
+        success: "#4f8f6a",
+        warning: "#a1723a",
+      } as const;
+
+      for (let index = 0; index < rows.length; index += 2) {
+        const slice = rows.slice(index, index + 2);
+        ensurePageSpace(98);
+
+        slice.forEach((row, offset) => {
+          const x = cardLeft + offset * (cardWidth + columnGap);
+          document.roundedRect(x, cursorY, cardWidth, 80, 14).fillAndStroke(surfaceBackground, surfaceBorder);
+          document
+            .fillColor(surfaceMuted)
+            .fontSize(8)
+            .text(row.label.toUpperCase(), x + 14, cursorY + 12, { width: cardWidth - 28, characterSpacing: 0.8 });
+          document
+            .fillColor(toneMap[row.tone ?? "neutral"])
+            .fontSize(18)
+            .text(row.value, x + 14, cursorY + 28, { width: cardWidth - 28 });
+          document.fillColor(surfaceMuted).fontSize(9).text(row.body, x + 14, cursorY + 52, {
+            width: cardWidth - 28,
+            height: 20,
+            ellipsis: true,
+          });
+        });
+
+        cursorY += 94;
       }
     };
 
@@ -1043,6 +1084,16 @@ export const createDocumentGenerationService = () => ({
     };
 
     document.roundedRect(cardLeft, cursorY, pageWidth, 120, 18).fillAndStroke(accentBackground, "#22262c");
+    const headerLogo = payload.logoBuffer ?? metadataLogoBuffer;
+    if (headerLogo) {
+      try {
+        document.image(headerLogo, cardLeft + pageWidth - 154, cursorY + 22, { fit: [116, 54], align: "center" });
+      } catch {
+        drawMetadataLogo(document, cardLeft + pageWidth - 128, cursorY + 26, "#5d4a2d");
+      }
+    } else {
+      drawMetadataLogo(document, cardLeft + pageWidth - 128, cursorY + 26, "#5d4a2d");
+    }
     document.fillColor("#7d8595").fontSize(10).text("FINANCE REPORT", cardLeft + 24, cursorY + 16, {
       width: 220,
       characterSpacing: 1.2,
@@ -1053,23 +1104,26 @@ export const createDocumentGenerationService = () => ({
     document.fillColor("#c2c7d0").fontSize(11).text(payload.periodLabel, cardLeft + 24, cursorY + 68, {
       width: 260,
     });
-    document.fillColor("#8f98a8").fontSize(10).text(payload.generatedAt, cardLeft + 24, cursorY + 90, {
+    document.fillColor("#8f98a8").fontSize(10).text(payload.generatedAt, cardLeft + 24, cursorY + 88, {
       width: 260,
     });
     document
       .roundedRect(cardLeft + pageWidth - 160, cursorY + 20, 136, 74, 14)
       .fill(accentSoft);
-    document.fillColor("#5d4a2d").fontSize(9).text("WORKSPACE", cardLeft + pageWidth - 144, cursorY + 34, {
+    document.fillColor("#5d4a2d").fontSize(8).text("WORKSPACE", cardLeft + pageWidth - 144, cursorY + 70, {
       width: 108,
       characterSpacing: 0.9,
+      align: "center",
     });
-    document.fillColor("#1f2126").fontSize(14).text(payload.workspaceLabel, cardLeft + pageWidth - 144, cursorY + 50, {
+    document.fillColor("#5d4a2d").fontSize(9).text(payload.workspaceLabel, cardLeft + pageWidth - 144, cursorY + 82, {
       width: 108,
+      align: "center",
+      ellipsis: true,
     });
 
     cursorY += 142;
 
-    drawSectionHeading("Executive summary");
+    drawSectionHeading("Resumen ejecutivo");
     document
       .roundedRect(cardLeft, cursorY, pageWidth, 62, 14)
       .fillAndStroke(surfaceBackground, surfaceBorder);
@@ -1079,70 +1133,50 @@ export const createDocumentGenerationService = () => ({
     });
     cursorY += 78;
 
-    drawSectionHeading("Core metrics", "Snapshot values taken from the active finance window.");
+    drawSectionHeading("Pulso de caja", "Valores reales de Tesoreria para la ventana seleccionada.");
     drawMetricCards(payload.totals);
 
-    drawSectionHeading("Operational metrics");
+    drawSectionHeading("Senales de decision", "Puntos que necesitan accion antes de confiar totalmente en los numeros.");
+    drawSignalCards(payload.signals);
+
+    drawSectionHeading("Flujo mensual", "Ingresos, gastos y neto por mes.");
     drawSimpleTable(
       [
-        { label: "Metric", width: 220 },
-        { label: "Value", width: pageWidth - 220, align: "right" },
+        { label: "Mes", width: 150 },
+        { label: "Ingresos", width: 124, align: "right" },
+        { label: "Gastos", width: 124, align: "right" },
+        { label: "Neto", width: pageWidth - 398, align: "right" },
       ],
-      payload.metrics.map((metric) => [metric.label, metric.value]),
-      "No operational finance metrics are available for this period.",
+      payload.monthly.slice(0, 12).map((row) => [row.month, row.income, row.expense, row.net]),
+      "No hay movimientos de tesoreria disponibles para este periodo.",
     );
 
-    drawSectionHeading("Project exposure", "Projects carrying the most linked incident pressure in the selected window.");
+    drawSectionHeading("Gasto por categoria", "Salidas clasificadas agrupadas por categoria.");
     drawSimpleTable(
       [
-        { label: "Project", width: 220 },
-        { label: "Exposure", width: 108, align: "right" },
-        { label: "Incidents", width: 74, align: "right" },
-        { label: "Assets out", width: 120, align: "right" },
-      ],
-      payload.exposureByProject.slice(0, 12).map((row) => [
-        row.project,
-        row.exposure,
-        String(row.incidentCount),
-        row.assetsOut,
-      ]),
-      "No projects are carrying measurable exposure in this period.",
-    );
-
-    drawSectionHeading("Category mix", "Tracked spend grouped by category for the selected period.");
-    drawSimpleTable(
-      [
-        { label: "Category", width: 220 },
-        { label: "Amount", width: 120, align: "right" },
-        { label: "Share", width: 80, align: "right" },
+        { label: "Categoria", width: 220 },
+        { label: "Monto", width: 120, align: "right" },
+        { label: "%", width: 80, align: "right" },
       ],
       payload.categoryBreakdown.slice(0, 10).map((row) => [row.category, row.amount, `${row.percentage}%`]),
-      "No tracked spend categories are available for this period.",
+      "No hay categorias de gasto disponibles para este periodo.",
     );
 
-    drawSectionHeading("Pending cost-link queue", "Incidents still waiting on financial follow-through.");
+    drawSectionHeading("Honorarios por colaborador", "Colaboradores con honorarios pendientes o pagos recientes.");
     drawSimpleTable(
       [
-        { label: "Incident", width: 170 },
-        { label: "Project", width: 150 },
-        { label: "Severity", width: 74 },
-        { label: "Estimate", width: 100, align: "right" },
-        { label: "Status", width: 80, align: "right" },
+        { label: "Colaborador", width: 240 },
+        { label: "Pendiente", width: 140, align: "right" },
+        { label: "Pagado", width: pageWidth - 380, align: "right" },
       ],
-      payload.pendingCostLinks.slice(0, 10).map((row) => [
-        row.incident,
-        row.project,
-        row.severity,
-        row.costEstimate,
-        row.financialStatus,
-      ]),
-      "No pending cost-link items are waiting in the selected finance queue.",
+      payload.crewBalances.slice(0, 10).map((row) => [row.collaborator, row.pending, row.paid]),
+      "No hay balances pendientes de honorarios.",
     );
 
     document
       .fontSize(9)
       .fillColor("#8f98a8")
-      .text("Generated by BukowskiOS internal alpha finance reporting.", cardLeft, document.page.height - 52, {
+      .text("Generado por bukowskiOS finance reporting.", cardLeft, document.page.height - 52, {
         width: pageWidth,
         align: "left",
       });

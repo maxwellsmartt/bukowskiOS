@@ -1,8 +1,9 @@
 import { app, BrowserWindow, Menu, session } from "electron";
+import fs from "node:fs";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { format } from "date-fns";
-import { ipcChannels, type CreateProjectBlueprintInput } from "@contracts";
+import { DEFAULT_WORKSPACE_ID, ipcChannels, type CreateProjectBlueprintInput, type TreasuryOverviewQuery } from "@contracts";
 
 import { buildContentSecurityPolicy } from "./security/securityConfig";
 import { registerAuthIpc } from "./ipc/registerAuthIpc";
@@ -26,6 +27,71 @@ const devAuthCallbackHost = "127.0.0.1";
 const devAuthCallbackPort = 17654;
 let devAuthCallbackServer: Server | null = null;
 let devAuthCallbackUrl: string | null = null;
+
+const currencySuffix = (currency: string) => {
+  const normalized = currency.trim().toUpperCase();
+  if (normalized === "USD") return "US$";
+  if (normalized === "EUR") return "€";
+  return normalized || currency;
+};
+
+const formatReportMoney = (value: number, currency = "DOP") =>
+  `${Number(value || 0).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ${currencySuffix(currency)}`;
+
+const categoryLabelsEs: Record<string, string> = {
+  uncategorized: "Sin clasificar",
+  crew_fees: "Pagos honorarios",
+  services: "Pagos servicios",
+  taxes: "Impuestos",
+  social_security: "Seguridad social (TSS)",
+  bank_fees: "Comisiones bancarias",
+  bank_fee: "Comisión bancaria",
+  credit_card: "Tarjeta de crédito",
+  loan_financing: "Préstamos y financiamiento",
+  production_income: "Ingresos de producción",
+  interest_income: "Intereses",
+  internal_transfer: "Transferencias internas",
+  other_expenses: "Otros gastos",
+  other_small: "Otros menores",
+};
+
+const formatCategoryLabel = (value: string | null | undefined) => {
+  const normalized = value?.trim();
+  if (!normalized) return "Sin clasificar";
+  return (
+    categoryLabelsEs[normalized] ??
+    normalized
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase())
+  );
+};
+
+const fetchOptionalAssetBuffer = async (url: string | null | undefined): Promise<Buffer | null> => {
+  if (!url) return null;
+  try {
+    if (url.startsWith("data:")) {
+      const [, payload = ""] = url.split(",", 2);
+      return Buffer.from(payload, url.includes(";base64,") ? "base64" : "utf8");
+    }
+    if (url.startsWith("file://")) {
+      return fs.readFileSync(new URL(url));
+    }
+    if (path.isAbsolute(url) && fs.existsSync(url)) {
+      return fs.readFileSync(url);
+    }
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch {
+    return null;
+  }
+};
 
 const createAppWindow = () =>
   createMainWindow({
@@ -357,6 +423,92 @@ app.whenReady().then(() => {
     throw error;
   }
   const documentGeneration = createDocumentGenerationService();
+  const createFinanceSummaryReportPdf = async (query: TreasuryOverviewQuery | undefined, targetFilePath: string) => {
+    const workspaceId = query?.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    const reportQuery: TreasuryOverviewQuery = {
+      workspaceId,
+      period: query?.period ?? "month",
+      customStartDate: query?.customStartDate ?? null,
+      customEndDate: query?.customEndDate ?? null,
+      reportCurrency: query?.reportCurrency ?? "DOP",
+    };
+    const overview = localDatabase.treasuryReads.getOverview(reportQuery);
+    const collaboratorSummary = localDatabase.collaboratorFeeReads.getSummary({ workspaceId });
+    const settings = localDatabase.currencyReads.getSettings(workspaceId);
+    const logoBuffer = await fetchOptionalAssetBuffer(settings.workspaceLogoUrl);
+    const moneyCurrency = overview.reportCurrency === "mixed" ? "DOP" : overview.reportCurrency;
+    const summaryParts = [
+      `${formatReportMoney(overview.totalIncome, moneyCurrency)} en ingresos reales`,
+      `${formatReportMoney(overview.totalExpense, moneyCurrency)} en gastos reales`,
+      `${formatReportMoney(overview.net, moneyCurrency)} neto`,
+    ];
+    if (collaboratorSummary.pendingAmount > 0) {
+      summaryParts.push(`${formatReportMoney(collaboratorSummary.pendingAmount, "DOP")} pendiente en honorarios`);
+    }
+    const pdf = await documentGeneration.createFinanceReportPdf({
+      reportTitle: "Resumen financiero real",
+      periodLabel: overview.activePeriodLabel,
+      generatedAt: `Generado ${format(new Date(), "yyyy-MM-dd HH:mm")}`,
+      workspaceLabel: localDatabase.foundationReads.getShellBootstrap().workspaceName,
+      logoBuffer,
+      executiveSummary: `${summaryParts.join(" · ")} en ${overview.activePeriodLabel.toLowerCase()}.`,
+      totals: [
+        { label: "Ingreso real", value: formatReportMoney(overview.totalIncome, moneyCurrency), tone: "success" },
+        { label: "Gasto real", value: formatReportMoney(overview.totalExpense, moneyCurrency), tone: "critical" },
+        { label: "Neto", value: formatReportMoney(overview.net, moneyCurrency), tone: overview.net >= 0 ? "warning" : "critical" },
+        { label: "Gasto deducible", value: formatReportMoney(overview.totalDeductibleExpense, moneyCurrency), tone: "info" },
+        { label: "Honorarios pendientes", value: formatReportMoney(collaboratorSummary.pendingAmount, "DOP"), tone: "warning" },
+        { label: "Transferencias excluidas", value: formatReportMoney(overview.excludedTransferTotal, moneyCurrency), tone: "neutral" },
+      ],
+      signals: [
+        {
+          label: "Sin clasificar",
+          value: String(overview.unclassifiedCount),
+          body: "Movimientos que todavía no alimentan correctamente gráficos y reportes.",
+          tone: overview.unclassifiedCount > 0 ? "warning" : "success",
+        },
+        {
+          label: "Revisión fiscal",
+          value: String(overview.pendingReviewCount),
+          body: "Gastos pendientes de aceptar, reducir o rechazar para DGII.",
+          tone: overview.pendingReviewCount > 0 ? "warning" : "success",
+        },
+        {
+          label: "Crew con balance",
+          value: String(collaboratorSummary.collaboratorsWithBalance),
+          body: "Colaboradores con honorarios pendientes de pago.",
+          tone: collaboratorSummary.collaboratorsWithBalance > 0 ? "critical" : "success",
+        },
+        {
+          label: "Conversión pendiente",
+          value: String(overview.conversionMissingCount),
+          body: "Movimientos sin tasa para consolidar en moneda de reporte.",
+          tone: overview.conversionMissingCount > 0 ? "warning" : "success",
+        },
+      ],
+      monthly: overview.monthly.map((row) => ({
+        month: row.month,
+        income: formatReportMoney(row.income, moneyCurrency),
+        expense: formatReportMoney(row.expense, moneyCurrency),
+        net: formatReportMoney(row.net, moneyCurrency),
+      })),
+      categoryBreakdown: overview.expenseByCategory.map((row) => ({
+        category: formatCategoryLabel(row.category),
+        amount: formatReportMoney(row.amount, moneyCurrency),
+        percentage: row.percentage,
+      })),
+      crewBalances: collaboratorSummary.byCollaborator.map((row) => ({
+        collaborator: row.crewMemberName,
+        pending: formatReportMoney(row.pendingAmount, row.currency),
+        paid: formatReportMoney(row.paidAmount, row.currency),
+      })),
+    });
+
+    return {
+      ...pdf,
+      targetFilePath,
+    };
+  };
   attachProcessRuntimeTelemetry(localDatabase.runtimeDiagnostics);
   attachWindowRuntimeTelemetry(mainWindow, localDatabase.runtimeDiagnostics);
   attachNativeNotificationWindowState(mainWindow);
@@ -427,19 +579,7 @@ app.whenReady().then(() => {
       const settings = localDatabase.currencyReads.getSettings(workspaceId);
       const { buildInvoicePdfPayload } = await import("./services/data/invoicePdfPayloadBuilder");
 
-      const fetchOptional = async (url: string | null): Promise<Buffer | null> => {
-        if (!url) return null;
-        try {
-          const response = await fetch(url);
-          if (!response.ok) return null;
-          const arrayBuffer = await response.arrayBuffer();
-          return Buffer.from(arrayBuffer);
-        } catch {
-          return null;
-        }
-      };
-
-      const logoBuffer = await fetchOptional(settings.workspaceLogoUrl);
+      const logoBuffer = await fetchOptionalAssetBuffer(settings.workspaceLogoUrl);
       const sourceQuote = detail.sourceQuoteId
         ? localDatabase.quoteReads.getQuoteDetail(workspaceId, detail.sourceQuoteId)
         : null;
@@ -460,24 +600,10 @@ app.whenReady().then(() => {
       const settings = localDatabase.currencyReads.getSettings(workspaceId);
       const { buildQuotePdfPayload } = await import("./services/data/quotePdfPayloadBuilder");
 
-      // Best-effort fetch of branding assets. Failures fall back to the text
-      // logo / blank seal/firma — the PDF is still valid and printable.
-      const fetchOptional = async (url: string | null): Promise<Buffer | null> => {
-        if (!url) return null;
-        try {
-          const response = await fetch(url);
-          if (!response.ok) return null;
-          const arrayBuffer = await response.arrayBuffer();
-          return Buffer.from(arrayBuffer);
-        } catch {
-          return null;
-        }
-      };
-
       const [logoBuffer, sealBuffer, signatureBuffer] = await Promise.all([
-        fetchOptional(settings.workspaceLogoUrl),
-        fetchOptional(settings.workspaceSealUrl),
-        fetchOptional(settings.workspaceSignatureUrl),
+        fetchOptionalAssetBuffer(settings.workspaceLogoUrl),
+        fetchOptionalAssetBuffer(settings.workspaceSealUrl),
+        fetchOptionalAssetBuffer(settings.workspaceSignatureUrl),
       ]);
 
       const payload = buildQuotePdfPayload({
@@ -491,40 +617,8 @@ app.whenReady().then(() => {
     },
     packingMutations: localDatabase.packingMutations,
     assistantAudioTranscription: localDatabase.assistantAudioTranscription,
-    exportFinanceReportPdf: async (query, targetFilePath) => {
-      const overview = localDatabase.foundationReads.getFinanceOverview(query);
-      const pdf = await documentGeneration.createFinanceReportPdf({
-        reportTitle: "Finance operating report",
-        periodLabel: overview.activePeriodLabel,
-        generatedAt: `Generated ${format(new Date(), "yyyy-MM-dd HH:mm")}`,
-        workspaceLabel: "Internal alpha",
-        executiveSummary: `${overview.totals.trackedSpend} tracked spend, ${overview.totals.incidentExposure} incident exposure, and ${overview.totals.reserve} reserve coverage in ${overview.activePeriodLabel.toLowerCase()}.`,
-        metrics: overview.metrics.map((metric) => ({
-          label: metric.label,
-          value: metric.value,
-        })),
-        totals: [
-          { label: "Tracked spend", value: overview.totals.trackedSpend, tone: "info" },
-          { label: "Incident exposure", value: overview.totals.incidentExposure, tone: "critical" },
-          { label: "Reserve coverage", value: overview.totals.reserve, tone: "warning" },
-          { label: "Average burn rate", value: overview.totals.burnRateAverage, tone: "neutral" },
-        ],
-        exposureByProject: overview.exposureByProject,
-        categoryBreakdown: overview.categoryBreakdown,
-        pendingCostLinks: overview.costLinks.map((row) => ({
-          incident: row.incident,
-          project: row.project,
-          severity: row.severity,
-          costEstimate: row.costEstimate,
-          financialStatus: row.financialStatus,
-        })),
-      });
-
-      return {
-        ...pdf,
-        targetFilePath,
-      };
-    },
+    exportFinanceReportPdf: async (query, targetFilePath) => createFinanceSummaryReportPdf(query, targetFilePath),
+    exportTreasuryOverviewPdf: async (query, targetFilePath) => createFinanceSummaryReportPdf(query, targetFilePath),
     exportPackingSlipPdf: async (packingSlipId, targetFilePath) => {
       const detail = localDatabase.foundationReads.getPackingSlipDetail(packingSlipId);
       if (!detail.slip) {

@@ -46,6 +46,7 @@ import { newCommandId } from "./quoteHelpers";
 import { InvoiceInboxPanel } from "./InvoiceInboxPanel";
 import { parseStatementFile } from "./treasury/bankStatementParsers";
 import {
+  exportTreasuryOverviewPdf,
   useBankAccounts,
   useReviewQueue,
   useProjectPnl,
@@ -463,6 +464,7 @@ export const TreasuryPage = () => {
   const [reviewLimit, setReviewLimit] = useState(40);
   const [isExportingDeductibleLedger, setIsExportingDeductibleLedger] = useState(false);
   const [isExportingDgiiReport, setIsExportingDgiiReport] = useState(false);
+  const [isExportingOverviewPdf, setIsExportingOverviewPdf] = useState(false);
 
   const accounts = useBankAccounts(activeWorkspaceId);
   const overview = useTreasuryOverview(
@@ -470,6 +472,10 @@ export const TreasuryPage = () => {
       () => ({ workspaceId: activeWorkspaceId, period, reportCurrency: overviewCurrency }),
       [activeWorkspaceId, overviewCurrency, period],
     ),
+  );
+  const overviewQuery = useMemo(
+    () => ({ workspaceId: activeWorkspaceId, period, reportCurrency: overviewCurrency }),
+    [activeWorkspaceId, overviewCurrency, period],
   );
   const transactions = useTreasuryTransactions(
     useMemo(
@@ -1058,6 +1064,22 @@ export const TreasuryPage = () => {
     }
   };
 
+  const exportOverviewPdf = async () => {
+    setIsExportingOverviewPdf(true);
+    try {
+      const result = await exportTreasuryOverviewPdf(overviewQuery);
+      if (result.saved) {
+        toast.success(t("finance.treasury.overview.exported"), {
+          description: result.summary,
+        });
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("finance.treasury.overview.exportFailed"));
+    } finally {
+      setIsExportingOverviewPdf(false);
+    }
+  };
+
   const snap = overview.data;
   const moneyCurrency = snap?.reportCurrency && snap.reportCurrency !== "mixed" ? snap.reportCurrency : overviewCurrency;
   const importTotals = useMemo(
@@ -1437,6 +1459,19 @@ export const TreasuryPage = () => {
                     ))}
                   </div>
                 </div>
+                <button
+                  className="ghost-control treasury-overview-export-button"
+                  disabled={isExportingOverviewPdf || overview.isLoading}
+                  onClick={() => void exportOverviewPdf()}
+                  type="button"
+                >
+                  <FileDown size={13} />
+                  <span>
+                    {isExportingOverviewPdf
+                      ? t("finance.treasury.overview.exportingSummary")
+                      : t("finance.treasury.overview.exportSummary")}
+                  </span>
+                </button>
               </div>
             </div>
 
