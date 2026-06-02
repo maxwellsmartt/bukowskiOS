@@ -28,8 +28,25 @@ const redactText = (value: string) =>
     .replace(/(Bearer\s+)[A-Za-z0-9._-]+/gi, "$1[redacted]")
     // JWTs (Supabase access/refresh tokens): three base64url segments.
     .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[redacted-jwt]")
+    // Provider API keys: OpenAI (sk-…) and Anthropic (sk-ant-…) both share the
+    // `sk-` prefix; the wide character class covers both.
     .replace(/\bsk-[A-Za-z0-9_-]{12,}\b/g, "[redacted-secret]")
+    // GitHub PATs (gh{p,o,u,s,r}_…) and fine-grained tokens.
     .replace(/\bgh[pousr]_[A-Za-z0-9]{20,}\b/g, "[redacted-token]")
+    // Telegram bot tokens: `<bot_id>:<base64-like-secret>`.
+    .replace(/\b\d{8,10}:[A-Za-z0-9_-]{30,}\b/g, "[redacted-telegram-token]")
+    // JSON key-value pairs that name a secret: never let the value leak even
+    // when it doesn't match any other pattern (short api keys, custom tokens).
+    .replace(
+      /"(apiKey|api_key|token|password|secret|authorization|client_secret|access_token|refresh_token|service_role_key|anon_key)"\s*:\s*"[^"]+"/gi,
+      '"$1":"[redacted]"',
+    )
+    // URL query-string secrets (signed URLs, webhook tokens).
+    .replace(
+      /([?&](?:token|key|api_key|access_token|refresh_token|signature|sig)=)[^&\s"]+/gi,
+      "$1[redacted]",
+    )
+    // Catch-all for long opaque base64-ish blobs (24+ chars).
     .replace(/\b[A-Za-z0-9+/]{24,}={0,2}\b/g, "[redacted-value]");
 
 const serializeMetadata = (metadata: unknown) => {

@@ -24,6 +24,31 @@ const insertRemoteWorkspace = (database: ReturnType<typeof createTestDatabase>["
 };
 
 describe("workspace access guard", () => {
+  it("still validates the default workspace when Supabase is configured (no spoof bypass)", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-access-default");
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+    const guard = createWorkspaceAccessGuard({
+      database,
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon-key",
+      getTokens: async () => ({ accessToken: null }),
+      fetchImpl,
+      now: () => 1_000,
+    });
+
+    await expect(
+      guard.assertWorkspaceAccess({
+        workspaceId: "workspace-metadata",
+        action: "import statements",
+        accessLevel: "write",
+      }),
+    ).rejects.toThrow(/Sign in again/);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    cleanup();
+  });
+
   it("allows the seeded local workspace without Supabase configuration", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-workspace-access");
     const guard = createWorkspaceAccessGuard({
@@ -207,7 +232,10 @@ describe("workspace access guard", () => {
       guard.assertRmaCaseAccess("rma-flowtech-latch", "load that RMA case", "read", "rma.read"),
     ).resolves.toBe("workspace-metadata");
 
-    expect(fetchImpl).not.toHaveBeenCalled();
+    // Default workspace now goes through Supabase membership checks (the
+    // legacy bypass was a spoof vector). Each distinct permission key (4
+    // here) triggers one verify call; identical keys would be cached.
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
 
     cleanup();
   });

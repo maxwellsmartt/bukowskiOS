@@ -25,6 +25,7 @@ import type {
 
 import type { createTreasuryMutationService } from "./treasuryMutationService";
 import type { SupabaseDocumentStorage } from "./supabaseDocumentStorageService";
+import { assertPathWithinRoot } from "../../security/pathSafety";
 
 const DATA_URL_RE = /^data:([^;]+);base64,(.+)$/;
 const ACCEPTED_MIME = /image\/(png|jpe?g|webp)|application\/pdf/i;
@@ -234,6 +235,9 @@ const decodeDataUrl = (file: InvoiceInboxFileInput): { buffer: Buffer; mimeType:
 export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInboxServiceOptions) => {
   ensureTable(db);
   const now = () => options.now?.() ?? new Date().toISOString();
+  // `storage_path` lives in SQLite — refuse any read/write that escapes the
+  // workspace storage root (symlink or `..` traversal).
+  const ensureSafePath = (target: string) => assertPathWithinRoot(target, options.userDataPath);
 
   /**
    * Enqueue an `invoice_extraction` row into the shared sync outbox so it
@@ -439,7 +443,8 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       | undefined;
     if (!row) return null;
     if (row.storage_path && fs.existsSync(row.storage_path)) {
-      return { buffer: fs.readFileSync(row.storage_path), mimeType: row.mime_type, fileName: row.original_name };
+      const safePath = ensureSafePath(row.storage_path);
+      return { buffer: fs.readFileSync(safePath), mimeType: row.mime_type, fileName: row.original_name };
     }
     // Not on this machine's disk (e.g. a teammate uploaded it): fetch the bytes
     // from cloud storage and cache them locally for next time.
@@ -447,8 +452,9 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       const buffer = await options.storage.download(row.storage_object_key);
       if (buffer) {
         try {
-          fs.mkdirSync(path.dirname(row.storage_path), { recursive: true });
-          fs.writeFileSync(row.storage_path, buffer);
+          const safePath = ensureSafePath(row.storage_path);
+          fs.mkdirSync(path.dirname(safePath), { recursive: true });
+          fs.writeFileSync(safePath, buffer);
         } catch {
           /* caching is best-effort */
         }
@@ -469,7 +475,8 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       | { storage_path: string; storage_object_key: string | null; mime_type: string }
       | undefined;
     if (!row?.storage_object_key || !row.storage_path || !fs.existsSync(row.storage_path)) return;
-    await options.storage.upload(row.storage_object_key, fs.readFileSync(row.storage_path), row.mime_type);
+    const safePath = ensureSafePath(row.storage_path);
+    await options.storage.upload(row.storage_object_key, fs.readFileSync(safePath), row.mime_type);
   };
 
   /**

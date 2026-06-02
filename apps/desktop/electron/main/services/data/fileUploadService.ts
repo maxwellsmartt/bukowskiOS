@@ -7,6 +7,8 @@ import type { DatabaseSync } from "node:sqlite";
 import type { FileDeleteMutationResult, FileUploadMutationResult } from "@contracts";
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
+import { assertPathWithinRoot } from "../../security/pathSafety";
+
 const workspaceId = DEFAULT_WORKSPACE_ID;
 
 type FileUploadServiceOptions = {
@@ -113,6 +115,10 @@ export const applyOperationalFilesMigration = (db: DatabaseSync) => {
 export const createFileUploadService = (db: DatabaseSync, options: FileUploadServiceOptions) => {
   const fileSystem = options.fileSystem ?? fs;
   const shellApi = options.shellApi ?? shell;
+  const getAllowedRoot = () => options.getStorageRoot?.() || options.userDataPath;
+  // Guard any filesystem op that targets a path coming from SQLite: refuse if
+  // it resolves outside the workspace storage root (symlink/`..` traversal).
+  const ensureSafePath = (target: string) => assertPathWithinRoot(target, getAllowedRoot());
 
   const importFiles = (
     domain: "asset" | "incident" | "finance" | "crew",
@@ -343,7 +349,8 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
       throw new Error("The stored file is missing from local storage.");
     }
 
-    const result = await shellApi.openPath(row.storage_path);
+    const safePath = ensureSafePath(row.storage_path);
+    const result = await shellApi.openPath(safePath);
     if (result) {
       throw new Error("The desktop app could not open that file.");
     }
@@ -401,7 +408,7 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
       }
 
       if (row.storage_path && fileSystem.existsSync(row.storage_path)) {
-        fileSystem.unlinkSync(row.storage_path);
+        fileSystem.unlinkSync(ensureSafePath(row.storage_path));
       }
 
       db.prepare(
@@ -481,7 +488,7 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
       }
 
       if (row.storage_path && fileSystem.existsSync(row.storage_path)) {
-        fileSystem.unlinkSync(row.storage_path);
+        fileSystem.unlinkSync(ensureSafePath(row.storage_path));
       }
 
       db.prepare(

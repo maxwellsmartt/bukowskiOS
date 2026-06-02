@@ -1023,8 +1023,8 @@ export const buildWriteToolDefinitions = (services: AgentWriteServices): WriteTo
   {
     name: "categorize_movements_by_rule",
     description:
-      "Classify ALL unclassified movements that share the selected movement's description, and remember the rule for future imports. Applies immediately and is reversible with Undo. Use for recurring movements like TSS, DGII taxes or bank fees.",
-    requiresApproval: false,
+      "Classify ALL unclassified movements that share the selected movement's description, and remember the rule for future imports. Requires approval because it affects many rows at once and persists a recurring rule. Reversible with Undo. Use for recurring movements like TSS, DGII taxes or bank fees.",
+    requiresApproval: true,
     parameters: {
       type: "object",
       additionalProperties: false,

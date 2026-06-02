@@ -1,6 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
 type WorkspaceAccessLevel = "read" | "write";
 
@@ -210,7 +209,12 @@ export const createWorkspaceAccessGuard = ({
   }: AssertWorkspaceAccessInput): Promise<void> => {
     assertLocalWorkspaceExists(workspaceId);
 
-    if (workspaceId === DEFAULT_WORKSPACE_ID || !isConfigured(supabaseUrl, anonKey)) {
+    // Bypass auth ONLY when Supabase is not configured (pure local/offline
+    // mode). The default workspace is still a real workspace with real data
+    // when Supabase is configured, so it must be access-checked like any other
+    // — otherwise an actor could spoof `workspaceId: DEFAULT_WORKSPACE_ID` to
+    // evade membership/permission checks.
+    if (!isConfigured(supabaseUrl, anonKey)) {
       return;
     }
 
