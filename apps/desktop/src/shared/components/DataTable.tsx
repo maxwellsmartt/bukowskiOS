@@ -509,6 +509,29 @@ export const DataTable = <T = unknown,>({
     selectable ? selectionColumnWidth : 0,
   );
 
+  // Show the full text as a native tooltip when a cell (or a truncating child)
+  // is clipped with an ellipsis — so users can read the value on hover without
+  // widening the column. Applied to every table through the shared cell below.
+  const applyOverflowTooltip = (event: ReactMouseEvent<HTMLTableCellElement>) => {
+    const cell = event.currentTarget;
+    const isClipped = (element: HTMLElement) => element.scrollWidth > element.clientWidth + 1;
+    let truncated: HTMLElement | null = isClipped(cell) ? cell : null;
+    if (!truncated) {
+      for (const child of cell.querySelectorAll<HTMLElement>("*")) {
+        if (isClipped(child)) {
+          truncated = child;
+          break;
+        }
+      }
+    }
+    const fullText = truncated?.textContent?.trim() ?? "";
+    if (fullText) {
+      if (cell.title !== fullText) cell.title = fullText;
+    } else if (cell.title) {
+      cell.removeAttribute("title");
+    }
+  };
+
   const toggleRowSelection = (rowId: string, checked: boolean) => {
     if (checked) {
       setSelection(Array.from(new Set([...activeSelection, rowId])));
@@ -979,7 +1002,11 @@ export const DataTable = <T = unknown,>({
                   ) : null}
 
                   {visibleColumns.map((column) => (
-                    <td key={column.key} className={column.align === "right" ? "align-right" : ""}>
+                    <td
+                      key={column.key}
+                      className={column.align === "right" ? "align-right" : ""}
+                      onMouseEnter={applyOverflowTooltip}
+                    >
                       {column.render(row)}
                     </td>
                   ))}
