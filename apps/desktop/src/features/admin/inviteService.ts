@@ -7,70 +7,22 @@ export type SendWorkspaceInviteInput = {
   message?: string | null;
 };
 
-const readFunctionErrorMessage = async (response: Response) => {
-  try {
-    const payload = (await response.json()) as { error?: unknown; message?: unknown };
-    if (typeof payload.error === "string") {
-      return payload.error;
-    }
-    if (typeof payload.message === "string") {
-      return payload.message;
-    }
-  } catch {
-    // ignore JSON parsing errors and fall back to status text
-  }
-  return response.statusText;
-};
-
 export const sendWorkspaceInvite = async (
   supabase: SupabaseClient,
   input: SendWorkspaceInviteInput,
 ): Promise<{ alreadyRegistered: boolean; magicLinkSent: boolean; membershipStatus: "active" | "invited"; warning: string | null; userId: string }> => {
   void supabase;
-  const accessToken = await window.bukowskiAuth?.getAccessToken();
-
-  if (!accessToken) {
-    throw new Error("An authenticated session is required to send invites.");
+  if (!window.bukowskiApp?.sendWorkspaceInvite) {
+    throw new Error("The secure invite bridge is unavailable.");
   }
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/+$/, "");
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !anonKey) {
-    throw new Error("Supabase is not configured. Invites require VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
-  }
-
-  const response = await fetch(`${supabaseUrl}/functions/v1/send-invite`, {
-    method: "POST",
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${accessToken}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      workspaceId: input.workspaceId,
-      email: input.email.trim().toLowerCase(),
-      roleId: input.roleId,
-      message: input.message?.trim() ? input.message.trim() : null,
-    }),
+  const payload = await window.bukowskiApp.sendWorkspaceInvite({
+    workspaceId: input.workspaceId,
+    email: input.email.trim().toLowerCase(),
+    roleId: input.roleId,
+    message: input.message?.trim() ? input.message.trim() : null,
   });
-
-  if (!response.ok) {
-    const detail = await readFunctionErrorMessage(response);
-    if (response.status === 403) {
-      throw new Error("You do not have permission to invite members in this workspace.");
-    }
-    throw new Error(`Invite failed (${response.status}): ${detail}`);
-  }
-
-  const payload = (await response.json()) as {
-    alreadyRegistered?: boolean;
-    magicLinkSent?: boolean;
-    membershipStatus?: "active" | "invited";
-    userId?: string;
-    warning?: string;
-  };
-  if (!payload.userId) {
+  if (!payload?.userId) {
     throw new Error("Invite was sent but the response did not include a user id.");
   }
 

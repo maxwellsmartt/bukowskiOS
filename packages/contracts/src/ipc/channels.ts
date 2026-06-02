@@ -12,6 +12,8 @@ export const ipcChannels = {
     deleteUser: "bukowskiApp:deleteUser",
     ensureLocalWorkspaces: "bukowskiApp:ensureLocalWorkspaces",
     getLocalWorkspaces: "bukowskiApp:getLocalWorkspaces",
+    createRemoteWorkspace: "bukowskiApp:createRemoteWorkspace",
+    sendWorkspaceInvite: "bukowskiApp:sendWorkspaceInvite",
     runIntegrityCheck: "bukowskiApp:runIntegrityCheck",
     runLocalSync: "bukowskiApp:runLocalSync",
     getSyncOutboxRows: "bukowskiApp:getSyncOutboxRows",

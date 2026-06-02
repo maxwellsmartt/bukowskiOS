@@ -15,6 +15,7 @@ import {
 } from "@contracts";
 import { ipcChannels } from "@contracts/ipc/channels";
 import { assertAllowedExternalUrl } from "../security/securityConfig";
+import { invokeSupabaseEdgeFunction } from "../services/auth/supabaseAuthBridge";
 import { safeHandle, safeHandleRead, safeHandleReadWithSchema } from "./ipcSafeHandler";
 
 type RegisterAppIpcOptions = {
@@ -71,6 +72,20 @@ type RegisterAppIpcOptions = {
 };
 
 const remoteRecordSchema = z.record(z.string(), z.unknown());
+
+const createRemoteWorkspaceSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  slug: z.string().trim().min(1).max(80),
+  baseCurrency: z.string().trim().min(2).max(8),
+  iconColor: z.string().trim().min(1).max(80).nullable().optional(),
+});
+
+const sendWorkspaceInviteSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  email: z.string().trim().email(),
+  roleId: z.string().trim().min(1),
+  message: z.string().trim().max(2000).nullable().optional(),
+});
 
 const applyRemoteCatalogRowsSchema = z.object({
   workspaceId: z.string().trim().min(1),
@@ -373,6 +388,56 @@ export const registerAppIpc = ({
       diagnostics: ensureLocalWorkspaces(input),
     }),
     "The app could not cache remote workspaces locally.",
+  );
+  safeHandle(
+    ipcChannels.app.createRemoteWorkspace,
+    createRemoteWorkspaceSchema,
+    async (_event, input) => {
+      const result = await invokeSupabaseEdgeFunction<Partial<import("@contracts").AppCreateRemoteWorkspaceResult>>(
+        "admin-workspace-bootstrap",
+        {
+          name: input.name.trim(),
+          slug: input.slug.trim().toLowerCase(),
+          baseCurrency: input.baseCurrency.trim().toUpperCase(),
+          iconColor: input.iconColor?.trim() || null,
+        },
+      );
+
+      if (!result.workspaceId) {
+        throw new Error("Workspace was created but Supabase did not return a workspace id.");
+      }
+
+      return { workspaceId: result.workspaceId };
+    },
+    "The app could not create that workspace.",
+  );
+  safeHandle(
+    ipcChannels.app.sendWorkspaceInvite,
+    sendWorkspaceInviteSchema,
+    async (_event, input) => {
+      const result = await invokeSupabaseEdgeFunction<Partial<import("@contracts").AppSendWorkspaceInviteResult>>(
+        "send-invite",
+        {
+          workspaceId: input.workspaceId,
+          email: input.email.trim().toLowerCase(),
+          roleId: input.roleId,
+          message: input.message?.trim() ? input.message.trim() : null,
+        },
+      );
+
+      if (!result.userId) {
+        throw new Error("Invite was sent but Supabase did not return a user id.");
+      }
+
+      return {
+        alreadyRegistered: Boolean(result.alreadyRegistered),
+        magicLinkSent: result.magicLinkSent !== false,
+        membershipStatus: result.membershipStatus ?? "invited",
+        warning: result.warning ?? null,
+        userId: result.userId,
+      };
+    },
+    "The app could not send that invite.",
   );
   safeHandleRead(
     ipcChannels.app.createBackup,

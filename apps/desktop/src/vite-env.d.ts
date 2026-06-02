@@ -165,6 +165,12 @@ declare global {
       deleteUser: (input: DeleteAppUserCommand) => Promise<AppUserMutationResult>;
       ensureLocalWorkspaces: (workspaces: EnsureLocalWorkspaceInput[]) => Promise<AppActionResult>;
       getLocalWorkspaces: () => Promise<AppLocalWorkspaceRow[]>;
+      createRemoteWorkspace: (
+        input: import("@contracts").AppCreateRemoteWorkspaceCommand,
+      ) => Promise<import("@contracts").AppCreateRemoteWorkspaceResult>;
+      sendWorkspaceInvite: (
+        input: import("@contracts").AppSendWorkspaceInviteCommand,
+      ) => Promise<import("@contracts").AppSendWorkspaceInviteResult>;
       runIntegrityCheck: () => Promise<AppActionResult>;
       runLocalSync: () => Promise<AppActionResult>;
       getSyncOutboxRows: () => Promise<AppSyncOutboxRow[]>;

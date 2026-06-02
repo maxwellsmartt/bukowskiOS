@@ -120,6 +120,32 @@ export type AppOperationalBackfillCommand = {
   workspaceId: string;
 };
 
+export type AppCreateRemoteWorkspaceCommand = {
+  name: string;
+  slug: string;
+  baseCurrency: string;
+  iconColor?: string | null;
+};
+
+export type AppCreateRemoteWorkspaceResult = {
+  workspaceId: string;
+};
+
+export type AppSendWorkspaceInviteCommand = {
+  workspaceId: string;
+  email: string;
+  roleId: string;
+  message?: string | null;
+};
+
+export type AppSendWorkspaceInviteResult = {
+  alreadyRegistered: boolean;
+  magicLinkSent: boolean;
+  membershipStatus: "active" | "invited";
+  warning: string | null;
+  userId: string;
+};
+
 export type AppOperationalBackfillResult = AppActionResult & {
   enqueuedCount: number;
   skippedCount: number;

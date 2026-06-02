@@ -196,4 +196,16 @@ describe("security regression checks", () => {
       "roles!workspace_memberships_workspace_role_fk",
     );
   });
+
+  it("keeps sensitive workspace Edge Function calls behind main-process IPC", () => {
+    const workspaceProviderSource = readText("apps/desktop/src/app/providers/WorkspaceProvider.tsx");
+    const inviteServiceSource = readText("apps/desktop/src/features/admin/inviteService.ts");
+    const combinedRendererSource = `${workspaceProviderSource}\n${inviteServiceSource}`;
+
+    expect(combinedRendererSource).not.toContain("/functions/v1/admin-workspace-bootstrap");
+    expect(combinedRendererSource).not.toContain("/functions/v1/send-invite");
+    expect(combinedRendererSource).not.toContain("getAccessToken()");
+    expect(workspaceProviderSource).toContain("createRemoteWorkspace");
+    expect(inviteServiceSource).toContain("sendWorkspaceInvite");
+  });
 });
