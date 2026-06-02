@@ -701,6 +701,24 @@ export const registerFoundationIpc = ({
     includeArchived: query?.includeArchived,
   });
 
+  const assertAgentWorkspaceAccess = (
+    input: { workspaceId: string },
+    action: string,
+    requiredPermission?: string,
+  ) =>
+    workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action,
+      accessLevel: "write",
+      requiredPermission,
+    });
+
+  const assertAgentAdminAccess = (input: { workspaceId: string }, action: string) =>
+    // Existing admin-like permission used by workspace administration screens.
+    // TODO(security): introduce a dedicated `agents.manage` permission in the
+    // remote and local role seeds, then switch these checks to that key.
+    assertAgentWorkspaceAccess(input, action, "users.invite");
+
   safeHandleReadWithSchema(
     ipcChannels.shell.getBootstrap,
     emptyReadArgsSchema,
@@ -757,94 +775,157 @@ export const registerFoundationIpc = ({
     () => agentMutations.getAssistantChatSnapshot(),
     "The app could not load the assistant chat.",
   );
-  safeHandle(ipcChannels.agents.create, createAgentSchema, (_event, input) => agentMutations.createAgent(input));
-  safeHandle(ipcChannels.agents.update, updateAgentSchema, (_event, input) => agentMutations.updateAgent(input));
-  safeHandle(ipcChannels.agents.setStatus, setAgentStatusSchema, (_event, input) => agentMutations.setAgentStatus(input));
+  safeHandle(ipcChannels.agents.create, createAgentSchema, async (_event, input) => {
+    await assertAgentAdminAccess(input, "create agents");
+    return agentMutations.createAgent(input);
+  });
+  safeHandle(ipcChannels.agents.update, updateAgentSchema, async (_event, input) => {
+    await assertAgentAdminAccess(input, "update agents");
+    return agentMutations.updateAgent(input);
+  });
+  safeHandle(ipcChannels.agents.setStatus, setAgentStatusSchema, async (_event, input) => {
+    await assertAgentAdminAccess(input, "change agent status");
+    return agentMutations.setAgentStatus(input);
+  });
   safeHandle(
     ipcChannels.agents.setApprovalMode,
     setAgentApprovalModeSchema,
-    (_event, input) => agentMutations.setAgentApprovalMode(input),
+    async (_event, input) => {
+      await assertAgentAdminAccess(input, "change agent approval mode");
+      return agentMutations.setAgentApprovalMode(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.saveAIProviderConfig,
     saveAiProviderConfigSchema,
-    (_event, input) => agentMutations.saveAIProviderConfig(input),
+    async (_event, input) => {
+      await assertAgentAdminAccess(input, "save AI provider settings");
+      return agentMutations.saveAIProviderConfig(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.saveConnectorConfig,
     saveConnectorConfigSchema,
-    (_event, input) => agentMutations.saveConnectorConfig(input),
+    async (_event, input) => {
+      await assertAgentAdminAccess(input, "save connector settings");
+      return agentMutations.saveConnectorConfig(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.testAIProviderConnection,
     testAiProviderConnectionSchema,
-    (_event, input) => agentMutations.testAIProviderConnection(input),
+    async (_event, input) => {
+      await assertAgentAdminAccess(input, "test AI provider settings");
+      return agentMutations.testAIProviderConnection(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.refreshAIProviderModels,
     refreshAiProviderModelsSchema,
-    (_event, input) => agentMutations.refreshAIProviderModels(input),
+    async (_event, input) => {
+      await assertAgentAdminAccess(input, "refresh AI provider models");
+      return agentMutations.refreshAIProviderModels(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.testConnectorConnection,
     testConnectorConnectionSchema,
-    (_event, input) => agentMutations.testConnectorConnection(input),
+    async (_event, input) => {
+      await assertAgentAdminAccess(input, "test connector settings");
+      return agentMutations.testConnectorConnection(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.createConnectorLinkToken,
     createConnectorLinkTokenSchema,
-    (_event, input) => agentMutations.createConnectorLinkToken(input),
+    async (_event, input) => {
+      await assertAgentAdminAccess(input, "create connector link tokens");
+      return agentMutations.createConnectorLinkToken(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.assignAgentModel,
     assignAgentModelSchema,
-    (_event, input) => agentMutations.assignAgentModel(input),
+    async (_event, input) => {
+      await assertAgentAdminAccess(input, "assign agent models");
+      return agentMutations.assignAgentModel(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.createAssistantThread,
     createAssistantThreadSchema,
-    (_event, input) => agentMutations.createAssistantThread(input),
+    async (_event, input) => {
+      await assertAgentWorkspaceAccess(input, "create assistant threads");
+      return agentMutations.createAssistantThread(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.deleteAssistantThread,
     deleteAssistantThreadSchema,
-    (_event, input) => agentMutations.deleteAssistantThread(input),
+    async (_event, input) => {
+      await assertAgentWorkspaceAccess(input, "delete assistant threads");
+      return agentMutations.deleteAssistantThread(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.setActiveAssistantThread,
     setActiveAssistantThreadSchema,
-    (_event, input) => agentMutations.setActiveAssistantThread(input),
+    async (_event, input) => {
+      await assertAgentWorkspaceAccess(input, "switch assistant threads");
+      return agentMutations.setActiveAssistantThread(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.updateAssistantThreadPreferences,
     updateAssistantThreadPreferencesSchema,
-    (_event, input) => agentMutations.updateAssistantThreadPreferences(input),
+    async (_event, input) => {
+      await assertAgentWorkspaceAccess(input, "update assistant thread preferences");
+      return agentMutations.updateAssistantThreadPreferences(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.renameAssistantThread,
     renameAssistantThreadSchema,
-    (_event, input) => agentMutations.renameAssistantThread(input),
+    async (_event, input) => {
+      await assertAgentWorkspaceAccess(input, "rename assistant threads");
+      return agentMutations.renameAssistantThread(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.sendAssistantChatTurn,
     sendAssistantChatTurnSchema,
-    (_event, input) => agentMutations.sendAssistantChatTurn(input),
+    async (_event, input) => {
+      await assertAgentWorkspaceAccess(input, "send assistant messages");
+      return agentMutations.sendAssistantChatTurn(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.transcribeAudio,
     transcribeAssistantAudioSchema,
-    (_event, input) => assistantAudioTranscription.transcribeDataUrl(input),
+    async (_event, input) => {
+      await assertAgentWorkspaceAccess(input, "transcribe assistant audio");
+      return assistantAudioTranscription.transcribeDataUrl(input);
+    },
   );
-  safeHandle(ipcChannels.agents.reviewRun, reviewAgentRunSchema, (_event, input) => agentMutations.reviewRun(input));
+  safeHandle(ipcChannels.agents.reviewRun, reviewAgentRunSchema, async (_event, input) => {
+    await assertAgentWorkspaceAccess(input, "review agent runs");
+    return agentMutations.reviewRun(input);
+  });
   safeHandle(
     ipcChannels.agents.sendAssistantMessage,
     sendAssistantChatTurnSchema,
-    (_event, input) => agentMutations.sendAssistantMessage(input),
+    async (_event, input) => {
+      await assertAgentWorkspaceAccess(input, "send assistant messages");
+      return agentMutations.sendAssistantMessage(input);
+    },
   );
   safeHandle(
     ipcChannels.agents.createDraftRunFromChat,
     createDraftRunFromChatSchema,
-    (_event, input) => agentMutations.createDraftRunFromChat(input),
+    async (_event, input) => {
+      await assertAgentWorkspaceAccess(input, "create draft runs from chat");
+      return agentMutations.createDraftRunFromChat(input);
+    },
   );
   safeHandle(
     ipcChannels.app.reportRuntimeError,
