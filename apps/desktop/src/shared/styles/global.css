@@ -19384,9 +19384,13 @@ input[type="number"] {
 /* Clean, borderless icon actions: no per-button box, even spacing, the only
    chrome is a subtle hover circle (from .icon-ghost-control:hover). */
 .invoice-actions-cell .icon-ghost-control {
-  width: 28px;
-  min-width: 28px;
-  height: 28px;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+}
+.invoice-actions-cell .icon-ghost-control svg {
+  width: 13px;
+  height: 13px;
 }
 
 /* Documents folder setting ================================================== */
