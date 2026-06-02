@@ -102,4 +102,65 @@ describe("security regression checks", () => {
 
     expect(missingGuard).toEqual([]);
   });
+
+  it("does not bootstrap existing workspaces by slug upsert", () => {
+    const source = readText("supabase/functions/admin-workspace-bootstrap/index.ts");
+
+    expect(source).not.toMatch(/\.from\("workspaces"\)\s*[\s\S]{0,500}\.upsert\(/);
+    expect(source).toMatch(/\.from\("workspaces"\)\s*[\s\S]{0,500}\.insert\(/);
+    expect(source).toContain("workspace_slug_already_exists");
+    expect(source).toContain('"finance.manage"');
+    expect(source).toContain('"treasury.transactions.read"');
+  });
+
+  it("keeps membership roles scoped to their workspace", () => {
+    const migrationText = listFiles("supabase/migrations")
+      .filter((relativePath) => relativePath.endsWith(".sql"))
+      .map(readText)
+      .join("\n");
+    const sendInviteSource = readText("supabase/functions/send-invite/index.ts");
+
+    expect(migrationText).toMatch(/FOREIGN KEY\s*\(\s*workspace_id\s*,\s*role_id\s*\)\s*REFERENCES\s+public\.roles\s*\(\s*workspace_id\s*,\s*id\s*\)/i);
+    expect(migrationText).toMatch(/JOIN\s+public\.roles\s+r\s+ON\s+r\.id\s*=\s*wm\.role_id\s+AND\s+r\.workspace_id\s*=\s*wm\.workspace_id/i);
+    expect(sendInviteSource).toMatch(/\.from\("roles"\)[\s\S]*?\.eq\("id",\s*payload\.roleId\)[\s\S]*?\.eq\("workspace_id",\s*payload\.workspaceId\)/);
+  });
+
+  it("protects workspace document storage with domain permissions instead of membership only", () => {
+    const migrationText = listFiles("supabase/migrations")
+      .filter((relativePath) => relativePath.endsWith(".sql"))
+      .map(readText)
+      .join("\n");
+
+    expect(migrationText).toContain("can_access_workspace_document");
+    expect(migrationText).toContain("treasury.transactions.read");
+    expect(migrationText).toContain("treasury.import");
+    expect(migrationText).not.toMatch(/CREATE POLICY "workspace_documents_read"[\s\S]*?public\.workspace_memberships[\s\S]*?split_part\(name,\s*'\/',\s*1\)/i);
+  });
+
+  it("does not allow finance read permission to satisfy write IPC handlers", () => {
+    const source = readText("apps/desktop/electron/main/ipc/registerFoundationIpc.ts");
+    const writeChannelExpectations = [
+      ["ipcChannels.finance.create", "finance.manage"],
+      ["ipcChannels.finance.update", "finance.manage"],
+      ["ipcChannels.currency.upsertSettings", "currency.manage_rates"],
+      ["ipcChannels.currency.createRate", "currency.manage_rates"],
+      ["ipcChannels.currency.deleteRate", "currency.manage_rates"],
+      ["ipcChannels.currency.saveProviderConfig", "currency.manage_rates"],
+      ["ipcChannels.currency.refreshRates", "currency.manage_rates"],
+      ["ipcChannels.quotes.create", "quotes.create"],
+      ["ipcChannels.quotes.update", "quotes.edit"],
+      ["ipcChannels.quotes.setStatus", "quotes.edit"],
+      ["ipcChannels.quotes.duplicate", "quotes.create"],
+      ["ipcChannels.quotes.delete", "quotes.cancel"],
+    ] as const;
+
+    const missingPermissions = writeChannelExpectations.filter(([channel, permission]) => {
+      const channelIndex = source.indexOf(channel);
+      if (channelIndex < 0) return true;
+      const handlerBlock = source.slice(channelIndex, channelIndex + 700);
+      return !handlerBlock.includes(`requiredPermission: "${permission}"`) && !handlerBlock.includes(`"${permission}"`);
+    });
+
+    expect(missingPermissions).toEqual([]);
+  });
 });

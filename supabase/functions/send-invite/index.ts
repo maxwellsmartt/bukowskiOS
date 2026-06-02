@@ -180,6 +180,21 @@ Deno.serve(async (request) => {
     return json(request, { error: "email_required" }, 400);
   }
 
+  const { data: targetRole, error: roleError } = await adminClient
+    .from("roles")
+    .select("id")
+    .eq("id", payload.roleId)
+    .eq("workspace_id", payload.workspaceId)
+    .maybeSingle();
+
+  if (roleError) {
+    return json(request, { error: roleError.message }, 400);
+  }
+
+  if (!targetRole) {
+    return json(request, { error: "role_not_found_in_workspace" }, 400);
+  }
+
   let inviteUser: SupabaseAuthUser | null = null;
   const { data: invite, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(normalizedEmail, {
     redirectTo: `bukowskios://auth/accept-invite?flow=invite&workspace_id=${encodeURIComponent(payload.workspaceId)}`,

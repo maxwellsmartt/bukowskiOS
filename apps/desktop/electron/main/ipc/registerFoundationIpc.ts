@@ -1937,12 +1937,12 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "create finance entries",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "finance.manage",
     });
     return financeMutations.createEntry(input);
   });
   safeHandle(ipcChannels.finance.update, updateFinancialEntrySchema, async (_event, input) => {
-    await workspaceAccess.assertFinanceEntryAccess(input.entryId, "update finance entries", "write", "finance.read");
+    await workspaceAccess.assertFinanceEntryAccess(input.entryId, "update finance entries", "write", "finance.manage");
     return financeMutations.updateEntry(input);
   });
 
@@ -2108,7 +2108,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "update currency settings",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "currency.manage_rates",
     });
     return currencyMutations.upsertSettings(input);
   });
@@ -2117,7 +2117,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "create exchange rates",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "currency.manage_rates",
     });
     return currencyMutations.createRate(input);
   });
@@ -2126,7 +2126,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "delete exchange rates",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "currency.manage_rates",
     });
     return currencyMutations.deleteRate(input);
   });
@@ -2152,7 +2152,7 @@ export const registerFoundationIpc = ({
         workspaceId: input.workspaceId,
         action: "update exchange-rate provider",
         accessLevel: "write",
-        requiredPermission: "finance.read",
+        requiredPermission: "currency.manage_rates",
       });
       return currencyRateProviders.saveConfig(input);
     },
@@ -2162,7 +2162,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "refresh exchange rates",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "currency.manage_rates",
     });
     return currencyRateProviders.refreshRates(input);
   });
@@ -2200,7 +2200,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "create quotes",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "quotes.create",
     });
     return quoteMutations.createQuote(input);
   });
@@ -2209,7 +2209,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "update quotes",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "quotes.edit",
     });
     return quoteMutations.updateQuote(input);
   });
@@ -2218,7 +2218,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "update quote status",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "quotes.edit",
     });
     return quoteMutations.setStatus(input);
   });
@@ -2227,7 +2227,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "duplicate quotes",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "quotes.create",
     });
     return quoteMutations.duplicateQuote(input);
   });
@@ -2236,7 +2236,7 @@ export const registerFoundationIpc = ({
       workspaceId: input.workspaceId,
       action: "delete quotes",
       accessLevel: "write",
-      requiredPermission: "finance.read",
+      requiredPermission: "quotes.cancel",
     });
     return quoteMutations.deleteQuote(input);
   });

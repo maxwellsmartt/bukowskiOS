@@ -1,16 +1,71 @@
--- 20260528130000 — Workspace documents storage bucket (PILAR T iteración 2, A2).
+-- 20260602130000 — Security hardening: workspace-scoped roles and protected documents.
 --
--- Private bucket holding the actual file bytes (invoice images, statement
--- PDFs, future cédula/company docs) so they sync across machines/users. The
--- app uploads on document creation and downloads on demand, caching locally.
---
--- Object keys are workspace-scoped: `{workspaceId}/invoices/{id}.ext`. The
--- RLS policies below derive the workspace from the first path segment and
--- only allow active members of that workspace to read/write.
+-- Fixes two isolation issues:
+-- 1. A workspace membership role must belong to the same workspace.
+-- 2. The workspace-documents bucket must enforce domain permissions for
+--    sensitive invoice/treasury files instead of plain membership.
 
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('workspace-documents', 'workspace-documents', false)
-ON CONFLICT (id) DO NOTHING;
+UPDATE public.workspace_memberships wm
+SET role_id = NULL,
+    updated_at = now()
+WHERE role_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.roles r
+    WHERE r.id = wm.role_id
+      AND r.workspace_id = wm.workspace_id
+  );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'roles_workspace_id_id_key'
+      AND conrelid = 'public.roles'::regclass
+  ) THEN
+    ALTER TABLE public.roles
+      ADD CONSTRAINT roles_workspace_id_id_key UNIQUE (workspace_id, id);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'workspace_memberships_workspace_role_fk'
+      AND conrelid = 'public.workspace_memberships'::regclass
+  ) THEN
+    ALTER TABLE public.workspace_memberships
+      ADD CONSTRAINT workspace_memberships_workspace_role_fk
+      FOREIGN KEY (workspace_id, role_id)
+      REFERENCES public.roles(workspace_id, id)
+      ON DELETE SET NULL (role_id);
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.has_permission(target_workspace_id uuid, permission_key text)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.workspace_memberships wm
+    JOIN public.roles r
+      ON r.id = wm.role_id
+     AND r.workspace_id = wm.workspace_id
+    JOIN public.role_permissions rp ON rp.role_id = r.id
+    JOIN public.permissions p ON p.id = rp.permission_id
+    WHERE wm.workspace_id = target_workspace_id
+      AND wm.user_id = auth.uid()
+      AND wm.status = 'active'
+      AND p.key = permission_key
+  );
+$$;
 
 CREATE OR REPLACE FUNCTION public.can_access_workspace_document(object_name text, access_mode text)
 RETURNS boolean

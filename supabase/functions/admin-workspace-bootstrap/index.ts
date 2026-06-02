@@ -23,6 +23,7 @@ const operationalPermissions = [
   { key: "packing-slips.read", label: "Read packing slips", description: "View packing slip detail and status" },
   { key: "packing-slips.create", label: "Create packing slips", description: "Issue and return packing slips" },
   { key: "finance.read", label: "Read finance", description: "View finance exposure and entries" },
+  { key: "finance.manage", label: "Manage finance entries", description: "Create and update financial entries." },
   { key: "invoices.read", label: "Read invoices", description: "View workspace invoices." },
   { key: "invoices.create", label: "Create invoices", description: "Create new invoice drafts." },
   { key: "invoices.edit_draft", label: "Edit invoice drafts", description: "Edit invoices that are still in draft." },
@@ -38,6 +39,15 @@ const operationalPermissions = [
   { key: "quotes.cancel", label: "Cancel quotes", description: "Cancel or delete quotes." },
   { key: "quotes.export", label: "Export quotes", description: "Generate PDFs of quotes." },
   { key: "quotes.manage_templates", label: "Manage quote templates", description: "Create and edit quote templates." },
+  { key: "treasury.accounts.manage", label: "Manage bank accounts", description: "Create and edit workspace bank accounts." },
+  { key: "treasury.import", label: "Import bank statements", description: "Import CSV/XLSX/manual bank statement rows." },
+  { key: "treasury.transactions.read", label: "Read treasury", description: "View bank accounts, transactions and treasury overview." },
+  { key: "treasury.transactions.classify", label: "Classify transactions", description: "Annotate transactions: kind, concept, category and project allocation." },
+  { key: "treasury.reimbursements.review", label: "Review reimbursements", description: "Adjust DGII-deductible amounts and fiscal status." },
+  { key: "treasury.export", label: "Export treasury reports", description: "Export treasury data and reports." },
+  { key: "crew_fees.read", label: "Read crew fees", description: "View collaborator fees and payment history." },
+  { key: "crew_fees.manage", label: "Manage crew fees", description: "Create, edit, approve and cancel collaborator fees." },
+  { key: "crew_payments.record", label: "Record crew payments", description: "Record outbound payments to collaborators." },
   { key: "rma.read", label: "Read RMAs", description: "Review RMA queues and manufacturer cases" },
   { key: "rma.create", label: "Create RMAs", description: "Open or prepare new RMA cases" },
   { key: "users.invite", label: "Invite users", description: "Invite a teammate to join a workspace by email." },
@@ -162,6 +172,12 @@ const getAuthenticatedUser = async (supabaseUrl: string, anonKey: string, bearer
   return user.id ? { user, error: null } : { user: null, error: "auth_user_missing_id" };
 };
 
+const isUniqueViolation = (error: unknown) =>
+  typeof error === "object" &&
+  error != null &&
+  "code" in error &&
+  (error as { code?: unknown }).code === "23505";
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response(null, {
@@ -192,25 +208,24 @@ Deno.serve(async (request) => {
 
   const payload = (await request.json()) as BootstrapPayload;
   const now = new Date().toISOString();
+
   const { data: workspace, error: workspaceError } = await adminClient
     .from("workspaces")
-    .upsert(
-      {
-        name: payload.name,
-        slug: payload.slug,
-        base_currency: payload.baseCurrency ?? "USD",
-        icon_color: payload.iconColor ?? null,
-        updated_at: now,
-      },
-      {
-        onConflict: "slug",
-        ignoreDuplicates: false,
-      },
-    )
+    .insert({
+      name: payload.name,
+      slug: payload.slug,
+      base_currency: payload.baseCurrency ?? "USD",
+      icon_color: payload.iconColor ?? null,
+      updated_at: now,
+    })
     .select("id")
     .single();
 
   if (workspaceError || !workspace) {
+    if (isUniqueViolation(workspaceError)) {
+      return json(request, { error: "workspace_slug_already_exists" }, 409);
+    }
+
     return json(request, { error: workspaceError?.message ?? "workspace_create_failed" }, 400);
   }
 

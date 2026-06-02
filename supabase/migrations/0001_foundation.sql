@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS public.roles (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (workspace_id, key),
-  UNIQUE (workspace_id, name)
+  UNIQUE (workspace_id, name),
+  UNIQUE (workspace_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS public.role_permissions (
@@ -55,14 +56,15 @@ CREATE TABLE IF NOT EXISTS public.workspace_memberships (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id uuid NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  role_id uuid REFERENCES public.roles(id) ON DELETE SET NULL,
+  role_id uuid,
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'invited', 'inactive')),
   invited_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   invited_at timestamptz,
   accepted_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (workspace_id, user_id)
+  UNIQUE (workspace_id, user_id),
+  FOREIGN KEY (workspace_id, role_id) REFERENCES public.roles(workspace_id, id) ON DELETE SET NULL (role_id)
 );
 
 CREATE TABLE IF NOT EXISTS public.notifications (
@@ -134,7 +136,7 @@ AS $$
   SELECT EXISTS (
     SELECT 1
     FROM public.workspace_memberships wm
-    JOIN public.roles r ON r.id = wm.role_id
+    JOIN public.roles r ON r.id = wm.role_id AND r.workspace_id = wm.workspace_id
     JOIN public.role_permissions rp ON rp.role_id = r.id
     JOIN public.permissions p ON p.id = rp.permission_id
     WHERE wm.workspace_id = target_workspace_id
