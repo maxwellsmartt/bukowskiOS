@@ -864,68 +864,76 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
               {
                 key: "actions",
                 label: t("finance.treasury.invoices.columns.actions", { defaultValue: "Acciones" }),
-                render: (row) => (
-                  <span className="invoice-actions-cell">
-                    <button
-                      type="button"
-                      className="ghost-control action-row-button"
-                      disabled={busyId === row.id}
-                      onClick={() => void downloadOne(row)}
-                      title={t("finance.treasury.invoices.download", { defaultValue: "Descargar" })}
-                      aria-label={t("finance.treasury.invoices.download", { defaultValue: "Descargar" })}
-                    >
-                      <Download size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-control action-row-button"
-                      onClick={() => setEditing(row)}
-                      title={t("finance.treasury.invoices.edit", { defaultValue: "Editar" })}
-                      aria-label={t("finance.treasury.invoices.edit", { defaultValue: "Editar" })}
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-control action-row-button"
-                      disabled={
-                        busyId === row.id ||
-                        row.status === "processing" ||
-                        row.status === "applied" ||
-                        row.status === "dismissed"
-                      }
-                      onClick={() => void retryRows([row])}
-                      title={t("finance.treasury.invoices.retry", { defaultValue: "Reprocesar" })}
-                      aria-label={t("finance.treasury.invoices.retry", { defaultValue: "Reprocesar" })}
-                    >
-                      {busyId === row.id ? <Loader2 className="spin" size={14} /> : <RotateCcw size={14} />}
-                    </button>
-                    <button
-                      type="button"
-                      className="action-primary-button action-row-button"
-                      disabled={
-                        busyId === row.id ||
-                        row.status === "applied" ||
-                        row.status === "dismissed" ||
-                        !row.suggestedTransactionId
-                      }
-                      onClick={() => void apply(row)}
-                    >
-                      <Check size={14} />
-                      {t("finance.treasury.invoices.apply", { defaultValue: "Aplicar" })}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-control action-row-button"
-                      disabled={busyId === row.id || row.status === "applied" || row.status === "dismissed"}
-                      onClick={() => void dismiss(row)}
-                      title={t("finance.treasury.invoices.dismiss", { defaultValue: "Descartar" })}
-                      aria-label={t("finance.treasury.invoices.dismiss", { defaultValue: "Descartar" })}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </span>
-                ),
+                render: (row) => {
+                  const downloadLabel = t("finance.treasury.invoices.download", { defaultValue: "Descargar" });
+                  const editLabel = t("finance.treasury.invoices.edit", { defaultValue: "Editar" });
+                  const retryLabel = t("finance.treasury.invoices.retry", { defaultValue: "Reprocesar" });
+                  const applyLabel = t("finance.treasury.invoices.apply", { defaultValue: "Aplicar" });
+                  const dismissLabel = t("finance.treasury.invoices.dismiss", { defaultValue: "Descartar" });
+                  return (
+                    <span className="invoice-actions-cell">
+                      <button
+                        type="button"
+                        className="icon-ghost-control"
+                        disabled={busyId === row.id}
+                        onClick={() => void downloadOne(row)}
+                        data-tooltip={downloadLabel}
+                        aria-label={downloadLabel}
+                      >
+                        <Download size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-ghost-control"
+                        onClick={() => setEditing(row)}
+                        data-tooltip={editLabel}
+                        aria-label={editLabel}
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-ghost-control"
+                        disabled={
+                          busyId === row.id ||
+                          row.status === "processing" ||
+                          row.status === "applied" ||
+                          row.status === "dismissed"
+                        }
+                        onClick={() => void retryRows([row])}
+                        data-tooltip={retryLabel}
+                        aria-label={retryLabel}
+                      >
+                        {busyId === row.id ? <Loader2 className="spin" size={15} /> : <RotateCcw size={15} />}
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-ghost-control is-success"
+                        disabled={
+                          busyId === row.id ||
+                          row.status === "applied" ||
+                          row.status === "dismissed" ||
+                          !row.suggestedTransactionId
+                        }
+                        onClick={() => void apply(row)}
+                        data-tooltip={applyLabel}
+                        aria-label={applyLabel}
+                      >
+                        <Check size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-ghost-control is-danger"
+                        disabled={busyId === row.id || row.status === "applied" || row.status === "dismissed"}
+                        onClick={() => void dismiss(row)}
+                        data-tooltip={dismissLabel}
+                        aria-label={dismissLabel}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </span>
+                  );
+                },
               },
             ]}
           />

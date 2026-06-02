@@ -48,32 +48,13 @@ export const loadMainWindowContent = (window: BrowserWindow, devServerUrl: strin
   return loadBuiltRenderer();
 };
 
-const escapeHtmlAttribute = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
-
-const readStartupLogoDataUrl = () => {
-  // Use the horizontal white wordmark (458×115) — NOT the 1025×1025 square
-  // desktop logo, which when squeezed into the splash mark renders as a
-  // distorted, over-thick "OS".
-  const candidates = [
-    path.join(process.resourcesPath, "startup-logo.png"),
-    path.join(process.cwd(), "src/shared/assets/inbox/logos/bukowskiOS_logo_white.png"),
-    path.join(process.cwd(), "apps/desktop/src/shared/assets/inbox/logos/bukowskiOS_logo_white.png"),
-  ];
-  const logoPath = candidates.find((candidate) => fs.existsSync(candidate));
-  if (!logoPath) return null;
-
-  try {
-    return `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
-  } catch {
-    return null;
-  }
-};
 
 const createStartupHtml = () => {
-  const logoDataUrl = readStartupLogoDataUrl();
-  const logoMarkup = logoDataUrl
-    ? `<img class="logo" src="${escapeHtmlAttribute(logoDataUrl)}" alt="bukowskiOS" />`
-    : `<div class="mark">b</div>`;
+  // Render the wordmark as crisp HTML text (white "bukowski" + rose "OS") so
+  // it is always pixel-perfect and centered — independent of any logo PNG,
+  // its transparent padding, or the build cache. This is the same brand
+  // treatment used elsewhere, just dependency-free for the boot splash.
+  const logoMarkup = `<div class="wordmark" role="img" aria-label="bukowskiOS">bukowski<span>OS</span></div>`;
 
   return `<!doctype html>
 <html>
@@ -116,12 +97,16 @@ const createStartupHtml = () => {
         font-weight: 800;
         font-size: 28px;
       }
-      .logo {
-        width: auto;
-        height: 34px;
-        max-width: min(280px, 70vw);
-        object-fit: contain;
-        filter: drop-shadow(0 18px 36px rgba(0,0,0,0.55));
+      .wordmark {
+        font-size: 30px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+        color: #f4f7fb;
+        text-shadow: 0 14px 30px rgba(0,0,0,0.5);
+      }
+      .wordmark span {
+        color: #e6b3b3;
+        font-weight: 600;
       }
       .title {
         margin-top: 4px;
