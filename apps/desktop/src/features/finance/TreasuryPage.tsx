@@ -422,7 +422,13 @@ const TreasuryBalanceTooltip = ({
 
 export const TreasuryPage = () => {
   const { t } = useTranslation();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId, hasPermission } = useWorkspace();
+  // Defense in depth + clearer UX: hide/disable write controls the signed-in
+  // role can't use, instead of letting the click bounce off the main-process
+  // guard with an error toast.
+  const canManageAccounts = hasPermission("treasury.accounts.manage");
+  const canImport = hasPermission("treasury.import");
+  const canExport = hasPermission("treasury.export");
   const mutations = useTreasuryMutations();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -1370,14 +1376,16 @@ export const TreasuryPage = () => {
 
       <div className="page-stack-row treasury-page-header">
         <SectionHeader title={t("finance.treasury.title")} titleTone="accent" />
-        <button
-          className={`ghost-control treasury-new-account-button${showAccountForm ? " is-active" : ""}`}
-          onClick={() => setShowAccountForm((v) => !v)}
-          type="button"
-        >
-          <Plus size={13} />
-          <span>{t("finance.treasury.actions.newAccount")}</span>
-        </button>
+        {canManageAccounts ? (
+          <button
+            className={`ghost-control treasury-new-account-button${showAccountForm ? " is-active" : ""}`}
+            onClick={() => setShowAccountForm((v) => !v)}
+            type="button"
+          >
+            <Plus size={13} />
+            <span>{t("finance.treasury.actions.newAccount")}</span>
+          </button>
+        ) : null}
       </div>
 
       {showAccountForm ? (
@@ -1763,18 +1771,20 @@ export const TreasuryPage = () => {
                       {t("finance.treasury.accounts.movementCount", { count: account.transactionCount })}
                       <ArrowUpRight size={13} />
                     </span>
-                    <span
-                      className="ghost-control"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        triggerImport(account.id, account.bankName);
-                      }}
-                      role="button"
-                      style={{ marginTop: 8 }}
-                    >
-                      <Download size={12} />
-                      <span>{t("finance.treasury.actions.import")}</span>
-                    </span>
+                    {canImport ? (
+                      <span
+                        className="ghost-control"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          triggerImport(account.id, account.bankName);
+                        }}
+                        role="button"
+                        style={{ marginTop: 8 }}
+                      >
+                        <Download size={12} />
+                        <span>{t("finance.treasury.actions.import")}</span>
+                      </span>
+                    ) : null}
                   </button>
                 ))}
               </div>
@@ -1835,18 +1845,20 @@ export const TreasuryPage = () => {
                 <Plus size={13} />
                 <span>{t("finance.treasury.actions.addRow")}</span>
               </button>
-              <button
-                className="ghost-control treasury-import-button"
-                disabled={accounts.data.length === 0 || busy}
-                onClick={() => {
-                  const account = accounts.data.find((a) => a.id === accountFilter) ?? accounts.data[0];
-                  if (account) triggerImport(account.id, account.bankName);
-                }}
-                type="button"
-              >
-                <Download size={13} />
-                <span>{t("finance.treasury.actions.import")}</span>
-              </button>
+              {canImport ? (
+                <button
+                  className="ghost-control treasury-import-button"
+                  disabled={accounts.data.length === 0 || busy}
+                  onClick={() => {
+                    const account = accounts.data.find((a) => a.id === accountFilter) ?? accounts.data[0];
+                    if (account) triggerImport(account.id, account.bankName);
+                  }}
+                  type="button"
+                >
+                  <Download size={13} />
+                  <span>{t("finance.treasury.actions.import")}</span>
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -2156,6 +2168,7 @@ export const TreasuryPage = () => {
           ) : (
             <>
               <div className="treasury-review-toolbar">
+                {canExport ? (
                 <div className="treasury-review-export-row">
                   <div className="treasury-review-export-group">
                     <span className="treasury-review-export-label">
@@ -2222,6 +2235,7 @@ export const TreasuryPage = () => {
                     </button>
                   </div>
                 </div>
+                ) : null}
                 <div className="treasury-review-filter-row">
                   <input
                     className="field-input treasury-review-search"

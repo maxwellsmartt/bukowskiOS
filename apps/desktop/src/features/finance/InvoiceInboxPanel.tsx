@@ -830,6 +830,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                       className="ghost-control action-row-button"
                       onClick={() => setEditing(row)}
                       title={t("finance.treasury.invoices.edit", { defaultValue: "Editar" })}
+                      aria-label={t("finance.treasury.invoices.edit", { defaultValue: "Editar" })}
                     >
                       <Pencil size={14} />
                     </button>
@@ -844,6 +845,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                       }
                       onClick={() => void retryRows([row])}
                       title={t("finance.treasury.invoices.retry", { defaultValue: "Reprocesar" })}
+                      aria-label={t("finance.treasury.invoices.retry", { defaultValue: "Reprocesar" })}
                     >
                       {busyId === row.id ? <Loader2 className="spin" size={14} /> : <RotateCcw size={14} />}
                     </button>
@@ -866,6 +868,8 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                       className="ghost-control action-row-button"
                       disabled={busyId === row.id || row.status === "applied" || row.status === "dismissed"}
                       onClick={() => void dismiss(row)}
+                      title={t("finance.treasury.invoices.dismiss", { defaultValue: "Descartar" })}
+                      aria-label={t("finance.treasury.invoices.dismiss", { defaultValue: "Descartar" })}
                     >
                       <Trash2 size={14} />
                     </button>
