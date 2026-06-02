@@ -5,7 +5,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { FinanceBusinessPullTable } from "@contracts";
 import { notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
-const POLL_INTERVAL_MS = 60_000;
+const POLL_INTERVAL_MS = 20_000;
 const PULL_BATCH_SIZE = 250;
 
 const tableConfigs: Array<{ table: FinanceBusinessPullTable; cursorColumn: string }> = [
@@ -87,10 +87,33 @@ export const useFinanceBusinessPull = () => {
           const rows = (data ?? []) as Array<Record<string, unknown>>;
           if (!rows.length) continue;
 
+          // Project tags live in a child join table that the push rewrites
+          // wholesale; co-fetch them for the pulled extractions so the apply
+          // can replace each one's full set (otherwise project assignments
+          // never reach other machines).
+          let childRows: Array<Record<string, unknown>> | undefined;
+          if (table === "invoice_extractions") {
+            const ids = rows.map((extraction) => extraction.id).filter(Boolean);
+            if (ids.length) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const { data: tagData, error: tagError } = await (supabase as any)
+                .from("invoice_extraction_projects")
+                .select("*")
+                .eq("workspace_id", activeWorkspaceId)
+                .in("invoice_extraction_id", ids);
+              if (tagError) {
+                console.warn("[finance-business-pull] invoice_extraction_projects fetch failed", tagError);
+              } else {
+                childRows = (tagData ?? []) as Array<Record<string, unknown>>;
+              }
+            }
+          }
+
           const result = await appApi.applyRemoteFinanceBusinessRows({
             workspaceId: activeWorkspaceId,
             table,
             rows,
+            childRows,
           });
           if (result.cursorAfter) writeCursor(key, result.cursorAfter);
           if (result.appliedCount > 0) appliedAny = true;

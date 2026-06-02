@@ -214,6 +214,7 @@ const applyRemoteFinanceBusinessRowsSchema = z.object({
     "software_licenses",
   ]),
   rows: z.array(remoteRecordSchema),
+  childRows: z.array(remoteRecordSchema).optional(),
 });
 
 const backfillOperationalSnapshotsSchema = z.object({

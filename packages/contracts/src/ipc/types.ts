@@ -308,6 +308,12 @@ export type AppApplyRemoteFinanceBusinessRowsCommand = {
   workspaceId: string;
   table: FinanceBusinessPullTable;
   rows: Array<Record<string, unknown>>;
+  /**
+   * Child rows for tables that own a join (currently invoice_extractions →
+   * invoice_extraction_projects). The pull replaces each applied parent's full
+   * child set from this, so project-tag adds/removes propagate across machines.
+   */
+  childRows?: Array<Record<string, unknown>>;
 };
 
 export type AppApplyRemoteFinanceBusinessRowsResult =

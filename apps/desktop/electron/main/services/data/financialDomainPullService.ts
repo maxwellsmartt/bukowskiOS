@@ -377,6 +377,34 @@ const updateCursor = (
   ).run(workspaceId, entityType, cursorAfter, appliedCount, errorMessage);
 };
 
+// Replace one invoice extraction's full project-tag set from the remote rows
+// (the push writes the whole set with fresh ids on every change, so additive
+// upsert would orphan stale rows — replacing by parent id is the correct LWW).
+const replaceExtractionProjectTags = (
+  db: DatabaseSync,
+  workspaceId: string,
+  extractionId: string,
+  childRows: Array<Record<string, unknown>>,
+) => {
+  db.prepare(`DELETE FROM invoice_extraction_projects WHERE invoice_extraction_id = ?`).run(extractionId);
+  const insert = db.prepare(
+    `INSERT OR IGNORE INTO invoice_extraction_projects (
+       id, workspace_id, invoice_extraction_id, project_id, project_name_snapshot, created_at
+     ) VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  for (const child of childRows) {
+    const id = child.id ?? `inv-proj-${String(child.invoice_extraction_id)}-${String(child.project_id ?? "")}`;
+    insert.run(
+      toSqlInputValue(id),
+      workspaceId,
+      extractionId,
+      toSqlInputValue(child.project_id ?? null),
+      toSqlInputValue(child.project_name_snapshot ?? null),
+      toSqlInputValue(child.created_at ?? new Date().toISOString()),
+    );
+  }
+};
+
 const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTable | FinanceBusinessPullTable>(
   db: DatabaseSync,
   workspaceId: string,
@@ -384,7 +412,19 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
   rows: Array<Record<string, unknown>>,
   config: { entityType: string; entityIdColumn: string; conflictColumns: string[] },
   sanitize: (row: Record<string, unknown>) => Record<string, unknown> | null,
+  childRows?: Array<Record<string, unknown>>,
 ): FinancialDomainPullResult<TTable> => {
+  // Group child rows by parent so each applied extraction can replace its set.
+  const childByParent = new Map<string, Array<Record<string, unknown>>>();
+  if (childRows?.length) {
+    for (const child of childRows) {
+      const parent = String(child.invoice_extraction_id ?? "");
+      if (!parent) continue;
+      const bucket = childByParent.get(parent) ?? [];
+      bucket.push(child);
+      childByParent.set(parent, bucket);
+    }
+  }
   const result: FinancialDomainPullResult<TTable> = {
     workspaceId,
     table,
@@ -429,6 +469,12 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
 
       try {
         upsertRow(db, table, row, config.conflictColumns);
+        if (table === "invoice_extractions") {
+          const extractionId = String(row.id ?? "");
+          if (extractionId) {
+            replaceExtractionProjectTags(db, workspaceId, extractionId, childByParent.get(extractionId) ?? []);
+          }
+        }
         result.appliedCount += 1;
         markCursorApplied();
       } catch (error) {
@@ -475,9 +521,16 @@ export const createFinancialDomainPullService = (db: DatabaseSync) => ({
     workspaceId: string,
     table: FinanceBusinessPullTable,
     rows: Array<Record<string, unknown>>,
+    childRows?: Array<Record<string, unknown>>,
   ): FinancialDomainPullResult<FinanceBusinessPullTable> {
-    return applyRows(db, workspaceId, table, rows, financeBusinessEntityMap[table], (row) =>
-      sanitizeFinanceBusinessRow(db, table, workspaceId, row),
+    return applyRows(
+      db,
+      workspaceId,
+      table,
+      rows,
+      financeBusinessEntityMap[table],
+      (row) => sanitizeFinanceBusinessRow(db, table, workspaceId, row),
+      childRows,
     );
   },
 });

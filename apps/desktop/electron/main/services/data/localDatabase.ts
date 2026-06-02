@@ -1769,7 +1769,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
       lastSyncSummary = "The scheduled local sync pass failed.";
       logger.warn("Scheduled local sync pass failed.");
     });
-  }, 60 * 1000);
+  }, 20 * 1000);
   syncOutboxTimer.unref();
 
   return {
@@ -1829,7 +1829,12 @@ const createRuntime = (): LocalDatabaseRuntime => {
     applyRemoteCollaboratorPaymentRows: (input: import("@contracts").AppApplyRemoteCollaboratorPaymentRowsCommand) =>
       createFinancialDomainPullService(database).applyRemoteCollaboratorPaymentRows(input.workspaceId, input.table, input.rows),
     applyRemoteFinanceBusinessRows: (input: import("@contracts").AppApplyRemoteFinanceBusinessRowsCommand) =>
-      createFinancialDomainPullService(database).applyRemoteFinanceBusinessRows(input.workspaceId, input.table, input.rows),
+      createFinancialDomainPullService(database).applyRemoteFinanceBusinessRows(
+        input.workspaceId,
+        input.table,
+        input.rows,
+        input.childRows,
+      ),
     runtimeDiagnostics,
     supportDiagnostics,
     userAdmin,

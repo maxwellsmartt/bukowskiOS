@@ -5,7 +5,7 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { TreasuryPullTable } from "@contracts";
 import { notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
-const POLL_INTERVAL_MS = 60_000;
+const POLL_INTERVAL_MS = 20_000;
 const PULL_BATCH_SIZE = 250;
 const MAX_PAGES_PER_TABLE = 6;
 

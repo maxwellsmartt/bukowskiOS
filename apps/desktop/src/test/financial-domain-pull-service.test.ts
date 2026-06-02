@@ -1,7 +1,13 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { createCollaboratorFeeReadService } from "../../electron/main/services/data/collaboratorFeeReadService";
 import { createFinancialDomainPullService } from "../../electron/main/services/data/financialDomainPullService";
+import { createInvoiceInboxService } from "../../electron/main/services/data/invoiceInboxService";
+import { createTreasuryMutationService } from "../../electron/main/services/data/treasuryMutationService";
 import { createTreasuryReadService } from "../../electron/main/services/data/treasuryReadService";
 import { createTestDatabase } from "./helpers/createTestDatabase";
 
@@ -707,6 +713,69 @@ describe("financialDomainPullService", () => {
       .prepare(`SELECT created_by_user_id FROM financial_entries WHERE id = ?`)
       .get("finance-remote-001") as { created_by_user_id: string };
     expect(entry.created_by_user_id).toBe("user-ops");
+
+    cleanup();
+  });
+
+  it("replaces an invoice extraction's project tags from the pulled child rows", () => {
+    const { cleanup, database } = createTestDatabase("financial-pull-invoice-extraction-tags");
+    const workspaceId = "workspace-metadata";
+    // The extraction table is created lazily by the inbox service.
+    createInvoiceInboxService(database, {
+      userDataPath: mkdtempSync(join(tmpdir(), "pull-inbox-")),
+      treasuryMutations: createTreasuryMutationService(database),
+    });
+    const service = createFinancialDomainPullService(database);
+
+    const extractionRow = {
+      id: "inv-remote-1",
+      workspace_id: workspaceId,
+      batch_id: "batch-remote",
+      status: "extracted",
+      original_name: "factura.png",
+      storage_path: "/tmp/factura.png",
+      mime_type: "image/png",
+      byte_size: 10,
+      created_at: "2026-05-24T10:00:00.000Z",
+      updated_at: "2026-05-24T10:00:00.000Z",
+    };
+
+    // First pull: one project tag.
+    service.applyRemoteFinanceBusinessRows(workspaceId, "invoice_extractions", [extractionRow], [
+      {
+        id: "tag-a",
+        workspace_id: workspaceId,
+        invoice_extraction_id: "inv-remote-1",
+        project_id: "project-aurora",
+        project_name_snapshot: "Aurora",
+        created_at: "2026-05-24T10:00:00.000Z",
+      },
+    ]);
+    expect(
+      (database.prepare(`SELECT project_id FROM invoice_extraction_projects WHERE invoice_extraction_id = ?`).all("inv-remote-1") as Array<{ project_id: string }>).map((r) => r.project_id),
+    ).toEqual(["project-aurora"]);
+
+    // Second pull (newer updated_at): the tag set changed — old tag must be
+    // gone, new tag present (replace semantics, not additive).
+    service.applyRemoteFinanceBusinessRows(
+      workspaceId,
+      "invoice_extractions",
+      [{ ...extractionRow, updated_at: "2026-05-25T10:00:00.000Z" }],
+      [
+        {
+          id: "tag-b",
+          workspace_id: workspaceId,
+          invoice_extraction_id: "inv-remote-1",
+          project_id: "project-borealis",
+          project_name_snapshot: "Borealis",
+          created_at: "2026-05-25T10:00:00.000Z",
+        },
+      ],
+    );
+    const tags = (
+      database.prepare(`SELECT project_id FROM invoice_extraction_projects WHERE invoice_extraction_id = ?`).all("inv-remote-1") as Array<{ project_id: string }>
+    ).map((r) => r.project_id);
+    expect(tags).toEqual(["project-borealis"]);
 
     cleanup();
   });
