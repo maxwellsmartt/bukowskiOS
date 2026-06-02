@@ -30,6 +30,7 @@ type SessionContextValue = {
   isLocalFallback: boolean;
   isPasswordRecovery: boolean;
   authError: string | null;
+  updateUserMetadata: (data: Record<string, unknown>) => Promise<void>;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<void>;
   requestFirstLoginLink: (email: string) => Promise<void>;
@@ -69,10 +70,19 @@ const toSessionUser = (
   };
 };
 
-const createSupabaseClientFromEnv = () => {
+const createSupabaseClientsFromEnv = () => {
   try {
     const env = resolveBukowskiSupabaseEnv(import.meta.env);
-    return createBukowskiSupabaseClient(env);
+    return {
+      authClient: createBukowskiSupabaseClient(env, {
+        persistSession: false,
+      }),
+      dataClient: createBukowskiSupabaseClient(env, {
+        accessToken: () => window.bukowskiAuth?.getAccessToken() ?? Promise.resolve(null),
+        autoRefreshToken: false,
+        persistSession: false,
+      }),
+    };
   } catch {
     return null;
   }
@@ -170,12 +180,11 @@ const resolveSessionUser = async (
   return avatarDataUrl ? { ...sessionUser, avatarUrl: avatarDataUrl } : sessionUser;
 };
 
-const acceptWorkspaceInvite = async (supabase: BukowskiSupabaseClient, workspaceId: string | null) => {
+const acceptWorkspaceInvite = async (workspaceId: string | null) => {
   const env = resolveBukowskiSupabaseEnv(import.meta.env);
-  const { data, error } = await supabase.auth.getSession();
-  const accessToken = data.session?.access_token;
+  const accessToken = await window.bukowskiAuth?.getAccessToken();
 
-  if (error || !accessToken) {
+  if (!accessToken) {
     throw new Error("We could not verify your invite session. Open the invite link again or sign in first.");
   }
 
@@ -196,10 +205,12 @@ const acceptWorkspaceInvite = async (supabase: BukowskiSupabaseClient, workspace
 };
 
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
-  const [supabase] = useState(() => createSupabaseClientFromEnv());
-  const [status, setStatus] = useState<SessionStatus>(() => (supabase ? "loading" : "authenticated"));
+  const [supabaseClients] = useState(() => createSupabaseClientsFromEnv());
+  const authSupabase = supabaseClients?.authClient ?? null;
+  const supabase = supabaseClients?.dataClient ?? null;
+  const [status, setStatus] = useState<SessionStatus>(() => (supabaseClients ? "loading" : "authenticated"));
   const [user, setUser] = useState<BukowskiSessionUser | null>(() =>
-    supabase
+    supabaseClients
       ? null
       : {
           id: "user-ops",
@@ -212,15 +223,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   useEffect(() => {
-    if (!supabase) {
+    if (!authSupabase || !supabase) {
       return undefined;
     }
 
     let isMounted = true;
 
     const hydrateSession = async () => {
-      const storedTokens = await window.bukowskiAuth?.getStoredTokens();
-      const cachedUser = buildCachedSessionUser(storedTokens?.accessToken);
+      const storedAccessToken = await window.bukowskiAuth?.getAccessToken();
+      const cachedUser = buildCachedSessionUser(storedAccessToken);
 
       if (cachedUser && isMounted) {
         setUser(cachedUser);
@@ -228,30 +239,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        if (storedTokens?.accessToken && storedTokens.refreshToken) {
-          const { error } = await supabase.auth.setSession({
-            access_token: storedTokens.accessToken,
-            refresh_token: storedTokens.refreshToken,
-          });
-
-          if (error) {
-            if (isNetworkAuthError(error) && cachedUser) {
-              return {
-                sessionUser: cachedUser,
-                status: "authenticated" as const,
-                authError: "Supabase no responde ahora mismo. Se cargó la sesión local en modo offline.",
-                shouldPersistTokens: false,
-              };
-            }
-
-            if (isMounted) {
-              setAuthError(error.message);
-              await window.bukowskiAuth?.clearStoredTokens();
-            }
-          }
-        }
-
-        const { data, error } = await supabase.auth.getSession();
+        const { data, error } = await authSupabase.auth.getSession();
 
         if (error) {
           if (isNetworkAuthError(error) && cachedUser) {
@@ -272,8 +260,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         }
 
         return {
-          sessionUser: data.session?.user ? await resolveSessionUser(supabase, data.session.user) : null,
-          status: data.session?.user ? ("authenticated" as const) : ("unauthenticated" as const),
+          sessionUser: data.session?.user
+            ? await resolveSessionUser(supabase, data.session.user)
+            : cachedUser,
+          status: data.session?.user || cachedUser ? ("authenticated" as const) : ("unauthenticated" as const),
           authError: null,
           shouldPersistTokens: Boolean(data.session),
           accessToken: data.session?.access_token ?? null,
@@ -325,8 +315,13 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setAuthError(getUserFacingErrorMessage(error, "Unable to restore the secure session."));
       });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+    const { data: listener } = authSupabase.auth.onAuthStateChange((event, nextSession) => {
       setIsPasswordRecovery(event === "PASSWORD_RECOVERY");
+      persistStoredTokens({
+        accessToken: nextSession?.access_token ?? null,
+        refreshToken: nextSession?.refresh_token ?? null,
+      });
+
       if (nextSession?.user) {
         setUser(toSessionUser(nextSession.user));
         void resolveSessionUser(supabase, nextSession.user).then(setUser).catch(() => {
@@ -337,45 +332,40 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       }
       setStatus(nextSession?.user ? "authenticated" : "unauthenticated");
       setAuthError(null);
-
-      persistStoredTokens({
-        accessToken: nextSession?.access_token ?? null,
-        refreshToken: nextSession?.refresh_token ?? null,
-      });
     });
 
     return () => {
       isMounted = false;
       listener.subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [authSupabase, supabase]);
 
   const signInWithPassword = useCallback(
     async (email: string, password: string) => {
-      if (!supabase) {
+      if (!authSupabase) {
         setStatus("authenticated");
         return;
       }
 
       setAuthError(null);
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await authSupabase.auth.signInWithPassword({ email, password });
       if (error) {
         setAuthError(error.message);
         throw error;
       }
     },
-    [supabase],
+    [authSupabase],
   );
 
   const signInWithMagicLink = useCallback(
     async (email: string) => {
-      if (!supabase) {
+      if (!authSupabase) {
         setStatus("authenticated");
         return;
       }
 
       setAuthError(null);
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await authSupabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: "bukowskios://auth/callback",
@@ -387,18 +377,18 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         throw error;
       }
     },
-    [supabase],
+    [authSupabase],
   );
 
   const requestFirstLoginLink = useCallback(
     async (email: string) => {
-      if (!supabase) {
+      if (!authSupabase) {
         setStatus("authenticated");
         return;
       }
 
       setAuthError(null);
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await authSupabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: "bukowskios://auth/callback?flow=first-login",
@@ -411,17 +401,17 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         throw error;
       }
     },
-    [supabase],
+    [authSupabase],
   );
 
   const requestPasswordReset = useCallback(
     async (email: string) => {
-      if (!supabase) {
+      if (!authSupabase) {
         throw new Error("Password recovery is unavailable in local-dev fallback mode.");
       }
 
       setAuthError(null);
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await authSupabase.auth.resetPasswordForEmail(email, {
         redirectTo: "bukowskios://auth/callback?flow=password-recovery",
       });
 
@@ -430,7 +420,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         throw error;
       }
     },
-    [supabase],
+    [authSupabase],
   );
 
   const updatePassword = useCallback(
@@ -440,14 +430,13 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setAuthError(null);
-      const { error } = await supabase.auth.updateUser({
+      if (!window.bukowskiAuth?.updateUser) {
+        throw new Error("The secure auth bridge is unavailable.");
+      }
+
+      await window.bukowskiAuth.updateUser({
         password,
       });
-
-      if (error) {
-        setAuthError(error.message);
-        throw error;
-      }
 
       setIsPasswordRecovery(false);
     },
@@ -456,14 +445,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   const signInWithOAuth = useCallback(
     async (provider: "google" | "github") => {
-      if (!supabase) {
+      if (!authSupabase) {
         setStatus("authenticated");
         return;
       }
 
       setAuthError(null);
       const redirectTo = await window.bukowskiAuth?.getOAuthRedirectUrl().catch(() => null);
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await authSupabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: redirectTo ?? "bukowskios://auth/callback",
@@ -480,7 +469,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         await window.bukowskiApp?.openExternal(data.url);
       }
     },
-    [supabase],
+    [authSupabase],
   );
 
   const refreshUser = useCallback(async () => {
@@ -488,19 +477,34 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
+    const cachedUser = buildCachedSessionUser(await window.bukowskiAuth?.getAccessToken());
+    if (!cachedUser) {
       return;
     }
-    setUser(await resolveSessionUser(supabase, data.user));
+    setUser(await resolveSessionUser(supabase, cachedUser));
   }, [supabase]);
+
+  const updateUserMetadata = useCallback(
+    async (data: Record<string, unknown>) => {
+      if (!supabase) {
+        throw new Error("User profile updates are unavailable in local-dev fallback mode.");
+      }
+
+      if (!window.bukowskiAuth?.updateUser) {
+        throw new Error("The secure auth bridge is unavailable.");
+      }
+
+      await window.bukowskiAuth.updateUser({ data });
+    },
+    [supabase],
+  );
 
   const signOut = useCallback(async () => {
     setAuthError(null);
     setIsPasswordRecovery(false);
 
-    if (supabase) {
-      const { error } = await supabase.auth.signOut();
+    if (authSupabase) {
+      const { error } = await authSupabase.auth.signOut();
       if (error) {
         setAuthError(error.message);
         console.warn("Supabase sign out returned an error; clearing local session anyway.", error);
@@ -516,11 +520,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         : { id: "user-ops", email: "local@bukowskios.dev", displayName: "Local operator", avatarUrl: null },
     );
     setStatus(supabase ? "unauthenticated" : "authenticated");
-  }, [supabase]);
+  }, [authSupabase, supabase]);
 
   const handleAuthDeepLink = useCallback(
     async (url: string) => {
-      if (!supabase) {
+      if (!authSupabase || !supabase) {
         return "/";
       }
 
@@ -540,23 +544,23 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
           return isRecoveryFlow || isFirstLoginFlow || isInviteFlow ? "/login/reset-password?mode=first-login" : "/workspaces/select";
         }
 
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        const { data, error } = await authSupabase.auth.exchangeCodeForSession(code);
         if (error) {
           setAuthError(error.message);
           throw error;
         }
 
         if (data.session) {
-          setUser(await resolveSessionUser(supabase, data.session.user));
-          setStatus("authenticated");
           persistStoredTokens({
             accessToken: data.session.access_token,
             refreshToken: data.session.refresh_token,
           });
+          setUser(await resolveSessionUser(supabase, data.session.user));
+          setStatus("authenticated");
         }
 
         if (isInviteFlow) {
-          await acceptWorkspaceInvite(supabase, workspaceId);
+          await acceptWorkspaceInvite(workspaceId);
           window.dispatchEvent(new CustomEvent("bukowski:workspace-memberships-changed"));
         }
 
@@ -567,7 +571,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         throw error;
       }
     },
-    [supabase],
+    [authSupabase, supabase],
   );
 
   const value = useMemo<SessionContextValue>(
@@ -579,6 +583,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       isLocalFallback: !supabase,
       isPasswordRecovery,
       authError,
+      updateUserMetadata,
       signInWithPassword,
       signInWithMagicLink,
       requestFirstLoginLink,
@@ -602,6 +607,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       signOut,
       status,
       supabase,
+      updateUserMetadata,
       updatePassword,
       user,
     ],

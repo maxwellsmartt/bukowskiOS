@@ -205,12 +205,10 @@ declare global {
       ) => Promise<AppApplyRemoteFinanceBusinessRowsResult>;
     };
     bukowskiAuth?: {
-      getStoredTokens: () => Promise<{
-        accessToken: string | null;
-        refreshToken: string | null;
-      }>;
+      getAccessToken: () => Promise<string | null>;
       getOAuthRedirectUrl: () => Promise<string>;
       getAvatarDataUrl: (url: string) => Promise<string | null>;
+      updateUser: (input: { password?: string; data?: Record<string, unknown> }) => Promise<unknown>;
       setStoredTokens: (tokens: { accessToken: string | null; refreshToken: string | null }) => Promise<void>;
       clearStoredTokens: () => Promise<void>;
     };

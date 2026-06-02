@@ -1,17 +1,24 @@
 import type { HeadersReceivedResponse, IpcMainInvokeEvent, OnHeadersReceivedListenerDetails } from "electron";
 
-const trustedDevHosts = new Set(["localhost", "127.0.0.1"]);
 const blockedExternalProtocols = new Set(["file:", "javascript:", "data:", "smb:", "ftp:", "blob:", "ws:", "wss:"]);
 const trustedRemoteImageOrigins = [
   "https://lh3.googleusercontent.com",
   "https://avatars.githubusercontent.com",
   "https://secure.gravatar.com",
 ];
+const trustedRendererFileUrls = new Set<string>();
+const trustedRendererDevOrigins = new Set<string>();
 
 const createSanitizedError = (message: string) => {
   const error = new Error(message);
   error.stack = `${error.name}: ${message}`;
   return error;
+};
+
+const toFileUrlWithoutHashOrSearch = (url: URL) => {
+  url.hash = "";
+  url.search = "";
+  return url.href;
 };
 
 export const isTrustedRendererUrl = (value: string) => {
@@ -23,16 +30,43 @@ export const isTrustedRendererUrl = (value: string) => {
     const url = new URL(value);
 
     if (url.protocol === "file:") {
-      return true;
+      return trustedRendererFileUrls.has(toFileUrlWithoutHashOrSearch(url));
     }
 
-    if ((url.protocol === "http:" || url.protocol === "https:") && trustedDevHosts.has(url.hostname)) {
-      return true;
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return trustedRendererDevOrigins.has(url.origin);
     }
 
     return false;
   } catch {
     return false;
+  }
+};
+
+export const configureTrustedRendererUrls = (input: { devServerUrl?: string; rendererFileUrl?: string }) => {
+  trustedRendererFileUrls.clear();
+  trustedRendererDevOrigins.clear();
+
+  if (input.rendererFileUrl) {
+    try {
+      const url = new URL(input.rendererFileUrl);
+      if (url.protocol === "file:") {
+        trustedRendererFileUrls.add(toFileUrlWithoutHashOrSearch(url));
+      }
+    } catch {
+      // Ignore invalid configuration values; the renderer will not be trusted.
+    }
+  }
+
+  if (input.devServerUrl) {
+    try {
+      const url = new URL(input.devServerUrl);
+      if (url.protocol === "http:" || url.protocol === "https:") {
+        trustedRendererDevOrigins.add(url.origin);
+      }
+    } catch {
+      // Ignore invalid configuration values; the renderer will not be trusted.
+    }
   }
 };
 

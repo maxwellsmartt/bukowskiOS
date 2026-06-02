@@ -171,6 +171,11 @@ type StoredSupabaseTokens = {
   refreshToken: string | null;
 };
 
+type AuthUserUpdate = {
+  password?: string;
+  data?: Record<string, unknown>;
+};
+
 ipcRenderer.on(ipcChannels.shell.appAction, (_event, action: ShellAppAction) => {
   shellActionListeners.forEach((listener) => {
     listener(action);
@@ -253,9 +258,10 @@ const bukowskiApp = {
 };
 
 const bukowskiAuth = {
-  getStoredTokens: () => ipcRenderer.invoke(ipcChannels.auth.getStoredTokens) as Promise<StoredSupabaseTokens>,
+  getAccessToken: () => ipcRenderer.invoke(ipcChannels.auth.getAccessToken) as Promise<string | null>,
   getOAuthRedirectUrl: () => ipcRenderer.invoke(ipcChannels.auth.getOAuthRedirectUrl) as Promise<string>,
   getAvatarDataUrl: (url: string) => ipcRenderer.invoke(ipcChannels.auth.getAvatarDataUrl, url) as Promise<string | null>,
+  updateUser: (input: AuthUserUpdate) => ipcRenderer.invoke(ipcChannels.auth.updateUser, input) as Promise<unknown>,
   setStoredTokens: (tokens: StoredSupabaseTokens) =>
     ipcRenderer.invoke(ipcChannels.auth.setStoredTokens, tokens) as Promise<void>,
   clearStoredTokens: () => ipcRenderer.invoke(ipcChannels.auth.clearStoredTokens) as Promise<void>,

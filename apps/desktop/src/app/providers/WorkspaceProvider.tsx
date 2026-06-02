@@ -269,11 +269,10 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       setWorkspaceError(null);
 
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        const accessToken = sessionData.session?.access_token;
+        const accessToken = await window.bukowskiAuth?.getAccessToken();
 
-        if (sessionError || !accessToken) {
-          throw new Error(sessionError?.message ?? "An authenticated session is required to create a workspace.");
+        if (!accessToken) {
+          throw new Error("An authenticated session is required to create a workspace.");
         }
 
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/+$/, "");

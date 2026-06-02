@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildContentSecurityPolicy, isAllowedExternalUrl, isTrustedRendererUrl } from "../../electron/main/security/securityConfig";
+import {
+  buildContentSecurityPolicy,
+  configureTrustedRendererUrls,
+  isAllowedExternalUrl,
+  isTrustedRendererUrl,
+} from "../../electron/main/security/securityConfig";
 
 describe("security config", () => {
   it("allows only safe external http protocols", () => {
@@ -11,10 +16,20 @@ describe("security config", () => {
     expect(isAllowedExternalUrl("data:text/html,hello")).toBe(false);
   });
 
-  it("recognizes only trusted renderer origins", () => {
-    expect(isTrustedRendererUrl("file:///Applications/bukowskiOS/index.html")).toBe(true);
+  it("recognizes only the configured renderer url", () => {
+    configureTrustedRendererUrls({
+      devServerUrl: "http://localhost:5173",
+      rendererFileUrl: "file:///Applications/bukowskiOS/resources/app/dist/index.html",
+    });
+
+    expect(isTrustedRendererUrl("file:///Applications/bukowskiOS/resources/app/dist/index.html")).toBe(true);
+    expect(isTrustedRendererUrl("file:///Applications/bukowskiOS/resources/app/dist/index.html#/finance/treasury")).toBe(true);
+    expect(isTrustedRendererUrl("file:///Applications/bukowskiOS/index.html")).toBe(false);
+    expect(isTrustedRendererUrl("file:///etc/passwd")).toBe(false);
     expect(isTrustedRendererUrl("http://localhost:5173")).toBe(true);
-    expect(isTrustedRendererUrl("https://127.0.0.1:4173")).toBe(true);
+    expect(isTrustedRendererUrl("http://localhost:5173/settings")).toBe(true);
+    expect(isTrustedRendererUrl("http://127.0.0.1:5173")).toBe(false);
+    expect(isTrustedRendererUrl("https://127.0.0.1:4173")).toBe(false);
     expect(isTrustedRendererUrl("https://evil.example")).toBe(false);
   });
 

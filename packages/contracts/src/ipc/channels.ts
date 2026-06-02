@@ -37,9 +37,10 @@ export const ipcChannels = {
     applyRemoteFinanceBusinessRows: "bukowskiApp:applyRemoteFinanceBusinessRows",
   },
   auth: {
-    getStoredTokens: "bukowskiAuth:getStoredTokens",
+    getAccessToken: "bukowskiAuth:getAccessToken",
     getOAuthRedirectUrl: "bukowskiAuth:getOAuthRedirectUrl",
     getAvatarDataUrl: "bukowskiAuth:getAvatarDataUrl",
+    updateUser: "bukowskiAuth:updateUser",
     setStoredTokens: "bukowskiAuth:setStoredTokens",
     clearStoredTokens: "bukowskiAuth:clearStoredTokens",
   },

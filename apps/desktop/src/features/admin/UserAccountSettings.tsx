@@ -26,7 +26,7 @@ type UserAccountSettingsProps = {
 export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsProps) => {
   const { t } = useTranslation();
   const toast = useToast();
-  const { user, status, supabase, isLocalFallback, signOut, refreshUser } = useSession();
+  const { user, status, supabase, isLocalFallback, signOut, refreshUser, updateUserMetadata } = useSession();
   const { activeMembership, activeWorkspaceName } = useWorkspace();
 
   const initialFullName = useMemo(() => {
@@ -109,12 +109,7 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
 
     setIsSaving(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          full_name: fullName.trim(),
-        },
-      });
-      if (error) throw error;
+      await updateUserMetadata({ full_name: fullName.trim() });
       await upsertProfile({ fullName: fullName.trim() || null });
       await refreshUser();
       toast.success(
@@ -163,10 +158,7 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
       const { data: publicUrlData } = supabase.storage.from("user-avatars").getPublicUrl(path);
       const avatarUrl = publicUrlData.publicUrl;
 
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: { avatar_url: avatarUrl },
-      });
-      if (updateError) throw updateError;
+      await updateUserMetadata({ avatar_url: avatarUrl });
       await upsertProfile({ avatarUrl });
 
       await refreshUser();
@@ -188,8 +180,7 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
     if (!supabase) return;
     setIsUploadingAvatar(true);
     try {
-      const { error } = await supabase.auth.updateUser({ data: { avatar_url: null } });
-      if (error) throw error;
+      await updateUserMetadata({ avatar_url: null });
       await upsertProfile({ avatarUrl: null });
       await refreshUser();
       toast.success(

@@ -14,6 +14,7 @@ export type CreateBukowskiSupabaseClientOptions = {
   detectSessionInUrl?: boolean;
   persistSession?: boolean;
   autoRefreshToken?: boolean;
+  accessToken?: () => Promise<string | null>;
 };
 
 const normalizeEnvValue = (value: string | undefined) => value?.trim() ?? "";
@@ -34,6 +35,7 @@ export const createBukowskiSupabaseClient = (
   options: CreateBukowskiSupabaseClientOptions = {},
 ): BukowskiSupabaseClient =>
   createClient<BukowskiDatabase>(env.url, env.anonKey, {
+    accessToken: options.accessToken,
     auth: {
       flowType: "pkce",
       autoRefreshToken: options.autoRefreshToken ?? true,

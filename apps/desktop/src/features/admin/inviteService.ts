@@ -26,11 +26,11 @@ export const sendWorkspaceInvite = async (
   supabase: SupabaseClient,
   input: SendWorkspaceInviteInput,
 ): Promise<{ alreadyRegistered: boolean; magicLinkSent: boolean; membershipStatus: "active" | "invited"; warning: string | null; userId: string }> => {
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  const accessToken = sessionData.session?.access_token;
+  void supabase;
+  const accessToken = await window.bukowskiAuth?.getAccessToken();
 
-  if (sessionError || !accessToken) {
-    throw new Error(sessionError?.message ?? "An authenticated session is required to send invites.");
+  if (!accessToken) {
+    throw new Error("An authenticated session is required to send invites.");
   }
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/+$/, "");

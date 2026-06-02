@@ -163,4 +163,15 @@ describe("security regression checks", () => {
 
     expect(missingPermissions).toEqual([]);
   });
+
+  it("does not expose persisted Supabase refresh tokens to the renderer", () => {
+    const preloadSource = readText("apps/desktop/electron/preload/index.ts");
+    const channelsSource = readText("packages/contracts/src/ipc/channels.ts");
+    const sessionProviderSource = readText("apps/desktop/src/app/providers/SessionProvider.tsx");
+
+    expect(preloadSource).not.toContain("getStoredTokens");
+    expect(channelsSource).not.toContain("getStoredTokens");
+    expect(sessionProviderSource).not.toContain("getStoredTokens");
+    expect(preloadSource).toContain("getAccessToken");
+  });
 });

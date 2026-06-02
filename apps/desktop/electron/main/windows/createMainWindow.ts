@@ -1,8 +1,9 @@
 import { BrowserWindow, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
-import { assertAllowedExternalUrl } from "../security/securityConfig";
+import { assertAllowedExternalUrl, configureTrustedRendererUrls, isTrustedRendererUrl } from "../security/securityConfig";
 import { bindWindowStatePersistence, getDefaultWindowBounds, readWindowState } from "./windowState";
 
 type CreateMainWindowOptions = {
@@ -15,6 +16,11 @@ type CreateMainWindowOptions = {
 
 export const loadMainWindowContent = (window: BrowserWindow, devServerUrl: string | undefined, rendererDist: string) => {
   const rendererIndexPath = path.join(rendererDist, "index.html");
+  configureTrustedRendererUrls({
+    devServerUrl,
+    rendererFileUrl: pathToFileURL(rendererIndexPath).toString(),
+  });
+
   const loadBuiltRenderer = () => {
     if (window.isDestroyed()) {
       return Promise.resolve();
@@ -224,6 +230,20 @@ export const createMainWindow = ({ devServerUrl, preloadPath, rendererDist, defe
     }
 
     return { action: "deny" };
+  });
+
+  window.webContents.on("will-navigate", (event, url) => {
+    if (isTrustedRendererUrl(url)) {
+      return;
+    }
+
+    event.preventDefault();
+    try {
+      assertAllowedExternalUrl(url);
+      void shell.openExternal(url);
+    } catch {
+      // Ignore blocked top-level navigations.
+    }
   });
 
   const showWindow = () => {
