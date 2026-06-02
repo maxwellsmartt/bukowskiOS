@@ -1,21 +1,31 @@
 import {
+  Activity,
   Bot,
   BarChart3,
-  Boxes,
+  BookOpen,
   BriefcaseBusiness,
   FileText,
   CalendarDays,
-  ClipboardList,
+  AlertTriangle,
   FolderCog,
+  FolderKanban,
   FolderOpenDot,
+  Gauge,
   Info,
   Inbox,
   KeyRound,
+  Landmark,
+  LineChart,
+  ListChecks,
+  Package,
+  PackageOpen,
   PackageSearch,
+  Radio,
+  Receipt,
   ScrollText,
   Settings,
   SwatchBook,
-  Wallet,
+  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -35,8 +45,8 @@ export type NavItem = {
 };
 
 export const primaryNav: NavItem[] = [
-  { label: "shell.nav.primary.projects", path: "/projects/schedule", icon: FolderOpenDot },
-  { label: "shell.nav.primary.assets", path: "/assets", icon: Boxes },
+  { label: "shell.nav.primary.projects", path: "/projects/schedule", icon: FolderKanban },
+  { label: "shell.nav.primary.assets", path: "/assets", icon: Package },
   { label: "shell.nav.primary.finance", path: "/finance", icon: BriefcaseBusiness },
   { label: "shell.nav.primary.inbox", path: "/inbox", icon: Inbox },
   { label: "shell.nav.primary.automation", path: "/agents/mission-control", icon: Bot },
@@ -50,34 +60,34 @@ export const projectsSubnav: NavItem[] = [
 export const assetsSubnav: NavItem[] = [
   { label: "shell.nav.assets.assets", path: "/assets", icon: PackageSearch },
   { label: "shell.nav.assets.licenses", path: "/assets/licenses", icon: KeyRound },
-  { label: "shell.nav.assets.packingSlips", path: "/packing-slips", icon: ScrollText },
-  { label: "shell.nav.assets.incidents", path: "/incidents", icon: ClipboardList },
+  { label: "shell.nav.assets.packingSlips", path: "/packing-slips", icon: PackageOpen },
+  { label: "shell.nav.assets.incidents", path: "/incidents", icon: AlertTriangle },
 ];
 
 export const financeSubnav: NavItem[] = [
-  { label: "shell.nav.finance.overview", path: "/finance", icon: BarChart3 },
-  { label: "shell.nav.finance.treasury", path: "/finance/treasury", icon: Wallet },
+  { label: "shell.nav.finance.overview", path: "/finance", icon: LineChart },
+  { label: "shell.nav.finance.treasury", path: "/finance/treasury", icon: Landmark },
   { label: "shell.nav.finance.quotes", path: "/finance/quotes", icon: FileText },
-  { label: "shell.nav.finance.invoices", path: "/finance/invoices", icon: ScrollText },
-  { label: "shell.nav.finance.collaborators", path: "/finance/collaborators", icon: Wallet },
-  { label: "shell.nav.finance.entries", path: "/finance/entries", icon: ScrollText },
-  { label: "shell.nav.finance.reviewQueue", path: "/finance/cost-links", icon: ClipboardList },
+  { label: "shell.nav.finance.invoices", path: "/finance/invoices", icon: Receipt },
+  { label: "shell.nav.finance.collaborators", path: "/finance/collaborators", icon: Users },
+  { label: "shell.nav.finance.entries", path: "/finance/entries", icon: BookOpen },
+  { label: "shell.nav.finance.reviewQueue", path: "/finance/cost-links", icon: ListChecks },
 ];
 
 export const agentsSubnav: NavItem[] = [
   { label: "shell.nav.agents.overview", path: "/agents/mission-control", icon: Bot },
-  { label: "shell.nav.agents.team", path: "/agents", icon: Boxes },
-  { label: "shell.nav.agents.activity", path: "/agents/runs", icon: ScrollText },
+  { label: "shell.nav.agents.team", path: "/agents", icon: Users },
+  { label: "shell.nav.agents.activity", path: "/agents/runs", icon: Activity },
   { label: "shell.nav.agents.models", path: "/agents/models", icon: FolderCog },
-  { label: "shell.nav.agents.channels", path: "/agents/connectors", icon: ClipboardList },
+  { label: "shell.nav.agents.channels", path: "/agents/connectors", icon: Radio },
 ];
 
 const projectSectionMeta: Record<ProjectRouteSection, Omit<NavItem, "path">> = {
-  overview: { label: "shell.nav.project.overview", icon: BarChart3 },
+  overview: { label: "shell.nav.project.overview", icon: Gauge },
   assets: { label: "shell.nav.project.assets", icon: PackageSearch },
-  packing: { label: "shell.nav.project.packing", icon: ScrollText },
-  incidents: { label: "shell.nav.project.incidents", icon: ClipboardList },
-  budget: { label: "shell.nav.project.budget", icon: Wallet },
+  packing: { label: "shell.nav.project.packing", icon: PackageOpen },
+  incidents: { label: "shell.nav.project.incidents", icon: AlertTriangle },
+  budget: { label: "shell.nav.project.budget", icon: BarChart3 },
   info: { label: "shell.nav.project.info", icon: Info },
 };
 

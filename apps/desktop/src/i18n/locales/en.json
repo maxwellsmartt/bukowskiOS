@@ -418,7 +418,7 @@
       },
       "toasts": {
         "unavailableTitle": "Licenses unavailable",
-        "unavailableBody": "Run the latest Supabase migration and try again.",
+        "unavailableBody": "This feature isn't available on this device yet. Update the app to the latest version and try again.",
         "softwareRequiredTitle": "Software name required",
         "softwareRequiredBody": "Add the software name before saving this license.",
         "savedWithoutReminderTitle": "License saved without reminder",
@@ -2086,7 +2086,7 @@
     "mfa": {
       "eyebrow": "Two-factor authentication",
       "title": "2FA challenge",
-      "placeholder": "TOTP verification is reserved for the Supabase MFA wiring step in this slice."
+      "placeholder": "Two-factor verification is coming soon."
     },
     "workspacePicker": {
       "title": "Choose workspace",
@@ -2390,7 +2390,7 @@
       "assignedAgentCount_one": "{{count}} agent",
       "assignedAgentCount_other": "{{count}} agents",
       "defaultModel": "Default model",
-      "defaultSource": "default",
+      "defaultSource": "suggested",
       "noFallback": "No fallback",
       "enabled": "Enabled",
       "disabled": "Disabled",

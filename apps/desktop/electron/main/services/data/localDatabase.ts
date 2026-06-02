@@ -1621,10 +1621,21 @@ const createRuntime = (): LocalDatabaseRuntime => {
         const match = invoiceInboxService.autoMatch(workspaceId, fields);
         invoiceInboxService.recordExtraction(id, fields, match);
       } catch (error) {
-        invoiceInboxService.recordFailure(
-          id,
-          error instanceof Error ? error.message : "No se pudo extraer la factura.",
-        );
+        const raw = error instanceof Error ? error.message : "";
+        // Map common low-level failures to a clear, human message (the inbox
+        // shows this verbatim). Keep the raw cause for anything unrecognized.
+        const friendly = /abort|tim-?out|timed out/i.test(raw)
+          ? "La IA tardó demasiado en responder. Reintenta la factura."
+          : /network|ECONN|ETIMEDOUT|socket|unavailable|overloaded|50\d/i.test(raw)
+            ? "No se pudo conectar con la IA. Revisa tu conexión y reintenta."
+            : /rate.?limit|throttl|429/i.test(raw)
+              ? "El proveedor de IA está saturado. Reintenta en un momento."
+              : /API key|no hay un proveedor/i.test(raw)
+                ? "Configura un proveedor de IA habilitado en Modelos."
+                : /PDF sin texto/i.test(raw)
+                  ? raw
+                  : raw || "No se pudo extraer la factura.";
+        invoiceInboxService.recordFailure(id, friendly);
       }
       for (const window of BrowserWindow.getAllWindows()) {
         window.webContents.send(ipcChannels.shell.appAction, {

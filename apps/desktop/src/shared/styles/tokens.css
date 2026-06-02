@@ -41,6 +41,27 @@
   --accent-success: #6ea987;
   --accent-positive: var(--accent-success);
 
+  /* ------------------------------------------------------------------ *
+   * Status tokens — single source of truth for pills/badges/dots so
+   * every "success/warning/critical/info/neutral" surface stays in sync
+   * (and a future light theme only overrides these).
+   * ------------------------------------------------------------------ */
+  --status-success-fg: #b8f2d3;
+  --status-success-bg: rgba(110, 169, 135, 0.14);
+  --status-success-border: rgba(110, 169, 135, 0.34);
+  --status-warning-fg: #ffd7a1;
+  --status-warning-bg: rgba(200, 154, 86, 0.14);
+  --status-warning-border: rgba(200, 154, 86, 0.32);
+  --status-critical-fg: #ffcccc;
+  --status-critical-bg: rgba(210, 112, 112, 0.14);
+  --status-critical-border: rgba(210, 112, 112, 0.32);
+  --status-info-fg: #cadcff;
+  --status-info-bg: rgba(115, 164, 255, 0.12);
+  --status-info-border: rgba(115, 164, 255, 0.26);
+  --status-neutral-fg: var(--text-secondary);
+  --status-neutral-bg: rgba(255, 255, 255, 0.04);
+  --status-neutral-border: rgba(255, 255, 255, 0.1);
+
   /* ========================================================================
    * Radius scale.
    * Aliases keep legacy names working: --radius-panel, --radius-control.

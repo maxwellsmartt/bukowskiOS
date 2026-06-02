@@ -1,4 +1,5 @@
-import { Check, FileText, Image as ImageIcon, Loader2, Pencil, RotateCcw, Trash2, UploadCloud, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, Clock, FileText, Image as ImageIcon, Loader2, Pencil, RotateCcw, Trash2, UploadCloud, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -63,6 +64,7 @@ const readFileAsDataUrl = (file: File): Promise<InvoiceInboxFileInput> =>
 
 const statusTone = (status: InvoiceExtraction["status"]): "neutral" | "info" | "success" | "warning" | "critical" => {
   switch (status) {
+    case "extracted":
     case "applied":
       return "success";
     case "failed":
@@ -70,10 +72,25 @@ const statusTone = (status: InvoiceExtraction["status"]): "neutral" | "info" | "
     case "pending":
     case "processing":
       return "warning";
-    case "extracted":
-      return "info";
     default:
       return "neutral";
+  }
+};
+
+const statusIcon = (status: InvoiceExtraction["status"]): { icon: LucideIcon; spin: boolean } => {
+  switch (status) {
+    case "extracted":
+      return { icon: Check, spin: false };
+    case "applied":
+      return { icon: CheckCircle2, spin: false };
+    case "failed":
+      return { icon: AlertCircle, spin: false };
+    case "processing":
+      return { icon: Loader2, spin: true };
+    case "pending":
+      return { icon: Clock, spin: false };
+    default:
+      return { icon: Clock, spin: false };
   }
 };
 
@@ -662,11 +679,14 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
               {
                 key: "status",
                 label: t("finance.treasury.invoices.columns.status", { defaultValue: "Estado" }),
-                render: (row) => (
-                  <StatusBadge tone={statusTone(row.status)}>
-                    {t(`finance.treasury.invoices.status.${row.status}`, { defaultValue: row.status })}
-                  </StatusBadge>
-                ),
+                render: (row) => {
+                  const { icon, spin } = statusIcon(row.status);
+                  return (
+                    <StatusBadge tone={statusTone(row.status)} icon={icon} spin={spin}>
+                      {t(`finance.treasury.invoices.status.${row.status}`, { defaultValue: row.status })}
+                    </StatusBadge>
+                  );
+                },
               },
               {
                 key: "supplier",

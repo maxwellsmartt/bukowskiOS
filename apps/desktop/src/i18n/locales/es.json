@@ -420,7 +420,7 @@
       },
       "toasts": {
         "unavailableTitle": "Licencias no disponibles",
-        "unavailableBody": "Ejecuta la migración más reciente de Supabase e intenta otra vez.",
+        "unavailableBody": "Esta función aún no está disponible en este equipo. Actualiza la app a la última versión e inténtalo de nuevo.",
         "softwareRequiredTitle": "Falta el nombre del software",
         "softwareRequiredBody": "Agrega el nombre del software antes de guardar esta licencia.",
         "savedWithoutReminderTitle": "Licencia guardada sin recordatorio",
@@ -2090,7 +2090,7 @@
     "mfa": {
       "eyebrow": "Autenticación de dos factores",
       "title": "Desafío 2FA",
-      "placeholder": "La verificación TOTP queda reservada para el wiring de Supabase MFA en este slice."
+      "placeholder": "La verificación en dos pasos estará disponible próximamente."
     },
     "workspacePicker": {
       "title": "Elegir workspace",
@@ -2393,8 +2393,8 @@
       "storedOnThisMac": "Guardada en esta Mac",
       "assignedAgentCount_one": "{{count}} agente",
       "assignedAgentCount_other": "{{count}} agentes",
-      "defaultModel": "Modelo default",
-      "defaultSource": "default",
+      "defaultModel": "Modelo por defecto",
+      "defaultSource": "sugerido",
       "noFallback": "Sin fallback",
       "enabled": "Activo",
       "disabled": "Inactivo",
@@ -2430,7 +2430,7 @@
       "fields": {
         "apiKey": "API key",
         "baseUrl": "Override de Base URL",
-        "defaultModel": "Modelo default",
+        "defaultModel": "Modelo por defecto",
         "fallbackModel": "Modelo fallback",
         "enabled": "Activo",
         "timeout": "Timeout (ms)",

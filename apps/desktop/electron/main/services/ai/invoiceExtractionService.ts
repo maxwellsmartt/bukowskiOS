@@ -214,35 +214,66 @@ export const createInvoiceExtractionService = (
           ]
         : `${instructions}\n\nTexto de la factura:\n${pdfText}`;
 
+    // Vision calls on high-detail images take longer than a chat turn; give
+    // them a generous floor (60s) so a slow-but-fine response is not aborted
+    // mid-flight — the "operation was aborted" failures users saw were the
+    // AbortController firing on a too-tight timeout.
+    const timeoutMs = Math.max(isImage ? 60_000 : 30_000, provider.timeout_ms);
+
+    // A failure we should retry once: network blips, request aborts/timeouts,
+    // rate limits, and 5xx. NOT auth/validation errors (those won't improve).
+    const isTransient = (summary: string | undefined) =>
+      /abort|tim-?out|timed out|network|ECONN|ETIMEDOUT|socket|temporarily|rate.?limit|throttl|429|50\d|unavailable|overloaded/i.test(
+        summary ?? "",
+      );
+
     // Deterministic single call (temperature 0) for a given instruction set.
     // Some newer/reasoning models reject `temperature`; if so, retry once
     // without it rather than failing the whole extraction.
     const callModel = async (
       instructions: string,
       useTemperature = true,
+      transientRetriesLeft = 1,
     ): Promise<Record<string, unknown>> => {
       const response = await providerService.createResponse(
         {
           apiKey,
           baseUrl: provider.base_url,
           defaultModelKey: model,
-          timeoutMs: Math.max(20_000, provider.timeout_ms),
+          timeoutMs,
         },
         {
           model,
           instructions: "Extrae datos de facturas y responde solo JSON.",
           input: buildInput(instructions),
-          maxOutputTokens: 900,
+          maxOutputTokens: 1_200,
           temperature: useTemperature ? 0 : undefined,
         },
       );
       if (!response.ok) {
         if (useTemperature && /temperature/i.test(response.summary ?? "")) {
-          return callModel(instructions, false);
+          return callModel(instructions, false, transientRetriesLeft);
+        }
+        if (transientRetriesLeft > 0 && isTransient(response.summary)) {
+          await new Promise((resolve) => setTimeout(resolve, 1_500));
+          return callModel(instructions, useTemperature, transientRetriesLeft - 1);
         }
         throw new Error(response.summary || "El proveedor de IA no pudo procesar la factura.");
       }
-      return parseJsonObject(response.outputText);
+      try {
+        return parseJsonObject(response.outputText);
+      } catch (parseError) {
+        // The model replied but not as parseable JSON (prose, partial object).
+        // Retry once forcing the format before giving up.
+        if (transientRetriesLeft > 0) {
+          return callModel(
+            `${instructions}\n\nTu respuesta anterior NO era JSON válido. Responde EXCLUSIVAMENTE con el objeto JSON, sin texto antes ni después.`,
+            useTemperature,
+            transientRetriesLeft - 1,
+          );
+        }
+        throw parseError;
+      }
     };
 
     let fields = mapFields(await callModel(EXTRACTION_INSTRUCTIONS), isImage ? "" : pdfText);
