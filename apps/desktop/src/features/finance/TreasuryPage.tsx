@@ -2669,7 +2669,20 @@ const ReviewRow = ({
   // The deductible can never exceed the expense itself (DGII can only accept up
   // to the claimed amount) and is never negative — clamp on entry.
   const clampDeductible = (value: number) => Math.min(Math.max(value, 0), row.amount);
+  // Display the deductible with thousands separators (consistent with the rest
+  // of the app) while keeping a numeric source of truth. A bare number input
+  // can't render commas, so we use a text input with parse/format.
+  const formatDeductible = (value: number) =>
+    value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const parseDeductible = (text: string) => {
+    const cleaned = text.replace(/[^0-9.]/g, "");
+    const value = Number.parseFloat(cleaned);
+    return Number.isFinite(value) ? value : 0;
+  };
   const [deductible, setDeductible] = useState<number>(clampDeductible(row.deductibleAmount ?? row.amount));
+  const [deductibleText, setDeductibleText] = useState<string>(() =>
+    formatDeductible(clampDeductible(row.deductibleAmount ?? row.amount)),
+  );
   const [fiscalDraft, setFiscalDraft] = useState<FiscalReviewDraft>({
     supplierNcf: row.supplierNcf ?? "",
     dgiiExpenseType: normalizeDgiiCode(row.dgiiExpenseType),
@@ -2781,18 +2794,25 @@ const ReviewRow = ({
             </span>
             <input
               className="field-input"
-              max={row.amount}
-              min={0}
-              onChange={(event) => setDeductible(clampDeductible(Number(event.target.value) || 0))}
+              inputMode="decimal"
+              onChange={(event) => {
+                setDeductibleText(event.target.value);
+                setDeductible(clampDeductible(parseDeductible(event.target.value)));
+              }}
+              onBlur={() => setDeductibleText(formatDeductible(clampDeductible(parseDeductible(deductibleText))))}
+              onFocus={(event) => event.target.select()}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  handleApply(deductible);
+                  const value = clampDeductible(parseDeductible(deductibleText));
+                  setDeductible(value);
+                  setDeductibleText(formatDeductible(value));
+                  handleApply(value);
                 }
               }}
               title={t("finance.treasury.review.saveHint", { defaultValue: "Press Enter to save" })}
-              type="number"
-              value={deductible}
+              type="text"
+              value={deductibleText}
             />
           </label>
           <div className="treasury-review-row-actions">
@@ -2801,6 +2821,7 @@ const ReviewRow = ({
               className="ghost-control treasury-review-row-action is-accept"
               onClick={() => {
                 setDeductible(row.amount);
+                setDeductibleText(formatDeductible(row.amount));
                 handleApply(row.amount);
               }}
               title={t("finance.treasury.review.acceptRowHint", { defaultValue: "Aceptar esta fila al 100%" })}
@@ -2813,6 +2834,7 @@ const ReviewRow = ({
               className="ghost-control treasury-review-row-action is-reject"
               onClick={() => {
                 setDeductible(0);
+                setDeductibleText(formatDeductible(0));
                 handleApply(0);
               }}
               type="button"

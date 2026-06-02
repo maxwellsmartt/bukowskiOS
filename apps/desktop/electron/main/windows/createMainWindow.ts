@@ -51,10 +51,13 @@ export const loadMainWindowContent = (window: BrowserWindow, devServerUrl: strin
 const escapeHtmlAttribute = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 
 const readStartupLogoDataUrl = () => {
+  // Use the horizontal white wordmark (458×115) — NOT the 1025×1025 square
+  // desktop logo, which when squeezed into the splash mark renders as a
+  // distorted, over-thick "OS".
   const candidates = [
     path.join(process.resourcesPath, "startup-logo.png"),
-    path.join(process.cwd(), "src/shared/assets/inbox/logos/bukowskiOS-desktop-logo.png"),
-    path.join(process.cwd(), "apps/desktop/src/shared/assets/inbox/logos/bukowskiOS-desktop-logo.png"),
+    path.join(process.cwd(), "src/shared/assets/inbox/logos/bukowskiOS_logo_white.png"),
+    path.join(process.cwd(), "apps/desktop/src/shared/assets/inbox/logos/bukowskiOS_logo_white.png"),
   ];
   const logoPath = candidates.find((candidate) => fs.existsSync(candidate));
   if (!logoPath) return null;
@@ -114,8 +117,9 @@ const createStartupHtml = () => {
         font-size: 28px;
       }
       .logo {
-        width: 76px;
-        height: 76px;
+        width: auto;
+        height: 34px;
+        max-width: min(280px, 70vw);
         object-fit: contain;
         filter: drop-shadow(0 18px 36px rgba(0,0,0,0.55));
       }
@@ -168,7 +172,6 @@ const createStartupHtml = () => {
   <body>
     <main class="shell">
       ${logoMarkup}
-      <div class="title">Starting bukowskiOS</div>
       <div class="copy" id="startup-copy">Preparing local workspace data...</div>
       <div class="progress" aria-label="Loading"></div>
       <div class="hint">First launch can take a little longer while the local database is prepared.</div>
