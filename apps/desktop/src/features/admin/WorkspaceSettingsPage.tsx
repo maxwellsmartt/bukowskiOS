@@ -114,7 +114,7 @@ const loadRemoteUsersSnapshot = async (
 
   const { data: membershipsData, error: membershipsError } = await looseSupabase
     .from("workspace_memberships")
-    .select("id,user_id,status,role_id,roles(key,name,role_permissions(permissions(key)))")
+    .select("id,user_id,status,role_id,roles!workspace_memberships_workspace_role_fk(key,name,role_permissions(permissions(key)))")
     .eq("workspace_id", workspaceId)
     .in("status", ["active", "inactive", "invited"]);
 
@@ -329,7 +329,7 @@ export const WorkspaceSettingsPage = () => {
       const looseSupabase = supabase as any;
       const { data, error: queryError } = await looseSupabase
         .from("workspace_memberships")
-        .select("id,user_id,invited_at,role_id,roles(name)")
+        .select("id,user_id,invited_at,role_id,roles!workspace_memberships_workspace_role_fk(name)")
         .eq("workspace_id", activeWorkspaceId)
         .eq("status", "invited");
 

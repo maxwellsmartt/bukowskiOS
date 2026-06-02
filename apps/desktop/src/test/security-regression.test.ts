@@ -174,4 +174,26 @@ describe("security regression checks", () => {
     expect(sessionProviderSource).not.toContain("getStoredTokens");
     expect(preloadSource).toContain("getAccessToken");
   });
+
+  it("uses the workspace-scoped role relationship when embedding membership roles", () => {
+    const remoteWorkspaceSources = [
+      "apps/desktop/src/app/providers/WorkspaceProvider.tsx",
+      "apps/desktop/src/features/admin/WorkspaceSettingsPage.tsx",
+    ];
+    const ambiguousEmbeds: string[] = [];
+
+    for (const relativePath of remoteWorkspaceSources) {
+      const lines = toLines(readText(relativePath));
+      lines.forEach((line, index) => {
+        if (/\.select\([^)]*roles\(/.test(line)) {
+          ambiguousEmbeds.push(`${relativePath}:${index + 1}: ${line.trim()}`);
+        }
+      });
+    }
+
+    expect(ambiguousEmbeds).toEqual([]);
+    expect(readText("apps/desktop/src/app/providers/WorkspaceProvider.tsx")).toContain(
+      "roles!workspace_memberships_workspace_role_fk",
+    );
+  });
 });

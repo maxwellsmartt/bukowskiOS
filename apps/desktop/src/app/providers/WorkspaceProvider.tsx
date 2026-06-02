@@ -130,7 +130,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       let { data, error } = await supabase
         .from("workspace_memberships")
         .select(
-          "workspace_id,status,workspaces(name,slug,base_currency,icon_color,avatar_url),roles(key,name,role_permissions(permissions(key)))",
+          "workspace_id,status,workspaces(name,slug,base_currency,icon_color,avatar_url),roles!workspace_memberships_workspace_role_fk(key,name,role_permissions(permissions(key)))",
         )
         .eq("user_id", userId)
         .eq("status", "active");
@@ -139,7 +139,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         const fallback = await supabase
           .from("workspace_memberships")
           .select(
-            "workspace_id,status,workspaces(name,slug,base_currency,icon_color),roles(key,name,role_permissions(permissions(key)))",
+            "workspace_id,status,workspaces(name,slug,base_currency,icon_color),roles!workspace_memberships_workspace_role_fk(key,name,role_permissions(permissions(key)))",
           )
           .eq("user_id", userId)
           .eq("status", "active");
