@@ -180,6 +180,14 @@ type LocalDatabaseRuntime = {
     getFileBuffer: (
       id: string,
     ) => Promise<{ buffer: Buffer; mimeType: string; fileName: string } | null>;
+    getDownload: (
+      workspaceId: string,
+      extractionId: string,
+    ) => Promise<{ buffer: Buffer; fileName: string; mimeType: string } | null>;
+    buildBatchZip: (
+      workspaceId: string,
+      extractionIds: string[],
+    ) => Promise<{ buffer: Buffer; fileName: string; includedCount: number; missingCount: number } | null>;
     findDuplicateGroups: (workspaceId: string) => import("@contracts").InvoiceDuplicateGroup[];
     backfillContentHashes: (workspaceId: string, limit?: number) => Promise<number>;
   };
@@ -1669,6 +1677,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
     apply: invoiceInboxService.applyExtraction,
     dismiss: invoiceInboxService.dismiss,
     getFileBuffer: invoiceInboxService.getFileBuffer,
+    getDownload: invoiceInboxService.getDownload,
+    buildBatchZip: invoiceInboxService.buildBatchZip,
     findDuplicateGroups: invoiceInboxService.findDuplicateGroups,
     backfillContentHashes: invoiceInboxService.backfillContentHashes,
   };

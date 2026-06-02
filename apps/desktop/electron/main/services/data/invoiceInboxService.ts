@@ -26,6 +26,7 @@ import type {
 import type { createTreasuryMutationService } from "./treasuryMutationService";
 import type { SupabaseDocumentStorage } from "./supabaseDocumentStorageService";
 import { assertPathWithinRoot } from "../../security/pathSafety";
+import { buildZip, dedupeZipNames } from "./zipWriter";
 
 const DATA_URL_RE = /^data:([^;]+);base64,(.+)$/;
 const ACCEPTED_MIME = /image\/(png|jpe?g|webp)|application\/pdf/i;
@@ -464,6 +465,74 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     return null;
   };
 
+  // Build a safe, human filename for a download: prefer supplier + date, fall
+  // back to the original name; always keep a sensible extension.
+  const downloadFileNameFor = (row: {
+    original_name: string;
+    supplier_name: string | null;
+    invoice_date: string | null;
+    mime_type: string;
+  }): string => {
+    const extMatch = row.original_name.match(/\.(png|jpe?g|webp|pdf)$/i);
+    const ext = extMatch
+      ? extMatch[0].toLowerCase()
+      : row.mime_type.includes("pdf")
+        ? ".pdf"
+        : row.mime_type.includes("png")
+          ? ".png"
+          : row.mime_type.includes("webp")
+            ? ".webp"
+            : ".jpg";
+    const base = [row.supplier_name?.trim(), row.invoice_date?.trim()]
+      .filter(Boolean)
+      .join(" · ")
+      .replace(/[\\/:*?"<>|]/g, "-");
+    return base ? `${base}${ext}` : row.original_name;
+  };
+
+  /** Resolve one document for download (workspace-scoped). */
+  const getDownload = async (
+    workspaceId: string,
+    extractionId: string,
+  ): Promise<{ buffer: Buffer; fileName: string; mimeType: string } | null> => {
+    const meta = db
+      .prepare(
+        `SELECT original_name, supplier_name, invoice_date, mime_type
+           FROM invoice_extractions WHERE id = ? AND workspace_id = ? LIMIT 1`,
+      )
+      .get(extractionId, workspaceId) as
+      | { original_name: string; supplier_name: string | null; invoice_date: string | null; mime_type: string }
+      | undefined;
+    if (!meta) return null;
+    const file = await getFileBuffer(extractionId);
+    if (!file) return null;
+    return { buffer: file.buffer, mimeType: file.mimeType, fileName: downloadFileNameFor(meta) };
+  };
+
+  /** Bundle many documents into a single ZIP (workspace-scoped). */
+  const buildBatchZip = async (
+    workspaceId: string,
+    extractionIds: string[],
+  ): Promise<{ buffer: Buffer; fileName: string; includedCount: number; missingCount: number } | null> => {
+    const files: Array<{ name: string; data: Buffer }> = [];
+    let missing = 0;
+    for (const id of extractionIds) {
+      const doc = await getDownload(workspaceId, id);
+      if (doc) files.push({ name: doc.fileName, data: doc.buffer });
+      else missing += 1;
+    }
+    if (!files.length) return null;
+    const names = dedupeZipNames(files.map((f) => f.name));
+    const entries = files.map((f, index) => ({ name: names[index], data: f.data }));
+    const today = (options.now?.() ?? new Date().toISOString()).slice(0, 10);
+    return {
+      buffer: buildZip(entries),
+      fileName: `facturas-${today}.zip`,
+      includedCount: files.length,
+      missingCount: missing,
+    };
+  };
+
   /** Upload a document's bytes to cloud storage (best-effort, idempotent). */
   const uploadDocument = async (id: string): Promise<void> => {
     if (!options.storage?.enabled) return;
@@ -825,6 +894,8 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     enqueueBatch,
     list,
     getFileBuffer,
+    getDownload,
+    buildBatchZip,
     uploadDocument,
     backfillContentHashes,
     findDuplicateGroups,

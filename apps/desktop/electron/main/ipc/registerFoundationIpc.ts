@@ -50,6 +50,8 @@ import {
   enqueueInvoiceBatchSchema,
   invoiceInboxListReadArgsSchema,
   invoiceInboxPreviewReadArgsSchema,
+  downloadInvoiceExtractionSchema,
+  downloadInvoiceExtractionBatchSchema,
   invoiceInboxDuplicatesReadArgsSchema,
   backfillInvoiceHashesSchema,
   updateInvoiceExtractionSchema,
@@ -499,6 +501,14 @@ type RegisterFoundationIpcOptions = {
     getFileBuffer: (
       id: string,
     ) => Promise<{ buffer: Buffer; mimeType: string; fileName: string } | null>;
+    getDownload: (
+      workspaceId: string,
+      extractionId: string,
+    ) => Promise<{ buffer: Buffer; fileName: string; mimeType: string } | null>;
+    buildBatchZip: (
+      workspaceId: string,
+      extractionIds: string[],
+    ) => Promise<{ buffer: Buffer; fileName: string; includedCount: number; missingCount: number } | null>;
     findDuplicateGroups: (workspaceId: string) => import("@contracts").InvoiceDuplicateGroup[];
     backfillContentHashes: (workspaceId: string, limit?: number) => Promise<number>;
   };
@@ -2788,6 +2798,64 @@ export const registerFoundationIpc = ({
       };
     },
     "The app could not load the invoice document.",
+  );
+  safeHandle(ipcChannels.treasury.invoiceInboxDownload, downloadInvoiceExtractionSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "download invoice document",
+      accessLevel: "read",
+      requiredPermission: "treasury.transactions.read",
+    });
+    const doc = await invoiceInbox.getDownload(input.workspaceId, input.extractionId);
+    if (!doc) {
+      return { saved: false, fileName: null, savedPath: null, summary: "El documento ya no está disponible." };
+    }
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "Descargar factura",
+      defaultPath: path.join(app.getPath("downloads"), doc.fileName),
+    });
+    if (canceled || !filePath) {
+      return { saved: false, fileName: null, savedPath: null, summary: "Descarga cancelada." };
+    }
+    fs.writeFileSync(filePath, doc.buffer);
+    return {
+      saved: true,
+      fileName: path.basename(filePath),
+      savedPath: filePath,
+      summary: "Factura descargada.",
+    };
+  });
+  safeHandle(
+    ipcChannels.treasury.invoiceInboxDownloadBatch,
+    downloadInvoiceExtractionBatchSchema,
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "download invoice documents",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      const bundle = await invoiceInbox.buildBatchZip(input.workspaceId, input.extractionIds);
+      if (!bundle) {
+        return { saved: false, fileName: null, savedPath: null, summary: "No hay documentos disponibles para descargar." };
+      }
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: "Descargar facturas",
+        defaultPath: path.join(app.getPath("downloads"), bundle.fileName),
+        filters: [{ name: "ZIP", extensions: ["zip"] }],
+      });
+      if (canceled || !filePath) {
+        return { saved: false, fileName: null, savedPath: null, summary: "Descarga cancelada." };
+      }
+      fs.writeFileSync(filePath, bundle.buffer);
+      const missingNote = bundle.missingCount > 0 ? ` (${bundle.missingCount} no disponible(s))` : "";
+      return {
+        saved: true,
+        fileName: path.basename(filePath),
+        savedPath: filePath,
+        summary: `${bundle.includedCount} factura(s) descargada(s) en ZIP${missingNote}.`,
+      };
+    },
   );
   safeHandle(ipcChannels.treasury.invoiceInboxApply, applyInvoiceExtractionSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({

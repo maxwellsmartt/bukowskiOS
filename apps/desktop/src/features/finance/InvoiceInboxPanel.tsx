@@ -1,4 +1,4 @@
-import { AlertCircle, Check, CheckCircle2, Clock, FileText, Image as ImageIcon, Loader2, Pencil, RotateCcw, Trash2, UploadCloud, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, Clock, Download, FileText, Image as ImageIcon, Loader2, Pencil, RotateCcw, Trash2, UploadCloud, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -118,6 +118,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isBulkDismissing, setIsBulkDismissing] = useState(false);
   const [isBulkRetrying, setIsBulkRetrying] = useState(false);
+  const [isBulkDownloading, setIsBulkDownloading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [uploaderFilter, setUploaderFilter] = useState<string>("all");
@@ -306,6 +307,37 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
       toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.dismissFailed", { defaultValue: "No se pudo descartar." })));
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const downloadOne = async (row: InvoiceExtraction) => {
+    setBusyId(row.id);
+    try {
+      const result = await mutations.downloadInvoiceDocument(workspaceId, row.id);
+      if (result.saved) toast.success(result.summary);
+      else if (result.summary && !/cancel/i.test(result.summary)) toast.error(result.summary);
+    } catch (error) {
+      toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.downloadFailed", { defaultValue: "No se pudo descargar la factura." })));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const downloadSelected = async () => {
+    const ids = selectedRowIdList;
+    if (!ids.length) return;
+    setIsBulkDownloading(true);
+    try {
+      const result =
+        ids.length === 1
+          ? await mutations.downloadInvoiceDocument(workspaceId, ids[0])
+          : await mutations.downloadInvoiceBatch(workspaceId, ids);
+      if (result.saved) toast.success(result.summary);
+      else if (result.summary && !/cancel/i.test(result.summary)) toast.error(result.summary);
+    } catch (error) {
+      toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.downloadFailed", { defaultValue: "No se pudieron descargar las facturas." })));
+    } finally {
+      setIsBulkDownloading(false);
     }
   };
 
@@ -614,6 +646,15 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
               </button>
               <button
                 className="ghost-control"
+                disabled={isBulkDownloading}
+                onClick={() => void downloadSelected()}
+                type="button"
+              >
+                {isBulkDownloading ? <Loader2 className="spin" size={14} /> : <Download size={14} />}
+                {t("finance.treasury.invoices.batchDownload", { defaultValue: "Descargar selección" })}
+              </button>
+              <button
+                className="ghost-control"
                 disabled={isBulkRetrying || retryableSelectedRows.length === 0}
                 onClick={() => void retryRows(selectedRows)}
                 type="button"
@@ -825,6 +866,16 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                 label: t("finance.treasury.invoices.columns.actions", { defaultValue: "Acciones" }),
                 render: (row) => (
                   <span className="invoice-actions-cell">
+                    <button
+                      type="button"
+                      className="ghost-control action-row-button"
+                      disabled={busyId === row.id}
+                      onClick={() => void downloadOne(row)}
+                      title={t("finance.treasury.invoices.download", { defaultValue: "Descargar" })}
+                      aria-label={t("finance.treasury.invoices.download", { defaultValue: "Descargar" })}
+                    >
+                      <Download size={14} />
+                    </button>
                     <button
                       type="button"
                       className="ghost-control action-row-button"

@@ -504,6 +504,14 @@ export const useTreasuryMutations = () =>
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.invoiceInboxPreview(workspaceId, extractionId);
       },
+      async downloadInvoiceDocument(workspaceId: string, extractionId: string) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceInboxDownload(workspaceId, extractionId);
+      },
+      async downloadInvoiceBatch(workspaceId: string, extractionIds: string[]) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceInboxDownloadBatch(workspaceId, extractionIds);
+      },
       async applyInvoiceExtraction(input: ApplyInvoiceExtractionCommand) {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.invoiceInboxApply(input);

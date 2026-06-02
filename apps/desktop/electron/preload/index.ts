@@ -720,6 +720,14 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxPreview, { workspaceId, extractionId }) as Promise<
       { fileName: string; mimeType: string; dataUrl: string } | null
     >,
+  invoiceInboxDownload: (workspaceId: string, extractionId: string) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxDownload, { workspaceId, extractionId }) as Promise<
+      import("@contracts").AppExportResult
+    >,
+  invoiceInboxDownloadBatch: (workspaceId: string, extractionIds: string[]) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxDownloadBatch, { workspaceId, extractionIds }) as Promise<
+      import("@contracts").AppExportResult
+    >,
   invoiceInboxDuplicates: (workspaceId: string) =>
     ipcRenderer.invoke(ipcChannels.treasury.invoiceInboxDuplicates, { workspaceId }) as Promise<
       import("@contracts").InvoiceDuplicateGroup[]

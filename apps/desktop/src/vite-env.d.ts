@@ -564,6 +564,14 @@ declare global {
         workspaceId: string,
         extractionId: string,
       ) => Promise<{ fileName: string; mimeType: string; dataUrl: string } | null>;
+      invoiceInboxDownload: (
+        workspaceId: string,
+        extractionId: string,
+      ) => Promise<import("@contracts").AppExportResult>;
+      invoiceInboxDownloadBatch: (
+        workspaceId: string,
+        extractionIds: string[],
+      ) => Promise<import("@contracts").AppExportResult>;
       invoiceInboxDuplicates: (
         workspaceId: string,
       ) => Promise<import("@contracts").InvoiceDuplicateGroup[]>;

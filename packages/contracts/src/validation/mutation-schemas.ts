@@ -1813,6 +1813,12 @@ export const invoiceInboxPreviewReadArgsSchema = z.tuple([
 export const invoiceInboxDuplicatesReadArgsSchema = z.tuple([
   z.object({ workspaceId: nonEmptyString }).strict(),
 ]);
+export const downloadInvoiceExtractionSchema = z
+  .object({ workspaceId: nonEmptyString, extractionId: nonEmptyString })
+  .strict();
+export const downloadInvoiceExtractionBatchSchema = z
+  .object({ workspaceId: nonEmptyString, extractionIds: z.array(nonEmptyString).min(1).max(500) })
+  .strict();
 export const backfillInvoiceHashesSchema = z.object({ workspaceId: nonEmptyString }).strict();
 
 // ----------------------------------------------------------------------------
