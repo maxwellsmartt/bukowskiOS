@@ -39,6 +39,7 @@ import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
+import { usePersistentState } from "@shared/hooks/usePersistentState";
 import bancoPopularLogo from "@shared/assets/inbox/logos/banco popular dominicano-logo.jpg";
 import bancoSantaCruzLogo from "@shared/assets/inbox/logos/banco santa cruz-logo.png";
 
@@ -432,7 +433,11 @@ export const TreasuryPage = () => {
   const mutations = useTreasuryMutations();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [tab, setTab] = useState<Tab>("overview");
+  // Remember which Treasury tab the user was on across reloads/sessions.
+  const [tab, setTab] = usePersistentState<Tab>(
+    `bukowski:treasury-tab:${activeWorkspaceId}`,
+    "overview",
+  );
   const [period, setPeriod] = useState<TreasuryPeriodPreset>("fiscal");
   const [accountFilter, setAccountFilter] = useState<string>("");
   const [dateFilter, setDateFilter] = useState<MovementDateFilter>("all");

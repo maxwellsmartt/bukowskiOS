@@ -29,6 +29,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useLocale } from "@shared/hooks/useLocale";
+import { usePersistentState } from "@shared/hooks/usePersistentState";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import bancoCentralLogo from "@shared/assets/inbox/logos/banco-central-logo.png";
 import bancoPopularLogo from "@shared/assets/inbox/logos/banco popular dominicano-logo.jpg";
@@ -226,13 +227,26 @@ export const FinanceOverviewPage = () => {
     return formatDate(value, RATE_TIMESTAMP_FORMAT) || value;
   };
   const formatRateTrendTime = (value: string) => formatDate(value, RATE_TREND_FORMAT) || value;
-  const [period, setPeriod] = useState<FinanceOverviewPeriodPreset>("month");
-  const [customStartDate, setCustomStartDate] = useState("");
-  const [customEndDate, setCustomEndDate] = useState("");
+  // Remember the user's period choice per workspace across sessions.
+  const [period, setPeriod] = usePersistentState<FinanceOverviewPeriodPreset>(
+    `bukowski:finance-overview-period:${activeWorkspaceId}`,
+    "month",
+  );
+  const [customStartDate, setCustomStartDate] = usePersistentState<string>(
+    `bukowski:finance-overview-custom-start:${activeWorkspaceId}`,
+    "",
+  );
+  const [customEndDate, setCustomEndDate] = usePersistentState<string>(
+    `bukowski:finance-overview-custom-end:${activeWorkspaceId}`,
+    "",
+  );
   const [exportError, setExportError] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isRefreshingRates, setIsRefreshingRates] = useState(false);
-  const [selectedFxCurrency, setSelectedFxCurrency] = useState<"USD" | "EUR">("USD");
+  const [selectedFxCurrency, setSelectedFxCurrency] = usePersistentState<"USD" | "EUR">(
+    `bukowski:finance-overview-fx:${activeWorkspaceId}`,
+    "USD",
+  );
   const [rateLimitBlockedUntil, setRateLimitBlockedUntil] = useState<string | null>(null);
   const isCustomRangeReady = period !== "custom" || (Boolean(customStartDate) && Boolean(customEndDate));
   const rateLimitStorageKey = `bukowski:fx-rate-limit:${activeWorkspaceId}:tasareal:${selectedFxCurrency}`;
