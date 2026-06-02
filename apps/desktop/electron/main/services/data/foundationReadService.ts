@@ -899,8 +899,14 @@ const resolveSearchRank = (query: string, code: string | null | undefined, title
   return Number.POSITIVE_INFINITY;
 };
 
-export const createFoundationReadService = (db: DatabaseSync) => {
-  const catalogReads = createCatalogReadService(db);
+type FoundationReadServiceDeps = {
+  getStorageRoot?: () => string;
+};
+
+export const createFoundationReadService = (db: DatabaseSync, deps: FoundationReadServiceDeps = {}) => {
+  const catalogReads = createCatalogReadService(db, {
+    getStorageRoot: deps.getStorageRoot,
+  });
   const assetReads = createAssetReadService(db, {
     defaultAssetListQuery,
     formatCurrency,
@@ -913,6 +919,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     formatTimelineTimestamp,
     toIsoDate,
     addDays,
+    getStorageRoot: deps.getStorageRoot,
   });
   const projectReads = createProjectReadService(db, {
     defaultProjectListQuery,
@@ -936,6 +943,7 @@ export const createFoundationReadService = (db: DatabaseSync) => {
     matchesSearch,
     resolveFinanceEntryComparator,
     sortRows,
+    getStorageRoot: deps.getStorageRoot,
   });
 
   const foundationReads = {

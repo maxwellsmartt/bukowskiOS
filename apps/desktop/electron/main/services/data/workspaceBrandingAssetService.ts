@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { SupabaseDocumentStorage } from "./supabaseDocumentStorageService";
+import { assertPathWithinRoot } from "../../security/pathSafety";
 
 export type WorkspaceBrandingAssetKey = "logo" | "seal" | "signature";
 
@@ -89,11 +90,13 @@ const fetchPublicAsset = async (url: string) => {
   if (url.startsWith("data:")) {
     return dataUrlToBuffer(url);
   }
-  if (url.startsWith("file://")) {
-    return { buffer: fs.readFileSync(new URL(url)), mimeType: "application/octet-stream" };
-  }
-  if (path.isAbsolute(url) && fs.existsSync(url)) {
-    return { buffer: fs.readFileSync(url), mimeType: "application/octet-stream" };
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return null;
+    }
+  } catch {
+    return null;
   }
 
   const response = await fetch(url);
@@ -112,6 +115,13 @@ export const createWorkspaceBrandingAssetService = (
 
   const storageRoot = () => options.getStorageRoot?.() || options.userDataPath;
   const localDirectory = (workspaceId: string) => path.join(storageRoot(), "workspace-branding-assets", workspaceId);
+  const resolveCachedPath = (storagePath: string) => {
+    try {
+      return assertPathWithinRoot(storagePath, storageRoot());
+    } catch {
+      return null;
+    }
+  };
 
   const cacheAsset = (
     workspaceId: string,
@@ -178,8 +188,11 @@ export const createWorkspaceBrandingAssetService = (
         `,
       )
       .get(workspaceId, assetKey) as CachedBrandingAssetRow | undefined;
-    if (cached?.storage_path && cached.source_url === sourceUrl && fs.existsSync(cached.storage_path)) {
-      return fs.readFileSync(cached.storage_path);
+    if (cached?.storage_path && cached.source_url === sourceUrl) {
+      const safePath = resolveCachedPath(cached.storage_path);
+      if (safePath && fs.existsSync(safePath)) {
+        return fs.readFileSync(safePath);
+      }
     }
 
     const objectKey = parseWorkspaceAssetsObjectKey(sourceUrl);

@@ -4,6 +4,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { CatalogListQuery, CatalogSnapshot } from "@contracts";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { assertPathWithinRoot } from "../../security/pathSafety";
 
 const activeProjectStatuses = new Set(["Prep", "Active", "On hold"]);
 const maxInlinePreviewBytes = 5 * 1024 * 1024;
@@ -46,7 +47,22 @@ const mapAssetStatus = (
   return "Available";
 };
 
-export const createCatalogReadService = (db: DatabaseSync) => ({
+type CatalogReadDeps = {
+  getStorageRoot?: () => string;
+};
+
+export const createCatalogReadService = (db: DatabaseSync, deps: CatalogReadDeps = {}) => {
+  const resolveStoredPath = (storagePath: string | null | undefined) => {
+    if (!storagePath) return null;
+    if (!deps.getStorageRoot) return storagePath;
+    try {
+      return assertPathWithinRoot(storagePath, deps.getStorageRoot());
+    } catch {
+      return null;
+    }
+  };
+
+  return {
   getSnapshot(query?: Pick<CatalogListQuery, "workspaceId">): CatalogSnapshot {
     const workspaceId = query?.workspaceId ?? DEFAULT_WORKSPACE_ID;
     const locations = db
@@ -278,9 +294,10 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
 
     crewDocuments.forEach((row) => {
       let previewDataUrl: string | null = null;
+      const safeStoragePath = resolveStoredPath(row.storage_path);
 
-      if (row.storage_path && row.status === "available" && row.byte_size <= maxInlinePreviewBytes && fs.existsSync(row.storage_path)) {
-        const encoded = fs.readFileSync(row.storage_path).toString("base64");
+      if (safeStoragePath && row.status === "available" && row.byte_size <= maxInlinePreviewBytes && fs.existsSync(safeStoragePath)) {
+        const encoded = fs.readFileSync(safeStoragePath).toString("base64");
         previewDataUrl = `data:${row.mime_type};base64,${encoded}`;
       }
 
@@ -692,6 +709,7 @@ export const createCatalogReadService = (db: DatabaseSync) => ({
       })),
     };
   },
-});
+  };
+};
 
 export type CatalogReadService = ReturnType<typeof createCatalogReadService>;

@@ -15,6 +15,8 @@ import {
 } from "@contracts";
 import { endOfMonth, endOfQuarter, endOfYear, format, startOfMonth, startOfQuarter, startOfYear, subMonths } from "date-fns";
 
+import { assertPathWithinRoot } from "../../security/pathSafety";
+
 type SortRows = <T>(rows: T[], comparator: (left: T, right: T) => number) => T[];
 
 type FinanceReadDeps = {
@@ -26,6 +28,7 @@ type FinanceReadDeps = {
     direction: ListSortDirection,
   ) => (left: any, right: any) => number;
   sortRows: SortRows;
+  getStorageRoot?: () => string;
 };
 
 type CountRow = {
@@ -85,7 +88,18 @@ const buildMonthlyWindows = (months: number) =>
 const maxInlinePreviewBytes = 5 * 1024 * 1024;
 const resolveWorkspaceId = (workspaceId?: string | null) => workspaceId?.trim() || DEFAULT_WORKSPACE_ID;
 
-export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps) => ({
+export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps) => {
+  const resolveStoredPath = (storagePath: string | null | undefined) => {
+    if (!storagePath) return null;
+    if (!deps.getStorageRoot) return storagePath;
+    try {
+      return assertPathWithinRoot(storagePath, deps.getStorageRoot());
+    } catch {
+      return null;
+    }
+  };
+
+  return {
   getFinanceOverview(query?: FinanceOverviewQuery): FinanceOverviewSnapshot {
     const workspaceId = resolveWorkspaceId(query?.workspaceId);
     const window = resolveFinanceOverviewWindow(query);
@@ -427,21 +441,22 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
     }>;
 
     return rows.map((row) => {
-      const isMissing = row.status !== "deleted" && row.storage_path ? !fs.existsSync(row.storage_path) : row.status === "missing";
+      const safeStoragePath = resolveStoredPath(row.storage_path);
+      const isMissing =
+        row.status !== "deleted" && row.storage_path ? !safeStoragePath || !fs.existsSync(safeStoragePath) : row.status === "missing";
       const mimeType = row.mime_type?.trim() || "application/octet-stream";
       const status = (isMissing ? "missing" : row.status?.trim() || "available") as "available" | "missing" | "deleted";
       const canInlinePreview =
         status === "available" &&
-        row.storage_path &&
-        fs.existsSync(row.storage_path) &&
+        safeStoragePath &&
+        fs.existsSync(safeStoragePath) &&
         (mimeType.startsWith("image/") || mimeType === "application/pdf") &&
         (row.byte_size ?? 0) <= maxInlinePreviewBytes;
 
       let previewDataUrl: string | null = null;
 
       if (canInlinePreview) {
-        const storagePath = row.storage_path!;
-        const encoded = fs.readFileSync(storagePath).toString("base64");
+        const encoded = fs.readFileSync(safeStoragePath).toString("base64");
         previewDataUrl = `data:${mimeType};base64,${encoded}`;
       }
 
@@ -650,4 +665,5 @@ export const createFinanceReadService = (db: DatabaseSync, deps: FinanceReadDeps
       summary: `Workspace finance is carrying ${overview.totals.incidentExposure} in incident exposure, ${overview.totals.reserve} in reserves and ${overview.totals.trackedSpend} in tracked spend for ${overview.activePeriodLabel.toLowerCase()}.`,
     };
   },
-});
+  };
+};

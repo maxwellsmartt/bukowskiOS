@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -56,6 +56,57 @@ describe("workspace branding asset service", () => {
     expect(downloadCount).toBe(1);
     expect(row?.storage_object_key).toBe("workspace-metadata/logo-123.png");
     expect(row?.byte_size).toBe(logoBytes.length);
+
+    cleanup();
+  });
+
+  it("does not read local files from persisted branding source URLs", async () => {
+    const { cleanup, database } = createTestDatabase("workspace-branding-assets-file-url");
+    const userDataPath = makeUserDataPath();
+    const outsideRoot = makeUserDataPath();
+    const privateFile = join(outsideRoot, "private.txt");
+    writeFileSync(privateFile, "private-branding-leak");
+
+    const service = createWorkspaceBrandingAssetService(database, {
+      userDataPath,
+    });
+
+    const result = await service.resolveAssetBuffer("workspace-metadata", "logo", `file://${privateFile}`);
+
+    expect(result).toBeNull();
+    expect(existsSync(privateFile)).toBe(true);
+
+    cleanup();
+  });
+
+  it("does not read cached branding paths outside the configured storage root", async () => {
+    const { cleanup, database } = createTestDatabase("workspace-branding-assets-cache-escape");
+    const userDataPath = makeUserDataPath();
+    const outsideRoot = makeUserDataPath();
+    const privateFile = join(outsideRoot, "private.txt");
+    writeFileSync(privateFile, "private-branding-cache");
+    const service = createWorkspaceBrandingAssetService(database, {
+      userDataPath,
+      storage: {
+        enabled: false,
+        download: async () => null,
+      },
+    });
+    database
+      .prepare(
+        `
+          INSERT INTO workspace_branding_assets (
+            workspace_id, asset_key, source_url, storage_object_key, mime_type,
+            original_name, storage_path, byte_size, content_hash, status, created_at, updated_at
+          ) VALUES (?, 'logo', ?, NULL, 'image/png', 'logo.png', ?, 22, 'hash', 'available', ?, ?)
+        `,
+      )
+      .run("workspace-metadata", "ftp://example.com/logo.png", privateFile, "2026-04-12T12:00:00.000Z", "2026-04-12T12:00:00.000Z");
+
+    const result = await service.resolveAssetBuffer("workspace-metadata", "logo", "ftp://example.com/logo.png");
+
+    expect(result).toBeNull();
+    expect(existsSync(privateFile)).toBe(true);
 
     cleanup();
   });

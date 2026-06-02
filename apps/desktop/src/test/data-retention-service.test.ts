@@ -157,4 +157,58 @@ describe("data retention service", () => {
 
     cleanup();
   });
+
+  it("does not delete attachment files outside the configured attachments root", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-retention-path-escape");
+    const attachmentsRootPath = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-retention-attachments-"));
+    const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-retention-outside-"));
+    const outsideAttachmentPath = path.join(outsideRoot, "private.txt");
+    fs.writeFileSync(outsideAttachmentPath, "do not delete");
+
+    database.prepare(
+      `
+        INSERT INTO assistant_chat_threads (
+          id, workspace_id, title, context_key, context_label, summary_text, created_at, updated_at, deleted_at
+        ) VALUES (?, ?, 'Old thread', 'global', 'Global', '', ?, ?, ?)
+      `,
+    ).run("thread-retention-escape", DEFAULT_WORKSPACE_ID, "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z");
+
+    database.prepare(
+      `
+        INSERT INTO assistant_chat_messages (
+          id, thread_id, role, body, message_state, state_payload_json, created_at, updated_at, deleted_at
+        ) VALUES (?, ?, 'assistant', 'Old body', 'completed', NULL, ?, ?, ?)
+      `,
+    ).run("message-retention-escape", "thread-retention-escape", "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z", "2025-01-01T00:00:00.000Z");
+
+    database.prepare(
+      `
+        INSERT INTO assistant_chat_attachments (
+          id, thread_id, message_id, name, mime_type, storage_path, byte_size, status, created_at, updated_at, deleted_at
+        ) VALUES (?, ?, ?, 'private.txt', 'text/plain', ?, 13, 'deleted', ?, ?, ?)
+      `,
+    ).run(
+      "attachment-retention-escape",
+      "thread-retention-escape",
+      "message-retention-escape",
+      outsideAttachmentPath,
+      "2025-01-01T00:00:00.000Z",
+      "2025-01-01T00:00:00.000Z",
+      "2025-01-01T00:00:00.000Z",
+    );
+
+    const retention = createDataRetentionService(database, {
+      attachmentsRootPath,
+      now: () => "2026-04-12T12:00:00.000Z",
+    });
+
+    const summary = retention.run();
+
+    expect(summary.deletedAttachmentFiles).toBe(0);
+    expect(fs.existsSync(outsideAttachmentPath)).toBe(true);
+
+    cleanup();
+    fs.rmSync(attachmentsRootPath, { force: true, recursive: true });
+    fs.rmSync(outsideRoot, { force: true, recursive: true });
+  });
 });

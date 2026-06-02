@@ -1395,7 +1395,10 @@ const createRuntime = (): LocalDatabaseRuntime => {
   reconcileLiveProviderEnablement(database, secretStore);
   const openaiProviderService = createOpenAIProviderService();
   const anthropicProviderService = createAnthropicProviderService();
-  const foundationReads = createFoundationReadService(database);
+  const appSettings = createAppSettingsStore(app.getPath("userData"));
+  const foundationReads = createFoundationReadService(database, {
+    getStorageRoot: () => appSettings.getDocumentsRoot(),
+  });
   const userAdmin = createUserAdminService(database);
   const agentReads = createAgentReadService(database, secretStore);
   const sessionStore = createAssistantGatewaySessionStore(database);
@@ -1565,7 +1568,6 @@ const createRuntime = (): LocalDatabaseRuntime => {
     getAppInfo,
     runtimeDiagnostics,
   });
-  const appSettings = createAppSettingsStore(app.getPath("userData"));
   const softwareLicenses = createSoftwareLicenseService(database);
   const fileUploads = createFileUploadService(database, {
     userDataPath: app.getPath("userData"),
@@ -1670,7 +1672,9 @@ const createRuntime = (): LocalDatabaseRuntime => {
     findDuplicateGroups: invoiceInboxService.findDuplicateGroups,
     backfillContentHashes: invoiceInboxService.backfillContentHashes,
   };
-  const dataRetention = createDataRetentionService(database);
+  const dataRetention = createDataRetentionService(database, {
+    attachmentsRootPath,
+  });
   assistantChatService.reconcileInterruptedThreads();
   void telegramConnectorService.start();
   try {

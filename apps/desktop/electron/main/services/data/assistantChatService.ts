@@ -28,6 +28,7 @@ import type { AssistantMemoryService } from "../ai/assistantMemoryService";
 import type { AssistantGatewayService } from "../ai/assistantGatewayService";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { assertPathWithinRoot } from "../../security/pathSafety";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
 const defaultThreadTitle = "New thread";
@@ -257,6 +258,8 @@ export const createAssistantChatService = (
     onWorkspaceDataChanged?: (detail: { source: "assistant-tool"; workspaceId: string; entities: string[] }) => void;
   },
 ) => {
+  const resolveAttachmentPath = (storagePath: string) => assertPathWithinRoot(storagePath, options.attachmentsRootPath);
+
   const writeWelcomeMessage = (threadId: string) => {
     const now = new Date().toISOString();
     db.prepare(
@@ -738,8 +741,9 @@ export const createAssistantChatService = (
 
       attachments.forEach((attachment) => {
         try {
-          if (fs.existsSync(attachment.storage_path)) {
-            fs.unlinkSync(attachment.storage_path);
+          const safePath = resolveAttachmentPath(attachment.storage_path);
+          if (fs.existsSync(safePath)) {
+            fs.unlinkSync(safePath);
           }
         } finally {
           db.prepare(

@@ -14,6 +14,8 @@ import type {
   ListSortDirection,
 } from "@contracts";
 
+import { assertPathWithinRoot } from "../../security/pathSafety";
+
 type SortRows = <T>(rows: T[], comparator: (left: T, right: T) => number) => T[];
 
 type AssetReadDeps = {
@@ -34,6 +36,7 @@ type AssetReadDeps = {
   formatTimelineTimestamp: (value: string) => string;
   toIsoDate: (value?: string | null) => string;
   addDays: (date: string, days: number) => string;
+  getStorageRoot?: () => string;
 };
 
 type CountRow = {
@@ -83,6 +86,16 @@ const loadActiveKitMemberships = (db: DatabaseSync, assetIds: string[]) => {
 };
 
 export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) => {
+  const resolveStoredPath = (storagePath: string | null | undefined) => {
+    if (!storagePath) return null;
+    if (!deps.getStorageRoot) return storagePath;
+    try {
+      return assertPathWithinRoot(storagePath, deps.getStorageRoot());
+    } catch {
+      return null;
+    }
+  };
+
   const service = {
     getAssetSummary(query: AssetWorkspaceQuery = {}): AssetSummarySnapshot {
       const totalAssets = db
@@ -677,17 +690,19 @@ export const createAssetReadService = (db: DatabaseSync, deps: AssetReadDeps) =>
           isPrimary: Boolean(row.is_primary),
         })),
         files: files.map((row) => {
-          const isMissing = row.status !== "deleted" && row.storage_path ? !fs.existsSync(row.storage_path) : row.status === "missing";
+          const safeStoragePath = resolveStoredPath(row.storage_path);
+          const isMissing =
+            row.status !== "deleted" && row.storage_path ? !safeStoragePath || !fs.existsSync(safeStoragePath) : row.status === "missing";
           const mimeType = row.mime_type?.trim() || "application/octet-stream";
           const status = (isMissing ? "missing" : row.status?.trim() || "available") as "available" | "missing" | "deleted";
           const canInlinePreview =
             status === "available" &&
-            row.storage_path &&
-            fs.existsSync(row.storage_path) &&
+            safeStoragePath &&
+            fs.existsSync(safeStoragePath) &&
             mimeType.startsWith("image/") &&
             (row.byte_size ?? 0) <= maxInlinePreviewBytes;
           const previewDataUrl = canInlinePreview
-            ? `data:${mimeType};base64,${fs.readFileSync(row.storage_path!).toString("base64")}`
+            ? `data:${mimeType};base64,${fs.readFileSync(safeStoragePath).toString("base64")}`
             : null;
 
           return {

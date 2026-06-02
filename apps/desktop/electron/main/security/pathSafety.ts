@@ -22,7 +22,11 @@ import path from "node:path";
 export const assertPathWithinRoot = (targetPath: string, allowedRoot: string): string => {
   const realRoot = fs.realpathSync(allowedRoot);
   const resolvedTarget = path.resolve(targetPath);
-  const realTarget = fs.existsSync(resolvedTarget) ? fs.realpathSync(resolvedTarget) : resolvedTarget;
+  const realTarget = fs.existsSync(resolvedTarget)
+    ? fs.realpathSync(resolvedTarget)
+    : fs.existsSync(path.dirname(resolvedTarget))
+      ? path.join(fs.realpathSync(path.dirname(resolvedTarget)), path.basename(resolvedTarget))
+      : resolvedTarget;
   const relative = path.relative(realRoot, realTarget);
   if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error("Refused to access a file outside its workspace storage.");

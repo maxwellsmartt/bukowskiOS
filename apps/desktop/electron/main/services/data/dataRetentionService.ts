@@ -2,9 +2,11 @@ import fs from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
+import { assertPathWithinRoot } from "../../security/pathSafety";
 
 type DataRetentionDeps = {
   fileSystem?: Pick<typeof fs, "existsSync" | "unlinkSync">;
+  attachmentsRootPath?: string;
   now?: () => string;
 };
 
@@ -58,6 +60,14 @@ export const summarizeDataRetention = (summary: DataRetentionSummary) => {
 
 export const createDataRetentionService = (db: DatabaseSync, deps: DataRetentionDeps = {}) => {
   const fileSystem = deps.fileSystem ?? fs;
+  const resolveAttachmentPath = (storagePath: string) => {
+    if (!deps.attachmentsRootPath) return storagePath;
+    try {
+      return assertPathWithinRoot(storagePath, deps.attachmentsRootPath);
+    } catch {
+      return null;
+    }
+  };
 
   return {
     run(args?: DataRetentionArgs): DataRetentionSummary {
@@ -88,8 +98,9 @@ export const createDataRetentionService = (db: DatabaseSync, deps: DataRetention
       let deletedAttachmentFiles = 0;
       oldDeletedAttachments.forEach((attachment) => {
         try {
-          if (fileSystem.existsSync(attachment.storage_path)) {
-            fileSystem.unlinkSync(attachment.storage_path);
+          const safePath = resolveAttachmentPath(attachment.storage_path);
+          if (safePath && fileSystem.existsSync(safePath)) {
+            fileSystem.unlinkSync(safePath);
             deletedAttachmentFiles += 1;
           }
         } catch {

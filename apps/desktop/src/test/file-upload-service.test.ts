@@ -87,6 +87,42 @@ describe("file upload service", () => {
     fs.rmSync(tempRoot, { force: true, recursive: true });
   });
 
+  it("does not inline preview files whose stored path escapes the configured storage root", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-file-upload-asset-path-escape");
+    const storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-asset-safe-root-"));
+    const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-asset-outside-root-"));
+    const sourceFilePath = path.join(storageRoot, "fixture-asset.png");
+    const outsideFilePath = path.join(outsideRoot, "private.png");
+    fs.writeFileSync(sourceFilePath, "safe-image");
+    fs.writeFileSync(outsideFilePath, "private-image");
+
+    const service = createFileUploadService(database, {
+      userDataPath: storageRoot,
+      getStorageRoot: () => storageRoot,
+      shellApi: {
+        openPath: vi.fn().mockResolvedValue(""),
+      },
+    });
+
+    service.importAssetFiles("asset-legacy-rentman-1", [sourceFilePath]);
+    database
+      .prepare("UPDATE asset_files SET storage_path = ?, byte_size = ?, mime_type = 'image/png' WHERE asset_id = ?")
+      .run(outsideFilePath, fs.statSync(outsideFilePath).size, "asset-legacy-rentman-1");
+
+    const reads = createFoundationReadService(database, {
+      getStorageRoot: () => storageRoot,
+    });
+    const detail = reads.getAssetDetail("asset-legacy-rentman-1");
+
+    expect(detail.files).toHaveLength(1);
+    expect(detail.files[0]?.status).toBe("missing");
+    expect(detail.files[0]?.previewDataUrl).toBeNull();
+
+    cleanup();
+    fs.rmSync(storageRoot, { force: true, recursive: true });
+    fs.rmSync(outsideRoot, { force: true, recursive: true });
+  });
+
   it("removes asset images and frees them from asset detail reads", () => {
     const { cleanup, database } = createTestDatabase("bukowski-file-delete-asset-image");
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-asset-image-delete-"));
