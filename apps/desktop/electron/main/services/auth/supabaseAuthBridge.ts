@@ -170,6 +170,21 @@ export const getFreshStoredUserId = async () => {
   return userId;
 };
 
+export const getFreshStoredUserClaims = async () => {
+  const accessToken = await getFreshStoredAccessToken();
+  const payload = accessToken ? decodeJwtPayload(accessToken) : null;
+  const userId = typeof payload?.sub === "string" ? payload.sub : null;
+
+  if (!userId) {
+    throw new Error("An authenticated user is required to complete this request.");
+  }
+
+  return {
+    email: typeof payload?.email === "string" ? payload.email : null,
+    userId,
+  };
+};
+
 export const setStoredSupabaseTokens = (tokens: StoredSupabaseTokens) => tokenStore.setTokens(tokens);
 
 export const clearStoredSupabaseTokens = () => tokenStore.clearTokens();

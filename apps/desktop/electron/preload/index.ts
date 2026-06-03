@@ -55,6 +55,7 @@ import type {
   AppSyncOutboxRow,
   AppUploadUserAvatarCommand,
   AppUploadWorkspaceImageAssetCommand,
+  AppUpsertUserProfileCommand,
   AppUpdateCustomRoleCommand,
   AppUpdateRemoteWorkspaceIdentityCommand,
   AppUpdateWorkspaceMemberRoleCommand,
@@ -219,6 +220,8 @@ const bukowskiApp = {
     ipcRenderer.invoke(ipcChannels.app.createRemoteWorkspace, input) as Promise<AppCreateRemoteWorkspaceResult>,
   sendWorkspaceInvite: (input: AppSendWorkspaceInviteCommand) =>
     ipcRenderer.invoke(ipcChannels.app.sendWorkspaceInvite, input) as Promise<AppSendWorkspaceInviteResult>,
+  upsertUserProfile: (input: AppUpsertUserProfileCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.upsertUserProfile, input) as Promise<void>,
   uploadUserAvatar: (input: AppUploadUserAvatarCommand) =>
     ipcRenderer.invoke(ipcChannels.app.uploadUserAvatar, input) as Promise<AppStorageUploadResult>,
   uploadWorkspaceImageAsset: (input: AppUploadWorkspaceImageAssetCommand) =>

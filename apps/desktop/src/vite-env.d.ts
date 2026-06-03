@@ -171,6 +171,7 @@ declare global {
       sendWorkspaceInvite: (
         input: import("@contracts").AppSendWorkspaceInviteCommand,
       ) => Promise<import("@contracts").AppSendWorkspaceInviteResult>;
+      upsertUserProfile: (input: import("@contracts").AppUpsertUserProfileCommand) => Promise<void>;
       uploadUserAvatar: (
         input: import("@contracts").AppUploadUserAvatarCommand,
       ) => Promise<import("@contracts").AppStorageUploadResult>;

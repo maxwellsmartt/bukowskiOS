@@ -146,6 +146,11 @@ export type AppSendWorkspaceInviteResult = {
   userId: string;
 };
 
+export type AppUpsertUserProfileCommand = {
+  avatarUrl?: string | null;
+  fullName?: string | null;
+};
+
 export type AppTrustedImageUploadFile = {
   fileName: string;
   contentType: string;

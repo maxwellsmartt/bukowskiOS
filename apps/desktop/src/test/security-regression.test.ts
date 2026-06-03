@@ -226,6 +226,18 @@ describe("security regression checks", () => {
     expect(appIpcSource).toContain("ipcChannels.app.uploadWorkspaceImageAsset");
   });
 
+  it("keeps user profile writes behind main-process IPC", () => {
+    const rendererProfileSource = readText("apps/desktop/src/features/admin/UserAccountSettings.tsx");
+    const appIpcSource = readText("apps/desktop/electron/main/ipc/registerAppIpc.ts");
+
+    expect(rendererProfileSource).not.toMatch(
+      /\.from\("user_profiles"\)[\s\S]{0,500}\.(?:insert|update|upsert|delete)\(/,
+    );
+    expect(rendererProfileSource).toContain("upsertUserProfile");
+    expect(appIpcSource).toContain("ipcChannels.app.upsertUserProfile");
+    expect(appIpcSource).toContain('table: "user_profiles"');
+  });
+
   it("keeps workspace admin mutations behind main-process IPC", () => {
     const rendererAdminSources = [
       "apps/desktop/src/features/admin/inviteService.ts",

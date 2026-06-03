@@ -14,6 +14,7 @@ export const ipcChannels = {
     getLocalWorkspaces: "bukowskiApp:getLocalWorkspaces",
     createRemoteWorkspace: "bukowskiApp:createRemoteWorkspace",
     sendWorkspaceInvite: "bukowskiApp:sendWorkspaceInvite",
+    upsertUserProfile: "bukowskiApp:upsertUserProfile",
     uploadUserAvatar: "bukowskiApp:uploadUserAvatar",
     uploadWorkspaceImageAsset: "bukowskiApp:uploadWorkspaceImageAsset",
     updateRemoteWorkspaceIdentity: "bukowskiApp:updateRemoteWorkspaceIdentity",

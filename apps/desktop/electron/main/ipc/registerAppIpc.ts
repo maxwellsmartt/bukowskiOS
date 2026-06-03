@@ -16,6 +16,7 @@ import {
 import { ipcChannels } from "@contracts/ipc/channels";
 import { assertAllowedExternalUrl } from "../security/securityConfig";
 import {
+  getFreshStoredUserClaims,
   getFreshStoredUserId,
   invokeSupabaseEdgeFunction,
   buildSupabaseRestQuery,
@@ -96,6 +97,15 @@ const sendWorkspaceInviteSchema = z.object({
   roleId: z.string().trim().min(1),
   message: z.string().trim().max(2000).nullable().optional(),
 });
+
+const upsertUserProfileSchema = z
+  .object({
+    avatarUrl: z.string().trim().url().nullable().optional(),
+    fullName: z.string().trim().max(160).nullable().optional(),
+  })
+  .refine((input) => input.avatarUrl !== undefined || input.fullName !== undefined, {
+    message: "At least one user profile field is required.",
+  });
 
 const trustedImageUploadFileSchema = z.object({
   fileName: z.string().trim().min(1).max(255),
@@ -538,6 +548,34 @@ export const registerAppIpc = ({
       };
     },
     "The app could not send that invite.",
+  );
+  safeHandle(
+    ipcChannels.app.upsertUserProfile,
+    upsertUserProfileSchema,
+    async (_event, input) => {
+      const user = await getFreshStoredUserClaims();
+      const payload: Record<string, string | null> = {
+        email: user.email,
+        updated_at: new Date().toISOString(),
+        user_id: user.userId,
+      };
+
+      if (input.avatarUrl !== undefined) {
+        payload.avatar_url = input.avatarUrl?.trim() || null;
+      }
+      if (input.fullName !== undefined) {
+        payload.full_name = input.fullName?.trim() || null;
+      }
+
+      await requestSupabaseRest({
+        table: "user_profiles",
+        method: "POST",
+        query: new URLSearchParams({ on_conflict: "user_id" }),
+        body: payload,
+        prefer: "resolution=merge-duplicates,return=minimal",
+      });
+    },
+    "The app could not update that profile.",
   );
   safeHandle(
     ipcChannels.app.uploadUserAvatar,

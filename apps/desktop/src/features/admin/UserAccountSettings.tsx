@@ -68,34 +68,11 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
   const initials = initialsFor(fullName.trim() || user.email || "?");
 
   const upsertProfile = async (updates: { avatarUrl?: string | null; fullName?: string | null }) => {
-    if (!supabase) {
-      return;
+    if (!window.bukowskiApp?.upsertUserProfile) {
+      throw new Error("The secure profile update bridge is unavailable.");
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const looseSupabase = supabase as any;
-    const payload: Record<string, string | null> = {
-      user_id: user.id,
-      email: user.email,
-      updated_at: new Date().toISOString(),
-    };
-
-    if ("avatarUrl" in updates) {
-      payload.avatar_url = updates.avatarUrl ?? null;
-    }
-
-    if ("fullName" in updates) {
-      payload.full_name = updates.fullName ?? null;
-    }
-
-    const { error } = await looseSupabase.from("user_profiles").upsert(payload, {
-      onConflict: "user_id",
-      ignoreDuplicates: false,
-    });
-
-    if (error) {
-      throw error;
-    }
+    await window.bukowskiApp.upsertUserProfile(updates);
   };
 
   const handleSave = async () => {
