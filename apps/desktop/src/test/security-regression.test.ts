@@ -208,4 +208,21 @@ describe("security regression checks", () => {
     expect(workspaceProviderSource).toContain("createRemoteWorkspace");
     expect(inviteServiceSource).toContain("sendWorkspaceInvite");
   });
+
+  it("keeps trusted avatar and workspace image uploads behind main-process IPC", () => {
+    const rendererUploadSources = [
+      "apps/desktop/src/features/admin/UserAccountSettings.tsx",
+      "apps/desktop/src/features/admin/WorkspaceBrandingCard.tsx",
+      "apps/desktop/src/features/admin/WorkspaceSettingsPage.tsx",
+    ];
+    const combinedRendererSource = rendererUploadSources.map(readText).join("\n");
+    const appIpcSource = readText("apps/desktop/electron/main/ipc/registerAppIpc.ts");
+
+    expect(combinedRendererSource).not.toContain("supabase.storage");
+    expect(combinedRendererSource).not.toContain(".storage.from(");
+    expect(combinedRendererSource).toContain("uploadUserAvatar");
+    expect(combinedRendererSource).toContain("uploadWorkspaceImageAsset");
+    expect(appIpcSource).toContain("ipcChannels.app.uploadUserAvatar");
+    expect(appIpcSource).toContain("ipcChannels.app.uploadWorkspaceImageAsset");
+  });
 });

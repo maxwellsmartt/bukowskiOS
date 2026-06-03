@@ -148,15 +148,15 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
 
     setIsUploadingAvatar(true);
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("user-avatars")
-        .upload(path, file, { upsert: true, contentType: file.type });
-      if (uploadError) throw uploadError;
+      if (!window.bukowskiApp?.uploadUserAvatar) {
+        throw new Error("The secure avatar upload bridge is unavailable.");
+      }
 
-      const { data: publicUrlData } = supabase.storage.from("user-avatars").getPublicUrl(path);
-      const avatarUrl = publicUrlData.publicUrl;
+      const { publicUrl: avatarUrl } = await window.bukowskiApp.uploadUserAvatar({
+        fileName: file.name,
+        contentType: file.type,
+        bytes: await file.arrayBuffer(),
+      });
 
       await updateUserMetadata({ avatar_url: avatarUrl });
       await upsertProfile({ avatarUrl });

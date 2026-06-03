@@ -171,6 +171,12 @@ declare global {
       sendWorkspaceInvite: (
         input: import("@contracts").AppSendWorkspaceInviteCommand,
       ) => Promise<import("@contracts").AppSendWorkspaceInviteResult>;
+      uploadUserAvatar: (
+        input: import("@contracts").AppUploadUserAvatarCommand,
+      ) => Promise<import("@contracts").AppStorageUploadResult>;
+      uploadWorkspaceImageAsset: (
+        input: import("@contracts").AppUploadWorkspaceImageAssetCommand,
+      ) => Promise<import("@contracts").AppStorageUploadResult>;
       runIntegrityCheck: () => Promise<AppActionResult>;
       runLocalSync: () => Promise<AppActionResult>;
       getSyncOutboxRows: () => Promise<AppSyncOutboxRow[]>;

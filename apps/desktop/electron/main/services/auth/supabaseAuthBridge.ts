@@ -4,6 +4,14 @@ import { createSupabaseTokenStore, type StoredSupabaseTokens } from "./tokenStor
 
 const refreshSkewMs = 90_000;
 const tokenStore = createSupabaseTokenStore();
+const imageExtensionByMime: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/svg+xml": "svg",
+};
+const userAvatarMimeTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+const workspaceImageMimeTypes = new Set([...userAvatarMimeTypes, "image/svg+xml"]);
 
 const decodeJwtPayload = (accessToken: string): Record<string, unknown> | null => {
   const [, payload] = accessToken.split(".");
@@ -102,7 +110,65 @@ const readResponseMessage = async (response: Response) => {
   return response.statusText;
 };
 
+const normalizeContentType = (value: string) => value.trim().toLowerCase().split(";")[0] ?? "";
+
+const extensionFromFileName = (fileName: string) => {
+  const extension = fileName.trim().toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  if (extension === "jpeg") {
+    return "jpg";
+  }
+  return extension ?? null;
+};
+
+const assertTrustedImageUpload = (input: {
+  bytes: ArrayBuffer;
+  contentType: string;
+  fileName: string;
+  allowedMimeTypes: Set<string>;
+  maxBytes: number;
+}) => {
+  const byteLength = input.bytes.byteLength;
+  if (byteLength <= 0) {
+    throw new Error("The selected image is empty.");
+  }
+  if (byteLength > input.maxBytes) {
+    throw new Error("The selected image is too large.");
+  }
+
+  const contentType = normalizeContentType(input.contentType);
+  const extension = extensionFromFileName(input.fileName);
+  const expectedExtension = imageExtensionByMime[contentType] ?? null;
+  const normalizedExtension = extension === "jpeg" ? "jpg" : extension;
+
+  if (!input.allowedMimeTypes.has(contentType) || !expectedExtension) {
+    throw new Error("The selected image format is not supported.");
+  }
+
+  if (normalizedExtension && normalizedExtension !== expectedExtension) {
+    throw new Error("The selected image extension does not match its content type.");
+  }
+
+  return { contentType, extension: expectedExtension };
+};
+
+const encodeObjectPath = (objectPath: string) => objectPath.split("/").map(encodeURIComponent).join("/");
+
+const publicStorageUrl = (supabaseUrl: string, bucket: string, objectPath: string) =>
+  `${supabaseUrl}/storage/v1/object/public/${bucket}/${encodeObjectPath(objectPath)}`;
+
 export const getFreshStoredAccessToken = async () => refreshStoredTokens(await tokenStore.getTokens());
+
+export const getFreshStoredUserId = async () => {
+  const accessToken = await getFreshStoredAccessToken();
+  const payload = accessToken ? decodeJwtPayload(accessToken) : null;
+  const userId = typeof payload?.sub === "string" ? payload.sub : null;
+
+  if (!userId) {
+    throw new Error("An authenticated user is required to complete this request.");
+  }
+
+  return userId;
+};
 
 export const setStoredSupabaseTokens = (tokens: StoredSupabaseTokens) => tokenStore.setTokens(tokens);
 
@@ -157,4 +223,79 @@ export const invokeSupabaseEdgeFunction = async <TPayload>(
   }
 
   return response.json() as Promise<TPayload>;
+};
+
+export const uploadSupabaseStorageObject = async (input: {
+  bucket: "user-avatars" | "workspace-assets";
+  objectPath: string;
+  bytes: ArrayBuffer;
+  contentType: string;
+}) => {
+  const accessToken = await getFreshStoredAccessToken();
+  if (!accessToken) {
+    throw new Error("An authenticated session is required to upload this file.");
+  }
+
+  const { url, anonKey } = getSupabaseAuthEnv();
+  const response = await fetch(`${url}/storage/v1/object/${input.bucket}/${encodeObjectPath(input.objectPath)}`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      authorization: `Bearer ${accessToken}`,
+      "cache-control": "max-age=3600",
+      "content-type": input.contentType,
+      "x-upsert": "true",
+    },
+    body: Buffer.from(input.bytes),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Storage upload failed (${response.status}): ${await readResponseMessage(response)}`);
+  }
+
+  return {
+    objectPath: input.objectPath,
+    publicUrl: publicStorageUrl(url, input.bucket, input.objectPath),
+  };
+};
+
+export const uploadUserAvatarObject = async (input: {
+  userId: string;
+  fileName: string;
+  contentType: string;
+  bytes: ArrayBuffer;
+}) => {
+  const { contentType, extension } = assertTrustedImageUpload({
+    ...input,
+    allowedMimeTypes: userAvatarMimeTypes,
+    maxBytes: 2 * 1024 * 1024,
+  });
+  const objectPath = `${input.userId}/avatar-${Date.now()}.${extension}`;
+  return uploadSupabaseStorageObject({
+    bucket: "user-avatars",
+    objectPath,
+    bytes: input.bytes,
+    contentType,
+  });
+};
+
+export const uploadWorkspaceImageObject = async (input: {
+  workspaceId: string;
+  assetKind: "avatar" | "logo" | "seal" | "signature";
+  fileName: string;
+  contentType: string;
+  bytes: ArrayBuffer;
+}) => {
+  const { contentType, extension } = assertTrustedImageUpload({
+    ...input,
+    allowedMimeTypes: workspaceImageMimeTypes,
+    maxBytes: 4 * 1024 * 1024,
+  });
+  const objectPath = `${input.workspaceId}/${input.assetKind}-${Date.now()}.${extension}`;
+  return uploadSupabaseStorageObject({
+    bucket: "workspace-assets",
+    objectPath,
+    bytes: input.bytes,
+    contentType,
+  });
 };

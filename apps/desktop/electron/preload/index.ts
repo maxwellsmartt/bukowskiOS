@@ -43,9 +43,12 @@ import type {
   AppOperationalBackfillResult,
   AppSendWorkspaceInviteCommand,
   AppSendWorkspaceInviteResult,
+  AppStorageUploadResult,
   AppSupportSnapshot,
   AppSyncPullCursorRow,
   AppSyncOutboxRow,
+  AppUploadUserAvatarCommand,
+  AppUploadWorkspaceImageAssetCommand,
   EnsureLocalWorkspaceInput,
   AppUserMutationResult,
   AppUsersSnapshot,
@@ -207,6 +210,10 @@ const bukowskiApp = {
     ipcRenderer.invoke(ipcChannels.app.createRemoteWorkspace, input) as Promise<AppCreateRemoteWorkspaceResult>,
   sendWorkspaceInvite: (input: AppSendWorkspaceInviteCommand) =>
     ipcRenderer.invoke(ipcChannels.app.sendWorkspaceInvite, input) as Promise<AppSendWorkspaceInviteResult>,
+  uploadUserAvatar: (input: AppUploadUserAvatarCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.uploadUserAvatar, input) as Promise<AppStorageUploadResult>,
+  uploadWorkspaceImageAsset: (input: AppUploadWorkspaceImageAssetCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.uploadWorkspaceImageAsset, input) as Promise<AppStorageUploadResult>,
   runIntegrityCheck: () => ipcRenderer.invoke(ipcChannels.app.runIntegrityCheck) as Promise<AppActionResult>,
   runLocalSync: () => ipcRenderer.invoke(ipcChannels.app.runLocalSync) as Promise<AppActionResult>,
   getSyncOutboxRows: () => ipcRenderer.invoke(ipcChannels.app.getSyncOutboxRows) as Promise<AppSyncOutboxRow[]>,

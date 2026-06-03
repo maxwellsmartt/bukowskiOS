@@ -128,15 +128,18 @@ export const WorkspaceBrandingCard = () => {
 
     setUploadingKey(key);
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-      const path = `${activeWorkspaceId}/${key}-${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("workspace-assets")
-        .upload(path, file, { upsert: true, contentType: file.type });
-      if (uploadError) throw uploadError;
+      if (!window.bukowskiApp?.uploadWorkspaceImageAsset) {
+        throw new Error("The secure workspace image upload bridge is unavailable.");
+      }
 
-      const { data: publicUrlData } = supabase.storage.from("workspace-assets").getPublicUrl(path);
-      const publicUrl = publicUrlData.publicUrl;
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const { publicUrl } = await window.bukowskiApp.uploadWorkspaceImageAsset({
+        workspaceId: activeWorkspaceId,
+        assetKind: key,
+        fileName: file.name,
+        contentType: file.type || (ext === "svg" ? "image/svg+xml" : ""),
+        bytes: await file.arrayBuffer(),
+      });
 
       const next: BrandingUrls = { ...urls, [ASSET_META[key].column]: publicUrl };
       await persistUrls(next);

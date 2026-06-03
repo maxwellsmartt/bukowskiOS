@@ -620,21 +620,22 @@ export const WorkspaceSettingsPage = () => {
     setIsUploadingWorkspaceAvatar(true);
 
     try {
-      const path = `${activeWorkspaceId}/avatar-${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("workspace-assets")
-        .upload(path, file, { upsert: true, contentType: file.type || (ext === "svg" ? "image/svg+xml" : undefined) });
-
-      if (uploadError) {
-        throw uploadError;
+      if (!window.bukowskiApp?.uploadWorkspaceImageAsset) {
+        throw new Error("The secure workspace image upload bridge is unavailable.");
       }
 
-      const { data: publicUrlData } = supabase.storage.from("workspace-assets").getPublicUrl(path);
+      const { publicUrl } = await window.bukowskiApp.uploadWorkspaceImageAsset({
+        workspaceId: activeWorkspaceId,
+        assetKind: "avatar",
+        fileName: file.name,
+        contentType: file.type || (ext === "svg" ? "image/svg+xml" : ""),
+        bytes: await file.arrayBuffer(),
+      });
       if (isEditingWorkspace) {
-        setWorkspaceDraft((current) => ({ ...current, avatarUrl: publicUrlData.publicUrl }));
+        setWorkspaceDraft((current) => ({ ...current, avatarUrl: publicUrl }));
         toast.success(t("settings.workspace.toasts.avatarReadyTitle"), t("settings.workspace.toasts.avatarReadyBody"));
       } else {
-        await persistWorkspaceIdentity({ avatarUrl: publicUrlData.publicUrl });
+        await persistWorkspaceIdentity({ avatarUrl: publicUrl });
         toast.success(t("settings.workspace.toasts.avatarUpdatedTitle"), t("settings.workspace.toasts.avatarUpdatedBody"));
       }
     } catch (nextError) {

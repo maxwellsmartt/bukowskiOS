@@ -15,7 +15,12 @@ import {
 } from "@contracts";
 import { ipcChannels } from "@contracts/ipc/channels";
 import { assertAllowedExternalUrl } from "../security/securityConfig";
-import { invokeSupabaseEdgeFunction } from "../services/auth/supabaseAuthBridge";
+import {
+  getFreshStoredUserId,
+  invokeSupabaseEdgeFunction,
+  uploadUserAvatarObject,
+  uploadWorkspaceImageObject,
+} from "../services/auth/supabaseAuthBridge";
 import { safeHandle, safeHandleRead, safeHandleReadWithSchema } from "./ipcSafeHandler";
 
 type RegisterAppIpcOptions = {
@@ -72,6 +77,9 @@ type RegisterAppIpcOptions = {
 };
 
 const remoteRecordSchema = z.record(z.string(), z.unknown());
+const fileBytesSchema = z.custom<ArrayBuffer>((value) => value instanceof ArrayBuffer, {
+  message: "File bytes must be sent as an ArrayBuffer.",
+});
 
 const createRemoteWorkspaceSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -85,6 +93,17 @@ const sendWorkspaceInviteSchema = z.object({
   email: z.string().trim().email(),
   roleId: z.string().trim().min(1),
   message: z.string().trim().max(2000).nullable().optional(),
+});
+
+const trustedImageUploadFileSchema = z.object({
+  fileName: z.string().trim().min(1).max(255),
+  contentType: z.string().trim().min(1).max(100),
+  bytes: fileBytesSchema,
+});
+
+const uploadWorkspaceImageAssetSchema = trustedImageUploadFileSchema.extend({
+  workspaceId: z.string().trim().min(1),
+  assetKind: z.enum(["avatar", "logo", "seal", "signature"]),
 });
 
 const applyRemoteCatalogRowsSchema = z.object({
@@ -438,6 +457,31 @@ export const registerAppIpc = ({
       };
     },
     "The app could not send that invite.",
+  );
+  safeHandle(
+    ipcChannels.app.uploadUserAvatar,
+    trustedImageUploadFileSchema,
+    async (_event, input) =>
+      uploadUserAvatarObject({
+        userId: await getFreshStoredUserId(),
+        fileName: input.fileName,
+        contentType: input.contentType,
+        bytes: input.bytes,
+      }),
+    "The app could not upload that avatar.",
+  );
+  safeHandle(
+    ipcChannels.app.uploadWorkspaceImageAsset,
+    uploadWorkspaceImageAssetSchema,
+    async (_event, input) =>
+      uploadWorkspaceImageObject({
+        workspaceId: input.workspaceId,
+        assetKind: input.assetKind,
+        fileName: input.fileName,
+        contentType: input.contentType,
+        bytes: input.bytes,
+      }),
+    "The app could not upload that workspace image.",
   );
   safeHandleRead(
     ipcChannels.app.createBackup,

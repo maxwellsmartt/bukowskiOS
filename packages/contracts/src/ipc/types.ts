@@ -146,6 +146,24 @@ export type AppSendWorkspaceInviteResult = {
   userId: string;
 };
 
+export type AppTrustedImageUploadFile = {
+  fileName: string;
+  contentType: string;
+  bytes: ArrayBuffer;
+};
+
+export type AppUploadUserAvatarCommand = AppTrustedImageUploadFile;
+
+export type AppUploadWorkspaceImageAssetCommand = AppTrustedImageUploadFile & {
+  workspaceId: string;
+  assetKind: "avatar" | "logo" | "seal" | "signature";
+};
+
+export type AppStorageUploadResult = {
+  publicUrl: string;
+  objectPath: string;
+};
+
 export type AppOperationalBackfillResult = AppActionResult & {
   enqueuedCount: number;
   skippedCount: number;
