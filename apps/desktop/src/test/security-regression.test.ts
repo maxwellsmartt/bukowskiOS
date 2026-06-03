@@ -225,4 +225,25 @@ describe("security regression checks", () => {
     expect(appIpcSource).toContain("ipcChannels.app.uploadUserAvatar");
     expect(appIpcSource).toContain("ipcChannels.app.uploadWorkspaceImageAsset");
   });
+
+  it("keeps workspace admin mutations behind main-process IPC", () => {
+    const rendererAdminSources = [
+      "apps/desktop/src/features/admin/inviteService.ts",
+      "apps/desktop/src/features/admin/customRolesService.ts",
+      "apps/desktop/src/features/admin/WorkspaceSettingsPage.tsx",
+    ];
+    const combinedRendererSource = rendererAdminSources.map(readText).join("\n");
+    const appIpcSource = readText("apps/desktop/electron/main/ipc/registerAppIpc.ts");
+
+    expect(combinedRendererSource).not.toMatch(/\.from\("workspace_memberships"\)[\s\S]{0,500}\.(?:insert|update|upsert|delete)\(/);
+    expect(combinedRendererSource).not.toMatch(/\.from\("roles"\)[\s\S]{0,500}\.(?:insert|update|upsert|delete)\(/);
+    expect(combinedRendererSource).not.toMatch(/\.from\("role_permissions"\)[\s\S]{0,500}\.(?:insert|update|upsert|delete)\(/);
+    expect(combinedRendererSource).not.toMatch(/\.from\("workspaces"\)[\s\S]{0,500}\.(?:insert|update|upsert|delete)\(/);
+    expect(combinedRendererSource).toContain("updateRemoteWorkspaceIdentity");
+    expect(combinedRendererSource).toContain("updateWorkspaceMemberRole");
+    expect(combinedRendererSource).toContain("setRolePermission");
+    expect(appIpcSource).toContain("assertWorkspaceRole");
+    expect(appIpcSource).toContain("ipcChannels.app.updateRemoteWorkspaceIdentity");
+    expect(appIpcSource).toContain("ipcChannels.app.setRolePermission");
+  });
 });

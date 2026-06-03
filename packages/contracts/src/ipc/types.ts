@@ -164,6 +164,61 @@ export type AppStorageUploadResult = {
   objectPath: string;
 };
 
+export type AppUpdateRemoteWorkspaceIdentityCommand = {
+  workspaceId: string;
+  name?: string;
+  baseCurrency?: string;
+  iconColor?: string | null;
+  avatarUrl?: string | null;
+};
+
+export type AppUpdateWorkspaceMemberRoleCommand = {
+  workspaceId: string;
+  userId: string;
+  roleId: string;
+};
+
+export type AppSetWorkspaceMemberStatusCommand = {
+  workspaceId: string;
+  userId: string;
+  status: "active" | "inactive";
+};
+
+export type AppRevokeWorkspaceInviteCommand = {
+  workspaceId: string;
+  membershipId: string;
+};
+
+export type AppCreateCustomRoleCommand = {
+  workspaceId: string;
+  key: string;
+  name: string;
+  description: string;
+};
+
+export type AppCreateCustomRoleResult = {
+  roleId: string;
+};
+
+export type AppUpdateCustomRoleCommand = {
+  workspaceId: string;
+  roleId: string;
+  name: string;
+  description: string;
+};
+
+export type AppDeleteCustomRoleCommand = {
+  workspaceId: string;
+  roleId: string;
+};
+
+export type AppSetRolePermissionCommand = {
+  workspaceId: string;
+  roleId: string;
+  permissionId: string;
+  enabled: boolean;
+};
+
 export type AppOperationalBackfillResult = AppActionResult & {
   enqueuedCount: number;
   skippedCount: number;

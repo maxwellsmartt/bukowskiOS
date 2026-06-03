@@ -18,6 +18,8 @@ import { assertAllowedExternalUrl } from "../security/securityConfig";
 import {
   getFreshStoredUserId,
   invokeSupabaseEdgeFunction,
+  buildSupabaseRestQuery,
+  requestSupabaseRest,
   uploadUserAvatarObject,
   uploadWorkspaceImageObject,
 } from "../services/auth/supabaseAuthBridge";
@@ -105,6 +107,85 @@ const uploadWorkspaceImageAssetSchema = trustedImageUploadFileSchema.extend({
   workspaceId: z.string().trim().min(1),
   assetKind: z.enum(["avatar", "logo", "seal", "signature"]),
 });
+
+const updateRemoteWorkspaceIdentitySchema = z
+  .object({
+    workspaceId: z.string().trim().min(1),
+    name: z.string().trim().min(1).max(120).optional(),
+    baseCurrency: z.string().trim().min(2).max(8).optional(),
+    iconColor: z.string().trim().min(1).max(80).nullable().optional(),
+    avatarUrl: z.string().trim().url().nullable().optional(),
+  })
+  .refine(
+    (input) =>
+      input.name !== undefined ||
+      input.baseCurrency !== undefined ||
+      input.iconColor !== undefined ||
+      input.avatarUrl !== undefined,
+    { message: "At least one workspace field is required." },
+  );
+
+const updateWorkspaceMemberRoleSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  userId: z.string().trim().min(1),
+  roleId: z.string().trim().min(1),
+});
+
+const setWorkspaceMemberStatusSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  userId: z.string().trim().min(1),
+  status: z.enum(["active", "inactive"]),
+});
+
+const revokeWorkspaceInviteSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  membershipId: z.string().trim().min(1),
+});
+
+const createCustomRoleSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  key: z.string().trim().min(1).max(120),
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500),
+});
+
+const updateCustomRoleSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  roleId: z.string().trim().min(1),
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500),
+});
+
+const deleteCustomRoleSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  roleId: z.string().trim().min(1),
+});
+
+const setRolePermissionSchema = z.object({
+  workspaceId: z.string().trim().min(1),
+  roleId: z.string().trim().min(1),
+  permissionId: z.string().trim().min(1),
+  enabled: z.boolean(),
+});
+
+const assertWorkspaceRole = async (input: { workspaceId: string; roleId: string; requireCustom?: boolean }) => {
+  const filters: Record<string, string> = {
+    id: `eq.${input.roleId}`,
+    workspace_id: `eq.${input.workspaceId}`,
+  };
+  if (input.requireCustom) {
+    filters.is_system_role = "eq.false";
+  }
+
+  const roles = await requestSupabaseRest<Array<{ id: string }>>({
+    table: "roles",
+    query: buildSupabaseRestQuery(filters, "id"),
+  });
+
+  if (!roles.length) {
+    throw new Error("That role is not available in this workspace.");
+  }
+};
 
 const applyRemoteCatalogRowsSchema = z.object({
   workspaceId: z.string().trim().min(1),
@@ -480,8 +561,168 @@ export const registerAppIpc = ({
         fileName: input.fileName,
         contentType: input.contentType,
         bytes: input.bytes,
-      }),
+    }),
     "The app could not upload that workspace image.",
+  );
+  safeHandle(
+    ipcChannels.app.updateRemoteWorkspaceIdentity,
+    updateRemoteWorkspaceIdentitySchema,
+    async (_event, input) => {
+      const payload: Record<string, string | null> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (input.name !== undefined) payload.name = input.name.trim();
+      if (input.baseCurrency !== undefined) payload.base_currency = input.baseCurrency.trim().toUpperCase();
+      if (input.iconColor !== undefined) payload.icon_color = input.iconColor?.trim() || null;
+      if (input.avatarUrl !== undefined) payload.avatar_url = input.avatarUrl?.trim() || null;
+
+      await requestSupabaseRest({
+        table: "workspaces",
+        method: "PATCH",
+        query: buildSupabaseRestQuery({ id: `eq.${input.workspaceId}` }),
+        body: payload,
+      });
+    },
+    "The app could not update that workspace.",
+  );
+  safeHandle(
+    ipcChannels.app.updateWorkspaceMemberRole,
+    updateWorkspaceMemberRoleSchema,
+    async (_event, input) => {
+      await assertWorkspaceRole({ workspaceId: input.workspaceId, roleId: input.roleId });
+      await requestSupabaseRest({
+        table: "workspace_memberships",
+        method: "PATCH",
+        query: buildSupabaseRestQuery({
+          workspace_id: `eq.${input.workspaceId}`,
+          user_id: `eq.${input.userId}`,
+        }),
+        body: { role_id: input.roleId, updated_at: new Date().toISOString() },
+      });
+    },
+    "The app could not update that member role.",
+  );
+  safeHandle(
+    ipcChannels.app.setWorkspaceMemberStatus,
+    setWorkspaceMemberStatusSchema,
+    async (_event, input) => {
+      await requestSupabaseRest({
+        table: "workspace_memberships",
+        method: "PATCH",
+        query: buildSupabaseRestQuery({
+          workspace_id: `eq.${input.workspaceId}`,
+          user_id: `eq.${input.userId}`,
+        }),
+        body: { status: input.status, updated_at: new Date().toISOString() },
+      });
+    },
+    "The app could not update that member status.",
+  );
+  safeHandle(
+    ipcChannels.app.revokeWorkspaceInvite,
+    revokeWorkspaceInviteSchema,
+    async (_event, input) => {
+      await requestSupabaseRest({
+        table: "workspace_memberships",
+        method: "DELETE",
+        query: buildSupabaseRestQuery({
+          id: `eq.${input.membershipId}`,
+          workspace_id: `eq.${input.workspaceId}`,
+          status: "eq.invited",
+        }),
+      });
+    },
+    "The app could not revoke that invite.",
+  );
+  safeHandle(
+    ipcChannels.app.createCustomRole,
+    createCustomRoleSchema,
+    async (_event, input) => {
+      const roles = await requestSupabaseRest<Array<{ id?: string }>>({
+        table: "roles",
+        method: "POST",
+        query: buildSupabaseRestQuery({}, "id"),
+        prefer: "return=representation",
+        body: {
+          workspace_id: input.workspaceId,
+          key: input.key.trim(),
+          name: input.name.trim(),
+          description: input.description.trim() || null,
+          is_system_role: false,
+        },
+      });
+      const roleId = roles[0]?.id;
+      if (!roleId) {
+        throw new Error("Role was created but Supabase did not return a role id.");
+      }
+      return { roleId };
+    },
+    "The app could not create that custom role.",
+  );
+  safeHandle(
+    ipcChannels.app.updateCustomRole,
+    updateCustomRoleSchema,
+    async (_event, input) => {
+      await assertWorkspaceRole({ workspaceId: input.workspaceId, roleId: input.roleId, requireCustom: true });
+      await requestSupabaseRest({
+        table: "roles",
+        method: "PATCH",
+        query: buildSupabaseRestQuery({
+          id: `eq.${input.roleId}`,
+          workspace_id: `eq.${input.workspaceId}`,
+          is_system_role: "eq.false",
+        }),
+        body: {
+          name: input.name.trim(),
+          description: input.description.trim() || null,
+          updated_at: new Date().toISOString(),
+        },
+      });
+    },
+    "The app could not update that custom role.",
+  );
+  safeHandle(
+    ipcChannels.app.deleteCustomRole,
+    deleteCustomRoleSchema,
+    async (_event, input) => {
+      await assertWorkspaceRole({ workspaceId: input.workspaceId, roleId: input.roleId, requireCustom: true });
+      await requestSupabaseRest({
+        table: "roles",
+        method: "DELETE",
+        query: buildSupabaseRestQuery({
+          id: `eq.${input.roleId}`,
+          workspace_id: `eq.${input.workspaceId}`,
+          is_system_role: "eq.false",
+        }),
+      });
+    },
+    "The app could not delete that custom role.",
+  );
+  safeHandle(
+    ipcChannels.app.setRolePermission,
+    setRolePermissionSchema,
+    async (_event, input) => {
+      await assertWorkspaceRole({ workspaceId: input.workspaceId, roleId: input.roleId, requireCustom: true });
+
+      if (input.enabled) {
+        await requestSupabaseRest({
+          table: "role_permissions",
+          method: "POST",
+          body: { role_id: input.roleId, permission_id: input.permissionId },
+        });
+        return;
+      }
+
+      await requestSupabaseRest({
+        table: "role_permissions",
+        method: "DELETE",
+        query: buildSupabaseRestQuery({
+          role_id: `eq.${input.roleId}`,
+          permission_id: `eq.${input.permissionId}`,
+        }),
+      });
+    },
+    "The app could not update that role permission.",
   );
   safeHandleRead(
     ipcChannels.app.createBackup,

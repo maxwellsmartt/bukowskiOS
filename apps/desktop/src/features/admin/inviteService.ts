@@ -41,48 +41,33 @@ export type RevokeWorkspaceInviteInput = {
 
 export const revokeWorkspaceInvite = async (
   supabase: SupabaseClient,
-  input: RevokeWorkspaceInviteInput,
+  input: RevokeWorkspaceInviteInput & { workspaceId: string },
 ): Promise<void> => {
-  const { error: deleteError } = await supabase
-    .from("workspace_memberships")
-    .delete()
-    .eq("id", input.membershipId)
-    .eq("status", "invited");
-
-  if (deleteError) {
-    throw new Error(deleteError.message);
+  void supabase;
+  if (!window.bukowskiApp?.revokeWorkspaceInvite) {
+    throw new Error("The secure invite bridge is unavailable.");
   }
+  await window.bukowskiApp.revokeWorkspaceInvite(input);
 };
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const looseClient = (client: SupabaseClient): any => client as unknown;
 
 export const updateMemberRole = async (
   supabase: SupabaseClient,
   input: { workspaceId: string; userId: string; roleId: string },
 ): Promise<void> => {
-  const { error } = await looseClient(supabase)
-    .from("workspace_memberships")
-    .update({ role_id: input.roleId, updated_at: new Date().toISOString() })
-    .eq("workspace_id", input.workspaceId)
-    .eq("user_id", input.userId);
-
-  if (error) {
-    throw new Error(error.message);
+  void supabase;
+  if (!window.bukowskiApp?.updateWorkspaceMemberRole) {
+    throw new Error("The secure member bridge is unavailable.");
   }
+  await window.bukowskiApp.updateWorkspaceMemberRole(input);
 };
 
 export const setMemberStatus = async (
   supabase: SupabaseClient,
   input: { workspaceId: string; userId: string; status: "active" | "inactive" },
 ): Promise<void> => {
-  const { error } = await looseClient(supabase)
-    .from("workspace_memberships")
-    .update({ status: input.status, updated_at: new Date().toISOString() })
-    .eq("workspace_id", input.workspaceId)
-    .eq("user_id", input.userId);
-
-  if (error) {
-    throw new Error(error.message);
+  void supabase;
+  if (!window.bukowskiApp?.setWorkspaceMemberStatus) {
+    throw new Error("The secure member bridge is unavailable.");
   }
+  await window.bukowskiApp.setWorkspaceMemberStatus(input);
 };

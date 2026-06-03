@@ -177,6 +177,22 @@ declare global {
       uploadWorkspaceImageAsset: (
         input: import("@contracts").AppUploadWorkspaceImageAssetCommand,
       ) => Promise<import("@contracts").AppStorageUploadResult>;
+      updateRemoteWorkspaceIdentity: (
+        input: import("@contracts").AppUpdateRemoteWorkspaceIdentityCommand,
+      ) => Promise<void>;
+      updateWorkspaceMemberRole: (
+        input: import("@contracts").AppUpdateWorkspaceMemberRoleCommand,
+      ) => Promise<void>;
+      setWorkspaceMemberStatus: (
+        input: import("@contracts").AppSetWorkspaceMemberStatusCommand,
+      ) => Promise<void>;
+      revokeWorkspaceInvite: (input: import("@contracts").AppRevokeWorkspaceInviteCommand) => Promise<void>;
+      createCustomRole: (
+        input: import("@contracts").AppCreateCustomRoleCommand,
+      ) => Promise<import("@contracts").AppCreateCustomRoleResult>;
+      updateCustomRole: (input: import("@contracts").AppUpdateCustomRoleCommand) => Promise<void>;
+      deleteCustomRole: (input: import("@contracts").AppDeleteCustomRoleCommand) => Promise<void>;
+      setRolePermission: (input: import("@contracts").AppSetRolePermissionCommand) => Promise<void>;
       runIntegrityCheck: () => Promise<AppActionResult>;
       runLocalSync: () => Promise<AppActionResult>;
       getSyncOutboxRows: () => Promise<AppSyncOutboxRow[]>;

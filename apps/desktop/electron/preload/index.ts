@@ -38,17 +38,26 @@ import type {
   AppInfo,
   AppCreateRemoteWorkspaceCommand,
   AppCreateRemoteWorkspaceResult,
+  AppCreateCustomRoleCommand,
+  AppCreateCustomRoleResult,
+  AppDeleteCustomRoleCommand,
   AppLocalWorkspaceRow,
   AppOperationalBackfillCommand,
   AppOperationalBackfillResult,
+  AppRevokeWorkspaceInviteCommand,
   AppSendWorkspaceInviteCommand,
   AppSendWorkspaceInviteResult,
+  AppSetRolePermissionCommand,
+  AppSetWorkspaceMemberStatusCommand,
   AppStorageUploadResult,
   AppSupportSnapshot,
   AppSyncPullCursorRow,
   AppSyncOutboxRow,
   AppUploadUserAvatarCommand,
   AppUploadWorkspaceImageAssetCommand,
+  AppUpdateCustomRoleCommand,
+  AppUpdateRemoteWorkspaceIdentityCommand,
+  AppUpdateWorkspaceMemberRoleCommand,
   EnsureLocalWorkspaceInput,
   AppUserMutationResult,
   AppUsersSnapshot,
@@ -214,6 +223,22 @@ const bukowskiApp = {
     ipcRenderer.invoke(ipcChannels.app.uploadUserAvatar, input) as Promise<AppStorageUploadResult>,
   uploadWorkspaceImageAsset: (input: AppUploadWorkspaceImageAssetCommand) =>
     ipcRenderer.invoke(ipcChannels.app.uploadWorkspaceImageAsset, input) as Promise<AppStorageUploadResult>,
+  updateRemoteWorkspaceIdentity: (input: AppUpdateRemoteWorkspaceIdentityCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.updateRemoteWorkspaceIdentity, input) as Promise<void>,
+  updateWorkspaceMemberRole: (input: AppUpdateWorkspaceMemberRoleCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.updateWorkspaceMemberRole, input) as Promise<void>,
+  setWorkspaceMemberStatus: (input: AppSetWorkspaceMemberStatusCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.setWorkspaceMemberStatus, input) as Promise<void>,
+  revokeWorkspaceInvite: (input: AppRevokeWorkspaceInviteCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.revokeWorkspaceInvite, input) as Promise<void>,
+  createCustomRole: (input: AppCreateCustomRoleCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.createCustomRole, input) as Promise<AppCreateCustomRoleResult>,
+  updateCustomRole: (input: AppUpdateCustomRoleCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.updateCustomRole, input) as Promise<void>,
+  deleteCustomRole: (input: AppDeleteCustomRoleCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.deleteCustomRole, input) as Promise<void>,
+  setRolePermission: (input: AppSetRolePermissionCommand) =>
+    ipcRenderer.invoke(ipcChannels.app.setRolePermission, input) as Promise<void>,
   runIntegrityCheck: () => ipcRenderer.invoke(ipcChannels.app.runIntegrityCheck) as Promise<AppActionResult>,
   runLocalSync: () => ipcRenderer.invoke(ipcChannels.app.runLocalSync) as Promise<AppActionResult>,
   getSyncOutboxRows: () => ipcRenderer.invoke(ipcChannels.app.getSyncOutboxRows) as Promise<AppSyncOutboxRow[]>,

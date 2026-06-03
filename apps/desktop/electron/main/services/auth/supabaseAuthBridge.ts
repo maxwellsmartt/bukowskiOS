@@ -225,6 +225,54 @@ export const invokeSupabaseEdgeFunction = async <TPayload>(
   return response.json() as Promise<TPayload>;
 };
 
+export const requestSupabaseRest = async <TPayload = unknown>(input: {
+  table: string;
+  query?: URLSearchParams;
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  body?: Record<string, unknown>;
+  prefer?: string;
+}) => {
+  const accessToken = await getFreshStoredAccessToken();
+  if (!accessToken) {
+    throw new Error("An authenticated session is required to complete this request.");
+  }
+
+  const { url, anonKey } = getSupabaseAuthEnv();
+  const query = input.query?.toString();
+  const response = await fetch(`${url}/rest/v1/${encodeURIComponent(input.table)}${query ? `?${query}` : ""}`, {
+    method: input.method ?? "GET",
+    headers: {
+      apikey: anonKey,
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+      ...(input.prefer ? { Prefer: input.prefer } : {}),
+    },
+    body: input.body ? JSON.stringify(input.body) : undefined,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Supabase REST request failed (${response.status}): ${await readResponseMessage(response)}`);
+  }
+
+  if (response.status === 204) {
+    return null as TPayload;
+  }
+
+  const text = await response.text();
+  return (text ? JSON.parse(text) : null) as TPayload;
+};
+
+export const buildSupabaseRestQuery = (filters: Record<string, string>, select?: string) => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    query.set(key, value);
+  }
+  if (select) {
+    query.set("select", select);
+  }
+  return query;
+};
+
 export const uploadSupabaseStorageObject = async (input: {
   bucket: "user-avatars" | "workspace-assets";
   objectPath: string;

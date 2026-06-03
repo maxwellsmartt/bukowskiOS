@@ -77,83 +77,58 @@ export const createCustomRole = async (
   supabase: SupabaseClient,
   input: { workspaceId: string; key: string; name: string; description: string },
 ): Promise<{ roleId: string }> => {
-  const payload = {
-    workspace_id: input.workspaceId,
-    key: input.key,
-    name: input.name,
-    description: input.description || null,
-    is_system_role: false,
-  };
-
-  const { data, error } = await loose(supabase)
-    .from("roles")
-    .insert(payload)
-    .select("id")
-    .single();
-
-  if (error || !data) {
-    throw new Error(error?.message ?? "Could not create role");
+  void supabase;
+  if (!window.bukowskiApp?.createCustomRole) {
+    throw new Error("The secure role bridge is unavailable.");
   }
-
-  return { roleId: (data as { id: string }).id };
+  return window.bukowskiApp.createCustomRole(input);
 };
 
 export const deleteCustomRole = async (
   supabase: SupabaseClient,
+  workspaceId: string,
   roleId: string,
 ): Promise<void> => {
-  const { error } = await loose(supabase).from("roles").delete().eq("id", roleId);
-  if (error) {
-    throw new Error(error.message);
+  void supabase;
+  if (!window.bukowskiApp?.deleteCustomRole) {
+    throw new Error("The secure role bridge is unavailable.");
   }
+  await window.bukowskiApp.deleteCustomRole({ workspaceId, roleId });
 };
 
 export const updateCustomRole = async (
   supabase: SupabaseClient,
-  input: { roleId: string; name: string; description: string },
+  input: { workspaceId: string; roleId: string; name: string; description: string },
 ): Promise<void> => {
-  const payload = {
-    name: input.name,
-    description: input.description || null,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { error } = await loose(supabase)
-    .from("roles")
-    .update(payload)
-    .eq("id", input.roleId);
-
-  if (error) {
-    throw new Error(error.message);
+  void supabase;
+  if (!window.bukowskiApp?.updateCustomRole) {
+    throw new Error("The secure role bridge is unavailable.");
   }
+  await window.bukowskiApp.updateCustomRole(input);
 };
 
 export const grantPermission = async (
   supabase: SupabaseClient,
+  workspaceId: string,
   roleId: string,
   permissionId: string,
 ): Promise<void> => {
-  const { error } = await loose(supabase)
-    .from("role_permissions")
-    .insert({ role_id: roleId, permission_id: permissionId });
-
-  if (error) {
-    throw new Error(error.message);
+  void supabase;
+  if (!window.bukowskiApp?.setRolePermission) {
+    throw new Error("The secure role bridge is unavailable.");
   }
+  await window.bukowskiApp.setRolePermission({ workspaceId, roleId, permissionId, enabled: true });
 };
 
 export const revokePermission = async (
   supabase: SupabaseClient,
+  workspaceId: string,
   roleId: string,
   permissionId: string,
 ): Promise<void> => {
-  const { error } = await loose(supabase)
-    .from("role_permissions")
-    .delete()
-    .eq("role_id", roleId)
-    .eq("permission_id", permissionId);
-
-  if (error) {
-    throw new Error(error.message);
+  void supabase;
+  if (!window.bukowskiApp?.setRolePermission) {
+    throw new Error("The secure role bridge is unavailable.");
   }
+  await window.bukowskiApp.setRolePermission({ workspaceId, roleId, permissionId, enabled: false });
 };

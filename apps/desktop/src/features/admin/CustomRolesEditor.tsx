@@ -121,9 +121,9 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
 
     try {
       if (has) {
-        await revokePermission(supabase, role.id, permission.id);
+        await revokePermission(supabase, workspaceId, role.id, permission.id);
       } else {
-        await grantPermission(supabase, role.id, permission.id);
+        await grantPermission(supabase, workspaceId, role.id, permission.id);
       }
       await refresh();
     } catch (nextError) {
@@ -209,6 +209,7 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
     setIsSavingEdit(true);
     try {
       await updateCustomRole(supabase, {
+        workspaceId,
         roleId: editingRole.id,
         name,
         description: editDraft.description.trim(),
@@ -233,7 +234,7 @@ export const CustomRolesEditor = ({ supabase, workspaceId }: CustomRolesEditorPr
     if (!pendingDeleteRole) return;
     setIsDeletingRole(true);
     try {
-      await deleteCustomRole(supabase, pendingDeleteRole.id);
+      await deleteCustomRole(supabase, workspaceId, pendingDeleteRole.id);
       toast.success(
         t("settings.workspace.rolesEditor.toasts.deletedTitle"),
         t("settings.workspace.rolesEditor.toasts.deletedBody", { name: pendingDeleteRole.name }),

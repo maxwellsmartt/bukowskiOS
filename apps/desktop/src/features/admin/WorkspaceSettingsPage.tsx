@@ -495,7 +495,7 @@ export const WorkspaceSettingsPage = () => {
   );
 
   const persistWorkspaceIdentity = async (updates: { avatarUrl?: string | null; iconColor?: string | null }) => {
-    if (!supabase || !workspaceProfile) {
+    if (!workspaceProfile) {
       return;
     }
 
@@ -505,27 +505,15 @@ export const WorkspaceSettingsPage = () => {
       iconColor: updates.iconColor !== undefined ? updates.iconColor : workspaceProfile.iconColor,
     };
 
-    const updatePayload: Record<string, string | null> = {
-      updated_at: new Date().toISOString(),
-    };
-
-    if (updates.avatarUrl !== undefined) {
-      updatePayload.avatar_url = nextProfile.avatarUrl;
+    if (!window.bukowskiApp?.updateRemoteWorkspaceIdentity) {
+      throw new Error("The secure workspace bridge is unavailable.");
     }
 
-    if (updates.iconColor !== undefined) {
-      updatePayload.icon_color = nextProfile.iconColor;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const looseSupabase = supabase as any;
-    const { error: updateError } = await looseSupabase
-      .from("workspaces")
-      .update(updatePayload)
-      .eq("id", activeWorkspaceId);
-
-    if (updateError) {
-      throw updateError;
-    }
+    await window.bukowskiApp.updateRemoteWorkspaceIdentity({
+      workspaceId: activeWorkspaceId,
+      ...(updates.avatarUrl !== undefined ? { avatarUrl: nextProfile.avatarUrl } : {}),
+      ...(updates.iconColor !== undefined ? { iconColor: nextProfile.iconColor } : {}),
+    });
 
     setWorkspaceProfile(nextProfile);
     setWorkspaceDraft((current) => ({
@@ -559,26 +547,17 @@ export const WorkspaceSettingsPage = () => {
     setIsSavingWorkspace(true);
 
     try {
-      const updatePayload: Record<string, string | null> = {
+      if (!window.bukowskiApp?.updateRemoteWorkspaceIdentity) {
+        throw new Error("The secure workspace bridge is unavailable.");
+      }
+
+      await window.bukowskiApp.updateRemoteWorkspaceIdentity({
+        workspaceId: activeWorkspaceId,
         name: nextName,
-        base_currency: nextBaseCurrency,
-        icon_color: nextIconColor,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (workspaceProfile.avatarUrl !== null || nextAvatarUrl !== null) {
-        updatePayload.avatar_url = nextAvatarUrl;
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const looseSupabase = supabase as any;
-      const { error: updateError } = await looseSupabase
-        .from("workspaces")
-        .update(updatePayload)
-        .eq("id", activeWorkspaceId);
-
-      if (updateError) {
-        throw updateError;
-      }
+        baseCurrency: nextBaseCurrency,
+        iconColor: nextIconColor,
+        ...(workspaceProfile.avatarUrl !== null || nextAvatarUrl !== null ? { avatarUrl: nextAvatarUrl } : {}),
+      });
 
       toast.success(t("settings.workspace.toasts.updatedTitle"), t("settings.workspace.toasts.updatedBody"));
       setIsEditingWorkspace(false);
@@ -766,7 +745,7 @@ export const WorkspaceSettingsPage = () => {
     }
 
     try {
-      await revokeWorkspaceInvite(supabase, { membershipId: invite.id });
+      await revokeWorkspaceInvite(supabase, { workspaceId: activeWorkspaceId, membershipId: invite.id });
       toast.success(
         t("settings.workspace.toasts.inviteRevokedTitle"),
         t("settings.workspace.toasts.inviteRevokedBody", { email: invite.email }),
