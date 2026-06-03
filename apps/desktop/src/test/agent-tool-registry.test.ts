@@ -125,6 +125,26 @@ describe("agent tool registry", () => {
     cleanup();
   });
 
+  it("filters tool definitions and blocks execution outside an agent allowlist", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-allowlist");
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => [],
+    });
+
+    const allowedDefinitions = registry.definitionsFor(["search_assets"]);
+
+    expect(allowedDefinitions.map((tool) => tool.name)).toEqual(["search_assets"]);
+    expect(registry.isAllowed("search_assets", ["search_assets"])).toBe(true);
+    expect(registry.isAllowed("get_financial_health", ["search_assets"])).toBe(false);
+    expect(() =>
+      registry.execute("get_financial_health", "{}", { workspaceId: "workspace-metadata" }, {
+        allowedToolNames: ["search_assets"],
+      }),
+    ).toThrow("Tool get_financial_health is not allowed for this agent.");
+
+    cleanup();
+  });
+
   it("resolves combined project labels before executing write tools", () => {
     const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-project-label-write");
     const secretStore = { hasProviderSecret: () => false };

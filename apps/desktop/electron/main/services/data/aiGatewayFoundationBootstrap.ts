@@ -448,6 +448,20 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
     WHERE workspace_id = ?
       AND id = ?
   `);
+  const updateLegacyToolAllowlist = db.prepare(`
+    UPDATE agents
+    SET
+      allowed_tools_json = ?,
+      allowed_domains_json = ?,
+      updated_at = ?
+    WHERE workspace_id = ?
+      AND id = ?
+      AND (
+        allowed_tools_json IS NULL
+        OR TRIM(allowed_tools_json) = ''
+        OR allowed_tools_json LIKE '%"%.%"%'
+      )
+  `);
 
   workspaceRows.forEach((workspace) => {
     agentConfig.agents.forEach((agentConfigRow) => {
@@ -505,6 +519,13 @@ export const bootstrapAIGatewayFoundation = (db: DatabaseSync) => {
         agent.isSupervisor,
         agent.seedVersion,
         agent.sortOrder,
+        now,
+        workspace.id,
+        agent.id,
+      );
+      updateLegacyToolAllowlist.run(
+        agent.allowedToolsJson,
+        agent.allowedDomainsJson,
         now,
         workspace.id,
         agent.id,

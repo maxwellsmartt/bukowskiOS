@@ -336,22 +336,30 @@
   - `medio`: quedan lecturas Supabase en renderer por diseño actual. No son el mismo riesgo que writes, pero siguen ampliando superficie si el renderer se compromete.
 
 ### Slice S3 — AI tool execution policy
-- Estado: `next`
+- Estado: `done`
 - Objetivo: cerrar C6/C7/C8 antes de entregar con datos confidenciales.
 - Área: `backend`
-- Alcance sugerido:
-  - ningún tool write sensible se ejecuta por `unsupervised` client-side.
-  - tool catalog filtrado por agente, actor, workspace y connector source.
-  - approvals vinculadas a `toolName`, argumentos exactos, hash y resumen humano.
-  - cualquier argumento distinto crea una nueva approval.
-- Pruebas mínimas:
-  - tests unitarios del gateway con prompt/tool request fuera de permiso.
-  - test de approval replay con argumentos cambiados.
-- Riesgo que desbloquea:
-  - `crítico`: prompt injection o agente equivocado ejecutando acciones fuera del alcance aprobado.
+- Alcance cerrado:
+  - ningún tool `requiresApproval` se ejecuta solo porque el thread venga en modo `unsupervised`.
+  - el modelo recibe un catálogo filtrado por `allowed_tools_json` del agente, no el catálogo global.
+  - la ejecución del tool vuelve a validar allowlist en el registry.
+  - approvals guardan `toolName`, argumentos canonicalizados y hash SHA-256.
+  - al aprobar, el gateway ejecuta el payload guardado sin volver a pedirle al modelo que decida argumentos.
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop exec vitest run src/test/assistant-gateway-service.test.ts src/test/agent-tool-registry.test.ts src/test/security-regression.test.ts`
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+- Evidencia:
+  - `apps/desktop/electron/main/services/ai/assistantGatewayService.ts`
+  - `apps/desktop/electron/main/services/ai/agentToolRegistry.ts`
+  - `apps/desktop/electron/main/services/data/aiGatewayFoundationBootstrap.ts`
+  - `apps/desktop/src/test/assistant-gateway-service.test.ts`
+  - `apps/desktop/src/test/agent-tool-registry.test.ts`
+- Riesgos remanentes:
+  - `bajo/medio`: runs antiguos sin `approval_tool_payloads` conservan fallback legacy para compatibilidad; antes de producción amplia conviene migrarlos, expirarlos o bloquear approval de runs legacy.
+  - `medio`: la allowlist actual se basa en `allowed_tools_json`; todavía no hay filtrado fino por conector/actor dinámico más allá del agente/workspace.
 
 ### Slice S4 — Export/support bundle/outbox redaction
-- Estado: `recommended-after-S3`
+- Estado: `next`
 - Objetivo: evitar que soporte, exports o pantallas de debug filtren payloads financieros/confidenciales.
 - Área: `backend` + `frontend`
 - Alcance sugerido:

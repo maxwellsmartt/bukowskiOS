@@ -11,6 +11,8 @@ import type {
 } from "@contracts";
 import type { DatabaseSync } from "node:sqlite";
 
+import { createHash } from "node:crypto";
+
 import type { AISecretStore } from "./aiSecretStore";
 import type { AnthropicProviderService } from "./anthropicProviderService";
 import type { AssistantMemoryService } from "./assistantMemoryService";
@@ -85,6 +87,38 @@ const safeJsonParse = <T>(value: string): T | null => {
   } catch {
     return null;
   }
+};
+
+const parseJsonStringArray = (value: string | null | undefined) => {
+  const parsed = value ? safeJsonParse<unknown>(value) : null;
+  return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+};
+
+const stableStringify = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+      .join(",")}}`;
+  }
+
+  return JSON.stringify(value);
+};
+
+const hashApprovedToolPayload = (toolName: string, args: Record<string, unknown>) => {
+  const source = `${toolName}:${stableStringify(args)}`;
+  return createHash("sha256").update(source, "utf8").digest("hex");
+};
+
+type DeferredWriteToolCall = {
+  toolName: string;
+  arguments: Record<string, unknown>;
+  approvalHash: string;
 };
 
 const parseAppContextSummary = (request: AssistantGatewayRequest) => ({
@@ -428,7 +462,7 @@ const loadSupervisorConfig = (db: DatabaseSync, workspaceId: string) =>
   db
     .prepare(
       `
-        SELECT workspace_id, id, agent_key, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
+        SELECT workspace_id, id, agent_key, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt, COALESCE(allowed_tools_json, '[]') AS allowed_tools_json
         FROM agents
         WHERE workspace_id IN (?, ?)
           AND is_supervisor = 1
@@ -444,6 +478,7 @@ const loadSupervisorConfig = (db: DatabaseSync, workspaceId: string) =>
         provider_key: string;
         model_key: string;
         base_prompt: string;
+        allowed_tools_json: string;
       }
     | undefined;
 
@@ -539,7 +574,7 @@ const loadAgentRuntimeConfigByKey = (db: DatabaseSync, agentKey: string, workspa
   db
     .prepare(
       `
-        SELECT id, agent_key, display_name, COALESCE(NULLIF(trim(role_label), ''), display_name) AS role_label, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
+        SELECT id, agent_key, display_name, COALESCE(NULLIF(trim(role_label), ''), display_name) AS role_label, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt, COALESCE(allowed_tools_json, '[]') AS allowed_tools_json
         FROM agents
         WHERE workspace_id IN (?, ?)
           AND agent_key = ?
@@ -557,6 +592,7 @@ const loadAgentRuntimeConfigByKey = (db: DatabaseSync, agentKey: string, workspa
         provider_key: string | null;
         model_key: string;
         base_prompt: string;
+        allowed_tools_json: string;
       }
     | undefined;
 
@@ -564,7 +600,7 @@ const loadAgentRuntimeConfigById = (db: DatabaseSync, agentId: string, workspace
   db
     .prepare(
       `
-        SELECT id, agent_key, display_name, COALESCE(NULLIF(trim(role_label), ''), display_name) AS role_label, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt
+        SELECT id, agent_key, display_name, COALESCE(NULLIF(trim(role_label), ''), display_name) AS role_label, approval_mode, provider_key, model_key, COALESCE(base_prompt, '') AS base_prompt, COALESCE(allowed_tools_json, '[]') AS allowed_tools_json
         FROM agents
         WHERE workspace_id IN (?, ?)
           AND id = ?
@@ -582,6 +618,7 @@ const loadAgentRuntimeConfigById = (db: DatabaseSync, agentId: string, workspace
         provider_key: string | null;
         model_key: string;
         base_prompt: string;
+        allowed_tools_json: string;
       }
     | undefined;
 
@@ -777,6 +814,39 @@ const createDraftRun = (
   );
 
   return { runId, now };
+};
+
+const parseApprovalToolPayloads = (detailsJson: string | null | undefined): DeferredWriteToolCall[] => {
+  const details = detailsJson ? safeJsonParse<Record<string, unknown>>(detailsJson) : null;
+  const rawPayloads = Array.isArray(details?.approval_tool_payloads)
+    ? details.approval_tool_payloads
+    : Array.isArray(details?.deferred_write_tools)
+      ? details.deferred_write_tools
+      : [];
+
+  return rawPayloads
+    .map((raw): DeferredWriteToolCall | null => {
+      if (!raw || typeof raw !== "object") {
+        return null;
+      }
+      const record = raw as Record<string, unknown>;
+      const toolName = typeof record.toolName === "string" ? record.toolName : null;
+      const args = record.arguments && typeof record.arguments === "object" && !Array.isArray(record.arguments)
+        ? (record.arguments as Record<string, unknown>)
+        : null;
+      if (!toolName || !args) {
+        return null;
+      }
+      const storedHash =
+        typeof record.approvalHash === "string"
+          ? record.approvalHash
+          : typeof record.approval_hash === "string"
+            ? record.approval_hash
+            : null;
+      const approvalHash = storedHash ?? hashApprovedToolPayload(toolName, args);
+      return { toolName, arguments: args, approvalHash };
+    })
+    .filter((payload): payload is DeferredWriteToolCall => Boolean(payload));
 };
 
 const buildHumanErrorResponse = (
@@ -1303,7 +1373,7 @@ export const createAssistantGatewayService = (
       `Workspace: ${workspaceId}`,
       `Requesting user: ${supervisorRequestingUser}`,
       "=== END SYSTEM CONTEXT ===",
-      "Specialists EXECUTE write tools directly when the user asks for an action — packing slips, incidents, RMAs, projects, finance entries, quotes. Don't block them.",
+      "Specialists may request write tools when the user asks for an action, but approval-required tools are gated by the runtime and must not be described as executed until a tool result confirms execution.",
       "Specialists must use search_assets / search_projects / etc. to resolve names → IDs BEFORE asking the user anything. They can use ask_user_choice to surface a small set of options when search returns ambiguous results.",
       "When the user asks to create, prepare, save, or draft a quote, treat it as a saved draft in Quotes and route toward create_quote. prepare_quote_draft is only for an explicitly non-saved outline.",
       "If the user is continuing a partially completed task, use the previous session summary and last tool results to continue the pending steps. Do not make them repeat the full original prompt.",
@@ -1315,7 +1385,7 @@ export const createAssistantGatewayService = (
       "If an asset search finds no available match, the specialist should run one broader workspace-level search_assets query and propose the closest available alternatives before asking the user what to use.",
       "Choose one target_agent from the allowed list below.",
       "Only set requires_approval=true when the action is truly irreversible (delete), externally visible (send message to a client), or above the workspace's risk threshold. Routine creation is NOT a reason for approval.",
-      "When the user asks for an action and the specialist has enough data, route it and let the specialist execute. Do not stall by asking the user to confirm what they already asked for.",
+      "When the user asks for an action and the specialist has enough data, route it and let the specialist request the right tool. The runtime enforces approval for sensitive writes.",
       "Keep user_facing_summary practical and concise — describe what got done, not what could be done.",
       "Allowed agents:",
       loadAgentsPrompt(db, workspaceId),
@@ -1340,11 +1410,10 @@ export const createAssistantGatewayService = (
       toolName: string;
       payload: unknown;
     }> = [];
-    const deferredWriteToolCalls: Array<{
-      toolName: string;
-      arguments: Record<string, unknown>;
-    }> = [];
+    const deferredWriteToolCalls: DeferredWriteToolCall[] = [];
     const executedWriteToolNames: string[] = [];
+    const supervisorAllowedTools = parseJsonStringArray(supervisor.allowed_tools_json);
+    const supervisorToolDefinitions = options.toolRegistry.definitionsFor(supervisorAllowedTools);
 
     let previousResponseId = sessionSnapshot.isExpired ? null : sessionSnapshot.previousResponseId;
     let supervisorRuntimeModelKey = supervisorModelKey;
@@ -1362,7 +1431,7 @@ export const createAssistantGatewayService = (
         instructions: supervisorInstructions,
         input: initialPrompt,
         previousResponseId,
-        tools: options.toolRegistry.definitions,
+        tools: supervisorToolDefinitions,
         toolChoice: "auto",
         maxOutputTokens: 900,
         textFormat: orchestrationSchema,
@@ -1414,18 +1483,21 @@ export const createAssistantGatewayService = (
         }
 
         try {
+          if (!options.toolRegistry.isAllowed(call.name, supervisorAllowedTools)) {
+            throw new Error(`Tool ${call.name} is not allowed for Supervisor Agent.`);
+          }
+
           const toolRequiresApproval = options.toolRegistry.requiresApproval(call.name);
-          const writeToolCanRunNow =
-            !toolRequiresApproval ||
-            request.context.requestedApprovalMode === "unsupervised" ||
-            Boolean(executionOptions?.approvalBypassAgentId);
+          const writeToolCanRunNow = !toolRequiresApproval;
 
           if (!writeToolCanRunNow) {
             const parsedArguments = parseToolArgumentsPreview(call.arguments);
+            const approvalHash = hashApprovedToolPayload(call.name, parsedArguments);
             const summary = `${summarizeToolName(call.name)} needs approval before it runs.`;
             deferredWriteToolCalls.push({
               toolName: call.name,
               arguments: parsedArguments,
+              approvalHash,
             });
             toolTraces.push({
               toolName: call.name,
@@ -1440,6 +1512,7 @@ export const createAssistantGatewayService = (
                 executed: false,
                 tool_name: call.name,
                 requested_arguments: parsedArguments,
+                approval_hash: approvalHash,
                 user_message:
                   "This write action was not executed yet. Prepare a clear approval summary for the user.",
               }),
@@ -1448,7 +1521,9 @@ export const createAssistantGatewayService = (
             continue;
           }
 
-          const execution = options.toolRegistry.execute(call.name, call.arguments, request.context);
+          const execution = options.toolRegistry.execute(call.name, call.arguments, request.context, {
+            allowedToolNames: supervisorAllowedTools,
+          });
           toolTraces.push(execution.trace);
           executedToolPayloads.push({
             toolName: call.name,
@@ -1498,7 +1573,7 @@ export const createAssistantGatewayService = (
           model: supervisorRuntimeModelKey,
           previousResponseId,
           input: outputs,
-          tools: options.toolRegistry.definitions,
+          tools: supervisorToolDefinitions,
           toolChoice: "auto",
           maxOutputTokens: 900,
           textFormat: orchestrationSchema,
@@ -1578,14 +1653,14 @@ export const createAssistantGatewayService = (
     const forceNeedsApproval = requestedApprovalMode === "needs_approval";
     const allowUnsupervised = requestedApprovalMode === "unsupervised" && targetApprovalMode !== "needs_approval";
     let requiresApproval =
-      !sessionApprovalApplies &&
-      !approvalBypassApplies &&
-      !allowUnsupervised &&
-      (deferredWriteToolCalls.length > 0 ||
-      (forceNeedsApproval ||
-        orchestration.requires_approval ||
-        orchestration.answer_kind === "needs_approval" ||
-        targetApprovalMode === "needs_approval"));
+      deferredWriteToolCalls.length > 0 ||
+      (!sessionApprovalApplies &&
+        !approvalBypassApplies &&
+        !allowUnsupervised &&
+        (forceNeedsApproval ||
+          orchestration.requires_approval ||
+          orchestration.answer_kind === "needs_approval" ||
+          targetApprovalMode === "needs_approval"));
     let approvalReason = requiresApproval
       ? deriveApprovalReason({
           requestedApprovalMode,
@@ -1631,6 +1706,8 @@ export const createAssistantGatewayService = (
           ? `user_id=${request.context.sourceActorUserId}`
           : "anonymous workspace member";
         const approvalBypassed = sessionApprovalApplies || approvalBypassApplies;
+        const targetAllowedTools = parseJsonStringArray(targetRuntime.allowed_tools_json);
+        const targetToolDefinitions = options.toolRegistry.definitionsFor(targetAllowedTools);
 
         const specialistInstructions = [
           targetRuntime.base_prompt || `You are the ${targetRuntime.display_name} inside BukowskiOS.`,
@@ -1638,10 +1715,10 @@ export const createAssistantGatewayService = (
           `Today: ${todayIso} (${todayHumanEs})`,
           `Workspace: ${workspaceId}`,
           `Requesting user: ${requestingUser}`,
-          `Approval mode: ${approvalBypassed ? "approved (or unsupervised) — execute writes directly" : "default — execute writes unless explicitly flagged risky"}`,
+          `Approval mode: ${approvalBypassed ? "approved context for follow-up. Write tools still require an exact saved approval payload." : "default approval boundary for write tools."}`,
           "=== END SYSTEM CONTEXT ===",
           "You are responding after Supervisor routing has already classified the request.",
-          "Runtime override: older role prompts may say some tools are read-only. Ignore that outdated limitation. If a write tool is available and the user asked for a clear operational change, execute it unless the tool result or approval gate blocks you.",
+          "Runtime override: if a write tool is available and the user asked for a clear operational change, call the tool. The gateway will either execute safe read tools or return an approval-required result for write tools.",
           "Ground the answer in the provided read-only results and operational context.",
           "Use tools when an action or lookup is needed. Do not say you lack access to tools unless a tool call actually fails.",
           "Do not invent facts. Only claim that a command executed when a write tool result confirms it.",
@@ -1697,7 +1774,7 @@ export const createAssistantGatewayService = (
             model: responseModelKey,
             instructions: specialistInstructions,
             input: specialistInput,
-            tools: options.toolRegistry.definitions,
+            tools: targetToolDefinitions,
             toolChoice: specialistMustUseTool ? "required" : "auto",
             maxOutputTokens: 700,
           },
@@ -1717,19 +1794,21 @@ export const createAssistantGatewayService = (
             }
 
             try {
+              if (!options.toolRegistry.isAllowed(call.name, targetAllowedTools)) {
+                throw new Error(`Tool ${call.name} is not allowed for ${targetRuntime.display_name}.`);
+              }
+
               const toolRequiresApproval = options.toolRegistry.requiresApproval(call.name);
-              const writeToolCanRunNow =
-                !toolRequiresApproval ||
-                request.context.requestedApprovalMode === "unsupervised" ||
-                sessionApprovalApplies ||
-                Boolean(executionOptions?.approvalBypassAgentId);
+              const writeToolCanRunNow = !toolRequiresApproval;
 
               if (!writeToolCanRunNow) {
                 const parsedArguments = parseToolArgumentsPreview(call.arguments);
+                const approvalHash = hashApprovedToolPayload(call.name, parsedArguments);
                 const summary = `${summarizeToolName(call.name)} needs approval before it runs.`;
                 deferredWriteToolCalls.push({
                   toolName: call.name,
                   arguments: parsedArguments,
+                  approvalHash,
                 });
                 toolTraces.push({
                   toolName: call.name,
@@ -1744,6 +1823,7 @@ export const createAssistantGatewayService = (
                     executed: false,
                     tool_name: call.name,
                     requested_arguments: parsedArguments,
+                    approval_hash: approvalHash,
                     user_message:
                       "This write action was not executed yet. Prepare a clear approval summary for the user.",
                   }),
@@ -1752,7 +1832,9 @@ export const createAssistantGatewayService = (
                 continue;
               }
 
-              const execution = options.toolRegistry.execute(call.name, call.arguments, request.context);
+              const execution = options.toolRegistry.execute(call.name, call.arguments, request.context, {
+                allowedToolNames: targetAllowedTools,
+              });
               toolTraces.push(execution.trace);
               executedToolPayloads.push({
                 toolName: call.name,
@@ -1802,7 +1884,7 @@ export const createAssistantGatewayService = (
               model: responseModelKey,
               previousResponseId: specialistPreviousResponseId,
               input: outputs,
-              tools: options.toolRegistry.definitions,
+              tools: targetToolDefinitions,
               toolChoice: "auto",
               maxOutputTokens: 700,
             },
@@ -1828,7 +1910,7 @@ export const createAssistantGatewayService = (
       }
     }
 
-    if (!requiresApproval && !sessionApprovalApplies && !approvalBypassApplies && !allowUnsupervised && deferredWriteToolCalls.length > 0) {
+    if (!requiresApproval && deferredWriteToolCalls.length > 0) {
       requiresApproval = true;
       approvalReason = deriveApprovalReason({
         requestedApprovalMode,
@@ -1885,6 +1967,7 @@ export const createAssistantGatewayService = (
       target_agent: orchestration.target_agent,
       tool_calls: toolTraces.map((trace) => trace.toolName),
       deferred_write_tools: deferredWriteToolCalls,
+      approval_tool_payloads: deferredWriteToolCalls,
       executed_write_tools: executedWriteToolNames,
       action_links: actionLinks,
       status: orchestration.answer_kind,
@@ -2093,7 +2176,18 @@ export const createAssistantGatewayService = (
       const run = db
         .prepare(
           `
-            SELECT id, thread_id, agent_id, title, input_summary
+            SELECT
+              id,
+              thread_id,
+              agent_id,
+              title,
+              input_summary,
+              details_json,
+              source_connector_key,
+              source_channel_id,
+              source_external_message_id,
+              source_actor_user_id,
+              correlation_id
             FROM agent_runs
             WHERE workspace_id = ?
               AND id = ?
@@ -2107,6 +2201,12 @@ export const createAssistantGatewayService = (
             agent_id: string | null;
             title: string;
             input_summary: string;
+            details_json: string | null;
+            source_connector_key: string | null;
+            source_channel_id: string | null;
+            source_external_message_id: string | null;
+            source_actor_user_id: string | null;
+            correlation_id: string | null;
           }
         | undefined;
 
@@ -2115,6 +2215,153 @@ export const createAssistantGatewayService = (
       }
 
       const threadContext = loadThreadRouteContext(db, run.thread_id);
+      const approvedPayloads = parseApprovalToolPayloads(run.details_json);
+
+      if (approvedPayloads.length > 0) {
+        const targetRuntime = loadAgentRuntimeConfigById(db, run.agent_id, args.workspaceId);
+        if (!targetRuntime) {
+          throw new Error("Approved run is not linked to an available agent.");
+        }
+
+        const targetAllowedTools = parseJsonStringArray(targetRuntime.allowed_tools_json);
+        const toolTraces: AIGatewayToolCallTrace[] = [];
+        const executedToolPayloads: Array<{ toolName: string; payload: unknown }> = [];
+        const executedWriteToolNames: string[] = [];
+        const context: AIGatewayToolContext = {
+          workspaceId: args.workspaceId,
+          activePath: threadContext?.context_key ?? "/agents",
+          currentView: threadContext?.context_label ?? "Agents",
+          activeProjectId: inferProjectIdFromPath(threadContext?.context_key ?? null),
+          activeFilters: {},
+          threadId: run.thread_id,
+          sourceConnectorKey: run.source_connector_key,
+          sourceChannelId: run.source_channel_id,
+          sourceExternalMessageId: run.source_external_message_id,
+          sourceActorUserId: run.source_actor_user_id,
+          correlationId: run.correlation_id,
+          attachedDocuments: [],
+        };
+
+        for (const payload of approvedPayloads) {
+          if (!options.toolRegistry.requiresApproval(payload.toolName)) {
+            throw new Error(`Approved payload contains non-gated tool ${payload.toolName}.`);
+          }
+          const expectedHash = hashApprovedToolPayload(payload.toolName, payload.arguments);
+          if (payload.approvalHash !== expectedHash) {
+            throw new Error(`Approved payload hash mismatch for ${payload.toolName}.`);
+          }
+
+          const execution = options.toolRegistry.execute(payload.toolName, JSON.stringify(payload.arguments), context, {
+            allowedToolNames: targetAllowedTools,
+          });
+          toolTraces.push(execution.trace);
+          executedToolPayloads.push({
+            toolName: payload.toolName,
+            payload: execution.result.payload,
+          });
+          executedWriteToolNames.push(payload.toolName);
+        }
+
+        const now = new Date().toISOString();
+        const actionLinks = buildActionLinks(executedToolPayloads);
+        const notificationIntents = collectNotificationIntents(executedToolPayloads);
+        const operationalReceipt = buildOperationalReceipt({
+          toolTraces,
+          actionLinks,
+          deferredWriteToolCalls: [],
+          executedWriteToolNames,
+        });
+        const summary =
+          toolTraces.map((trace) => trace.summary).join(" · ") ||
+          `${targetRuntime.display_name} completed the approved action.`;
+        const previousDetails = run.details_json ? safeJsonParse<Record<string, unknown>>(run.details_json) : {};
+        const detailsJson = JSON.stringify({
+          ...(previousDetails ?? {}),
+          approval_execution: {
+            executed_at: now,
+            approval_scope: args.approvalScope,
+            payload_hashes: approvedPayloads.map((payload) => payload.approvalHash),
+          },
+          action_links: actionLinks,
+          executed_write_tools: executedWriteToolNames,
+          operational_receipt: operationalReceipt,
+        });
+        const approvalDecision = args.approvalScope === "session" ? "approved_for_session" : "approved";
+
+        db.prepare(
+          `
+            UPDATE agent_runs
+            SET status = 'done',
+                output_summary = ?,
+                approval_decision = ?,
+                approval_scope = ?,
+                approval_decided_at = COALESCE(approval_decided_at, ?),
+                details_json = ?,
+                updated_at = ?
+            WHERE workspace_id = ?
+              AND id = ?
+          `,
+        ).run(summary, approvalDecision, args.approvalScope, now, detailsJson, now, args.workspaceId, run.id);
+
+        createActivityEvent(db, {
+          workspaceId: args.workspaceId,
+          id: createEventId("agent-activity"),
+          agentId: run.agent_id,
+          runId: run.id,
+          kind: "ai_run_completed_after_exact_approval",
+          title: "Approved action completed",
+          body: summary,
+          tone: "success",
+          source: "ai_gateway",
+          detailsJson,
+          createdAt: now,
+        });
+
+        options.sessionStore.writeResult(args.workspaceId, args.threadId, {
+          previousResponseId: null,
+          intent: "approved_tool_execution",
+          targetAgent: targetRuntime.agent_key,
+          toolResultSummary: summarizeOperationalReceiptForSession(operationalReceipt) ?? summary,
+          status: "approved",
+          error: null,
+        });
+
+        return {
+          status: "answered",
+          stateLabel: `Routed to ${targetRuntime.display_name}`,
+          stateBody: `${targetRuntime.display_name} completed the approved action.`,
+          assistantMessage: summary,
+          routedAgentId: targetRuntime.id,
+          routedAgentName: targetRuntime.display_name,
+          routedAgentRole: targetRuntime.role_label,
+          intentLabel: "Approved action executed",
+          commandStateLabel: args.approvalScope === "session" ? "Session-approved action completed" : "Approved action completed",
+          draftRunId: run.id,
+          approvalDecision,
+          approvalScope: args.approvalScope,
+          approvalReason: null,
+          providerKey: targetRuntime.provider_key ?? null,
+          modelKey: targetRuntime.model_key,
+          toolTraces,
+          orchestration: {
+            intent: "approved_tool_execution",
+            targetAgentId: targetRuntime.id,
+            targetAgentName: targetRuntime.display_name,
+            confidence: 1,
+            requiresApproval: false,
+            toolCallRequested: true,
+            toolCalls: toolTraces,
+            userFacingSummary: summary,
+            answerKind: "informational",
+            draftRunTitle: null,
+            draftRunDescription: null,
+          },
+          actionLinks,
+          notificationIntents,
+          operationalReceipt,
+        };
+      }
+
       const request: AssistantGatewayRequest = {
         commandId: `cmd-approved-${Date.now().toString(36)}`,
         workspaceId: args.workspaceId,

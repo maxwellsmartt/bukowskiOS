@@ -20,6 +20,17 @@ type ToolDefinition = {
   execute: (args: Record<string, unknown>, context: AIGatewayToolContext) => ToolExecutionResult;
 };
 
+type ToolPolicyOptions = {
+  allowedToolNames?: readonly string[] | null;
+};
+
+const isToolAllowed = (toolName: string, toolNames: readonly string[] | null | undefined) => {
+  if (toolNames === undefined || toolNames === null) {
+    return true;
+  }
+  return toolNames.includes(toolName);
+};
+
 const asString = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 const asNumber = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
 const asOptionalString = (value: unknown) => {
@@ -2574,11 +2585,29 @@ export const createAgentToolRegistry = (
       parameters: tool.parameters,
       ...(tool.requiresApproval ? { requiresApproval: true } : {}),
     })),
+    definitionsFor(toolNames: readonly string[] | null | undefined) {
+      return definitions
+        .filter((tool) => isToolAllowed(tool.name, toolNames))
+        .map((tool) => ({
+          type: "function" as const,
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+          ...(tool.requiresApproval ? { requiresApproval: true } : {}),
+        }));
+    },
     requiresApproval(name: string): boolean {
       const tool = toolMap.get(name);
       return Boolean(tool?.requiresApproval);
     },
-    execute(name: string, rawArguments: string, context: AIGatewayToolContext) {
+    isAllowed(name: string, toolNames: readonly string[] | null | undefined) {
+      return isToolAllowed(name, toolNames);
+    },
+    execute(name: string, rawArguments: string, context: AIGatewayToolContext, policy?: ToolPolicyOptions) {
+      if (!isToolAllowed(name, policy?.allowedToolNames)) {
+        throw new Error(`Tool ${name} is not allowed for this agent.`);
+      }
+
       const tool = toolMap.get(name);
 
       if (!tool) {

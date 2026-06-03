@@ -14,12 +14,12 @@ Estado actual resumido:
   finance write permissions, refresh tokens expuestos al renderer, trusted
   renderer/will-navigate, workspace Edge Functions desde renderer, uploads
   Storage desde renderer, mutaciones admin workspace desde renderer y
-  `user_profiles.upsert` desde renderer.
+  `user_profiles.upsert` desde renderer, AI tool allowlists y approvals exactos.
 - Commits clave: `abcc669`, `8bb3424`, `376bdb7`, `168ab79`, `d2874fd`,
   `8b26185`, `b3baf44`.
 - Sigue sin darse visto bueno total para datos confidenciales hasta cerrar:
-  data-at-rest, AI tool policy/approvals, exports/support bundle redaction,
-  XLSX import hardening y release signing/notarization.
+  data-at-rest, exports/support bundle redaction, XLSX import hardening y
+  release signing/notarization.
 
 ## Resumen ejecutivo
 
