@@ -297,6 +297,94 @@
 - Riesgos remanentes:
   - `bajo`: todavía puede quedar copy heredado en datos demo y tests, pero ya no en el flujo principal del usuario
 
+## P0.5 — Remediación de auditoría profunda (junio 2026)
+
+### Slice S0 — Supabase workspace/RLS/document permissions
+- Estado: `done`
+- Objetivo: cerrar takeover por slug, roles cross-workspace, permisos de documentos financieros y mismatches de write permissions.
+- Área: `backend` + `infra`
+- Evidencia:
+  - commit `abcc669`
+  - migración `supabase/migrations/20260602130000_security_workspace_role_and_documents.sql`
+  - tests de regresión de permisos/RLS en `security-regression.test.ts`
+- Riesgos remanentes:
+  - `medio`: validar policies con queries reales por usuario/rol en Supabase remoto después de cada cambio de permisos.
+
+### Slice S1 — C4/C5 token broker y renderer trust
+- Estado: `done`
+- Objetivo: no entregar refresh tokens al renderer y cerrar navegación/preload a páginas no confiables.
+- Área: `backend` + `infra`
+- Evidencia:
+  - commit `8bb3424`
+  - `getStoredTokens` removido del preload/renderer
+  - `will-navigate` bloquea destinos no app
+  - trusted renderer exacto para packaged/dev
+- Riesgos remanentes:
+  - `medio`: el renderer todavía puede pedir access token para clientes de data; próximos slices deben mover más data access a IPC main o aplicar broker por capacidad.
+
+### Slice S2 — C4.2 renderer write paths
+- Estado: `done`
+- Objetivo: sacar del renderer las llamadas sensibles a Edge Functions, Storage y mutaciones admin/user profile.
+- Área: `backend` + `frontend`
+- Evidencia:
+  - `168ab79`: workspace Edge Functions detrás de IPC main
+  - `d2874fd`: uploads de avatares/assets detrás de IPC main
+  - `8b26185`: mutaciones admin de workspace detrás de IPC main
+  - `b3baf44`: `user_profiles.upsert` detrás de IPC main
+  - tests de regresión fallan si reaparecen writes directos en renderer
+- Riesgos remanentes:
+  - `medio`: quedan lecturas Supabase en renderer por diseño actual. No son el mismo riesgo que writes, pero siguen ampliando superficie si el renderer se compromete.
+
+### Slice S3 — AI tool execution policy
+- Estado: `next`
+- Objetivo: cerrar C6/C7/C8 antes de entregar con datos confidenciales.
+- Área: `backend`
+- Alcance sugerido:
+  - ningún tool write sensible se ejecuta por `unsupervised` client-side.
+  - tool catalog filtrado por agente, actor, workspace y connector source.
+  - approvals vinculadas a `toolName`, argumentos exactos, hash y resumen humano.
+  - cualquier argumento distinto crea una nueva approval.
+- Pruebas mínimas:
+  - tests unitarios del gateway con prompt/tool request fuera de permiso.
+  - test de approval replay con argumentos cambiados.
+- Riesgo que desbloquea:
+  - `crítico`: prompt injection o agente equivocado ejecutando acciones fuera del alcance aprobado.
+
+### Slice S4 — Export/support bundle/outbox redaction
+- Estado: `recommended-after-S3`
+- Objetivo: evitar que soporte, exports o pantallas de debug filtren payloads financieros/confidenciales.
+- Área: `backend` + `frontend`
+- Alcance sugerido:
+  - admin/re-auth o confirmación local fuerte para export/support bundle.
+  - export scoped por workspace.
+  - redacción por defecto de payloads crudos, tokens, rutas locales y datos financieros sensibles.
+  - `sync_outbox` UI muestra metadata y error saneado; payload crudo queda en main/DB.
+- Riesgo que desbloquea:
+  - `crítico/medio`: data leaks por archivos de soporte, screenshots o renderer comprometido.
+
+### Slice S5 — XLSX import hardening
+- Estado: `recommended-after-S4`
+- Objetivo: tratar estados bancarios como input no confiable.
+- Área: `backend`
+- Alcance sugerido:
+  - límites de tamaño, filas, columnas y hojas antes de parsear.
+  - parsing aislado/cancelable o reemplazo de `xlsx` si no hay versión segura.
+  - tests con archivos grandes/malformados.
+- Riesgo que desbloquea:
+  - `crítico/medio`: ReDoS, freeze o parsing inseguro de archivos bancarios.
+
+### Slice S6 — Data-at-rest
+- Estado: `strategic-blocker`
+- Objetivo: aprobar uso real con información confidencial en laptops y backups.
+- Área: `backend` + `infra`
+- Alcance sugerido:
+  - SQLCipher o cifrado equivalente de SQLite con key en Keychain.
+  - backups cifrados.
+  - document cache cifrado o política clara de ubicación/purge.
+  - smoke de recuperación y pérdida de keychain.
+- Riesgo que desbloquea:
+  - `blocker`: exposición de data local ante laptop robada, malware, backup o usuario del sistema.
+
 ## P1 — Producto usable y más confiable
 
 ### Slice 6 — Settings MVP

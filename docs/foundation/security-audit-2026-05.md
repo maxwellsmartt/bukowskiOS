@@ -31,6 +31,53 @@ Esta ronda cerró tres huecos concretos (un guard de lectura faltante, redacció
 de logs incompleta, y documentación del fail-open de lecturas), y dejó
 registrado el endurecimiento pendiente (unificación de handlers IPC).
 
+### Actualización 2026-06-03 - estado post auditoría profunda
+
+La auditoría profunda del 2026-06-02 cambió el estado de release: **todavía no
+hay visto bueno para alojar información confidencial sin restricciones**. Sí se
+han cerrado los riesgos críticos de takeover, permisos Supabase, tokens en
+renderer y navegación trusted renderer. El estado actual permite seguir con
+smoke interno y datos controlados, pero antes de entregar a Carlos con datos
+sensibles conviene cerrar los slices restantes de AI tools, exports/support
+bundle, dependencia `xlsx` y data-at-rest.
+
+Fixes cerrados desde la auditoría profunda:
+
+| Finding | Estado | Commits / evidencia |
+|---------|--------|---------------------|
+| B1 / C1 / C2 / C3 - workspace takeover, rol cross-workspace, Storage y permisos finance | `fixed` | `abcc669` + migración `20260602130000_security_workspace_role_and_documents.sql` |
+| C4 / C5 - refresh tokens expuestos, trusted renderer amplio y navegación no bloqueada | `fixed` | `8bb3424` |
+| PGRST201 por relaciones duplicadas de roles | `fixed` | `376bdb7` |
+| C4.2a - Edge Functions sensibles llamadas desde renderer | `fixed` | `168ab79` |
+| C4.2b - uploads Storage confiados desde renderer | `fixed` | `d2874fd` |
+| C4.2c - mutaciones admin de workspace desde renderer | `fixed` | `8b26185` |
+| C4.2d - `user_profiles.upsert` desde renderer | `fixed` | `b3baf44` |
+
+Riesgos abiertos más importantes:
+
+| Riesgo | Severidad | Significado práctico | Consecuencia si no se corrige |
+|--------|-----------|----------------------|-------------------------------|
+| B2 - SQLite, backups y documentos locales sin cifrado app-level | `blocker` para datos confidenciales | El login protege la UI, no necesariamente los archivos crudos en disco | Laptop robada, malware o backup del usuario podrían exponer finanzas, facturas y movimientos |
+| C6/C7/C8 - política de AI tools y approvals no suficientemente amarrada | `crítico` | Un agente o prompt injection podría intentar herramientas fuera de su rol o cambiar argumentos tras aprobación | Acciones no deseadas, fuga cross-domain o auditoría débil de decisiones asistidas |
+| C11/M3 - exports/support bundle/outbox payload con demasiados datos | `crítico/medio` | Herramientas de soporte pueden sacar datos sensibles sin suficiente compuerta o redacción | Filtraciones por soporte, screenshots, archivos compartidos o renderer comprometido |
+| C12 - release no notarizado puede confundirse con build final | `crítico` para distribución | Un build interno puede parecer listo para usuarios externos | Riesgo de confianza, Gatekeeper y supply chain |
+| C13 - parsing `xlsx` vulnerable/no aislado | `crítico/medio` según input | Los estados bancarios son archivos externos y deben tratarse como no confiables | Freeze, ReDoS o comportamiento inseguro al importar bancos |
+| M1 - permisos offline cacheados demasiado amplios | `medio` | El usuario desconectado puede ver una UI más permisiva que su estado remoto actual | Revocaciones tardías y confusión operativa |
+
+Próximo orden recomendado:
+
+1. **AI tool execution policy**: bloquear unsupervised para writes sensibles,
+   generar tool registry por agente/actor y amarrar aprobaciones a
+   `toolName + arguments + hash`.
+2. **Exports/support bundle/outbox redaction**: admin/re-auth para exports,
+   soporte redactado por defecto y payload crudo fuera del renderer.
+3. **XLSX import hardening**: límites de tamaño/filas/hojas, parsing aislado o
+   reemplazo/sandbox de `xlsx`, y tests con archivos malformados.
+4. **Data-at-rest**: definir SQLCipher o estrategia equivalente con keychain,
+   backups cifrados y política de purge/document cache.
+5. **Release integrity**: separar internal build vs release build; release debe
+   fallar si no hay signing/notarization reales.
+
 ---
 
 ## Hallazgos
@@ -146,10 +193,23 @@ máquina (requiere acceso físico/usuario). Sin acción esta ronda.
 |--------|--------|
 | `d6069a6` | Redacción de JWT en logs (H-2) + doc/test del fail-open de lecturas (H-3) |
 | `a5a3601` | `assertCrewDocumentAccess` en open/delete de documentos de crew (H-1) |
+| `abcc669` | Migración Supabase de permisos/RLS/documentos y hardening de finance/workspace roles |
+| `8bb3424` | Tokens Supabase fuera de `getStoredTokens`; trusted renderer exacto y `will-navigate` cerrado |
+| `376bdb7` | Embed explícito `roles!workspace_memberships_workspace_role_fk` para evitar PGRST201 |
+| `168ab79` | Edge Functions sensibles de workspace movidas detrás de IPC main |
+| `d2874fd` | Uploads de avatares/assets de workspace movidos a IPC main |
+| `8b26185` | Mutaciones admin de workspace movidas a IPC main |
+| `b3baf44` | `user_profiles.upsert` movido a IPC main y cubierto por test de regresión |
 
 ## Pendiente / seguimiento
 
-- **H-4**: migrar handlers de admin a `safeHandle` cuando se toquen.
+- **B2**: cifrar SQLite/backups/document cache antes de aprobar uso amplio con
+  datos confidenciales.
+- **C6/C7/C8**: cerrar política de AI tools y approvals exactos.
+- **C11/M3**: reducir datos expuestos por exports/support bundle/outbox.
+- **C13**: endurecer importación XLSX de bancos.
+- **H-4**: continuar migrando cualquier handler restante a `safeHandle` cuando
+  se toque.
 - Revisar con Carlos qué permisos tiene el rol "Contable" sobre treasury vs.
   admin (ya sembrado con read/review/export).
 - Auditoría completa post-implementación (solicitada por el usuario) — ver

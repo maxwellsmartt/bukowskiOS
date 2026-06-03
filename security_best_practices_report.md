@@ -2,6 +2,25 @@
 
 Fecha: 2026-06-02
 
+## Actualizacion 2026-06-03
+
+Este reporte queda como evidencia de una auditoria local previa. Fue superado
+por la auditoria profunda del 2026-06-02 y por las remediaciones posteriores en
+`docs/foundation/security-audit-2026-05.md`.
+
+Estado actual resumido:
+
+- Cerrado: workspace takeover, role/workspace binding, Storage permissions,
+  finance write permissions, refresh tokens expuestos al renderer, trusted
+  renderer/will-navigate, workspace Edge Functions desde renderer, uploads
+  Storage desde renderer, mutaciones admin workspace desde renderer y
+  `user_profiles.upsert` desde renderer.
+- Commits clave: `abcc669`, `8bb3424`, `376bdb7`, `168ab79`, `d2874fd`,
+  `8b26185`, `b3baf44`.
+- Sigue sin darse visto bueno total para datos confidenciales hasta cerrar:
+  data-at-rest, AI tool policy/approvals, exports/support bundle redaction,
+  XLSX import hardening y release signing/notarization.
+
 ## Resumen ejecutivo
 
 Se convirtio la auditoria semanal en una automatizacion con plantilla fija de reporte: resumen ejecutivo, hallazgos por impacto, fixes aplicados, pruebas/verificaciones y deuda tecnica.
