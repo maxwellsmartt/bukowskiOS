@@ -23,7 +23,7 @@ module.exports = {
   asarUnpack: ["dist/**"],
   extraResources: [
     {
-      from: "src/shared/assets/inbox/logos/bukowskiOS-desktop-logo.png",
+      from: "src/shared/assets/inbox/logos/bukowskiOS_logo_white.png",
       to: "startup-logo.png",
     },
     {

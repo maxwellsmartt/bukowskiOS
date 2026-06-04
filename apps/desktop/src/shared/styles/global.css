@@ -1700,12 +1700,32 @@ button:disabled {
   line-height: 1.45;
 }
 
+/* Subtle cross-fade so the login options and the OAuth-waiting card swap in
+   place without a jump (the card replaces the options, never stacks below). */
+.auth-options {
+  display: contents;
+}
+.auth-oauth-waiting {
+  animation: auth-soft-in 200ms ease-out both;
+}
+
+@keyframes auth-soft-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .auth-oauth-waiting {
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr);
-  gap: 11px;
+  gap: 11px 13px;
   align-items: center;
-  padding: 13px;
+  padding: 15px;
   border: 1px solid rgba(148, 184, 230, 0.22);
   border-radius: 13px;
   background:
@@ -11007,6 +11027,15 @@ select.field-input {
   letter-spacing: 0;
   color: rgba(246, 188, 188, 0.95);
   text-shadow: 0 0 34px rgba(246, 188, 188, 0.18);
+}
+
+.app-startup-logo-img {
+  width: auto;
+  height: 30px;
+  max-width: min(260px, 70vw);
+  object-fit: contain;
+  margin-bottom: 4px;
+  filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.5));
 }
 
 .app-startup-gate-core strong {

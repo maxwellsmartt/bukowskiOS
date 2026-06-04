@@ -55,12 +55,30 @@ export const loadMainWindowContent = (window: BrowserWindow, devServerUrl: strin
 };
 
 
+// Read the real bukowskiOS horizontal wordmark (white "bukowski" + rose "OS",
+// 458×115) as a base64 data URL. Tries the packaged resource first, then the
+// dev asset paths. Falls back to a crisp HTML text wordmark if the file is
+// missing so the splash never breaks.
+const readStartupWordmark = (): string | null => {
+  const candidates = [
+    path.join(process.resourcesPath, "startup-logo.png"),
+    path.join(process.cwd(), "src/shared/assets/inbox/logos/bukowskiOS_logo_white.png"),
+    path.join(process.cwd(), "apps/desktop/src/shared/assets/inbox/logos/bukowskiOS_logo_white.png"),
+  ];
+  const logoPath = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!logoPath) return null;
+  try {
+    return `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
+  } catch {
+    return null;
+  }
+};
+
 const createStartupHtml = () => {
-  // Render the wordmark as crisp HTML text (white "bukowski" + rose "OS") so
-  // it is always pixel-perfect and centered — independent of any logo PNG,
-  // its transparent padding, or the build cache. This is the same brand
-  // treatment used elsewhere, just dependency-free for the boot splash.
-  const logoMarkup = `<div class="wordmark" role="img" aria-label="bukowskiOS">bukowski<span>OS</span></div>`;
+  const wordmarkDataUrl = readStartupWordmark();
+  const logoMarkup = wordmarkDataUrl
+    ? `<img class="wordmark-img" src="${wordmarkDataUrl}" alt="bukowskiOS" />`
+    : `<div class="wordmark" role="img" aria-label="bukowskiOS">bukowski<span>OS</span></div>`;
 
   return `<!doctype html>
 <html>
@@ -102,6 +120,13 @@ const createStartupHtml = () => {
         place-items: center;
         font-weight: 800;
         font-size: 28px;
+      }
+      .wordmark-img {
+        width: auto;
+        height: 30px;
+        max-width: min(280px, 72vw);
+        object-fit: contain;
+        filter: drop-shadow(0 14px 30px rgba(0,0,0,0.5));
       }
       .wordmark {
         font-size: 30px;

@@ -1,18 +1,20 @@
+import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.png";
+import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
+
 type AppStartupGateProps = {
   message?: string;
   detail?: string;
 };
 
-export const AppStartupGate = ({
-  message = "Starting bukowskiOS",
-  detail = "Almost ready...",
-}: AppStartupGateProps) => (
+export const AppStartupGate = ({ detail = "Almost ready..." }: AppStartupGateProps) => (
   <div className="app-startup-gate" role="status" aria-live="polite">
     <div className="app-startup-gate-core">
-      <div className="app-startup-logo" aria-hidden="true">
-        OS
-      </div>
-      <strong>{message}</strong>
+      <img
+        className="app-startup-logo-img"
+        src={brandLogoWhite1x}
+        srcSet={`${brandLogoWhite1x} 1x, ${brandLogoWhite} 2x`}
+        alt="bukowskiOS"
+      />
       <span>{detail}</span>
       <div className="app-startup-progress" aria-hidden="true">
         <span />

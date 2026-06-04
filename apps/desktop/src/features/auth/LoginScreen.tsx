@@ -81,6 +81,8 @@ export const LoginScreen = () => {
           <h1 id="login-title">{t("auth.login.title")}</h1>
         </div>
 
+        {!pendingOAuthProvider ? (
+        <div className="auth-options">
         <form
           className="auth-form"
           onSubmit={(event) => {
@@ -190,8 +192,8 @@ export const LoginScreen = () => {
             {t("auth.login.setupPassword")}
           </button>
         </div>
-
-        {pendingOAuthProvider ? (
+        </div>
+        ) : (
           <div className="auth-oauth-waiting" role="status" aria-live="polite">
             <div className="auth-oauth-spinner" aria-hidden="true" />
             <div>
@@ -208,7 +210,7 @@ export const LoginScreen = () => {
               {t("auth.login.useAnotherMethod")}
             </button>
           </div>
-        ) : null}
+        )}
 
         {status || authError ? <p className="auth-status">{status ?? authError}</p> : null}
       </section>
