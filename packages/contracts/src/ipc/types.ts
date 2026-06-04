@@ -70,6 +70,7 @@ export type AppDiagnosticsSnapshot = {
   syncOutboxPendingCount: number;
   syncOutboxProcessingCount: number;
   syncOutboxFailedCount: number;
+  databaseEncrypted: boolean;
   encryptionAvailable: boolean;
   internalBuildArtifacts: string[];
 };

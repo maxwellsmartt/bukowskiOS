@@ -19,6 +19,7 @@ import { useCatalogData } from "@features/projects/useProjectsData";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { useLocale } from "@shared/hooks/useLocale";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
@@ -39,6 +40,7 @@ const emptyDiagnostics: AppDiagnosticsSnapshot = {
   syncOutboxPendingCount: 0,
   syncOutboxProcessingCount: 0,
   syncOutboxFailedCount: 0,
+  databaseEncrypted: false,
   encryptionAvailable: false,
   internalBuildArtifacts: [],
 };
@@ -327,6 +329,7 @@ export const SettingsPage = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const { t } = useTranslation();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const { formatDateTime } = useLocale();
   const formatDateLabel = (value: string | null) => {
     if (!value) return t("common.never");
@@ -425,6 +428,57 @@ export const SettingsPage = () => {
     }
   };
 
+  const confirmSensitiveExport = async (kind: "workspaceData" | "supportBundle" | "logs") => {
+    const exportCopy =
+      kind === "workspaceData"
+        ? {
+            title: t("settings.advanced.dataExport.confirmTitle", { defaultValue: "Exportar datos del workspace" }),
+            body: t("settings.advanced.dataExport.confirmBody", {
+              defaultValue:
+                "Este archivo puede incluir datos operativos y financieros del workspace actual. Úsalo solo para soporte o respaldo controlado.",
+            }),
+            confirmLabel: t("settings.advanced.dataExport.confirmAction", { defaultValue: "Exportar de todos modos" }),
+          }
+        : kind === "supportBundle"
+          ? {
+              title: t("settings.advanced.support.confirmBundleTitle", { defaultValue: "Exportar support bundle" }),
+              body: t("settings.advanced.support.confirmBundleBody", {
+                defaultValue:
+                  "El support bundle puede incluir diagnósticos, errores recientes y metadata local redactada. Compártelo solo con personas de confianza.",
+              }),
+              confirmLabel: t("settings.advanced.support.confirmBundleAction", { defaultValue: "Exportar bundle" }),
+            }
+          : {
+              title: t("settings.advanced.support.confirmLogsTitle", { defaultValue: "Exportar logs recientes" }),
+              body: t("settings.advanced.support.confirmLogsBody", {
+                defaultValue:
+                  "Los logs salen redactados, pero igual pueden revelar contexto operativo. Verifica el destinatario antes de compartirlos.",
+              }),
+              confirmLabel: t("settings.advanced.support.confirmLogsAction", { defaultValue: "Exportar logs" }),
+            };
+
+    return confirm({
+      title: exportCopy.title,
+      body: exportCopy.body,
+      confirmLabel: exportCopy.confirmLabel,
+      details: (
+        <div className="summary-grid">
+          <div className="summary-row">
+            <span className="summary-label">{t("settings.advanced.dataExport.scope", { defaultValue: "Scope" })}</span>
+            <span className="summary-value">{activeWorkspaceName}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">{t("settings.advanced.dataExport.format", { defaultValue: "Format" })}</span>
+            <span className="summary-value">
+              {kind === "workspaceData" ? "JSON" : kind === "supportBundle" ? "Bundle" : "TXT"}
+            </span>
+          </div>
+        </div>
+      ),
+      tone: "danger",
+    });
+  };
+
   const dataHealthRows = useMemo(
     () => [
       {
@@ -442,6 +496,12 @@ export const SettingsPage = () => {
       {
         label: t("settings.data.rows.dataCheck"),
         value: t(`settings.integrity.${integrityLabelKey(diagnostics.lastIntegrityCheckStatus)}`),
+      },
+      {
+        label: t("settings.data.rows.localDbEncryption", { defaultValue: "Local database encryption" }),
+        value: diagnostics.databaseEncrypted
+          ? t("settings.data.rows.localDbEncrypted", { defaultValue: "Encrypted at rest" })
+          : t("settings.data.rows.localDbUnencrypted", { defaultValue: "Not encrypted yet" }),
       },
       {
         label: t("settings.data.rows.lastIntegrityCheck"),
@@ -1112,7 +1172,11 @@ export const SettingsPage = () => {
               <button
                 className="action-primary-button"
                 disabled={isExportingSupportBundle}
-                onClick={() => void runAction(() => window.bukowskiApp!.exportSupportBundle(), setIsExportingSupportBundle)}
+                onClick={async () => {
+                  const confirmed = await confirmSensitiveExport("supportBundle");
+                  if (!confirmed) return;
+                  await runAction(() => window.bukowskiApp!.exportSupportBundle(), setIsExportingSupportBundle);
+                }}
                 type="button"
               >
                 {isExportingSupportBundle ? t("settings.advanced.support.exporting") : t("settings.advanced.support.exportBundle")}
@@ -1120,7 +1184,11 @@ export const SettingsPage = () => {
               <button
                 className="ghost-control"
                 disabled={isExportingLogs}
-                onClick={() => void runAction(() => window.bukowskiApp!.exportRecentLogs(), setIsExportingLogs)}
+                onClick={async () => {
+                  const confirmed = await confirmSensitiveExport("logs");
+                  if (!confirmed) return;
+                  await runAction(() => window.bukowskiApp!.exportRecentLogs(), setIsExportingLogs);
+                }}
                 type="button"
               >
                 {isExportingLogs ? t("settings.advanced.support.exportingLogs") : t("settings.advanced.support.exportLogs")}
@@ -1165,7 +1233,11 @@ export const SettingsPage = () => {
               <button
                 className="action-primary-button"
                 disabled={isExporting}
-                onClick={() => void runAction(() => window.bukowskiApp!.exportWorkspaceData(), setIsExporting)}
+                onClick={async () => {
+                  const confirmed = await confirmSensitiveExport("workspaceData");
+                  if (!confirmed) return;
+                  await runAction(() => window.bukowskiApp!.exportWorkspaceData(), setIsExporting);
+                }}
                 type="button"
               >
                 {isExporting ? t("settings.advanced.dataExport.exporting") : t("settings.advanced.dataExport.exportJson")}
@@ -1215,6 +1287,7 @@ export const SettingsPage = () => {
         title={t("settings.team.deleteDialog.title")}
         tone="danger"
       />
+      {confirmDialog}
     </div>
   );
 };

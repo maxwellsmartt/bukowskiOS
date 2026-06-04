@@ -2,9 +2,9 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
 
 import { assertPathWithinRoot } from "../../security/pathSafety";
+import { parseBoundedXlsxGrid } from "../../../../src/shared/lib/xlsxSafety";
 
 // Extracts machine-readable content from an attached document so agents can
 // reason over it (free docs) or import it (bank statements). CSV/XLSX use the
@@ -46,12 +46,7 @@ const parseCsvRows = (text: string): string[][] => {
 };
 
 const parseXlsxRows = (buffer: Buffer): string[][] => {
-  const workbook = XLSX.read(buffer, { type: "buffer" });
-  const sheetName = workbook.SheetNames[0];
-  if (!sheetName) return [];
-  const sheet = workbook.Sheets[sheetName];
-  const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false }) as unknown[][];
-  return grid.map((row) => row.map((cell) => (cell == null ? "" : String(cell))));
+  return parseBoundedXlsxGrid(new Uint8Array(buffer), "attached XLSX");
 };
 
 const normalizeExtractedPdfText = (value: string): string =>

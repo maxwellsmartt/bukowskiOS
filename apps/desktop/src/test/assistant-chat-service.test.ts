@@ -148,6 +148,9 @@ describe("assistant chat service", () => {
     expect(attachmentRow).toBeTruthy();
     expect(attachmentRow?.status).toBe("available");
     expect(fs.existsSync(attachmentRow?.storage_path ?? "")).toBe(true);
+    if (process.platform !== "win32") {
+      expect(fs.statSync(attachmentRow!.storage_path).mode & 0o777).toBe(0o600);
+    }
 
     fs.unlinkSync(attachmentRow?.storage_path ?? "");
     const snapshotWithMissingAttachment = service.getSnapshot();

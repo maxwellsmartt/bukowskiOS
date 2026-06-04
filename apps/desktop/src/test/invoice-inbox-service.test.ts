@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import fs, { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -96,6 +96,12 @@ describe("invoice inbox service", () => {
     });
     expect(result.queuedCount).toBe(1);
     expect(ids).toHaveLength(1);
+    const storedPath = (
+      database.prepare("SELECT storage_path FROM invoice_extractions WHERE id = ?").get(ids[0]) as { storage_path: string }
+    ).storage_path;
+    if (process.platform !== "win32") {
+      expect(fs.statSync(storedPath).mode & 0o777).toBe(0o600);
+    }
 
     const match = inbox.autoMatch(workspaceId, fields);
     expect(match).not.toBeNull();

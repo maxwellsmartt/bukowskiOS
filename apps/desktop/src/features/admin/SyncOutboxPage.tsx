@@ -34,6 +34,7 @@ const emptyDiagnostics: AppDiagnosticsSnapshot = {
   syncOutboxPendingCount: 0,
   syncOutboxProcessingCount: 0,
   syncOutboxFailedCount: 0,
+  databaseEncrypted: false,
   encryptionAvailable: false,
   internalBuildArtifacts: [],
 };

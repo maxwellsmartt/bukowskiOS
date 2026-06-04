@@ -23,8 +23,11 @@ let isInitialized = false;
 let logsDirectoryPath: string | null = null;
 const isElectronAppAvailable = () => typeof app !== "undefined" && app !== null;
 
-const redactText = (value: string) =>
+export const redactSensitiveText = (value: string) =>
   value
+    // Local absolute paths in support bundles and screenshots.
+    .replace(/(?:\/Users\/|\/users\/|\/home\/|\/var\/folders\/)[^\s"'`]+/g, "[redacted-path]")
+    .replace(/[A-Za-z]:\\Users\\[^\s"'`]+/g, "[redacted-path]")
     .replace(/(Bearer\s+)[A-Za-z0-9._-]+/gi, "$1[redacted]")
     // JWTs (Supabase access/refresh tokens): three base64url segments.
     .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[redacted-jwt]")
@@ -55,7 +58,7 @@ const serializeMetadata = (metadata: unknown) => {
   }
 
   if (metadata instanceof Error) {
-    return redactText(
+    return redactSensitiveText(
       JSON.stringify({
         name: metadata.name,
         message: metadata.message,
@@ -65,13 +68,13 @@ const serializeMetadata = (metadata: unknown) => {
   }
 
   if (typeof metadata === "string") {
-    return redactText(metadata);
+    return redactSensitiveText(metadata);
   }
 
   try {
-    return redactText(JSON.stringify(metadata));
+    return redactSensitiveText(JSON.stringify(metadata));
   } catch {
-    return redactText(String(metadata));
+    return redactSensitiveText(String(metadata));
   }
 };
 
@@ -92,7 +95,7 @@ const resolveLogsDirectory = (customPath?: string) => {
 };
 
 const fallbackConsole = (level: LogLevel, scope: string, message: string, metadata?: unknown) => {
-  const line = [`[${scope}]`, redactText(message), serializeMetadata(metadata)].filter(Boolean).join(" ");
+  const line = [`[${scope}]`, redactSensitiveText(message), serializeMetadata(metadata)].filter(Boolean).join(" ");
   const writer =
     level === "error"
       ? console.error
@@ -161,12 +164,12 @@ export const listRecentLogFiles = (limit = 5): AppLogFileDescriptor[] => {
 
 export const readCombinedRecentLogs = (limit = 5) =>
   listRecentLogFiles(limit)
-    .map((file) => `===== ${file.name} (${file.updatedAt}) =====\n${fs.readFileSync(file.path, "utf8")}`)
+    .map((file) => `===== ${file.name} (${file.updatedAt}) =====\n${redactSensitiveText(fs.readFileSync(file.path, "utf8"))}`)
     .join("\n\n");
 
 export const getDesktopLogger = (scope: string): DesktopLogger => {
   const write = (level: LogLevel, message: string, metadata?: unknown) => {
-    const sanitizedMessage = redactText(message);
+    const sanitizedMessage = redactSensitiveText(message);
     const serializedMetadata = serializeMetadata(metadata);
     const text = [sanitizedMessage, serializedMetadata].filter(Boolean).join(" ");
 

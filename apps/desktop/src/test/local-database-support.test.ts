@@ -59,5 +59,8 @@ describe("local database support", () => {
 
     expect(fs.existsSync(backupPath)).toBe(true);
     expect(shouldRefreshBackup(backupPath, 24 * 60 * 60 * 1000)).toBe(false);
+    if (process.platform !== "win32") {
+      expect(fs.statSync(backupPath).mode & 0o777).toBe(0o600);
+    }
   });
 });

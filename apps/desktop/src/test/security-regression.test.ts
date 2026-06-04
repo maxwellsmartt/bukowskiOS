@@ -209,6 +209,50 @@ describe("security regression checks", () => {
     expect(inviteServiceSource).toContain("sendWorkspaceInvite");
   });
 
+  it("sanitizes sync outbox payload previews before they reach the renderer", () => {
+    const source = readText("apps/desktop/electron/main/services/data/syncOutboxWorkerService.ts");
+
+    expect(source).toContain("sanitizeOutboxPayloadJson(row.payload_json)");
+    expect(source).not.toContain("payloadJson: row.payload_json");
+  });
+
+  it("keeps XLSX imports behind bounded parsing helpers", () => {
+    const documentExtractionSource = readText("apps/desktop/electron/main/services/data/documentExtractionService.ts");
+    const bankParserSource = readText("apps/desktop/src/features/finance/treasury/bankStatementParsers.ts");
+    const xlsxSafetySource = readText("apps/desktop/src/shared/lib/xlsxSafety.ts");
+
+    expect(documentExtractionSource).toContain("parseBoundedXlsxGrid");
+    expect(bankParserSource).toContain("parseBoundedXlsxGrid");
+    expect(xlsxSafetySource).toContain("MAX_XLSX_BYTES");
+    expect(xlsxSafetySource).toContain("sheetRows: MAX_XLSX_ROWS + 1");
+  });
+
+  it("keeps sensitive exports behind an explicit confirmation step in Settings", () => {
+    const settingsSource = readText("apps/desktop/src/features/admin/SettingsPage.tsx");
+
+    expect(settingsSource).toContain('const confirmSensitiveExport = async (kind: "workspaceData" | "supportBundle" | "logs") =>');
+    expect(settingsSource).toContain('const confirmed = await confirmSensitiveExport("supportBundle")');
+    expect(settingsSource).toContain('const confirmed = await confirmSensitiveExport("logs")');
+    expect(settingsSource).toContain('const confirmed = await confirmSensitiveExport("workspaceData")');
+  });
+
+  it("keeps local at-rest hardening centralized in the storage privacy helper", () => {
+    const backupSource = readText("apps/desktop/electron/main/services/data/localDatabaseSupport.ts");
+    const secretStoreSource = readText("apps/desktop/electron/main/services/ai/aiSecretStore.ts");
+    const fileUploadSource = readText("apps/desktop/electron/main/services/data/fileUploadService.ts");
+    const invoiceInboxSource = readText("apps/desktop/electron/main/services/data/invoiceInboxService.ts");
+    const assistantChatSource = readText("apps/desktop/electron/main/services/data/assistantChatService.ts");
+    const helperSource = readText("apps/desktop/electron/main/security/storagePrivacy.ts");
+
+    expect(helperSource).toContain("PRIVATE_FILE_MODE = 0o600");
+    expect(helperSource).toContain("PRIVATE_DIRECTORY_MODE = 0o700");
+    expect(backupSource).toContain("ensurePrivateFile(backupPath)");
+    expect(secretStoreSource).toContain("writePrivateFile(getSecretFilePath()");
+    expect(fileUploadSource).toContain("ensurePrivateFile(storagePath)");
+    expect(invoiceInboxSource).toContain("writePrivateFile(storagePath, buffer)");
+    expect(assistantChatSource).toContain("writePrivateFile(storagePath, buffer)");
+  });
+
   it("keeps trusted avatar and workspace image uploads behind main-process IPC", () => {
     const rendererUploadSources = [
       "apps/desktop/src/features/admin/UserAccountSettings.tsx",

@@ -8,6 +8,7 @@ import type { FileDeleteMutationResult, FileUploadMutationResult } from "@contra
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
 import { assertPathWithinRoot } from "../../security/pathSafety";
+import { ensurePrivateDirectory, ensurePrivateFile } from "../../security/storagePrivacy";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
 
@@ -136,6 +137,7 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
     const storageRoot = options.getStorageRoot?.() || options.userDataPath;
     const rootDirectory = path.join(storageRoot, `${domain}-files`, workspaceId, entityId);
     fileSystem.mkdirSync(rootDirectory, { recursive: true });
+    ensurePrivateDirectory(rootDirectory);
 
     if (domain === "asset") {
       const assetRow = db.prepare("SELECT id FROM assets WHERE id = ? LIMIT 1").get(entityId) as { id: string } | undefined;
@@ -267,6 +269,7 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
         const storagePath = path.join(rootDirectory, `${fileId}${extension}`);
         const byteSize = fileSystem.statSync(sourceFilePath).size;
         fileSystem.copyFileSync(sourceFilePath, storagePath);
+        ensurePrivateFile(storagePath);
 
         if (domain === "asset") {
           insertStatement.run(

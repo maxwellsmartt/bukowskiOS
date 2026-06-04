@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { describe, expect, it } from "vitest";
 
 import { extractDocument } from "../../electron/main/services/data/documentExtractionService";
+import { MAX_XLSX_BYTES } from "../shared/lib/xlsxSafety";
 
 const tmpFile = (suffix: string) =>
   path.join(os.tmpdir(), `doc-extract-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${suffix}`);
@@ -74,5 +75,22 @@ describe("document extraction service", () => {
     );
     fs.rmSync(allowedRoot, { recursive: true, force: true });
     fs.unlinkSync(file);
+  });
+
+  it("rejects oversized XLSX attachments before parsing them", async () => {
+    const dir = tmpDir();
+    const file = path.join(dir, "huge.xlsx");
+    fs.writeFileSync(file, Buffer.alloc(MAX_XLSX_BYTES + 1, 0x31));
+
+    await expect(
+      extractDocument(
+        file,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "huge.xlsx",
+        dir,
+      ),
+    ).rejects.toThrow("Spreadsheet import rejected: attached XLSX exceeds");
+
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

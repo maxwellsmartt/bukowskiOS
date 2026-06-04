@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, expect, test } from "vitest";
 
-import { getDesktopLogger, initializeDesktopLogger, listRecentLogFiles } from "../../electron/main/services/logger";
+import { getDesktopLogger, initializeDesktopLogger, listRecentLogFiles, redactSensitiveText } from "../../electron/main/services/logger";
 
 const tempDirectories: string[] = [];
 
@@ -70,4 +70,12 @@ test("desktop logger redacts Anthropic keys, Telegram bot tokens, JSON secret fi
   // URL token query gets redacted but the host stays for debugging.
   expect(content).not.toContain("verylongopaquesecretvalue123");
   expect(content).toContain("example.test");
+});
+
+test("desktop logger redacts local absolute paths when preparing support-safe text", () => {
+  const text = redactSensitiveText('Open /Users/ernestomaxwell/Library/Application Support/bukowskiOS/db.sqlite and C:\\Users\\Ernesto\\Desktop\\dump.json');
+
+  expect(text).not.toContain("/Users/ernestomaxwell/");
+  expect(text).not.toContain("C:\\Users\\Ernesto\\");
+  expect(text).toContain("[redacted-path]");
 });

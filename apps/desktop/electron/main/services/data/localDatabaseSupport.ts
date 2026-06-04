@@ -1,5 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
+import path from "node:path";
+
+import { ensurePrivateDirectory, ensurePrivateFile } from "../../security/storagePrivacy";
 
 type SqlMigration = {
   version: string;
@@ -84,11 +87,13 @@ export const runIntegrityChecks = (database: DatabaseSync) => {
 };
 
 export const createDatabaseBackup = (database: DatabaseSync, backupPath: string) => {
+  ensurePrivateDirectory(path.dirname(backupPath));
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
   }
 
   database.exec(`VACUUM INTO '${escapeSqliteString(backupPath)}';`);
+  ensurePrivateFile(backupPath);
 };
 
 export const shouldRefreshBackup = (backupPath: string, maxAgeMs: number) => {

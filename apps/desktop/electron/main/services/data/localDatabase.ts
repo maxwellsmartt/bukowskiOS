@@ -86,18 +86,24 @@ import { applySchedulingFoundationMigration, bootstrapSchedulingFoundation } fro
 import { createSupportDiagnosticsService, type SupportDiagnosticsService } from "./supportDiagnosticsService";
 import { createSyncOutboxWorkerService, summarizeSyncOutboxWorker } from "./syncOutboxWorkerService";
 import { createUserAdminService, type UserAdminService } from "./userAdminService";
+import { createLocalDatabaseKeyStore } from "../auth/databaseKeyStore";
 import { createSupabaseTokenStore } from "../auth/tokenStore";
 import { createWorkspaceAccessGuard, type WorkspaceAccessGuard } from "../auth/workspaceAccessGuard";
 import { createConnectorBridgeService } from "../connectors/connectorBridgeService";
 import { createTelegramConnectorService } from "../connectors/telegramConnectorService";
 import {
+  createEncryptedDatabaseBackup,
+  isPlaintextSqliteDatabase,
+  openOrMigrateEncryptedDatabase,
+} from "./databaseEncryption";
+import {
   applyTrackedSqlMigrations,
   applyTrackedStep,
-  createDatabaseBackup,
   runIntegrityChecks,
   shouldRefreshBackup,
 } from "./localDatabaseSupport";
 import { getDesktopLogger, initializeDesktopLogger } from "../logger";
+import { ensurePrivateDirectory, ensurePrivateFile } from "../../security/storagePrivacy";
 
 type ProjectMutationService = ReturnType<typeof createProjectMutationService>;
 type CatalogMutationService = ReturnType<typeof createCatalogMutationService>;
@@ -136,6 +142,7 @@ type LocalDatabaseRuntime = {
   database: DatabaseSync;
   databasePath: string;
   backupPath: string;
+  databaseEncrypted: boolean;
   foundationReads: FoundationReadService;
   agentReads: AgentReadService;
   assistantChatService: AssistantChatService;
@@ -265,6 +272,19 @@ const runStartupStep = <T>(label: string, step: () => T): T => {
   logger.info(`Startup step started: ${label}.`);
   try {
     const result = step();
+    logger.info(`Startup step completed: ${label}.`, { durationMs: Date.now() - startedAt });
+    return result;
+  } catch (error) {
+    logger.error(`Startup step failed: ${label}.`, error);
+    throw error;
+  }
+};
+
+const runAsyncStartupStep = async <T>(label: string, step: () => Promise<T>): Promise<T> => {
+  const startedAt = Date.now();
+  logger.info(`Startup step started: ${label}.`);
+  try {
+    const result = await step();
     logger.info(`Startup step completed: ${label}.`, { durationMs: Date.now() - startedAt });
     return result;
   } catch (error) {
@@ -539,51 +559,78 @@ const seedProjectShellForWorkspace = (database: DatabaseSync, workspaceId: strin
   return projectIdBySourceId.size;
 };
 
-const withRecoveredDatabase = (databasePath: string, backupPath: string) => {
-  const openDatabase = () => {
-    const database = new DatabaseSync(databasePath);
-    database.exec("PRAGMA journal_mode = WAL;");
-    database.exec("PRAGMA foreign_keys = ON;");
-    return database;
-  };
-
-  let database = openDatabase();
+const withRecoveredDatabase = async (databasePath: string, backupPath: string) => {
+  const keyStore = createLocalDatabaseKeyStore();
+  let { database: rawDatabase, databaseEncrypted, migrationPerformed } = await openOrMigrateEncryptedDatabase({
+    databasePath,
+    keyStore,
+  });
+  let database = rawDatabase as unknown as DatabaseSync;
 
   try {
     runIntegrityChecks(database);
     lastIntegrityCheckAt = new Date().toISOString();
     lastIntegrityCheckStatus = "healthy";
-    return database;
+    return {
+      database: rawDatabase,
+      databaseEncrypted,
+      migrationPerformed,
+    };
   } catch (error) {
     lastIntegrityCheckAt = new Date().toISOString();
     lastIntegrityCheckStatus = "failed";
-    database.close();
+    rawDatabase.close();
 
     if (!fs.existsSync(backupPath)) {
       throw error;
     }
 
     fs.copyFileSync(backupPath, databasePath);
-    database = openDatabase();
+    ensurePrivateFile(databasePath);
+    ({ database: rawDatabase, databaseEncrypted, migrationPerformed } = await openOrMigrateEncryptedDatabase({
+      databasePath,
+      keyStore,
+    }));
+    database = rawDatabase as unknown as DatabaseSync;
     runIntegrityChecks(database);
     lastIntegrityCheckAt = new Date().toISOString();
     lastIntegrityCheckStatus = "healthy";
-    return database;
+    return {
+      database: rawDatabase,
+      databaseEncrypted,
+      migrationPerformed,
+    };
   }
 };
 
-const createRuntime = (): LocalDatabaseRuntime => {
-  const databasePath = path.join(app.getPath("userData"), "bukowski-foundation.sqlite");
-  const backupPath = path.join(app.getPath("userData"), "bukowski-foundation.backup.sqlite");
-  initializeDesktopLogger(path.join(app.getPath("userData"), "logs"));
+const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
+  const userDataPath = app.getPath("userData");
+  ensurePrivateDirectory(userDataPath);
+  const databasePath = path.join(userDataPath, "bukowski-foundation.sqlite");
+  const backupPath = path.join(userDataPath, "bukowski-foundation.backup.sqlite");
+  initializeDesktopLogger(path.join(userDataPath, "logs"));
   logger.info("Initializing local database runtime.", {
     profileDatasetEnabled: process.env.BUKOWSKI_PROFILE_DATASET === "1",
   });
   const databaseAlreadyExisted = fs.existsSync(databasePath);
-  const database = runStartupStep("open and verify local database", () => withRecoveredDatabase(databasePath, backupPath));
+  const backupRequiresEncryption = fs.existsSync(backupPath) && isPlaintextSqliteDatabase(backupPath);
+  const {
+    database: rawDatabase,
+    databaseEncrypted,
+    migrationPerformed,
+  } = await runAsyncStartupStep("open and verify local database", () => withRecoveredDatabase(databasePath, backupPath));
+  const database = rawDatabase as unknown as DatabaseSync;
+  ensurePrivateFile(databasePath);
+  if (fs.existsSync(backupPath)) {
+    ensurePrivateFile(backupPath);
+  }
 
-  if (databaseAlreadyExisted && shouldRefreshBackup(backupPath, backupMaxAgeMs)) {
-    runStartupStep("refresh startup database backup", () => createDatabaseBackup(database, backupPath));
+  if (migrationPerformed) {
+    logger.info("Migrated local SQLite database to SQLCipher-compatible encryption.");
+  }
+
+  if (databaseAlreadyExisted && (migrationPerformed || backupRequiresEncryption || shouldRefreshBackup(backupPath, backupMaxAgeMs))) {
+    runStartupStep("refresh startup database backup", () => createEncryptedDatabaseBackup(rawDatabase, backupPath));
     logger.info("Refreshed local database backup before migrations.");
   }
 
@@ -654,8 +701,13 @@ const createRuntime = (): LocalDatabaseRuntime => {
   lastIntegrityCheckAt = new Date().toISOString();
   lastIntegrityCheckStatus = "healthy";
 
-  if (!databaseAlreadyExisted || shouldRefreshBackup(backupPath, backupMaxAgeMs)) {
-    runStartupStep("create startup database backup", () => createDatabaseBackup(database, backupPath));
+  if (
+    !databaseAlreadyExisted ||
+    migrationPerformed ||
+    backupRequiresEncryption ||
+    shouldRefreshBackup(backupPath, backupMaxAgeMs)
+  ) {
+    runStartupStep("create startup database backup", () => createEncryptedDatabaseBackup(rawDatabase, backupPath));
     logger.info("Created startup backup for local database.");
   }
 
@@ -704,13 +756,14 @@ const createRuntime = (): LocalDatabaseRuntime => {
       syncOutboxPendingCount: syncOutboxCounts.pending,
       syncOutboxProcessingCount: syncOutboxCounts.processing,
       syncOutboxFailedCount: syncOutboxCounts.failed,
+      databaseEncrypted,
       encryptionAvailable: safeStorage.isEncryptionAvailable(),
       internalBuildArtifacts,
     };
   };
 
   const createBackupNow = () => {
-    createDatabaseBackup(database, backupPath);
+    createEncryptedDatabaseBackup(rawDatabase, backupPath);
     logger.info("Created backup on demand from Settings.");
     return getDiagnosticsSnapshot();
   };
@@ -1412,7 +1465,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
   const sessionStore = createAssistantGatewaySessionStore(database);
   const projectMutations = createProjectMutationService(database, {
     createBackupBeforeDelete: () => {
-      createDatabaseBackup(database, backupPath);
+      createEncryptedDatabaseBackup(rawDatabase, backupPath);
     },
   });
   const catalogMutations = createCatalogMutationService(database);
@@ -1540,8 +1593,8 @@ const createRuntime = (): LocalDatabaseRuntime => {
     toolRegistry,
     memoryService,
   });
-  const attachmentsRootPath = path.join(app.getPath("userData"), "assistant-attachments");
-  fs.mkdirSync(attachmentsRootPath, { recursive: true });
+  const attachmentsRootPath = path.join(userDataPath, "assistant-attachments");
+  ensurePrivateDirectory(attachmentsRootPath);
   const assistantChatService = createAssistantChatService(database, {
     assistantGatewayService,
     memoryService,
@@ -1776,6 +1829,7 @@ const createRuntime = (): LocalDatabaseRuntime => {
     database,
     databasePath,
     backupPath,
+    databaseEncrypted,
     foundationReads,
     agentReads,
     assistantChatService,
@@ -1867,9 +1921,9 @@ const createRuntime = (): LocalDatabaseRuntime => {
   };
 };
 
-export const initializeLocalDatabase = () => {
+export const initializeLocalDatabaseAsync = async () => {
   if (!runtime) {
-    runtime = createRuntime();
+    runtime = await createRuntime();
   }
 
   return runtime;

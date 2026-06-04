@@ -339,6 +339,64 @@ describe("sync outbox worker service", () => {
     cleanup();
   });
 
+  it("returns a sanitized payload preview instead of raw outbox payloads", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-sync-outbox-preview");
+
+    database.prepare("DELETE FROM sync_outbox").run();
+    database
+      .prepare(
+        `
+          INSERT INTO sync_outbox (
+            id,
+            workspace_id,
+            entity_type,
+            entity_id,
+            event_id,
+            operation_type,
+            payload_json,
+            status,
+            attempt_count,
+            last_error,
+            next_retry_at,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run(
+        "outbox-sensitive-preview",
+        "workspace-metadata",
+        "bank_statement_import",
+        "import-1",
+        null,
+        "upsert",
+        JSON.stringify({
+          file_path: "/Users/ernestomaxwell/Documents/private.csv",
+          access_token: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.fakeSignatureValue123",
+          rows: [{ description: "keep visible", amount: 100 }],
+        }),
+        "failed",
+        2,
+        "Remote rejected payload",
+        null,
+        "2026-04-12T18:00:00.000Z",
+        "2026-04-12T18:01:00.000Z",
+      );
+
+    const service = createSyncOutboxWorkerService(database);
+    const rows = service.listRows();
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.payloadJson).toContain('"file_path": "[redacted]"');
+    expect(rows[0]?.payloadJson).toContain('"access_token": "[redacted]"');
+    expect(rows[0]?.payloadJson).toContain('"description": "keep visible"');
+    expect(rows[0]?.payloadJson).not.toContain("/Users/ernestomaxwell/Documents/private.csv");
+    expect(rows[0]?.payloadJson).not.toContain("fakeSignatureValue123");
+
+    cleanup();
+  });
+
   it("pushes outbox rows to Supabase REST with the stored user token", async () => {
     const requests: Array<{ url: string; init: RequestInit }> = [];
     const transport = createSupabaseOutboxTransport({

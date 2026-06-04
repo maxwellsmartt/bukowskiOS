@@ -21,7 +21,8 @@
       "@sync": ["../../packages/sync/src/index.ts"],
       "@sync/*": ["../../packages/sync/src/*"],
       "@ui": ["../../packages/ui/src/index.ts"],
-      "@ui/*": ["../../packages/ui/src/*"]
+      "@ui/*": ["../../packages/ui/src/*"],
+      "node:sqlite": ["electron/main/services/data/nodeSqliteShim.ts"]
     }
   },
   "include": ["src", "electron", "vite.config.ts"]

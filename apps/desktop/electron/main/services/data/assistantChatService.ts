@@ -29,6 +29,7 @@ import type { AssistantGatewayService } from "../ai/assistantGatewayService";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 import { assertPathWithinRoot } from "../../security/pathSafety";
+import { ensurePrivateDirectory, writePrivateFile } from "../../security/storagePrivacy";
 
 const workspaceId = DEFAULT_WORKSPACE_ID;
 const defaultThreadTitle = "New thread";
@@ -36,6 +37,7 @@ const interruptedMessage = "This response was interrupted before completion.";
 
 const ensureDir = (value: string) => {
   fs.mkdirSync(value, { recursive: true });
+  ensurePrivateDirectory(value);
 };
 
 const resolveAttachmentExtension = (mimeType: string) => {
@@ -482,7 +484,7 @@ export const createAssistantChatService = (
     const threadDir = path.join(options.attachmentsRootPath, workspaceId, threadId);
     ensureDir(threadDir);
     const storagePath = path.join(threadDir, `${attachment.id}.${extension}`);
-    fs.writeFileSync(storagePath, buffer);
+    writePrivateFile(storagePath, buffer);
 
     db.prepare(
       `

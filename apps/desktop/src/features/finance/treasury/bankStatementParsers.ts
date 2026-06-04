@@ -1,7 +1,7 @@
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
 
 import type { BankName, ParsedBankTransaction } from "@contracts";
+import { parseBoundedXlsxGrid } from "@shared/lib/xlsxSafety";
 
 /**
  * Bank statement parsers — one preset per real-world format Carlos exports.
@@ -163,9 +163,7 @@ export const parseBancoPopularCsv = (text: string): ParsedStatement => {
 /* ----------------------------------------------------------------------- */
 
 export const parseBancoSantaCruzXlsx = (data: ArrayBuffer | Uint8Array): ParsedStatement => {
-  const workbook = XLSX.read(data, { type: "array" });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, blankrows: false });
+  const grid = parseBoundedXlsxGrid(data, "bank statement XLSX");
 
   let accountNumber: string | null = null;
   let currencyHint: string | null = null;

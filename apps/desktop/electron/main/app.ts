@@ -12,10 +12,12 @@ import { registerNotificationIpc } from "./ipc/registerNotificationIpc";
 import { buildAppMenu } from "./menus/buildAppMenu";
 import { getDesktopEnvironment } from "./services/appEnvironment";
 import { createDocumentGenerationService } from "./services/data/documentGenerationService";
-import { initializeLocalDatabase } from "./services/data/localDatabase";
+import { initializeLocalDatabaseAsync } from "./services/data/localDatabase";
 import { getDesktopLogger, initializeDesktopLogger } from "./services/logger";
 import { attachNativeNotificationWindowState, setNativeNotificationDockBadge } from "./services/notifications/nativeNotifier";
 import { createMainWindow, loadMainWindowContent } from "./windows/createMainWindow";
+
+type LocalDatabaseInstance = Awaited<ReturnType<typeof initializeLocalDatabaseAsync>>;
 
 const { devServerUrl, preloadPath, rendererDist } = getDesktopEnvironment(import.meta.url);
 const isE2E = process.env.BUKOWSKI_E2E === "1";
@@ -209,7 +211,7 @@ const startDevAuthCallbackServer = () => {
 
 const attachWindowRuntimeTelemetry = (
   window: BrowserWindow,
-  runtimeDiagnostics: ReturnType<typeof initializeLocalDatabase>["runtimeDiagnostics"],
+  runtimeDiagnostics: LocalDatabaseInstance["runtimeDiagnostics"],
 ) => {
   window.webContents.on("console-message", (_event, level, message, line, sourceId) => {
     const payload = {
@@ -257,7 +259,7 @@ const attachWindowRuntimeTelemetry = (
 };
 
 const attachProcessRuntimeTelemetry = (
-  runtimeDiagnostics: ReturnType<typeof initializeLocalDatabase>["runtimeDiagnostics"],
+  runtimeDiagnostics: LocalDatabaseInstance["runtimeDiagnostics"],
 ) => {
   const isTransientPipeError = (error: NodeJS.ErrnoException) =>
     error.code === "EPIPE" || error.code === "EIO" || error.code === "ECONNRESET";
@@ -351,7 +353,7 @@ if (initialDeepLink) {
   pendingDeepLinks.push(initialDeepLink);
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   initializeDesktopLogger();
   logger.info("Electron main ready.");
   startDevAuthCallbackServer();
@@ -381,10 +383,10 @@ app.whenReady().then(() => {
   const mainWindow = createStartupWindow();
   logger.info("Startup window created before local database initialization.");
 
-  let localDatabase: ReturnType<typeof initializeLocalDatabase>;
+  let localDatabase: LocalDatabaseInstance;
   const databaseStartedAt = Date.now();
   try {
-    localDatabase = initializeLocalDatabase();
+    localDatabase = await initializeLocalDatabaseAsync();
     logger.info("Local database initialized; loading renderer.", {
       durationMs: Date.now() - databaseStartedAt,
       startupDurationMs: Date.now() - startupStartedAt,

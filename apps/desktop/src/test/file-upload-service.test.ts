@@ -31,6 +31,14 @@ describe("file upload service", () => {
     expect(detail.files[0]?.originalName).toBe("fixture-asset.pdf");
     expect(detail.files[0]?.status).toBe("available");
     expect(detail.files[0]?.mimeType).toBe("application/pdf");
+    const storedPath = (
+      database.prepare("SELECT storage_path FROM asset_files WHERE asset_id = ? LIMIT 1").get("asset-legacy-rentman-1") as {
+        storage_path: string;
+      }
+    ).storage_path;
+    if (process.platform !== "win32") {
+      expect(fs.statSync(storedPath).mode & 0o777).toBe(0o600);
+    }
 
     cleanup();
     fs.rmSync(tempRoot, { force: true, recursive: true });

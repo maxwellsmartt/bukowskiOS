@@ -2,10 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
-import type { AppDiagnosticsSnapshot, AppExportResult, AppInfo, AppSupportSnapshot } from "@contracts";
+import type { AppDiagnosticsSnapshot, AppExportResult, AppInfo, AppSupportEventSummary, AppSupportSnapshot } from "@contracts";
 
 import type { RuntimeDiagnosticsService } from "./runtimeDiagnosticsService";
-import { listRecentLogFiles, readCombinedRecentLogs } from "../logger";
+import { listRecentLogFiles, readCombinedRecentLogs, redactSensitiveText } from "../logger";
 
 type CreateSupportDiagnosticsServiceOptions = {
   database: DatabaseSync;
@@ -17,6 +17,36 @@ type CreateSupportDiagnosticsServiceOptions = {
 const writeJsonFile = (filePath: string, value: unknown) => {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 };
+
+const sanitizeSupportEvent = (event: AppSupportEventSummary | null): AppSupportEventSummary | null => {
+  if (!event) {
+    return null;
+  }
+
+  return {
+    ...event,
+    processLabel: redactSensitiveText(event.processLabel),
+    errorName: redactSensitiveText(event.errorName),
+    message: redactSensitiveText(event.message),
+    fingerprint: redactSensitiveText(event.fingerprint),
+  };
+};
+
+const sanitizeSupportSnapshot = (snapshot: AppSupportSnapshot): AppSupportSnapshot => ({
+  ...snapshot,
+  logStorageLabel: redactSensitiveText(snapshot.logStorageLabel),
+  lastCrash: sanitizeSupportEvent(snapshot.lastCrash),
+  lastError: sanitizeSupportEvent(snapshot.lastError),
+  lastLoadFailure: sanitizeSupportEvent(snapshot.lastLoadFailure),
+  recentCriticalEvents: snapshot.recentCriticalEvents.map((event) => sanitizeSupportEvent(event)!),
+});
+
+const sanitizeRuntimeErrorRows = (rows: Array<Record<string, unknown>>) =>
+  rows.map((row) =>
+    Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [key, typeof value === "string" ? redactSensitiveText(value) : value]),
+    ),
+  );
 
 export const createSupportDiagnosticsService = ({
   database,
@@ -55,7 +85,7 @@ export const createSupportDiagnosticsService = ({
 
     exportSupportBundle(directoryPath: string): AppExportResult {
       fs.mkdirSync(directoryPath, { recursive: true });
-      const supportSnapshot = getSupportSnapshot();
+      const supportSnapshot = sanitizeSupportSnapshot(getSupportSnapshot());
 
       writeJsonFile(path.join(directoryPath, "support-summary.json"), {
         exportedAt: new Date().toISOString(),
@@ -85,9 +115,9 @@ export const createSupportDiagnosticsService = ({
           LIMIT 25
         `,
         )
-        .all();
+        .all() as Array<Record<string, unknown>>;
 
-      writeJsonFile(path.join(directoryPath, "runtime-errors.json"), runtimeErrorRows);
+      writeJsonFile(path.join(directoryPath, "runtime-errors.json"), sanitizeRuntimeErrorRows(runtimeErrorRows));
 
       return {
         saved: true,

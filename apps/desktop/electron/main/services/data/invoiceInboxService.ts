@@ -26,6 +26,7 @@ import type {
 import type { createTreasuryMutationService } from "./treasuryMutationService";
 import type { SupabaseDocumentStorage } from "./supabaseDocumentStorageService";
 import { assertPathWithinRoot } from "../../security/pathSafety";
+import { ensurePrivateDirectory, writePrivateFile } from "../../security/storagePrivacy";
 import { buildZip, dedupeZipNames } from "./zipWriter";
 
 const DATA_URL_RE = /^data:([^;]+);base64,(.+)$/;
@@ -355,6 +356,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
     const storageRoot = options.getStorageRoot?.() || options.userDataPath;
     const directory = path.join(storageRoot, "invoice-inbox", input.workspaceId);
     fs.mkdirSync(directory, { recursive: true });
+    ensurePrivateDirectory(directory);
 
     const insert = db.prepare(
       `INSERT INTO invoice_extractions (
@@ -378,7 +380,7 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       const storagePath = path.join(directory, `${id}${extension}`);
       const storageObjectKey = `${input.workspaceId}/invoices/${id}${extension}`;
       const contentHash = createHash("sha256").update(buffer).digest("hex");
-      fs.writeFileSync(storagePath, buffer);
+      writePrivateFile(storagePath, buffer);
       insert.run(
         id,
         input.workspaceId,
@@ -455,7 +457,8 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
         try {
           const safePath = ensureSafePath(row.storage_path);
           fs.mkdirSync(path.dirname(safePath), { recursive: true });
-          fs.writeFileSync(safePath, buffer);
+          ensurePrivateDirectory(path.dirname(safePath));
+          writePrivateFile(safePath, buffer);
         } catch {
           /* caching is best-effort */
         }

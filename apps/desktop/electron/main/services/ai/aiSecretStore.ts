@@ -1,6 +1,7 @@
 import { app, safeStorage } from "electron";
 import fs from "node:fs";
 import path from "node:path";
+import { writePrivateFile } from "../../security/storagePrivacy";
 
 const secretFileName = "bukowski-ai-secrets.json";
 
@@ -43,7 +44,7 @@ const loadManifest = (): SecretManifest => {
 
 const saveManifest = (manifest: SecretManifest) => {
   manifestCache = { ...manifest };
-  fs.writeFileSync(getSecretFilePath(), JSON.stringify(manifest, null, 2), "utf8");
+  writePrivateFile(getSecretFilePath(), JSON.stringify(manifest, null, 2), "utf8");
 };
 
 const getCachedSecret = (secretKey: string, encodedSecret: string) => {

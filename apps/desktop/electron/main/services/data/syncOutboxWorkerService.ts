@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { AppSyncOutboxRow } from "@contracts";
 
-import { getDesktopLogger } from "../logger";
+import { getDesktopLogger, redactSensitiveText } from "../logger";
 
 type SyncOutboxStatus = "pending" | "processing" | "failed" | "sent";
 
@@ -61,6 +61,70 @@ const resolveRetryDelayMinutes = (attemptCount: number) => {
   }
 
   return Math.min(60, 2 ** (attemptCount - 1));
+};
+
+const MAX_PAYLOAD_DEPTH = 4;
+const MAX_PAYLOAD_ARRAY_ITEMS = 10;
+const MAX_PAYLOAD_OBJECT_KEYS = 20;
+const MAX_PAYLOAD_STRING_LENGTH = 240;
+const MAX_PAYLOAD_PREVIEW_LENGTH = 4_000;
+const sensitivePayloadKey = /(^|_)(token|secret|password|authorization|api_key|access_token|refresh_token|service_role_key|anon_key|storage_path|file_path|saved_path|absolute_path|path|root|roots)$/i;
+
+const truncateText = (value: string, limit = MAX_PAYLOAD_STRING_LENGTH) =>
+  value.length > limit ? `${value.slice(0, limit)}… [truncated]` : value;
+
+const sanitizePayloadValue = (value: unknown, depth = 0): unknown => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return truncateText(redactSensitiveText(value));
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value.slice(0, MAX_PAYLOAD_ARRAY_ITEMS).map((item) => sanitizePayloadValue(item, depth + 1));
+    if (value.length > MAX_PAYLOAD_ARRAY_ITEMS) {
+      items.push(`[${value.length - MAX_PAYLOAD_ARRAY_ITEMS} more item(s) truncated]`);
+    }
+    return items;
+  }
+
+  if (typeof value !== "object") {
+    return redactSensitiveText(String(value));
+  }
+
+  if (depth >= MAX_PAYLOAD_DEPTH) {
+    return "[nested object truncated]";
+  }
+
+  const entries = Object.entries(value);
+  const sanitizedEntries = entries.slice(0, MAX_PAYLOAD_OBJECT_KEYS).map(([key, entryValue]) => [
+    key,
+    sensitivePayloadKey.test(key) ? "[redacted]" : sanitizePayloadValue(entryValue, depth + 1),
+  ]);
+
+  if (entries.length > MAX_PAYLOAD_OBJECT_KEYS) {
+    sanitizedEntries.push([
+      "__truncatedFields",
+      `[${entries.length - MAX_PAYLOAD_OBJECT_KEYS} more field(s) omitted]`,
+    ]);
+  }
+
+  return Object.fromEntries(sanitizedEntries);
+};
+
+const sanitizeOutboxPayloadJson = (payloadJson: string) => {
+  try {
+    const parsed = JSON.parse(payloadJson) as unknown;
+    return truncateText(JSON.stringify(sanitizePayloadValue(parsed), null, 2), MAX_PAYLOAD_PREVIEW_LENGTH);
+  } catch {
+    return truncateText(redactSensitiveText(payloadJson), MAX_PAYLOAD_PREVIEW_LENGTH);
+  }
 };
 
 export const summarizeSyncOutboxWorker = (summary: SyncOutboxWorkerSummary) => {
@@ -188,7 +252,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
         lastError: row.last_error,
         nextRetryAt: row.next_retry_at,
         updatedAt: row.updated_at,
-        payloadJson: row.payload_json,
+        payloadJson: sanitizeOutboxPayloadJson(row.payload_json),
       }));
     },
 

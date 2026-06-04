@@ -107,7 +107,15 @@ export default defineConfig(async ({ mode }) => {
           vite: {
             build: {
               rollupOptions: {
-                external: ["@napi-rs/canvas", "better-sqlite3", "bwip-js", "keytar", "qrcode", "pdfkit"],
+                external: [
+                  "@napi-rs/canvas",
+                  "better-sqlite3",
+                  "better-sqlite3-multiple-ciphers",
+                  "bwip-js",
+                  "keytar",
+                  "qrcode",
+                  "pdfkit",
+                ],
               },
             },
             define: {
