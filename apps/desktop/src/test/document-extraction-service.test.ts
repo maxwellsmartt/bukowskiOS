@@ -10,21 +10,24 @@ import { extractDocument } from "../../electron/main/services/data/documentExtra
 
 const tmpFile = (suffix: string) =>
   path.join(os.tmpdir(), `doc-extract-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${suffix}`);
+const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "doc-extract-"));
 
 describe("document extraction service", () => {
   it("parses CSV rows", async () => {
-    const file = tmpFile(".csv");
+    const dir = tmpDir();
+    const file = path.join(dir, "movs.csv");
     fs.writeFileSync(file, "Fecha,Concepto,Monto\n2026-05-01,TSS,1000\n2026-05-02,DGII,250\n", "utf8");
-    const result = await extractDocument(file, "text/csv", "movs.csv");
+    const result = await extractDocument(file, "text/csv", "movs.csv", dir);
     expect(result.kind).toBe("csv");
     expect(result.rowCount).toBe(3);
     expect(result.rows[1]).toEqual(["2026-05-01", "TSS", "1000"]);
     expect(result.text).toContain("TSS");
-    fs.unlinkSync(file);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 
   it("parses XLSX first-sheet rows", async () => {
-    const file = tmpFile(".xlsx");
+    const dir = tmpDir();
+    const file = path.join(dir, "bsc.xlsx");
     const workbook = XLSX.utils.book_new();
     const sheet = XLSX.utils.aoa_to_sheet([
       ["Fecha", "Retiros", "Depositos"],
@@ -36,15 +39,17 @@ describe("document extraction service", () => {
       file,
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "bsc.xlsx",
+      dir,
     );
     expect(result.kind).toBe("xlsx");
     expect(result.rowCount).toBe(2);
     expect(result.text).toContain("Retiros");
-    fs.unlinkSync(file);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 
   it("extracts text from a PDF", async () => {
-    const file = tmpFile(".pdf");
+    const dir = tmpDir();
+    const file = path.join(dir, "factura.pdf");
     await new Promise<void>((resolve, reject) => {
       const document = new PDFDocument();
       const stream = fs.createWriteStream(file);
@@ -54,9 +59,20 @@ describe("document extraction service", () => {
       document.text("FACTURA NCF B0100000123 Monto 1500.00");
       document.end();
     });
-    const result = await extractDocument(file, "application/pdf", "factura.pdf");
+    const result = await extractDocument(file, "application/pdf", "factura.pdf", dir);
     expect(result.kind).toBe("pdf");
     expect(result.text).toContain("B0100000123");
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("rejects files outside the allowed root", async () => {
+    const allowedRoot = tmpDir();
+    const file = tmpFile(".csv");
+    fs.writeFileSync(file, "Fecha,Concepto,Monto\n2026-05-01,TSS,1000\n", "utf8");
+    await expect(extractDocument(file, "text/csv", "movs.csv", allowedRoot)).rejects.toThrow(
+      "Refused to access a file outside its workspace storage.",
+    );
+    fs.rmSync(allowedRoot, { recursive: true, force: true });
     fs.unlinkSync(file);
   });
 });

@@ -4,6 +4,8 @@ import { createRequire } from "node:module";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
+import { assertPathWithinRoot } from "../../security/pathSafety";
+
 // Extracts machine-readable content from an attached document so agents can
 // reason over it (free docs) or import it (bank statements). CSV/XLSX use the
 // already-bundled papaparse/xlsx; PDF text is pulled with pdfjs-dist (loaded
@@ -165,7 +167,9 @@ export const extractDocument = async (
   storagePath: string,
   mimeType: string,
   fileName: string,
-): Promise<ExtractedDocument> => extractDocumentFromBuffer(fs.readFileSync(storagePath), mimeType, fileName);
+  allowedRoot: string,
+): Promise<ExtractedDocument> =>
+  extractDocumentFromBuffer(fs.readFileSync(assertPathWithinRoot(storagePath, allowedRoot)), mimeType, fileName);
 
 const DATA_URL_RE = /^data:([^;]+);base64,(.+)$/;
 
