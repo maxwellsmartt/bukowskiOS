@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { CollaboratorPaymentPullTable } from "@contracts";
+import { canReadCollaboratorPayments } from "@shared/lib/financeAccess";
 import { notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
 const POLL_INTERVAL_MS = 20_000;
@@ -36,8 +37,9 @@ const writeCursor = (key: string, value: string | null) => {
 
 export const useCollaboratorPaymentPull = () => {
   const { supabase, isLocalFallback, status } = useSession();
-  const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { activeMembership, activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const inFlightRef = useRef(false);
+  const canPullCollaboratorPayments = canReadCollaboratorPayments(activeMembership);
 
   useEffect(() => {
     if (
@@ -45,6 +47,7 @@ export const useCollaboratorPaymentPull = () => {
       isLocalFallback ||
       status !== "authenticated" ||
       !isWorkspaceReady ||
+      !canPullCollaboratorPayments ||
       !activeWorkspaceId ||
       !window.bukowskiApp?.applyRemoteCollaboratorPaymentRows
     ) {
@@ -103,5 +106,5 @@ export const useCollaboratorPaymentPull = () => {
     void runOnce();
     const interval = window.setInterval(() => void runOnce(), POLL_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [activeWorkspaceId, isLocalFallback, isWorkspaceReady, status, supabase]);
+  }, [activeWorkspaceId, canPullCollaboratorPayments, isLocalFallback, isWorkspaceReady, status, supabase]);
 };

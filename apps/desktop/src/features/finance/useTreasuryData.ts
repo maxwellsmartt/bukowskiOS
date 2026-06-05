@@ -38,12 +38,20 @@ import type {
   RetryInvoiceExtractionsCommand,
   UpdateInvoiceExtractionCommand,
 } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
+import { canReadTreasury } from "@shared/lib/financeAccess";
 
 const emptyAccounts: BankAccountRow[] = [];
 const emptyTransactions: BankTransactionRow[] = [];
 
+const useTreasuryReadAccess = () => {
+  const { activeMembership } = useWorkspace();
+  return canReadTreasury(activeMembership);
+};
+
 export const useBankAccounts = (workspaceId: string) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
   const [data, setData] = useState<BankAccountRow[]>(emptyAccounts);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +61,7 @@ export const useBankAccounts = (workspaceId: string) => {
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    if (!window.bukowskiTreasury || !workspaceId) {
+    if (!window.bukowskiTreasury || !workspaceId || !hasTreasuryReadAccess) {
       setData(emptyAccounts);
       return;
     }
@@ -74,12 +82,13 @@ export const useBankAccounts = (workspaceId: string) => {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, version, refreshVersion]);
+  }, [workspaceId, hasTreasuryReadAccess, version, refreshVersion]);
 
   return { data, isLoading, error, refresh };
 };
 
 export const useTreasuryTransactions = (query: TreasuryTransactionListQuery) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
   const [data, setData] = useState<BankTransactionRow[]>(emptyTransactions);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +98,7 @@ export const useTreasuryTransactions = (query: TreasuryTransactionListQuery) => 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    if (!window.bukowskiTreasury || !query.workspaceId) {
+    if (!window.bukowskiTreasury || !query.workspaceId || !hasTreasuryReadAccess) {
       setData(emptyTransactions);
       return;
     }
@@ -123,6 +132,7 @@ export const useTreasuryTransactions = (query: TreasuryTransactionListQuery) => 
     query.pendingReviewOnly,
     query.search,
     query.limit,
+    hasTreasuryReadAccess,
     version,
     refreshVersion,
   ]);
@@ -131,6 +141,7 @@ export const useTreasuryTransactions = (query: TreasuryTransactionListQuery) => 
 };
 
 export const useTreasuryOverview = (query: TreasuryOverviewQuery) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
   const [data, setData] = useState<TreasuryOverviewSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,7 +151,7 @@ export const useTreasuryOverview = (query: TreasuryOverviewQuery) => {
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    if (!window.bukowskiTreasury || !query.workspaceId) {
+    if (!window.bukowskiTreasury || !query.workspaceId || !hasTreasuryReadAccess) {
       setData(null);
       return;
     }
@@ -161,7 +172,16 @@ export const useTreasuryOverview = (query: TreasuryOverviewQuery) => {
     return () => {
       cancelled = true;
     };
-  }, [query.workspaceId, query.period, query.customStartDate, query.customEndDate, query.reportCurrency, version, refreshVersion]);
+  }, [
+    query.workspaceId,
+    query.period,
+    query.customStartDate,
+    query.customEndDate,
+    query.reportCurrency,
+    hasTreasuryReadAccess,
+    version,
+    refreshVersion,
+  ]);
 
   return { data, isLoading, error, refresh };
 };
@@ -174,6 +194,7 @@ export const exportTreasuryOverviewPdf = async (query: TreasuryOverviewQuery): P
 };
 
 export const useTreasuryImports = (workspaceId: string, bankAccountId?: string) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
   const [data, setData] = useState<BankStatementImportRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [version, setVersion] = useState(0);
@@ -182,7 +203,7 @@ export const useTreasuryImports = (workspaceId: string, bankAccountId?: string) 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    if (!window.bukowskiTreasury || !workspaceId) {
+    if (!window.bukowskiTreasury || !workspaceId || !hasTreasuryReadAccess) {
       setData([]);
       return;
     }
@@ -199,19 +220,20 @@ export const useTreasuryImports = (workspaceId: string, bankAccountId?: string) 
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, bankAccountId, version, refreshVersion]);
+  }, [workspaceId, bankAccountId, hasTreasuryReadAccess, version, refreshVersion]);
 
   return { data, isLoading, refresh };
 };
 
 export const useInvoiceDuplicates = (workspaceId: string) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
   const [data, setData] = useState<import("@contracts").InvoiceDuplicateGroup[]>([]);
   const [version, setVersion] = useState(0);
   const refreshVersion = useWorkspaceDataRefreshVersion();
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    if (!window.bukowskiTreasury || !workspaceId) {
+    if (!window.bukowskiTreasury || !workspaceId || !hasTreasuryReadAccess) {
       setData([]);
       return;
     }
@@ -228,17 +250,18 @@ export const useInvoiceDuplicates = (workspaceId: string) => {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, version, refreshVersion]);
+  }, [workspaceId, hasTreasuryReadAccess, version, refreshVersion]);
 
   return { data, refresh };
 };
 
 export const useExpenseCategories = (workspaceId: string) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
   const [data, setData] = useState<string[]>([]);
   const refreshVersion = useWorkspaceDataRefreshVersion();
 
   useEffect(() => {
-    if (!window.bukowskiTreasury || !workspaceId) {
+    if (!window.bukowskiTreasury || !workspaceId || !hasTreasuryReadAccess) {
       setData([]);
       return;
     }
@@ -252,12 +275,13 @@ export const useExpenseCategories = (workspaceId: string) => {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, refreshVersion]);
+  }, [workspaceId, hasTreasuryReadAccess, refreshVersion]);
 
   return data;
 };
 
 export const useReviewQueue = (workspaceId: string) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
   const [data, setData] = useState<ReviewQueueRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -267,7 +291,7 @@ export const useReviewQueue = (workspaceId: string) => {
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    if (!window.bukowskiTreasury || !workspaceId) {
+    if (!window.bukowskiTreasury || !workspaceId || !hasTreasuryReadAccess) {
       setData([]);
       return;
     }
@@ -287,12 +311,13 @@ export const useReviewQueue = (workspaceId: string) => {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, version, refreshVersion]);
+  }, [workspaceId, hasTreasuryReadAccess, version, refreshVersion]);
 
   return { data, isLoading, error, refresh };
 };
 
 export const useInvoiceInbox = (workspaceId: string, includeResolved = false) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
   const [data, setData] = useState<InvoiceExtraction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -302,7 +327,7 @@ export const useInvoiceInbox = (workspaceId: string, includeResolved = false) =>
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    if (!window.bukowskiTreasury || !workspaceId) {
+    if (!window.bukowskiTreasury || !workspaceId || !hasTreasuryReadAccess) {
       setData([]);
       return;
     }
@@ -322,18 +347,19 @@ export const useInvoiceInbox = (workspaceId: string, includeResolved = false) =>
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, includeResolved, version, refreshVersion]);
+  }, [workspaceId, includeResolved, hasTreasuryReadAccess, version, refreshVersion]);
 
   return { data, isLoading, error, refresh };
 };
 
 export const useProjectPnl = (workspaceId: string, dateFrom?: string, dateTo?: string) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
   const [data, setData] = useState<ProjectPnlRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const refreshVersion = useWorkspaceDataRefreshVersion();
 
   useEffect(() => {
-    if (!window.bukowskiTreasury || !workspaceId) {
+    if (!window.bukowskiTreasury || !workspaceId || !hasTreasuryReadAccess) {
       setData([]);
       return;
     }
@@ -350,12 +376,13 @@ export const useProjectPnl = (workspaceId: string, dateFrom?: string, dateTo?: s
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, dateFrom, dateTo, refreshVersion]);
+  }, [workspaceId, dateFrom, dateTo, hasTreasuryReadAccess, refreshVersion]);
 
   return { data, isLoading };
 };
 
 export const useTreasuryUndoPreview = (workspaceId: string) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
   const [data, setData] = useState<TreasuryUndoPreview>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [version, setVersion] = useState(0);
@@ -364,7 +391,7 @@ export const useTreasuryUndoPreview = (workspaceId: string) => {
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    if (!window.bukowskiTreasury || !workspaceId) {
+    if (!window.bukowskiTreasury || !workspaceId || !hasTreasuryReadAccess) {
       setData(null);
       return;
     }
@@ -384,12 +411,13 @@ export const useTreasuryUndoPreview = (workspaceId: string) => {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, version, refreshVersion]);
+  }, [workspaceId, hasTreasuryReadAccess, version, refreshVersion]);
 
   return { data, isLoading, refresh };
 };
 
 export const useTreasuryDeductibleLedger = (query: TreasuryDeductibleLedgerQuery) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
   const [data, setData] = useState<TreasuryDeductibleLedger | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -399,7 +427,7 @@ export const useTreasuryDeductibleLedger = (query: TreasuryDeductibleLedgerQuery
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
-    if (!window.bukowskiTreasury || !query.workspaceId) {
+    if (!window.bukowskiTreasury || !query.workspaceId || !hasTreasuryReadAccess) {
       setData(null);
       return;
     }
@@ -420,7 +448,15 @@ export const useTreasuryDeductibleLedger = (query: TreasuryDeductibleLedgerQuery
     return () => {
       cancelled = true;
     };
-  }, [query.workspaceId, query.period, query.customStartDate, query.customEndDate, version, refreshVersion]);
+  }, [
+    query.workspaceId,
+    query.period,
+    query.customStartDate,
+    query.customEndDate,
+    hasTreasuryReadAccess,
+    version,
+    refreshVersion,
+  ]);
 
   return { data, isLoading, error, refresh };
 };

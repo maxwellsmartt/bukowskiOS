@@ -2,8 +2,10 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { resolveActiveRoute, resolvePrimaryNavKey } from "@app/routing/route-meta";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.png";
 import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
+import { hasFinanceAccess } from "@shared/lib/financeAccess";
 
 import { ShellProjectsPanel } from "./ShellProjectsPanel";
 import { SidebarUserMenu } from "./SidebarUserMenu";
@@ -12,8 +14,10 @@ import { primaryNav, utilityNav } from "./navigation";
 export const ShellSidebar = () => {
   const location = useLocation();
   const { t } = useTranslation();
+  const { activeMembership } = useWorkspace();
   const primaryNavKey = resolvePrimaryNavKey(location.pathname);
   const activeRoute = resolveActiveRoute(location.pathname);
+  const canAccessFinance = hasFinanceAccess(activeMembership);
 
   return (
     <aside className="shell-sidebar">
@@ -29,6 +33,10 @@ export const ShellSidebar = () => {
       <div className="shell-sidebar-scroll-zone">
         <nav className="shell-nav">
           {primaryNav.map((item) => {
+            if (item.path.startsWith("/finance") && !canAccessFinance) {
+              return null;
+            }
+
             const Icon = item.icon;
             const navKey = item.path.startsWith("/projects")
               ? "projects"

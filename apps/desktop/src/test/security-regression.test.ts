@@ -310,4 +310,68 @@ describe("security regression checks", () => {
     expect(appIpcSource).toContain("ipcChannels.app.updateRemoteWorkspaceIdentity");
     expect(appIpcSource).toContain("ipcChannels.app.setRolePermission");
   });
+
+  it("keeps Finance routes, sidebar, project budget, and sync pulls behind finance permissions", () => {
+    const routesSource = readText("apps/desktop/src/app/routing/routes.tsx");
+    const sidebarSource = readText("apps/desktop/src/app/shell/ShellSidebar.tsx");
+    const appShellSource = readText("apps/desktop/src/app/shell/AppShell.tsx");
+    const treasuryPullSource = readText("apps/desktop/src/shared/hooks/useTreasuryPull.ts");
+    const financePullSource = readText("apps/desktop/src/shared/hooks/useFinanceBusinessPull.ts");
+    const collaboratorPullSource = readText("apps/desktop/src/shared/hooks/useCollaboratorPaymentPull.ts");
+
+    expect(routesSource).toContain("FinanceAccessGuard");
+    expect(routesSource).toContain('route.domain === "finance" || route.projectSection === "budget"');
+    expect(sidebarSource).toContain("hasFinanceAccess(activeMembership)");
+    expect(sidebarSource).toContain('item.path.startsWith("/finance") && !canAccessFinance');
+    expect(appShellSource).toContain("buildProjectSubnav(activeProjectId, { includeBudget: canAccessFinance })");
+    expect(treasuryPullSource).toContain("!canPullTreasury");
+    expect(financePullSource).toContain("!canPullFinanceBusiness");
+    expect(collaboratorPullSource).toContain("!canPullCollaboratorPayments");
+  });
+
+  it("does not expose project budget targets to generic workspace members", () => {
+    const migrationText = readText("supabase/migrations/20260605130000_finance_access_role_hardening.sql");
+
+    expect(migrationText).toContain('DROP POLICY IF EXISTS "members can read project budget targets"');
+    expect(migrationText).toContain('CREATE POLICY "finance can read project budget targets"');
+    expect(migrationText).toContain("public.has_permission(workspace_id, 'finance.read')");
+    expect(migrationText).toContain('CREATE POLICY "finance can manage project budget targets"');
+    expect(migrationText).toContain("public.has_permission(workspace_id, 'finance.manage')");
+    expect(migrationText).not.toContain("public.is_workspace_member(workspace_id)");
+  });
+
+  it("sanitizes project finance fields outside Finance access", () => {
+    const foundationIpcSource = readText("apps/desktop/electron/main/ipc/registerFoundationIpc.ts");
+    const projectReadSource = readText("apps/desktop/electron/main/services/data/projectReadService.ts");
+    const projectPageSource = readText("apps/desktop/src/features/projects/ProjectsPage.tsx");
+    const projectDetailPanelSource = readText("apps/desktop/src/features/projects/ProjectDetailPanel.tsx");
+
+    expect(foundationIpcSource).toContain("canReadFinanceForWorkspace");
+    expect(foundationIpcSource).toContain("foundationReads.getProjects(safeQuery, { includeFinancials })");
+    expect(foundationIpcSource).toContain("foundationReads.getProjectDetail(projectId, { includeFinancials })");
+    expect(projectReadSource).toContain('exposure: includeFinancials ? deps.formatCurrency(row.exposure) : "—"');
+    expect(projectReadSource).toContain("includeFinancials ? (hasBudgetEntries ? \"Finance hooks linked\" : \"No finance entries yet\") : \"Restricted\"");
+    expect(projectPageSource).toContain('option.value !== "exposure"');
+    expect(projectDetailPanelSource).toContain("canAccessFinance ? (");
+  });
+
+  it("keeps cached workspace users idempotent when a local user already owns the same email", () => {
+    const localDatabaseSource = readText("apps/desktop/electron/main/services/data/localDatabase.ts");
+
+    expect(localDatabaseSource).toContain("findUserByEmail");
+    expect(localDatabaseSource).toContain("LOWER(email) = LOWER(?)");
+    expect(localDatabaseSource).toContain("@cached.bukowskios.local");
+    expect(localDatabaseSource).toContain("emailOwner && emailOwner.id !== workspace.userId");
+  });
+
+  it("reuses existing local role keys when caching remote workspace memberships", () => {
+    const localDatabaseSource = readText("apps/desktop/electron/main/services/data/localDatabase.ts");
+
+    expect(localDatabaseSource).toContain("findRoleByWorkspaceAndKey");
+    expect(localDatabaseSource).toContain("WHERE workspace_id = ?");
+    expect(localDatabaseSource).toContain("AND key = ?");
+    expect(localDatabaseSource).toContain("const cachedRoleId = existingRole?.id");
+    expect(localDatabaseSource).toContain("if (!existingRole)");
+    expect(localDatabaseSource).toContain("if (!existingRole?.isSystemRole)");
+  });
 });

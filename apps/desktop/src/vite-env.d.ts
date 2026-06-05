@@ -164,7 +164,7 @@ declare global {
       revokeTelegramLink: (input: RevokeTelegramLinkCommand) => Promise<AppUserMutationResult>;
       deleteUser: (input: DeleteAppUserCommand) => Promise<AppUserMutationResult>;
       ensureLocalWorkspaces: (workspaces: EnsureLocalWorkspaceInput[]) => Promise<AppActionResult>;
-      getLocalWorkspaces: () => Promise<AppLocalWorkspaceRow[]>;
+      getLocalWorkspaces: (query?: { userId?: string | null }) => Promise<AppLocalWorkspaceRow[]>;
       createRemoteWorkspace: (
         input: import("@contracts").AppCreateRemoteWorkspaceCommand,
       ) => Promise<import("@contracts").AppCreateRemoteWorkspaceResult>;

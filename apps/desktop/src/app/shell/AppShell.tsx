@@ -17,6 +17,7 @@ import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { AppStartupGate } from "@shared/components/AppStartupGate";
 import { Breadcrumb } from "@shared/components/Breadcrumb";
+import { hasFinanceAccess } from "@shared/lib/financeAccess";
 import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 import { pushRecentEntityKey } from "@shared/lib/recentEntities";
 
@@ -46,7 +47,7 @@ export const AppShell = () => {
   const { activeProjectId, activeProjectRouteSection, isScopeReady } = useShellContext();
   const { handleAuthDeepLink } = useSession();
   const { markReminderDone, snoozeReminder } = useNotifications();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeMembership, activeWorkspaceId } = useWorkspace();
   useAutoLogout();
   useCatalogPull();
   useAssetSnapshotPull();
@@ -68,6 +69,7 @@ export const AppShell = () => {
     return undefined;
   }, [activeWorkspaceId]);
   const activeRoute = resolveActiveRoute(location.pathname);
+  const canAccessFinance = hasFinanceAccess(activeMembership);
   const isLicensesRoute = location.pathname === "/assets/licenses";
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     clampSidebarWidth(readNumberPreference(uiPreferenceKeys.shellSidebarWidth, sidebarWidthDefault)),
@@ -76,11 +78,11 @@ export const AppShell = () => {
 
   const subnavItems = useMemo(() => {
     if (activeRoute.scopeMode === "project" && activeProjectId) {
-      return buildProjectSubnav(activeProjectId);
+      return buildProjectSubnav(activeProjectId, { includeBudget: canAccessFinance });
     }
 
     if (activeRoute.domain === "finance") {
-      return financeSubnav;
+      return canAccessFinance ? financeSubnav : [];
     }
 
     if (activeRoute.domain === "agents") {
@@ -96,10 +98,14 @@ export const AppShell = () => {
     }
 
     return [];
-  }, [activeProjectId, activeRoute.domain, activeRoute.scopeMode]);
+  }, [activeProjectId, activeRoute.domain, activeRoute.scopeMode, canAccessFinance]);
 
   useEffect(() => {
     if (location.pathname !== "/") {
+      if ((activeRoute.domain === "finance" || activeRoute.projectSection === "budget") && !canAccessFinance) {
+        return;
+      }
+
       writePreference(uiPreferenceKeys.lastRoutePath, location.pathname);
 
       if (activeRoute.scopeMode === "project") {
@@ -109,7 +115,14 @@ export const AppShell = () => {
         writePreference(uiPreferenceKeys.lastGlobalRoutePath, location.pathname);
       }
     }
-  }, [activeProjectRouteSection, activeRoute.scopeMode, location.pathname]);
+  }, [
+    activeProjectRouteSection,
+    activeRoute.domain,
+    activeRoute.projectSection,
+    activeRoute.scopeMode,
+    canAccessFinance,
+    location.pathname,
+  ]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);

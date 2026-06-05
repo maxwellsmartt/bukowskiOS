@@ -892,8 +892,8 @@ export const FinanceOverviewPage = () => {
                   style={{ background: categoryDonutGradient }}
                 />
                 <div className="finance-donut-center">
-                  {t("finance.treasury.overview.expenseTotal")}
-                  <strong>{formatSummaryMoney(categorySpendTotal, treasuryCurrency)}</strong>
+                  <span>{t("finance.treasury.overview.expenseTotal")}</span>
+                  <strong>{formatAxisCurrency(categorySpendTotal, treasuryCurrency)}</strong>
                 </div>
               </div>
 

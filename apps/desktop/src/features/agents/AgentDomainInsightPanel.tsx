@@ -9,6 +9,7 @@ import { useProjectsRegistry } from "@features/projects/useProjectsData";
 import { useRmaSnapshot } from "@features/rma/useRmaData";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { getAgentRunStatusLabel, titleCaseEnum } from "@shared/labels/statusLabels";
+import { hasFinanceAccess } from "@shared/lib/financeAccess";
 
 import { useAgentConnectors } from "./useAgentsData";
 
@@ -50,7 +51,8 @@ const FocusList = ({ items }: { items: FocusItem[] }) => (
 
 export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainInsightPanelProps) => {
   const navigate = useNavigate();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeMembership, activeWorkspaceId } = useWorkspace();
+  const canAccessFinance = hasFinanceAccess(activeMembership);
   const { data: assetsOverview } = useAssetsOverview({ workspaceId: activeWorkspaceId });
   const { data: financeOverview } = useFinanceOverview();
   const { data: incidents } = useIncidentsData({
@@ -144,7 +146,7 @@ export const AgentDomainInsightPanel = ({ domain, missionControl }: AgentDomainI
     ];
   }
 
-  if (domain === "finance") {
+  if (domain === "finance" && canAccessFinance) {
     title = "Finance";
     insights = [
       `${financeOverview.totals.trackedSpend} tracked spend in ${financeOverview.activePeriodLabel.toLowerCase()}`,

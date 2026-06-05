@@ -103,6 +103,11 @@ export type EnsureLocalWorkspaceInput = {
   slug: string;
   baseCurrency: string;
   iconColor?: string | null;
+  userId?: string | null;
+  userEmail?: string | null;
+  roleKey?: string | null;
+  roleName?: string | null;
+  permissions?: string[];
 };
 
 export type AppLocalWorkspaceRow = {
@@ -110,6 +115,9 @@ export type AppLocalWorkspaceRow = {
   name: string;
   slug: string;
   baseCurrency: string;
+  roleKey?: string | null;
+  roleName?: string | null;
+  permissions?: string[];
 };
 
 export type AppActionResult = {

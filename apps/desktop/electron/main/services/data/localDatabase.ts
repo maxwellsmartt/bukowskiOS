@@ -218,7 +218,7 @@ type LocalDatabaseRuntime = {
   createBackupNow: () => AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => AppDiagnosticsSnapshot;
   ensureLocalWorkspaces: (workspaces: EnsureLocalWorkspaceInput[]) => AppDiagnosticsSnapshot;
-  getLocalWorkspaces: () => import("@contracts").AppLocalWorkspaceRow[];
+  getLocalWorkspaces: (query?: { userId?: string | null }) => import("@contracts").AppLocalWorkspaceRow[];
   runLocalSyncNow: () => Promise<AppDiagnosticsSnapshot>;
   getSyncOutboxRows: () => AppSyncOutboxRow[];
   getSyncPullCursors: () => AppSyncPullCursorRow[];
@@ -791,6 +791,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
 
   const ensureLocalWorkspaces = (workspaces: EnsureLocalWorkspaceInput[]) => {
     const timestamp = new Date().toISOString();
+    bootstrapAdminFoundation(database);
     const statement = database.prepare(
       `
         INSERT INTO workspaces (id, name, slug, base_currency, created_at, updated_at)
@@ -822,6 +823,64 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
           status = 'active'
       `,
     );
+    const findUserByEmail = database.prepare(
+      `
+        SELECT id
+        FROM users
+        WHERE LOWER(email) = LOWER(?)
+        LIMIT 1
+      `,
+    );
+    const upsertCachedUser = database.prepare(
+      `
+        INSERT INTO users (id, full_name, email, phone, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, '', 1, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          full_name = excluded.full_name,
+          email = excluded.email,
+          is_active = 1,
+          updated_at = excluded.updated_at
+      `,
+    );
+    const upsertCachedRole = database.prepare(
+      `
+        INSERT INTO roles (id, workspace_id, key, name, description, is_system_role, created_at)
+        VALUES (?, ?, ?, ?, 'Cached remote role for offline permission checks.', 0, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          workspace_id = excluded.workspace_id,
+          key = excluded.key,
+          name = excluded.name,
+          description = excluded.description
+      `,
+    );
+    const findRoleByWorkspaceAndKey = database.prepare(
+      `
+        SELECT id, is_system_role AS isSystemRole
+        FROM roles
+        WHERE workspace_id = ?
+          AND key = ?
+        LIMIT 1
+      `,
+    );
+    const deleteCachedRolePermissions = database.prepare("DELETE FROM role_permissions WHERE role_id = ?");
+    const insertCachedRolePermission = database.prepare(
+      `
+        INSERT INTO role_permissions (role_id, permission_id, created_at)
+        SELECT ?, permissions.id, ?
+        FROM permissions
+        WHERE permissions.key = ?
+        ON CONFLICT(role_id, permission_id) DO NOTHING
+      `,
+    );
+    const upsertCachedMembership = database.prepare(
+      `
+        INSERT INTO workspace_memberships (id, workspace_id, user_id, role_id, status, joined_at, created_at)
+        VALUES (?, ?, ?, ?, 'active', ?, ?)
+        ON CONFLICT(workspace_id, user_id) DO UPDATE SET
+          role_id = excluded.role_id,
+          status = 'active'
+      `,
+    );
 
     try {
       database.exec("BEGIN");
@@ -837,10 +896,49 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
           timestamp,
         );
         ensureCommandActorMembership.run(`membership-${workspace.id}-ops`, workspace.id, timestamp, timestamp);
+        if (workspace.userId && workspace.permissions?.length) {
+          const roleKey = workspace.roleKey?.trim() || "cached";
+          const roleName = workspace.roleName?.trim() || "Cached access";
+          const existingRole = findRoleByWorkspaceAndKey.get(workspace.id, roleKey) as
+            | { id: string; isSystemRole: number }
+            | undefined;
+          const cachedRoleId = existingRole?.id ?? `cached-role-${workspace.id}-${workspace.userId}`;
+          const normalizedEmail = workspace.userEmail?.trim() || "";
+          const emailOwner = normalizedEmail
+            ? (findUserByEmail.get(normalizedEmail) as { id: string } | undefined)
+            : undefined;
+          const cachedEmail =
+            !normalizedEmail || (emailOwner && emailOwner.id !== workspace.userId)
+              ? `${workspace.userId}@cached.bukowskios.local`
+              : normalizedEmail;
+          upsertCachedUser.run(
+            workspace.userId,
+            normalizedEmail || "Cached user",
+            cachedEmail,
+            timestamp,
+            timestamp,
+          );
+          if (!existingRole) {
+            upsertCachedRole.run(cachedRoleId, workspace.id, roleKey, roleName, timestamp);
+          }
+          if (!existingRole?.isSystemRole) {
+            deleteCachedRolePermissions.run(cachedRoleId);
+            Array.from(new Set(workspace.permissions)).forEach((permissionKey) => {
+              insertCachedRolePermission.run(cachedRoleId, timestamp, permissionKey);
+            });
+          }
+          upsertCachedMembership.run(
+            `membership-${workspace.id}-${workspace.userId}`,
+            workspace.id,
+            workspace.userId,
+            cachedRoleId,
+            timestamp,
+            timestamp,
+          );
+        }
         seededProjectCount += seedProjectShellForWorkspace(database, workspace.id, timestamp);
       });
       database.exec("COMMIT");
-      bootstrapAdminFoundation(database);
       if (seededProjectCount > 0) {
         logger.info("Seeded project shell rows for remote workspaces.", { count: seededProjectCount });
       }
@@ -853,8 +951,59 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     return getDiagnosticsSnapshot();
   };
 
-  const getLocalWorkspaces = () =>
-    (
+  const getLocalWorkspaces = (query?: { userId?: string | null }) => {
+    const userId = query?.userId?.trim() || null;
+
+    if (userId) {
+      return (
+        database
+          .prepare(
+            `
+              SELECT
+                workspaces.id,
+                workspaces.name,
+                workspaces.slug,
+                workspaces.base_currency AS baseCurrency,
+                roles.key AS roleKey,
+                roles.name AS roleName,
+                GROUP_CONCAT(DISTINCT permissions.key) AS permissionKeys
+              FROM workspaces
+              JOIN workspace_memberships
+                ON workspace_memberships.workspace_id = workspaces.id
+                AND workspace_memberships.user_id = ?
+                AND workspace_memberships.status = 'active'
+              LEFT JOIN roles ON roles.id = workspace_memberships.role_id
+              LEFT JOIN role_permissions ON role_permissions.role_id = roles.id
+              LEFT JOIN permissions ON permissions.id = role_permissions.permission_id
+              WHERE workspaces.is_active = 1
+              GROUP BY workspaces.id, workspaces.name, workspaces.slug, workspaces.base_currency, roles.key, roles.name
+              ORDER BY workspaces.created_at ASC, workspaces.name ASC
+            `,
+          )
+          .all(userId) as Array<{
+          id: string;
+          name: string;
+          slug: string;
+          baseCurrency: string;
+          roleKey: string | null;
+          roleName: string | null;
+          permissionKeys: string | null;
+        }>
+      ).map((workspace) => ({
+        id: workspace.id,
+        name: workspace.name,
+        slug: workspace.slug,
+        baseCurrency: workspace.baseCurrency,
+        roleKey: workspace.roleKey,
+        roleName: workspace.roleName,
+        permissions: (workspace.permissionKeys ?? "")
+          .split(",")
+          .map((permissionKey) => permissionKey.trim())
+          .filter(Boolean),
+      }));
+    }
+
+    return (
       database
         .prepare(
           `
@@ -880,6 +1029,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
       slug: workspace.slug,
       baseCurrency: workspace.baseCurrency,
     }));
+  };
 
   const resolveSupabaseAssetSnapshot = (row: { entity_type: string; entity_id: string; event_id: string | null }) => {
     if (row.entity_type !== "asset_event") {

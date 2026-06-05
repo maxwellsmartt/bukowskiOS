@@ -58,6 +58,10 @@ type ProjectReadDeps = {
   addDays: (date: string, days: number) => string;
 };
 
+type ProjectFinancialVisibilityOptions = {
+  includeFinancials?: boolean;
+};
+
 type CrewAssignmentConflictRow = {
   assignmentId: string;
   crewMemberId: string;
@@ -886,8 +890,12 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
     };
   },
 
-  getProjects(query: ProjectListQuery = deps.defaultProjectListQuery): ProjectCardRow[] {
+  getProjects(
+    query: ProjectListQuery = deps.defaultProjectListQuery,
+    options: ProjectFinancialVisibilityOptions = {},
+  ): ProjectCardRow[] {
     const workspaceId = query.workspaceId ?? deps.defaultProjectListQuery.workspaceId;
+    const includeFinancials = options.includeFinancials !== false;
     const rows = db
       .prepare(
         `
@@ -1004,12 +1012,12 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         preproductionEndDate: row.preproduction_end_date,
         colorKey: row.color_key,
         departments: row.departments,
-        exposure: deps.formatCurrency(row.exposure),
+        exposure: includeFinancials ? deps.formatCurrency(row.exposure) : "—",
         assetCount: row.asset_count,
         incidentCount: row.incident_count,
         activeUnitCount: row.active_unit_count,
         description: row.description,
-        exposureValue: row.exposure,
+        exposureValue: includeFinancials ? row.exposure : 0,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       }))
@@ -1102,7 +1110,11 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
     };
   },
 
-  getProjectDetail(projectId: string): ProjectDetailSnapshot {
+  getProjectDetail(
+    projectId: string,
+    options: ProjectFinancialVisibilityOptions = {},
+  ): ProjectDetailSnapshot {
+    const includeFinancials = options.includeFinancials !== false;
     const project = db
       .prepare(
         `
@@ -1491,8 +1503,12 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
     const detailMetrics: OverviewMetric[] = [
       { label: "Assigned assets", value: String(project.asset_count), tone: "info" },
       { label: "Open incidents", value: String(incidents.filter((row) => row.status !== "Closed").length), tone: "critical" },
-      { label: "Incident exposure", value: deps.formatCurrency(project.exposure), tone: "warning" },
-      { label: "Replacement at risk", value: deps.formatCurrency(project.replacement_at_risk), tone: "neutral" },
+      ...(includeFinancials
+        ? [
+            { label: "Incident exposure", value: deps.formatCurrency(project.exposure), tone: "warning" as const },
+            { label: "Replacement at risk", value: deps.formatCurrency(project.replacement_at_risk), tone: "neutral" as const },
+          ]
+        : []),
     ];
 
     const assetRows: ProjectDetailAssetRow[] = assets.map((row) => ({
@@ -1639,7 +1655,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
         preproductionEndDate: project.preproduction_end_date,
         colorKey: project.color_key,
         departments: project.departments,
-        exposure: deps.formatCurrency(project.exposure),
+        exposure: includeFinancials ? deps.formatCurrency(project.exposure) : "—",
         assetCount: project.asset_count,
         incidentCount: project.incident_count,
         activeUnitCount: timelineSummary.activeUnits,
@@ -1659,13 +1675,15 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       incidents: incidentRows,
       responsibles: responsibleRows,
       budget: {
-        totalEntries: deps.formatCurrency(budgetRow.total_entries),
-        reserve: deps.formatCurrency(budgetRow.reserve_amount),
-        exposure: deps.formatCurrency(project.exposure),
-        status: hasBudgetEntries ? "Finance hooks linked" : "No finance entries yet",
-        note: hasBudgetEntries
-          ? `Committed foundation entries: ${deps.formatCurrency(budgetRow.committed_amount)}.`
-          : "This project is ready for budget, reserve and actual tracking once Finance flows are expanded.",
+        totalEntries: includeFinancials ? deps.formatCurrency(budgetRow.total_entries) : "—",
+        reserve: includeFinancials ? deps.formatCurrency(budgetRow.reserve_amount) : "—",
+        exposure: includeFinancials ? deps.formatCurrency(project.exposure) : "—",
+        status: includeFinancials ? (hasBudgetEntries ? "Finance hooks linked" : "No finance entries yet") : "Restricted",
+        note: includeFinancials
+          ? hasBudgetEntries
+            ? `Committed foundation entries: ${deps.formatCurrency(budgetRow.committed_amount)}.`
+            : "This project is ready for budget, reserve and actual tracking once Finance flows are expanded."
+          : "Financial details require Finance access.",
       },
     };
   },

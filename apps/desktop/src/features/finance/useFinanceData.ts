@@ -25,6 +25,11 @@ import type {
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
+import {
+  canReadCollaboratorPayments,
+  canReadFinanceBusiness,
+  hasFinanceAccess,
+} from "@shared/lib/financeAccess";
 
 const emptyOverview: FinanceOverviewSnapshot = {
   activePeriodLabel: "This month",
@@ -74,11 +79,12 @@ const defaultCollaboratorFeeListQuery: CollaboratorFeeListQuery = {
 
 export const useFinanceOverview = (query?: FinanceOverviewQuery) =>
   {
-    const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+    const { activeMembership, activeWorkspaceId, isWorkspaceReady } = useWorkspace();
     const refreshVersion = useWorkspaceDataRefreshVersion();
+    const canReadFinance = canReadFinanceBusiness(activeMembership);
     return useAsyncValue(
       async () => {
-        if (!window.bukowskiFinance || !isWorkspaceReady) {
+        if (!window.bukowskiFinance || !isWorkspaceReady || !canReadFinance) {
           return emptyOverview;
         }
 
@@ -90,66 +96,79 @@ export const useFinanceOverview = (query?: FinanceOverviewQuery) =>
         });
       },
       emptyOverview,
-      [activeWorkspaceId, isWorkspaceReady, query?.period, query?.customStartDate, query?.customEndDate, refreshVersion],
+      [
+        activeWorkspaceId,
+        canReadFinance,
+        isWorkspaceReady,
+        query?.period,
+        query?.customStartDate,
+        query?.customEndDate,
+        refreshVersion,
+      ],
     );
   };
 
 export const useFinanceCostLinks = () =>
   {
-    const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+    const { activeMembership, activeWorkspaceId, isWorkspaceReady } = useWorkspace();
     const refreshVersion = useWorkspaceDataRefreshVersion();
+    const canReadFinance = canReadFinanceBusiness(activeMembership);
     return useAsyncValue(
       async () => {
-        if (!window.bukowskiFinance || !isWorkspaceReady) {
+        if (!window.bukowskiFinance || !isWorkspaceReady || !canReadFinance) {
           return emptyCostLinks;
         }
 
         return window.bukowskiFinance.getCostLinks(activeWorkspaceId);
       },
       emptyCostLinks,
-      [activeWorkspaceId, isWorkspaceReady, refreshVersion],
+      [activeWorkspaceId, canReadFinance, isWorkspaceReady, refreshVersion],
     );
   };
 
 export const useFinanceEntries = (query: FinanceEntryListQuery = defaultFinanceEntryListQuery) =>
   {
-    const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+    const { activeMembership, activeWorkspaceId, isWorkspaceReady } = useWorkspace();
     const refreshVersion = useWorkspaceDataRefreshVersion();
+    const canReadFinance = canReadFinanceBusiness(activeMembership);
     return useAsyncValue(
       async () => {
-        if (!window.bukowskiFinance || !isWorkspaceReady) {
+        if (!window.bukowskiFinance || !isWorkspaceReady || !canReadFinance) {
           return emptyEntries;
         }
 
         return window.bukowskiFinance.getEntries({ ...query, workspaceId: activeWorkspaceId });
       },
       emptyEntries,
-      [activeWorkspaceId, isWorkspaceReady, query.search, query.sortBy, query.sortDirection, refreshVersion],
+      [activeWorkspaceId, canReadFinance, isWorkspaceReady, query.search, query.sortBy, query.sortDirection, refreshVersion],
     );
   };
 
 export const useFinanceEntryDocuments = (entryId: string | null) => {
+  const { activeMembership } = useWorkspace();
   const refreshVersion = useWorkspaceDataRefreshVersion();
+  const canReadFinance = hasFinanceAccess(activeMembership);
 
   return useAsyncValue(
     async () => {
-      if (!window.bukowskiFinance || !entryId) {
+      if (!window.bukowskiFinance || !entryId || !canReadFinance) {
         return emptyDocuments;
       }
 
       return window.bukowskiFinance.getDocuments(entryId);
     },
     emptyDocuments,
-    [entryId, refreshVersion],
+    [canReadFinance, entryId, refreshVersion],
   );
 };
 
 export const useCollaboratorFees = (query: CollaboratorFeeListQuery = defaultCollaboratorFeeListQuery) => {
-  const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { activeMembership, activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const refreshVersion = useWorkspaceDataRefreshVersion();
+  const canReadFees = canReadCollaboratorPayments(activeMembership);
   return useAsyncValue(
     async () => {
-      if (!window.bukowskiFinance || !isWorkspaceReady) {
+      if (!window.bukowskiFinance || !isWorkspaceReady || !canReadFees) {
         return emptyCollaboratorFees;
       }
 
@@ -158,6 +177,7 @@ export const useCollaboratorFees = (query: CollaboratorFeeListQuery = defaultCol
     emptyCollaboratorFees,
     [
       activeWorkspaceId,
+      canReadFees,
       isWorkspaceReady,
       query.search,
       query.sortBy,
@@ -171,43 +191,46 @@ export const useCollaboratorFees = (query: CollaboratorFeeListQuery = defaultCol
 };
 
 export const useCollaboratorFeeSummary = (projectId?: string | null) => {
-  const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { activeMembership, activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const refreshVersion = useWorkspaceDataRefreshVersion();
+  const canReadFees = canReadCollaboratorPayments(activeMembership);
   return useAsyncValue(
     async () => {
-      if (!window.bukowskiFinance || !isWorkspaceReady) {
+      if (!window.bukowskiFinance || !isWorkspaceReady || !canReadFees) {
         return emptyCollaboratorSummary;
       }
 
       return window.bukowskiFinance.getCollaboratorFeeSummary(activeWorkspaceId, projectId ?? null);
     },
     emptyCollaboratorSummary,
-    [activeWorkspaceId, isWorkspaceReady, projectId, refreshVersion],
+    [activeWorkspaceId, canReadFees, isWorkspaceReady, projectId, refreshVersion],
   );
 };
 
 export const useCollaboratorFeeDetail = (feeId: string | null) => {
-  const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { activeMembership, activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const refreshVersion = useWorkspaceDataRefreshVersion();
+  const canReadFees = canReadCollaboratorPayments(activeMembership);
   return useAsyncValue<CollaboratorFeeDetail | null>(
     async () => {
-      if (!window.bukowskiFinance || !isWorkspaceReady || !feeId) {
+      if (!window.bukowskiFinance || !isWorkspaceReady || !feeId || !canReadFees) {
         return null;
       }
 
       return window.bukowskiFinance.getCollaboratorFeeDetail(activeWorkspaceId, feeId);
     },
     null,
-    [activeWorkspaceId, isWorkspaceReady, feeId, refreshVersion],
+    [activeWorkspaceId, canReadFees, isWorkspaceReady, feeId, refreshVersion],
   );
 };
 
 export const useCollaboratorFeeSuggestions = (input?: { projectId?: string | null; crewMemberId?: string | null }) => {
-  const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { activeMembership, activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const refreshVersion = useWorkspaceDataRefreshVersion();
+  const canManageFees = hasFinanceAccess(activeMembership);
   return useAsyncValue(
     async () => {
-      if (!window.bukowskiFinance || !isWorkspaceReady) {
+      if (!window.bukowskiFinance || !isWorkspaceReady || !canManageFees) {
         return emptyCollaboratorSuggestions;
       }
 
@@ -218,7 +241,7 @@ export const useCollaboratorFeeSuggestions = (input?: { projectId?: string | nul
       });
     },
     emptyCollaboratorSuggestions,
-    [activeWorkspaceId, isWorkspaceReady, input?.projectId, input?.crewMemberId, refreshVersion],
+    [activeWorkspaceId, canManageFees, isWorkspaceReady, input?.projectId, input?.crewMemberId, refreshVersion],
   );
 };
 

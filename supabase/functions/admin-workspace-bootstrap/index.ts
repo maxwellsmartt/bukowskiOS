@@ -91,7 +91,17 @@ const operationalRoles = [
     name: "Finance Viewer",
     description: "Review finance status without edit access.",
     isSystemRole: false,
-    permissionKeys: ["finance.read", "quotes.read", "quotes.export", "invoices.read", "invoices.export"],
+    permissionKeys: [
+      "finance.read",
+      "quotes.read",
+      "quotes.export",
+      "invoices.read",
+      "invoices.export",
+      "treasury.transactions.read",
+      "treasury.reimbursements.review",
+      "treasury.export",
+      "crew_fees.read",
+    ],
   },
   {
     key: "maintenance",

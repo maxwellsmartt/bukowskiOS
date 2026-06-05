@@ -1,8 +1,8 @@
 import { Archive } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { ProjectListQuery, ProjectSortField } from "@contracts";
+import type { ProjectCardRow, ProjectListQuery, ProjectSortField } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
@@ -16,6 +16,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { uiPreferenceKeys } from "@shared/lib/preferences";
+import { hasFinanceAccess } from "@shared/lib/financeAccess";
 
 import { ProjectDetailPanel } from "./ProjectDetailPanel";
 import { useProjectDetail, useProjectsRegistry } from "./useProjectsData";
@@ -37,7 +38,12 @@ const projectSortOptions: Array<ListSortOption<ProjectSortField> & { labelKey: s
 
 export const ProjectsPage = () => {
   const { t } = useTranslation();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeMembership, activeWorkspaceId } = useWorkspace();
+  const canAccessFinance = hasFinanceAccess(activeMembership);
+  const availableProjectSortOptions = useMemo(
+    () => (canAccessFinance ? projectSortOptions : projectSortOptions.filter((option) => option.value !== "exposure")),
+    [canAccessFinance],
+  );
   const [showArchived, setShowArchived] = useState(false);
   const projectControls = useListControls<ProjectSortField, ProjectListQuery>({
     viewKey: "projects-registry-list",
@@ -46,7 +52,7 @@ export const ProjectsPage = () => {
       sortBy: "name",
       sortDirection: "asc",
     },
-    sortOptions: projectSortOptions,
+    sortOptions: availableProjectSortOptions,
     defaultDirectionBySort: {
       activeUnitCount: "desc",
       assetCount: "desc",
@@ -140,7 +146,7 @@ export const ProjectsPage = () => {
             searchValue={projectControls.searchValue}
             sortBy={projectControls.sortBy}
             sortDirection={projectControls.sortDirection}
-            sortOptions={projectSortOptions.map((option) => ({
+            sortOptions={availableProjectSortOptions.map((option) => ({
               ...option,
               label: t(option.labelKey, { defaultValue: option.label }),
             }))}
@@ -217,7 +223,18 @@ export const ProjectsPage = () => {
                 render: (row) => row.incidentCount,
               },
               { key: "departments", label: t("projects.registry.columns.departments"), width: 210, minWidth: 170, render: (row) => row.departments },
-              { key: "exposure", label: t("projects.registry.columns.exposure"), align: "right", width: 110, minWidth: 96, render: (row) => row.exposure },
+              ...(canAccessFinance
+                ? [
+                    {
+                      key: "exposure",
+                      label: t("projects.registry.columns.exposure"),
+                      align: "right" as const,
+                      width: 110,
+                      minWidth: 96,
+                      render: (row: ProjectCardRow) => row.exposure,
+                    },
+                  ]
+                : []),
               { key: "description", label: t("projects.registry.columns.description"), width: 260, minWidth: 220, render: (row) => row.description },
             ]}
             emptyContent={

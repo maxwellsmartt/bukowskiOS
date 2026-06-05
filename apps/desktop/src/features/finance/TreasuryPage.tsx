@@ -1,4 +1,4 @@
-import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, FileDown, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, FileDown, FileUp, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -1478,7 +1478,7 @@ export const TreasuryPage = () => {
                   onClick={() => void exportOverviewPdf()}
                   type="button"
                 >
-                  <FileDown size={13} />
+                  <FileUp size={13} />
                   <span>
                     {isExportingOverviewPdf
                       ? t("finance.treasury.overview.exportingSummary")
@@ -1587,9 +1587,11 @@ export const TreasuryPage = () => {
                 <div className="finance-chart-shell finance-chart-shell-pie">
                   <div className="finance-category-layout">
                     <div className="finance-donut-wrap">
-                      <ResponsiveContainer height={268} width="100%">
+                      <ResponsiveContainer height={252} width="100%">
                         <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                           <Pie
+                            cx="50%"
+                            cy="50%"
                             data={categoryChartData}
                             dataKey="amount"
                             innerRadius="55%"

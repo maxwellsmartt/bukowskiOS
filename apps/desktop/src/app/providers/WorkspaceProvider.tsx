@@ -80,16 +80,19 @@ const toCachedMembership = (workspace: {
   id: string;
   name: string;
   baseCurrency?: string | null;
+  roleKey?: string | null;
+  roleName?: string | null;
+  permissions?: string[] | null;
 }): WorkspaceMembership => ({
   workspaceId: workspace.id,
   workspaceName: workspace.name,
   avatarUrl: null,
   iconColor: null,
   baseCurrency: (workspace.baseCurrency ?? "USD").toUpperCase(),
-  roleKey: "admin",
-  roleName: "Cached access",
+  roleKey: workspace.roleKey ?? null,
+  roleName: workspace.roleName ?? "Cached access",
   status: "active",
-  permissions: ["*"],
+  permissions: workspace.permissions ?? [],
 });
 
 export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
@@ -233,6 +236,11 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
             slug: sourceRow?.workspaces?.slug ?? membership.workspaceId,
             baseCurrency: sourceRow?.workspaces?.base_currency ?? "USD",
             iconColor: sourceRow?.workspaces?.icon_color ?? null,
+            userId,
+            userEmail: user?.email ?? null,
+            roleKey: membership.roleKey,
+            roleName: membership.roleName,
+            permissions: membership.permissions,
           };
         }),
       );
@@ -268,8 +276,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      const localWorkspaces = (await window.bukowskiApp?.getLocalWorkspaces?.().catch(() => [])) ?? [];
-      const cachedMemberships = localWorkspaces.length > 0 ? localWorkspaces.map(toCachedMembership) : [localMembership];
+      const localWorkspaces = (await window.bukowskiApp?.getLocalWorkspaces?.({ userId }).catch(() => [])) ?? [];
+      const cachedMemberships = localWorkspaces.map(toCachedMembership);
       const message = getUserFacingErrorMessage(error, "Unable to load remote workspaces.");
 
       setIsSessionExpired(false);
@@ -283,7 +291,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       );
       setIsLoadingWorkspaces(false);
     }
-  }, [isLocalFallback, status, supabase, userId, verifySessionActive]);
+  }, [isLocalFallback, status, supabase, user?.email, userId, verifySessionActive]);
 
   useEffect(() => {
     void refreshWorkspaces();

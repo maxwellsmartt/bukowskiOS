@@ -45,7 +45,7 @@ type RegisterAppIpcOptions = {
   createBackupNow: () => import("@contracts").AppDiagnosticsSnapshot;
   runIntegrityCheckNow: () => import("@contracts").AppDiagnosticsSnapshot;
   ensureLocalWorkspaces: (workspaces: import("@contracts").EnsureLocalWorkspaceInput[]) => import("@contracts").AppDiagnosticsSnapshot;
-  getLocalWorkspaces: () => import("@contracts").AppLocalWorkspaceRow[];
+  getLocalWorkspaces: (query?: { userId?: string | null }) => import("@contracts").AppLocalWorkspaceRow[];
   runLocalSyncNow: () => Promise<import("@contracts").AppDiagnosticsSnapshot>;
   getSyncOutboxRows: () => import("@contracts").AppSyncOutboxRow[];
   getSyncPullCursors: () => import("@contracts").AppSyncPullCursorRow[];
@@ -353,8 +353,17 @@ const ensureLocalWorkspacesSchema = z.array(
     slug: z.string().trim().min(1),
     baseCurrency: z.string().trim().min(1),
     iconColor: z.string().trim().nullable().optional(),
+    userId: z.string().trim().nullable().optional(),
+    userEmail: z.string().trim().nullable().optional(),
+    roleKey: z.string().trim().nullable().optional(),
+    roleName: z.string().trim().nullable().optional(),
+    permissions: z.array(z.string().trim().min(1)).optional(),
   }),
 );
+
+const localWorkspacesReadArgsSchema = z.object({
+  userId: z.string().trim().nullable().optional(),
+}).optional();
 
 const exportDatabaseJson = async (database: RegisterAppIpcOptions["database"]) => {
   const { canceled, filePath } = await dialog.showSaveDialog({
@@ -456,8 +465,8 @@ export const registerAppIpc = ({
   );
   safeHandleReadWithSchema(
     ipcChannels.app.getLocalWorkspaces,
-    emptyReadArgsSchema,
-    () => getLocalWorkspaces(),
+    localWorkspacesReadArgsSchema,
+    (_event, query) => getLocalWorkspaces(query as z.infer<typeof localWorkspacesReadArgsSchema>),
     "The app could not load the local workspace cache.",
   );
   safeHandle(

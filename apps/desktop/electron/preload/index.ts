@@ -215,7 +215,8 @@ const bukowskiApp = {
   deleteUser: (input: DeleteAppUserCommand) => ipcRenderer.invoke(ipcChannels.app.deleteUser, input) as Promise<AppUserMutationResult>,
   ensureLocalWorkspaces: (workspaces: EnsureLocalWorkspaceInput[]) =>
     ipcRenderer.invoke(ipcChannels.app.ensureLocalWorkspaces, workspaces) as Promise<AppActionResult>,
-  getLocalWorkspaces: () => ipcRenderer.invoke(ipcChannels.app.getLocalWorkspaces) as Promise<AppLocalWorkspaceRow[]>,
+  getLocalWorkspaces: (query?: { userId?: string | null }) =>
+    ipcRenderer.invoke(ipcChannels.app.getLocalWorkspaces, query) as Promise<AppLocalWorkspaceRow[]>,
   createRemoteWorkspace: (input: AppCreateRemoteWorkspaceCommand) =>
     ipcRenderer.invoke(ipcChannels.app.createRemoteWorkspace, input) as Promise<AppCreateRemoteWorkspaceResult>,
   sendWorkspaceInvite: (input: AppSendWorkspaceInviteCommand) =>

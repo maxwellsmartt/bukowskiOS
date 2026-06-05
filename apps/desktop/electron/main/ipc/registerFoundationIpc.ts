@@ -701,6 +701,20 @@ export const registerFoundationIpc = ({
     includeArchived: query?.includeArchived,
   });
 
+  const canReadFinanceForWorkspace = async (workspaceId: string) => {
+    try {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId,
+        action: "load finance fields",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const assertAgentWorkspaceAccess = (
     input: { workspaceId: string },
     action: string,
@@ -1398,7 +1412,12 @@ export const registerFoundationIpc = ({
         accessLevel: "read",
         requiredPermission: "projects.read",
       });
-      return foundationReads.getProjects(scopedQuery);
+      const includeFinancials = await canReadFinanceForWorkspace(scopedQuery.workspaceId ?? DEFAULT_WORKSPACE_ID);
+      const safeQuery =
+        includeFinancials || scopedQuery.sortBy !== "exposure"
+          ? scopedQuery
+          : { ...scopedQuery, sortBy: "name" as const, sortDirection: "asc" as const };
+      return foundationReads.getProjects(safeQuery, { includeFinancials });
     },
     "The app could not load projects.",
   );
@@ -1406,8 +1425,9 @@ export const registerFoundationIpc = ({
     ipcChannels.projects.getDetail,
     idReadArgsSchema,
     async (_event, projectId: string) => {
-      await workspaceAccess.assertProjectAccess(projectId, "load that project", "read", "projects.read");
-      return foundationReads.getProjectDetail(projectId);
+      const workspaceId = await workspaceAccess.assertProjectAccess(projectId, "load that project", "read", "projects.read");
+      const includeFinancials = await canReadFinanceForWorkspace(workspaceId);
+      return foundationReads.getProjectDetail(projectId, { includeFinancials });
     },
     "The app could not load that project.",
   );

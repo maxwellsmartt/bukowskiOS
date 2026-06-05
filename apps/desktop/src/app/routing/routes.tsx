@@ -1,6 +1,8 @@
 import { lazy, type ComponentType } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { hasFinanceAccess } from "@shared/lib/financeAccess";
 import { GuestOnlyRoute, AuthGuard } from "./AuthGuard";
 import { appRouteMeta, resolveInitialPath } from "./route-meta";
 
@@ -108,6 +110,17 @@ export const appRoutes = appRouteMeta.map((route) => ({
   element: routeElements[route.path as keyof typeof routeElements],
 }));
 
+const FinanceAccessGuard = ({ children }: { children: JSX.Element }) => {
+  const location = useLocation();
+  const { activeMembership } = useWorkspace();
+
+  if (!hasFinanceAccess(activeMembership)) {
+    return <Navigate to="/projects/schedule" replace state={{ blockedFrom: location.pathname }} />;
+  }
+
+  return children;
+};
+
 export const AppRoutes = () => (
   <Routes>
     <Route
@@ -154,8 +167,15 @@ export const AppRoutes = () => (
     <Route path="/" element={<AuthGuard><Navigate to={resolveInitialPath()} replace /></AuthGuard>} />
     <Route path="/overview" element={<AuthGuard><Navigate to="/assets" replace /></AuthGuard>} />
     <Route path="/assets/overview" element={<AuthGuard><Navigate to="/assets" replace /></AuthGuard>} />
-    {appRoutes.map((route) => (
-      <Route key={route.path} path={route.path} element={<AuthGuard>{route.element}</AuthGuard>} />
-    ))}
+    {appRoutes.map((route) => {
+      const requiresFinanceAccess = route.domain === "finance" || route.projectSection === "budget";
+      const guardedElement = requiresFinanceAccess ? (
+        <FinanceAccessGuard>{route.element}</FinanceAccessGuard>
+      ) : (
+        route.element
+      );
+
+      return <Route key={route.path} path={route.path} element={<AuthGuard>{guardedElement}</AuthGuard>} />;
+    })}
   </Routes>
 );

@@ -13,6 +13,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useLocale } from "@shared/hooks/useLocale";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { hasFinanceAccess } from "@shared/lib/financeAccess";
 
 import { CurrencySettingsCard } from "./CurrencySettingsCard";
 import { DocumentsFolderCard } from "./DocumentsFolderCard";
@@ -295,6 +296,7 @@ export const WorkspaceSettingsPage = () => {
   const navigate = useNavigate();
   const { supabase, isLocalFallback, user: sessionUser } = useSession();
   const { activeWorkspaceId, activeWorkspaceName, activeMembership, memberships, refreshWorkspaces } = useWorkspace();
+  const canAccessFinance = hasFinanceAccess(activeMembership);
   const { formatDate } = useLocale();
   const workspaceAvatarInputRef = useRef<HTMLInputElement | null>(null);
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
@@ -1204,25 +1206,29 @@ export const WorkspaceSettingsPage = () => {
         <WorkspaceBrandingCard />
       </WorkspaceDisclosure>
 
-      <WorkspaceDisclosure
-        title={t("settings.workspace.sections.currency")}
-        summary={
-          workspaceProfile?.baseCurrency
-            ? t("settings.workspace.summaries.currencyWith", { currency: workspaceProfile.baseCurrency })
-            : t("settings.workspace.summaries.currency")
-        }
-      >
-        <CurrencySettingsCard />
-      </WorkspaceDisclosure>
+      {canAccessFinance ? (
+        <>
+          <WorkspaceDisclosure
+            title={t("settings.workspace.sections.currency")}
+            summary={
+              workspaceProfile?.baseCurrency
+                ? t("settings.workspace.summaries.currencyWith", { currency: workspaceProfile.baseCurrency })
+                : t("settings.workspace.summaries.currency")
+            }
+          >
+            <CurrencySettingsCard />
+          </WorkspaceDisclosure>
 
-      <WorkspaceDisclosure
-        title={t("settings.workspace.sections.ncf", { defaultValue: "NCF" })}
-        summary={t("settings.workspace.summaries.ncf", {
-          defaultValue: "Serie fiscal, próxima secuencia y vencimiento para facturación.",
-        })}
-      >
-        <NcfSettingsCard />
-      </WorkspaceDisclosure>
+          <WorkspaceDisclosure
+            title={t("settings.workspace.sections.ncf", { defaultValue: "NCF" })}
+            summary={t("settings.workspace.summaries.ncf", {
+              defaultValue: "Serie fiscal, próxima secuencia y vencimiento para facturación.",
+            })}
+          >
+            <NcfSettingsCard />
+          </WorkspaceDisclosure>
+        </>
+      ) : null}
 
       <WorkspaceDisclosure
         title={t("settings.workspace.sections.documentsFolder", { defaultValue: "Carpeta de documentos" })}

@@ -99,6 +99,40 @@ export const createWorkspaceAccessGuard = ({
     }
   };
 
+  const hasLocalWorkspaceAccess = (userId: string, workspaceId: string, requiredPermission?: string) => {
+    const row = database
+      .prepare(
+        `
+          SELECT
+            roles.key AS role_key,
+            GROUP_CONCAT(DISTINCT permissions.key) AS permission_keys
+          FROM workspace_memberships
+          LEFT JOIN roles ON roles.id = workspace_memberships.role_id
+          LEFT JOIN role_permissions ON role_permissions.role_id = roles.id
+          LEFT JOIN permissions ON permissions.id = role_permissions.permission_id
+          WHERE workspace_memberships.workspace_id = ?
+            AND workspace_memberships.user_id = ?
+            AND workspace_memberships.status = 'active'
+          GROUP BY workspace_memberships.workspace_id, workspace_memberships.user_id, roles.key
+          LIMIT 1
+        `,
+      )
+      .get(workspaceId, userId) as { role_key: string | null; permission_keys: string | null } | undefined;
+
+    if (!row) {
+      return false;
+    }
+
+    if (!requiredPermission || row.role_key === "admin") {
+      return true;
+    }
+
+    return (row.permission_keys ?? "")
+      .split(",")
+      .map((permissionKey) => permissionKey.trim())
+      .includes(requiredPermission);
+  };
+
   const getAssetWorkspaceId = (assetId: string) => {
     const row = database.prepare("SELECT workspace_id FROM assets WHERE id = ? LIMIT 1").get(assetId) as
       | { workspace_id: string }
@@ -264,11 +298,11 @@ export const createWorkspaceAccessGuard = ({
             },
           });
     } catch (error) {
-      // Offline tolerance for reads: the workspace was already proven to exist
-      // locally (assertLocalWorkspaceExists at the top), which only holds for
-      // workspaces this user is a member of — so a read here is for the user's
-      // own data. Unknown workspaces are already denied before this point.
-      if (accessLevel === "read") {
+      // Offline tolerance for reads: use the cached membership/permissions for
+      // this authenticated user. Workspace existence alone is not sufficient;
+      // otherwise a synced local database could expose Finance/Treasury data to
+      // a user whose role does not include those permissions.
+      if (accessLevel === "read" && hasLocalWorkspaceAccess(userId, workspaceId, requiredPermission)) {
         return;
       }
 

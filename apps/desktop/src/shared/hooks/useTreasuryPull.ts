@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { TreasuryPullTable } from "@contracts";
+import { canReadTreasury } from "@shared/lib/financeAccess";
 import { notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
 const POLL_INTERVAL_MS = 20_000;
@@ -45,8 +46,9 @@ const writeCursor = (key: string, value: string | null) => {
 
 export const useTreasuryPull = () => {
   const { supabase, isLocalFallback, status } = useSession();
-  const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
+  const { activeMembership, activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const inFlightRef = useRef(false);
+  const canPullTreasury = canReadTreasury(activeMembership);
 
   useEffect(() => {
     if (
@@ -54,6 +56,7 @@ export const useTreasuryPull = () => {
       isLocalFallback ||
       status !== "authenticated" ||
       !isWorkspaceReady ||
+      !canPullTreasury ||
       !activeWorkspaceId ||
       !window.bukowskiApp?.applyRemoteTreasuryRows
     ) {
@@ -119,5 +122,5 @@ export const useTreasuryPull = () => {
     void runOnce();
     const interval = window.setInterval(() => void runOnce(), POLL_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [activeWorkspaceId, isLocalFallback, isWorkspaceReady, status, supabase]);
+  }, [activeWorkspaceId, canPullTreasury, isLocalFallback, isWorkspaceReady, status, supabase]);
 };

@@ -23,6 +23,69 @@ const insertRemoteWorkspace = (database: ReturnType<typeof createTestDatabase>["
     .run(remoteWorkspaceId, "remote-test", "Remote Test", "2026-04-24T00:00:00.000Z", "2026-04-24T00:00:00.000Z");
 };
 
+const insertCachedWorkspaceMembership = (
+  database: ReturnType<typeof createTestDatabase>["database"],
+  permissionKey: string,
+) => {
+  const timestamp = "2026-04-24T00:00:00.000Z";
+  database
+    .prepare(
+      `
+        INSERT INTO users (id, full_name, email, phone, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, NULL, 1, ?, ?)
+        ON CONFLICT(id) DO NOTHING
+      `,
+    )
+    .run("user-remote", "Remote user", "remote@example.test", timestamp, timestamp);
+  database
+    .prepare(
+      `
+        INSERT INTO roles (id, workspace_id, key, name, description, is_system_role, created_at)
+        VALUES (?, ?, ?, ?, ?, 0, ?)
+        ON CONFLICT(id) DO NOTHING
+      `,
+    )
+    .run("role-remote-assets-reader", remoteWorkspaceId, "assets_reader", "Assets reader", "Cached read-only role", timestamp);
+  database
+    .prepare(
+      `
+        INSERT INTO permissions (id, key, label, description)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(key) DO NOTHING
+      `,
+    )
+    .run(`permission-${permissionKey}`, permissionKey, permissionKey, "Cached test permission");
+  database
+    .prepare(
+      `
+        INSERT INTO role_permissions (role_id, permission_id, created_at)
+        SELECT ?, permissions.id, ?
+        FROM permissions
+        WHERE permissions.key = ?
+        ON CONFLICT(role_id, permission_id) DO NOTHING
+      `,
+    )
+    .run("role-remote-assets-reader", timestamp, permissionKey);
+  database
+    .prepare(
+      `
+        INSERT INTO workspace_memberships (id, workspace_id, user_id, role_id, status, joined_at, created_at)
+        VALUES (?, ?, ?, ?, 'active', ?, ?)
+        ON CONFLICT(workspace_id, user_id) DO UPDATE SET
+          role_id = excluded.role_id,
+          status = 'active'
+      `,
+    )
+    .run(
+      "membership-remote-assets-reader",
+      remoteWorkspaceId,
+      "user-remote",
+      "role-remote-assets-reader",
+      timestamp,
+      timestamp,
+    );
+};
+
 describe("workspace access guard", () => {
   it("still validates the default workspace when Supabase is configured (no spoof bypass)", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-workspace-access-default");
@@ -120,6 +183,7 @@ describe("workspace access guard", () => {
   it("keeps cached reads available when Supabase cannot be reached", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-workspace-access");
     insertRemoteWorkspace(database);
+    insertCachedWorkspaceMembership(database, "assets.read");
     const guard = createWorkspaceAccessGuard({
       database,
       supabaseUrl: "https://example.supabase.co",

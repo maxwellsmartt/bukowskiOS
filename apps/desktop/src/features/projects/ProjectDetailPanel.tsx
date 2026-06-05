@@ -17,6 +17,7 @@ import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { formatProjectAssignmentInline } from "@shared/lib/assetQuantityPresentation";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { hasFinanceAccess } from "@shared/lib/financeAccess";
 
 type ProjectDetailPanelProps = {
   data: ProjectDetailSnapshot;
@@ -52,7 +53,8 @@ const translateProjectMetricLabel = (label: string, t: TFunction) =>
 export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }: ProjectDetailPanelProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeMembership, activeWorkspaceId } = useWorkspace();
+  const canAccessFinance = hasFinanceAccess(activeMembership);
   const { projects, refreshProjects } = useShellContext();
   const { data: catalog, error: catalogError } = useCatalogData();
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
@@ -131,10 +133,12 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
             <span className="summary-label">{t("projects.detail.summary.client")}</span>
             <span className="summary-value">{project.client}</span>
           </div>
-          <div className="summary-row">
-            <span className="summary-label">{t("projects.detail.summary.exposure")}</span>
-            <span className="summary-value">{project.exposure}</span>
-          </div>
+          {canAccessFinance ? (
+            <div className="summary-row">
+              <span className="summary-label">{t("projects.detail.summary.exposure")}</span>
+              <span className="summary-value">{project.exposure}</span>
+            </div>
+          ) : null}
           <div className="summary-row">
             <span className="summary-label">{t("projects.detail.summary.timeline")}</span>
             <span className="summary-value">{data.schedule?.windowLabel ?? t("projects.fallbacks.unscheduled")}</span>

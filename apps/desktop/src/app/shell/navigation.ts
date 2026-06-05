@@ -93,11 +93,13 @@ const projectSectionMeta: Record<ProjectRouteSection, Omit<NavItem, "path">> = {
 
 const projectSectionOrder: ProjectRouteSection[] = ["info", "overview", "assets", "packing", "incidents", "budget"];
 
-export const buildProjectSubnav = (projectId: string): NavItem[] =>
-  projectSectionOrder.map((section) => ({
-    ...projectSectionMeta[section],
-    path: `/projects/${projectId}/${section}`,
-  }));
+export const buildProjectSubnav = (projectId: string, options: { includeBudget?: boolean } = {}): NavItem[] =>
+  projectSectionOrder
+    .filter((section) => section !== "budget" || options.includeBudget === true)
+    .map((section) => ({
+      ...projectSectionMeta[section],
+      path: `/projects/${projectId}/${section}`,
+    }));
 
 export const utilityNav: NavItem[] = [
   { label: "shell.nav.utility.catalog", path: "/catalog", icon: SwatchBook },
