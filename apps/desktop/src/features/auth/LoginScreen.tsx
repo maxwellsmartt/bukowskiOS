@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
-import { useSession } from "@app/providers/SessionProvider";
+import { REMEMBER_SESSION_KEY, useSession } from "@app/providers/SessionProvider";
 import brandLogoWhite1x from "@shared/assets/inbox/logos/bukowskiOS_logo_white.png";
 import brandLogoWhite from "@shared/assets/logos/bukowskiOS_logo_white@2x.png";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
@@ -24,7 +24,24 @@ export const LoginScreen = () => {
 
   const from = typeof location.state === "object" && location.state && "from" in location.state ? String(location.state.from) : "/";
 
+  // Persist the "Keep me signed in" choice before any sign-in starts, so the
+  // session provider honours it the moment auth state changes. Applies to every
+  // method (password, magic link, OAuth). "0" = session-only (memory).
+  const commitRememberPreference = () => {
+    try {
+      window.localStorage.setItem(REMEMBER_SESSION_KEY, rememberLogin ? "1" : "0");
+    } catch {
+      /* storage unavailable — default (remember) applies */
+    }
+  };
+
+  useEffect(() => {
+    commitRememberPreference();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rememberLogin]);
+
   const runAuthAction = async (action: () => Promise<void>, successMessage?: string) => {
+    commitRememberPreference();
     setPendingOAuthProvider(null);
     setIsSubmitting(true);
     setStatus(null);
@@ -48,6 +65,7 @@ export const LoginScreen = () => {
   };
 
   const runOAuthAction = async (provider: OAuthProvider) => {
+    commitRememberPreference();
     setPendingOAuthProvider(provider);
     setIsSubmitting(true);
     setStatus(t("auth.login.oauthOpening", { provider: t(`auth.providers.${provider}`) }));

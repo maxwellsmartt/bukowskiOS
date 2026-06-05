@@ -305,7 +305,7 @@ const bukowskiAuth = {
   getOAuthRedirectUrl: () => ipcRenderer.invoke(ipcChannels.auth.getOAuthRedirectUrl) as Promise<string>,
   getAvatarDataUrl: (url: string) => ipcRenderer.invoke(ipcChannels.auth.getAvatarDataUrl, url) as Promise<string | null>,
   updateUser: (input: AuthUserUpdate) => ipcRenderer.invoke(ipcChannels.auth.updateUser, input) as Promise<unknown>,
-  setStoredTokens: (tokens: StoredSupabaseTokens) =>
+  setStoredTokens: (tokens: StoredSupabaseTokens & { remember?: boolean }) =>
     ipcRenderer.invoke(ipcChannels.auth.setStoredTokens, tokens) as Promise<void>,
   clearStoredTokens: () => ipcRenderer.invoke(ipcChannels.auth.clearStoredTokens) as Promise<void>,
 };

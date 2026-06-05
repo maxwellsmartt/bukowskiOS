@@ -238,7 +238,11 @@ declare global {
       getOAuthRedirectUrl: () => Promise<string>;
       getAvatarDataUrl: (url: string) => Promise<string | null>;
       updateUser: (input: { password?: string; data?: Record<string, unknown> }) => Promise<unknown>;
-      setStoredTokens: (tokens: { accessToken: string | null; refreshToken: string | null }) => Promise<void>;
+      setStoredTokens: (tokens: {
+        accessToken: string | null;
+        refreshToken: string | null;
+        remember?: boolean;
+      }) => Promise<void>;
       clearStoredTokens: () => Promise<void>;
     };
     bukowskiNotifications?: {

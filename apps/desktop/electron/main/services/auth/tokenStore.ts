@@ -37,10 +37,22 @@ const readLegacyKeytarTokens = async (): Promise<StoredSupabaseTokens> => {
   }
 };
 
+// In-memory tokens for the current app run. When the user did NOT check
+// "Keep me signed in" we keep the session only here — it works for this run
+// but disappears on restart because nothing is written to disk.
+let memoryTokens: StoredSupabaseTokens | null = null;
+// Whether token writes should persist to disk. Set by setTokens({ persist });
+// later refresh-driven writes (which pass no flag) inherit the current mode.
+let persistMode = true;
+
 export const createSupabaseTokenStore = () => ({
   async getTokens(): Promise<StoredSupabaseTokens> {
     if (isE2E) {
       return e2eTokens;
+    }
+
+    if (memoryTokens) {
+      return memoryTokens;
     }
 
     const accessToken = normalizeToken(readSecret(secretFileName, accessTokenAccount));
@@ -58,7 +70,7 @@ export const createSupabaseTokenStore = () => ({
     return legacy;
   },
 
-  async setTokens(tokens: StoredSupabaseTokens): Promise<void> {
+  async setTokens(tokens: StoredSupabaseTokens, options?: { persist?: boolean }): Promise<void> {
     const accessToken = normalizeToken(tokens.accessToken);
     const refreshToken = normalizeToken(tokens.refreshToken);
 
@@ -67,11 +79,25 @@ export const createSupabaseTokenStore = () => ({
       return;
     }
 
-    writeSecret(secretFileName, accessTokenAccount, accessToken);
-    writeSecret(secretFileName, refreshTokenAccount, refreshToken);
+    if (options?.persist !== undefined) {
+      persistMode = options.persist;
+    }
+
+    // Always keep the current-run copy so the session works immediately.
+    memoryTokens = accessToken || refreshToken ? { accessToken, refreshToken } : null;
+
+    if (persistMode) {
+      writeSecret(secretFileName, accessTokenAccount, accessToken);
+      writeSecret(secretFileName, refreshTokenAccount, refreshToken);
+    } else {
+      // Session-only: make sure nothing survives the next launch.
+      deleteSecret(secretFileName, accessTokenAccount);
+      deleteSecret(secretFileName, refreshTokenAccount);
+    }
   },
 
   async clearTokens(): Promise<void> {
+    memoryTokens = null;
     if (isE2E) {
       e2eTokens = { accessToken: null, refreshToken: null };
       return;

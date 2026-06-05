@@ -14,6 +14,7 @@ import { safeHandle, safeHandleReadWithSchema } from "./ipcSafeHandler";
 const storedSupabaseTokensSchema = z.object({
   accessToken: z.string().nullable(),
   refreshToken: z.string().nullable(),
+  remember: z.boolean().optional(),
 });
 const updateUserSchema = z
   .object({
@@ -91,7 +92,11 @@ export const registerAuthIpc = (options: RegisterAuthIpcOptions = {}) => {
   safeHandle(
     ipcChannels.auth.setStoredTokens,
     storedSupabaseTokensSchema,
-    (_event, input: StoredSupabaseTokens) => setStoredSupabaseTokens(input),
+    (_event, input: StoredSupabaseTokens & { remember?: boolean }) =>
+      setStoredSupabaseTokens(
+        { accessToken: input.accessToken, refreshToken: input.refreshToken },
+        input.remember ?? true,
+      ),
     "The app could not store the auth session.",
   );
 

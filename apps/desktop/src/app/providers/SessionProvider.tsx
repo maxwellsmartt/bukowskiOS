@@ -140,10 +140,25 @@ const buildCachedSessionUser = (accessToken: string | null | undefined): Bukowsk
   }
 };
 
+// "Keep me signed in" preference: when false, the session is kept in memory
+// for the current run only and not written to disk, so a restart returns to
+// the login screen. Default true. The LoginScreen writes this key on sign-in.
+export const REMEMBER_SESSION_KEY = "bukowski:remember-session";
+
+const shouldRememberSession = () => {
+  try {
+    return window.localStorage.getItem(REMEMBER_SESSION_KEY) !== "0";
+  } catch {
+    return true;
+  }
+};
+
 const persistStoredTokens = (tokens: { accessToken: string | null; refreshToken: string | null }) => {
-  void window.bukowskiAuth?.setStoredTokens(tokens).catch((error) => {
-    console.warn("Unable to persist the Supabase session locally.", error);
-  });
+  void window.bukowskiAuth
+    ?.setStoredTokens({ ...tokens, remember: shouldRememberSession() })
+    .catch((error) => {
+      console.warn("Unable to persist the Supabase session locally.", error);
+    });
 };
 
 const loadUserProfile = async (supabase: BukowskiSupabaseClient, userId: string): Promise<BukowskiUserProfile | null> => {

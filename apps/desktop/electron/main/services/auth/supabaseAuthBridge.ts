@@ -185,7 +185,8 @@ export const getFreshStoredUserClaims = async () => {
   };
 };
 
-export const setStoredSupabaseTokens = (tokens: StoredSupabaseTokens) => tokenStore.setTokens(tokens);
+export const setStoredSupabaseTokens = (tokens: StoredSupabaseTokens, remember = true) =>
+  tokenStore.setTokens(tokens, { persist: remember });
 
 export const clearStoredSupabaseTokens = () => tokenStore.clearTokens();
 
