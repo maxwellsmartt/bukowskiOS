@@ -11033,8 +11033,8 @@ select.field-input {
 
 .app-startup-logo-img {
   width: auto;
-  height: 30px;
-  max-width: min(260px, 70vw);
+  height: 42px;
+  max-width: min(320px, 76vw);
   object-fit: contain;
   margin-bottom: 4px;
   filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.5));
