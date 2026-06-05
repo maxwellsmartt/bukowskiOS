@@ -17,9 +17,14 @@ export const WorkspacePickerScreen = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { signOut } = useSession();
-  const { activeWorkspaceId, isLoadingWorkspaces, memberships, refreshWorkspaces, switchWorkspace, workspaceError } =
+  const { activeWorkspaceId, isLoadingWorkspaces, isSessionExpired, memberships, refreshWorkspaces, switchWorkspace, workspaceError } =
     useWorkspace();
-  const hasNoWorkspaceAccess = !isLoadingWorkspaces && memberships.length === 0;
+  const hasNoWorkspaceAccess = !isLoadingWorkspaces && !isSessionExpired && memberships.length === 0;
+  const showSessionExpired = !isLoadingWorkspaces && isSessionExpired;
+
+  const returnToLogin = () => {
+    void signOut().finally(() => navigate("/login", { replace: true }));
+  };
 
   return (
     <div className="auth-screen">
@@ -59,6 +64,15 @@ export const WorkspacePickerScreen = () => {
               {membership.workspaceId === activeWorkspaceId ? <Check className="workspace-picker-check" size={16} /> : null}
             </button>
           ))}
+          {showSessionExpired ? (
+            <div className="workspace-picker-empty">
+              <strong>{t("auth.workspacePicker.expiredTitle")}</strong>
+              <p>{t("auth.workspacePicker.expiredBody")}</p>
+              <button className="auth-primary-button" onClick={returnToLogin} type="button">
+                <span>{t("auth.workspacePicker.expiredAction")}</span>
+              </button>
+            </div>
+          ) : null}
           {hasNoWorkspaceAccess ? (
             <div className="workspace-picker-empty">
               <strong>{t("auth.workspacePicker.emptyTitle")}</strong>
@@ -71,10 +85,12 @@ export const WorkspacePickerScreen = () => {
           ) : null}
         </div>
 
-        <button className="auth-secondary-button" onClick={() => navigate("/workspaces/create")} type="button">
-          <Plus size={16} />
-          <span>{t("auth.workspacePicker.createWorkspace")}</span>
-        </button>
+        {showSessionExpired ? null : (
+          <button className="auth-secondary-button" onClick={() => navigate("/workspaces/create")} type="button">
+            <Plus size={16} />
+            <span>{t("auth.workspacePicker.createWorkspace")}</span>
+          </button>
+        )}
         {workspaceError ? <p className="auth-status">{workspaceError}</p> : null}
       </section>
       <button

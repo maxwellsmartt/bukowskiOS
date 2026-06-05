@@ -1,4 +1,4 @@
-import { Download, FileText, RotateCcw, ShieldAlert } from "lucide-react";
+import { FileText, RotateCcw, ShieldAlert, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -87,7 +87,7 @@ export const PackingSlipDetailPanel = ({
         onClick={() => void onExportPdf()}
         type="button"
       >
-        <Download size={14} />
+        <Upload size={14} />
         <span>{isExportingPdf ? t("packing.detail.exporting") : t("packing.detail.exportSlip")}</span>
       </button>
       <button

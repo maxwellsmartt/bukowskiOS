@@ -2099,6 +2099,9 @@
       "emptyTitle": "Aún no tienes acceso a ningún workspace",
       "emptyBody": "Pide a un admin que invite este correo y refresca cuando aceptes la invitación.",
       "refreshAccess": "Refrescar acceso",
+      "expiredTitle": "Tu sesión expiró",
+      "expiredBody": "Por seguridad cerramos tu sesión. Vuelve a iniciar sesión para continuar.",
+      "expiredAction": "Volver a iniciar sesión",
       "createWorkspace": "Crear workspace",
       "backToLogin": "Volver al login"
     },

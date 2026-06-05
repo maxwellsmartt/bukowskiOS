@@ -40,6 +40,13 @@ type SessionContextValue = {
   signOut: () => Promise<void>;
   handleAuthDeepLink: (url: string) => Promise<string>;
   refreshUser: () => Promise<void>;
+  /**
+   * Validates that the stored session can still authenticate requests (the
+   * bridge refreshes the token if needed). Returns false when the session has
+   * expired and cannot be refreshed, so callers can tell an expired session
+   * apart from a user who genuinely has no access.
+   */
+  verifySessionActive: () => Promise<boolean>;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -102,6 +109,25 @@ const decodeJwtSegment = (segment: string) => {
   const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
   return JSON.parse(globalThis.atob(padded)) as Record<string, unknown>;
+};
+
+const isAccessTokenFresh = (accessToken: string | null | undefined) => {
+  const token = accessToken?.trim();
+  if (!token) {
+    return false;
+  }
+
+  try {
+    const payloadSegment = token.split(".")[1];
+    if (!payloadSegment) {
+      return false;
+    }
+    const payload = decodeJwtSegment(payloadSegment);
+    const exp = typeof payload.exp === "number" ? payload.exp : null;
+    return exp ? exp * 1000 > Date.now() : false;
+  } catch {
+    return false;
+  }
 };
 
 const buildCachedSessionUser = (accessToken: string | null | undefined): BukowskiSessionUser | null => {
@@ -499,6 +525,21 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setUser(await resolveSessionUser(supabase, cachedUser));
   }, [supabase]);
 
+  const verifySessionActive = useCallback(async () => {
+    // Local-dev fallback has no remote session to expire.
+    if (!supabase) {
+      return true;
+    }
+
+    try {
+      // The bridge refreshes the access token when possible; a fresh token back
+      // means the session is still active, anything else means it expired.
+      return isAccessTokenFresh(await window.bukowskiAuth?.getAccessToken());
+    } catch {
+      return false;
+    }
+  }, [supabase]);
+
   const updateUserMetadata = useCallback(
     async (data: Record<string, unknown>) => {
       if (!supabase) {
@@ -608,12 +649,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       signOut,
       handleAuthDeepLink,
       refreshUser,
+      verifySessionActive,
     }),
     [
       authError,
       handleAuthDeepLink,
       isPasswordRecovery,
       refreshUser,
+      verifySessionActive,
       requestFirstLoginLink,
       requestPasswordReset,
       signInWithMagicLink,

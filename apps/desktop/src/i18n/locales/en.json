@@ -2095,6 +2095,9 @@
       "emptyTitle": "No workspace access yet",
       "emptyBody": "Ask an admin to invite this email, then refresh once you accept the invite.",
       "refreshAccess": "Refresh access",
+      "expiredTitle": "Your session expired",
+      "expiredBody": "We signed you out for security. Sign in again to continue.",
+      "expiredAction": "Sign in again",
       "createWorkspace": "Create workspace",
       "backToLogin": "Back to login"
     },

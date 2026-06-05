@@ -28,6 +28,7 @@ type WorkspaceContextValue = {
   isWorkspaceReady: boolean;
   isLoadingWorkspaces: boolean;
   isCreatingWorkspace: boolean;
+  isSessionExpired: boolean;
   workspaceError: string | null;
   switchWorkspace: (workspaceId: string) => void;
   refreshWorkspaces: () => Promise<void>;
@@ -56,6 +57,25 @@ const localMembership: WorkspaceMembership = {
   permissions: ["*"],
 };
 
+// Heuristic: did this failure come from an invalid/expired session rather than a
+// transient network/server hiccup? Auth failures must route to "session expired"
+// messaging (and a re-login CTA), never to the misleading "no workspace access".
+const isAuthLikeError = (error: unknown) => {
+  const message = (error instanceof Error ? error.message : String(error ?? "")).toLowerCase();
+  return (
+    message.includes("jwt") ||
+    message.includes("expired") ||
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes("unauthorized") ||
+    message.includes("invalid token") ||
+    message.includes("invalid_token") ||
+    message.includes("not authenticated") ||
+    message.includes("pgrst301") ||
+    message.includes("authsessionmissing")
+  );
+};
+
 const toCachedMembership = (workspace: {
   id: string;
   name: string;
@@ -73,9 +93,10 @@ const toCachedMembership = (workspace: {
 });
 
 export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
-  const { status, user, supabase, isLocalFallback } = useSession();
+  const { status, user, supabase, isLocalFallback, verifySessionActive } = useSession();
   const [memberships, setMemberships] = useState<WorkspaceMembership[]>(() => []);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true);
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
   const hasLoadedWorkspacesRef = useRef(false);
@@ -105,11 +126,13 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       hasLoadedWorkspacesRef.current = true;
       setActiveWorkspaceId((current) => current || DEFAULT_WORKSPACE_ID);
       setWorkspaceError(null);
+      setIsSessionExpired(false);
       setIsLoadingWorkspaces(false);
       return;
     }
 
     setWorkspaceError(null);
+    setIsSessionExpired(false);
 
     try {
       let { data, error } = await supabase
@@ -198,6 +221,16 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         }),
       );
 
+      // Zero rows with no error is ambiguous: either the user genuinely has no
+      // membership, or the request ran unauthenticated because the session
+      // expired (RLS then returns an empty set, not an error). Probe the stored
+      // token so the picker shows the right message instead of always "no access".
+      if (nextMemberships.length === 0) {
+        setIsSessionExpired(!(await verifySessionActive()));
+      } else {
+        setIsSessionExpired(false);
+      }
+
       setMemberships(nextMemberships);
       hasLoadedWorkspacesRef.current = true;
       setActiveWorkspaceId((current) =>
@@ -207,10 +240,23 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       );
       setIsLoadingWorkspaces(false);
     } catch (error) {
+      // An auth/expired-session failure must not masquerade as an offline cache
+      // load: surface "session expired" with empty memberships and let the picker
+      // route the user back to login.
+      if (isAuthLikeError(error) && !(await verifySessionActive())) {
+        setIsSessionExpired(true);
+        setWorkspaceError(null);
+        setMemberships([]);
+        hasLoadedWorkspacesRef.current = true;
+        setIsLoadingWorkspaces(false);
+        return;
+      }
+
       const localWorkspaces = (await window.bukowskiApp?.getLocalWorkspaces?.().catch(() => [])) ?? [];
       const cachedMemberships = localWorkspaces.length > 0 ? localWorkspaces.map(toCachedMembership) : [localMembership];
       const message = getUserFacingErrorMessage(error, "Unable to load remote workspaces.");
 
+      setIsSessionExpired(false);
       setWorkspaceError(`Supabase no responde ahora mismo. Se cargó el cache local de workspaces. ${message}`);
       setMemberships(cachedMemberships);
       hasLoadedWorkspacesRef.current = true;
@@ -221,7 +267,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       );
       setIsLoadingWorkspaces(false);
     }
-  }, [isLocalFallback, status, supabase, userId]);
+  }, [isLocalFallback, status, supabase, userId, verifySessionActive]);
 
   useEffect(() => {
     void refreshWorkspaces();
@@ -315,6 +361,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       isWorkspaceReady: status === "authenticated" && !isLoadingWorkspaces && Boolean(activeMembership),
       isLoadingWorkspaces,
       isCreatingWorkspace,
+      isSessionExpired,
       workspaceError,
       switchWorkspace,
       refreshWorkspaces,
@@ -329,6 +376,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       isCreatingWorkspace,
       isLoadingWorkspaces,
       isLocalFallback,
+      isSessionExpired,
       memberships,
       refreshWorkspaces,
       status,

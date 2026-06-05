@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { ClipboardList, FileUp, Plus, SquarePen, Trash2, X } from "lucide-react";
+import { ClipboardList, FileUp, Import, Plus, SquarePen, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -1688,7 +1688,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     onClick={() => fileInputRef.current?.click()}
                     type="button"
                   >
-                    <FileUp size={14} />
+                    <Import size={14} />
                     <span>{isImportingAssets ? t("assets.importing") : t("assets.importCsv")}</span>
                   </button>
                   <input

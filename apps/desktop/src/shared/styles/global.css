@@ -1512,6 +1512,8 @@ button:disabled {
   margin: 0;
   color: var(--text-primary);
   font-size: 26px;
+  font-weight: 300;
+  letter-spacing: 0.01em;
   line-height: 1.15;
 }
 
