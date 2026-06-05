@@ -14,6 +14,11 @@ const normalizeStoredKey = (value: string | null | undefined) => {
   return trimmed ? trimmed : null;
 };
 
+const readE2EFixedDatabaseKey = () => {
+  const fixedKey = normalizeStoredKey(process.env.BUKOWSKI_E2E_DATABASE_KEY_BASE64);
+  return fixedKey ? Buffer.from(fixedKey, "base64") : null;
+};
+
 const generateDatabaseKey = () => randomBytes(32);
 
 // One-time migration: earlier builds stored the key in the OS keychain via
@@ -40,6 +45,10 @@ export type LocalDatabaseKeyStore = {
 export const createLocalDatabaseKeyStore = (): LocalDatabaseKeyStore => ({
   async getKey() {
     if (isE2E) {
+      const fixedKey = readE2EFixedDatabaseKey();
+      if (fixedKey) {
+        return fixedKey;
+      }
       const normalized = normalizeStoredKey(e2eDatabaseKey);
       return normalized ? Buffer.from(normalized, "base64") : null;
     }
@@ -74,6 +83,9 @@ export const createLocalDatabaseKeyStore = (): LocalDatabaseKeyStore => ({
     const encodedKey = key.toString("base64");
 
     if (isE2E) {
+      if (readE2EFixedDatabaseKey()) {
+        return;
+      }
       e2eDatabaseKey = encodedKey;
       return;
     }
@@ -83,6 +95,9 @@ export const createLocalDatabaseKeyStore = (): LocalDatabaseKeyStore => ({
 
   async clearKey() {
     if (isE2E) {
+      if (readE2EFixedDatabaseKey()) {
+        return;
+      }
       e2eDatabaseKey = null;
       return;
     }

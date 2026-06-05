@@ -313,7 +313,8 @@ swallowStreamPipeErrors(process.stdout);
 swallowStreamPipeErrors(process.stderr);
 
 app.setName("bukowskiOS");
-app.setPath("userData", path.join(app.getPath("appData"), "@bukowski/desktop"));
+const e2eUserDataPath = process.env.BUKOWSKI_E2E_USER_DATA_PATH?.trim();
+app.setPath("userData", isE2E && e2eUserDataPath ? e2eUserDataPath : path.join(app.getPath("appData"), "@bukowski/desktop"));
 
 if (!isE2E) {
   if (process.defaultApp && process.argv.length >= 2) {

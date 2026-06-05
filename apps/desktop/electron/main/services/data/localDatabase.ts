@@ -561,25 +561,35 @@ const seedProjectShellForWorkspace = (database: DatabaseSync, workspaceId: strin
 
 const withRecoveredDatabase = async (databasePath: string, backupPath: string) => {
   const keyStore = createLocalDatabaseKeyStore();
-  let { database: rawDatabase, databaseEncrypted, migrationPerformed } = await openOrMigrateEncryptedDatabase({
-    databasePath,
-    keyStore,
-  });
-  let database = rawDatabase as unknown as DatabaseSync;
+
+  const openAndVerifyDatabase = async () => {
+    const result = await openOrMigrateEncryptedDatabase({
+      databasePath,
+      keyStore,
+    });
+    const database = result.database as unknown as DatabaseSync;
+
+    try {
+      runIntegrityChecks(database);
+      return result;
+    } catch (error) {
+      result.database.close();
+      throw error;
+    }
+  };
 
   try {
-    runIntegrityChecks(database);
+    const result = await openAndVerifyDatabase();
     lastIntegrityCheckAt = new Date().toISOString();
     lastIntegrityCheckStatus = "healthy";
     return {
-      database: rawDatabase,
-      databaseEncrypted,
-      migrationPerformed,
+      database: result.database,
+      databaseEncrypted: result.databaseEncrypted,
+      migrationPerformed: result.migrationPerformed,
     };
   } catch (error) {
     lastIntegrityCheckAt = new Date().toISOString();
     lastIntegrityCheckStatus = "failed";
-    rawDatabase.close();
 
     if (!fs.existsSync(backupPath)) {
       throw error;
@@ -587,18 +597,13 @@ const withRecoveredDatabase = async (databasePath: string, backupPath: string) =
 
     fs.copyFileSync(backupPath, databasePath);
     ensurePrivateFile(databasePath);
-    ({ database: rawDatabase, databaseEncrypted, migrationPerformed } = await openOrMigrateEncryptedDatabase({
-      databasePath,
-      keyStore,
-    }));
-    database = rawDatabase as unknown as DatabaseSync;
-    runIntegrityChecks(database);
+    const result = await openAndVerifyDatabase();
     lastIntegrityCheckAt = new Date().toISOString();
     lastIntegrityCheckStatus = "healthy";
     return {
-      database: rawDatabase,
-      databaseEncrypted,
-      migrationPerformed,
+      database: result.database,
+      databaseEncrypted: result.databaseEncrypted,
+      migrationPerformed: result.migrationPerformed,
     };
   }
 };

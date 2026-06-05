@@ -253,6 +253,14 @@ describe("security regression checks", () => {
     expect(assistantChatSource).toContain("writePrivateFile(storagePath, buffer)");
   });
 
+  it("does not silently downgrade encrypted local database failures to plaintext", () => {
+    const encryptionSource = readText("apps/desktop/electron/main/services/data/databaseEncryption.ts");
+
+    expect(encryptionSource).not.toContain("openPlaintextDatabase");
+    expect(encryptionSource).not.toContain("databaseEncrypted: false");
+    expect(encryptionSource).not.toMatch(/opening plaintext/i);
+  });
+
   it("keeps trusted avatar and workspace image uploads behind main-process IPC", () => {
     const rendererUploadSources = [
       "apps/desktop/src/features/admin/UserAccountSettings.tsx",

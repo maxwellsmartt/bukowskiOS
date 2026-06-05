@@ -8,10 +8,14 @@ import { _electron as electron, expect, type ElectronApplication, type Page } fr
 type LaunchDesktopAppOptions = {
   env?: Record<string, string>;
   firstWindowTimeoutMs?: number;
+  cleanupHome?: boolean;
+  homePath?: string;
 };
 
 export const launchDesktopApp = async (options: LaunchDesktopAppOptions = {}) => {
-  const temporaryHome = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-desktop-e2e-"));
+  const homePath = options.homePath ?? fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-desktop-e2e-"));
+  const userDataPath = path.join(homePath, "userData");
+  const shouldCleanupHome = options.cleanupHome ?? !options.homePath;
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const appRoot = path.resolve(currentDir, "../..");
 
@@ -21,7 +25,8 @@ export const launchDesktopApp = async (options: LaunchDesktopAppOptions = {}) =>
     env: {
       ...process.env,
       BUKOWSKI_E2E: "1",
-      HOME: temporaryHome,
+      BUKOWSKI_E2E_USER_DATA_PATH: userDataPath,
+      HOME: homePath,
       ...options.env,
     },
   });
@@ -32,10 +37,14 @@ export const launchDesktopApp = async (options: LaunchDesktopAppOptions = {}) =>
 
   return {
     electronApp,
+    getUserDataPath: () => electronApp.evaluate(({ app }) => app.getPath("userData")),
+    homePath,
     page,
     cleanup: async () => {
       await electronApp.close();
-      fs.rmSync(temporaryHome, { force: true, recursive: true });
+      if (shouldCleanupHome) {
+        fs.rmSync(homePath, { force: true, recursive: true });
+      }
     },
   };
 };

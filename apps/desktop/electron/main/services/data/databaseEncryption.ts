@@ -3,11 +3,8 @@ import type { DatabaseSync as NativeDatabaseSync } from "node:sqlite";
 
 import { ensurePrivateFile } from "../../security/storagePrivacy";
 import type { LocalDatabaseKeyStore } from "../auth/databaseKeyStore";
-import { getDesktopLogger } from "../logger";
 import { createDatabaseBackup, runIntegrityChecks } from "./localDatabaseSupport";
 import { DatabaseSync } from "./nodeSqliteShim";
-
-const encryptionLogger = getDesktopLogger("database-encryption");
 
 const SQLITE_HEADER = "SQLite format 3\u0000";
 const rollbackSuffix = ".plaintext-migration.sqlite";
@@ -16,13 +13,6 @@ const createCipherOptions = (key: Buffer) => ({
   key,
   profile: "sqlcipher-legacy4" as const,
 });
-
-const openDatabase = (databasePath: string) => {
-  const database = new DatabaseSync(databasePath);
-  database.exec("PRAGMA journal_mode = WAL;");
-  database.exec("PRAGMA foreign_keys = ON;");
-  return database;
-};
 
 const openMigrationDatabase = (databasePath: string) => {
   // Open the still-plaintext file through the cipher-capable driver with the
@@ -102,13 +92,6 @@ export type OpenEncryptedDatabaseResult = {
   migrationPerformed: boolean;
 };
 
-const openPlaintextDatabase = (databasePath: string) => {
-  const database = new DatabaseSync(databasePath);
-  database.exec("PRAGMA journal_mode = WAL;");
-  database.exec("PRAGMA foreign_keys = ON;");
-  return database;
-};
-
 export const openOrMigrateEncryptedDatabase = async ({
   databasePath,
   keyStore,
@@ -119,74 +102,54 @@ export const openOrMigrateEncryptedDatabase = async ({
   const databaseExists = fs.existsSync(databasePath);
   const startedPlaintext = databaseExists ? isPlaintextSqliteDatabase(databasePath) : false;
 
-  try {
-    const key = await keyStore.ensureKey();
+  const key = await keyStore.ensureKey();
 
-    if (!databaseExists) {
-      return {
-        database: openEncryptedDatabase(databasePath, key),
-        databaseEncrypted: true,
-        migrationPerformed: false,
-      };
-    }
-
-    if (!startedPlaintext) {
-      return {
-        database: openEncryptedDatabase(databasePath, key),
-        databaseEncrypted: true,
-        migrationPerformed: false,
-      };
-    }
-
-    const rollbackPath = `${databasePath}${rollbackSuffix}`;
-    if (fs.existsSync(rollbackPath)) {
-      fs.unlinkSync(rollbackPath);
-    }
-
-    migratePlaintextDatabaseInPlace(databasePath, rollbackPath, key);
-
-    const encryptedDatabase = openEncryptedDatabase(databasePath, key);
-    const encryptedDatabaseHandle = encryptedDatabase as unknown as NativeDatabaseSync;
-
-    try {
-      runIntegrityChecks(encryptedDatabaseHandle);
-    } catch (error) {
-      encryptedDatabase.close();
-      if (fs.existsSync(rollbackPath)) {
-        fs.copyFileSync(rollbackPath, databasePath);
-        ensurePrivateFile(databasePath);
-      }
-      throw error;
-    }
-
-    if (fs.existsSync(rollbackPath)) {
-      fs.unlinkSync(rollbackPath);
-    }
-
+  if (!databaseExists) {
     return {
-      database: encryptedDatabase,
+      database: openEncryptedDatabase(databasePath, key),
       databaseEncrypted: true,
-      migrationPerformed: true,
-    };
-  } catch (error) {
-    // Encryption is a hardening layer in progress — it must never brick boot.
-    // If the key store or the SQLCipher migration fails, fall back to opening
-    // the database as plaintext (the prior behavior) so the app still loads.
-    // This only works when the on-disk file is currently plaintext; an
-    // already-encrypted file that fails to open is a genuine error and rethrows.
-    if (databaseExists && !startedPlaintext) {
-      throw error;
-    }
-    encryptionLogger.error(
-      "Database encryption unavailable; opening plaintext so the app can boot. The hardening migration needs to be fixed.",
-      error,
-    );
-    return {
-      database: openPlaintextDatabase(databasePath),
-      databaseEncrypted: false,
       migrationPerformed: false,
     };
   }
+
+  if (!startedPlaintext) {
+    return {
+      database: openEncryptedDatabase(databasePath, key),
+      databaseEncrypted: true,
+      migrationPerformed: false,
+    };
+  }
+
+  const rollbackPath = `${databasePath}${rollbackSuffix}`;
+  if (fs.existsSync(rollbackPath)) {
+    fs.unlinkSync(rollbackPath);
+  }
+
+  migratePlaintextDatabaseInPlace(databasePath, rollbackPath, key);
+
+  const encryptedDatabase = openEncryptedDatabase(databasePath, key);
+  const encryptedDatabaseHandle = encryptedDatabase as unknown as NativeDatabaseSync;
+
+  try {
+    runIntegrityChecks(encryptedDatabaseHandle);
+  } catch (error) {
+    encryptedDatabase.close();
+    if (fs.existsSync(rollbackPath)) {
+      fs.copyFileSync(rollbackPath, databasePath);
+      ensurePrivateFile(databasePath);
+    }
+    throw error;
+  }
+
+  if (fs.existsSync(rollbackPath)) {
+    fs.unlinkSync(rollbackPath);
+  }
+
+  return {
+    database: encryptedDatabase,
+    databaseEncrypted: true,
+    migrationPerformed: true,
+  };
 };
 
 export const createEncryptedDatabaseBackup = (database: DatabaseSync, backupPath: string) => {
