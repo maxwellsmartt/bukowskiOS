@@ -75,6 +75,72 @@ Próximo orden recomendado:
 4. **Release integrity**: separar internal build vs release build; release debe
    fallar si no hay signing/notarization reales.
 
+### Actualización 2026-06-05 - auditoría Finance/Roles post hardening
+
+Se revisó el último batch de cambios de Finance/Roles (`fix: harden finance
+access and workspace cache`) con foco en fugas indirectas. Resultado: el
+hardening va en buena dirección, pero **todavía no hay visto bueno final para
+datos financieros confidenciales**. Los guards directos de Finance/Treasury en
+IPC y el fallback offline de `workspaceAccessGuard` están sustancialmente mejor,
+pero quedan tres rutas que pueden exponer datos económicos fuera de la
+superficie Finance.
+
+Hallazgos nuevos:
+
+| ID | Severidad | Estado | Significado práctico | Consecuencia si no se corrige |
+|----|-----------|--------|----------------------|-------------------------------|
+| F-R1 | `crítico` | `open` | Los tools del chat/agentes tienen allowlist por agente, pero no verifican permisos del usuario antes de leer Finance/Treasury. | Un usuario sin Finance podría pedir al chat movimientos bancarios, P&L, DGII ledger o health financiero y recibir datos aunque la UI esconda Finance. |
+| F-R2 | `alto` | `open` | Varias mutaciones de Projects devuelven listas/detalles con defaults financieros después de crear/editar/archivar. | Un usuario con `projects.manage` pero sin Finance puede recibir `exposure`, budget u otros campos económicos en el payload IPC post-mutación. |
+| F-R3 | `medio` | `open` | `getProjectDetail(..., { includeFinancials: false })` aún devuelve `replacementValue` y `costEstimate`. | Si la regla es "sin Finance no ve datos económicos", Projects/Assets/Incidents siguen filtrando valores monetarios. |
+
+Evidencia técnica:
+
+- `apps/desktop/electron/main/services/ai/agentToolRegistry.ts`: tools como
+  `get_financial_exposure_summary`, `get_budget_vs_actual`,
+  `get_financial_health`, `get_treasury_overview`, `list_bank_movements`,
+  `get_deductible_ledger`, `get_dgii_report` y `get_project_pnl` llaman directo
+  a read services internos.
+- `apps/desktop/electron/main/services/ai/assistantGatewayService.ts`: el
+  gateway filtra por `allowed_tools_json` del agente, pero ese allowlist no es
+  equivalente a permisos del usuario actual.
+- `apps/desktop/electron/main/ipc/registerFoundationIpc.ts`: las lecturas
+  directas de Projects ya usan `{ includeFinancials }`, pero los returns
+  post-mutación (`projects.create`, `createBlueprint`, `update`, `archive`,
+  `unarchive`, `delete`, `createUnit`, `updateUnit`, `deleteUnit`,
+  `assignCrewToUnit`, `unassignCrewFromUnit`) vuelven a llamar
+  `foundationReads.getProjects(...)` o `foundationReads.getProjectDetail(...)`
+  sin pasar visibilidad financiera.
+- `apps/desktop/electron/main/services/data/projectReadService.ts`:
+  `includeFinancials=false` oculta `exposure`/`budget`, pero no
+  `replacementValue` ni `costEstimate`.
+
+Orden de fixes recomendado:
+
+1. **F-R1 primero**: convertir el tool registry en una frontera de seguridad.
+   Cada tool financiero debe declarar `requiredPermission`; `execute()` debe
+   negar ejecución si el usuario actual no tiene ese permiso. Para esto el
+   contexto del gateway debe incluir identidad/permisos confiables resueltos en
+   main, no datos enviados desde renderer.
+2. **F-R2 segundo**: crear helpers internos para devolver Project list/detail
+   sanitizados después de cualquier mutación. No debe quedar ningún call-site de
+   `getProjects/getProjectDetail` expuesto a renderer sin decisión explícita de
+   `includeFinancials`.
+3. **F-R3 tercero**: decidir con producto si `replacementValue` y
+   `costEstimate` son datos financieros restringidos. Si sí, enmascararlos en
+   read service y ocultar columnas en UI para usuarios sin Finance.
+
+Tests sugeridos para cerrar:
+
+- Test unitario de `agentToolRegistry.execute()` que rechace tools
+  Finance/Treasury sin `finance.read` / `treasury.transactions.read`.
+- Test de gateway que demuestre que un usuario no-finance no puede recibir
+  payload financiero aunque el Finance Agent tenga el tool en `allowed_tools_json`.
+- Test estático o unitario que cubra todos los returns post-mutación de Projects
+  y falle si aparece `foundationReads.getProjects(...)` o
+  `foundationReads.getProjectDetail(...)` sin visibilidad financiera explícita.
+- Test de `projectReadService` para `includeFinancials=false` sobre
+  `replacementValue` y `costEstimate`, según la decisión de producto.
+
 ---
 
 ## Hallazgos
