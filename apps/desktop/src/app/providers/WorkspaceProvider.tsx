@@ -121,13 +121,29 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       setIsLoadingWorkspaces(true);
     }
 
-    if (isLocalFallback || !supabase || !userId) {
+    // True local-dev fallback (no Supabase configured): expose a single synthetic
+    // local workspace so the app is usable offline.
+    if (isLocalFallback || !supabase) {
       setMemberships([localMembership]);
       hasLoadedWorkspacesRef.current = true;
       setActiveWorkspaceId((current) => current || DEFAULT_WORKSPACE_ID);
       setWorkspaceError(null);
       setIsSessionExpired(false);
       setIsLoadingWorkspaces(false);
+      return;
+    }
+
+    // Supabase is configured but there is no authenticated user yet (login screen
+    // or just signed out). Stay in a not-ready, loading state with NO memberships
+    // so a successful login resolves the real workspace before the app interior
+    // (or the empty-state picker) can render — this is what prevents the brief
+    // flash of the app interior right after login.
+    if (!userId) {
+      hasLoadedWorkspacesRef.current = false;
+      setMemberships([]);
+      setWorkspaceError(null);
+      setIsSessionExpired(false);
+      setIsLoadingWorkspaces(true);
       return;
     }
 
