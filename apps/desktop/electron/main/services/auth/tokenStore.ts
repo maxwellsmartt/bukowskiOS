@@ -1,8 +1,9 @@
-import keytar from "keytar";
+import { deleteSecret, readSecret, writeSecret } from "../../security/secureSecretFile";
 
-const serviceName = "bukowskiOS";
+const secretFileName = "bukowski-auth-tokens.json";
 const refreshTokenAccount = "supabase-refresh-token";
 const accessTokenAccount = "supabase-access-token";
+const legacyServiceName = "bukowskiOS";
 const isE2E = process.env.BUKOWSKI_E2E === "1";
 
 let e2eTokens: StoredSupabaseTokens = {
@@ -20,21 +21,41 @@ const normalizeToken = (value: string | null | undefined) => {
   return token ? token : null;
 };
 
+// One-time migration from the legacy keytar-backed tokens so an existing
+// signed-in user is not logged out by the move to safeStorage. Fresh installs
+// have no legacy tokens and never touch keytar.
+const readLegacyKeytarTokens = async (): Promise<StoredSupabaseTokens> => {
+  try {
+    const { default: keytar } = await import("keytar");
+    const [accessToken, refreshToken] = await Promise.all([
+      keytar.getPassword(legacyServiceName, accessTokenAccount),
+      keytar.getPassword(legacyServiceName, refreshTokenAccount),
+    ]);
+    return { accessToken: normalizeToken(accessToken), refreshToken: normalizeToken(refreshToken) };
+  } catch {
+    return { accessToken: null, refreshToken: null };
+  }
+};
+
 export const createSupabaseTokenStore = () => ({
   async getTokens(): Promise<StoredSupabaseTokens> {
     if (isE2E) {
       return e2eTokens;
     }
 
-    const [accessToken, refreshToken] = await Promise.all([
-      keytar.getPassword(serviceName, accessTokenAccount),
-      keytar.getPassword(serviceName, refreshTokenAccount),
-    ]);
+    const accessToken = normalizeToken(readSecret(secretFileName, accessTokenAccount));
+    const refreshToken = normalizeToken(readSecret(secretFileName, refreshTokenAccount));
+    if (accessToken || refreshToken) {
+      return { accessToken, refreshToken };
+    }
 
-    return {
-      accessToken: normalizeToken(accessToken),
-      refreshToken: normalizeToken(refreshToken),
-    };
+    // Migrate legacy keytar tokens into safeStorage once.
+    const legacy = await readLegacyKeytarTokens();
+    if (legacy.accessToken || legacy.refreshToken) {
+      writeSecret(secretFileName, accessTokenAccount, legacy.accessToken);
+      writeSecret(secretFileName, refreshTokenAccount, legacy.refreshToken);
+    }
+    return legacy;
   },
 
   async setTokens(tokens: StoredSupabaseTokens): Promise<void> {
@@ -46,14 +67,8 @@ export const createSupabaseTokenStore = () => ({
       return;
     }
 
-    await Promise.all([
-      accessToken
-        ? keytar.setPassword(serviceName, accessTokenAccount, accessToken)
-        : keytar.deletePassword(serviceName, accessTokenAccount),
-      refreshToken
-        ? keytar.setPassword(serviceName, refreshTokenAccount, refreshToken)
-        : keytar.deletePassword(serviceName, refreshTokenAccount),
-    ]);
+    writeSecret(secretFileName, accessTokenAccount, accessToken);
+    writeSecret(secretFileName, refreshTokenAccount, refreshToken);
   },
 
   async clearTokens(): Promise<void> {
@@ -62,9 +77,7 @@ export const createSupabaseTokenStore = () => ({
       return;
     }
 
-    await Promise.all([
-      keytar.deletePassword(serviceName, accessTokenAccount),
-      keytar.deletePassword(serviceName, refreshTokenAccount),
-    ]);
+    deleteSecret(secretFileName, accessTokenAccount);
+    deleteSecret(secretFileName, refreshTokenAccount);
   },
 });
