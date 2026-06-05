@@ -31,6 +31,67 @@ Esta ronda cerró tres huecos concretos (un guard de lectura faltante, redacció
 de logs incompleta, y documentación del fail-open de lecturas), y dejó
 registrado el endurecimiento pendiente (unificación de handlers IPC).
 
+### Actualización 2026-06-05 - estado post remediación S0-S6.1
+
+Desde la auditoría profunda ya se cerraron los frentes que bloqueaban trabajar
+con datos sensibles en piloto controlado: permisos/RLS, tokens fuera del
+renderer, writes sensibles movidos a IPC main, approvals de AI tools, redacción
+de exports/support/outbox, límites de XLSX, privacidad de archivos locales y
+SQLCipher con smoke real en Electron.
+
+Estado actual: **apto para continuar smoke interno/piloto controlado con mucha
+menos exposición local**, siempre distinguiendo internal alpha de release final.
+El riesgo más importante que queda ya no es una fuga directa en app/data layer,
+sino **integridad de distribución**: signing/notarization reales, disciplina de
+release y validación de build en máquina externa antes de entregar a usuarios no
+técnicos.
+
+Fixes cerrados desde el 2026-06-03:
+
+| Finding / frente | Estado | Evidencia |
+|------------------|--------|-----------|
+| S4 - exports/support bundle/outbox redaction | `fixed` | `syncOutboxWorkerService.ts`, `logger.ts`, `supportDiagnosticsService.ts`, `security-regression.test.ts` |
+| S5 - XLSX import hardening | `fixed` | `xlsxSafety.ts`, `bankStatementParsers.ts`, `documentExtractionService.ts`, tests de parsers/extraction |
+| S6 - data-at-rest incremental | `fixed` | `storagePrivacy.ts`, permisos `0600/0700`, writes privados en backups/documentos/adjuntos |
+| S6 - SQLCipher + key segura + backups cifrados | `fixed` | `databaseEncryption.ts`, `databaseKeyStore.ts`, `localDatabase.ts`, diagnostics `databaseEncrypted` |
+| S6.1 - runtime Electron SQLCipher smoke | `fixed` | commit `aae263f`, `e2e/smoke/database-encryption.spec.ts`, fail-closed sin fallback plaintext |
+
+Riesgos abiertos priorizados:
+
+| Prioridad | Riesgo | Impacto real | Fix rápido | Fix definitivo |
+|-----------|--------|--------------|------------|----------------|
+| P0 crítico | Release integrity/signing/notarization no validado end-to-end con credenciales reales | Un build interno puede confundirse con release; Gatekeeper/supply-chain quedan débiles | Mantener internal alpha explícito, no distribuir como final, correr `package:mac` + `verify:mac-build` | Release lane con Developer ID, notarization, stapling, evidencia `spctl` y checklist firmado |
+| P0 medio/alto | Smoke externo en Mac limpia pendiente | Bugs de permisos, Keychain, SQLCipher o Gatekeeper pueden aparecer fuera de la máquina dev | Probar DMG/ZIP en otra Mac con user limpio y capturar evidencia | Matriz de release smoke por arquitectura y versión, documentada |
+| P1 medio | Permisos offline cacheados amplios por diseño | Revocaciones remotas pueden tardar en reflejarse localmente | Mostrar estado offline/cache y restringir acciones sensibles offline | Broker de permisos por capacidad + TTL menor para acciones admin/write |
+| P1 medio | Lecturas Supabase aún existen en renderer | Si renderer se compromete, aumenta superficie aunque RLS siga protegiendo | Priorizar dominios sensibles para mover reads a IPC main | Data access broker por dominio/capacidad |
+| P1 medio | Runs legacy sin `approval_tool_payloads` | Compatibilidad puede permitir aprobaciones antiguas menos auditables | Bloquear aprobación de runs legacy en UI/admin | Migración/purge de runs legacy con recibos |
+
+Quick wins recomendados antes de seguir features:
+
+1. Ejecutar y documentar smoke de internal alpha en Mac limpia: arranque,
+   login, Settings diagnostics, backup, export con confirmación y quit/reopen.
+2. Añadir banner/copy visible en build internal alpha: "Internal alpha - not
+   notarized release" si todavía no hay Developer ID/notarization.
+3. Agregar checklist de release evidence con fecha, commit, `codesign`,
+   `spctl`, notarization/staple y resultado del smoke externo.
+4. Revisar que support bundle/log export no incluya rutas absolutas ni tokens
+   en una corrida real posterior a los fixes.
+5. Documentar política operativa de pérdida de Keychain/DB: qué mensaje ve el
+   usuario, qué backup se usa y cuándo escalar manualmente.
+
+Orden recomendado para continuar desde oficina:
+
+1. **Release integrity/signing/notarization evidence**: cerrar la diferencia
+   entre internal alpha y release final con pruebas reproducibles.
+2. **Smoke externo en Mac limpia**: validar SQLCipher/Keychain/Gatekeeper fuera
+   del entorno de desarrollo.
+3. **Offline permission narrowing**: bajar riesgo de revocaciones tardías y UI
+   permisiva sin conexión.
+4. **Export/support smoke real**: validar redacción de logs/support bundles con
+   artefactos generados por la app, sin imprimir secretos.
+5. **AI approvals legacy cleanup**: bloquear/migrar runs viejos sin payload
+   firmado si existen.
+
 ### Actualización 2026-06-03 - estado post auditoría profunda
 
 La auditoría profunda del 2026-06-02 cambió el estado de release: **todavía no
@@ -39,7 +100,8 @@ han cerrado los riesgos críticos de takeover, permisos Supabase, tokens en
 renderer y navegación trusted renderer. El estado actual permite seguir con
 smoke interno y datos controlados, pero antes de entregar a Carlos con datos
 sensibles conviene cerrar los slices restantes de exports/support bundle,
-dependencia `xlsx` y data-at-rest.
+dependencia `xlsx` y data-at-rest. Estos tres frentes quedaron cerrados entre
+el 2026-06-04 y el 2026-06-05; ver actualización 2026-06-05 arriba.
 
 Fixes cerrados desde la auditoría profunda:
 
@@ -58,22 +120,16 @@ Riesgos abiertos más importantes:
 
 | Riesgo | Severidad | Significado práctico | Consecuencia si no se corrige |
 |--------|-----------|----------------------|-------------------------------|
-| B2 - SQLite, backups y documentos locales sin cifrado app-level | `blocker` para datos confidenciales | El login protege la UI, no necesariamente los archivos crudos en disco | Laptop robada, malware o backup del usuario podrían exponer finanzas, facturas y movimientos |
-| C11/M3 - exports/support bundle/outbox payload con demasiados datos | `crítico/medio` | Herramientas de soporte pueden sacar datos sensibles sin suficiente compuerta o redacción | Filtraciones por soporte, screenshots, archivos compartidos o renderer comprometido |
+| B2 - SQLite, backups y documentos locales sin cifrado app-level | `fixed` | Cerrado con permisos privados, SQLCipher, key segura, backups cifrados y smoke Electron | Riesgo residual: pérdida de Keychain/recovery UX debe documentarse |
+| C11/M3 - exports/support bundle/outbox payload con demasiados datos | `fixed` | Support/logs/outbox salen saneados y exports sensibles piden confirmación explícita | Riesgo residual: falta smoke real de artefactos exportados post-fix |
 | C12 - release no notarizado puede confundirse con build final | `crítico` para distribución | Un build interno puede parecer listo para usuarios externos | Riesgo de confianza, Gatekeeper y supply chain |
-| C13 - parsing `xlsx` vulnerable/no aislado | `crítico/medio` según input | Los estados bancarios son archivos externos y deben tratarse como no confiables | Freeze, ReDoS o comportamiento inseguro al importar bancos |
+| C13 - parsing `xlsx` vulnerable/no aislado | `fixed` | Se añadieron límites de tamaño, hojas, filas y columnas en parser compartido | Riesgo residual: phase 2 puede aislar/cancelar parsing si aparecen archivos extremos |
 | M1 - permisos offline cacheados demasiado amplios | `medio` | El usuario desconectado puede ver una UI más permisiva que su estado remoto actual | Revocaciones tardías y confusión operativa |
 
-Próximo orden recomendado:
-
-1. **Exports/support bundle/outbox redaction**: admin/re-auth para exports,
-   soporte redactado por defecto y payload crudo fuera del renderer.
-2. **XLSX import hardening**: límites de tamaño/filas/hojas, parsing aislado o
-   reemplazo/sandbox de `xlsx`, y tests con archivos malformados.
-3. **Data-at-rest**: definir SQLCipher o estrategia equivalente con keychain,
-   backups cifrados y política de purge/document cache.
-4. **Release integrity**: separar internal build vs release build; release debe
-   fallar si no hay signing/notarization reales.
+Próximo orden recomendado actualizado: ver la sección **Actualización
+2026-06-05** arriba. El primer frente pendiente ahora es **release
+integrity/signing/notarization evidence**, seguido por smoke externo en Mac
+limpia y narrowing de permisos offline.
 
 ### Actualización 2026-06-05 - auditoría Finance/Roles post hardening
 

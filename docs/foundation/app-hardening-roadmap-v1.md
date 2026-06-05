@@ -359,39 +359,144 @@
   - `medio`: la allowlist actual se basa en `allowed_tools_json`; todavía no hay filtrado fino por conector/actor dinámico más allá del agente/workspace.
 
 ### Slice S4 — Export/support bundle/outbox redaction
-- Estado: `next`
+- Estado: `done`
 - Objetivo: evitar que soporte, exports o pantallas de debug filtren payloads financieros/confidenciales.
 - Área: `backend` + `frontend`
-- Alcance sugerido:
-  - admin/re-auth o confirmación local fuerte para export/support bundle.
-  - export scoped por workspace.
-  - redacción por defecto de payloads crudos, tokens, rutas locales y datos financieros sensibles.
-  - `sync_outbox` UI muestra metadata y error saneado; payload crudo queda en main/DB.
+- Alcance cerrado:
+  - confirmación local fuerte antes de exportar workspace data, support bundle o logs.
+  - support diagnostics y logs recientes pasan por redacción centralizada.
+  - `sync_outbox` UI ya no recibe `payload_json` crudo; muestra preview saneado/truncado.
+  - tests de regresión impiden reabrir payloads crudos, tokens o rutas sensibles en renderer/support.
+- Evidencia:
+  - `apps/desktop/electron/main/services/data/syncOutboxWorkerService.ts`
+  - `apps/desktop/electron/main/services/logger.ts`
+  - `apps/desktop/electron/main/services/data/supportDiagnosticsService.ts`
+  - `apps/desktop/src/features/admin/SettingsPage.tsx`
+  - `apps/desktop/src/test/security-regression.test.ts`
 - Riesgo que desbloquea:
   - `crítico/medio`: data leaks por archivos de soporte, screenshots o renderer comprometido.
+- Riesgos remanentes:
+  - `medio`: falta smoke real con artefactos generados por la app para confirmar redacción end-to-end fuera de tests unitarios.
 
 ### Slice S5 — XLSX import hardening
-- Estado: `recommended-after-S4`
+- Estado: `done`
 - Objetivo: tratar estados bancarios como input no confiable.
 - Área: `backend`
-- Alcance sugerido:
-  - límites de tamaño, filas, columnas y hojas antes de parsear.
-  - parsing aislado/cancelable o reemplazo de `xlsx` si no hay versión segura.
-  - tests con archivos grandes/malformados.
+- Alcance cerrado:
+  - helper compartido `parseBoundedXlsxGrid(...)`.
+  - límites de tamaño, hojas, filas y columnas antes/durante parseo.
+  - Treasury bank statement parsers y document extraction usan el helper común.
+  - tests cubren límites y regresión para impedir bypass.
+- Evidencia:
+  - `apps/desktop/src/shared/lib/xlsxSafety.ts`
+  - `apps/desktop/src/features/finance/treasury/bankStatementParsers.ts`
+  - `apps/desktop/electron/main/services/data/documentExtractionService.ts`
+  - `apps/desktop/src/test/bank-statement-parsers.test.ts`
+  - `apps/desktop/src/test/document-extraction-service.test.ts`
 - Riesgo que desbloquea:
   - `crítico/medio`: ReDoS, freeze o parsing inseguro de archivos bancarios.
+- Riesgos remanentes:
+  - `bajo/medio`: phase 2 puede mover parsing a worker/cancelable si aparecen archivos extremos o UX de cancelación requerida.
 
 ### Slice S6 — Data-at-rest
-- Estado: `strategic-blocker`
+- Estado: `done`
 - Objetivo: aprobar uso real con información confidencial en laptops y backups.
 - Área: `backend` + `infra`
-- Alcance sugerido:
-  - SQLCipher o cifrado equivalente de SQLite con key en Keychain.
-  - backups cifrados.
-  - document cache cifrado o política clara de ubicación/purge.
-  - smoke de recuperación y pérdida de keychain.
+- Alcance cerrado:
+  - permisos privados `0600/0700` para DB, backups, logs/secret files, documentos y adjuntos locales.
+  - SQLCipher vía `better-sqlite3-multiple-ciphers`.
+  - key local almacenada fuera de la DB con `safeStorage` y migración legacy desde `keytar`.
+  - migración plaintext -> encrypted con rollback temporal.
+  - backups cifrados y diagnostics `databaseEncrypted`.
+- Evidencia:
+  - `apps/desktop/electron/main/security/storagePrivacy.ts`
+  - `apps/desktop/electron/main/services/data/databaseEncryption.ts`
+  - `apps/desktop/electron/main/services/auth/databaseKeyStore.ts`
+  - `apps/desktop/electron/main/services/data/localDatabase.ts`
+  - `apps/desktop/src/test/database-encryption.test.ts`
 - Riesgo que desbloquea:
   - `blocker`: exposición de data local ante laptop robada, malware, backup o usuario del sistema.
+- Riesgos remanentes:
+  - `medio`: documentar UX/proceso de pérdida de Keychain y recovery manual.
+  - `medio`: validar en Mac externa con user limpio antes de piloto amplio.
+
+### Slice S6.1 — SQLCipher runtime smoke y fail-closed
+- Estado: `done`
+- Objetivo: probar SQLCipher en runtime Electron real y evitar downgrades silenciosos a SQLite plaintext.
+- Área: `backend` + `infra`
+- Alcance cerrado:
+  - `databaseEncryption.ts` ya no tiene fallback `openPlaintextDatabase`.
+  - fallos de SQLCipher/key/DB cifrada corrupta fallan cerrados o recuperan desde backup cifrado.
+  - recuperación cubre fallo al abrir DB y fallo de `integrity_check`.
+  - harness E2E fuerza `BUKOWSKI_E2E_USER_DATA_PATH` dentro de temp para no tocar `userData` real.
+  - smoke Electron valida DB cifrada, backup cifrado y recovery desde backup cifrado.
+- Evidencia:
+  - commit `aae263f`
+  - `apps/desktop/e2e/smoke/database-encryption.spec.ts`
+  - `apps/desktop/e2e/helpers/electronApp.ts`
+  - `apps/desktop/electron/main/app.ts`
+  - `apps/desktop/src/test/security-regression.test.ts`
+- Qué se probó:
+  - `corepack pnpm --filter @bukowski/desktop build`
+  - `corepack pnpm --filter @bukowski/desktop exec playwright test -c playwright.electron.config.ts e2e/smoke/database-encryption.spec.ts`
+  - `corepack pnpm --filter @bukowski/desktop typecheck`
+  - `corepack pnpm --filter @bukowski/desktop exec vitest run src/test/security-regression.test.ts src/test/database-encryption.test.ts`
+- Riesgos remanentes:
+  - `medio`: antes del fix de aislamiento, una corrida E2E escalada tocó `userData` real y falló con `file is not a database`; la app volvió a iniciar con key real después. No se hizo restauración destructiva.
+  - `medio`: queda pendiente smoke externo en Mac limpia para confirmar Keychain/safeStorage/SQLCipher fuera del entorno dev.
+
+## P0.6 — Próximos frentes post data-at-rest
+
+### Slice S7 — Release integrity, signing y notarization evidence
+- Estado: `next`
+- Objetivo: separar sin ambigüedad internal alpha de release final y validar supply-chain macOS.
+- Área: `infra`
+- Por qué va primero:
+  - ahora que datos locales están cifrados, el mayor riesgo operativo es distribuir un build que parezca final sin Developer ID/notarization real.
+- Alcance MVP:
+  - correr `package:mac` y `verify:mac-build` sobre el commit actual.
+  - documentar evidencia de `codesign`, `spctl`, DMG/ZIP, arquitectura y resultado.
+  - si no hay credenciales Apple, dejar explícito `internal alpha / not notarized` en docs y/o copy de build.
+- Hardening:
+  - release lane con `BUKOWSKI_RELEASE_SIGNING=1`, Developer ID, notarization, stapling y fallo explícito si faltan credenciales en release.
+  - checklist reproducible por commit y fecha.
+- Optimización:
+  - preparar publicación/versionado a GitHub Releases y eventual auto-update.
+- Riesgo que desbloquea:
+  - `crítico`: Gatekeeper/supply-chain/confianza de distribución.
+
+### Slice S8 — External clean-Mac smoke
+- Estado: `recommended-after-S7`
+- Objetivo: validar el app fuera del entorno dev/casa/oficina.
+- Área: `infra` + `backend` + `frontend`
+- Alcance MVP:
+  - instalar/abrir internal alpha en Mac limpia o usuario limpio.
+  - validar startup, login, Settings diagnostics, `databaseEncrypted`, backup, quit/reopen.
+  - capturar evidencia sin datos sensibles.
+- Riesgo que desbloquea:
+  - `medio/alto`: problemas de Keychain, permisos, Gatekeeper, rutas o SQLCipher que no aparecen en dev.
+
+### Slice S9 — Offline permission narrowing
+- Estado: `recommended-after-S8`
+- Objetivo: reducir permisos efectivos cuando Supabase no está disponible o la cache de membresía está stale.
+- Área: `backend` + `frontend`
+- Alcance MVP:
+  - mostrar estado offline/cacheado en UI para acciones sensibles.
+  - fallar cerrado en writes/admin ya cubiertos y revisar lecturas de dominios sensibles.
+  - reducir TTL o exigir confirmación/refresh para acciones admin después de revocaciones.
+- Riesgo que desbloquea:
+  - `medio`: revocaciones tardías y confusión operativa offline.
+
+### Slice S10 — Export/support smoke real
+- Estado: `quick-win`
+- Objetivo: probar redacción end-to-end con artefactos reales, no solo unit tests.
+- Área: `backend` + `frontend`
+- Alcance MVP:
+  - generar support bundle/log export en app.
+  - revisar que no incluya tokens, rutas absolutas crudas ni payloads sensibles.
+  - documentar resultado con hashes/nombres de archivos, sin imprimir secretos.
+- Riesgo que desbloquea:
+  - `medio`: data leaks por soporte en operación real.
 
 ## P1 — Producto usable y más confiable
 
