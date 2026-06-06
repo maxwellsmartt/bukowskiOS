@@ -1067,6 +1067,7 @@ const extractAttachedDocuments = async (
 const maybeRunFastPath = (
   request: AssistantGatewayRequest,
   toolRegistry: AgentToolRegistry,
+  db: DatabaseSync,
 ): AssistantGatewayResponse | null => {
   if (request.attachments?.length) {
     return null;
@@ -1076,10 +1077,7 @@ const maybeRunFastPath = (
     return null;
   }
 
-  const context: AIGatewayToolContext = {
-    ...request.context,
-    workspaceId: request.workspaceId || request.context.workspaceId || defaultWorkspaceId,
-  };
+  const context = buildTrustedToolContext(db, request);
 
   if (/\b(tasa|tasas|exchange|cambio|dolar|dolares|usd|euro|eur|banco|popular|central|santa cruz)\b/.test(normalizedMessage)) {
     const toolTraces: AIGatewayToolCallTrace[] = [];
@@ -1178,6 +1176,57 @@ const markThreadRoutedAgentPending = (db: DatabaseSync, threadId: string, routed
   ).run(routedAgentId, new Date().toISOString(), threadId);
 };
 
+const loadActorPermissions = (db: DatabaseSync, workspaceId: string, userId: string | null | undefined) => {
+  const normalizedUserId = userId?.trim();
+  if (!normalizedUserId) {
+    return [];
+  }
+
+  const row = db
+    .prepare(
+      `
+        SELECT
+          roles.key AS role_key,
+          GROUP_CONCAT(DISTINCT permissions.key) AS permission_keys
+        FROM workspace_memberships
+        LEFT JOIN roles ON roles.id = workspace_memberships.role_id
+        LEFT JOIN role_permissions ON role_permissions.role_id = roles.id
+        LEFT JOIN permissions ON permissions.id = role_permissions.permission_id
+        WHERE workspace_memberships.workspace_id = ?
+          AND workspace_memberships.user_id = ?
+          AND workspace_memberships.status = 'active'
+        GROUP BY workspace_memberships.workspace_id, workspace_memberships.user_id, roles.key
+        LIMIT 1
+      `,
+    )
+    .get(workspaceId, normalizedUserId) as { role_key: string | null; permission_keys: string | null } | undefined;
+
+  if (!row) {
+    return [];
+  }
+
+  if (row.role_key === "admin") {
+    return ["*"];
+  }
+
+  return (row.permission_keys ?? "")
+    .split(",")
+    .map((permissionKey) => permissionKey.trim())
+    .filter(Boolean);
+};
+
+const buildTrustedToolContext = (db: DatabaseSync, request: AssistantGatewayRequest): AIGatewayToolContext => {
+  const workspaceId = request.workspaceId || request.context.workspaceId || defaultWorkspaceId;
+  const actorUserId = request.context.sourceActorUserId ?? request.source?.actorUserId ?? null;
+
+  return {
+    ...request.context,
+    workspaceId,
+    sourceActorUserId: actorUserId,
+    userPermissions: loadActorPermissions(db, workspaceId, actorUserId),
+  };
+};
+
 export const createAssistantGatewayService = (
   db: DatabaseSync,
   options: {
@@ -1262,7 +1311,9 @@ export const createAssistantGatewayService = (
       threadId: request.threadId,
       attachedDocuments: await extractAttachedDocuments(request.attachments),
     };
-    const fastPathResponse = maybeRunFastPath(request, options.toolRegistry);
+    const trustedContext = buildTrustedToolContext(db, request);
+    request.context = trustedContext;
+    const fastPathResponse = maybeRunFastPath(request, options.toolRegistry, db);
     if (fastPathResponse) {
       options.sessionStore.writeResult(request.workspaceId, request.threadId, {
         previousResponseId: null,
@@ -1339,7 +1390,7 @@ export const createAssistantGatewayService = (
       request.context.activePath?.startsWith("/finance")
         ? (() => {
             try {
-              const result = options.toolRegistry.execute("get_financial_health", "{}", request.context);
+              const result = options.toolRegistry.execute("get_financial_health", "{}", trustedContext);
               const payload = result.result.payload as {
                 trackedSpend?: string;
                 reserve?: string;
@@ -1521,7 +1572,7 @@ export const createAssistantGatewayService = (
             continue;
           }
 
-          const execution = options.toolRegistry.execute(call.name, call.arguments, request.context, {
+          const execution = options.toolRegistry.execute(call.name, call.arguments, trustedContext, {
             allowedToolNames: supervisorAllowedTools,
           });
           toolTraces.push(execution.trace);
@@ -1832,7 +1883,7 @@ export const createAssistantGatewayService = (
                 continue;
               }
 
-              const execution = options.toolRegistry.execute(call.name, call.arguments, request.context, {
+              const execution = options.toolRegistry.execute(call.name, call.arguments, trustedContext, {
                 allowedToolNames: targetAllowedTools,
               });
               toolTraces.push(execution.trace);
@@ -2238,6 +2289,7 @@ export const createAssistantGatewayService = (
           sourceChannelId: run.source_channel_id,
           sourceExternalMessageId: run.source_external_message_id,
           sourceActorUserId: run.source_actor_user_id,
+          userPermissions: loadActorPermissions(db, args.workspaceId, run.source_actor_user_id),
           correlationId: run.correlation_id,
           attachedDocuments: [],
         };

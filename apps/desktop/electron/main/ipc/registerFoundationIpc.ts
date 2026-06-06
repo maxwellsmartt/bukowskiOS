@@ -715,6 +715,23 @@ export const registerFoundationIpc = ({
     }
   };
 
+  const getProjectListForWorkspace = async (query: ProjectListQuery) => {
+    const scopedQuery = normalizeProjectListQuery(query);
+    const workspaceId = scopedQuery.workspaceId ?? DEFAULT_WORKSPACE_ID;
+    const includeFinancials = await canReadFinanceForWorkspace(workspaceId);
+    const safeQuery =
+      includeFinancials || scopedQuery.sortBy !== "exposure"
+        ? scopedQuery
+        : { ...scopedQuery, sortBy: "name" as const, sortDirection: "asc" as const };
+
+    return foundationReads.getProjects(safeQuery, { includeFinancials });
+  };
+
+  const getProjectDetailForWorkspace = async (workspaceId: string, projectId: string) => {
+    const includeFinancials = await canReadFinanceForWorkspace(workspaceId);
+    return foundationReads.getProjectDetail(projectId, { includeFinancials });
+  };
+
   const assertAgentWorkspaceAccess = (
     input: { workspaceId: string },
     action: string,
@@ -726,6 +743,30 @@ export const registerFoundationIpc = ({
       accessLevel: "write",
       requiredPermission,
     });
+
+  const withTrustedAssistantActor = async <T extends AssistantGatewayRequest>(input: T): Promise<T> => {
+    const actorUserId = await workspaceAccess.getCurrentUserId("send assistant messages");
+    return {
+      ...input,
+      context: {
+        ...input.context,
+        sourceActorUserId: actorUserId,
+        userPermissions: undefined,
+      },
+      source: input.source
+        ? {
+            ...input.source,
+            actorUserId,
+          }
+        : {
+            connectorKey: "desktop",
+            actorName: "Desktop user",
+            permissionSummary: "Authenticated workspace member",
+            isLinkedIdentity: true,
+            actorUserId,
+          },
+    };
+  };
 
   const assertAgentAdminAccess = (input: { workspaceId: string }, action: string) =>
     // Existing admin-like permission used by workspace administration screens.
@@ -910,7 +951,7 @@ export const registerFoundationIpc = ({
     sendAssistantChatTurnSchema,
     async (_event, input) => {
       await assertAgentWorkspaceAccess(input, "send assistant messages");
-      return agentMutations.sendAssistantChatTurn(input);
+      return agentMutations.sendAssistantChatTurn(await withTrustedAssistantActor(input));
     },
   );
   safeHandle(
@@ -930,7 +971,7 @@ export const registerFoundationIpc = ({
     sendAssistantChatTurnSchema,
     async (_event, input) => {
       await assertAgentWorkspaceAccess(input, "send assistant messages");
-      return agentMutations.sendAssistantMessage(input);
+      return agentMutations.sendAssistantMessage(await withTrustedAssistantActor(input));
     },
   );
   safeHandle(
@@ -1412,12 +1453,7 @@ export const registerFoundationIpc = ({
         accessLevel: "read",
         requiredPermission: "projects.read",
       });
-      const includeFinancials = await canReadFinanceForWorkspace(scopedQuery.workspaceId ?? DEFAULT_WORKSPACE_ID);
-      const safeQuery =
-        includeFinancials || scopedQuery.sortBy !== "exposure"
-          ? scopedQuery
-          : { ...scopedQuery, sortBy: "name" as const, sortDirection: "asc" as const };
-      return foundationReads.getProjects(safeQuery, { includeFinancials });
+      return getProjectListForWorkspace(scopedQuery);
     },
     "The app could not load projects.",
   );
@@ -1467,7 +1503,7 @@ export const registerFoundationIpc = ({
       requiredPermission: "projects.manage",
     });
     projectMutations.createProject(input);
-    return foundationReads.getProjects(normalizeProjectListQuery({ workspaceId: input.workspaceId, search: "", sortBy: "name", sortDirection: "asc" }));
+    return getProjectListForWorkspace({ workspaceId: input.workspaceId, search: "", sortBy: "name", sortDirection: "asc" });
   });
   safeHandleReadWithSchema(
     ipcChannels.projects.getStagingPackingSlips,
@@ -1497,7 +1533,7 @@ export const registerFoundationIpc = ({
       requiredPermission: "projects.manage",
     });
     projectMutations.createProjectBlueprint(input);
-    return foundationReads.getProjects(normalizeProjectListQuery({ workspaceId: input.workspaceId, search: "", sortBy: "name", sortDirection: "asc" }));
+    return getProjectListForWorkspace({ workspaceId: input.workspaceId, search: "", sortBy: "name", sortDirection: "asc" });
   });
   safeHandleReadWithSchema(
     ipcChannels.projects.exportBlueprintPdf,
@@ -1541,47 +1577,47 @@ export const registerFoundationIpc = ({
   safeHandle(ipcChannels.projects.update, updateProjectSchema, async (_event, input) => {
     const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "update that project", "write", "projects.manage");
     projectMutations.updateProject(input);
-    return foundationReads.getProjects(normalizeProjectListQuery({ workspaceId, search: "", sortBy: "name", sortDirection: "asc" }));
+    return getProjectListForWorkspace({ workspaceId, search: "", sortBy: "name", sortDirection: "asc" });
   });
   safeHandle(ipcChannels.projects.archive, archiveProjectSchema, async (_event, input) => {
     const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "archive that project", "write", "projects.manage");
     projectMutations.archiveProject(input);
-    return foundationReads.getProjects({ workspaceId, search: "", sortBy: "name", sortDirection: "asc", includeArchived: true });
+    return getProjectListForWorkspace({ workspaceId, search: "", sortBy: "name", sortDirection: "asc", includeArchived: true });
   });
   safeHandle(ipcChannels.projects.unarchive, unarchiveProjectSchema, async (_event, input) => {
     const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "restore that project", "write", "projects.manage");
     projectMutations.unarchiveProject(input);
-    return foundationReads.getProjects({ workspaceId, search: "", sortBy: "name", sortDirection: "asc", includeArchived: true });
+    return getProjectListForWorkspace({ workspaceId, search: "", sortBy: "name", sortDirection: "asc", includeArchived: true });
   });
   safeHandle(ipcChannels.projects.delete, deleteProjectSchema, async (_event, input) => {
     const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "delete that project", "write", "projects.manage");
     projectMutations.deleteProject(input);
-    return foundationReads.getProjects(normalizeProjectListQuery({ workspaceId, search: "", sortBy: "name", sortDirection: "asc" }));
+    return getProjectListForWorkspace({ workspaceId, search: "", sortBy: "name", sortDirection: "asc" });
   });
   safeHandle(ipcChannels.projects.createUnit, createProjectUnitSchema, async (_event, input) => {
-    await workspaceAccess.assertProjectAccess(input.projectId, "create project units", "write", "projects.manage");
+    const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "create project units", "write", "projects.manage");
     projectMutations.createProjectUnit(input);
-    return foundationReads.getProjectDetail(input.projectId);
+    return getProjectDetailForWorkspace(workspaceId, input.projectId);
   });
   safeHandle(ipcChannels.projects.updateUnit, updateProjectUnitSchema, async (_event, input) => {
-    await workspaceAccess.assertProjectAccess(input.projectId, "update project units", "write", "projects.manage");
+    const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "update project units", "write", "projects.manage");
     projectMutations.updateProjectUnit(input);
-    return foundationReads.getProjectDetail(input.projectId);
+    return getProjectDetailForWorkspace(workspaceId, input.projectId);
   });
   safeHandle(ipcChannels.projects.deleteUnit, deleteProjectUnitSchema, async (_event, input) => {
-    await workspaceAccess.assertProjectAccess(input.projectId, "delete project units", "write", "projects.manage");
+    const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "delete project units", "write", "projects.manage");
     projectMutations.deleteProjectUnit(input);
-    return foundationReads.getProjectDetail(input.projectId);
+    return getProjectDetailForWorkspace(workspaceId, input.projectId);
   });
   safeHandle(ipcChannels.projects.assignCrewToUnit, assignCrewToProjectUnitSchema, async (_event, input) => {
-    await workspaceAccess.assertProjectAccess(input.projectId, "assign crew to project units", "write", "projects.manage");
+    const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "assign crew to project units", "write", "projects.manage");
     projectMutations.assignCrewToProjectUnit(input);
-    return foundationReads.getProjectDetail(input.projectId);
+    return getProjectDetailForWorkspace(workspaceId, input.projectId);
   });
   safeHandle(ipcChannels.projects.unassignCrewFromUnit, unassignCrewFromProjectUnitSchema, async (_event, input) => {
-    await workspaceAccess.assertProjectAccess(input.projectId, "remove crew from project units", "write", "projects.manage");
+    const workspaceId = await workspaceAccess.assertProjectAccess(input.projectId, "remove crew from project units", "write", "projects.manage");
     projectMutations.unassignCrewFromProjectUnit(input);
-    return foundationReads.getProjectDetail(input.projectId);
+    return getProjectDetailForWorkspace(workspaceId, input.projectId);
   });
   safeHandleReadWithSchema(
     ipcChannels.catalog.getSnapshot,

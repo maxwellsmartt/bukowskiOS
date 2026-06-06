@@ -70,6 +70,8 @@ export type AIGatewayToolContext = {
   sourceChannelId?: string | null;
   sourceExternalMessageId?: string | null;
   sourceActorUserId?: string | null;
+  /** Main-process resolved permissions for the authenticated actor. Never trust renderer-supplied values. */
+  userPermissions?: string[];
   correlationId?: string | null;
   /** Current chat thread, so document tools can scope to its attachments. */
   threadId?: string | null;

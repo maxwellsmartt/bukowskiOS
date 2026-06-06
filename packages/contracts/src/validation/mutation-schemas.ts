@@ -276,6 +276,7 @@ export const assistantGatewayToolContextSchema = z
     sourceChannelId: optionalNullableString,
     sourceExternalMessageId: optionalNullableString,
     sourceActorUserId: optionalNullableString,
+    userPermissions: z.array(nonEmptyString).optional(),
     correlationId: optionalNullableString,
   })
   .strict();

@@ -340,6 +340,30 @@ export const createWorkspaceAccessGuard = ({
   return {
     assertWorkspaceAccess,
 
+    async getCurrentUserId(action = "continue") {
+      if (!isConfigured(supabaseUrl, anonKey)) {
+        return null;
+      }
+
+      const { accessToken } = await getTokens();
+      if (!accessToken) {
+        throw new Error(`Sign in again before you ${action}.`);
+      }
+
+      const payload = decodeJwtPayload(accessToken);
+      const userId = payload?.sub;
+      if (!userId) {
+        throw new Error(`Sign in again before you ${action}.`);
+      }
+
+      const tokenExpiresAtMs = typeof payload.exp === "number" ? payload.exp * 1000 : null;
+      if (tokenExpiresAtMs && tokenExpiresAtMs <= now()) {
+        throw new Error(`Your session expired. Sign in again before you ${action}.`);
+      }
+
+      return userId;
+    },
+
     async assertAssetAccess(
       assetId: string,
       action: string,

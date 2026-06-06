@@ -17,6 +17,7 @@ type ToolDefinition = {
   description: string;
   parameters: Record<string, unknown>;
   requiresApproval?: boolean;
+  requiredPermission?: string;
   execute: (args: Record<string, unknown>, context: AIGatewayToolContext) => ToolExecutionResult;
 };
 
@@ -29,6 +30,21 @@ const isToolAllowed = (toolName: string, toolNames: readonly string[] | null | u
     return true;
   }
   return toolNames.includes(toolName);
+};
+
+const hasUserPermission = (context: AIGatewayToolContext, permission: string) => {
+  const permissions = context.userPermissions ?? [];
+  return permissions.includes("*") || permissions.includes(permission);
+};
+
+const assertToolPermission = (tool: ToolDefinition, context: AIGatewayToolContext) => {
+  if (!tool.requiredPermission) {
+    return;
+  }
+
+  if (!hasUserPermission(context, tool.requiredPermission)) {
+    throw new Error(`Tool ${tool.name} requires ${tool.requiredPermission}.`);
+  }
 };
 
 const asString = (value: unknown) => (typeof value === "string" ? value.trim() : "");
@@ -1186,6 +1202,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_financial_exposure_summary",
+      requiredPermission: "finance.read",
       description: "Return a compact finance exposure summary by project.",
       parameters: {
         type: "object",
@@ -1210,6 +1227,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_budget_vs_actual",
+      requiredPermission: "finance.read",
       description: "Return project spend, reserve and exposure against the current finance baseline.",
       parameters: {
         type: "object",
@@ -1231,6 +1249,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_monthly_burn_rate",
+      requiredPermission: "finance.read",
       description: "Return monthly spend rhythm and average burn rate for the workspace or one project.",
       parameters: {
         type: "object",
@@ -1254,6 +1273,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_expense_breakdown",
+      requiredPermission: "finance.read",
       description: "Return category-level expense distribution for the workspace or one project.",
       parameters: {
         type: "object",
@@ -1278,6 +1298,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_financial_health",
+      requiredPermission: "finance.read",
       description: "Return a compact financial health summary for the workspace or one project.",
       parameters: {
         type: "object",
@@ -1867,6 +1888,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_project_financials",
+      requiredPermission: "finance.read",
       description: "Return budget, reserve and recent financial entries for one project.",
       parameters: {
         type: "object",
@@ -1888,6 +1910,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_incident_costs",
+      requiredPermission: "finance.read",
       description: "Return compact incident-linked financial cost visibility.",
       parameters: {
         type: "object",
@@ -1916,6 +1939,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_asset_exposure",
+      requiredPermission: "finance.read",
       description: "Return incident and finance exposure around one asset.",
       parameters: {
         type: "object",
@@ -1938,6 +1962,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_open_invoices",
+      requiredPermission: "finance.read",
       description: "Return open invoices or unpaid finance entries.",
       parameters: {
         type: "object",
@@ -1960,6 +1985,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_reserves_status",
+      requiredPermission: "finance.read",
       description: "Return current reserve entries and total reserve amount.",
       parameters: {
         type: "object",
@@ -2045,6 +2071,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_treasury_overview",
+      requiredPermission: "treasury.transactions.read",
       description:
         "Treasury cash overview for a period: real income, expense, net, deductible expense, unclassified count, and per-account balances. Use for questions about cash position, spending, or how much is fiscally deductible.",
       parameters: {
@@ -2092,6 +2119,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "list_bank_accounts",
+      requiredPermission: "treasury.transactions.read",
       description: "List treasury bank accounts with currency, bank, balance and movement count.",
       parameters: { type: "object", additionalProperties: false, properties: {} },
       execute: (_args, context) => {
@@ -2114,6 +2142,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "list_bank_movements",
+      requiredPermission: "treasury.transactions.read",
       description:
         "List bank movements (transactions) with filters. Use unclassified_only to find movements that still need classification.",
       parameters: {
@@ -2162,6 +2191,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_treasury_review_queue",
+      requiredPermission: "treasury.transactions.read",
       description:
         "List reimbursements/expenses pending DGII deductible review (Jeannette's queue): claimed vs deductible amount and fiscal status.",
       parameters: { type: "object", additionalProperties: false, properties: {} },
@@ -2188,6 +2218,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_deductible_ledger",
+      requiredPermission: "treasury.transactions.read",
       description:
         "Deductible expense ledger for a period (supplier, RNC, NCF, claimed, deductible, fiscal status). Use for DGII 606-style questions and totals.",
       parameters: {
@@ -2230,6 +2261,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_dgii_report",
+      requiredPermission: "treasury.transactions.read",
       description: "Build a DGII fiscal report: 606 (purchases), 607 (sales) or 608 (voided). Returns totals and a sample of rows.",
       parameters: {
         type: "object",
@@ -2267,6 +2299,7 @@ export const createAgentToolRegistry = (
     },
     {
       name: "get_project_pnl",
+      requiredPermission: "treasury.transactions.read",
       description: "Per-project profit and loss from treasury allocations (income, expense, net, margin).",
       parameters: { type: "object", additionalProperties: false, properties: {} },
       execute: (_args, context) => {
@@ -2613,6 +2646,8 @@ export const createAgentToolRegistry = (
       if (!tool) {
         throw new Error(`Tool ${name} is not allowed.`);
       }
+
+      assertToolPermission(tool, context);
 
       let parsedArgs: Record<string, unknown> = {};
 

@@ -819,6 +819,163 @@ describe("assistant gateway service", () => {
     cleanup();
   });
 
+  it("blocks finance tools for chat users without finance permission even when the agent can call the tool", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-finance-permission");
+    const secrets = new Map<string, string>();
+    const secretStore = {
+      hasProviderSecret: (workspaceId: string, providerKey: string) => secrets.has(`${workspaceId}:${providerKey}`),
+      getProviderSecret: (workspaceId: string, providerKey: string) => secrets.get(`${workspaceId}:${providerKey}`) ?? null,
+      setProviderSecret: (workspaceId: string, providerKey: string, secret: string) => {
+        secrets.set(`${workspaceId}:${providerKey}`, secret);
+      },
+      clearProviderSecret: (workspaceId: string, providerKey: string) => {
+        secrets.delete(`${workspaceId}:${providerKey}`);
+      },
+    };
+
+    const now = new Date().toISOString();
+    database
+      .prepare(
+        `
+          INSERT INTO users (id, full_name, email, phone, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, '', 1, ?, ?)
+        `,
+      )
+      .run("user-no-finance", "No Finance User", "no-finance@bukowskios.local", now, now);
+    database
+      .prepare(
+        `
+          INSERT INTO workspace_memberships (id, workspace_id, user_id, role_id, status, joined_at, created_at)
+          VALUES (?, ?, ?, ?, 'active', ?, ?)
+        `,
+      )
+      .run("membership-no-finance", "workspace-metadata", "user-no-finance", "role-crew", now, now);
+
+    database
+      .prepare(
+        `
+          UPDATE ai_provider_configs
+          SET status = 'healthy',
+              enabled = 1,
+              default_model_key = 'openai:gpt-5.4',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE workspace_id = ?
+            AND provider_key = 'openai'
+        `,
+      )
+      .run("workspace-metadata");
+    secretStore.setProviderSecret("workspace-metadata", "openai", "sk-test");
+
+    let callCount = 0;
+    const gateway = createAssistantGatewayService(database, {
+      secretStore,
+      sessionStore: createAssistantGatewaySessionStore(),
+      toolRegistry: createAgentToolRegistry(createFoundationReadService(database), {
+        getRunsList: () => createAgentReadService(database, secretStore).getRunsList(),
+      }),
+      openaiProviderService: {
+        createResponse: async () => {
+          callCount += 1;
+          if (callCount === 1) {
+            return {
+              ok: true as const,
+              responseId: "resp-finance-permission-1",
+              status: "completed",
+              outputText: JSON.stringify({
+                intent: "finance_health_request",
+                target_agent: "finance-agent",
+                confidence: 0.92,
+                requires_approval: false,
+                tool_call_requested: true,
+                user_facing_summary: "Routing to Finance Agent.",
+                answer_kind: "informational",
+                draft_run_title: null,
+                draft_run_description: null,
+              }),
+              functionCalls: [],
+            };
+          }
+
+          if (callCount === 2) {
+            return {
+              ok: true as const,
+              responseId: "resp-finance-permission-2",
+              status: "completed",
+              outputText: "",
+              functionCalls: [
+                {
+                  id: "fc-finance-health",
+                  type: "function_call" as const,
+                  name: "get_financial_health",
+                  arguments: "{}",
+                  call_id: "call-finance-health",
+                },
+              ],
+            };
+          }
+
+          return {
+            ok: true as const,
+            responseId: "resp-finance-permission-3",
+            status: "completed",
+            outputText: JSON.stringify({
+              intent: "finance_permission_denied",
+              target_agent: "finance-agent",
+              confidence: 0.92,
+              requires_approval: false,
+              tool_call_requested: false,
+              user_facing_summary: "I cannot show finance data because your role does not include Finance access.",
+              answer_kind: "informational",
+              draft_run_title: null,
+              draft_run_description: null,
+            }),
+            functionCalls: [],
+          };
+        },
+        testConnection: async () => ({
+          ok: true as const,
+          status: "healthy" as const,
+          summary: "OpenAI responded successfully.",
+        }),
+      },
+    });
+
+    const result = await gateway.sendMessage({
+      commandId: "cmd-finance-permission-denied",
+      workspaceId: "workspace-metadata",
+      threadId: "thread-finance-permission-denied",
+      message: "Show me the financial health.",
+      attachments: [],
+      source: {
+        connectorKey: "desktop",
+        actorName: "No Finance User",
+        permissionSummary: "Crew",
+        isLinkedIdentity: true,
+        actorUserId: "user-no-finance",
+      },
+      context: {
+        workspaceId: "workspace-metadata",
+        activePath: "/agents/chat",
+        currentView: "Agents chat",
+        sourceActorUserId: "user-no-finance",
+      },
+    });
+
+    expect(result.status).toBe("answered");
+    expect(result.assistantMessage).toContain("Finance access");
+    expect(result.toolTraces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          toolName: "get_financial_health",
+          status: "failed",
+          summary: "Tool get_financial_health requires finance.read.",
+        }),
+      ]),
+    );
+
+    cleanup();
+  });
+
   it("supports approve for this session and reuses that approval in the same thread", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-assistant-gateway-session-approval");
     const secrets = new Map<string, string>();

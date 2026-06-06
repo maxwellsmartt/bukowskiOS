@@ -175,6 +175,13 @@ describe("security regression checks", () => {
     expect(preloadSource).toContain("getAccessToken");
   });
 
+  it("does not treat Supabase's empty initial renderer session as a stored-session logout", () => {
+    const sessionProviderSource = readText("apps/desktop/src/app/providers/SessionProvider.tsx");
+
+    expect(sessionProviderSource).toContain('event === "INITIAL_SESSION" && !nextSession');
+    expect(sessionProviderSource).toContain("buildCachedSessionUser(storedAccessToken)");
+  });
+
   it("uses the workspace-scoped role relationship when embedding membership roles", () => {
     const remoteWorkspaceSources = [
       "apps/desktop/src/app/providers/WorkspaceProvider.tsx",
@@ -347,9 +354,15 @@ describe("security regression checks", () => {
     const projectDetailPanelSource = readText("apps/desktop/src/features/projects/ProjectDetailPanel.tsx");
 
     expect(foundationIpcSource).toContain("canReadFinanceForWorkspace");
+    expect(foundationIpcSource).toContain("getProjectListForWorkspace");
     expect(foundationIpcSource).toContain("foundationReads.getProjects(safeQuery, { includeFinancials })");
+    expect(foundationIpcSource).toContain("getProjectDetailForWorkspace");
     expect(foundationIpcSource).toContain("foundationReads.getProjectDetail(projectId, { includeFinancials })");
+    expect(foundationIpcSource).not.toContain("foundationReads.getProjectDetail(input.projectId)");
+    expect(foundationIpcSource).not.toContain("foundationReads.getProjects(normalizeProjectListQuery({ workspaceId");
     expect(projectReadSource).toContain('exposure: includeFinancials ? deps.formatCurrency(row.exposure) : "—"');
+    expect(projectReadSource).toContain('replacementValue: includeFinancials ? deps.formatCurrency(row.replacement_value) : "—"');
+    expect(projectReadSource).toContain('costEstimate: includeFinancials ? deps.formatCurrency(row.cost_estimate) : "—"');
     expect(projectReadSource).toContain("includeFinancials ? (hasBudgetEntries ? \"Finance hooks linked\" : \"No finance entries yet\") : \"Restricted\"");
     expect(projectPageSource).toContain('option.value !== "exposure"');
     expect(projectDetailPanelSource).toContain("canAccessFinance ? (");
@@ -373,5 +386,38 @@ describe("security regression checks", () => {
     expect(localDatabaseSource).toContain("const cachedRoleId = existingRole?.id");
     expect(localDatabaseSource).toContain("if (!existingRole)");
     expect(localDatabaseSource).toContain("if (!existingRole?.isSystemRole)");
+  });
+
+  it("requires user permissions on finance and treasury agent read tools", () => {
+    const source = readText("apps/desktop/electron/main/services/ai/agentToolRegistry.ts");
+    const expectedPermissions = [
+      ["get_financial_exposure_summary", "finance.read"],
+      ["get_budget_vs_actual", "finance.read"],
+      ["get_monthly_burn_rate", "finance.read"],
+      ["get_expense_breakdown", "finance.read"],
+      ["get_financial_health", "finance.read"],
+      ["get_project_financials", "finance.read"],
+      ["get_incident_costs", "finance.read"],
+      ["get_asset_exposure", "finance.read"],
+      ["get_open_invoices", "finance.read"],
+      ["get_reserves_status", "finance.read"],
+      ["get_treasury_overview", "treasury.transactions.read"],
+      ["list_bank_accounts", "treasury.transactions.read"],
+      ["list_bank_movements", "treasury.transactions.read"],
+      ["get_treasury_review_queue", "treasury.transactions.read"],
+      ["get_deductible_ledger", "treasury.transactions.read"],
+      ["get_dgii_report", "treasury.transactions.read"],
+      ["get_project_pnl", "treasury.transactions.read"],
+    ] as const;
+
+    const missingGuards = expectedPermissions.filter(([toolName, permission]) => {
+      const toolIndex = source.indexOf(`name: "${toolName}"`);
+      if (toolIndex < 0) return true;
+      const definitionPreview = source.slice(toolIndex, toolIndex + 220);
+      return !definitionPreview.includes(`requiredPermission: "${permission}"`);
+    });
+
+    expect(missingGuards).toEqual([]);
+    expect(source).toContain("assertToolPermission(tool, context)");
   });
 });

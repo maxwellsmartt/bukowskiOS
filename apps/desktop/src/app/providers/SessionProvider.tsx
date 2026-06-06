@@ -358,6 +358,13 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: listener } = authSupabase.auth.onAuthStateChange((event, nextSession) => {
       setIsPasswordRecovery(event === "PASSWORD_RECOVERY");
+
+      // The renderer client intentionally does not persist refresh tokens; the
+      // main-process token bridge owns stored-session hydration.
+      if (event === "INITIAL_SESSION" && !nextSession) {
+        return;
+      }
+
       persistStoredTokens({
         accessToken: nextSession?.access_token ?? null,
         refreshToken: nextSession?.refresh_token ?? null,

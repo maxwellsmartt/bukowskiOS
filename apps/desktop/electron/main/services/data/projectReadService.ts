@@ -1529,7 +1529,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       location: row.location,
       responsible: row.responsible,
       condition: row.condition_status,
-      replacementValue: deps.formatCurrency(row.replacement_value),
+      replacementValue: includeFinancials ? deps.formatCurrency(row.replacement_value) : "—",
       projectUnitId: row.project_unit_id,
       projectUnit: row.project_unit,
     }));
@@ -1540,7 +1540,7 @@ export const createProjectReadService = (db: DatabaseSync, deps: ProjectReadDeps
       asset: row.asset_code,
       responsible: row.responsible,
       severity: row.severity,
-      costEstimate: deps.formatCurrency(row.cost_estimate),
+      costEstimate: includeFinancials ? deps.formatCurrency(row.cost_estimate) : "—",
       status: row.status,
       projectUnitId: row.project_unit_id,
       projectUnit: row.project_unit,

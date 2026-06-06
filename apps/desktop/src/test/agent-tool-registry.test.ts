@@ -145,6 +145,42 @@ describe("agent tool registry", () => {
     cleanup();
   });
 
+  it("requires user permissions for finance and treasury read tools even when the agent allowlist permits them", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-finance-permissions");
+    const registry = createAgentToolRegistry(createFoundationReadService(database), {
+      getRunsList: () => [],
+    });
+
+    expect(() =>
+      registry.execute(
+        "get_financial_health",
+        "{}",
+        { workspaceId: "workspace-metadata" },
+        { allowedToolNames: ["get_financial_health"] },
+      ),
+    ).toThrow("Tool get_financial_health requires finance.read.");
+
+    expect(() =>
+      registry.execute(
+        "list_bank_movements",
+        "{}",
+        { workspaceId: "workspace-metadata", userPermissions: ["finance.read"] },
+        { allowedToolNames: ["list_bank_movements"] },
+      ),
+    ).toThrow("Tool list_bank_movements requires treasury.transactions.read.");
+
+    expect(
+      registry.execute(
+        "get_financial_health",
+        "{}",
+        { workspaceId: "workspace-metadata", userPermissions: ["finance.read"] },
+        { allowedToolNames: ["get_financial_health"] },
+      ).result.payload,
+    ).toBeTruthy();
+
+    cleanup();
+  });
+
   it("resolves combined project labels before executing write tools", () => {
     const { cleanup, database } = createTestDatabase("bukowski-agent-tool-registry-project-label-write");
     const secretStore = { hasProviderSecret: () => false };
@@ -426,6 +462,7 @@ describe("agent tool registry", () => {
         workspaceId: "workspace-metadata",
         activePath: "/finance",
         currentView: "Finance",
+        userPermissions: ["finance.read"],
       },
     );
     const budgetVsActual = registry.execute(
@@ -435,6 +472,7 @@ describe("agent tool registry", () => {
         workspaceId: "workspace-metadata",
         activePath: "/finance",
         currentView: "Finance",
+        userPermissions: ["finance.read"],
       },
     );
     const burnRate = registry.execute(
@@ -444,6 +482,7 @@ describe("agent tool registry", () => {
         workspaceId: "workspace-metadata",
         activePath: "/finance",
         currentView: "Finance",
+        userPermissions: ["finance.read"],
       },
     );
     const expenseBreakdown = registry.execute(
@@ -453,6 +492,7 @@ describe("agent tool registry", () => {
         workspaceId: "workspace-metadata",
         activePath: "/finance",
         currentView: "Finance",
+        userPermissions: ["finance.read"],
       },
     );
     const financialHealth = registry.execute(
@@ -462,6 +502,7 @@ describe("agent tool registry", () => {
         workspaceId: "workspace-metadata",
         activePath: "/finance",
         currentView: "Finance",
+        userPermissions: ["finance.read"],
       },
     );
     const recipients = registry.execute(

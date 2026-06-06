@@ -46,6 +46,26 @@ describe("foundation read service", () => {
     cleanup();
   });
 
+  it("redacts project detail financial fields when finance visibility is disabled", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-foundation-project-finance-redaction");
+    const reads = createFoundationReadService(database);
+
+    const restrictedDetail = reads.getProjectDetail("project-aurora", { includeFinancials: false });
+
+    expect(restrictedDetail.project?.exposure).toBe("—");
+    expect(restrictedDetail.budget.totalEntries).toBe("—");
+    expect(restrictedDetail.budget.reserve).toBe("—");
+    expect(restrictedDetail.budget.exposure).toBe("—");
+    expect(restrictedDetail.assets.length).toBeGreaterThan(0);
+    expect(restrictedDetail.incidents.length).toBeGreaterThan(0);
+    expect(restrictedDetail.assets.every((asset) => asset.replacementValue === "—")).toBe(true);
+    expect(restrictedDetail.incidents.every((incident) => incident.costEstimate === "—")).toBe(true);
+    expect(restrictedDetail.metrics.map((metric) => metric.label)).not.toContain("Incident exposure");
+    expect(restrictedDetail.metrics.map((metric) => metric.label)).not.toContain("Replacement at risk");
+
+    cleanup();
+  });
+
   it("builds timeline windows from range, scale and anchor date without changing project data", () => {
     const { cleanup, database } = createTestDatabase("bukowski-foundation-timeline");
     const reads = createFoundationReadService(database);
