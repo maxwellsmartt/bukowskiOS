@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
@@ -18,6 +19,27 @@ const writeJsonFile = (filePath: string, value: unknown) => {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 };
 
+const sanitizeStructuredValue = <T>(value: T): T => {
+  try {
+    return JSON.parse(redactSensitiveText(JSON.stringify(value))) as T;
+  } catch {
+    return value;
+  }
+};
+
+const buildExportManifest = (directoryPath: string, fileNames: string[]) => ({
+  generatedAt: new Date().toISOString(),
+  files: fileNames.map((fileName) => {
+    const filePath = path.join(directoryPath, fileName);
+    const buffer = fs.readFileSync(filePath);
+    return {
+      name: fileName,
+      sizeBytes: buffer.byteLength,
+      sha256: crypto.createHash("sha256").update(buffer).digest("hex"),
+    };
+  }),
+});
+
 const sanitizeSupportEvent = (event: AppSupportEventSummary | null): AppSupportEventSummary | null => {
   if (!event) {
     return null;
@@ -32,21 +54,17 @@ const sanitizeSupportEvent = (event: AppSupportEventSummary | null): AppSupportE
   };
 };
 
-const sanitizeSupportSnapshot = (snapshot: AppSupportSnapshot): AppSupportSnapshot => ({
-  ...snapshot,
-  logStorageLabel: redactSensitiveText(snapshot.logStorageLabel),
-  lastCrash: sanitizeSupportEvent(snapshot.lastCrash),
-  lastError: sanitizeSupportEvent(snapshot.lastError),
-  lastLoadFailure: sanitizeSupportEvent(snapshot.lastLoadFailure),
-  recentCriticalEvents: snapshot.recentCriticalEvents.map((event) => sanitizeSupportEvent(event)!),
-});
+const sanitizeSupportSnapshot = (snapshot: AppSupportSnapshot): AppSupportSnapshot =>
+  sanitizeStructuredValue({
+    ...snapshot,
+    logStorageLabel: redactSensitiveText(snapshot.logStorageLabel),
+    lastCrash: sanitizeSupportEvent(snapshot.lastCrash),
+    lastError: sanitizeSupportEvent(snapshot.lastError),
+    lastLoadFailure: sanitizeSupportEvent(snapshot.lastLoadFailure),
+    recentCriticalEvents: snapshot.recentCriticalEvents.map((event) => sanitizeSupportEvent(event)!),
+  });
 
-const sanitizeRuntimeErrorRows = (rows: Array<Record<string, unknown>>) =>
-  rows.map((row) =>
-    Object.fromEntries(
-      Object.entries(row).map(([key, value]) => [key, typeof value === "string" ? redactSensitiveText(value) : value]),
-    ),
-  );
+const sanitizeRuntimeErrorRows = (rows: Array<Record<string, unknown>>) => sanitizeStructuredValue(rows);
 
 export const createSupportDiagnosticsService = ({
   database,
@@ -87,13 +105,18 @@ export const createSupportDiagnosticsService = ({
       fs.mkdirSync(directoryPath, { recursive: true });
       const supportSnapshot = sanitizeSupportSnapshot(getSupportSnapshot());
 
-      writeJsonFile(path.join(directoryPath, "support-summary.json"), {
+      const supportSummaryFileName = "support-summary.json";
+      const recentLogsFileName = "recent-logs.txt";
+      const runtimeErrorsFileName = "runtime-errors.json";
+      const manifestFileName = "support-manifest.json";
+
+      writeJsonFile(path.join(directoryPath, supportSummaryFileName), {
         exportedAt: new Date().toISOString(),
         supportSnapshot,
       });
 
       fs.writeFileSync(
-        path.join(directoryPath, "recent-logs.txt"),
+        path.join(directoryPath, recentLogsFileName),
         readCombinedRecentLogs() || "No recent logs were available.\n",
         "utf8",
       );
@@ -117,7 +140,11 @@ export const createSupportDiagnosticsService = ({
         )
         .all() as Array<Record<string, unknown>>;
 
-      writeJsonFile(path.join(directoryPath, "runtime-errors.json"), sanitizeRuntimeErrorRows(runtimeErrorRows));
+      writeJsonFile(path.join(directoryPath, runtimeErrorsFileName), sanitizeRuntimeErrorRows(runtimeErrorRows));
+      writeJsonFile(
+        path.join(directoryPath, manifestFileName),
+        buildExportManifest(directoryPath, [supportSummaryFileName, recentLogsFileName, runtimeErrorsFileName]),
+      );
 
       return {
         saved: true,

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 
@@ -32,6 +33,14 @@ const emptyDiagnostics: AppDiagnosticsSnapshot = {
 };
 
 const tempDirectories: string[] = [];
+const assertSupportArtifactIsSafe = (text: string, leakedValues: string[]) => {
+  for (const leakedValue of leakedValues) {
+    expect(text).not.toContain(leakedValue);
+  }
+
+  expect(text).not.toMatch(/\/Users\/[^\s"']+/);
+  expect(text).not.toMatch(/[A-Za-z]:\\Users\\/);
+};
 
 afterEach(() => {
   tempDirectories.splice(0).forEach((directoryPath) => {
@@ -47,9 +56,13 @@ test("support diagnostics snapshot and exports include recent runtime failures a
   initializeDesktopLogger(logsDirectory);
   const leakedPath = "/Users/ernestomaxwell/Secrets/workspace.sqlite";
   const leakedToken = "sk-12345678901234567890";
+  const leakedJwt =
+    "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyLXJlbW90ZSIsImV4cCI6OTk5OTk5OTk5OX0.signature";
+  const leakedSignedUrl = "https://files.example.test/download?token=signed-url-secret-value-1234567890";
+  const leakedValues = [leakedPath, leakedToken, leakedJwt, "signed-url-secret-value-1234567890"];
   fs.writeFileSync(
     path.join(logsDirectory, "bukowski-test.log"),
-    `support line\npath=${leakedPath}\napiKey=${leakedToken}\n`,
+    `support line\npath=${leakedPath}\napiKey=${leakedToken}\njwt=${leakedJwt}\nurl=${leakedSignedUrl}\n`,
     "utf8",
   );
 
@@ -72,7 +85,10 @@ test("support diagnostics snapshot and exports include recent runtime failures a
 
     const supportDiagnostics = createSupportDiagnosticsService({
       database,
-      getDiagnosticsSnapshot: () => emptyDiagnostics,
+      getDiagnosticsSnapshot: () => ({
+        ...emptyDiagnostics,
+        internalBuildArtifacts: [leakedPath],
+      }),
       getAppInfo: () => ({
         appName: "bukowskiOS",
         platform: "darwin",
@@ -94,8 +110,7 @@ test("support diagnostics snapshot and exports include recent runtime failures a
     expect(logsExport.saved).toBe(true);
     expect(fs.existsSync(logsExportPath)).toBe(true);
     const logsExportText = fs.readFileSync(logsExportPath, "utf8");
-    expect(logsExportText).not.toContain(leakedPath);
-    expect(logsExportText).not.toContain(leakedToken);
+    assertSupportArtifactIsSafe(logsExportText, leakedValues);
     expect(logsExportText).toContain("[redacted-path]");
 
     const bundleDirectory = path.join(exportDirectory, "bundle");
@@ -104,14 +119,36 @@ test("support diagnostics snapshot and exports include recent runtime failures a
     expect(fs.existsSync(path.join(bundleDirectory, "support-summary.json"))).toBe(true);
     expect(fs.existsSync(path.join(bundleDirectory, "recent-logs.txt"))).toBe(true);
     expect(fs.existsSync(path.join(bundleDirectory, "runtime-errors.json"))).toBe(true);
+    expect(fs.existsSync(path.join(bundleDirectory, "support-manifest.json"))).toBe(true);
+
+    const bundleFileNames = fs.readdirSync(bundleDirectory).sort();
+    expect(bundleFileNames).toEqual([
+      "recent-logs.txt",
+      "runtime-errors.json",
+      "support-manifest.json",
+      "support-summary.json",
+    ]);
+
+    for (const fileName of bundleFileNames) {
+      assertSupportArtifactIsSafe(fs.readFileSync(path.join(bundleDirectory, fileName), "utf8"), leakedValues);
+    }
 
     const supportSummaryText = fs.readFileSync(path.join(bundleDirectory, "support-summary.json"), "utf8");
-    const runtimeErrorsText = fs.readFileSync(path.join(bundleDirectory, "runtime-errors.json"), "utf8");
-    expect(supportSummaryText).not.toContain(leakedPath);
-    expect(supportSummaryText).not.toContain(leakedToken);
-    expect(runtimeErrorsText).not.toContain(leakedPath);
-    expect(runtimeErrorsText).not.toContain(leakedToken);
     expect(supportSummaryText).toContain("[redacted-path]");
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(bundleDirectory, "support-manifest.json"), "utf8")) as {
+      files: Array<{ name: string; sizeBytes: number; sha256: string }>;
+    };
+    expect(manifest.files.map((file) => file.name).sort()).toEqual([
+      "recent-logs.txt",
+      "runtime-errors.json",
+      "support-summary.json",
+    ]);
+    for (const file of manifest.files) {
+      const buffer = fs.readFileSync(path.join(bundleDirectory, file.name));
+      expect(file.sizeBytes).toBe(buffer.byteLength);
+      expect(file.sha256).toBe(crypto.createHash("sha256").update(buffer).digest("hex"));
+    }
   } finally {
     cleanup();
   }

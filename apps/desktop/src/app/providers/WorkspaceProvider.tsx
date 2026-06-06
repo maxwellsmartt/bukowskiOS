@@ -36,6 +36,9 @@ type WorkspaceContextValue = {
   hasPermission: (permissionKey: string) => boolean;
 };
 
+const onlineOnlyPermissionPrefixes = ["finance.", "treasury.", "quotes.", "invoices.", "crew_fees.", "crew_payments."] as const;
+const onlineOnlyPermissionKeys = new Set(["currency.manage_rates"]);
+
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 export type CreateWorkspaceInput = {
@@ -83,17 +86,25 @@ const toCachedMembership = (workspace: {
   roleKey?: string | null;
   roleName?: string | null;
   permissions?: string[] | null;
-}): WorkspaceMembership => ({
-  workspaceId: workspace.id,
-  workspaceName: workspace.name,
-  avatarUrl: null,
-  iconColor: null,
-  baseCurrency: (workspace.baseCurrency ?? "USD").toUpperCase(),
-  roleKey: workspace.roleKey ?? null,
-  roleName: workspace.roleName ?? "Cached access",
-  status: "active",
-  permissions: workspace.permissions ?? [],
-});
+}): WorkspaceMembership => {
+  const cachedPermissions = (workspace.permissions ?? []).filter(
+    (permissionKey) =>
+      !onlineOnlyPermissionKeys.has(permissionKey) &&
+      !onlineOnlyPermissionPrefixes.some((prefix) => permissionKey.startsWith(prefix)),
+  );
+
+  return {
+    workspaceId: workspace.id,
+    workspaceName: workspace.name,
+    avatarUrl: null,
+    iconColor: null,
+    baseCurrency: (workspace.baseCurrency ?? "USD").toUpperCase(),
+    roleKey: null,
+    roleName: "Cached access",
+    status: "active",
+    permissions: cachedPermissions,
+  };
+};
 
 export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   const { status, user, supabase, isLocalFallback, verifySessionActive } = useSession();

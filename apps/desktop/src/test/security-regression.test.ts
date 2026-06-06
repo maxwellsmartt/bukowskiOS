@@ -216,6 +216,18 @@ describe("security regression checks", () => {
     expect(inviteServiceSource).toContain("sendWorkspaceInvite");
   });
 
+  it("narrows cached offline workspace permissions for sensitive finance domains", () => {
+    const workspaceProviderSource = readText("apps/desktop/src/app/providers/WorkspaceProvider.tsx");
+    const workspaceAccessGuardSource = readText("apps/desktop/electron/main/services/auth/workspaceAccessGuard.ts");
+
+    expect(workspaceProviderSource).toContain("onlineOnlyPermissionPrefixes");
+    expect(workspaceProviderSource).toContain("roleKey: null");
+    expect(workspaceProviderSource).toContain("roleName: \"Cached access\"");
+    expect(workspaceProviderSource).toContain("!onlineOnlyPermissionKeys.has(permissionKey)");
+    expect(workspaceAccessGuardSource).toContain("requiresOnlinePermissionCheck(requiredPermission)");
+    expect(workspaceAccessGuardSource).toContain("Supabase must be reachable");
+  });
+
   it("sanitizes sync outbox payload previews before they reach the renderer", () => {
     const source = readText("apps/desktop/electron/main/services/data/syncOutboxWorkerService.ts");
 
@@ -236,11 +248,15 @@ describe("security regression checks", () => {
 
   it("keeps sensitive exports behind an explicit confirmation step in Settings", () => {
     const settingsSource = readText("apps/desktop/src/features/admin/SettingsPage.tsx");
+    const supportDiagnosticsSource = readText("apps/desktop/electron/main/services/data/supportDiagnosticsService.ts");
 
     expect(settingsSource).toContain('const confirmSensitiveExport = async (kind: "workspaceData" | "supportBundle" | "logs") =>');
     expect(settingsSource).toContain('const confirmed = await confirmSensitiveExport("supportBundle")');
     expect(settingsSource).toContain('const confirmed = await confirmSensitiveExport("logs")');
     expect(settingsSource).toContain('const confirmed = await confirmSensitiveExport("workspaceData")');
+    expect(supportDiagnosticsSource).toContain("support-manifest.json");
+    expect(supportDiagnosticsSource).toContain("crypto.createHash(\"sha256\")");
+    expect(supportDiagnosticsSource).toContain("sanitizeStructuredValue");
   });
 
   it("keeps local at-rest hardening centralized in the storage privacy helper", () => {

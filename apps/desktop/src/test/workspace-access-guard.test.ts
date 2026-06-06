@@ -207,6 +207,69 @@ describe("workspace access guard", () => {
     cleanup();
   });
 
+  it("fails closed for cached finance reads when Supabase cannot be reached", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-access-finance-offline");
+    insertRemoteWorkspace(database);
+    insertCachedWorkspaceMembership(database, "finance.read");
+    const guard = createWorkspaceAccessGuard({
+      database,
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon-key",
+      getTokens: async () => ({ accessToken: createJwt({ sub: "user-remote", exp: 9_999_999_999 }) }),
+      fetchImpl: async () => {
+        throw new Error("network down");
+      },
+      now: () => 1_000,
+    });
+
+    await expect(
+      guard.assertWorkspaceAccess({
+        workspaceId: remoteWorkspaceId,
+        action: "load finance",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      }),
+    ).rejects.toThrow(/Supabase must be reachable/i);
+
+    cleanup();
+  });
+
+  it("does not reuse the in-memory TTL cache for sensitive finance permissions", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-workspace-access-finance-ttl");
+    insertRemoteWorkspace(database);
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(true), { status: 200 }));
+    const guard = createWorkspaceAccessGuard({
+      database,
+      supabaseUrl: "https://example.supabase.co",
+      anonKey: "anon-key",
+      getTokens: async () => ({ accessToken: createJwt({ sub: "user-remote", exp: 9_999_999_999 }) }),
+      fetchImpl,
+      now: () => 1_000,
+      cacheTtlMs: 60_000,
+    });
+
+    await expect(
+      guard.assertWorkspaceAccess({
+        workspaceId: remoteWorkspaceId,
+        action: "load finance",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      guard.assertWorkspaceAccess({
+        workspaceId: remoteWorkspaceId,
+        action: "load finance again",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+
+    cleanup();
+  });
+
   it("denies reads for unknown workspaces when Supabase is unreachable", async () => {
     const { cleanup, database } = createTestDatabase("bukowski-workspace-access");
     // Note: we do NOT insert the workspace locally.

@@ -35,10 +35,19 @@ type WorkspaceRow = {
 };
 
 const defaultCacheTtlMs = 5 * 60 * 1000;
+const onlineOnlyPermissionPrefixes = ["finance.", "treasury.", "quotes.", "invoices.", "crew_fees.", "crew_payments."] as const;
+const onlineOnlyPermissionKeys = new Set(["currency.manage_rates"]);
 
 const normalizeSupabaseUrl = (value: string | undefined) => value?.trim().replace(/\/+$/, "") ?? "";
 
 const isConfigured = (supabaseUrl: string, anonKey: string) => Boolean(supabaseUrl && anonKey);
+
+const requiresOnlinePermissionCheck = (permissionKey: string | undefined) =>
+  Boolean(
+    permissionKey &&
+      (onlineOnlyPermissionKeys.has(permissionKey) ||
+        onlineOnlyPermissionPrefixes.some((prefix) => permissionKey.startsWith(prefix))),
+  );
 
 const decodeBase64Url = (value: string) => {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -272,7 +281,7 @@ export const createWorkspaceAccessGuard = ({
 
     const cacheKey = `${userId}:${workspaceId}:${requiredPermission ?? "member"}`;
     const cachedAt = membershipCache.get(cacheKey);
-    if (cachedAt && now() - cachedAt < cacheTtlMs) {
+    if (!requiresOnlinePermissionCheck(requiredPermission) && cachedAt && now() - cachedAt < cacheTtlMs) {
       return;
     }
 
@@ -298,6 +307,10 @@ export const createWorkspaceAccessGuard = ({
             },
           });
     } catch (error) {
+      if (requiresOnlinePermissionCheck(requiredPermission)) {
+        throw new Error(`Supabase must be reachable to verify ${requiredPermission} before you ${action}.`);
+      }
+
       // Offline tolerance for reads: use the cached membership/permissions for
       // this authenticated user. Workspace existence alone is not sufficient;
       // otherwise a synced local database could expose Finance/Treasury data to
