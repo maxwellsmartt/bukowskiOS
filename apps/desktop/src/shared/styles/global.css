@@ -11732,6 +11732,92 @@ select.field-input {
   grid-column: 1 / -1;
 }
 
+/* ----- Settings · Data & Advanced stat tiles ----- */
+.settings-stat-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.settings-stat-grid .summary-row {
+  justify-content: space-between;
+  gap: 9px;
+  min-block-size: 62px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 15%, transparent);
+  border-radius: var(--radius-md, 12px);
+  background: color-mix(in srgb, var(--text-muted) 5%, transparent);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.settings-stat-grid .summary-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+  transform: translateY(-1px);
+}
+
+.settings-stat-grid .summary-label {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+}
+
+.settings-stat-grid .summary-value {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.settings-stat-value-wrap {
+  display: flex;
+}
+
+.settings-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 11px 3px 9px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.settings-stat-pill::before {
+  content: "";
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.settings-stat-pill.is-positive {
+  color: #8ec3aa;
+  background: color-mix(in srgb, #8ec3aa 12%, transparent);
+  border-color: color-mix(in srgb, #8ec3aa 26%, transparent);
+}
+
+.settings-stat-pill.is-warning {
+  color: #d6ad6c;
+  background: color-mix(in srgb, #d6ad6c 12%, transparent);
+  border-color: color-mix(in srgb, #d6ad6c 26%, transparent);
+}
+
+.settings-stat-pill.is-critical {
+  color: #e08a8a;
+  background: color-mix(in srgb, #e08a8a 13%, transparent);
+  border-color: color-mix(in srgb, #e08a8a 30%, transparent);
+}
+
+.settings-stat-pill.is-neutral {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  border-color: color-mix(in srgb, var(--text-muted) 24%, transparent);
+}
+
 .settings-role-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

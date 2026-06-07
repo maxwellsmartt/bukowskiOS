@@ -26,8 +26,8 @@ export const settingsNavEntries: SettingsNavEntry[] = [
   { id: "general", to: "/settings?section=general" },
   { id: "workspace", to: "/settings/workspace" },
   { id: "team", to: "/settings?section=team" },
-  { id: "data", to: "/settings?section=data" },
   { id: "sync", to: "/settings/sync" },
+  { id: "data", to: "/settings?section=data" },
   { id: "advanced", to: "/settings?section=advanced" },
 ];
 

@@ -156,6 +156,34 @@ const integrityLabelKey = (
   return "pending";
 };
 
+type StatTone = "positive" | "warning" | "critical" | "neutral";
+
+type SettingsStat = {
+  label: string;
+  value: string;
+  /** When set, the value renders as a colored status pill. */
+  tone?: StatTone;
+};
+
+const integrityTone = (status: AppDiagnosticsSnapshot["lastIntegrityCheckStatus"]): StatTone => {
+  if (status === "healthy") return "positive";
+  if (status === "failed") return "critical";
+  return "neutral";
+};
+
+const SettingsStatRow = ({ stat }: { stat: SettingsStat }) => (
+  <div className="summary-row settings-stat-row">
+    <span className="summary-label">{stat.label}</span>
+    {stat.tone ? (
+      <span className="settings-stat-value-wrap">
+        <span className={`settings-stat-pill is-${stat.tone}`}>{stat.value}</span>
+      </span>
+    ) : (
+      <span className="summary-value">{stat.value}</span>
+    )}
+  </div>
+);
+
 const buildUserDraft = (user: AppUserAdminRow | null, roles: AppUsersSnapshot["roles"]): UserEditorDraft => ({
   fullName: user?.fullName ?? "",
   email: user?.email ?? "",
@@ -479,7 +507,7 @@ export const SettingsPage = () => {
     });
   };
 
-  const dataHealthRows = useMemo(
+  const dataHealthRows = useMemo<SettingsStat[]>(
     () => [
       {
         label: t("settings.data.rows.localData"),
@@ -496,12 +524,14 @@ export const SettingsPage = () => {
       {
         label: t("settings.data.rows.dataCheck"),
         value: t(`settings.integrity.${integrityLabelKey(diagnostics.lastIntegrityCheckStatus)}`),
+        tone: integrityTone(diagnostics.lastIntegrityCheckStatus),
       },
       {
-        label: t("settings.data.rows.localDbEncryption", { defaultValue: "Local database encryption" }),
+        label: t("settings.data.rows.localDbEncryption"),
         value: diagnostics.databaseEncrypted
-          ? t("settings.data.rows.localDbEncrypted", { defaultValue: "Encrypted at rest" })
-          : t("settings.data.rows.localDbUnencrypted", { defaultValue: "Not encrypted yet" }),
+          ? t("settings.data.rows.localDbEncrypted")
+          : t("settings.data.rows.localDbUnencrypted"),
+        tone: diagnostics.databaseEncrypted ? "positive" : "warning",
       },
       {
         label: t("settings.data.rows.lastIntegrityCheck"),
@@ -512,13 +542,14 @@ export const SettingsPage = () => {
         value: diagnostics.encryptionAvailable
           ? t("settings.data.rows.deviceSecAvailable")
           : t("settings.data.rows.deviceSecUnavailable"),
+        tone: diagnostics.encryptionAvailable ? "positive" : "warning",
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [diagnostics, t],
   );
 
-  const syncHealthRows = useMemo(
+  const syncHealthRows = useMemo<SettingsStat[]>(
     () => [
       {
         label: t("settings.data.rows.maintenance"),
@@ -526,7 +557,11 @@ export const SettingsPage = () => {
       },
       {
         label: t("settings.data.rows.maintenanceResult"),
-        value: diagnostics.lastRetentionSummary ?? t("settings.data.rows.maintenanceNotRun"),
+        value: !diagnostics.lastRetentionSummary
+          ? t("settings.data.rows.maintenanceNotRun")
+          : diagnostics.lastRetentionSummary === "Nothing to purge in this pass."
+            ? t("settings.data.rows.maintenanceClean")
+            : diagnostics.lastRetentionSummary,
       },
       {
         label: t("settings.data.rows.lastUpload"),
@@ -540,10 +575,24 @@ export const SettingsPage = () => {
             : diagnostics.lastSyncStatus === "failed"
               ? t("settings.data.rows.uploadStatusFailed")
               : t("settings.data.rows.uploadStatusIdle"),
+        tone:
+          diagnostics.lastSyncStatus === "healthy"
+            ? "positive"
+            : diagnostics.lastSyncStatus === "failed"
+              ? "critical"
+              : "neutral",
       },
       {
         label: t("settings.data.rows.uploadResult"),
-        value: diagnostics.lastSyncSummary ?? t("settings.data.rows.uploadResultNone"),
+        value: !diagnostics.lastSyncRunAt
+          ? t("settings.data.rows.uploadResultNone")
+          : diagnostics.syncOutboxPendingCount === 0 && diagnostics.syncOutboxFailedCount === 0
+            ? t("settings.data.rows.uploadResultClean")
+            : t("settings.data.rows.uploadResultCounts", {
+                pending: diagnostics.syncOutboxPendingCount,
+                failed: diagnostics.syncOutboxFailedCount,
+              }),
+        tone: diagnostics.syncOutboxFailedCount > 0 ? "critical" : undefined,
       },
       {
         label: t("settings.data.rows.waiting"),
@@ -556,6 +605,7 @@ export const SettingsPage = () => {
       {
         label: t("settings.data.rows.needsAttention"),
         value: String(diagnostics.syncOutboxFailedCount),
+        tone: diagnostics.syncOutboxFailedCount > 0 ? "critical" : "positive",
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1056,12 +1106,9 @@ export const SettingsPage = () => {
       {activeSection === "data" ? (
         <div className="settings-data-stack">
           <SurfaceCard title={t("settings.data.healthTitle")}>
-            <div className="summary-grid">
+            <div className="summary-grid settings-stat-grid">
               {dataHealthRows.map((row) => (
-                <div key={row.label} className="summary-row">
-                  <span className="summary-label">{row.label}</span>
-                  <span className="summary-value">{row.value}</span>
-                </div>
+                <SettingsStatRow key={row.label} stat={row} />
               ))}
             </div>
 
@@ -1094,17 +1141,13 @@ export const SettingsPage = () => {
           </SurfaceCard>
 
           <SurfaceCard title={t("settings.data.syncTitle")}>
-            <div className="summary-grid">
+            <div className="summary-grid settings-stat-grid">
               {syncHealthRows.map((row) => (
-                <div key={row.label} className="summary-row">
-                  <span className="summary-label">{row.label}</span>
-                  <span className="summary-value">{row.value}</span>
-                </div>
+                <SettingsStatRow key={row.label} stat={row} />
               ))}
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.data.rows.visibleQueue")}</span>
-                <span className="summary-value">{syncRows.length}</span>
-              </div>
+              <SettingsStatRow
+                stat={{ label: t("settings.data.rows.visibleQueue"), value: String(syncRows.length) }}
+              />
             </div>
 
             <div className="action-panel-actions action-panel-actions-start">
@@ -1133,7 +1176,7 @@ export const SettingsPage = () => {
       {activeSection === "advanced" ? (
         <div className="settings-advanced-layout">
           <SurfaceCard className="settings-advanced-card settings-advanced-card-wide" title={t("settings.advanced.support.cardTitle")}>
-            <div className="summary-grid">
+            <div className="summary-grid settings-stat-grid">
               <div className="summary-row">
                 <span className="summary-label">{t("settings.advanced.support.lastCrash")}</span>
                 <span className="summary-value">{formatSupportEvent(supportSnapshot.lastCrash, t("settings.advanced.support.noneCaptured"))}</span>
@@ -1150,7 +1193,11 @@ export const SettingsPage = () => {
               </div>
               <div className="summary-row">
                 <span className="summary-label">{t("settings.advanced.support.logLocation")}</span>
-                <span className="summary-value">{supportSnapshot.logStorageLabel}</span>
+                <span className="summary-value">
+                  {supportSnapshot.logStorageLabel === emptySupportSnapshot.logStorageLabel
+                    ? t("settings.advanced.support.logLocationValue")
+                    : supportSnapshot.logStorageLabel}
+                </span>
               </div>
               <div className="summary-row">
                 <span className="summary-label">{t("settings.advanced.support.recentLogFiles")}</span>
@@ -1212,7 +1259,7 @@ export const SettingsPage = () => {
           </SurfaceCard>
 
           <SurfaceCard className="settings-advanced-card" title={t("settings.advanced.dataExport.cardTitle")}>
-            <div className="summary-grid">
+            <div className="summary-grid settings-stat-grid">
               <div className="summary-row">
                 <span className="summary-label">{t("settings.advanced.dataExport.format")}</span>
                 <span className="summary-value">JSON</span>
@@ -1246,7 +1293,7 @@ export const SettingsPage = () => {
           </SurfaceCard>
 
           <SurfaceCard className="settings-advanced-card" title={t("settings.advanced.appInfo.cardTitle")}>
-            <div className="summary-grid">
+            <div className="summary-grid settings-stat-grid">
               <div className="summary-row">
                 <span className="summary-label">{t("settings.advanced.appInfo.app")}</span>
                 <span className="summary-value">{appInfo?.appName ?? "bukowskiOS"}</span>
