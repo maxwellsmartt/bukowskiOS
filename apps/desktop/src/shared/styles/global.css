@@ -11736,12 +11736,15 @@ select.field-input {
 .settings-stat-grid {
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
+  /* Tiles size to their own content instead of stretching to the tallest in the
+     row — this kills the large empty gaps when one tile (e.g. the log-file list)
+     is much taller than its neighbours. */
+  align-items: start;
 }
 
 .settings-stat-grid .summary-row {
-  justify-content: space-between;
-  gap: 9px;
-  min-block-size: 62px;
+  gap: 7px;
+  min-block-size: 56px;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--text-muted) 15%, transparent);
   border-radius: var(--radius-md, 12px);
