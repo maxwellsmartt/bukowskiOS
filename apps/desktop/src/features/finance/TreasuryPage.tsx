@@ -1370,7 +1370,7 @@ export const TreasuryPage = () => {
 
   return (
     <>
-    <div className={`page-stack${tab === "movements" ? " treasury-page-stack--fill" : ""}`}>
+    <div className={`page-stack is-dense${tab === "movements" ? " treasury-page-stack--fill" : ""}`}>
       <input
         accept=".csv,.xlsx,.xls"
         hidden
@@ -1380,7 +1380,7 @@ export const TreasuryPage = () => {
       />
 
       <div className="page-stack-row treasury-page-header">
-        <SectionHeader title={t("finance.treasury.title")} titleTone="accent" />
+        <SectionHeader title={t("finance.treasury.title")} titleTone="accent" compact />
         {canManageAccounts ? (
           <button
             className={`ghost-control treasury-new-account-button${showAccountForm ? " is-active" : ""}`}

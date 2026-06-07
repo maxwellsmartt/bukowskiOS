@@ -572,8 +572,8 @@ export const FinanceOverviewPage = () => {
   };
 
   return (
-    <div className="page-stack">
-      <SectionHeader title={t("finance.overview.title")} />
+    <div className="page-stack is-dense">
+      <SectionHeader title={t("finance.overview.title")} compact />
 
       {error ? <div className="empty-state">{t("finance.overview.unavailable", { message: error })}</div> : null}
       {exportError ? <div className="action-feedback action-feedback-error">{exportError}</div> : null}

@@ -7,13 +7,23 @@ type SurfaceCardProps = {
   children: ReactNode;
   className?: string;
   titleLevel?: "h2" | "h3";
+  /** Tighter padding/gaps for dense views (Treasury, Finance, Projects). */
+  compact?: boolean;
 };
 
-export const SurfaceCard = ({ title, subtitle, aside, children, className = "", titleLevel = "h2" }: SurfaceCardProps) => {
+export const SurfaceCard = ({
+  title,
+  subtitle,
+  aside,
+  children,
+  className = "",
+  titleLevel = "h2",
+  compact = false,
+}: SurfaceCardProps) => {
   const TitleTag = titleLevel;
 
   return (
-    <section className={`surface-card ${className}`.trim()}>
+    <section className={`surface-card ${compact ? "surface-card-compact " : ""}${className}`.trim()}>
       {title || subtitle || aside ? (
         <header className="surface-card-header">
           <div>

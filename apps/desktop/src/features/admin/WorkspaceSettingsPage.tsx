@@ -811,7 +811,7 @@ export const WorkspaceSettingsPage = () => {
               </div>
               {workspaceDraft.avatarUrl ? (
                 <button
-                  className="ghost-control is-danger"
+                  className="ghost-control action-row-button is-danger workspace-avatar-editor-remove"
                   disabled={isUploadingWorkspaceAvatar}
                   onClick={() => void handleWorkspaceAvatarRemove()}
                   type="button"
@@ -849,7 +849,7 @@ export const WorkspaceSettingsPage = () => {
             </label>
             <div className="surface-card-actions" style={{ gridColumn: "1 / -1", justifyContent: "flex-end" }}>
               <button
-                className="ghost-control"
+                className="ghost-control action-row-button"
                 disabled={isSavingWorkspace}
                 onClick={() => {
                   setIsEditingWorkspace(false);
@@ -868,7 +868,7 @@ export const WorkspaceSettingsPage = () => {
                 <span>{t("common.cancel")}</span>
               </button>
               <button
-                className="action-primary-button"
+                className="action-primary-button action-row-button"
                 disabled={isSavingWorkspace}
                 onClick={() => void handleSaveWorkspace()}
                 type="button"
