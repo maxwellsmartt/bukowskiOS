@@ -13,6 +13,7 @@ import { useShellContext } from "@shared/hooks/useShellContext";
 import { useTreasuryPull } from "@shared/hooks/useTreasuryPull";
 import { notifyWorkspaceDataChanged } from "@shared/hooks/useWorkspaceDataRefresh";
 import { useSession } from "@app/providers/SessionProvider";
+import { useToast } from "@app/providers/ToastProvider";
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { AppStartupGate } from "@shared/components/AppStartupGate";
@@ -22,6 +23,8 @@ import { readNumberPreference, uiPreferenceKeys, writePreference } from "@shared
 import { pushRecentEntityKey } from "@shared/lib/recentEntities";
 
 import { OnboardingTour } from "@features/onboarding/OnboardingTour";
+import { reviewAgentRun } from "@features/agents/useAgentsData";
+import { newCommandId } from "@features/finance/quoteHelpers";
 
 import { CompareTrayBar } from "./CompareTrayBar";
 import { FloatingTooltipLayer } from "./FloatingTooltipLayer";
@@ -46,6 +49,7 @@ export const AppShell = () => {
   const navigate = useNavigate();
   const { activeProjectId, activeProjectRouteSection, isScopeReady } = useShellContext();
   const { handleAuthDeepLink } = useSession();
+  const toast = useToast();
   const { markReminderDone, snoozeReminder } = useNotifications();
   const { activeMembership, activeWorkspaceId } = useWorkspace();
   useAutoLogout();
@@ -223,7 +227,11 @@ export const AppShell = () => {
 
       if (action.type === "notification-clicked") {
         if (action.linkTo) {
-          navigate(action.linkTo);
+          if (/^https:\/\/github\.com\/maxwellsmartt\/bukowskiOS\/releases\b/.test(action.linkTo)) {
+            void window.bukowskiApp?.openExternal(action.linkTo);
+          } else {
+            navigate(action.linkTo);
+          }
         }
         return;
       }
@@ -239,11 +247,31 @@ export const AppShell = () => {
         return;
       }
 
+      if (action.type === "agent-run-native-action") {
+        navigate("/agents/runs");
+        void reviewAgentRun({
+          commandId: newCommandId("agent-native-approve"),
+          workspaceId: action.workspaceId,
+          runId: action.runId,
+          decision: action.decision,
+        })
+          .then((result) => {
+            toast.success("Agent approved", result.summary);
+          })
+          .catch((error) => {
+            toast.error(
+              "Could not approve agent",
+              error instanceof Error ? error.message : "Open the run and review it manually.",
+            );
+          });
+        return;
+      }
+
       if (action.type === "auth-deep-link") {
         void handleAuthDeepLink(action.url).then((targetPath) => navigate(targetPath, { replace: true }));
       }
     });
-  }, [handleAuthDeepLink, markReminderDone, navigate, snoozeReminder]);
+  }, [handleAuthDeepLink, markReminderDone, navigate, snoozeReminder, toast]);
 
   useEffect(
     () => () => {

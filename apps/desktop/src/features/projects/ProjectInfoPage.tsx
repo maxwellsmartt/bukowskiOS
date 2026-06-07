@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
 import { projectColorPalette } from "@contracts";
+import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { SelectField } from "@shared/components/SelectField";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -27,6 +28,7 @@ export const ProjectInfoPage = () => {
   const { project, projectId } = useProjectMode();
   const [searchParams] = useSearchParams();
   const toast = useToast();
+  const { createNotification } = useNotifications();
   const { data, error, isLoading, reload } = useProjectDetail(projectId);
   const { data: catalog } = useCatalogData();
   const { refreshProjects, updateProject } = useShellContext();
@@ -101,6 +103,18 @@ export const ProjectInfoPage = () => {
       await Promise.all([reload(), refreshProjects()]);
       setSaveError(null);
       toast.success(t("projects.info.toasts.savedTitle"), t("projects.info.toasts.savedBody"));
+      await createNotification({
+        kind: "project",
+        title: t("projects.info.notifications.updatedTitle", { defaultValue: "Proyecto actualizado" }),
+        body: t("projects.info.notifications.updatedBody", {
+          defaultValue: "{{name}} recibió cambios de información, fechas o estado.",
+          name,
+        }),
+        linkTo: `/projects/${currentProject.id}/info`,
+        sourceType: "project",
+        sourceRef: { projectId: currentProject.id, action: "updated" },
+        notifyNow: true,
+      });
     } catch (nextError) {
       setSaveError(getUserFacingErrorMessage(nextError, t("projects.info.toasts.updateFailed")));
     } finally {

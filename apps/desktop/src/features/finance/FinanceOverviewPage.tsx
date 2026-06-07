@@ -49,6 +49,8 @@ const periodOptions: Array<{ labelKey: string; value: FinanceOverviewPeriodPrese
 
 const chartPalette = ["#d6b37a", "#7eb7b2", "#92a7c1", "#c88d7f", "#a29cd8", "#8ca772"];
 const fxRefreshIntervalMs = 30 * 60 * 1000;
+const isTasaRealAuthError = (message: string) =>
+  /TasaReal API key is invalid|no longer authorized|TasaReal refresh failed \((?:401|403)\)/i.test(message);
 const exchangeRateInstitutions: Array<{ label: string; logo: string; source: CurrencyRateSource }> = [
   { label: "Banco Popular", logo: bancoPopularLogo, source: "banco_popular" },
   { label: "Banco Central", logo: bancoCentralLogo, source: "banco_central" },
@@ -248,8 +250,10 @@ export const FinanceOverviewPage = () => {
     "USD",
   );
   const [rateLimitBlockedUntil, setRateLimitBlockedUntil] = useState<string | null>(null);
+  const [isTasaRealAuthBlocked, setIsTasaRealAuthBlocked] = useState(false);
   const isCustomRangeReady = period !== "custom" || (Boolean(customStartDate) && Boolean(customEndDate));
   const rateLimitStorageKey = `bukowski:fx-rate-limit:${activeWorkspaceId}:tasareal:${selectedFxCurrency}`;
+  const tasaRealAuthBlockStorageKey = `bukowski:fx-auth-blocked:${activeWorkspaceId}:tasareal`;
 
   const overviewQuery = useMemo<FinanceOverviewQuery>(() => {
     if (period === "custom") {
@@ -435,9 +439,22 @@ export const FinanceOverviewPage = () => {
     setRateLimitBlockedUntil(readRateLimitBlock(rateLimitStorageKey));
   }, [rateLimitStorageKey]);
 
+  useEffect(() => {
+    setIsTasaRealAuthBlocked(window.localStorage.getItem(tasaRealAuthBlockStorageKey) === "1");
+  }, [tasaRealAuthBlockStorageKey]);
+
   const handleRefreshRates = useCallback(
     async ({ quiet = false }: { quiet?: boolean } = {}) => {
       if (!providerStatus?.hasApiKey || isRefreshingRates) return;
+      if (isTasaRealAuthBlocked) {
+        if (!quiet) {
+          toast.warning(
+            t("finance.overview.toasts.providerAuthTitle"),
+            t("finance.overview.toasts.providerAuthBody"),
+          );
+        }
+        return;
+      }
       if (isRateLimitBlocked) {
         if (!quiet) {
           toast.warning(
@@ -458,7 +475,9 @@ export const FinanceOverviewPage = () => {
         reloadExchangeRates();
         reloadProviderStatus();
         window.localStorage.removeItem(rateLimitStorageKey);
+        window.localStorage.removeItem(tasaRealAuthBlockStorageKey);
         setRateLimitBlockedUntil(null);
+        setIsTasaRealAuthBlocked(false);
         if (!quiet) {
           toast.success(t("finance.overview.toasts.ratesRefreshed"), result.summary);
         }
@@ -469,14 +488,24 @@ export const FinanceOverviewPage = () => {
           window.localStorage.setItem(rateLimitStorageKey, blockedUntil);
           setRateLimitBlockedUntil(blockedUntil);
         }
+        if (isTasaRealAuthError(errorMessage)) {
+          window.localStorage.setItem(tasaRealAuthBlockStorageKey, "1");
+          setIsTasaRealAuthBlocked(true);
+        }
         if (!quiet) {
           toast.error(
-            errorMessage.includes("429") ? t("finance.overview.toasts.rateLimitTitle") : t("finance.overview.toasts.refreshFailed"),
+            errorMessage.includes("429")
+              ? t("finance.overview.toasts.rateLimitTitle")
+              : isTasaRealAuthError(errorMessage)
+                ? t("finance.overview.toasts.providerAuthTitle")
+                : t("finance.overview.toasts.refreshFailed"),
             getUserFacingErrorMessage(
               nextError,
               errorMessage.includes("429")
                 ? t("finance.overview.toasts.rateLimitFallback")
-                : t("finance.overview.toasts.refreshFailedFallback"),
+                : isTasaRealAuthError(errorMessage)
+                  ? t("finance.overview.toasts.providerAuthBody")
+                  : t("finance.overview.toasts.refreshFailedFallback"),
             ),
           );
         }
@@ -486,6 +515,7 @@ export const FinanceOverviewPage = () => {
     },
     [
       activeWorkspaceId,
+      isTasaRealAuthBlocked,
       isRateLimitBlocked,
       isRefreshingRates,
       providerStatus?.hasApiKey,
@@ -494,12 +524,14 @@ export const FinanceOverviewPage = () => {
       reloadExchangeRates,
       reloadProviderStatus,
       selectedFxCurrency,
+      tasaRealAuthBlockStorageKey,
       toast,
     ],
   );
 
   useEffect(() => {
     if (!providerStatus?.hasApiKey) return;
+    if (isTasaRealAuthBlocked) return;
     if (isRateLimitBlocked) return;
     const lastFetchedMs = providerStatus.lastFetchedAt ? new Date(providerStatus.lastFetchedAt).getTime() : 0;
     const today = new Date().toISOString().slice(0, 10);
@@ -519,6 +551,7 @@ export const FinanceOverviewPage = () => {
     exchangeRates,
     handleRefreshRates,
     hasExchangeRates,
+    isTasaRealAuthBlocked,
     isRateLimitBlocked,
     providerStatus?.hasApiKey,
     providerStatus?.lastFetchedAt,
@@ -684,11 +717,13 @@ export const FinanceOverviewPage = () => {
             <button
               aria-label={t("finance.overview.exchange.refresh")}
               className="icon-ghost-control"
-              disabled={isRefreshingRates || !providerStatus?.hasApiKey || isRateLimitBlocked}
+              disabled={isRefreshingRates || !providerStatus?.hasApiKey || isRateLimitBlocked || isTasaRealAuthBlocked}
               onClick={() => void handleRefreshRates()}
               title={
                 isRateLimitBlocked
                   ? t("finance.overview.exchange.limitUntil", { time: formatRateTimestamp(rateLimitBlockedUntil) })
+                  : isTasaRealAuthBlocked
+                    ? t("finance.overview.exchange.authBlocked")
                   : providerStatus?.hasApiKey
                     ? t("finance.overview.exchange.refresh")
                     : t("finance.overview.exchange.connectTasaReal")

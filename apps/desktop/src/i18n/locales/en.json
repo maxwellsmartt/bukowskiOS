@@ -898,6 +898,7 @@
         "currency": "Currency",
         "refresh": "Refresh exchange rates",
         "connectTasaReal": "Connect TasaReal in Settings",
+        "authBlocked": "Update the TasaReal API key in Settings",
         "limitUntil": "TasaReal limit reached until {{time}}",
         "statusAria": "Exchange rates {{status}}",
         "status": {
@@ -931,6 +932,8 @@
         "rateLimitTitle": "Daily exchange-rate limit reached",
         "rateLimitBody": "Showing saved rates. TasaReal refresh unlocks after {{time}}.",
         "rateLimitFallback": "Showing saved rates. TasaReal should reset the quota at midnight.",
+        "providerAuthTitle": "TasaReal API key is not authorized",
+        "providerAuthBody": "Update the API key in Settings → Workspace → Currency before refreshing rates again.",
         "refreshFailedFallback": "Check the API connection and try again.",
         "ratesRefreshed": "Rates refreshed",
         "refreshFailed": "Could not refresh rates",
@@ -3784,6 +3787,22 @@
         "minutes_one": "{{count}} min",
         "minutes_other": "{{count}} min",
         "hour": "1 hour"
+      },
+      "notifications": {
+        "label": "macOS notifications",
+        "helper": "Controls native macOS alerts only. The tray, popover and Inbox still record important events.",
+        "nativeEnabled": "Allow native macOS notifications",
+        "categoriesLabel": "Native notification categories",
+        "preview": "If macOS blocks system permission, the app will still record notifications inside Inbox.",
+        "categories": {
+          "invoiceInbox": "Processed invoices",
+          "agentsDone": "Agents finish tasks",
+          "agentsApproval": "Agents need approval",
+          "exchangeRates": "Exchange rates",
+          "projects": "Projects and units",
+          "todosReminders": "Todos and reminders",
+          "appUpdates": "App updates"
+        }
       }
     },
     "actions": {

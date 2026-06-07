@@ -59,6 +59,7 @@ import { createCatalogReadService } from "./catalogReadService";
 import { createFinanceReadService } from "./financeReadService";
 import { createProjectReadService } from "./projectReadService";
 import { deriveProjectUnitStatus, resolveScheduleWindowLabel } from "./projectScheduling";
+import { assertPathWithinRoot } from "../../security/pathSafety";
 
 import { DEFAULT_WORKSPACE_ID } from "@contracts";
 
@@ -904,6 +905,16 @@ type FoundationReadServiceDeps = {
 };
 
 export const createFoundationReadService = (db: DatabaseSync, deps: FoundationReadServiceDeps = {}) => {
+  const resolveStoredPath = (storagePath: string | null | undefined) => {
+    if (!storagePath) return null;
+    if (!deps.getStorageRoot) return storagePath;
+    try {
+      return assertPathWithinRoot(storagePath, deps.getStorageRoot());
+    } catch {
+      return null;
+    }
+  };
+
   const catalogReads = createCatalogReadService(db, {
     getStorageRoot: deps.getStorageRoot,
   });
@@ -2292,7 +2303,9 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
         notes: row.notes,
       },
       files: files.map((file) => {
-        const isMissing = file.status !== "deleted" && file.storage_path ? !fs.existsSync(file.storage_path) : file.status === "missing";
+        const safeStoragePath = resolveStoredPath(file.storage_path);
+        const isMissing =
+          file.status !== "deleted" && file.storage_path ? !safeStoragePath || !fs.existsSync(safeStoragePath) : file.status === "missing";
         const mimeType = file.mime_type?.trim() || "application/octet-stream";
 
         return {

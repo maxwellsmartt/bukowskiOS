@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import type { CatalogSnapshot, ProjectDetailSnapshot } from "@contracts";
 import { projectColorPalette } from "@contracts";
+import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { SelectField } from "@shared/components/SelectField";
@@ -96,6 +97,7 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
   const [warning, setWarning] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const toast = useToast();
+  const { createNotification } = useNotifications();
   const [pendingUnitAction, setPendingUnitAction] = useState<{
     unit: ProjectDetailSnapshot["units"][number];
     action: "mark_wrapped" | "delete";
@@ -177,6 +179,22 @@ export const ProjectUnitsManager = ({ crewMembers, focusedUnitId = null, onChang
 
       await Promise.resolve(onChanged());
       const nextFeedback = editorMode === "create" ? t("projects.units.toasts.createdBody") : t("projects.units.toasts.updatedBody");
+      const notificationAction = editorMode === "create" ? "created" : "updated";
+      await createNotification({
+        kind: "project",
+        title:
+          editorMode === "create"
+            ? t("projects.units.notifications.createdTitle", { defaultValue: "Unidad creada" })
+            : t("projects.units.notifications.updatedTitle", { defaultValue: "Unidad actualizada" }),
+        body: t("projects.units.notifications.changedBody", {
+          defaultValue: "{{name}} cambió dentro del proyecto.",
+          name: unitDraft.name,
+        }),
+        linkTo: `/projects/${projectId}/info`,
+        sourceType: "project_unit",
+        sourceRef: { projectId, unitId: editingUnit?.id ?? null, action: notificationAction },
+        notifyNow: true,
+      });
       resetEditor();
       toast.success(t("projects.units.toasts.done"), nextFeedback);
     } catch (nextError) {

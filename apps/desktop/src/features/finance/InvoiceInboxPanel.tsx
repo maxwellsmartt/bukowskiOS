@@ -13,6 +13,7 @@ import type {
   UpdateInvoiceExtractionCommand,
 } from "@contracts";
 import { useSession } from "@app/providers/SessionProvider";
+import { useNotifications } from "@app/providers/NotificationsProvider";
 import { CompactSelect } from "@shared/components/CompactSelect";
 import { CreatableSelect } from "@shared/components/CreatableSelect";
 import { DataTable } from "@shared/components/DataTable";
@@ -104,6 +105,7 @@ type Props = {
 export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const { t } = useTranslation();
   const { user } = useSession();
+  const { createNotification } = useNotifications();
   const inbox = useInvoiceInbox(workspaceId);
   const expenseCategories = useExpenseCategories(workspaceId);
   const duplicates = useInvoiceDuplicates(workspaceId);
@@ -263,6 +265,18 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
         uploadedByName: user?.displayName ?? null,
       });
       toast.success(result.summary);
+      await createNotification({
+        kind: "invoice_inbox",
+        title: t("finance.treasury.invoices.notifications.uploadedTitle", { defaultValue: "Facturas subidas" }),
+        body: t("finance.treasury.invoices.notifications.uploadedBody", {
+          defaultValue: "{{count}} factura(s) listas para procesar en Tesorería.",
+          count: result.queuedCount,
+        }),
+        linkTo: "/finance/treasury",
+        sourceType: "invoice_inbox",
+        sourceRef: { batchId: result.batchId, queuedCount: result.queuedCount, skippedCount: result.skippedCount },
+        notifyNow: true,
+      });
       inbox.refresh();
     } catch (error) {
       toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.uploadFailed", { defaultValue: "No se pudieron subir las facturas." })));

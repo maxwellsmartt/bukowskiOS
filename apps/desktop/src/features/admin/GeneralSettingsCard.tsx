@@ -11,7 +11,10 @@ import { getCurrencyEntry } from "@shared/lib/currencyCatalog";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import {
   DATE_FORMAT_MODES,
+  NOTIFICATION_CATEGORIES,
   SUPPORTED_LANGUAGES,
+  defaultNativeNotificationPreferences,
+  mergeNativeNotificationPreferences,
   userSettingKeys,
   type DateFormatMode,
   type SupportedLanguage,
@@ -33,6 +36,7 @@ export const GeneralSettingsCard = () => {
   const [language, setLanguage] = useUserSetting(userSettingKeys.language);
   const [dateFormatMode, setDateFormatMode] = useUserSetting(userSettingKeys.dateFormatMode);
   const [defaultCurrency, setDefaultCurrency] = useUserSetting(userSettingKeys.defaultCurrency);
+  const [nativeNotifications, setNativeNotifications] = useUserSetting(userSettingKeys.nativeNotifications);
 
   const workspaceCurrency = (activeMembership?.baseCurrency ?? "USD").toUpperCase();
   const effectiveDateMode: DateFormatMode = dateFormatMode ?? "locale";
@@ -40,6 +44,9 @@ export const GeneralSettingsCard = () => {
 
   const datePreview = formatDate(today);
   const moneyPreview = formatMoney(1234.56);
+  const effectiveNativeNotifications = mergeNativeNotificationPreferences(
+    nativeNotifications ?? defaultNativeNotificationPreferences,
+  );
 
   const handleSet = async <T,>(label: string, fn: () => Promise<void>) => {
     try {
@@ -148,6 +155,57 @@ export const GeneralSettingsCard = () => {
           </div>
           <div className="general-settings-row-control">
             <AutoLogoutSetting />
+          </div>
+        </div>
+
+        {/* Native notifications */}
+        <div className="general-settings-row general-settings-row-wide">
+          <div className="general-settings-row-label">
+            <strong>{t("settings.general.notifications.label")}</strong>
+            <small>{t("settings.general.notifications.helper")}</small>
+          </div>
+          <div className="general-settings-row-control">
+            <label className="settings-toggle-row">
+              <input
+                checked={effectiveNativeNotifications.enabled}
+                type="checkbox"
+                onChange={(event) =>
+                  void handleSet("native notifications", async () => {
+                    await setNativeNotifications({
+                      ...effectiveNativeNotifications,
+                      enabled: event.target.checked,
+                    });
+                  })
+                }
+              />
+              <span>{t("settings.general.notifications.nativeEnabled")}</span>
+            </label>
+            <div className="notification-settings-grid" aria-label={t("settings.general.notifications.categoriesLabel")}>
+              {NOTIFICATION_CATEGORIES.map((category) => (
+                <label className="settings-toggle-row" key={category}>
+                  <input
+                    checked={effectiveNativeNotifications.categories[category]}
+                    disabled={!effectiveNativeNotifications.enabled}
+                    type="checkbox"
+                    onChange={(event) =>
+                      void handleSet("native notification category", async () => {
+                        await setNativeNotifications({
+                          ...effectiveNativeNotifications,
+                          categories: {
+                            ...effectiveNativeNotifications.categories,
+                            [category]: event.target.checked,
+                          },
+                        });
+                      })
+                    }
+                  />
+                  <span>{t(`settings.general.notifications.categories.${category}`)}</span>
+                </label>
+              ))}
+            </div>
+            <span className="general-settings-preview">
+              {t("settings.general.notifications.preview")}
+            </span>
           </div>
         </div>
       </div>

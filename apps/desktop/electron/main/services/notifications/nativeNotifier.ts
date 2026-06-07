@@ -8,6 +8,7 @@ const nativeActionLabels: Record<NonNullable<ShowNativeNotificationCommand["acti
   mark_done: "Done",
   snooze_15m: "Snooze 15m",
   snooze_1h: "Snooze 1h",
+  approve_run: "Approve",
 };
 
 const focusMainWindow = () => {
@@ -82,11 +83,27 @@ export const showNativeNotification = (input: ShowNativeNotificationCommand) => 
 
   notification.on("action", (_event, index) => {
     const action = input.actions?.[index];
-    if (!input.reminderId || !action) {
+    if (!action) {
       return;
     }
 
     const targetWindow = focusMainWindow();
+    if (action === "approve_run") {
+      if (!input.agentRunId || !input.workspaceId) {
+        return;
+      }
+      targetWindow?.webContents.send(ipcChannels.shell.appAction, {
+        type: "agent-run-native-action",
+        workspaceId: input.workspaceId,
+        runId: input.agentRunId,
+        decision: "approve",
+      });
+      return;
+    }
+
+    if (!input.reminderId) {
+      return;
+    }
     targetWindow?.webContents.send(ipcChannels.shell.appAction, {
       type: "reminder-native-action",
       reminderId: input.reminderId,

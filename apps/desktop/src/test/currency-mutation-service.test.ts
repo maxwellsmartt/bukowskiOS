@@ -204,6 +204,44 @@ describe("currency mutation service", () => {
     cleanup();
   });
 
+  it("returns an actionable error when TasaReal rejects the stored API key", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-currency-provider-unauthorized");
+    const reads = createCurrencyReadService(database);
+    const mutations = createCurrencyMutationService(database);
+    const secrets = new Map<string, string>([["fx:tasareal", "stale-key"]]);
+    const secretStore = {
+      hasProviderSecret: () => false,
+      getProviderSecret: () => null,
+      setProviderSecret: () => undefined,
+      clearProviderSecret: () => undefined,
+      hasConnectorSecret: (_workspaceId: string, connectorKey: string) => secrets.has(connectorKey),
+      getConnectorSecret: (_workspaceId: string, connectorKey: string) => secrets.get(connectorKey) ?? null,
+      setConnectorSecret: (_workspaceId: string, connectorKey: string, secret: string) => {
+        secrets.set(connectorKey, secret);
+      },
+      clearConnectorSecret: (_workspaceId: string, connectorKey: string) => {
+        secrets.delete(connectorKey);
+      },
+    };
+    const providers = createCurrencyRateProviderService({
+      currencyMutations: mutations,
+      currencyReads: reads,
+      secretStore,
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("unauthorized", { status: 401 })));
+
+    await expect(
+      providers.refreshRates({
+        commandId: "cmd-rate-provider-unauthorized",
+        workspaceId: "workspace-metadata",
+        provider: "tasareal",
+        currency: "USD",
+      }),
+    ).rejects.toThrow(/API key is invalid/i);
+
+    cleanup();
+  });
+
   it("deletes a rate and prevents re-deleting after success", () => {
     const { cleanup, database } = createTestDatabase("bukowski-currency-delete");
     const reads = createCurrencyReadService(database);

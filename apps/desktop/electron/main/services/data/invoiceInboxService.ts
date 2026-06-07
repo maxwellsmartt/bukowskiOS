@@ -445,9 +445,11 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       | { storage_path: string; storage_object_key: string | null; mime_type: string; original_name: string }
       | undefined;
     if (!row) return null;
-    if (row.storage_path && fs.existsSync(row.storage_path)) {
+    if (row.storage_path) {
       const safePath = ensureSafePath(row.storage_path);
-      return { buffer: fs.readFileSync(safePath), mimeType: row.mime_type, fileName: row.original_name };
+      if (fs.existsSync(safePath)) {
+        return { buffer: fs.readFileSync(safePath), mimeType: row.mime_type, fileName: row.original_name };
+      }
     }
     // Not on this machine's disk (e.g. a teammate uploaded it): fetch the bytes
     // from cloud storage and cache them locally for next time.
@@ -546,8 +548,9 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       .get(id) as
       | { storage_path: string; storage_object_key: string | null; mime_type: string }
       | undefined;
-    if (!row?.storage_object_key || !row.storage_path || !fs.existsSync(row.storage_path)) return;
+    if (!row?.storage_object_key || !row.storage_path) return;
     const safePath = ensureSafePath(row.storage_path);
+    if (!fs.existsSync(safePath)) return;
     await options.storage.upload(row.storage_object_key, fs.readFileSync(safePath), row.mime_type);
   };
 

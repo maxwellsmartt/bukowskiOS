@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CurrencyRateSource, CurrencyRateType } from "@contracts";
+import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { NumberStepper } from "@shared/components/NumberStepper";
@@ -20,10 +21,12 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 const enabledCurrencyOptions = ["DOP", "USD", "EUR"];
 const RATE_SOURCE_VALUES: CurrencyRateSource[] = ["manual", "banco_popular", "banco_central", "banco_santa_cruz", "custom"];
 const RATE_TYPE_VALUES: CurrencyRateType[] = ["buy", "sell", "average", "manual"];
+const tasaRealAuthBlockStorageKey = (workspaceId: string) => `bukowski:fx-auth-blocked:${workspaceId}:tasareal`;
 
 export const CurrencySettingsCard = () => {
   const { t } = useTranslation();
   const toast = useToast();
+  const { createNotification } = useNotifications();
   const { activeWorkspaceId } = useWorkspace();
   const { data: settings, refresh } = useCurrencySettings(activeWorkspaceId);
   const { data: rates, refresh: refreshRates } = useExchangeRates(activeWorkspaceId, { limit: 10 });
@@ -189,6 +192,7 @@ export const CurrencySettingsCard = () => {
         apiKey: providerApiKey.trim() || null,
       });
       setProviderApiKey("");
+      window.localStorage.removeItem(tasaRealAuthBlockStorageKey(activeWorkspaceId));
       refreshProviderStatus();
       toast.success(t("settings.workspace.currencyCard.toasts.providerConnectedTitle"), result.summary);
     } catch (error) {
@@ -209,6 +213,7 @@ export const CurrencySettingsCard = () => {
         provider: "tasareal",
         clearApiKey: true,
       });
+      window.localStorage.removeItem(tasaRealAuthBlockStorageKey(activeWorkspaceId));
       refreshProviderStatus();
       toast.success(t("settings.workspace.currencyCard.toasts.providerDisconnectedTitle"), result.summary);
     } catch (error) {
@@ -233,7 +238,25 @@ export const CurrencySettingsCard = () => {
       refreshRates();
       refreshProviderStatus();
       toast.success(t("settings.workspace.currencyCard.toasts.ratesRefreshedTitle"), result.summary);
+      await createNotification({
+        kind: "exchange_rate",
+        title: t("settings.workspace.currencyCard.notifications.refreshedTitle", { defaultValue: "Tasas actualizadas" }),
+        body: result.summary,
+        linkTo: "/settings/workspace",
+        sourceType: "exchange_rate",
+        sourceRef: { provider: "tasareal", currency: "USD" },
+        notifyNow: true,
+      });
     } catch (error) {
+      await createNotification({
+        kind: "exchange_rate",
+        title: t("settings.workspace.currencyCard.notifications.refreshFailedTitle", { defaultValue: "No se actualizaron las tasas" }),
+        body: getUserFacingErrorMessage(error, t("settings.workspace.currencyCard.toasts.couldNotRefreshBody")),
+        linkTo: "/settings/workspace",
+        sourceType: "exchange_rate",
+        sourceRef: { provider: "tasareal", currency: "USD", status: "failed" },
+        notifyNow: true,
+      }).catch(() => undefined);
       toast.error(
         t("settings.workspace.currencyCard.toasts.couldNotRefresh"),
         getUserFacingErrorMessage(error, t("settings.workspace.currencyCard.toasts.couldNotRefreshBody")),

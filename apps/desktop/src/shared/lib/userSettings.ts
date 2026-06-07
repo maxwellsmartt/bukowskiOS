@@ -22,6 +22,7 @@
  */
 
 import type { BukowskiSupabaseClient } from "@bukowski/supabase-client";
+import type { NativeNotificationPreferences, NotificationCategory } from "@contracts";
 
 export const userSettingKeys = {
   autoLogoutInactivityMinutes: "autoLogoutInactivityMinutes",
@@ -37,6 +38,8 @@ export const userSettingKeys = {
   dateFormatMode: "dateFormatMode",
   /** ISO-4217 currency code the user prefers (e.g. "MXN", "USD"). */
   defaultCurrency: "defaultCurrency",
+  /** macOS native notification delivery preferences. In-app notifications stay on. */
+  nativeNotifications: "nativeNotifications",
 } as const;
 
 export type UserSettingKey = (typeof userSettingKeys)[keyof typeof userSettingKeys];
@@ -55,6 +58,7 @@ export type UserSettingsMap = {
   [userSettingKeys.dateFormatMode]?: DateFormatMode;
   /** Three-letter ISO-4217 code, uppercase. */
   [userSettingKeys.defaultCurrency]?: string;
+  [userSettingKeys.nativeNotifications]?: NativeNotificationPreferences;
 };
 
 type Listener = (settings: UserSettingsMap) => void;
@@ -109,6 +113,51 @@ const isDateFormatMode = (value: unknown): value is DateFormatMode =>
 const isCurrencyCode = (value: unknown): value is string =>
   typeof value === "string" && /^[A-Z]{3}$/.test(value);
 
+export const NOTIFICATION_CATEGORIES = [
+  "invoiceInbox",
+  "agentsDone",
+  "agentsApproval",
+  "exchangeRates",
+  "projects",
+  "todosReminders",
+  "appUpdates",
+] as const satisfies readonly NotificationCategory[];
+
+export const defaultNativeNotificationPreferences: NativeNotificationPreferences = {
+  enabled: true,
+  categories: {
+    invoiceInbox: true,
+    agentsDone: true,
+    agentsApproval: true,
+    exchangeRates: true,
+    projects: true,
+    todosReminders: true,
+    appUpdates: true,
+  },
+};
+
+export const mergeNativeNotificationPreferences = (value: unknown): NativeNotificationPreferences => {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const rawCategories =
+    source.categories && typeof source.categories === "object" && !Array.isArray(source.categories)
+      ? (source.categories as Record<string, unknown>)
+      : {};
+
+  return {
+    enabled: typeof source.enabled === "boolean" ? source.enabled : defaultNativeNotificationPreferences.enabled,
+    categories: NOTIFICATION_CATEGORIES.reduce<NativeNotificationPreferences["categories"]>(
+      (next, category) => ({
+        ...next,
+        [category]:
+          typeof rawCategories[category] === "boolean"
+            ? rawCategories[category]
+            : defaultNativeNotificationPreferences.categories[category],
+      }),
+      { ...defaultNativeNotificationPreferences.categories },
+    ),
+  };
+};
+
 const sanitizeRemoteSettings = (raw: unknown): UserSettingsMap => {
   if (!raw || typeof raw !== "object") {
     return {};
@@ -134,6 +183,10 @@ const sanitizeRemoteSettings = (raw: unknown): UserSettingsMap => {
 
   if (isCurrencyCode(source[userSettingKeys.defaultCurrency])) {
     next[userSettingKeys.defaultCurrency] = source[userSettingKeys.defaultCurrency] as string;
+  }
+
+  if (source[userSettingKeys.nativeNotifications] !== undefined) {
+    next[userSettingKeys.nativeNotifications] = mergeNativeNotificationPreferences(source[userSettingKeys.nativeNotifications]);
   }
 
   return next;

@@ -18,8 +18,8 @@ const listFiles = (directory: string): string[] => {
 const toLines = (text: string) => text.split(/\r?\n/);
 
 describe("security regression checks", () => {
-  it("does not read, open or delete persisted storage_path values without the path safety guard", () => {
-    const riskyOperations = /\b(?:readFileSync|unlinkSync|openPath)\s*\(/;
+  it("does not touch persisted storage_path values with filesystem APIs before the path safety guard", () => {
+    const riskyOperations = /\b(?:readFileSync|createReadStream|existsSync|statSync|copyFileSync|renameSync|unlinkSync|openPath)\s*\(/;
     const persistedPathReference = /\b(?:row|attachment|file|cached)\.storage_path\b/;
     const safeGuardReference = /assertPathWithinRoot|ensureSafePath|resolveStoredPath|resolveAttachmentPath|resolveCachedPath|safePath|safeStoragePath/;
     const violations: string[] = [];
@@ -29,8 +29,7 @@ describe("security regression checks", () => {
       const lines = toLines(readText(relativePath));
       lines.forEach((line, index) => {
         if (!riskyOperations.test(line) || !persistedPathReference.test(line)) return;
-        const localContext = lines.slice(Math.max(0, index - 5), Math.min(lines.length, index + 2)).join("\n");
-        if (!safeGuardReference.test(localContext)) {
+        if (!safeGuardReference.test(line)) {
           violations.push(`${relativePath}:${index + 1}: ${line.trim()}`);
         }
       });
@@ -226,6 +225,15 @@ describe("security regression checks", () => {
     expect(workspaceProviderSource).toContain("!onlineOnlyPermissionKeys.has(permissionKey)");
     expect(workspaceAccessGuardSource).toContain("requiresOnlinePermissionCheck(requiredPermission)");
     expect(workspaceAccessGuardSource).toContain("Supabase must be reachable");
+  });
+
+  it("uses refreshed main-process Supabase tokens for online finance and storage checks", () => {
+    const localDatabaseSource = readText("apps/desktop/electron/main/services/data/localDatabase.ts");
+
+    expect(localDatabaseSource).toContain("getFreshStoredAccessToken");
+    expect(localDatabaseSource).toContain("getTokens: async () => ({ accessToken: await getFreshStoredAccessToken() })");
+    expect(localDatabaseSource).toContain("getAccessToken: getFreshStoredAccessToken");
+    expect(localDatabaseSource).not.toContain("supabaseTokenStore.getTokens()");
   });
 
   it("sanitizes sync outbox payload previews before they reach the renderer", () => {

@@ -246,6 +246,19 @@ declare global {
       clearStoredTokens: () => Promise<void>;
     };
     bukowskiNotifications?: {
+      list: (query: import("@contracts").NotificationListQuery) => Promise<import("@contracts").NotificationRow[]>;
+      create: (input: import("@contracts").NotificationCreateCommand) => Promise<import("@contracts").NotificationRow>;
+      markRead: (input: import("@contracts").NotificationMarkReadCommand) => Promise<void>;
+      markAllRead: (input: import("@contracts").NotificationMarkAllReadCommand) => Promise<void>;
+      listTodos: (query: import("@contracts").NotificationListQuery) => Promise<import("@contracts").TodoRow[]>;
+      createTodo: (input: import("@contracts").TodoCreateCommand) => Promise<import("@contracts").TodoRow>;
+      updateTodo: (input: import("@contracts").TodoUpdateCommand) => Promise<void>;
+      deleteTodo: (input: { userId: string; workspaceId: string; id: string }) => Promise<void>;
+      listReminders: (query: import("@contracts").NotificationListQuery) => Promise<import("@contracts").ReminderRow[]>;
+      createReminder: (input: import("@contracts").ReminderCreateCommand) => Promise<import("@contracts").ReminderRow>;
+      updateReminder: (input: import("@contracts").ReminderUpdateCommand) => Promise<void>;
+      deleteReminder: (input: { userId: string; workspaceId: string; id: string }) => Promise<void>;
+      applyRemoteRows: (input: { table: "notifications" | "todos" | "reminders"; rows: Record<string, unknown>[] }) => Promise<void>;
       showNative: (input: import("@contracts").ShowNativeNotificationCommand) => Promise<void>;
       setDockBadge: (count: number) => Promise<void>;
       getForegroundState: () => Promise<{ isForeground: boolean }>;

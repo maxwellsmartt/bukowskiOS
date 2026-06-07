@@ -142,6 +142,14 @@ import type {
   ShellAppAction,
   ShellBootstrap,
   ShowNativeNotificationCommand,
+  NotificationCreateCommand,
+  NotificationListQuery,
+  NotificationMarkAllReadCommand,
+  NotificationMarkReadCommand,
+  NotificationRow,
+  ReminderCreateCommand,
+  ReminderRow,
+  ReminderUpdateCommand,
   SetAgentApprovalModeCommand,
   SetActiveAssistantThreadCommand,
   SetAgentStatusCommand,
@@ -151,6 +159,9 @@ import type {
   MissionControlSnapshot,
   TestAIProviderConnectionCommand,
   TestConnectorConnectionCommand,
+  TodoCreateCommand,
+  TodoRow,
+  TodoUpdateCommand,
   AssignCrewToProjectUnitInput,
   UnassignCrewFromProjectUnitInput,
   UpdateAssetCommand,
@@ -312,6 +323,32 @@ const bukowskiAuth = {
 };
 
 const bukowskiNotifications = {
+  list: (query: NotificationListQuery) =>
+    ipcRenderer.invoke(ipcChannels.notifications.list, query) as Promise<NotificationRow[]>,
+  create: (input: NotificationCreateCommand) =>
+    ipcRenderer.invoke(ipcChannels.notifications.create, input) as Promise<NotificationRow>,
+  markRead: (input: NotificationMarkReadCommand) =>
+    ipcRenderer.invoke(ipcChannels.notifications.markRead, input) as Promise<void>,
+  markAllRead: (input: NotificationMarkAllReadCommand) =>
+    ipcRenderer.invoke(ipcChannels.notifications.markAllRead, input) as Promise<void>,
+  listTodos: (query: NotificationListQuery) =>
+    ipcRenderer.invoke(ipcChannels.notifications.listTodos, query) as Promise<TodoRow[]>,
+  createTodo: (input: TodoCreateCommand) =>
+    ipcRenderer.invoke(ipcChannels.notifications.createTodo, input) as Promise<TodoRow>,
+  updateTodo: (input: TodoUpdateCommand) =>
+    ipcRenderer.invoke(ipcChannels.notifications.updateTodo, input) as Promise<void>,
+  deleteTodo: (input: { userId: string; workspaceId: string; id: string }) =>
+    ipcRenderer.invoke(ipcChannels.notifications.deleteTodo, input) as Promise<void>,
+  listReminders: (query: NotificationListQuery) =>
+    ipcRenderer.invoke(ipcChannels.notifications.listReminders, query) as Promise<ReminderRow[]>,
+  createReminder: (input: ReminderCreateCommand) =>
+    ipcRenderer.invoke(ipcChannels.notifications.createReminder, input) as Promise<ReminderRow>,
+  updateReminder: (input: ReminderUpdateCommand) =>
+    ipcRenderer.invoke(ipcChannels.notifications.updateReminder, input) as Promise<void>,
+  deleteReminder: (input: { userId: string; workspaceId: string; id: string }) =>
+    ipcRenderer.invoke(ipcChannels.notifications.deleteReminder, input) as Promise<void>,
+  applyRemoteRows: (input: { table: "notifications" | "todos" | "reminders"; rows: Record<string, unknown>[] }) =>
+    ipcRenderer.invoke(ipcChannels.notifications.applyRemoteRows, input) as Promise<void>,
   showNative: (input: ShowNativeNotificationCommand) =>
     ipcRenderer.invoke(ipcChannels.notifications.showNative, input) as Promise<void>,
   setDockBadge: (count: number) => ipcRenderer.invoke(ipcChannels.notifications.setDockBadge, count) as Promise<void>,

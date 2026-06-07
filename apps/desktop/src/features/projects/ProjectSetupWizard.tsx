@@ -19,6 +19,7 @@ import type {
   StagingPackingSlipRow,
 } from "@contracts";
 import { projectColorPalette } from "@contracts";
+import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { useCatalogData, exportProjectBlueprintPdf, getProjectCreationConflicts, getStagingPackingSlips } from "@features/projects/useProjectsData";
@@ -470,6 +471,7 @@ export const ProjectSetupWizard = ({
   const { data: catalog } = useCatalogData();
   const { activeWorkspaceId } = useWorkspace();
   const toast = useToast();
+  const { createNotification } = useNotifications();
   const { createProjectBlueprint, openProject } = useShellContext();
   const [stagingSlips, setStagingSlips] = useState<StagingPackingSlipRow[]>([]);
   const [stagingError, setStagingError] = useState<string | null>(null);
@@ -1270,6 +1272,18 @@ export const ProjectSetupWizard = ({
       onClose();
 
       if (createdProject) {
+        await createNotification({
+          kind: "project",
+          title: t("projectSetup.notifications.createdTitle", { defaultValue: "Proyecto creado" }),
+          body: t("projectSetup.notifications.createdBody", {
+            defaultValue: "{{name}} ya está listo para planificación.",
+            name: createdProject.name,
+          }),
+          linkTo: `/projects/${createdProject.id}/info`,
+          sourceType: "project",
+          sourceRef: { projectId: createdProject.id, action: "created" },
+          notifyNow: true,
+        });
         openProject(createdProject.id, "info");
       }
     } catch (error) {

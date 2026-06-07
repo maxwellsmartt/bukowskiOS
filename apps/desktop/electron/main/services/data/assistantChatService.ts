@@ -308,7 +308,8 @@ export const createAssistantChatService = (
     ).all() as AttachmentDbRow[];
 
     attachmentRows.forEach((attachment) => {
-      if (attachment.status === "available" && !fs.existsSync(attachment.storage_path)) {
+      const safePath = resolveAttachmentPath(attachment.storage_path);
+      if (attachment.status === "available" && !fs.existsSync(safePath)) {
         db.prepare(
           `
             UPDATE assistant_chat_attachments

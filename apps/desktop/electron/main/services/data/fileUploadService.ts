@@ -347,12 +347,12 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
       throw new Error("This file is no longer available.");
     }
 
-    if (!fileSystem.existsSync(row.storage_path)) {
+    const safePath = ensureSafePath(row.storage_path);
+    if (!fileSystem.existsSync(safePath)) {
       db.prepare(`UPDATE ${tableName} SET status = 'missing' WHERE id = ?`).run(fileId);
       throw new Error("The stored file is missing from local storage.");
     }
 
-    const safePath = ensureSafePath(row.storage_path);
     const result = await shellApi.openPath(safePath);
     if (result) {
       throw new Error("The desktop app could not open that file.");
@@ -410,8 +410,11 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
         throw new Error("Asset file was not found.");
       }
 
-      if (row.storage_path && fileSystem.existsSync(row.storage_path)) {
-        fileSystem.unlinkSync(ensureSafePath(row.storage_path));
+      if (row.storage_path) {
+        const safePath = ensureSafePath(row.storage_path);
+        if (fileSystem.existsSync(safePath)) {
+          fileSystem.unlinkSync(safePath);
+        }
       }
 
       db.prepare(
@@ -490,8 +493,11 @@ export const createFileUploadService = (db: DatabaseSync, options: FileUploadSer
         throw new Error("Crew document was not found.");
       }
 
-      if (row.storage_path && fileSystem.existsSync(row.storage_path)) {
-        fileSystem.unlinkSync(ensureSafePath(row.storage_path));
+      if (row.storage_path) {
+        const safePath = ensureSafePath(row.storage_path);
+        if (fileSystem.existsSync(safePath)) {
+          fileSystem.unlinkSync(safePath);
+        }
       }
 
       db.prepare(

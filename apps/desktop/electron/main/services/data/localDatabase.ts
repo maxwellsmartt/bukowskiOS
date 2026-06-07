@@ -62,6 +62,7 @@ import { createSupabaseDocumentStorage } from "./supabaseDocumentStorageService"
 import { createWorkspaceBrandingAssetService, type WorkspaceBrandingAssetService } from "./workspaceBrandingAssetService";
 import { createAppSettingsStore } from "./appSettingsStore";
 import { createSoftwareLicenseService } from "./softwareLicenseService";
+import { applyNotificationLocalMigration, createNotificationLocalService } from "./notificationLocalService";
 import { createQuoteMutationService } from "./quoteMutationService";
 import { createQuoteReadService } from "./quoteReadService";
 import { createFinanceMutationService } from "./financeMutationService";
@@ -87,7 +88,7 @@ import { createSupportDiagnosticsService, type SupportDiagnosticsService } from 
 import { createSyncOutboxWorkerService, summarizeSyncOutboxWorker } from "./syncOutboxWorkerService";
 import { createUserAdminService, type UserAdminService } from "./userAdminService";
 import { createLocalDatabaseKeyStore } from "../auth/databaseKeyStore";
-import { createSupabaseTokenStore } from "../auth/tokenStore";
+import { getFreshStoredAccessToken } from "../auth/supabaseAuthBridge";
 import { createWorkspaceAccessGuard, type WorkspaceAccessGuard } from "../auth/workspaceAccessGuard";
 import { createConnectorBridgeService } from "../connectors/connectorBridgeService";
 import { createTelegramConnectorService } from "../connectors/telegramConnectorService";
@@ -123,6 +124,7 @@ type PackingMutationService = ReturnType<typeof createPackingMutationService>;
 type RmaMutationService = ReturnType<typeof createRmaMutationService>;
 type AgentMutationService = ReturnType<typeof createAgentMutationService>;
 type AssistantAudioTranscriptionService = ReturnType<typeof createAssistantAudioTranscriptionService>;
+type NotificationLocalService = ReturnType<typeof createNotificationLocalService>;
 
 const resolveTelegramPollingMode = (): "host" | "disabled" => {
   const rawMode = (process.env.BUKOWSKI_TELEGRAM_POLLING_MODE ?? "").trim().toLowerCase();
@@ -207,6 +209,7 @@ type LocalDatabaseRuntime = {
   userAdmin: UserAdminService;
   fileUploads: FileUploadService;
   softwareLicenses: ReturnType<typeof createSoftwareLicenseService>;
+  notifications: NotificationLocalService;
   appSettings: {
     getDocumentsRoot: () => string;
     getDocumentsRootSetting: () => string | null;
@@ -689,6 +692,9 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   );
   runStartupStep("apply quote agent source migration", () =>
     applyTrackedStep(database, "runtime_quote_agent_source_v1", () => applyQuoteAgentSourceMigration(database)),
+  );
+  runStartupStep("apply local notifications migration", () =>
+    applyTrackedStep(database, "runtime_notifications_local_first_v1", () => applyNotificationLocalMigration(database)),
   );
   runStartupStep("bootstrap admin foundation", () => bootstrapAdminFoundation(database, { cleanupDemoPlaceholders: true }));
   runStartupStep("bootstrap scheduling foundation", () => bootstrapSchedulingFoundation(database));
@@ -1450,6 +1456,22 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         });
         return upserts;
       }
+      case "notification": {
+        const rows = selectAll("SELECT * FROM notifications WHERE id = ?", row.entity_id).map((r) =>
+          parseJsonColumn(r, ["source_ref"]),
+        );
+        return rows.length ? [{ table: "notifications", onConflict: "id", rows }] : [];
+      }
+      case "todo": {
+        const rows = selectAll("SELECT * FROM todos WHERE id = ?", row.entity_id).map((r) =>
+          parseJsonColumn(r, ["agent_action_ref"]),
+        );
+        return rows.length ? [{ table: "todos", onConflict: "id", rows }] : [];
+      }
+      case "reminder": {
+        const rows = selectAll("SELECT * FROM reminders WHERE id = ?", row.entity_id);
+        return rows.length ? [{ table: "reminders", onConflict: "id", rows }] : [];
+      }
       default:
         return null;
     }
@@ -1493,6 +1515,12 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         ];
       case "software_license":
         return [{ table: "software_licenses", column: "id", value: row.entity_id }];
+      case "notification":
+        return [{ table: "notifications", column: "id", value: row.entity_id }];
+      case "todo":
+        return [{ table: "todos", column: "id", value: row.entity_id }];
+      case "reminder":
+        return [{ table: "reminders", column: "id", value: row.entity_id }];
       case "client":
         return [{ table: "clients", column: "id", value: row.entity_id }];
       case "manufacturer":
@@ -1504,20 +1532,19 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     }
   };
 
-  const supabaseTokenStore = createSupabaseTokenStore();
   const operationalSnapshots = createOperationalSnapshotService(database);
   const workspaceAccess = createWorkspaceAccessGuard({
     database,
     supabaseUrl: process.env.VITE_SUPABASE_URL,
     anonKey: process.env.VITE_SUPABASE_ANON_KEY,
-    getTokens: () => supabaseTokenStore.getTokens(),
+    getTokens: async () => ({ accessToken: await getFreshStoredAccessToken() }),
   });
   const syncOutboxWorker = createSyncOutboxWorkerService(database, {
     transport: isSupabaseSyncEnabled()
       ? createSupabaseOutboxTransport({
           supabaseUrl: process.env.VITE_SUPABASE_URL ?? "",
           anonKey: process.env.VITE_SUPABASE_ANON_KEY ?? "",
-          getAccessToken: async () => (await supabaseTokenStore.getTokens()).accessToken,
+          getAccessToken: getFreshStoredAccessToken,
           resolveAssetSnapshot: resolveSupabaseAssetSnapshot,
           resolveOperationalSnapshot: (row) => operationalSnapshots.resolveSnapshot(row),
           resolveDomainUpserts: resolveSupabaseDomainUpserts,
@@ -1785,6 +1812,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     runtimeDiagnostics,
   });
   const softwareLicenses = createSoftwareLicenseService(database);
+  const notifications = createNotificationLocalService(database);
   const fileUploads = createFileUploadService(database, {
     userDataPath: app.getPath("userData"),
     getStorageRoot: () => appSettings.getDocumentsRoot(),
@@ -1792,12 +1820,12 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   const documentStorage = createSupabaseDocumentStorage({
     supabaseUrl: isSupabaseSyncEnabled() ? process.env.VITE_SUPABASE_URL : undefined,
     bucket: "workspace-documents",
-    getAccessToken: async () => (await supabaseTokenStore.getTokens()).accessToken,
+    getAccessToken: getFreshStoredAccessToken,
   });
   const brandingAssetStorage = createSupabaseDocumentStorage({
     supabaseUrl: isSupabaseSyncEnabled() ? process.env.VITE_SUPABASE_URL : undefined,
     bucket: "workspace-assets",
-    getAccessToken: async () => (await supabaseTokenStore.getTokens()).accessToken,
+    getAccessToken: getFreshStoredAccessToken,
   });
   const workspaceBrandingAssets = createWorkspaceBrandingAssetService(database, {
     userDataPath: app.getPath("userData"),
@@ -2050,6 +2078,7 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
     fileUploads,
     appSettings,
     softwareLicenses,
+    notifications,
     getDiagnosticsSnapshot,
     getSupportSnapshot: () => supportDiagnostics.getSupportSnapshot(),
     createBackupNow,

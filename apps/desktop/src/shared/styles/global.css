@@ -19039,6 +19039,33 @@ input[type="number"] {
   font-variant-numeric: tabular-nums;
 }
 
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: var(--font-xs, 12px);
+  line-height: 1.35;
+}
+
+.settings-toggle-row input {
+  accent-color: var(--accent);
+}
+
+.settings-toggle-row:has(input:disabled) {
+  opacity: 0.56;
+}
+
+.notification-settings-grid {
+  display: grid;
+  gap: 8px 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  padding: 10px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md, 12px);
+  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+}
+
 /* ----- Treasury · Invoice inbox ----- */
 .invoice-inbox-hint {
   color: var(--text-muted);

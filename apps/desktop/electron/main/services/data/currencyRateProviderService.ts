@@ -186,6 +186,10 @@ export const createCurrencyRateProviderService = (options: {
       },
     });
 
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("TasaReal API key is invalid or no longer authorized. Update the key in Settings before refreshing exchange rates.");
+    }
+
     if (!response.ok) {
       throw new Error(`TasaReal refresh failed (${response.status}).`);
     }

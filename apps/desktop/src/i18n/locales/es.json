@@ -900,6 +900,7 @@
         "currency": "Moneda",
         "refresh": "Actualizar tasas",
         "connectTasaReal": "Conectar TasaReal en Settings",
+        "authBlocked": "Actualiza la API key de TasaReal en Settings",
         "limitUntil": "Límite de TasaReal alcanzado hasta {{time}}",
         "statusAria": "Tasas de cambio {{status}}",
         "status": {
@@ -933,6 +934,8 @@
         "rateLimitTitle": "Límite diario de tasas alcanzado",
         "rateLimitBody": "Mostrando tasas guardadas. TasaReal vuelve a estar disponible después de {{time}}.",
         "rateLimitFallback": "Mostrando tasas guardadas. TasaReal debería reiniciar la cuota a medianoche.",
+        "providerAuthTitle": "API key de TasaReal no autorizada",
+        "providerAuthBody": "Actualiza la API key en Settings → Workspace → Moneda antes de volver a refrescar tasas.",
         "refreshFailedFallback": "Revisa la conexión API e inténtalo otra vez.",
         "ratesRefreshed": "Tasas actualizadas",
         "refreshFailed": "No se pudieron actualizar las tasas",
@@ -3788,6 +3791,22 @@
         "minutes_one": "{{count}} min",
         "minutes_other": "{{count}} min",
         "hour": "1 hora"
+      },
+      "notifications": {
+        "label": "Notificaciones macOS",
+        "helper": "Controla solo las alertas nativas de macOS. La bandeja, el popover e Inbox siguen registrando eventos importantes.",
+        "nativeEnabled": "Permitir notificaciones nativas de macOS",
+        "categoriesLabel": "Categorías de notificaciones nativas",
+        "preview": "Si macOS bloquea permisos del sistema, el app seguirá registrando las notificaciones dentro de Inbox.",
+        "categories": {
+          "invoiceInbox": "Facturas procesadas",
+          "agentsDone": "Agentes terminan tareas",
+          "agentsApproval": "Agentes necesitan aprobación",
+          "exchangeRates": "Tasas de cambio",
+          "projects": "Proyectos y unidades",
+          "todosReminders": "Todos y reminders",
+          "appUpdates": "Actualizaciones del app"
+        }
       }
     },
     "actions": {

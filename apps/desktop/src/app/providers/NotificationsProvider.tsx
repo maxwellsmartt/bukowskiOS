@@ -1,7 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { Json } from "@bukowski/supabase-client";
-import type { AgentNotificationIntent, NotificationRow, ReminderRow, TodoRow } from "@contracts";
+import type { AgentNotificationIntent, NotificationCategory, NotificationRow, ReminderRow, TodoRow } from "@contracts";
+import { useUserSetting } from "@shared/hooks/useUserSetting";
+import {
+  defaultNativeNotificationPreferences,
+  mergeNativeNotificationPreferences,
+  userSettingKeys,
+} from "@shared/lib/userSettings";
 
 import { useToast } from "./ToastProvider";
 import { useSession } from "./SessionProvider";
@@ -180,6 +186,11 @@ const sortNotifications = (rows: NotificationRow[]) =>
 const isRecentSelfEcho = (row: NotificationRow, seenIds: Set<string>) => seenIds.has(row.id);
 const reminderPollMs = 30_000;
 const notificationRefreshMs = 20_000;
+const appUpdateCheckIntervalMs = 24 * 60 * 60 * 1000;
+const appUpdateLastCheckKey = "bukowski:notifications:last-app-update-check";
+const appUpdateLastNotifiedKey = "bukowski:notifications:last-app-update-notified";
+const appReleaseApiUrl = "https://api.github.com/repos/maxwellsmartt/bukowskiOS/releases/latest";
+const appReleasePageUrl = "https://github.com/maxwellsmartt/bukowskiOS/releases/latest";
 const todoColumnsBase = "id,user_id,workspace_id,title,notes,due_at,priority,completed_at,created_by,agent_action_ref,created_at,updated_at";
 const todoColumnsWithRecurrence =
   "id,user_id,workspace_id,title,notes,due_at,recurrence_rule,priority,completed_at,created_by,agent_action_ref,created_at,updated_at";
@@ -216,10 +227,47 @@ const asLooseSupabase = (supabase: NonNullable<ReturnType<typeof useSession>["su
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase as any;
 
+const parseVersionParts = (value: string) =>
+  value
+    .replace(/^v/i, "")
+    .split(".")
+    .map((part) => Number.parseInt(part.replace(/[^0-9].*$/, ""), 10) || 0)
+    .slice(0, 3);
+
+const isVersionGreater = (candidate: string, current: string) => {
+  const left = parseVersionParts(candidate);
+  const right = parseVersionParts(current);
+  for (let index = 0; index < 3; index += 1) {
+    if ((left[index] ?? 0) > (right[index] ?? 0)) return true;
+    if ((left[index] ?? 0) < (right[index] ?? 0)) return false;
+  }
+  return false;
+};
+
+const nativeCategoryForNotification = (row: Pick<NotificationRow, "kind" | "sourceRef">): NotificationCategory | null => {
+  if (row.kind === "invoice_inbox") return "invoiceInbox";
+  if (row.kind === "agent_approval") return "agentsApproval";
+  if (row.kind === "agent_completion") return "agentsDone";
+  if (row.kind === "exchange_rate") return "exchangeRates";
+  if (row.kind === "project") return "projects";
+  if (row.kind === "reminder") return "todosReminders";
+  if (row.kind === "app_update") return "appUpdates";
+  if (
+    row.sourceRef &&
+    typeof row.sourceRef === "object" &&
+    !Array.isArray(row.sourceRef) &&
+    "draftRunId" in row.sourceRef
+  ) {
+    return "agentsApproval";
+  }
+  return null;
+};
+
 export const NotificationsProvider = ({ children }: { children: ReactNode }) => {
   const { status, user, supabase } = useSession();
   const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const toast = useToast();
+  const [nativeNotificationSettings] = useUserSetting(userSettingKeys.nativeNotifications);
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [todos, setTodos] = useState<TodoRow[]>([]);
   const [reminders, setReminders] = useState<ReminderRow[]>([]);
@@ -230,6 +278,11 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   const firedReminderIdsRef = useRef(new Set<string>());
   const processedAgentIntentKeysRef = useRef(new Set<string>());
   const activeUserId = user?.id ?? null;
+  const nativePreferences = useMemo(
+    () => mergeNativeNotificationPreferences(nativeNotificationSettings ?? defaultNativeNotificationPreferences),
+    [nativeNotificationSettings],
+  );
+  const canUseLocal = Boolean(activeUserId && activeWorkspaceId && isWorkspaceReady && status === "authenticated" && window.bukowskiNotifications);
   const canUseRemote = Boolean(supabase && activeUserId && activeWorkspaceId && isWorkspaceReady && status === "authenticated");
 
   const unreadCount = useMemo(() => items.filter((item) => !item.readAt).length, [items]);
@@ -240,17 +293,28 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
 
       const foregroundState = await window.bukowskiNotifications?.getForegroundState().catch(() => ({ isForeground: true }));
       const shouldUseNative = !foregroundState?.isForeground || !document.hasFocus();
+      const category = nativeCategoryForNotification(row);
+      const nativeAllowed =
+        nativePreferences.enabled && (category == null || nativePreferences.categories[category]);
 
-      if (shouldUseNative) {
+      if (shouldUseNative && nativeAllowed) {
+        const sourceRef =
+          row.sourceRef && typeof row.sourceRef === "object" && !Array.isArray(row.sourceRef)
+            ? (row.sourceRef as Record<string, unknown>)
+            : null;
+        const draftRunId = typeof sourceRef?.draftRunId === "string" ? sourceRef.draftRunId : null;
         await window.bukowskiNotifications?.showNative({
           id: row.id,
           title: row.title,
           body: row.body,
           linkTo: row.linkTo,
+          workspaceId: draftRunId ? row.workspaceId : null,
+          agentRunId: draftRunId,
+          actions: draftRunId && nativePreferences.categories.agentsApproval ? ["approve_run"] : undefined,
         }).catch(() => undefined);
       }
     },
-    [toast],
+    [nativePreferences, toast],
   );
 
   useEffect(() => {
@@ -258,7 +322,21 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   }, [unreadCount]);
 
   const refreshNotifications = useCallback(async () => {
-    if (!canUseRemote || !supabase || !activeUserId || !activeWorkspaceId) {
+    if (!canUseLocal || !activeUserId || !activeWorkspaceId) {
+      return;
+    }
+
+    const localRows = await window.bukowskiNotifications?.list({
+      userId: activeUserId,
+      workspaceId: activeWorkspaceId,
+      limit: maxTrayItems,
+    });
+    if (localRows) {
+      localRows.forEach((item) => seenIdsRef.current.add(item.id));
+      setItems(sortNotifications(localRows));
+    }
+
+    if (!canUseRemote || !supabase) {
       return;
     }
 
@@ -271,13 +349,32 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       .order("created_at", { ascending: false })
       .limit(maxTrayItems);
 
-    const nextItems = ((data ?? []) as Parameters<typeof toNotificationRow>[0][]).map(toNotificationRow);
+    await window.bukowskiNotifications?.applyRemoteRows({
+      table: "notifications",
+      rows: (data ?? []) as Record<string, unknown>[],
+    });
+    const nextItems = await window.bukowskiNotifications?.list({
+      userId: activeUserId,
+      workspaceId: activeWorkspaceId,
+      limit: maxTrayItems,
+    }) ?? ((data ?? []) as Parameters<typeof toNotificationRow>[0][]).map(toNotificationRow);
     nextItems.forEach((item) => seenIdsRef.current.add(item.id));
-    setItems(nextItems);
-  }, [activeUserId, activeWorkspaceId, canUseRemote, supabase]);
+    setItems(sortNotifications(nextItems));
+  }, [activeUserId, activeWorkspaceId, canUseLocal, canUseRemote, supabase]);
 
   const refreshPersonalWork = useCallback(async () => {
-    if (!canUseRemote || !supabase || !activeUserId || !activeWorkspaceId) {
+    if (!canUseLocal || !activeUserId || !activeWorkspaceId) {
+      return;
+    }
+
+    const [localTodos, localReminders] = await Promise.all([
+      window.bukowskiNotifications?.listTodos({ userId: activeUserId, workspaceId: activeWorkspaceId, limit: 80 }),
+      window.bukowskiNotifications?.listReminders({ userId: activeUserId, workspaceId: activeWorkspaceId, limit: 80 }),
+    ]);
+    if (localTodos) setTodos(localTodos);
+    if (localReminders) setReminders(localReminders);
+
+    if (!canUseRemote || !supabase) {
       return;
     }
 
@@ -308,12 +405,27 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
           .limit(80)
       : todosResultWithRecurrence;
 
-    setTodos(((todosResult.data ?? []) as Parameters<typeof toTodoRow>[0][]).map(toTodoRow));
-    setReminders(((remindersResult.data ?? []) as Parameters<typeof toReminderRow>[0][]).map(toReminderRow));
-  }, [activeUserId, activeWorkspaceId, canUseRemote, supabase]);
+    await Promise.all([
+      window.bukowskiNotifications?.applyRemoteRows({
+        table: "todos",
+        rows: (todosResult.data ?? []) as Record<string, unknown>[],
+      }),
+      window.bukowskiNotifications?.applyRemoteRows({
+        table: "reminders",
+        rows: (remindersResult.data ?? []) as Record<string, unknown>[],
+      }),
+    ]);
+
+    const [nextTodos, nextReminders] = await Promise.all([
+      window.bukowskiNotifications?.listTodos({ userId: activeUserId, workspaceId: activeWorkspaceId, limit: 80 }),
+      window.bukowskiNotifications?.listReminders({ userId: activeUserId, workspaceId: activeWorkspaceId, limit: 80 }),
+    ]);
+    setTodos(nextTodos ?? ((todosResult.data ?? []) as Parameters<typeof toTodoRow>[0][]).map(toTodoRow));
+    setReminders(nextReminders ?? ((remindersResult.data ?? []) as Parameters<typeof toReminderRow>[0][]).map(toReminderRow));
+  }, [activeUserId, activeWorkspaceId, canUseLocal, canUseRemote, supabase]);
 
   useEffect(() => {
-    if (!canUseRemote || !supabase || !activeUserId || !activeWorkspaceId) {
+    if (!canUseLocal || !activeUserId || !activeWorkspaceId) {
       setItems([]);
       setTodos([]);
       setReminders([]);
@@ -337,6 +449,12 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
         setIsLoading(false);
       });
 
+    if (!canUseRemote || !supabase) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
     const channel = supabase
       .channel(`notifications:${activeUserId}:${activeWorkspaceId}`)
       .on(
@@ -353,6 +471,9 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
             return;
           }
 
+          void window.bukowskiNotifications?.applyRemoteRows({ table: "notifications", rows: [payload.new as Record<string, unknown>] }).catch(
+            () => undefined,
+          );
           const alreadySeen = isRecentSelfEcho(nextRow, seenIdsRef.current);
           seenIdsRef.current.add(nextRow.id);
           setItems((current) => sortNotifications([nextRow, ...current.filter((item) => item.id !== nextRow.id)]));
@@ -376,6 +497,9 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
             return;
           }
           seenIdsRef.current.add(nextRow.id);
+          void window.bukowskiNotifications?.applyRemoteRows({ table: "notifications", rows: [payload.new as Record<string, unknown>] }).catch(
+            () => undefined,
+          );
           setItems((current) => sortNotifications(current.map((item) => (item.id === nextRow.id ? nextRow : item))));
         },
       )
@@ -385,10 +509,10 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       isMounted = false;
       void Promise.resolve(supabase.removeChannel(channel));
     };
-  }, [activeUserId, activeWorkspaceId, canUseRemote, refreshNotifications, refreshPersonalWork, showNewNotification, supabase]);
+  }, [activeUserId, activeWorkspaceId, canUseLocal, canUseRemote, refreshNotifications, refreshPersonalWork, showNewNotification, supabase]);
 
   useEffect(() => {
-    if (!canUseRemote) {
+    if (!canUseLocal) {
       return undefined;
     }
 
@@ -413,59 +537,53 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [canUseRemote, refreshNotifications, refreshPersonalWork]);
+  }, [canUseLocal, refreshNotifications, refreshPersonalWork]);
 
   const markRead = useCallback(
     async (notificationId: string) => {
-      if (!supabase) return;
-      const looseSupabase = asLooseSupabase(supabase);
+      if (!activeUserId || !activeWorkspaceId) return;
       const readAt = new Date().toISOString();
       setItems((current) => current.map((item) => (item.id === notificationId ? { ...item, readAt } : item)));
-      await looseSupabase.from("notifications").update({ read_at: readAt }).eq("id", notificationId);
+      await window.bukowskiNotifications?.markRead({
+        userId: activeUserId,
+        workspaceId: activeWorkspaceId,
+        notificationId,
+        readAt,
+      });
     },
-    [supabase],
+    [activeUserId, activeWorkspaceId],
   );
 
   const markAllRead = useCallback(async () => {
-    if (!supabase || !activeUserId || !activeWorkspaceId) return;
-    const looseSupabase = asLooseSupabase(supabase);
+    if (!activeUserId || !activeWorkspaceId) return;
     const readAt = new Date().toISOString();
     setItems((current) => current.map((item) => ({ ...item, readAt: item.readAt ?? readAt })));
-    await looseSupabase
-      .from("notifications")
-      .update({ read_at: readAt })
-      .eq("user_id", activeUserId)
-      .eq("workspace_id", activeWorkspaceId)
-      .is("read_at", null);
-  }, [activeUserId, activeWorkspaceId, supabase]);
+    await window.bukowskiNotifications?.markAllRead({
+      userId: activeUserId,
+      workspaceId: activeWorkspaceId,
+      readAt,
+    });
+  }, [activeUserId, activeWorkspaceId]);
 
   const createNotification = useCallback(
     async (input: NotificationInsertInput) => {
-      if (!supabase || !activeUserId || !activeWorkspaceId) {
+      if (!activeUserId || !activeWorkspaceId) {
         return null;
       }
 
-      const looseSupabase = asLooseSupabase(supabase);
-      const { data, error } = await looseSupabase
-        .from("notifications")
-        .insert({
-          user_id: activeUserId,
-          workspace_id: activeWorkspaceId,
-          kind: input.kind ?? "system",
-          title: input.title,
-          body: input.body ?? null,
-          link_to: input.linkTo ?? null,
-          source_type: input.sourceType ?? "user",
-          source_ref: input.sourceRef ?? null,
-        })
-        .select("id,user_id,workspace_id,kind,title,body,source_type,source_ref,link_to,read_at,created_at")
-        .single();
-
-      if (error || !data) {
-        throw error ?? new Error("Notification was not created.");
+      const row = await window.bukowskiNotifications?.create({
+        userId: activeUserId,
+        workspaceId: activeWorkspaceId,
+        kind: input.kind ?? "system",
+        title: input.title,
+        body: input.body ?? null,
+        linkTo: input.linkTo ?? null,
+        sourceType: input.sourceType ?? "user",
+        sourceRef: input.sourceRef ?? null,
+      });
+      if (!row) {
+        throw new Error("Notification was not created.");
       }
-
-      const row = toNotificationRow(data as Parameters<typeof toNotificationRow>[0]);
       seenIdsRef.current.add(row.id);
       setItems((current) => sortNotifications([row, ...current.filter((item) => item.id !== row.id)]));
       if (input.notifyNow) {
@@ -473,57 +591,38 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       }
       return row;
     },
-    [activeUserId, activeWorkspaceId, showNewNotification, supabase],
+    [activeUserId, activeWorkspaceId, showNewNotification],
   );
 
   const createTodo = useCallback(
     async (input: TodoInsertInput) => {
-      if (!supabase || !activeUserId || !activeWorkspaceId) {
+      if (!activeUserId || !activeWorkspaceId) {
         return null;
       }
 
-      const looseSupabase = asLooseSupabase(supabase);
-      const insertPayload = {
-        user_id: activeUserId,
-        workspace_id: activeWorkspaceId,
+      const row = await window.bukowskiNotifications?.createTodo({
+        userId: activeUserId,
+        workspaceId: activeWorkspaceId,
         title: input.title,
         notes: input.notes ?? null,
-        due_at: input.dueAt ?? null,
-        recurrence_rule: input.recurrenceRule ?? null,
+        dueAt: input.dueAt ?? null,
+        recurrenceRule: input.recurrenceRule ?? null,
         priority: Math.max(0, Math.min(3, Math.floor(input.priority ?? 0))),
-        created_by: input.createdBy ?? "user",
-        agent_action_ref: input.agentActionRef ?? null,
-      };
-      const { data, error } = await looseSupabase
-        .from("todos")
-        .insert(insertPayload)
-        .select(todoColumnsWithRecurrence)
-        .single();
-
-      if (error || !data) {
-        if (error && input.recurrenceRule) {
-          const fallbackPayload: Record<string, unknown> = { ...insertPayload };
-          delete fallbackPayload.recurrence_rule;
-          const fallback = await looseSupabase.from("todos").insert(fallbackPayload).select(todoColumnsBase).single();
-          if (!fallback.error && fallback.data) {
-            const row = toTodoRow(fallback.data as Parameters<typeof toTodoRow>[0]);
-            setTodos((current) => [row, ...current.filter((item) => item.id !== row.id)].slice(0, 80));
-            return row;
-          }
-        }
-        throw error ?? new Error("Todo was not created.");
+        createdBy: input.createdBy ?? "user",
+        agentActionRef: input.agentActionRef ?? null,
+      });
+      if (!row) {
+        throw new Error("Todo was not created.");
       }
-
-      const row = toTodoRow(data as Parameters<typeof toTodoRow>[0]);
       setTodos((current) => [row, ...current.filter((item) => item.id !== row.id)].slice(0, 80));
       return row;
     },
-    [activeUserId, activeWorkspaceId, supabase],
+    [activeUserId, activeWorkspaceId],
   );
 
   const createReminder = useCallback(
     async (input: ReminderInsertInput) => {
-      if (!supabase || !activeUserId || !activeWorkspaceId) {
+      if (!activeUserId || !activeWorkspaceId) {
         return null;
       }
 
@@ -532,26 +631,18 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
         throw new Error("Reminder time is invalid.");
       }
 
-      const looseSupabase = asLooseSupabase(supabase);
-      const { data, error } = await looseSupabase
-        .from("reminders")
-        .insert({
-          user_id: activeUserId,
-          workspace_id: activeWorkspaceId,
-          title: input.title,
-          body: input.body ?? null,
-          remind_at: remindAt.toISOString(),
-          recurrence_rule: input.recurrenceRule ?? null,
-          created_by: input.createdBy ?? "user",
-        })
-        .select("id,user_id,workspace_id,title,body,remind_at,recurrence_rule,snoozed_until,completed_at,created_by,created_at")
-        .single();
-
-      if (error || !data) {
-        throw error ?? new Error("Reminder was not created.");
+      const row = await window.bukowskiNotifications?.createReminder({
+        userId: activeUserId,
+        workspaceId: activeWorkspaceId,
+        title: input.title,
+        body: input.body ?? null,
+        remindAt: remindAt.toISOString(),
+        recurrenceRule: input.recurrenceRule ?? null,
+        createdBy: input.createdBy ?? "user",
+      });
+      if (!row) {
+        throw new Error("Reminder was not created.");
       }
-
-      const row = toReminderRow(data as Parameters<typeof toReminderRow>[0]);
       setReminders((current) =>
         [row, ...current.filter((item) => item.id !== row.id)]
           .sort((left, right) => new Date(left.remindAt).getTime() - new Date(right.remindAt).getTime())
@@ -559,12 +650,12 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       );
       return row;
     },
-    [activeUserId, activeWorkspaceId, supabase],
+    [activeUserId, activeWorkspaceId],
   );
 
   const updateTodo = useCallback(
     async (input: TodoUpdateInput) => {
-      if (!supabase) return;
+      if (!activeUserId || !activeWorkspaceId) return;
       const priority = Math.max(0, Math.min(3, Math.floor(input.priority ?? 0)));
       const updatedAt = new Date().toISOString();
       setTodos((current) =>
@@ -582,39 +673,32 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
             : item,
         ),
       );
-      const updatePayload = {
+      await window.bukowskiNotifications?.updateTodo({
+        userId: activeUserId,
+        workspaceId: activeWorkspaceId,
+        id: input.id,
         title: input.title,
         notes: input.notes ?? null,
-        due_at: input.dueAt ?? null,
-        recurrence_rule: input.recurrenceRule ?? null,
+        dueAt: input.dueAt ?? null,
+        recurrenceRule: input.recurrenceRule ?? null,
         priority,
-        updated_at: updatedAt,
-      };
-      const updateResult = await asLooseSupabase(supabase)
-        .from("todos")
-        .update(updatePayload)
-        .eq("id", input.id);
-      if (updateResult.error && input.recurrenceRule) {
-        const fallbackPayload: Record<string, unknown> = { ...updatePayload };
-        delete fallbackPayload.recurrence_rule;
-        await asLooseSupabase(supabase).from("todos").update(fallbackPayload).eq("id", input.id);
-      }
+      });
     },
-    [supabase],
+    [activeUserId, activeWorkspaceId],
   );
 
   const deleteTodo = useCallback(
     async (todoId: string) => {
-      if (!supabase) return;
+      if (!activeUserId || !activeWorkspaceId) return;
       setTodos((current) => current.filter((item) => item.id !== todoId));
-      await asLooseSupabase(supabase).from("todos").delete().eq("id", todoId);
+      await window.bukowskiNotifications?.deleteTodo({ userId: activeUserId, workspaceId: activeWorkspaceId, id: todoId });
     },
-    [supabase],
+    [activeUserId, activeWorkspaceId],
   );
 
   const updateReminder = useCallback(
     async (input: ReminderUpdateInput) => {
-      if (!supabase) return;
+      if (!activeUserId || !activeWorkspaceId) return;
       const remindAt = new Date(input.remindAt);
       if (!Number.isFinite(remindAt.getTime())) {
         throw new Error("Reminder time is invalid.");
@@ -636,70 +720,89 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
         ),
       );
       firedReminderIdsRef.current.delete(input.id);
-      await asLooseSupabase(supabase)
-        .from("reminders")
-        .update({
+      await window.bukowskiNotifications?.updateReminder({
+          userId: activeUserId,
+          workspaceId: activeWorkspaceId,
+          id: input.id,
           title: input.title,
           body: input.body ?? null,
-          remind_at: nextRemindAt,
-          recurrence_rule: input.recurrenceRule ?? null,
-          snoozed_until: null,
-          completed_at: null,
-        })
-        .eq("id", input.id);
+          remindAt: nextRemindAt,
+          recurrenceRule: input.recurrenceRule ?? null,
+          snoozedUntil: null,
+          completedAt: null,
+        });
     },
-    [supabase],
+    [activeUserId, activeWorkspaceId],
   );
 
   const deleteReminder = useCallback(
     async (reminderId: string) => {
-      if (!supabase) return;
+      if (!activeUserId || !activeWorkspaceId) return;
       setReminders((current) => current.filter((item) => item.id !== reminderId));
       firedReminderIdsRef.current.delete(reminderId);
-      await asLooseSupabase(supabase).from("reminders").delete().eq("id", reminderId);
+      await window.bukowskiNotifications?.deleteReminder({ userId: activeUserId, workspaceId: activeWorkspaceId, id: reminderId });
     },
-    [supabase],
+    [activeUserId, activeWorkspaceId],
   );
 
   const markTodoDone = useCallback(
     async (todoId: string) => {
-      if (!supabase) return;
+      if (!activeUserId || !activeWorkspaceId) return;
       const todo = todos.find((item) => item.id === todoId);
       const nextDueAt = todo?.dueAt ? parseBasicRecurrenceNext(todo.recurrenceRule, todo.dueAt) : null;
       if (nextDueAt) {
         setTodos((current) => current.map((item) => (item.id === todoId ? { ...item, dueAt: nextDueAt, completedAt: null } : item)));
-        await asLooseSupabase(supabase).from("todos").update({ due_at: nextDueAt, completed_at: null }).eq("id", todoId);
+        await window.bukowskiNotifications?.updateTodo({
+          userId: activeUserId,
+          workspaceId: activeWorkspaceId,
+          id: todoId,
+          dueAt: nextDueAt,
+          completedAt: null,
+        });
         return;
       }
       const completedAt = new Date().toISOString();
       setTodos((current) => current.map((item) => (item.id === todoId ? { ...item, completedAt } : item)));
-      await asLooseSupabase(supabase).from("todos").update({ completed_at: completedAt }).eq("id", todoId);
+      await window.bukowskiNotifications?.updateTodo({
+        userId: activeUserId,
+        workspaceId: activeWorkspaceId,
+        id: todoId,
+        completedAt,
+      });
     },
-    [supabase, todos],
+    [activeUserId, activeWorkspaceId, todos],
   );
 
   const markReminderDone = useCallback(
     async (reminderId: string) => {
-      if (!supabase) return;
+      if (!activeUserId || !activeWorkspaceId) return;
       const completedAt = new Date().toISOString();
       setReminders((current) => current.map((item) => (item.id === reminderId ? { ...item, completedAt } : item)));
-      await asLooseSupabase(supabase).from("reminders").update({ completed_at: completedAt }).eq("id", reminderId);
+      await window.bukowskiNotifications?.updateReminder({
+        userId: activeUserId,
+        workspaceId: activeWorkspaceId,
+        id: reminderId,
+        completedAt,
+      });
     },
-    [supabase],
+    [activeUserId, activeWorkspaceId],
   );
 
   const snoozeReminder = useCallback(
     async (reminderId: string, minutes: number) => {
-      if (!supabase) return;
+      if (!activeUserId || !activeWorkspaceId) return;
       const snoozedUntil = new Date(Date.now() + Math.max(1, minutes) * 60_000).toISOString();
       setReminders((current) => current.map((item) => (item.id === reminderId ? { ...item, snoozedUntil, completedAt: null } : item)));
       firedReminderIdsRef.current.delete(reminderId);
-      await asLooseSupabase(supabase)
-        .from("reminders")
-        .update({ snoozed_until: snoozedUntil, completed_at: null })
-        .eq("id", reminderId);
+      await window.bukowskiNotifications?.updateReminder({
+        userId: activeUserId,
+        workspaceId: activeWorkspaceId,
+        id: reminderId,
+        snoozedUntil,
+        completedAt: null,
+      });
     },
-    [supabase],
+    [activeUserId, activeWorkspaceId],
   );
 
   const applyAgentNotificationIntents = useCallback(
@@ -774,27 +877,64 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   );
 
   useEffect(() => {
-    if (!canUseRemote || !supabase || !activeUserId || !activeWorkspaceId) {
+    if (!canUseLocal || !activeUserId || !activeWorkspaceId) {
+      return;
+    }
+
+    const lastCheck = Number(window.localStorage.getItem(appUpdateLastCheckKey) ?? "0");
+    if (Number.isFinite(lastCheck) && Date.now() - lastCheck < appUpdateCheckIntervalMs) {
+      return;
+    }
+
+    window.localStorage.setItem(appUpdateLastCheckKey, String(Date.now()));
+    void (async () => {
+      const appInfo = await window.bukowskiApp?.getAppInfo().catch(() => null);
+      const currentVersion = appInfo?.version ?? null;
+      if (!currentVersion) {
+        return;
+      }
+      const response = await fetch(appReleaseApiUrl, { headers: { Accept: "application/vnd.github+json" } });
+      if (!response.ok) {
+        return;
+      }
+      const release = (await response.json()) as { tag_name?: string; html_url?: string; name?: string };
+      const latest = release.tag_name?.trim();
+      if (!latest || !isVersionGreater(latest, currentVersion)) {
+        return;
+      }
+      if (window.localStorage.getItem(appUpdateLastNotifiedKey) === latest) {
+        return;
+      }
+      window.localStorage.setItem(appUpdateLastNotifiedKey, latest);
+      await createNotification({
+        kind: "app_update",
+        title: "bukowskiOS update available",
+        body: `${release.name || latest} is available on GitHub Releases.`,
+        linkTo: release.html_url || appReleasePageUrl,
+        sourceType: "app_update",
+        sourceRef: { latestVersion: latest, currentVersion },
+        notifyNow: true,
+      });
+    })().catch(() => undefined);
+  }, [activeUserId, activeWorkspaceId, canUseLocal, createNotification]);
+
+  useEffect(() => {
+    if (!canUseLocal || !activeUserId || !activeWorkspaceId) {
       return undefined;
     }
 
-    const looseSupabase = asLooseSupabase(supabase);
-
     const runReminderPoll = async () => {
       const now = new Date().toISOString();
-      const { data } = await looseSupabase
-        .from("reminders")
-        .select("id,user_id,workspace_id,title,body,remind_at,recurrence_rule,snoozed_until,completed_at,created_by,created_at")
-        .eq("user_id", activeUserId)
-        .eq("workspace_id", activeWorkspaceId)
-        .is("completed_at", null)
-        .lte("remind_at", now)
-        .order("remind_at", { ascending: true })
-        .limit(20);
+      const localReminders =
+        (await window.bukowskiNotifications?.listReminders({
+          userId: activeUserId,
+          workspaceId: activeWorkspaceId,
+          limit: 80,
+        })) ?? [];
 
-      const dueReminders = ((data ?? []) as Parameters<typeof toReminderRow>[0][])
-        .map(toReminderRow)
+      const dueReminders = localReminders
         .filter((reminder) => !reminder.snoozedUntil || reminder.snoozedUntil <= now)
+        .filter((reminder) => !reminder.completedAt && reminder.remindAt <= now)
         .slice(0, 10);
       for (const reminder of dueReminders) {
         if (firedReminderIdsRef.current.has(reminder.id)) {
@@ -811,34 +951,39 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
           sourceRef: { reminderId: reminder.id },
           notifyNow: false,
         }).then((notification) => {
-          void window.bukowskiNotifications?.showNative({
-            id: notification?.id ?? reminder.id,
-            title: reminder.title,
-            body: reminder.body,
-            linkTo: "/inbox",
-            reminderId: reminder.id,
-            actions: ["mark_done", "snooze_15m"],
-          }).catch(() => undefined);
+          if (nativePreferences.enabled && nativePreferences.categories.todosReminders) {
+            void window.bukowskiNotifications?.showNative({
+              id: notification?.id ?? reminder.id,
+              title: reminder.title,
+              body: reminder.body,
+              linkTo: "/inbox",
+              reminderId: reminder.id,
+              actions: ["mark_done", "snooze_15m"],
+            }).catch(() => undefined);
+          }
         }).catch(() => undefined);
 
         const nextRemindAt = parseBasicRecurrenceNext(reminder.recurrenceRule, reminder.remindAt);
         if (nextRemindAt) {
-          await looseSupabase
-            .from("reminders")
-            .update({ remind_at: nextRemindAt, snoozed_until: null })
-            .eq("id", reminder.id)
-            .catch(() => undefined);
+          await window.bukowskiNotifications?.updateReminder({
+            userId: activeUserId,
+            workspaceId: activeWorkspaceId,
+            id: reminder.id,
+            remindAt: nextRemindAt,
+            snoozedUntil: null,
+          }).catch(() => undefined);
           setReminders((current) =>
             current.map((item) => (item.id === reminder.id ? { ...item, remindAt: nextRemindAt, snoozedUntil: null } : item)),
           );
           firedReminderIdsRef.current.delete(reminder.id);
         } else {
           const completedAt = new Date().toISOString();
-          await looseSupabase
-            .from("reminders")
-            .update({ completed_at: completedAt })
-            .eq("id", reminder.id)
-            .catch(() => undefined);
+          await window.bukowskiNotifications?.updateReminder({
+            userId: activeUserId,
+            workspaceId: activeWorkspaceId,
+            id: reminder.id,
+            completedAt,
+          }).catch(() => undefined);
           setReminders((current) => current.map((item) => (item.id === reminder.id ? { ...item, completedAt } : item)));
         }
       }
@@ -854,7 +999,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     return () => {
       window.clearInterval(interval);
     };
-  }, [activeUserId, activeWorkspaceId, canUseRemote, createNotification, supabase]);
+  }, [activeUserId, activeWorkspaceId, canUseLocal, createNotification, nativePreferences]);
 
   const value = useMemo<NotificationsContextValue>(
     () => ({

@@ -48,6 +48,12 @@ export type ShellAppAction =
       type: "reminder-native-action";
       reminderId: string;
       action: "mark_done" | "snooze_15m" | "snooze_1h";
+    }
+  | {
+      type: "agent-run-native-action";
+      workspaceId: string;
+      runId: string;
+      decision: "approve";
     };
 
 export type GlobalSearchEntityType = "asset" | "project" | "project_unit" | "packing_slip" | "incident" | "financial_entry";

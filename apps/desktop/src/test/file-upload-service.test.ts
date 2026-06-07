@@ -193,6 +193,41 @@ describe("file upload service", () => {
     fs.rmSync(tempRoot, { force: true, recursive: true });
   });
 
+  it("marks incident evidence outside the storage root as missing without trusting persisted paths", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-file-upload-incident-safe-root");
+    const storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-incident-safe-root-"));
+    const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-incident-outside-root-"));
+    const sourceFilePath = path.join(storageRoot, "fixture-incident.png");
+    const outsideFilePath = path.join(outsideRoot, "private-incident.png");
+    fs.writeFileSync(sourceFilePath, "incident-file");
+    fs.writeFileSync(outsideFilePath, "private-incident-file");
+
+    const service = createFileUploadService(database, {
+      userDataPath: storageRoot,
+      getStorageRoot: () => storageRoot,
+      shellApi: {
+        openPath: vi.fn().mockResolvedValue(""),
+      },
+    });
+
+    service.importIncidentFiles("incident-cine7-scratch", [sourceFilePath]);
+    database
+      .prepare("UPDATE incident_files SET storage_path = ?, byte_size = ?, mime_type = 'image/png' WHERE incident_id = ?")
+      .run(outsideFilePath, fs.statSync(outsideFilePath).size, "incident-cine7-scratch");
+
+    const reads = createFoundationReadService(database, {
+      getStorageRoot: () => storageRoot,
+    });
+    const detail = reads.getIncidentDetail("incident-cine7-scratch");
+
+    expect(detail.files).toHaveLength(1);
+    expect(detail.files[0]?.status).toBe("missing");
+
+    cleanup();
+    fs.rmSync(storageRoot, { force: true, recursive: true });
+    fs.rmSync(outsideRoot, { force: true, recursive: true });
+  });
+
   it("imports finance documents and exposes inline preview metadata for the entry", () => {
     const { cleanup, database } = createTestDatabase("bukowski-file-upload-finance");
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bukowski-finance-files-"));

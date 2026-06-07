@@ -500,7 +500,7 @@ app.whenReady().then(async () => {
   registerAuthIpc({
     getOAuthRedirectUrl: () => devAuthCallbackUrl ?? "bukowskios://auth/callback",
   });
-  registerNotificationIpc();
+  registerNotificationIpc(localDatabase.notifications);
   registerAppIpc({
     database: localDatabase.database,
     appSettings: localDatabase.appSettings,
