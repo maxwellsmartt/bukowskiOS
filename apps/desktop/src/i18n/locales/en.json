@@ -107,6 +107,23 @@
         "invite": "Invite",
         "sync": "Sync",
         "system": "System"
+      },
+      "events": {
+        "todoAddedTitle": "Task added",
+        "reminderScheduledTitle": "Reminder scheduled",
+        "appUpdateTitle": "Update available",
+        "appUpdateBody": "{{version}} is now available."
+      },
+      "nativeActions": {
+        "mark_done": "Done",
+        "snooze_15m": "Snooze 15m",
+        "snooze_1h": "Snooze 1h",
+        "approve_run": "Approve"
+      },
+      "agentApproval": {
+        "approvedTitle": "Agent approved",
+        "failedTitle": "Could not approve agent",
+        "failedBody": "Open the run and review it manually."
       }
     },
     "search": {

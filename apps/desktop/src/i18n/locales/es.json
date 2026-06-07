@@ -107,6 +107,23 @@
         "invite": "Invitación",
         "sync": "Sincronización",
         "system": "Sistema"
+      },
+      "events": {
+        "todoAddedTitle": "Tarea agregada",
+        "reminderScheduledTitle": "Recordatorio programado",
+        "appUpdateTitle": "Actualización disponible",
+        "appUpdateBody": "{{version}} ya está disponible."
+      },
+      "nativeActions": {
+        "mark_done": "Listo",
+        "snooze_15m": "Posponer 15 min",
+        "snooze_1h": "Posponer 1 h",
+        "approve_run": "Aprobar"
+      },
+      "agentApproval": {
+        "approvedTitle": "Agente aprobado",
+        "failedTitle": "No se pudo aprobar el agente",
+        "failedBody": "Abre el run y revísalo manualmente."
       }
     },
     "search": {

@@ -2,12 +2,31 @@ import { z } from "zod";
 
 import { ipcChannels } from "@contracts/ipc/channels";
 
+import { getFreshStoredUserId, isSupabaseAuthConfigured } from "../services/auth/supabaseAuthBridge";
 import {
   getNativeNotificationForegroundState,
   setNativeNotificationDockBadge,
   showNativeNotification,
 } from "../services/notifications/nativeNotifier";
 import { safeHandle, safeHandleReadWithSchema } from "./ipcSafeHandler";
+
+/**
+ * Notifications, todos and reminders are always scoped to the signed-in user.
+ * Never trust the `userId` the renderer sends: derive it from the main-process
+ * session so a compromised renderer cannot read or write another user's rows.
+ * In the local-dev/offline build (no Supabase) there is no remote session, so
+ * the renderer-provided local user id is the only identity available.
+ */
+const resolveTrustedUserId = async (rendererUserId: string): Promise<string> => {
+  try {
+    return await getFreshStoredUserId();
+  } catch (error) {
+    if (!isSupabaseAuthConfigured()) {
+      return rendererUserId;
+    }
+    throw error instanceof Error ? error : new Error("An authenticated session is required for notifications.");
+  }
+};
 
 type NotificationLocalService = {
   listNotifications: (query: { userId: string; workspaceId: string; limit?: number }) => unknown;
@@ -48,6 +67,9 @@ const nativeNotificationSchema = z.object({
   agentRunId: z.string().trim().min(1).max(120).nullable().optional(),
   workspaceId: z.string().trim().min(1).max(120).nullable().optional(),
   actions: z.array(z.enum(["mark_done", "snooze_15m", "snooze_1h", "approve_run"])).max(3).optional(),
+  actionLabels: z
+    .record(z.enum(["mark_done", "snooze_15m", "snooze_1h", "approve_run"]), z.string().trim().min(1).max(40))
+    .optional(),
 });
 
 const notificationCreateSchema = z.object({
@@ -138,91 +160,110 @@ export const registerNotificationIpc = (service: NotificationLocalService) => {
   safeHandleReadWithSchema(
     ipcChannels.notifications.list,
     z.tuple([listQuerySchema]),
-    (_event, query) => service.listNotifications(query as { userId: string; workspaceId: string; limit?: number }),
+    async (_event, query) =>
+      service.listNotifications({ ...(query as { userId: string; workspaceId: string; limit?: number }), userId: await resolveTrustedUserId((query as { userId: string }).userId) }),
     "The app could not load notifications.",
   );
 
   safeHandle(
     ipcChannels.notifications.create,
     notificationCreateSchema,
-    (_event, input) => service.createNotification(input as import("@contracts").NotificationCreateCommand),
+    async (_event, input) =>
+      service.createNotification({
+        ...input,
+        userId: await resolveTrustedUserId(input.userId),
+      } as import("@contracts").NotificationCreateCommand),
     "The app could not create this notification.",
   );
 
   safeHandle(
     ipcChannels.notifications.markRead,
     markReadSchema,
-    (_event, input) => service.markRead(input),
+    async (_event, input) => service.markRead({ ...input, userId: await resolveTrustedUserId(input.userId) }),
     "The app could not mark this notification as read.",
   );
 
   safeHandle(
     ipcChannels.notifications.markAllRead,
     markAllReadSchema,
-    (_event, input) => service.markAllRead(input),
+    async (_event, input) => service.markAllRead({ ...input, userId: await resolveTrustedUserId(input.userId) }),
     "The app could not mark notifications as read.",
   );
 
   safeHandleReadWithSchema(
     ipcChannels.notifications.listTodos,
     z.tuple([listQuerySchema]),
-    (_event, query) => service.listTodos(query as { userId: string; workspaceId: string; limit?: number }),
+    async (_event, query) => service.listTodos({ ...(query as { userId: string; workspaceId: string; limit?: number }), userId: await resolveTrustedUserId((query as { userId: string }).userId) }),
     "The app could not load todos.",
   );
 
   safeHandle(
     ipcChannels.notifications.createTodo,
     todoCreateSchema,
-    (_event, input) => service.createTodo(input as import("@contracts").TodoCreateCommand),
+    async (_event, input) =>
+      service.createTodo({ ...input, userId: await resolveTrustedUserId(input.userId) } as import("@contracts").TodoCreateCommand),
     "The app could not create this todo.",
   );
 
   safeHandle(
     ipcChannels.notifications.updateTodo,
     todoUpdateSchema,
-    (_event, input) => service.updateTodo(input),
+    async (_event, input) => service.updateTodo({ ...input, userId: await resolveTrustedUserId(input.userId) }),
     "The app could not update this todo.",
   );
 
   safeHandle(
     ipcChannels.notifications.deleteTodo,
     deleteSchema,
-    (_event, input) => service.deleteTodo(input),
+    async (_event, input) => service.deleteTodo({ ...input, userId: await resolveTrustedUserId(input.userId) }),
     "The app could not delete this todo.",
   );
 
   safeHandleReadWithSchema(
     ipcChannels.notifications.listReminders,
     z.tuple([listQuerySchema]),
-    (_event, query) => service.listReminders(query as { userId: string; workspaceId: string; limit?: number }),
+    async (_event, query) => service.listReminders({ ...(query as { userId: string; workspaceId: string; limit?: number }), userId: await resolveTrustedUserId((query as { userId: string }).userId) }),
     "The app could not load reminders.",
   );
 
   safeHandle(
     ipcChannels.notifications.createReminder,
     reminderCreateSchema,
-    (_event, input) => service.createReminder(input),
+    async (_event, input) => service.createReminder({ ...input, userId: await resolveTrustedUserId(input.userId) }),
     "The app could not create this reminder.",
   );
 
   safeHandle(
     ipcChannels.notifications.updateReminder,
     reminderUpdateSchema,
-    (_event, input) => service.updateReminder(input),
+    async (_event, input) => service.updateReminder({ ...input, userId: await resolveTrustedUserId(input.userId) }),
     "The app could not update this reminder.",
   );
 
   safeHandle(
     ipcChannels.notifications.deleteReminder,
     deleteSchema,
-    (_event, input) => service.deleteReminder(input),
+    async (_event, input) => service.deleteReminder({ ...input, userId: await resolveTrustedUserId(input.userId) }),
     "The app could not delete this reminder.",
   );
 
   safeHandle(
     ipcChannels.notifications.applyRemoteRows,
     applyRemoteRowsSchema,
-    (_event, input) => service.applyRemoteRows(input),
+    async (_event, input) => {
+      if (input.rows.length === 0) {
+        return;
+      }
+      // Stamp every applied row with the trusted user id so a compromised
+      // renderer cannot inject rows that impersonate another user locally.
+      const trustedUserId = await resolveTrustedUserId(
+        typeof input.rows[0]?.user_id === "string" ? (input.rows[0].user_id as string) : "",
+      );
+      service.applyRemoteRows({
+        table: input.table,
+        rows: input.rows.map((row) => ({ ...row, user_id: trustedUserId })),
+      });
+    },
     "The app could not apply remote notifications.",
   );
 

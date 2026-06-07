@@ -53,6 +53,20 @@ const getSupabaseAuthEnv = () => {
   return { url, anonKey };
 };
 
+/**
+ * Whether this build is wired to a remote Supabase project. When false the app
+ * runs in the local-dev/offline fallback where there is no authenticated remote
+ * session, so callers may trust the renderer-provided local user id.
+ */
+export const isSupabaseAuthConfigured = () => {
+  try {
+    getSupabaseAuthEnv();
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const refreshStoredTokens = async (tokens: StoredSupabaseTokens) => {
   if (!tokens.refreshToken) {
     return tokens.accessToken;

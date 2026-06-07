@@ -1,7 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { Json } from "@bukowski/supabase-client";
-import type { AgentNotificationIntent, NotificationCategory, NotificationRow, ReminderRow, TodoRow } from "@contracts";
+import type {
+  AgentNotificationIntent,
+  NativeNotificationAction,
+  NotificationCategory,
+  NotificationRow,
+  ReminderRow,
+  TodoRow,
+} from "@contracts";
 import { useUserSetting } from "@shared/hooks/useUserSetting";
 import {
   defaultNativeNotificationPreferences,
@@ -87,6 +95,28 @@ type NotificationsContextValue = {
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
 
 const maxTrayItems = 80;
+
+// In-session de-dupe sets are capped so a long-running session cannot grow them
+// unbounded. Sets preserve insertion order, so we evict the oldest keys first.
+const seenIdsCap = 600;
+const firedReminderIdsCap = 400;
+const processedIntentKeysCap = 600;
+
+const boundedAdd = (set: Set<string>, key: string, cap: number) => {
+  set.add(key);
+  if (set.size <= cap) {
+    return;
+  }
+  const overflow = set.size - cap;
+  let removed = 0;
+  for (const value of set) {
+    if (removed >= overflow) {
+      break;
+    }
+    set.delete(value);
+    removed += 1;
+  }
+};
 
 const stableAgentIntentKey = (intent: AgentNotificationIntent, threadId: string) => {
   if (intent.type === "create_todo") {
@@ -187,6 +217,7 @@ const isRecentSelfEcho = (row: NotificationRow, seenIds: Set<string>) => seenIds
 const reminderPollMs = 30_000;
 const notificationRefreshMs = 20_000;
 const appUpdateCheckIntervalMs = 24 * 60 * 60 * 1000;
+const appUpdateFailureRetryMs = 60 * 60 * 1000;
 const appUpdateLastCheckKey = "bukowski:notifications:last-app-update-check";
 const appUpdateLastNotifiedKey = "bukowski:notifications:last-app-update-notified";
 const appReleaseApiUrl = "https://api.github.com/repos/maxwellsmartt/bukowskiOS/releases/latest";
@@ -264,6 +295,7 @@ const nativeCategoryForNotification = (row: Pick<NotificationRow, "kind" | "sour
 };
 
 export const NotificationsProvider = ({ children }: { children: ReactNode }) => {
+  const { t } = useTranslation();
   const { status, user, supabase } = useSession();
   const { activeWorkspaceId, isWorkspaceReady } = useWorkspace();
   const toast = useToast();
@@ -287,6 +319,12 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
 
   const unreadCount = useMemo(() => items.filter((item) => !item.readAt).length, [items]);
 
+  const nativeActionLabels = useCallback(
+    (actions: NativeNotificationAction[]): Partial<Record<NativeNotificationAction, string>> =>
+      Object.fromEntries(actions.map((action) => [action, t(`notifications.nativeActions.${action}`)])),
+    [t],
+  );
+
   const showNewNotification = useCallback(
     async (row: NotificationRow) => {
       toast.info(row.title, row.body ?? undefined);
@@ -303,6 +341,8 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
             ? (row.sourceRef as Record<string, unknown>)
             : null;
         const draftRunId = typeof sourceRef?.draftRunId === "string" ? sourceRef.draftRunId : null;
+        const actions: NativeNotificationAction[] | undefined =
+          draftRunId && nativePreferences.categories.agentsApproval ? ["approve_run"] : undefined;
         await window.bukowskiNotifications?.showNative({
           id: row.id,
           title: row.title,
@@ -310,11 +350,12 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
           linkTo: row.linkTo,
           workspaceId: draftRunId ? row.workspaceId : null,
           agentRunId: draftRunId,
-          actions: draftRunId && nativePreferences.categories.agentsApproval ? ["approve_run"] : undefined,
+          actions,
+          actionLabels: actions ? nativeActionLabels(actions) : undefined,
         }).catch(() => undefined);
       }
     },
-    [nativePreferences, toast],
+    [nativeActionLabels, nativePreferences, toast],
   );
 
   useEffect(() => {
@@ -332,7 +373,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       limit: maxTrayItems,
     });
     if (localRows) {
-      localRows.forEach((item) => seenIdsRef.current.add(item.id));
+      localRows.forEach((item) => boundedAdd(seenIdsRef.current, item.id, seenIdsCap));
       setItems(sortNotifications(localRows));
     }
 
@@ -358,7 +399,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       workspaceId: activeWorkspaceId,
       limit: maxTrayItems,
     }) ?? ((data ?? []) as Parameters<typeof toNotificationRow>[0][]).map(toNotificationRow);
-    nextItems.forEach((item) => seenIdsRef.current.add(item.id));
+    nextItems.forEach((item) => boundedAdd(seenIdsRef.current, item.id, seenIdsCap));
     setItems(sortNotifications(nextItems));
   }, [activeUserId, activeWorkspaceId, canUseLocal, canUseRemote, supabase]);
 
@@ -475,7 +516,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
             () => undefined,
           );
           const alreadySeen = isRecentSelfEcho(nextRow, seenIdsRef.current);
-          seenIdsRef.current.add(nextRow.id);
+          boundedAdd(seenIdsRef.current, nextRow.id, seenIdsCap);
           setItems((current) => sortNotifications([nextRow, ...current.filter((item) => item.id !== nextRow.id)]));
 
           if (!alreadySeen) {
@@ -496,7 +537,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
           if (nextRow.workspaceId !== activeWorkspaceId) {
             return;
           }
-          seenIdsRef.current.add(nextRow.id);
+          boundedAdd(seenIdsRef.current, nextRow.id, seenIdsCap);
           void window.bukowskiNotifications?.applyRemoteRows({ table: "notifications", rows: [payload.new as Record<string, unknown>] }).catch(
             () => undefined,
           );
@@ -584,7 +625,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       if (!row) {
         throw new Error("Notification was not created.");
       }
-      seenIdsRef.current.add(row.id);
+      boundedAdd(seenIdsRef.current, row.id, seenIdsCap);
       setItems((current) => sortNotifications([row, ...current.filter((item) => item.id !== row.id)]));
       if (input.notifyNow) {
         void showNewNotification(row);
@@ -812,7 +853,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
         if (processedAgentIntentKeysRef.current.has(intentKey)) {
           continue;
         }
-        processedAgentIntentKeysRef.current.add(intentKey);
+        boundedAdd(processedAgentIntentKeysRef.current, intentKey, processedIntentKeysCap);
 
         if (intent.type === "create_notification") {
           await createNotification({
@@ -843,7 +884,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
           if (todo) {
             await createNotification({
               kind: "operation",
-              title: "Todo added",
+              title: t("notifications.events.todoAddedTitle"),
               body: todo.title,
               linkTo: "/inbox",
               sourceType: "agent",
@@ -862,7 +903,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
           if (reminder) {
             await createNotification({
               kind: "operation",
-              title: "Reminder scheduled",
+              title: t("notifications.events.reminderScheduledTitle"),
               body: reminder.title,
               linkTo: "/inbox",
               sourceType: "agent",
@@ -886,15 +927,26 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       return;
     }
 
+    // Optimistically stamp "now" so concurrent re-runs don't double-fetch. On a
+    // failed check we rewind the stamp so the next attempt is in ~1h instead of
+    // being blocked for the full 24h window.
     window.localStorage.setItem(appUpdateLastCheckKey, String(Date.now()));
+    const backoffAfterFailure = () => {
+      window.localStorage.setItem(
+        appUpdateLastCheckKey,
+        String(Date.now() - (appUpdateCheckIntervalMs - appUpdateFailureRetryMs)),
+      );
+    };
     void (async () => {
       const appInfo = await window.bukowskiApp?.getAppInfo().catch(() => null);
       const currentVersion = appInfo?.version ?? null;
       if (!currentVersion) {
+        backoffAfterFailure();
         return;
       }
       const response = await fetch(appReleaseApiUrl, { headers: { Accept: "application/vnd.github+json" } });
       if (!response.ok) {
+        backoffAfterFailure();
         return;
       }
       const release = (await response.json()) as { tag_name?: string; html_url?: string; name?: string };
@@ -908,15 +960,15 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       window.localStorage.setItem(appUpdateLastNotifiedKey, latest);
       await createNotification({
         kind: "app_update",
-        title: "bukowskiOS update available",
-        body: `${release.name || latest} is available on GitHub Releases.`,
+        title: t("notifications.events.appUpdateTitle"),
+        body: t("notifications.events.appUpdateBody", { version: release.name || latest }),
         linkTo: release.html_url || appReleasePageUrl,
         sourceType: "app_update",
         sourceRef: { latestVersion: latest, currentVersion },
         notifyNow: true,
       });
-    })().catch(() => undefined);
-  }, [activeUserId, activeWorkspaceId, canUseLocal, createNotification]);
+    })().catch(() => backoffAfterFailure());
+  }, [activeUserId, activeWorkspaceId, canUseLocal, createNotification, t]);
 
   useEffect(() => {
     if (!canUseLocal || !activeUserId || !activeWorkspaceId) {
@@ -941,7 +993,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
           continue;
         }
 
-        firedReminderIdsRef.current.add(reminder.id);
+        boundedAdd(firedReminderIdsRef.current, reminder.id, firedReminderIdsCap);
         await createNotification({
           kind: "reminder",
           title: reminder.title,
@@ -950,15 +1002,30 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
           sourceType: "reminder",
           sourceRef: { reminderId: reminder.id },
           notifyNow: false,
-        }).then((notification) => {
+        }).then(async (notification) => {
+          // Stay consistent with showNewNotification: when the app is in front and
+          // focused, a toast is enough; only escalate to a native OS alert (with
+          // its quick actions) when the window is in the background.
+          const foregroundState = await window.bukowskiNotifications
+            ?.getForegroundState()
+            .catch(() => ({ isForeground: true }));
+          const isForeground = (foregroundState?.isForeground ?? true) && document.hasFocus();
+
+          if (isForeground) {
+            toast.info(reminder.title, reminder.body ?? undefined);
+            return;
+          }
+
           if (nativePreferences.enabled && nativePreferences.categories.todosReminders) {
+            const reminderActions: NativeNotificationAction[] = ["mark_done", "snooze_15m"];
             void window.bukowskiNotifications?.showNative({
               id: notification?.id ?? reminder.id,
               title: reminder.title,
               body: reminder.body,
               linkTo: "/inbox",
               reminderId: reminder.id,
-              actions: ["mark_done", "snooze_15m"],
+              actions: reminderActions,
+              actionLabels: nativeActionLabels(reminderActions),
             }).catch(() => undefined);
           }
         }).catch(() => undefined);
@@ -999,7 +1066,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     return () => {
       window.clearInterval(interval);
     };
-  }, [activeUserId, activeWorkspaceId, canUseLocal, createNotification, nativePreferences]);
+  }, [activeUserId, activeWorkspaceId, canUseLocal, createNotification, nativeActionLabels, nativePreferences, toast]);
 
   const value = useMemo<NotificationsContextValue>(
     () => ({

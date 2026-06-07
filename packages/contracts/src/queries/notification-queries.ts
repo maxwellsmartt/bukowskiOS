@@ -86,6 +86,8 @@ export type AgentNotificationIntent =
       sourceRef?: Json | null;
     };
 
+export type NativeNotificationAction = "mark_done" | "snooze_15m" | "snooze_1h" | "approve_run";
+
 export type ShowNativeNotificationCommand = {
   id?: string | null;
   title: string;
@@ -94,7 +96,9 @@ export type ShowNativeNotificationCommand = {
   reminderId?: string | null;
   agentRunId?: string | null;
   workspaceId?: string | null;
-  actions?: Array<"mark_done" | "snooze_15m" | "snooze_1h" | "approve_run">;
+  actions?: NativeNotificationAction[];
+  /** Localized labels for the action buttons; falls back to English defaults. */
+  actionLabels?: Partial<Record<NativeNotificationAction, string>>;
 };
 
 export type NotificationCategory =

@@ -1,4 +1,5 @@
 import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
 
 import { resolveActiveRoute } from "@app/routing/route-meta";
@@ -49,6 +50,7 @@ export const AppShell = () => {
   const navigate = useNavigate();
   const { activeProjectId, activeProjectRouteSection, isScopeReady } = useShellContext();
   const { handleAuthDeepLink } = useSession();
+  const { t } = useTranslation();
   const toast = useToast();
   const { markReminderDone, snoozeReminder } = useNotifications();
   const { activeMembership, activeWorkspaceId } = useWorkspace();
@@ -258,12 +260,12 @@ export const AppShell = () => {
           decision: action.decision,
         })
           .then((result) => {
-            toast.success("Agent approved", result.summary);
+            toast.success(t("notifications.agentApproval.approvedTitle"), result.summary);
           })
           .catch((error) => {
             toast.error(
-              "Could not approve agent",
-              error instanceof Error ? error.message : "Open the run and review it manually.",
+              t("notifications.agentApproval.failedTitle"),
+              error instanceof Error ? error.message : t("notifications.agentApproval.failedBody"),
             );
           });
         return;
@@ -273,7 +275,7 @@ export const AppShell = () => {
         void handleAuthDeepLink(action.url).then((targetPath) => navigate(targetPath, { replace: true }));
       }
     });
-  }, [handleAuthDeepLink, markReminderDone, navigate, snoozeReminder, toast]);
+  }, [handleAuthDeepLink, markReminderDone, navigate, snoozeReminder, t, toast]);
 
   useEffect(
     () => () => {

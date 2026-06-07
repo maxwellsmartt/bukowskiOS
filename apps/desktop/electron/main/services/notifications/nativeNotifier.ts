@@ -4,7 +4,7 @@ import { ipcChannels, type ShowNativeNotificationCommand } from "@contracts";
 
 let isForeground = true;
 
-const nativeActionLabels: Record<NonNullable<ShowNativeNotificationCommand["actions"]>[number], string> = {
+const fallbackNativeActionLabels: Record<NonNullable<ShowNativeNotificationCommand["actions"]>[number], string> = {
   mark_done: "Done",
   snooze_15m: "Snooze 15m",
   snooze_1h: "Snooze 1h",
@@ -73,7 +73,7 @@ export const showNativeNotification = (input: ShowNativeNotificationCommand) => 
       process.platform === "darwin"
         ? input.actions?.map((action) => ({
             type: "button" as const,
-            text: nativeActionLabels[action],
+            text: input.actionLabels?.[action] ?? fallbackNativeActionLabels[action],
           }))
         : undefined,
   });

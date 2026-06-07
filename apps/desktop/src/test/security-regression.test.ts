@@ -203,6 +203,22 @@ describe("security regression checks", () => {
     );
   });
 
+  it("scopes notification IPC to the main-process session user, not the renderer-supplied id", () => {
+    const source = readText("apps/desktop/electron/main/ipc/registerNotificationIpc.ts");
+
+    // The trusted-id helper must exist and be derived from the signed-in session.
+    expect(source).toContain("resolveTrustedUserId");
+    expect(source).toContain("getFreshStoredUserId");
+
+    // Every write/read handler must override userId via the helper instead of
+    // forwarding the renderer-provided id verbatim.
+    const forwardsRawUserId = /service\.(?:listNotifications|createNotification|markRead|markAllRead|listTodos|createTodo|updateTodo|deleteTodo|listReminders|createReminder|updateReminder|deleteReminder)\((?:input|query)\b/;
+    expect(forwardsRawUserId.test(source)).toBe(false);
+
+    const handlerCount = (source.match(/await resolveTrustedUserId\(/g) ?? []).length;
+    expect(handlerCount).toBeGreaterThanOrEqual(12);
+  });
+
   it("keeps sensitive workspace Edge Function calls behind main-process IPC", () => {
     const workspaceProviderSource = readText("apps/desktop/src/app/providers/WorkspaceProvider.tsx");
     const inviteServiceSource = readText("apps/desktop/src/features/admin/inviteService.ts");
