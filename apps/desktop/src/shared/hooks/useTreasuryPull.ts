@@ -4,7 +4,7 @@ import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { TreasuryPullTable } from "@contracts";
 import { canReadTreasury } from "@shared/lib/financeAccess";
-import { notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
+import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
 const POLL_INTERVAL_MS = 20_000;
 const PULL_BATCH_SIZE = 250;
@@ -120,7 +120,12 @@ export const useTreasuryPull = () => {
     };
 
     void runOnce();
+    const onImmediatePull = () => void runOnce();
+    window.addEventListener(immediatePullEvent, onImmediatePull);
     const interval = window.setInterval(() => void runOnce(), POLL_INTERVAL_MS);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener(immediatePullEvent, onImmediatePull);
+    };
   }, [activeWorkspaceId, canPullTreasury, isLocalFallback, isWorkspaceReady, status, supabase]);
 };

@@ -4,6 +4,8 @@ import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { AppRemoteOperationalSnapshotRow, OperationalSnapshotEntityType } from "@contracts";
 
+import { immediatePullEvent } from "./useWorkspaceDataRefresh";
+
 const POLL_INTERVAL_MS = 60_000;
 const PULL_BATCH_SIZE = 100;
 const MAX_BATCHES_PER_ENTITY = 3;
@@ -128,7 +130,12 @@ export const useOperationalSnapshotPull = () => {
     };
 
     void runOnce();
+    const onImmediatePull = () => void runOnce();
+    window.addEventListener(immediatePullEvent, onImmediatePull);
     const interval = window.setInterval(() => void runOnce(), POLL_INTERVAL_MS);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener(immediatePullEvent, onImmediatePull);
+    };
   }, [activeWorkspaceId, isLocalFallback, isWorkspaceReady, status, supabase]);
 };

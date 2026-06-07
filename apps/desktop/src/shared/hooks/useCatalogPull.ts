@@ -7,6 +7,8 @@ import type {
 } from "@contracts";
 import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+
+import { immediatePullEvent } from "./useWorkspaceDataRefresh";
 /* eslint-disable no-console */
 
 const POLL_INTERVAL_MS = 60_000;
@@ -167,12 +169,15 @@ export const useCatalogPull = () => {
     };
 
     void runOnce();
+    const onImmediatePull = () => void runOnce();
+    window.addEventListener(immediatePullEvent, onImmediatePull);
     const intervalId = window.setInterval(() => {
       void runOnce();
     }, POLL_INTERVAL_MS);
 
     return () => {
       window.clearInterval(intervalId);
+      window.removeEventListener(immediatePullEvent, onImmediatePull);
     };
   }, [activeWorkspaceId, isLocalFallback, isWorkspaceReady, status, supabase]);
 };

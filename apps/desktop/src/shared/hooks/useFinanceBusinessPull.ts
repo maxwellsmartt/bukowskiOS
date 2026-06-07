@@ -4,7 +4,7 @@ import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { FinanceBusinessPullTable } from "@contracts";
 import { canReadFinanceBusiness } from "@shared/lib/financeAccess";
-import { notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
+import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
 const POLL_INTERVAL_MS = 20_000;
 const PULL_BATCH_SIZE = 250;
@@ -134,7 +134,12 @@ export const useFinanceBusinessPull = () => {
     };
 
     void runOnce();
+    const onImmediatePull = () => void runOnce();
+    window.addEventListener(immediatePullEvent, onImmediatePull);
     const interval = window.setInterval(() => void runOnce(), POLL_INTERVAL_MS);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener(immediatePullEvent, onImmediatePull);
+    };
   }, [activeWorkspaceId, canPullFinanceBusiness, isLocalFallback, isWorkspaceReady, status, supabase]);
 };

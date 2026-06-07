@@ -10,6 +10,7 @@ import { useCatalogPull } from "@shared/hooks/useCatalogPull";
 import { useCollaboratorPaymentPull } from "@shared/hooks/useCollaboratorPaymentPull";
 import { useFinanceBusinessPull } from "@shared/hooks/useFinanceBusinessPull";
 import { useOperationalSnapshotPull } from "@shared/hooks/useOperationalSnapshotPull";
+import { useRealtimeWorkspaceSync } from "@shared/hooks/useRealtimeWorkspaceSync";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useTreasuryPull } from "@shared/hooks/useTreasuryPull";
 import { notifyWorkspaceDataChanged } from "@shared/hooks/useWorkspaceDataRefresh";
@@ -61,6 +62,7 @@ export const AppShell = () => {
   useTreasuryPull();
   useCollaboratorPaymentPull();
   useFinanceBusinessPull();
+  useRealtimeWorkspaceSync();
   const [workspaceTransitionActive, setWorkspaceTransitionActive] = useState(false);
   const prevWorkspaceIdRef = useRef(activeWorkspaceId);
 
