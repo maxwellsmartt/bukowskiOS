@@ -640,19 +640,19 @@ export const AssetLicensesPage = () => {
                       </div>
 
                       <div className="license-row-actions">
-                        <button className="icon-ghost-control" data-tooltip={t("assets.licenses.actions.renewal")} disabled={!license.renewal_url} onClick={() => openUrl(license.renewal_url)} type="button">
+                        <button className="icon-ghost-control" data-tooltip={t("assets.licenses.actions.renewal")} aria-label={t("assets.licenses.actions.renewal")} disabled={!license.renewal_url} onClick={() => openUrl(license.renewal_url)} type="button">
                           <Repeat2 size={14} />
                         </button>
-                        <button className="icon-ghost-control" data-tooltip={t("assets.licenses.actions.payment")} disabled={!license.payment_url} onClick={() => openUrl(license.payment_url)} type="button">
+                        <button className="icon-ghost-control" data-tooltip={t("assets.licenses.actions.payment")} aria-label={t("assets.licenses.actions.payment")} disabled={!license.payment_url} onClick={() => openUrl(license.payment_url)} type="button">
                           <CreditCard size={14} />
                         </button>
-                        <button className="icon-ghost-control" data-tooltip={t("assets.licenses.actions.invoice")} disabled={!license.invoice_url} onClick={() => openUrl(license.invoice_url)} type="button">
+                        <button className="icon-ghost-control" data-tooltip={t("assets.licenses.actions.invoice")} aria-label={t("assets.licenses.actions.invoice")} disabled={!license.invoice_url} onClick={() => openUrl(license.invoice_url)} type="button">
                           <ReceiptText size={14} />
                         </button>
-                        <button className="icon-ghost-control" data-tooltip={t("common.edit")} onClick={() => handleEdit(license)} type="button">
+                        <button className="icon-ghost-control" data-tooltip={t("common.edit")} aria-label={t("common.edit")} onClick={() => handleEdit(license)} type="button">
                           <Pencil size={14} />
                         </button>
-                        <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} onClick={() => void handleArchive(license)} type="button">
+                        <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} aria-label={t("common.delete")} onClick={() => void handleArchive(license)} type="button">
                           <Trash2 size={14} />
                         </button>
                       </div>

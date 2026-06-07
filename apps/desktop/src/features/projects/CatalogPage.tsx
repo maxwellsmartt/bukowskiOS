@@ -1106,7 +1106,7 @@ export const CatalogPage = () => {
                 <span className="selection-action-subtitle">{catalogActionMessage}</span>
               </div>
               <div className="selection-action-buttons">
-                <button className="icon-ghost-control" data-tooltip={t("catalog.actions.clearMessage")} onClick={() => setCatalogActionMessage(null)} type="button">
+                <button className="icon-ghost-control" data-tooltip={t("catalog.actions.clearMessage")} aria-label={t("catalog.actions.clearMessage")} onClick={() => setCatalogActionMessage(null)} type="button">
                   <X size={14} />
                 </button>
               </div>
@@ -1127,7 +1127,7 @@ export const CatalogPage = () => {
               <div className="selection-action-buttons">
                 <button
                   className="icon-ghost-control"
-                  data-tooltip={t("catalog.actions.clearSelection")}
+                  data-tooltip={t("catalog.actions.clearSelection")} aria-label={t("catalog.actions.clearSelection")}
                   onClick={() => setSelectedIds((current) => ({ ...current, [activeTab]: [] }))}
                   type="button"
                 >

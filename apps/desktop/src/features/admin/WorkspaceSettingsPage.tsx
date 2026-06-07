@@ -916,7 +916,7 @@ export const WorkspaceSettingsPage = () => {
                     <code className="workspace-details-id">{activeWorkspaceId}</code>
                     <button
                       className={`icon-ghost-control workspace-id-copy-button${copiedWorkspaceId ? " is-copied" : ""}`}
-                      data-tooltip={copiedWorkspaceId ? t("settings.workspace.generalInfo.copied") : t("settings.workspace.generalInfo.copyId")}
+                      data-tooltip={copiedWorkspaceId ? t("settings.workspace.generalInfo.copied") : t("settings.workspace.generalInfo.copyId")} aria-label={copiedWorkspaceId ? t("settings.workspace.generalInfo.copied") : t("settings.workspace.generalInfo.copyId")}
                       onClick={() => void handleCopyWorkspaceId()}
                       type="button"
                     >

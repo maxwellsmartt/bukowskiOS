@@ -398,10 +398,10 @@ export const InboxPage = () => {
                               </button>
                             ) : null}
                             <span className="inbox-card-hover-actions">
-                              <button className="icon-ghost-control" data-tooltip={t("common.edit")} onClick={() => startEditingTodo(todo)} type="button">
+                              <button className="icon-ghost-control" data-tooltip={t("common.edit")} aria-label={t("common.edit")} onClick={() => startEditingTodo(todo)} type="button">
                                 <Pencil size={14} />
                               </button>
-                              <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} onClick={() => void requestDeleteTodo(todo.id, todo.title)} type="button">
+                              <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} aria-label={t("common.delete")} onClick={() => void requestDeleteTodo(todo.id, todo.title)} type="button">
                                 <Trash2 size={14} />
                               </button>
                             </span>
@@ -515,10 +515,10 @@ export const InboxPage = () => {
                               </>
                             ) : null}
                             <span className="inbox-card-hover-actions">
-                              <button className="icon-ghost-control" data-tooltip={t("common.edit")} onClick={() => startEditingReminder(reminder)} type="button">
+                              <button className="icon-ghost-control" data-tooltip={t("common.edit")} aria-label={t("common.edit")} onClick={() => startEditingReminder(reminder)} type="button">
                                 <Pencil size={14} />
                               </button>
-                              <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} onClick={() => void requestDeleteReminder(reminder.id, reminder.title)} type="button">
+                              <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} aria-label={t("common.delete")} onClick={() => void requestDeleteReminder(reminder.id, reminder.title)} type="button">
                                 <Trash2 size={14} />
                               </button>
                             </span>

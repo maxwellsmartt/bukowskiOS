@@ -41,6 +41,9 @@
   --accent-success: #6ea987;
   --accent-positive: var(--accent-success);
 
+  /* Keyboard focus ring (WCAG 2.4.7) — one consistent indicator for controls. */
+  --focus-ring: rgba(115, 164, 255, 0.6);
+
   /* ------------------------------------------------------------------ *
    * Status tokens — single source of truth for pills/badges/dots so
    * every "success/warning/critical/info/neutral" surface stays in sync

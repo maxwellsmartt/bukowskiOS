@@ -2822,6 +2822,21 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   -webkit-app-region: no-drag;
 }
 
+/* One consistent keyboard focus ring for the common interactive controls
+   (WCAG 2.4.7 Focus Visible). Mouse clicks stay ring-free via :focus-visible. */
+.ghost-control:focus-visible,
+.icon-ghost-control:focus-visible,
+.icon-control:focus-visible,
+.action-primary-button:focus-visible,
+.action-mode-button:focus-visible,
+.action-danger-button:focus-visible,
+.action-row-button:focus-visible,
+.subnav-tab:focus-visible,
+.treasury-segmented-tab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .ghost-control,
 .icon-ghost-control,
 .icon-control,
