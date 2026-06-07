@@ -353,7 +353,7 @@
         "licenses": "Licencias",
         "expiringSoon": "Por vencer",
         "expired": "Vencidas",
-        "seats": "Seats"
+        "seats": "Puestos"
       },
       "add": {
         "title": "Agregar licencia"
@@ -384,7 +384,7 @@
         "software": "Software",
         "vendor": "Proveedor",
         "type": "Tipo",
-        "seats": "Seats",
+        "seats": "Puestos",
         "renewalReminder": "Aviso de renovación",
         "start": "Inicio",
         "trialEnds": "Fin de prueba",
@@ -420,13 +420,13 @@
         "copyCode": "Copiar código de licencia"
       },
       "seats": {
-        "used": "{{assigned}}/{{total}} seats usados",
+        "used": "{{assigned}}/{{total}} puestos usados",
         "assigned": "{{assigned}}/{{total}} asignados",
         "available": "{{count}} disponibles",
-        "none": "Aún no hay seats asignados",
-        "noLines": "Aún no hay líneas de seat",
-        "setSeatFirst": "Define al menos 1 seat antes de asignarlo.",
-        "setLicenseSeatFirst": "Define al menos 1 seat en esta licencia antes de asignarlo.",
+        "none": "Aún no hay puestos asignados",
+        "noLines": "Aún no hay líneas de puesto",
+        "setSeatFirst": "Define al menos 1 puesto antes de asignarlo.",
+        "setLicenseSeatFirst": "Define al menos 1 puesto en esta licencia antes de asignarlo.",
         "more": "+{{count}} más"
       },
       "aria": {

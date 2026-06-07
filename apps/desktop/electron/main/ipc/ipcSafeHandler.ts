@@ -12,18 +12,22 @@ const humanizeFieldPath = (path: PropertyKey[]) =>
     .trim()
     .toLowerCase();
 
+const capitalize = (value: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : value);
+
 const formatValidationError = (error: z.ZodError) => {
   const issue = error.issues[0];
-  const field = issue?.path.length ? humanizeFieldPath(issue.path) : "one field";
+  const field = issue?.path.length ? capitalize(humanizeFieldPath(issue.path)) : null;
   const rawIssue = issue as z.ZodIssue & { input?: unknown };
-  const detail =
-    issue?.code === "invalid_type" && rawIssue.input === undefined
-      ? `${field} is required.`
-      : issue?.message
-        ? `${field}: ${issue.message}`
-        : "Some information is missing or has the wrong format.";
 
-  return `Some information is missing or invalid. ${detail} Review the form and try again.`;
+  // Keep the message human and specific instead of the robotic "Some information
+  // is missing or invalid. one field is required." prefix dump.
+  if (issue?.code === "invalid_type" && rawIssue.input === undefined) {
+    return field ? `${field} is required.` : "A required field is missing.";
+  }
+  if (field && issue?.message) {
+    return `${field}: ${issue.message}`;
+  }
+  return "Please review the highlighted fields and try again.";
 };
 
 export const safeHandle = <TSchema extends ZodTypeAny, TResult>(
