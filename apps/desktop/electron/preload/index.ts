@@ -353,7 +353,11 @@ const bukowskiNotifications = {
     ipcRenderer.invoke(ipcChannels.notifications.showNative, input) as Promise<void>,
   setDockBadge: (count: number) => ipcRenderer.invoke(ipcChannels.notifications.setDockBadge, count) as Promise<void>,
   getForegroundState: () =>
-    ipcRenderer.invoke(ipcChannels.notifications.getForegroundState) as Promise<{ isForeground: boolean }>,
+    ipcRenderer.invoke(ipcChannels.notifications.getForegroundState) as Promise<{
+      isForeground: boolean;
+      isSupported: boolean;
+      permissionStatus: "unknown" | "unsupported";
+    }>,
 };
 
 const bukowskiShell = {

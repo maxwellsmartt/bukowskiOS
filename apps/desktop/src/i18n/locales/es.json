@@ -3793,19 +3793,64 @@
         "hour": "1 hora"
       },
       "notifications": {
-        "label": "Notificaciones macOS",
-        "helper": "Controla solo las alertas nativas de macOS. La bandeja, el popover e Inbox siguen registrando eventos importantes.",
-        "nativeEnabled": "Permitir notificaciones nativas de macOS",
-        "categoriesLabel": "Categorías de notificaciones nativas",
-        "preview": "Si macOS bloquea permisos del sistema, el app seguirá registrando las notificaciones dentro de Inbox.",
+        "label": "Notificaciones de escritorio",
+        "helper": "Elige de qué te avisamos fuera del app. Dentro siempre verás todo en la campana y en Inbox.",
+        "nativeEnabled": "Mostrar avisos en el escritorio",
+        "nativeEnabledHelper": "Si lo apagas, todo seguirá llegando, pero solo dentro del app.",
+        "categoriesLabel": "Tipos de aviso",
+        "preview": "Nunca pierdes un aviso: aunque bloquees los permisos del sistema, todo queda guardado en Inbox.",
+        "groups": {
+          "operations": {
+            "label": "Operación",
+            "helper": "Facturas, tasas de cambio y novedades del app."
+          },
+          "agents": {
+            "label": "Agentes",
+            "helper": "Cuando un agente termina o necesita tu permiso."
+          },
+          "workspace": {
+            "label": "Workspace",
+            "helper": "El día a día de tus proyectos y tareas."
+          }
+        },
         "categories": {
-          "invoiceInbox": "Facturas procesadas",
-          "agentsDone": "Agentes terminan tareas",
-          "agentsApproval": "Agentes necesitan aprobación",
+          "invoiceInbox": "Facturas listas",
+          "agentsDone": "Un agente termina",
+          "agentsApproval": "Un agente pide aprobación",
           "exchangeRates": "Tasas de cambio",
           "projects": "Proyectos y unidades",
-          "todosReminders": "Todos y reminders",
-          "appUpdates": "Actualizaciones del app"
+          "todosReminders": "Tareas y recordatorios",
+          "appUpdates": "Nuevas versiones"
+        },
+        "categoryHelpers": {
+          "invoiceInbox": "Al terminar de procesar tus facturas.",
+          "agentsDone": "Cuando un agente completa su trabajo.",
+          "agentsApproval": "Apruébalo desde el aviso, sin abrir el app.",
+          "exchangeRates": "Cuando se actualizan las tasas de cambio.",
+          "projects": "Nuevos proyectos, fechas y cambios de unidades.",
+          "todosReminders": "Recordatorios vencidos y tareas importantes.",
+          "appUpdates": "Cuando hay una nueva versión disponible."
+        },
+        "permissionStatus": {
+          "ready": {
+            "label": "Listo para avisarte",
+            "helper": "¿No ves la prueba? Revisa los permisos de Notificaciones en Ajustes del sistema."
+          },
+          "appDisabled": {
+            "label": "Avisos de escritorio apagados",
+            "helper": "Enciende el interruptor de arriba para recibirlos."
+          },
+          "unsupported": {
+            "label": "No disponible en este equipo",
+            "helper": "Este equipo no permite mostrar avisos de escritorio."
+          }
+        },
+        "test": {
+          "action": "Enviar prueba",
+          "title": "Prueba de bukowskiOS",
+          "body": "Tus notificaciones de escritorio funcionan. 🎉",
+          "failedTitle": "No se pudo enviar la prueba",
+          "failedBody": "Revisa los permisos de macOS y vuelve a intentar."
         }
       }
     },

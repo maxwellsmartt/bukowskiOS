@@ -3789,19 +3789,64 @@
         "hour": "1 hour"
       },
       "notifications": {
-        "label": "macOS notifications",
-        "helper": "Controls native macOS alerts only. The tray, popover and Inbox still record important events.",
-        "nativeEnabled": "Allow native macOS notifications",
-        "categoriesLabel": "Native notification categories",
-        "preview": "If macOS blocks system permission, the app will still record notifications inside Inbox.",
+        "label": "Desktop notifications",
+        "helper": "Choose what we alert you about outside the app. Inside, everything still shows in the bell and Inbox.",
+        "nativeEnabled": "Show alerts on the desktop",
+        "nativeEnabledHelper": "Turn this off and everything still arrives — just inside the app.",
+        "categoriesLabel": "Alert types",
+        "preview": "You never miss an alert: even if you block system permission, everything is saved in Inbox.",
+        "groups": {
+          "operations": {
+            "label": "Operations",
+            "helper": "Invoices, exchange rates and app updates."
+          },
+          "agents": {
+            "label": "Agents",
+            "helper": "When an agent finishes or needs your approval."
+          },
+          "workspace": {
+            "label": "Workspace",
+            "helper": "The day-to-day of your projects and tasks."
+          }
+        },
         "categories": {
-          "invoiceInbox": "Processed invoices",
-          "agentsDone": "Agents finish tasks",
-          "agentsApproval": "Agents need approval",
+          "invoiceInbox": "Invoices ready",
+          "agentsDone": "An agent finishes",
+          "agentsApproval": "An agent needs approval",
           "exchangeRates": "Exchange rates",
           "projects": "Projects and units",
-          "todosReminders": "Todos and reminders",
-          "appUpdates": "App updates"
+          "todosReminders": "Tasks and reminders",
+          "appUpdates": "New versions"
+        },
+        "categoryHelpers": {
+          "invoiceInbox": "When your invoices finish processing.",
+          "agentsDone": "When an agent completes its work.",
+          "agentsApproval": "Approve it right from the alert, without opening the app.",
+          "exchangeRates": "When exchange rates are refreshed.",
+          "projects": "New projects, dates and unit changes.",
+          "todosReminders": "Due reminders and important tasks.",
+          "appUpdates": "When a new version is available."
+        },
+        "permissionStatus": {
+          "ready": {
+            "label": "Ready to alert you",
+            "helper": "Don't see the test? Check Notifications permissions in System Settings."
+          },
+          "appDisabled": {
+            "label": "Desktop alerts are off",
+            "helper": "Turn on the switch above to start receiving them."
+          },
+          "unsupported": {
+            "label": "Not available on this device",
+            "helper": "This device can't show desktop alerts."
+          }
+        },
+        "test": {
+          "action": "Send test",
+          "title": "bukowskiOS test",
+          "body": "Your desktop notifications are working. 🎉",
+          "failedTitle": "Could not send test",
+          "failedBody": "Check macOS permissions and try again."
         }
       }
     },

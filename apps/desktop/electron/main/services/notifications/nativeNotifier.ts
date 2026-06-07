@@ -45,6 +45,11 @@ export const attachNativeNotificationWindowState = (window: BrowserWindow) => {
 
 export const getNativeNotificationForegroundState = () => ({
   isForeground,
+  isSupported: Notification.isSupported(),
+  // Electron does not expose macOS notification authorization state in the
+  // main-process Notification API. Keep this explicit so the UI does not
+  // pretend it can prove System Settings are enabled.
+  permissionStatus: Notification.isSupported() ? "unknown" : "unsupported",
 });
 
 export const setNativeNotificationDockBadge = (count: number) => {

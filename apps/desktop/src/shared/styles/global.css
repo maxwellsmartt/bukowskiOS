@@ -19039,31 +19039,240 @@ input[type="number"] {
   font-variant-numeric: tabular-nums;
 }
 
-.settings-toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-secondary);
-  font-size: var(--font-xs, 12px);
-  line-height: 1.35;
+.notification-settings-card {
+  overflow: hidden;
 }
 
-.settings-toggle-row input {
-  accent-color: var(--accent);
-}
-
-.settings-toggle-row:has(input:disabled) {
-  opacity: 0.56;
-}
-
-.notification-settings-grid {
+.notification-settings-layout {
   display: grid;
-  gap: 8px 14px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  padding: 10px 12px;
+  gap: 14px;
+}
+
+.notification-settings-master {
+  display: grid;
+  gap: 12px;
+  max-width: 560px;
+  padding: 12px 14px;
   border: 1px solid var(--card-border);
   border-radius: var(--radius-md, 12px);
-  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 46%),
+    color-mix(in srgb, var(--surface-raised) 68%, transparent);
+}
+
+.notification-permission-status {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--card-border) 72%, transparent);
+}
+
+.notification-permission-dot {
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: 999px;
+  background: var(--text-muted);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-muted) 12%, transparent);
+}
+
+.notification-permission-status strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: var(--font-xs, 12.5px);
+  line-height: 1.3;
+}
+
+.notification-permission-status small {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--font-xs, 12px);
+  line-height: 1.45;
+}
+
+.notification-permission-status.is-ready .notification-permission-dot {
+  background: #8ec3aa;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #8ec3aa 16%, transparent);
+}
+
+.notification-permission-status.is-appDisabled .notification-permission-dot {
+  background: #d6ad6c;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #d6ad6c 16%, transparent);
+}
+
+.notification-permission-status.is-unsupported .notification-permission-dot {
+  background: #d88282;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #d88282 16%, transparent);
+}
+
+.notification-test-button {
+  align-self: center;
+  min-height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--card-border) 90%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+  color: var(--text-secondary);
+  font-size: var(--font-xs, 12px);
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.notification-test-button:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text-primary);
+}
+
+.notification-test-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.notification-settings-groups {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.notification-settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 12px 13px;
+  border: 1px solid color-mix(in srgb, var(--card-border) 82%, transparent);
+  border-radius: var(--radius-md, 12px);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-raised) 58%, transparent), transparent),
+    color-mix(in srgb, var(--surface-base, #111317) 54%, transparent);
+}
+
+.notification-settings-group-header {
+  display: grid;
+  gap: 4px;
+}
+
+.notification-settings-group-header strong {
+  color: var(--text-primary);
+  font-size: var(--font-sm, 13.5px);
+  letter-spacing: 0.01em;
+}
+
+.notification-settings-group-header small,
+.settings-switch-copy small,
+.notification-settings-footnote {
+  color: var(--text-muted);
+  font-size: var(--font-xs, 12px);
+  line-height: 1.45;
+}
+
+.notification-settings-group-list {
+  display: grid;
+  gap: 9px;
+}
+
+.settings-switch-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 11px;
+  align-items: center;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.settings-switch-row input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-switch-track {
+  position: relative;
+  inline-size: 30px;
+  block-size: 17px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 38%, transparent);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #20242b 88%, transparent), color-mix(in srgb, #101318 94%, transparent));
+  box-shadow:
+    inset 0 1px 3px color-mix(in srgb, #000 38%, transparent),
+    0 1px 0 color-mix(in srgb, white 4%, transparent);
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.settings-switch-thumb {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 2px;
+  inline-size: 13px;
+  block-size: 13px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7d8797, #c4cad4);
+  box-shadow:
+    0 1px 4px color-mix(in srgb, #000 42%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 38%, transparent);
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.9, 0.2, 1),
+    background 180ms ease;
+  transform: translateY(-50%);
+}
+
+.settings-switch-row input:checked + .settings-switch-track {
+  border-color: color-mix(in srgb, #82b6a1 64%, transparent);
+  background: linear-gradient(135deg, #2f5f52, #6aa68d);
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, white 14%, transparent),
+    0 0 0 2px color-mix(in srgb, #6aa68d 12%, transparent);
+}
+
+.settings-switch-row input:checked + .settings-switch-track .settings-switch-thumb {
+  transform: translate(13px, -50%);
+  background: linear-gradient(135deg, #e0f1e8, #8ec3aa);
+}
+
+.settings-switch-row input:focus-visible + .settings-switch-track {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, white 10%);
+  outline-offset: 3px;
+}
+
+.settings-switch-row.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.settings-switch-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-switch-copy strong {
+  color: var(--text-primary);
+  font-size: var(--font-sm, 13px);
+  line-height: 1.3;
+}
+
+.notification-settings-footnote {
+  margin: 0;
+  padding-inline: 2px;
+}
+
+@media (max-width: 960px) {
+  .notification-settings-groups {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ----- Treasury · Invoice inbox ----- */

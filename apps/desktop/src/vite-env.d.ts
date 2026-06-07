@@ -261,7 +261,11 @@ declare global {
       applyRemoteRows: (input: { table: "notifications" | "todos" | "reminders"; rows: Record<string, unknown>[] }) => Promise<void>;
       showNative: (input: import("@contracts").ShowNativeNotificationCommand) => Promise<void>;
       setDockBadge: (count: number) => Promise<void>;
-      getForegroundState: () => Promise<{ isForeground: boolean }>;
+      getForegroundState: () => Promise<{
+        isForeground: boolean;
+        isSupported: boolean;
+        permissionStatus: "unknown" | "unsupported";
+      }>;
     };
     bukowskiShell?: {
       getBootstrap: () => Promise<ShellBootstrap>;

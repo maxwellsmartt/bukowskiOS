@@ -227,7 +227,9 @@ export const AppShell = () => {
 
       if (action.type === "notification-clicked") {
         if (action.linkTo) {
-          if (/^https:\/\/github\.com\/maxwellsmartt\/bukowskiOS\/releases\b/.test(action.linkTo)) {
+          // Absolute http(s) links (e.g. GitHub release pages) must open in the
+          // browser; only in-app router paths should go through navigate().
+          if (/^https?:\/\//i.test(action.linkTo)) {
             void window.bukowskiApp?.openExternal(action.linkTo);
           } else {
             navigate(action.linkTo);

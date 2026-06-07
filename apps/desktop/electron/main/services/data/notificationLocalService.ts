@@ -155,6 +155,53 @@ export const applyNotificationLocalMigration = (db: DatabaseSync) => {
 };
 
 export const createNotificationLocalService = (db: DatabaseSync) => {
+  const getNotificationById = (userId: string, workspaceId: string, id: string): NotificationRow => {
+    const row = db
+      .prepare(
+        `
+          SELECT id, user_id, workspace_id, kind, title, body, source_type, source_ref, link_to, read_at, created_at
+          FROM notifications
+          WHERE id = ? AND user_id = ? AND workspace_id = ?
+          LIMIT 1
+        `,
+      )
+      .get(id, userId, workspaceId) as Record<string, unknown> | undefined;
+    if (!row) throw new Error("Notification was not found after writing.");
+    return toNotificationRow(row);
+  };
+
+  const getTodoById = (userId: string, workspaceId: string, id: string): TodoRow => {
+    const row = db
+      .prepare(
+        `
+          SELECT id, user_id, workspace_id, title, notes, due_at, recurrence_rule, priority, completed_at,
+                 created_by, agent_action_ref, created_at, updated_at
+          FROM todos
+          WHERE id = ? AND user_id = ? AND workspace_id = ?
+          LIMIT 1
+        `,
+      )
+      .get(id, userId, workspaceId) as Record<string, unknown> | undefined;
+    if (!row) throw new Error("Todo was not found after writing.");
+    return toTodoRow(row);
+  };
+
+  const getReminderById = (userId: string, workspaceId: string, id: string): ReminderRow => {
+    const row = db
+      .prepare(
+        `
+          SELECT id, user_id, workspace_id, title, body, remind_at, recurrence_rule, snoozed_until,
+                 completed_at, created_by, created_at
+          FROM reminders
+          WHERE id = ? AND user_id = ? AND workspace_id = ?
+          LIMIT 1
+        `,
+      )
+      .get(id, userId, workspaceId) as Record<string, unknown> | undefined;
+    if (!row) throw new Error("Reminder was not found after writing.");
+    return toReminderRow(row);
+  };
+
   const listNotifications = (query: NotificationListQuery): NotificationRow[] =>
     (db
       .prepare(
@@ -223,7 +270,7 @@ export const createNotificationLocalService = (db: DatabaseSync) => {
         now,
       );
       enqueueOutbox(db, input.workspaceId, "notification", id, "upsert", { id }, now);
-      return listNotifications({ userId: input.userId, workspaceId: input.workspaceId, limit: maxListLimit }).find((row) => row.id === id)!;
+      return getNotificationById(input.userId, input.workspaceId, id);
     },
 
     markRead(input: NotificationMarkReadCommand): void {
@@ -276,7 +323,7 @@ export const createNotificationLocalService = (db: DatabaseSync) => {
         now,
       );
       enqueueOutbox(db, input.workspaceId, "todo", id, "upsert", { id }, now);
-      return listTodos({ userId: input.userId, workspaceId: input.workspaceId, limit: maxListLimit }).find((row) => row.id === id)!;
+      return getTodoById(input.userId, input.workspaceId, id);
     },
 
     updateTodo(input: TodoUpdateCommand): void {
@@ -336,7 +383,7 @@ export const createNotificationLocalService = (db: DatabaseSync) => {
         now,
       );
       enqueueOutbox(db, input.workspaceId, "reminder", id, "upsert", { id }, now);
-      return listReminders({ userId: input.userId, workspaceId: input.workspaceId, limit: maxListLimit }).find((row) => row.id === id)!;
+      return getReminderById(input.userId, input.workspaceId, id);
     },
 
     updateReminder(input: ReminderUpdateCommand): void {

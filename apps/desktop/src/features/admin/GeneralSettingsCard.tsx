@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useToast } from "@app/providers/ToastProvider";
@@ -11,7 +11,6 @@ import { getCurrencyEntry } from "@shared/lib/currencyCatalog";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import {
   DATE_FORMAT_MODES,
-  NOTIFICATION_CATEGORIES,
   SUPPORTED_LANGUAGES,
   defaultNativeNotificationPreferences,
   mergeNativeNotificationPreferences,
@@ -27,6 +26,43 @@ const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
   es: "Español",
 };
 
+const NOTIFICATION_GROUPS = [
+  { key: "operations", categories: ["invoiceInbox", "exchangeRates", "appUpdates"] },
+  { key: "agents", categories: ["agentsDone", "agentsApproval"] },
+  { key: "workspace", categories: ["projects", "todosReminders"] },
+] as const;
+
+type SwitchControlProps = {
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  description?: string;
+  onChange: (checked: boolean) => void;
+};
+
+type NativeNotificationState = {
+  isSupported: boolean;
+  permissionStatus: "unknown" | "unsupported";
+};
+
+const SwitchControl = ({ checked, disabled = false, label, description, onChange }: SwitchControlProps) => (
+  <label className={`settings-switch-row${disabled ? " is-disabled" : ""}`}>
+    <input
+      checked={checked}
+      disabled={disabled}
+      type="checkbox"
+      onChange={(event) => onChange(event.target.checked)}
+    />
+    <span className="settings-switch-track" aria-hidden="true">
+      <span className="settings-switch-thumb" />
+    </span>
+    <span className="settings-switch-copy">
+      <strong>{label}</strong>
+      {description ? <small>{description}</small> : null}
+    </span>
+  </label>
+);
+
 export const GeneralSettingsCard = () => {
   const { t } = useTranslation();
   const toast = useToast();
@@ -37,6 +73,7 @@ export const GeneralSettingsCard = () => {
   const [dateFormatMode, setDateFormatMode] = useUserSetting(userSettingKeys.dateFormatMode);
   const [defaultCurrency, setDefaultCurrency] = useUserSetting(userSettingKeys.defaultCurrency);
   const [nativeNotifications, setNativeNotifications] = useUserSetting(userSettingKeys.nativeNotifications);
+  const [nativeState, setNativeState] = useState<NativeNotificationState | null>(null);
 
   const workspaceCurrency = (activeMembership?.baseCurrency ?? "USD").toUpperCase();
   const effectiveDateMode: DateFormatMode = dateFormatMode ?? "locale";
@@ -47,6 +84,32 @@ export const GeneralSettingsCard = () => {
   const effectiveNativeNotifications = mergeNativeNotificationPreferences(
     nativeNotifications ?? defaultNativeNotificationPreferences,
   );
+  const nativeStatusKey = !nativeState?.isSupported
+    ? "unsupported"
+    : effectiveNativeNotifications.enabled
+      ? "ready"
+      : "appDisabled";
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.bukowskiNotifications?.getForegroundState()
+      .then((state) => {
+        if (!cancelled) {
+          setNativeState({
+            isSupported: state.isSupported,
+            permissionStatus: state.permissionStatus,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNativeState({ isSupported: false, permissionStatus: "unsupported" });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSet = async <T,>(label: string, fn: () => Promise<void>) => {
     try {
@@ -60,33 +123,34 @@ export const GeneralSettingsCard = () => {
   };
 
   return (
-    <SurfaceCard title={t("settings.general.title")}>
-      <div className="general-settings-grid">
-        {/* Language */}
-        <div className="general-settings-row">
-          <div className="general-settings-row-label">
-            <strong>{t("settings.general.language.label")}</strong>
-            <small>{t("settings.general.language.helper")}</small>
+    <>
+      <SurfaceCard title={t("settings.general.title")}>
+        <div className="general-settings-grid">
+          {/* Language */}
+          <div className="general-settings-row">
+            <div className="general-settings-row-label">
+              <strong>{t("settings.general.language.label")}</strong>
+              <small>{t("settings.general.language.helper")}</small>
+            </div>
+            <div className="general-settings-row-control">
+              <select
+                className="field-input"
+                value={language ?? ""}
+                onChange={(event) =>
+                  void handleSet("language", async () => {
+                    const next = event.target.value as SupportedLanguage | "";
+                    await setLanguage(next === "" ? undefined : next);
+                  })
+                }
+              >
+                {SUPPORTED_LANGUAGES.map((code) => (
+                  <option key={code} value={code}>
+                    {LANGUAGE_LABELS[code]}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div className="general-settings-row-control">
-            <select
-              className="field-input"
-              value={language ?? ""}
-              onChange={(event) =>
-                void handleSet("language", async () => {
-                  const next = event.target.value as SupportedLanguage | "";
-                  await setLanguage(next === "" ? undefined : next);
-                })
-              }
-            >
-              {SUPPORTED_LANGUAGES.map((code) => (
-                <option key={code} value={code}>
-                  {LANGUAGE_LABELS[code]}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
 
         {/* Date format */}
         <div className="general-settings-row">
@@ -158,57 +222,95 @@ export const GeneralSettingsCard = () => {
           </div>
         </div>
 
-        {/* Native notifications */}
-        <div className="general-settings-row general-settings-row-wide">
-          <div className="general-settings-row-label">
-            <strong>{t("settings.general.notifications.label")}</strong>
-            <small>{t("settings.general.notifications.helper")}</small>
-          </div>
-          <div className="general-settings-row-control">
-            <label className="settings-toggle-row">
-              <input
-                checked={effectiveNativeNotifications.enabled}
-                type="checkbox"
-                onChange={(event) =>
-                  void handleSet("native notifications", async () => {
-                    await setNativeNotifications({
-                      ...effectiveNativeNotifications,
-                      enabled: event.target.checked,
-                    });
+        </div>
+      </SurfaceCard>
+
+      <SurfaceCard
+        className="notification-settings-card"
+        title={t("settings.general.notifications.label")}
+        subtitle={t("settings.general.notifications.helper")}
+      >
+        <div className="notification-settings-layout">
+          <div className="notification-settings-master">
+            <SwitchControl
+              checked={effectiveNativeNotifications.enabled}
+              label={t("settings.general.notifications.nativeEnabled")}
+              description={t("settings.general.notifications.nativeEnabledHelper")}
+              onChange={(checked) =>
+                void handleSet("native notifications", async () => {
+                  await setNativeNotifications({
+                    ...effectiveNativeNotifications,
+                    enabled: checked,
+                  });
+                })
+              }
+            />
+            <div className={`notification-permission-status is-${nativeStatusKey}`}>
+              <span className="notification-permission-dot" aria-hidden="true" />
+              <div>
+                <strong>{t(`settings.general.notifications.permissionStatus.${nativeStatusKey}.label`)}</strong>
+                <small>{t(`settings.general.notifications.permissionStatus.${nativeStatusKey}.helper`)}</small>
+              </div>
+              <button
+                className="ghost-control notification-test-button"
+                disabled={!nativeState?.isSupported || !effectiveNativeNotifications.enabled}
+                type="button"
+                onClick={() =>
+                  void window.bukowskiNotifications?.showNative({
+                    title: t("settings.general.notifications.test.title"),
+                    body: t("settings.general.notifications.test.body"),
+                    linkTo: "/settings",
+                  }).catch((error) => {
+                    toast.error(
+                      t("settings.general.notifications.test.failedTitle"),
+                      getUserFacingErrorMessage(error, t("settings.general.notifications.test.failedBody")),
+                    );
                   })
                 }
-              />
-              <span>{t("settings.general.notifications.nativeEnabled")}</span>
-            </label>
-            <div className="notification-settings-grid" aria-label={t("settings.general.notifications.categoriesLabel")}>
-              {NOTIFICATION_CATEGORIES.map((category) => (
-                <label className="settings-toggle-row" key={category}>
-                  <input
-                    checked={effectiveNativeNotifications.categories[category]}
-                    disabled={!effectiveNativeNotifications.enabled}
-                    type="checkbox"
-                    onChange={(event) =>
-                      void handleSet("native notification category", async () => {
-                        await setNativeNotifications({
-                          ...effectiveNativeNotifications,
-                          categories: {
-                            ...effectiveNativeNotifications.categories,
-                            [category]: event.target.checked,
-                          },
-                        });
-                      })
-                    }
-                  />
-                  <span>{t(`settings.general.notifications.categories.${category}`)}</span>
-                </label>
-              ))}
+              >
+                {t("settings.general.notifications.test.action")}
+              </button>
             </div>
-            <span className="general-settings-preview">
-              {t("settings.general.notifications.preview")}
-            </span>
           </div>
+
+          <div className="notification-settings-groups" aria-label={t("settings.general.notifications.categoriesLabel")}>
+            {NOTIFICATION_GROUPS.map((group) => (
+              <section className="notification-settings-group" key={group.key}>
+                <div className="notification-settings-group-header">
+                  <strong>{t(`settings.general.notifications.groups.${group.key}.label`)}</strong>
+                  <small>{t(`settings.general.notifications.groups.${group.key}.helper`)}</small>
+                </div>
+                <div className="notification-settings-group-list">
+                  {group.categories.map((category) => (
+                    <SwitchControl
+                      checked={effectiveNativeNotifications.categories[category]}
+                      disabled={!effectiveNativeNotifications.enabled}
+                      key={category}
+                      label={t(`settings.general.notifications.categories.${category}`)}
+                      description={t(`settings.general.notifications.categoryHelpers.${category}`)}
+                      onChange={(checked) =>
+                        void handleSet("native notification category", async () => {
+                          await setNativeNotifications({
+                            ...effectiveNativeNotifications,
+                            categories: {
+                              ...effectiveNativeNotifications.categories,
+                              [category]: checked,
+                            },
+                          });
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+
+          <p className="notification-settings-footnote">
+            {t("settings.general.notifications.preview")}
+          </p>
         </div>
-      </div>
-    </SurfaceCard>
+      </SurfaceCard>
+    </>
   );
 };
