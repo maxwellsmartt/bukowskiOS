@@ -6667,7 +6667,10 @@ body.is-resizing-side-rail {
 }
 
 .resizable-side-layout.projects-layout.has-side-rail {
-  grid-template-columns: minmax(320px, 0.9fr) 14px minmax(var(--side-rail-min-width, 360px), var(--side-rail-width, 520px));
+  /* The flexible column must be a full 1fr: a sub-1 flex factor (0.9fr) makes
+     Grid leave the remaining ~10% of free space empty to the right of the
+     detail rail. 1fr lets the table absorb all of it. */
+  grid-template-columns: minmax(320px, 1fr) 14px minmax(var(--side-rail-min-width, 360px), var(--side-rail-width, 520px));
   gap: 0;
 }
 
