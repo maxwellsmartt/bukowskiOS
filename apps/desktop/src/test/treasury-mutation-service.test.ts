@@ -592,6 +592,74 @@ describe("treasury mutation service", () => {
     expect(stored.instrument_kind).toBe("credit_card");
     expect(stored.owner_user_id).toBe("user-ops");
 
+    const reminder = database
+      .prepare(`SELECT user_id, title, recurrence_rule, completed_at FROM reminders WHERE id = ?`)
+      .get("treasury-card-payment-bank-account-cmd-card-valid") as {
+      user_id: string;
+      title: string;
+      recurrence_rule: string;
+      completed_at: string | null;
+    };
+    expect(reminder.user_id).toBe("user-ops");
+    expect(reminder.title).toBe("Pagar tarjeta: Visa personal");
+    expect(reminder.recurrence_rule).toBe("FREQ=MONTHLY");
+    expect(reminder.completed_at).toBeNull();
+
+    cleanup();
+  });
+
+  it("requires a reminder user for shared credit cards and removes reminders on deactivate", () => {
+    const { cleanup, database } = createTestDatabase("treasury-card-reminder-user");
+    const mutations = createTreasuryMutationService(database);
+
+    expect(() =>
+      mutations.upsertBankAccount(
+        account("cmd-card-shared-invalid", {
+          accountLabel: "Tarjeta shared",
+          instrumentKind: "credit_card",
+          owner: "shared",
+          statementCycleDay: 12,
+          paymentDueDay: 27,
+        }),
+      ),
+    ).toThrow("Active shared/company credit cards require a reminder user.");
+
+    mutations.upsertBankAccount(
+      account("cmd-card-shared-valid", {
+        accountLabel: "Tarjeta shared",
+        instrumentKind: "credit_card",
+        owner: "shared",
+        reminderUserId: "user-ops",
+        statementCycleDay: 12,
+        paymentDueDay: 27,
+      }),
+    );
+
+    const reminderBefore = database
+      .prepare(`SELECT user_id, recurrence_rule FROM reminders WHERE id = ?`)
+      .get("treasury-card-payment-bank-account-cmd-card-shared-valid") as {
+      user_id: string;
+      recurrence_rule: string;
+    };
+    expect(reminderBefore).toEqual({ user_id: "user-ops", recurrence_rule: "FREQ=MONTHLY" });
+
+    mutations.deactivatePaymentInstrument({
+      commandId: "cmd-card-shared-deactivate",
+      workspaceId,
+      ...baseChannel,
+      paymentInstrumentId: "bank-account-cmd-card-shared-valid",
+    });
+
+    const reminderCount = database
+      .prepare(`SELECT COUNT(*) AS count FROM reminders WHERE id = ?`)
+      .get("treasury-card-payment-bank-account-cmd-card-shared-valid") as { count: number };
+    expect(reminderCount.count).toBe(0);
+
+    const outbox = database
+      .prepare(`SELECT operation_type FROM sync_outbox WHERE entity_type = 'reminder' AND entity_id = ?`)
+      .get("treasury-card-payment-bank-account-cmd-card-shared-valid") as { operation_type: string };
+    expect(outbox.operation_type).toBe("delete");
+
     cleanup();
   });
 

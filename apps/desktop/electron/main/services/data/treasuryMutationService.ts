@@ -58,6 +58,55 @@ const validatePaymentInstrumentOwner = (input: { owner?: string; ownerUserId?: s
   }
 };
 
+const validateCreditCardReminderUser = (input: {
+  instrumentKind?: string;
+  isActive?: boolean;
+  ownerUserId?: string | null;
+  reminderUserId?: string | null;
+}) => {
+  if (input.instrumentKind !== "credit_card" || input.isActive === false) return;
+  if (!input.ownerUserId?.trim() && !input.reminderUserId?.trim()) {
+    throw new Error("Active shared/company credit cards require a reminder user.");
+  }
+};
+
+const cardPaymentReminderId = (paymentInstrumentId: string) => `treasury-card-payment-${paymentInstrumentId}`;
+
+const ensureReminderTable = (db: DatabaseSync) => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reminders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      workspace_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      remind_at TEXT NOT NULL,
+      recurrence_rule TEXT,
+      snoozed_until TEXT,
+      completed_at TEXT,
+      created_by TEXT NOT NULL DEFAULT 'user',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_reminders_user_workspace_due
+      ON reminders(user_id, workspace_id, remind_at ASC);
+  `);
+};
+
+const nextMonthlyReminderAt = (paymentDueDay: number, now = new Date()) => {
+  const safeDay = Math.max(1, Math.min(31, Math.floor(paymentDueDay)));
+  const build = (year: number, month: number) => {
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    // Santo Domingo has no DST; 13:00Z keeps the reminder around 9am local.
+    return new Date(Date.UTC(year, month, Math.min(safeDay, lastDay), 13, 0, 0, 0));
+  };
+  let next = build(now.getUTCFullYear(), now.getUTCMonth());
+  if (next <= now) {
+    next = build(now.getUTCFullYear(), now.getUTCMonth() + 1);
+  }
+  return next.toISOString();
+};
+
 const buildFailedCommandMessage = (label: string, previousError?: string | null) =>
   previousError
     ? `This command id already failed once for ${label}: ${previousError}`
@@ -93,7 +142,7 @@ const enqueueOutbox = (
 ) => {
   db.prepare(
     `
-      INSERT INTO sync_outbox (
+      INSERT OR REPLACE INTO sync_outbox (
         id, workspace_id, entity_type, entity_id, operation_type,
         payload_json, status, attempt_count, last_error, next_retry_at,
         created_at, updated_at
@@ -506,6 +555,61 @@ const ensureAllocationTotalWithinEntity = (
   }
 };
 
+const syncCardPaymentReminder = (
+  db: DatabaseSync,
+  input: {
+    workspaceId: string;
+    paymentInstrumentId: string;
+    accountLabel: string;
+    instrumentKind: string;
+    isActive: boolean;
+    ownerUserId?: string | null;
+    reminderUserId?: string | null;
+    paymentDueDay?: number | null;
+  },
+  now: string,
+) => {
+  ensureReminderTable(db);
+  const reminderId = cardPaymentReminderId(input.paymentInstrumentId);
+  if (input.instrumentKind !== "credit_card" || !input.isActive) {
+    const deleted = db.prepare(`DELETE FROM reminders WHERE id = ? AND workspace_id = ?`).run(reminderId, input.workspaceId);
+    if (Number(deleted.changes ?? 0) > 0) {
+      enqueueOutbox(db, input.workspaceId, "reminder", reminderId, { id: reminderId }, `sync-reminder-${reminderId}`, now, "delete");
+    }
+    return;
+  }
+
+  const userId = input.ownerUserId?.trim() || input.reminderUserId?.trim() || null;
+  if (!userId) {
+    throw new Error("Active shared/company credit cards require a reminder user.");
+  }
+  if (!input.paymentDueDay) {
+    throw new Error("Active credit cards require a payment due day to create reminders.");
+  }
+
+  const title = `Pagar tarjeta: ${input.accountLabel}`;
+  const body = `Recordatorio mensual para pagar ${input.accountLabel}.`;
+  const remindAt = nextMonthlyReminderAt(input.paymentDueDay);
+  db.prepare(
+    `
+      INSERT INTO reminders (
+        id, user_id, workspace_id, title, body, remind_at, recurrence_rule,
+        snoozed_until, completed_at, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'FREQ=MONTHLY', NULL, NULL, 'user', ?)
+      ON CONFLICT(id) DO UPDATE SET
+        user_id = excluded.user_id,
+        workspace_id = excluded.workspace_id,
+        title = excluded.title,
+        body = excluded.body,
+        remind_at = excluded.remind_at,
+        recurrence_rule = excluded.recurrence_rule,
+        snoozed_until = NULL,
+        completed_at = NULL
+    `,
+  ).run(reminderId, userId, input.workspaceId, title, body, remindAt, now);
+  enqueueOutbox(db, input.workspaceId, "reminder", reminderId, { id: reminderId }, `sync-reminder-${reminderId}`, now);
+};
+
   const importTransactions = (input: ImportStatementCommand): ImportStatementResult => {
     const existing = receiptHelpers.getExistingReceipt(input.commandId);
     const importId = `import-${input.commandId}`;
@@ -708,12 +812,14 @@ const ensureAllocationTotalWithinEntity = (
       if (!input.accountLabel.trim()) throw new Error("Account label is required.");
       ensureCreditCardDays(input);
       validatePaymentInstrumentOwner(input);
+      validateCreditCardReminderUser(input);
 
       const now = new Date().toISOString();
       const last4 = extractLast4(input.accountNumberMasked) ?? extractLast4(input.accountNumberFull);
       const maskedNumber = input.accountNumberMasked?.trim() || (last4 ? `****${last4}` : null);
       const owner = input.owner ?? "company";
       const instrumentKind = input.instrumentKind ?? "bank_account";
+      const isActive = input.isActive !== false;
       db.exec("BEGIN");
       try {
         const priorAccount = db.prepare(`SELECT * FROM bank_accounts WHERE id = ?`).get(bankAccountId) ?? null;
@@ -782,6 +888,21 @@ const ensureAllocationTotalWithinEntity = (
           input.paymentDueDay ?? null,
           input.reminderUserId?.trim() || null,
           now,
+          now,
+        );
+
+        syncCardPaymentReminder(
+          db,
+          {
+            workspaceId: input.workspaceId,
+            paymentInstrumentId: bankAccountId,
+            accountLabel: input.accountLabel.trim(),
+            instrumentKind,
+            isActive,
+            ownerUserId: input.ownerUserId,
+            reminderUserId: input.reminderUserId,
+            paymentDueDay: input.paymentDueDay,
+          },
           now,
         );
 
@@ -1658,6 +1779,20 @@ const ensureAllocationTotalWithinEntity = (
           input.notes?.trim() || null,
           now,
           input.paymentInstrumentId,
+        );
+        syncCardPaymentReminder(
+          db,
+          {
+            workspaceId: input.workspaceId,
+            paymentInstrumentId: input.paymentInstrumentId,
+            accountLabel: String(priorAccount.account_label ?? input.paymentInstrumentId),
+            instrumentKind: String(priorAccount.instrument_kind ?? "bank_account"),
+            isActive: false,
+            ownerUserId: priorAccount.owner_user_id == null ? null : String(priorAccount.owner_user_id),
+            reminderUserId: priorAccount.reminder_user_id == null ? null : String(priorAccount.reminder_user_id),
+            paymentDueDay: priorAccount.payment_due_day == null ? null : Number(priorAccount.payment_due_day),
+          },
+          now,
         );
         enqueueOutbox(
           db,

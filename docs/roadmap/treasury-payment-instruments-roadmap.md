@@ -4,7 +4,7 @@
 
 - **Fecha de apertura:** 2026-06-08
 - **Fuente:** `/Users/ernestomaxwell/Desktop/PLAN.md`
-- **Estado general:** Slice 1 implementado localmente; pendiente aplicar/verificar migracion en Supabase remoto.
+- **Estado general:** Slices 1-3 implementados localmente; pendiente aplicar/verificar migracion en Supabase remoto y avanzar con UX de Tesoreria.
 - **Prioridad:** Alta para Tesoreria, porque desbloquea asignaciones de facturas a tarjetas/cuentas sin duplicar gastos ni perder links pendientes entre maquinas.
 
 ## Resumen ejecutivo
@@ -100,16 +100,23 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 
 ### Slice 3 — Reminders ligeros
 
-**Estado:** Pendiente
+**Estado:** Implementado en backend local-first el 2026-06-08
 
 **Objetivo:** Crear/actualizar reminders mensuales simples para tarjetas activas.
 
 **Reglas:**
-- Usar `reminders.recurrence_rule`.
+- Usar `reminders.recurrence_rule = 'FREQ=MONTHLY'`.
 - Si `instrument_kind = 'credit_card'` y la tarjeta esta activa:
   - si tiene `owner_user_id`, usarlo como default;
   - si no tiene `owner_user_id`, exigir `reminder_user_id`.
+- Crear/actualizar un reminder deterministico por tarjeta: `treasury-card-payment-${paymentInstrumentId}`.
+- Si la tarjeta se desactiva o deja de ser `credit_card`, borrar el reminder deterministico.
+- Encolar outbox de reminder con `sync-reminder-${reminderId}` para que delete reemplace upsert pendiente y no genere duplicados.
 - No implementar calendario bancario movil avanzado en v1.
+
+**Archivos principales:**
+- `apps/desktop/electron/main/services/data/treasuryMutationService.ts`
+- `apps/desktop/src/test/treasury-mutation-service.test.ts`
 
 ### Slice 4 — UX de medios de pago y asignaciones
 
@@ -183,15 +190,23 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 - Verificacion Slice 2:
   - `corepack pnpm --filter @bukowski/desktop test -- src/test/treasury-mutation-service.test.ts`: **290 passed, 2 skipped**.
   - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
+- Se implementa Slice 3 backend local-first:
+  - tarjetas de credito activas crean/actualizan reminder mensual en SQLite;
+  - tarjetas personales usan `owner_user_id` como usuario del reminder;
+  - tarjetas shared/company sin usuario dueno exigen `reminder_user_id`;
+  - desactivar tarjeta borra el reminder deterministico;
+  - el outbox de reminders usa ID estable para que un delete reemplace un upsert pendiente.
+- Verificacion Slice 3:
+  - `corepack pnpm exec vitest run src/test/treasury-mutation-service.test.ts` desde `apps/desktop`: **21 passed**.
+  - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
 
 ## Proximo slice recomendado
 
-**Slice 3 — reminders ligeros.**
+**Slice 4 — UX de medios de pago y asignaciones.**
 
 Orden sugerido:
-1. Crear/actualizar reminders mensuales simples al guardar tarjetas activas.
-2. Usar `owner_user_id` como default si existe.
-3. Para company/shared sin owner, exigir `reminder_user_id` cuando se active reminder.
-4. No implementar calendario bancario movil avanzado todavia.
-
-Despues de Slice 3, avanzar a Slice 4 UX de Cuentas y tarjetas + columnas de allocation en Bandeja de facturas.
+1. Crear vista **Cuentas y tarjetas** en Tesoreria usando los IPC ya disponibles.
+2. Agregar drawer compacto de crear/editar medio de pago sin campos sensibles.
+3. Agregar columnas de medio de pago, conciliacion, movimiento y reembolso en Bandeja de facturas.
+4. Habilitar acciones batch para asignar medio, vincular movimiento, rechazar y marcar reembolsado.
+5. Dejar conciliacion asistida avanzada para Slice 5.
