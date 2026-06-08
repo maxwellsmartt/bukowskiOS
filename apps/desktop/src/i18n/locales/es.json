@@ -684,6 +684,61 @@
       "unableArchive": "No se pudo archivar el equipo.",
       "unableOpenImage": "No se pudo abrir esa imagen.",
       "unableAddImages": "No se pudieron agregar imágenes a este equipo."
+    },
+    "editor": {
+      "titleNew": "Nuevo equipo",
+      "titleEdit": "Editar equipo",
+      "close": "Cerrar editor",
+      "primaryCode": "Código principal",
+      "willGenerate": "Se generará al guardar",
+      "status": "Estado",
+      "active": "Activo",
+      "archived": "Archivado",
+      "name": "Nombre",
+      "assetCode": "Código de equipo",
+      "category": "Categoría",
+      "chooseCategory": "Elige categoría",
+      "defaultLocation": "Ubicación por defecto",
+      "noDefaultLocation": "Sin ubicación por defecto",
+      "condition": "Condición",
+      "moreDetails": "Más detalles",
+      "brand": "Marca",
+      "model": "Modelo",
+      "serial": "Serie",
+      "ownership": "Propiedad",
+      "insuranceValues": "Valores de seguro",
+      "purchasePrice": "Precio de compra",
+      "additionalCosts": "Costos adicionales",
+      "currentValue": "Valor actual",
+      "replacementValue": "Valor de reposición",
+      "qrValue": "Valor QR",
+      "description": "Descripción",
+      "notes": "Notas",
+      "cancel": "Cancelar",
+      "archiving": "Archivando…",
+      "archiveAsset": "Archivar equipo",
+      "saving": "Guardando…",
+      "createAsset": "Crear equipo",
+      "saveAsset": "Guardar equipo",
+      "archiveConfirmBody": "¿Archivar este equipo? Quedará en el historial, pero ya no aparecerá en el trabajo activo.",
+      "conditions": {
+        "Good": "Bueno",
+        "Review": "Revisar",
+        "Damaged": "Dañado"
+      },
+      "ownershipTypes": {
+        "owned": "Propio",
+        "rented": "Rentado",
+        "consigned": "Consignado"
+      },
+      "placeholders": {
+        "optional": "Opcional",
+        "shippingCustoms": "Envío, aduana, manejo",
+        "manualInsured": "Valor asegurado manual",
+        "qrAuto": "Déjalo en blanco para generarlo automáticamente",
+        "shortDescription": "Descripción corta",
+        "optionalNote": "Nota opcional"
+      }
     }
   },
   "finance": {

@@ -26,6 +26,8 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 import { AssetAssignMovePanel, type AssetAssignMoveFormValue } from "./AssetAssignMovePanel";
+import { ModalShell } from "@shared/components/ModalShell";
+
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
 import {
   archiveAsset,
@@ -1606,6 +1608,12 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       ) : null}
 
       {editorMode ? (
+        <ModalShell
+          onClose={() => {
+            setEditorMode(null);
+            setEditorError(null);
+          }}
+        >
         <AssetEditorPanel
           key={`${editorMode}-${editorAssetId ?? "new"}-${editorDetail.editor?.id ?? "empty"}`}
           categories={catalog.categories}
@@ -1622,6 +1630,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           }}
           onSubmit={handleSubmitAssetEditor}
         />
+        </ModalShell>
       ) : null}
 
       {!isProjectMode ? <GlobalAssetsMetrics /> : null}

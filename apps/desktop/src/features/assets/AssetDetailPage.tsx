@@ -19,6 +19,7 @@ import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
+import { ModalShell } from "@shared/components/ModalShell";
 
 import { AssetEditorPanel, type AssetEditorDraft } from "./AssetEditorPanel";
 import { archiveAsset, deleteAssetFile, openAssetFile, updateAsset, uploadAssetFiles, uploadAssetImages, useAssetDetail } from "./useAssetsData";
@@ -330,6 +331,12 @@ export const AssetDetailPage = () => {
       </SurfaceCard>
 
       {editorOpen && data.editor ? (
+        <ModalShell
+          onClose={() => {
+            setEditorOpen(false);
+            setEditorError(null);
+          }}
+        >
         <AssetEditorPanel
           categories={catalog.categories}
           error={editorError}
@@ -387,6 +394,7 @@ export const AssetDetailPage = () => {
             }
           }}
         />
+        </ModalShell>
       ) : null}
 
       {reportOpen ? (

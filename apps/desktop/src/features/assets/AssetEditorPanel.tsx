@@ -1,5 +1,6 @@
 import { Archive, Save, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { AssetEditorSnapshot, CatalogSnapshot } from "@contracts";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
@@ -40,11 +41,7 @@ type AssetEditorPanelProps = {
 };
 
 const conditionOptions = ["Good", "Review", "Damaged"] as const;
-const ownershipOptions = [
-  { value: "owned", label: "Owned" },
-  { value: "rented", label: "Rented" },
-  { value: "consigned", label: "Consigned" },
-] as const;
+const ownershipValues = ["owned", "rented", "consigned"] as const;
 
 const normalizeOptional = (value: string) => {
   const nextValue = value.trim();
@@ -63,6 +60,7 @@ export const AssetEditorPanel = ({
   onClose,
   onSubmit,
 }: AssetEditorPanelProps) => {
+  const { t } = useTranslation();
   const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
   const [name, setName] = useState(initialValue?.name ?? "");
   const [internalCode, setInternalCode] = useState(initialValue?.internalCode ?? "");
@@ -89,13 +87,16 @@ export const AssetEditorPanel = ({
   const [ownershipType, setOwnershipType] = useState(initialValue?.ownershipType ?? "owned");
   const [qrCodeValue, setQrCodeValue] = useState(initialValue?.qrCodeValue ?? initialValue?.primaryCodeValue ?? "");
 
-  const title = mode === "create" ? "New asset" : "Edit asset";
-  const primaryCodeValue = useMemo(() => initialValue?.primaryCodeValue || qrCodeValue.trim() || "Will generate on save", [initialValue, qrCodeValue]);
+  const title = mode === "create" ? t("assets.editor.titleNew") : t("assets.editor.titleEdit");
+  const primaryCodeValue = useMemo(
+    () => initialValue?.primaryCodeValue || qrCodeValue.trim() || t("assets.editor.willGenerate"),
+    [initialValue, qrCodeValue, t],
+  );
 
   return (
     <SurfaceCard
       aside={
-        <button aria-label="Close asset editor" className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("assets.editor.close")} className="surface-card-action" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }
@@ -104,14 +105,14 @@ export const AssetEditorPanel = ({
       {mode === "edit" ? (
         <div className="summary-grid compact-summary-grid">
           <div className="summary-row">
-            <span className="summary-label">Primary code</span>
+            <span className="summary-label">{t("assets.editor.primaryCode")}</span>
             <span className="summary-value">{primaryCodeValue}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Status</span>
+            <span className="summary-label">{t("assets.editor.status")}</span>
             <span className="summary-value">
               <StatusBadge tone={initialValue?.isActive ? "success" : "neutral"}>
-                {initialValue?.isActive ? "Active" : "Archived"}
+                {initialValue?.isActive ? t("assets.editor.active") : t("assets.editor.archived")}
               </StatusBadge>
             </span>
           </div>
@@ -120,12 +121,12 @@ export const AssetEditorPanel = ({
 
       <div className="action-form-grid">
         <label className="action-field">
-          <span className="action-field-label">Name</span>
+          <span className="action-field-label">{t("assets.editor.name")}</span>
           <input className="action-field-control" onChange={(event) => setName(event.target.value)} value={name} />
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Asset code</span>
+          <span className="action-field-label">{t("assets.editor.assetCode")}</span>
           <input
             className="action-field-control"
             onChange={(event) => setInternalCode(event.target.value.toUpperCase())}
@@ -134,9 +135,9 @@ export const AssetEditorPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Category</span>
+          <span className="action-field-label">{t("assets.editor.category")}</span>
           <SelectField onChange={(event) => setCategoryId(event.target.value)} value={categoryId}>
-            <option value="">Choose category</option>
+            <option value="">{t("assets.editor.chooseCategory")}</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.code} · {category.name}
@@ -146,9 +147,9 @@ export const AssetEditorPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Default location</span>
+          <span className="action-field-label">{t("assets.editor.defaultLocation")}</span>
           <SelectField onChange={(event) => setDefaultLocationId(event.target.value)} value={defaultLocationId}>
-            <option value="">No default location</option>
+            <option value="">{t("assets.editor.noDefaultLocation")}</option>
             {locations.map((location) => (
               <option key={location.id} value={location.id}>
                 {location.code} · {location.name}
@@ -158,11 +159,11 @@ export const AssetEditorPanel = ({
         </label>
 
         <label className="action-field">
-          <span className="action-field-label">Condition</span>
+          <span className="action-field-label">{t("assets.editor.condition")}</span>
           <SelectField onChange={(event) => setConditionStatus(event.target.value)} value={conditionStatus}>
             {conditionOptions.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {t(`assets.editor.conditions.${option}`)}
               </option>
             ))}
           </SelectField>
@@ -171,72 +172,72 @@ export const AssetEditorPanel = ({
       </div>
 
       <details className="detail-disclosure">
-        <summary className="detail-disclosure-summary">More details</summary>
+        <summary className="detail-disclosure-summary">{t("assets.editor.moreDetails")}</summary>
         <div className="detail-disclosure-content">
           <div className="action-form-grid">
             <label className="action-field">
-              <span className="action-field-label">Brand</span>
+              <span className="action-field-label">{t("assets.editor.brand")}</span>
               <input className="action-field-control" onChange={(event) => setBrand(event.target.value)} value={brand} />
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Model</span>
+              <span className="action-field-label">{t("assets.editor.model")}</span>
               <input className="action-field-control" onChange={(event) => setModel(event.target.value)} value={model} />
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Serial</span>
+              <span className="action-field-label">{t("assets.editor.serial")}</span>
               <input className="action-field-control" onChange={(event) => setSerialNumber(event.target.value)} value={serialNumber} />
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Ownership</span>
+              <span className="action-field-label">{t("assets.editor.ownership")}</span>
               <SelectField onChange={(event) => setOwnershipType(event.target.value)} value={ownershipType}>
-                {ownershipOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+                {ownershipValues.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`assets.editor.ownershipTypes.${value}`)}
                   </option>
                 ))}
               </SelectField>
             </label>
 
-            <div className="action-form-section-label action-field-wide">Insurance values</div>
+            <div className="action-form-section-label action-field-wide">{t("assets.editor.insuranceValues")}</div>
 
             <label className="action-field">
-              <span className="action-field-label">Purchase price</span>
+              <span className="action-field-label">{t("assets.editor.purchasePrice")}</span>
               <input
                 className="action-field-control"
                 inputMode="decimal"
                 onChange={(event) => setPurchasePrice(event.target.value)}
-                placeholder="Optional"
+                placeholder={t("assets.editor.placeholders.optional")}
                 value={purchasePrice}
               />
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Additional costs</span>
+              <span className="action-field-label">{t("assets.editor.additionalCosts")}</span>
               <input
                 className="action-field-control"
                 inputMode="decimal"
                 onChange={(event) => setAdditionalCosts(event.target.value)}
-                placeholder="Shipping, customs, handling"
+                placeholder={t("assets.editor.placeholders.shippingCustoms")}
                 value={additionalCosts}
               />
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Current value</span>
+              <span className="action-field-label">{t("assets.editor.currentValue")}</span>
               <input
                 className="action-field-control"
                 inputMode="decimal"
                 onChange={(event) => setCurrentBookValue(event.target.value)}
-                placeholder="Manual insured value"
+                placeholder={t("assets.editor.placeholders.manualInsured")}
                 value={currentBookValue}
               />
             </label>
 
             <label className="action-field">
-              <span className="action-field-label">Replacement value</span>
+              <span className="action-field-label">{t("assets.editor.replacementValue")}</span>
               <input
                 className="action-field-control"
                 inputMode="decimal"
@@ -247,32 +248,32 @@ export const AssetEditorPanel = ({
             </label>
 
             <label className="action-field action-field-wide">
-              <span className="action-field-label">QR value</span>
+              <span className="action-field-label">{t("assets.editor.qrValue")}</span>
               <input
                 className="action-field-control"
                 onChange={(event) => setQrCodeValue(event.target.value)}
-                placeholder="Leave blank to generate it automatically"
+                placeholder={t("assets.editor.placeholders.qrAuto")}
                 value={qrCodeValue}
               />
             </label>
 
             <label className="action-field action-field-wide">
-              <span className="action-field-label">Description</span>
+              <span className="action-field-label">{t("assets.editor.description")}</span>
               <textarea
                 className="action-field-control action-textarea"
                 onChange={(event) => setDescription(event.target.value)}
-                placeholder="Short description"
+                placeholder={t("assets.editor.placeholders.shortDescription")}
                 rows={3}
                 value={description}
               />
             </label>
 
             <label className="action-field action-field-wide">
-              <span className="action-field-label">Notes</span>
+              <span className="action-field-label">{t("assets.editor.notes")}</span>
               <textarea
                 className="action-field-control action-textarea"
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional note"
+                placeholder={t("assets.editor.placeholders.optionalNote")}
                 rows={3}
                 value={notes}
               />
@@ -287,11 +288,11 @@ export const AssetEditorPanel = ({
         {mode === "edit" && onArchive ? (
           <button className="ghost-control" disabled={isArchiving} onClick={() => setConfirmArchiveOpen(true)} type="button">
             <Archive size={14} />
-            <span>{isArchiving ? "Archiving..." : "Archive asset"}</span>
+            <span>{isArchiving ? t("assets.editor.archiving") : t("assets.editor.archiveAsset")}</span>
           </button>
         ) : (
           <button className="ghost-control cancel-control" onClick={onClose} type="button">
-            Cancel
+            {t("assets.editor.cancel")}
           </button>
         )}
 
@@ -321,13 +322,13 @@ export const AssetEditorPanel = ({
           type="button"
         >
           <Save size={14} />
-          <span>{isSubmitting ? "Saving..." : mode === "create" ? "Create asset" : "Save asset"}</span>
+          <span>{isSubmitting ? t("assets.editor.saving") : mode === "create" ? t("assets.editor.createAsset") : t("assets.editor.saveAsset")}</span>
         </button>
       </div>
 
       <ConfirmDialog
-        body="Archive this asset? It will stay in history, but it will no longer appear in active work."
-        confirmLabel="Archive asset"
+        body={t("assets.editor.archiveConfirmBody")}
+        confirmLabel={t("assets.editor.archiveAsset")}
         isOpen={confirmArchiveOpen}
         isSubmitting={isArchiving}
         onCancel={() => setConfirmArchiveOpen(false)}
@@ -335,7 +336,7 @@ export const AssetEditorPanel = ({
           await onArchive?.();
           setConfirmArchiveOpen(false);
         }}
-        title="Archive asset"
+        title={t("assets.editor.archiveAsset")}
         tone="danger"
       />
     </SurfaceCard>

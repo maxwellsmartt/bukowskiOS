@@ -7071,6 +7071,35 @@ body.is-resizing-side-rail {
   text-transform: uppercase;
 }
 
+/* ----- Generic centered modal shell ----- */
+.modal-shell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(24px, 7vh, 90px) 24px;
+  overflow-y: auto;
+  background: rgba(6, 8, 11, 0.72);
+  backdrop-filter: blur(6px);
+  animation: lightbox-fade-in 150ms ease-out;
+}
+
+.modal-shell-dialog {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100vh - clamp(48px, 14vh, 180px));
+  overflow-y: auto;
+  border-radius: var(--radius-panel);
+  box-shadow: 0 24px 60px rgba(4, 6, 10, 0.5);
+}
+
+.modal-shell-dialog > .surface-card {
+  min-height: 0;
+}
+
 /* ----- Asset image lightbox (in-app, instead of opening Finder) ----- */
 .asset-lightbox-overlay {
   position: fixed;

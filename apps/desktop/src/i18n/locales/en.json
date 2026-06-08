@@ -682,6 +682,61 @@
       "unableArchive": "Unable to archive asset.",
       "unableOpenImage": "Unable to open that asset image.",
       "unableAddImages": "Unable to add images to this asset."
+    },
+    "editor": {
+      "titleNew": "New asset",
+      "titleEdit": "Edit asset",
+      "close": "Close asset editor",
+      "primaryCode": "Primary code",
+      "willGenerate": "Will generate on save",
+      "status": "Status",
+      "active": "Active",
+      "archived": "Archived",
+      "name": "Name",
+      "assetCode": "Asset code",
+      "category": "Category",
+      "chooseCategory": "Choose category",
+      "defaultLocation": "Default location",
+      "noDefaultLocation": "No default location",
+      "condition": "Condition",
+      "moreDetails": "More details",
+      "brand": "Brand",
+      "model": "Model",
+      "serial": "Serial",
+      "ownership": "Ownership",
+      "insuranceValues": "Insurance values",
+      "purchasePrice": "Purchase price",
+      "additionalCosts": "Additional costs",
+      "currentValue": "Current value",
+      "replacementValue": "Replacement value",
+      "qrValue": "QR value",
+      "description": "Description",
+      "notes": "Notes",
+      "cancel": "Cancel",
+      "archiving": "Archiving…",
+      "archiveAsset": "Archive asset",
+      "saving": "Saving…",
+      "createAsset": "Create asset",
+      "saveAsset": "Save asset",
+      "archiveConfirmBody": "Archive this asset? It will stay in history, but it will no longer appear in active work.",
+      "conditions": {
+        "Good": "Good",
+        "Review": "Review",
+        "Damaged": "Damaged"
+      },
+      "ownershipTypes": {
+        "owned": "Owned",
+        "rented": "Rented",
+        "consigned": "Consigned"
+      },
+      "placeholders": {
+        "optional": "Optional",
+        "shippingCustoms": "Shipping, customs, handling",
+        "manualInsured": "Manual insured value",
+        "qrAuto": "Leave blank to generate it automatically",
+        "shortDescription": "Short description",
+        "optionalNote": "Optional note"
+      }
     }
   },
   "finance": {
