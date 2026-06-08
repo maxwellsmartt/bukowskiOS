@@ -527,7 +527,7 @@ export const AssetDetailPage = () => {
                   </div>
                   {data.legacy ? (
                     <div className="summary-row">
-                      <span className="summary-label">Source</span>
+                      <span className="summary-label">{t("assets.detail.labels.source")}</span>
                       <span className="summary-value">{data.legacy.source}</span>
                     </div>
                   ) : null}
@@ -536,19 +536,19 @@ export const AssetDetailPage = () => {
                 {data.legacy ? (
                   <div className="summary-grid">
                     <div className="summary-row">
-                      <span className="summary-label">Legacy code</span>
+                      <span className="summary-label">{t("assets.detail.labels.legacyCode")}</span>
                       <span className="summary-value">{data.legacy.legacyCode}</span>
                     </div>
                     <div className="summary-row">
-                      <span className="summary-label">Warehouse slot</span>
+                      <span className="summary-label">{t("assets.detail.labels.warehouseSlot")}</span>
                       <span className="summary-value">{data.legacy.warehouseSlot}</span>
                     </div>
                     <div className="summary-row">
-                      <span className="summary-label">Folder path</span>
+                      <span className="summary-label">{t("assets.detail.labels.folderPath")}</span>
                       <span className="summary-value">{data.legacy.folderPath}</span>
                     </div>
                     <div className="summary-row">
-                      <span className="summary-label">Accessories</span>
+                      <span className="summary-label">{t("assets.detail.labels.accessories")}</span>
                       <span className="summary-value">{data.legacy.hasAccessories}</span>
                     </div>
                   </div>
@@ -570,7 +570,7 @@ export const AssetDetailPage = () => {
             </details>
           </SurfaceCard>
 
-          <SurfaceCard title="Timeline">
+          <SurfaceCard title={t("assets.detail.sections.timeline")}>
             <div className="timeline-list">
               {data.timeline.map((event) => (
                 <div key={event.timestamp + event.title} className="timeline-item">
@@ -585,7 +585,7 @@ export const AssetDetailPage = () => {
 
         <div className="page-stack">
           <SurfaceCard
-            title="Operations"
+            title={t("assets.detail.sections.operations")}
             aside={
               <button
                 className="surface-card-action-text"
@@ -610,15 +610,15 @@ export const AssetDetailPage = () => {
                 }}
                 type="button"
               >
-                {isUploadingFiles ? "Uploading..." : "Attach PDF"}
+                {isUploadingFiles ? t("assets.detail.files.uploading") : t("assets.detail.files.attachPdf")}
               </button>
             }
           >
             <div className="entity-detail-section-stack">
               <section className="entity-detail-section">
                 <header className="entity-detail-section-header">
-                  <h3>Incidents</h3>
-                  <span>{data.linkedIncidents.length || "None"}</span>
+                  <h3>{t("assets.detail.sections.incidents")}</h3>
+                  <span>{data.linkedIncidents.length || t("common.none")}</span>
                 </header>
                 {data.linkedIncidents.length ? (
                   <div className="queue-list entity-detail-compact-list">
@@ -637,14 +637,14 @@ export const AssetDetailPage = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="empty-state">No incidents linked.</div>
+                  <div className="empty-state">{t("assets.detail.files.noIncidents")}</div>
                 )}
               </section>
 
               <section className="entity-detail-section">
                 <header className="entity-detail-section-header">
-                  <h3>Files</h3>
-                  <span>{documentFiles.length || "None"}</span>
+                  <h3>{t("assets.detail.sections.files")}</h3>
+                  <span>{documentFiles.length || t("common.none")}</span>
                 </header>
                 {documentFiles.length ? (
                   <div className="entity-file-list entity-detail-compact-list">
@@ -681,7 +681,7 @@ export const AssetDetailPage = () => {
                             }}
                             type="button"
                           >
-                            {openingFileId === file.id ? "Opening..." : "Open"}
+                            {openingFileId === file.id ? t("assets.detail.files.opening") : t("assets.detail.files.open")}
                           </button>
                         </div>
                       </div>

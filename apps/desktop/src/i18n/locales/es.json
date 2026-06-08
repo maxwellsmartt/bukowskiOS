@@ -227,13 +227,22 @@
       "stockSummary": "{{available}} disponibles · {{assigned}} reservadas · {{checkedOut}} fuera",
       "sections": {
         "details": "Detalles",
-        "moreDetails": "Más detalles"
+        "moreDetails": "Más detalles",
+        "timeline": "Cronología",
+        "operations": "Operaciones",
+        "incidents": "Incidencias",
+        "files": "Archivos"
       },
       "labels": {
         "tracking": "Tracking",
         "kitMembership": "Membresía de kit",
         "insuredValue": "Valor asegurado",
-        "primaryCode": "Código principal"
+        "primaryCode": "Código principal",
+        "source": "Origen",
+        "legacyCode": "Código heredado",
+        "warehouseSlot": "Casillero",
+        "folderPath": "Ruta de carpeta",
+        "accessories": "Accesorios"
       },
       "actions": {
         "editAsset": "Editar equipo",
@@ -277,6 +286,13 @@
         "responsible": "Responsable",
         "condition": "Condición",
         "lifecycleTooltip": "Ciclo de vida: Activo = en servicio, Mantenimiento = en reparación, Retirado = fuera de rotación. Para el día a día mira Disponibilidad más abajo."
+      },
+      "files": {
+        "attachPdf": "Adjuntar PDF",
+        "uploading": "Subiendo…",
+        "open": "Abrir",
+        "opening": "Abriendo…",
+        "noIncidents": "Sin incidencias vinculadas."
       }
     },
     "inKit": "En kit {{codes}}",

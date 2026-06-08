@@ -227,13 +227,22 @@
       "stockSummary": "{{available}} available · {{assigned}} reserved · {{checkedOut}} checked out",
       "sections": {
         "details": "Details",
-        "moreDetails": "More details"
+        "moreDetails": "More details",
+        "timeline": "Timeline",
+        "operations": "Operations",
+        "incidents": "Incidents",
+        "files": "Files"
       },
       "labels": {
         "tracking": "Tracking",
         "kitMembership": "Kit membership",
         "insuredValue": "Insured value",
-        "primaryCode": "Primary code"
+        "primaryCode": "Primary code",
+        "source": "Source",
+        "legacyCode": "Legacy code",
+        "warehouseSlot": "Warehouse slot",
+        "folderPath": "Folder path",
+        "accessories": "Accessories"
       },
       "actions": {
         "editAsset": "Edit asset",
@@ -277,6 +286,13 @@
         "responsible": "Responsible",
         "condition": "Condition",
         "lifecycleTooltip": "Lifecycle: Active means in service, Maintenance means under repair, Retired means out of rotation. For day-to-day work look at Availability below."
+      },
+      "files": {
+        "attachPdf": "Attach PDF",
+        "uploading": "Uploading…",
+        "open": "Open",
+        "opening": "Opening…",
+        "noIncidents": "No incidents linked."
       }
     },
     "inKit": "In kit {{codes}}",
