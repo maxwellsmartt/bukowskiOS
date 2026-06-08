@@ -79,6 +79,7 @@ export const AppShell = () => {
   const activeRoute = resolveActiveRoute(location.pathname);
   const canAccessFinance = hasFinanceAccess(activeMembership);
   const isLicensesRoute = location.pathname === "/assets/licenses";
+  const isCatalogRoute = location.pathname === "/catalog";
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     clampSidebarWidth(readNumberPreference(uiPreferenceKeys.shellSidebarWidth, sidebarWidthDefault)),
   );
@@ -352,7 +353,7 @@ export const AppShell = () => {
           <Breadcrumb />
           {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
           <RouteTransitionMain
-            className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}${activeRoute.domain === "assets" ? " shell-content-assets" : ""}${isLicensesRoute ? " shell-content-licenses" : ""}`}
+            className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}${activeRoute.domain === "assets" ? " shell-content-assets" : ""}${isLicensesRoute ? " shell-content-licenses" : ""}${isCatalogRoute ? " shell-content-catalog" : ""}`}
             transitionKey={location.pathname}
           >
             {!isScopeReady ? (

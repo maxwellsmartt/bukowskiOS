@@ -977,7 +977,7 @@ export const CatalogPage = () => {
   };
 
   return (
-    <div className="page-stack">
+    <div className="page-stack catalog-page-stack">
       <SectionHeader title={t("catalog.title")} />
 
       {error ? <div className="empty-state">{t("catalog.unavailable", { message: error })}</div> : null}

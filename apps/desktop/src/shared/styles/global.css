@@ -4252,9 +4252,10 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   gap: 6px;
   max-height: 46vh;
   overflow: auto;
-  padding: 0 2px 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.16);
   scrollbar-width: thin;
 }
 
@@ -4276,9 +4277,13 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   position: sticky;
   top: 0;
   z-index: 3;
-  padding: 8px 0 7px;
-  background: rgba(11, 15, 19, 0.985);
-  color: var(--text-muted);
+  padding: 11px 14px 10px;
+  background: rgba(17, 23, 30, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px 12px 0 0;
+  color: var(--text-secondary);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -4286,8 +4291,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .asset-import-review-row:not(.is-header) {
-  padding: 2px 0;
-  border-radius: 9px;
+  padding: 5px 14px;
+  border-radius: 8px;
 }
 
 .asset-import-review-row:not(.is-header):hover {
@@ -4329,8 +4334,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .asset-import-review-row-note {
-  min-width: 1040px;
-  margin-top: -2px;
+  min-width: 1012px;
+  margin: -2px 14px 0;
   padding: 7px 10px;
   border: 1px solid rgba(255, 219, 132, 0.14);
   border-radius: 10px;
@@ -4340,8 +4345,9 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .asset-import-review-notes {
-  min-width: 1040px;
+  min-width: 1012px;
   min-height: 48px;
+  margin: 0 14px;
   resize: vertical;
   padding: 9px 10px;
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -20159,6 +20165,42 @@ input[type="number"] {
   flex: 1;
   min-height: 0;
   max-height: none;
+}
+
+/* Catálogo: fill the viewport like the other registry tables (Equipos, etc.)
+   instead of a fixed-height card. The route container stops scrolling so the
+   page-stack owns the height; the table then scrolls internally on both axes. */
+.shell-content-catalog {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.catalog-page-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+.catalog-page-stack > .resizable-side-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.catalog-page-stack > .resizable-side-layout.split-layout,
+.catalog-page-stack > .resizable-side-layout.list-layout {
+  align-items: stretch;
+}
+.catalog-page-stack .catalog-surface-card.rail-table-card {
+  min-height: 0;
+  max-height: none;
+}
+.catalog-page-stack .catalog-side-rail {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+  overscroll-behavior: contain;
 }
 
 /* Row right-click context menu (reuses the toolbar menu look) ================ */
