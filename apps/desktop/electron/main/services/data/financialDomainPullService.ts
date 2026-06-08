@@ -48,7 +48,7 @@ const treasuryEntityMap: Record<TreasuryPullTable, { entityType: string; entityI
   bank_transactions: { entityType: "bank_transaction", entityIdColumn: "id", conflictColumns: ["id"] },
   transaction_annotations: { entityType: "transaction_annotation", entityIdColumn: "transaction_id", conflictColumns: ["transaction_id"] },
   transaction_project_allocations: { entityType: "transaction_allocations", entityIdColumn: "transaction_id", conflictColumns: ["id"] },
-  transaction_links: { entityType: "transaction_link", entityIdColumn: "transaction_id", conflictColumns: ["id"] },
+  transaction_links: { entityType: "transaction_link", entityIdColumn: "id", conflictColumns: ["id"] },
   counterparty_rules: { entityType: "counterparty_rule", entityIdColumn: "id", conflictColumns: ["id"] },
 };
 
@@ -83,7 +83,7 @@ const tableCursorColumn: Record<TreasuryPullTable | CollaboratorPaymentPullTable
   bank_transactions: "created_at",
   transaction_annotations: "updated_at",
   transaction_project_allocations: "updated_at",
-  transaction_links: "created_at",
+  transaction_links: "updated_at",
   counterparty_rules: "updated_at",
   collaborator_fees: "updated_at",
   collaborator_payment_batches: "created_at",
@@ -254,6 +254,7 @@ const sanitizeTreasuryRow = (
   row: Record<string, unknown>,
 ): Record<string, unknown> | null => {
   const next = toRecord(row);
+  if (table === "bank_accounts") next.account_number_full = null;
   if (table === "bank_statement_imports" && !rowExists(db, "bank_accounts", next.bank_account_id)) return null;
   if (table === "bank_transactions" && !rowExists(db, "bank_accounts", next.bank_account_id)) return null;
   if (table === "transaction_annotations" && !rowExists(db, "bank_transactions", next.transaction_id)) return null;
@@ -261,7 +262,7 @@ const sanitizeTreasuryRow = (
     if (!rowExists(db, "bank_transactions", next.transaction_id)) return null;
     if (next.project_id && !rowExists(db, "projects", next.project_id)) next.project_id = null;
   }
-  if (table === "transaction_links" && !rowExists(db, "bank_transactions", next.transaction_id)) return null;
+  if (table === "transaction_links" && next.transaction_id && !rowExists(db, "bank_transactions", next.transaction_id)) return null;
   if (table === "counterparty_rules" && next.default_project_id && !rowExists(db, "projects", next.default_project_id)) {
     next.default_project_id = null;
   }

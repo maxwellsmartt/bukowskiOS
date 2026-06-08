@@ -24,6 +24,10 @@ import type {
 const defaultActorUserId = "user-ops";
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const extractLast4 = (value: string | null | undefined) => {
+  const digits = (value ?? "").replace(/\D/g, "");
+  return digits.length >= 4 ? digits.slice(-4) : null;
+};
 
 const buildFailedCommandMessage = (label: string, previousError?: string | null) =>
   previousError
@@ -325,16 +329,17 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
 
     const ownAccounts = db
       .prepare(
-        `SELECT account_number_full, account_number_masked, currency
+        `SELECT account_number_full, account_number_masked, last4, currency
          FROM bank_accounts WHERE workspace_id = ? AND id <> ?`,
       )
       .all(input.workspaceId, input.bankAccountId) as Array<{
       account_number_full: string | null;
       account_number_masked: string | null;
+      last4: string | null;
       currency: string;
     }>;
     const ownAccountNumbers = ownAccounts.flatMap((row) =>
-      [row.account_number_full, row.account_number_masked]
+      [row.account_number_full, row.account_number_masked, row.last4, extractLast4(row.account_number_masked)]
         .filter((n): n is string => Boolean(n && n.trim().length >= 4))
         .map((number) => ({ number, currency: row.currency })),
     );
@@ -489,6 +494,8 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
       if (!input.accountLabel.trim()) throw new Error("Account label is required.");
 
       const now = new Date().toISOString();
+      const last4 = extractLast4(input.accountNumberMasked) ?? extractLast4(input.accountNumberFull);
+      const maskedNumber = input.accountNumberMasked?.trim() || (last4 ? `****${last4}` : null);
       db.exec("BEGIN");
       try {
         const priorAccount = db.prepare(`SELECT * FROM bank_accounts WHERE id = ?`).get(bankAccountId) ?? null;
@@ -508,8 +515,8 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           `INSERT INTO bank_accounts (
              id, workspace_id, bank_name, account_label, account_number_masked,
              account_number_full, currency, account_type, opening_balance,
-             opening_balance_date, is_active, notes, created_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             opening_balance_date, is_active, notes, last4, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              bank_name = excluded.bank_name,
              account_label = excluded.account_label,
@@ -521,20 +528,22 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
              opening_balance_date = excluded.opening_balance_date,
              is_active = excluded.is_active,
              notes = excluded.notes,
+             last4 = excluded.last4,
              updated_at = excluded.updated_at`,
         ).run(
           bankAccountId,
           input.workspaceId,
           input.bankName,
           input.accountLabel.trim(),
-          input.accountNumberMasked?.trim() || null,
-          input.accountNumberFull?.trim() || null,
+          maskedNumber,
+          null,
           input.currency.trim().toUpperCase(),
           input.accountType ?? null,
           input.openingBalance != null ? round2(input.openingBalance) : 0,
           input.openingBalanceDate?.trim() || null,
           input.isActive === false ? 0 : 1,
           input.notes?.trim() || null,
+          last4,
           now,
           now,
         );
@@ -1336,9 +1345,9 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
       try {
         db.prepare(
           `INSERT INTO transaction_links (
-             id, workspace_id, transaction_id, linked_entity_type, linked_entity_id, notes, created_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(transaction_id, linked_entity_type, linked_entity_id) DO NOTHING`,
+             id, workspace_id, transaction_id, linked_entity_type, linked_entity_id, allocation_status, notes, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, 'matched', ?, ?, ?)
+           ON CONFLICT DO NOTHING`,
         ).run(
           `link-${input.commandId}`,
           input.workspaceId,
@@ -1347,12 +1356,13 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           input.linkedEntityId,
           input.notes?.trim() || null,
           now,
+          now,
         );
         enqueueOutbox(
           db,
           input.workspaceId,
           "transaction_link",
-          input.transactionId,
+          `link-${input.commandId}`,
           { linkedEntityType: input.linkedEntityType, linkedEntityId: input.linkedEntityId },
           `sync-${input.commandId}`,
           now,

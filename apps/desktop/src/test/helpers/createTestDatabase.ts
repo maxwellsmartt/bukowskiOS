@@ -23,6 +23,7 @@ import {
 } from "../../../electron/main/services/data/schedulingFoundationBootstrap";
 import { applyOperationalFilesMigration } from "../../../electron/main/services/data/fileUploadService";
 import { applyTrackedSqlMigrations, applyTrackedStep } from "../../../electron/main/services/data/localDatabaseSupport";
+import { applyTreasuryFoundationSelfHeal } from "../../../electron/main/services/data/treasuryFoundationBootstrap";
 
 type TestDatabase = {
   cleanup: () => void;
@@ -36,6 +37,7 @@ export const createTestDatabase = (prefix: string): TestDatabase => {
 
   database.exec("PRAGMA foreign_keys = ON;");
   applyTrackedSqlMigrations(database, foundationMigrations);
+  applyTreasuryFoundationSelfHeal(database);
   applyTrackedStep(database, "runtime_admin_foundation_v1", () => applyAdminFoundationMigration(database));
   applyTrackedStep(database, "runtime_scheduling_foundation_v1", () => applySchedulingFoundationMigration(database));
   applyTrackedStep(database, "runtime_project_archive_v1", () => applyProjectArchiveFoundationMigration(database));

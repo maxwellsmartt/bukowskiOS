@@ -37,7 +37,9 @@ export type TransactionLinkEntityType =
   | "invoice"
   | "invoice_payment"
   | "crew_voucher"
-  | "financial_entry";
+  | "financial_entry"
+  | "invoice_extraction"
+  | "card_settlement";
 
 /* ----------------------------------------------------------------------- */
 /* Bank accounts                                                            */

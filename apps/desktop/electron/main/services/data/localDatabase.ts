@@ -1258,7 +1258,9 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
   ): SupabaseDomainUpsert[] | null => {
     switch (row.entity_type) {
       case "bank_account": {
-        const rows = selectAll("SELECT * FROM bank_accounts WHERE id = ?", row.entity_id);
+        const rows = selectAll("SELECT * FROM bank_accounts WHERE id = ?", row.entity_id).map((r) =>
+          nullNonUuid(r, ["owner_user_id", "reminder_user_id"]),
+        );
         return rows.length ? [{ table: "bank_accounts", onConflict: "id", rows }] : [];
       }
       case "bank_statement_import": {
@@ -1303,7 +1305,12 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         ];
       }
       case "transaction_link": {
-        const rows = selectAll("SELECT * FROM transaction_links WHERE transaction_id = ?", row.entity_id);
+        let rows = selectAll("SELECT * FROM transaction_links WHERE id = ?", row.entity_id);
+        if (!rows.length) {
+          // Transitional compatibility: older outbox rows used transaction_id as
+          // entity_id. Keep draining those instead of forcing a manual outbox reset.
+          rows = selectAll("SELECT * FROM transaction_links WHERE transaction_id = ?", row.entity_id);
+        }
         return [{ table: "transaction_links", onConflict: "id", rows }];
       }
       case "counterparty_rule": {

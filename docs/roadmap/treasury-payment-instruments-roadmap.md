@@ -1,0 +1,174 @@
+# Roadmap v4 — Medios de Pago, Conciliacion y Reembolsos
+
+## Estado
+
+- **Fecha de apertura:** 2026-06-08
+- **Fuente:** `/Users/ernestomaxwell/Desktop/PLAN.md`
+- **Estado general:** Slice 1 implementado localmente; pendiente aplicar/verificar migracion en Supabase remoto.
+- **Prioridad:** Alta para Tesoreria, porque desbloquea asignaciones de facturas a tarjetas/cuentas sin duplicar gastos ni perder links pendientes entre maquinas.
+
+## Resumen ejecutivo
+
+El objetivo es registrar cuentas y tarjetas como medios de pago, asignar facturas de gasto a esos medios, conciliarlas contra movimientos bancarios cuando existan y ver reembolsos pendientes por usuario/tarjeta/ciclo. La implementacion debe ser local-first, sincronizable y segura: Tesoreria puede ver datos operativos no sensibles, pero no se guardan ni muestran numeros completos de cuentas o tarjetas.
+
+La base critica es cambiar `transaction_links` para que su identidad de sync sea `id`, no `transaction_id`. Sin ese cambio, una asignacion pendiente con `transaction_id = null` puede perderse en pull/sync o deduplicarse mal. Por eso el roadmap empieza por schema/sync antes de UX.
+
+## Decisiones cerradas
+
+- Extender `bank_accounts`; no crear un catalogo paralelo.
+- Extender `transaction_links`; no crear tabla nueva de allocations en v1.
+- Usar `owner = 'user'` + `owner_user_id` para tarjetas personales, alineado con `invoice_extractions.linked_user_id`.
+- Tesoreria ve todos los medios de pago, pero solo datos no sensibles: banco, tipo, owner, moneda, last4.
+- `account_number_full` queda deprecado: no se usa ni se muestra; migrar a `NULL` y conservar columna por compatibilidad.
+- Una tarjeta de credito activa requiere dia de corte y dia de vencimiento.
+- Reminders entran en v1 solo en version ligera, mensual y auditable.
+
+## Roadmap por slices
+
+### Slice 1 — Schema y sync base
+
+**Estado:** Implementado en codigo el 2026-06-08
+
+**Objetivo:** Hacer que `transaction_links` soporte links pendientes sin `transaction_id`, que sincronice por `id` y que no duplique asignaciones.
+
+**Backend/local:**
+- Extender `bank_accounts` en SQLite y Supabase con owner, instrumento, last4, issuer, ciclo y reminder.
+- Extender `transaction_links` con `transaction_id` nullable, `payment_instrument_id`, montos aplicados, moneda, FX, estado, ciclo y `updated_at`.
+- Agregar `invoice_extraction` y `card_settlement` a los tipos permitidos de links.
+- Cambiar UNIQUE local/remoto a dedupe por `workspace_id`, `linked_entity_type`, `linked_entity_id`, `COALESCE(transaction_id, '')`, `COALESCE(payment_instrument_id, '')`.
+- Reconstruir tabla SQLite si hace falta para remover el UNIQUE viejo por `transaction_id + linked_entity_type + linked_entity_id`.
+
+**Sync:**
+- `localDatabase.ts`: materializar outbox de `transaction_link` por `id`.
+- `localDatabase.ts`: tombstones siguen borrando por `id`.
+- `financialDomainPullService.ts`: `transaction_links.entityIdColumn = 'id'`.
+- `financialDomainPullService.ts`: validar existencia de `bank_transactions` solo cuando `transaction_id != null`.
+- `treasuryMutationService.ts`: undo/outbox restore debe encolar con `link.id`.
+- Compatibilidad transitoria: outbox viejo puede resolver por `transaction_id` si no encuentra link por `id`.
+
+**Criterios de aceptacion:**
+- Un link pendiente con `transaction_id = null` creado en maquina A aparece en maquina B despues de pull. **Cubierto por test local.**
+- Doble asignacion de la misma factura al mismo medio no duplica por UNIQUE con `COALESCE`. **Cubierto por indice local y migracion Supabase.**
+- Pull remoto de links repetidos no crea duplicados. **Cubierto por test local.**
+- Links con `transaction_id` invalido se descartan solo cuando `transaction_id` no es null. **Cubierto por test local.**
+- `account_number_full` no se reintroduce por upsert local ni pull remoto. **Cubierto por test local.**
+
+**Archivos principales:**
+- `apps/desktop/electron/main/services/data/treasuryFoundationBootstrap.ts`
+- `apps/desktop/electron/main/services/data/financialDomainPullService.ts`
+- `apps/desktop/electron/main/services/data/localDatabase.ts`
+- `apps/desktop/electron/main/services/data/treasuryMutationService.ts`
+- `supabase/migrations/20260608211102_treasury_payment_instruments_v4.sql`
+- `apps/desktop/src/test/financial-domain-pull-service.test.ts`
+
+### Slice 2 — Comandos idempotentes de Tesoreria
+
+**Estado:** Pendiente
+
+**Objetivo:** Agregar comandos seguros, idempotentes y auditables.
+
+**Comandos:**
+- `treasury.paymentInstrument.upsert`
+- `treasury.paymentInstrument.deactivate`
+- `treasury.invoiceAllocation.assign`
+- `treasury.invoiceAllocation.linkToTransaction`
+- `treasury.invoiceAllocation.unlink`
+- `treasury.invoiceAllocation.reject`
+- `treasury.invoiceAllocation.markReimbursed`
+- `treasury.cardSettlement.create`
+
+**Reglas:**
+- Todos idempotentes por `commandId`, con receipts y undo donde aplique.
+- `cardSettlement.create` marca el movimiento de pago de tarjeta como `is_internal_transfer = 1`.
+- La liquidacion de tarjeta solo cierra allocations del ciclo si el usuario lo confirma.
+- Suma de allocations no puede exceder total de factura.
+- Multimoneda exige `fx_rate`.
+
+### Slice 3 — Reminders ligeros
+
+**Estado:** Pendiente
+
+**Objetivo:** Crear/actualizar reminders mensuales simples para tarjetas activas.
+
+**Reglas:**
+- Usar `reminders.recurrence_rule`.
+- Si `instrument_kind = 'credit_card'` y la tarjeta esta activa:
+  - si tiene `owner_user_id`, usarlo como default;
+  - si no tiene `owner_user_id`, exigir `reminder_user_id`.
+- No implementar calendario bancario movil avanzado en v1.
+
+### Slice 4 — UX de medios de pago y asignaciones
+
+**Estado:** Pendiente
+
+**Objetivo:** Darle a Tesoreria una UI usable para administrar medios y asignar facturas.
+
+**Frontend:**
+- Nueva vista **Cuentas y tarjetas** en Tesoreria.
+- Drawer compacto para crear/editar medios de pago, sin campos sensibles.
+- Bandeja de facturas agrega: Medio de pago, Estado conciliacion, Movimiento, Reembolso.
+- Seleccion multiple permite asignar medio, vincular movimiento y marcar reembolsado.
+
+### Slice 5 — Conciliacion asistida y Reembolsos
+
+**Estado:** Pendiente
+
+**Objetivo:** Conciliar contra candidatos y visualizar deuda de reembolso.
+
+**Frontend/backend:**
+- Drawer de conciliacion con candidatos rankeados por medio, monto, fecha, proveedor/RNC/descripcion y moneda.
+- Vista **Reembolsos** derivada: agrupar por `owner_user_id x payment_instrument_id x ciclo`.
+- No crear `reimbursement_batches` formal en v1.
+
+## Tests criticos
+
+- Crear tarjeta activa sin corte/vencimiento falla.
+- Crear tarjeta company/shared sin `owner_user_id` exige `reminder_user_id` si reminders activos.
+- No se guarda ni expone `account_number_full`.
+- Asignar factura a tarjeta sin movimiento crea link pendiente.
+- Link pendiente sync A -> B sobrevive con `transaction_id = null`.
+- Doble asignacion de la misma factura al mismo medio no duplica por UNIQUE con `COALESCE`.
+- Vincular movimiento posterior cambia estado a `matched` o `partial`.
+- Suma de allocations no puede exceder total de factura.
+- Liquidacion de tarjeta no infla gastos porque el movimiento queda como transferencia interna.
+- Multimoneda exige `fx_rate`.
+- Permisos de Tesoreria/Finance bloquean lectura y escritura para usuarios no autorizados.
+
+## Fuera de alcance v1
+
+- Tabla formal de `reimbursement_batches`.
+- Statements especializados de tarjetas con intereses, minimos o fees.
+- Auto-conciliacion sin confirmacion humana.
+- Guardar numeros completos de cuentas o tarjetas.
+- Calendario bancario movil avanzado para fechas de corte/vencimiento.
+
+## Bitacora
+
+### 2026-06-08
+
+- Se crea este documento vivo a partir del plan aprobado.
+- Se confirma riesgo critico existente: `transaction_links` aun usa `transaction_id` como identidad de sync en algunos paths, lo que bloquea links pendientes con `transaction_id = null`.
+- Primer slice seleccionado: schema/sync base antes de UX.
+- Se implementa self-heal local idempotente para medios de pago y `transaction_links` v4:
+  - agrega metadata no sensible de medio de pago en `bank_accounts`;
+  - nulifica `account_number_full`;
+  - reconstruye `transaction_links` para permitir `transaction_id = null`;
+  - agrega dedupe unico por `COALESCE(transaction_id, '')` y `COALESCE(payment_instrument_id, '')`.
+- Se crea migracion Supabase `20260608211102_treasury_payment_instruments_v4.sql`.
+- Se cambia sync de `transaction_links` para usar `id` como identidad, con fallback transitorio para outbox viejo por `transaction_id`.
+- Se ajusta la deteccion de transferencias internas para usar `last4`/masked en vez de numeros completos.
+- Verificacion local:
+  - `corepack pnpm --filter @bukowski/desktop test -- src/test/financial-domain-pull-service.test.ts src/test/treasury-mutation-service.test.ts` termino ejecutando la suite desktop completa: **287 passed, 2 skipped**.
+  - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
+
+## Proximo slice recomendado
+
+**Slice 2 — comandos idempotentes de Tesoreria.**
+
+Orden sugerido:
+1. `treasury.paymentInstrument.upsert/deactivate` con validaciones de tarjeta activa, owner/reminder y no almacenamiento de datos sensibles.
+2. `treasury.invoiceAllocation.assign` para crear links pendientes sin movimiento.
+3. `treasury.invoiceAllocation.linkToTransaction/unlink/reject/markReimbursed`.
+4. `treasury.cardSettlement.create` marcando pago de tarjeta como transferencia interna.
+
+No empezar UX hasta tener estos comandos y tests, porque la UI depende de reglas de negocio correctas.

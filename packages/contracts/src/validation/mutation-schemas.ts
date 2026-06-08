@@ -1443,6 +1443,8 @@ const transactionLinkEntityTypeSchema = z.enum([
   "invoice_payment",
   "crew_voucher",
   "financial_entry",
+  "invoice_extraction",
+  "card_settlement",
 ]);
 
 export const upsertBankAccountSchema = z

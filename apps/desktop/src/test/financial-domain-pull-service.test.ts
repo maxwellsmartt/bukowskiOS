@@ -244,6 +244,154 @@ describe("financialDomainPullService", () => {
     cleanup();
   });
 
+  it("hydrates pending transaction links by id when transaction_id is null", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-financial-pull-pending-link");
+    const workspaceId = "workspace-metadata";
+    const service = createFinancialDomainPullService(database);
+
+    service.applyRemoteTreasuryRows(workspaceId, "bank_accounts", [
+      {
+        id: "card-remote-user-001",
+        workspace_id: workspaceId,
+        bank_name: "popular",
+        account_label: "Visa personal terminada 1234",
+        account_number_masked: "****1234",
+        account_number_full: "SHOULD_NOT_SURVIVE",
+        owner: "user",
+        owner_user_id: null,
+        owner_user_name_snapshot: "Carlos",
+        instrument_kind: "credit_card",
+        last4: "1234",
+        issuer: "Banco Popular",
+        statement_cycle_day: 15,
+        payment_due_day: 30,
+        reminder_user_id: null,
+        currency: "DOP",
+        account_type: "other",
+        opening_balance: 0,
+        opening_balance_date: null,
+        is_active: 1,
+        notes: null,
+        created_at: "2026-06-08T10:00:00.000Z",
+        updated_at: "2026-06-08T10:00:00.000Z",
+      },
+    ]);
+
+    const firstPull = service.applyRemoteTreasuryRows(workspaceId, "transaction_links", [
+      {
+        id: "txn-link-pending-invoice-001",
+        workspace_id: workspaceId,
+        transaction_id: null,
+        payment_instrument_id: "card-remote-user-001",
+        linked_entity_type: "invoice_extraction",
+        linked_entity_id: "invoice-extraction-remote-001",
+        amount_applied: 1250,
+        amount_currency: "DOP",
+        fx_rate: null,
+        allocation_status: "pending",
+        cycle_start: "2026-06-01",
+        cycle_end: "2026-06-30",
+        notes: "Pending card allocation from office",
+        created_at: "2026-06-08T10:01:00.000Z",
+        updated_at: "2026-06-08T10:01:00.000Z",
+      },
+    ]);
+    const secondPull = service.applyRemoteTreasuryRows(workspaceId, "transaction_links", [
+      {
+        id: "txn-link-pending-invoice-001",
+        workspace_id: workspaceId,
+        transaction_id: null,
+        payment_instrument_id: "card-remote-user-001",
+        linked_entity_type: "invoice_extraction",
+        linked_entity_id: "invoice-extraction-remote-001",
+        amount_applied: 1250,
+        amount_currency: "DOP",
+        fx_rate: null,
+        allocation_status: "pending",
+        cycle_start: "2026-06-01",
+        cycle_end: "2026-06-30",
+        notes: "Duplicate pull should not duplicate",
+        created_at: "2026-06-08T10:01:00.000Z",
+        updated_at: "2026-06-08T10:01:00.000Z",
+      },
+    ]);
+
+    expect(firstPull.appliedCount).toBe(1);
+    expect(secondPull.appliedCount).toBe(0);
+    expect(secondPull.skippedDueToOlderCount).toBe(1);
+
+    const account = database
+      .prepare(`SELECT account_number_full, instrument_kind, last4 FROM bank_accounts WHERE id = ?`)
+      .get("card-remote-user-001") as { account_number_full: string | null; instrument_kind: string; last4: string };
+    expect(account.account_number_full).toBeNull();
+    expect(account.instrument_kind).toBe("credit_card");
+    expect(account.last4).toBe("1234");
+
+    const links = database
+      .prepare(
+        `
+          SELECT transaction_id, payment_instrument_id, linked_entity_type, allocation_status, amount_applied
+          FROM transaction_links
+          WHERE id = ?
+        `,
+      )
+      .all("txn-link-pending-invoice-001") as Array<{
+      transaction_id: string | null;
+      payment_instrument_id: string;
+      linked_entity_type: string;
+      allocation_status: string;
+      amount_applied: number;
+    }>;
+
+    expect(links).toEqual([
+      {
+        transaction_id: null,
+        payment_instrument_id: "card-remote-user-001",
+        linked_entity_type: "invoice_extraction",
+        allocation_status: "pending",
+        amount_applied: 1250,
+      },
+    ]);
+
+    cleanup();
+  });
+
+  it("skips transaction links only when a non-null transaction_id is missing", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-financial-pull-missing-link-transaction");
+    const workspaceId = "workspace-metadata";
+    const service = createFinancialDomainPullService(database);
+
+    const result = service.applyRemoteTreasuryRows(workspaceId, "transaction_links", [
+      {
+        id: "txn-link-missing-transaction",
+        workspace_id: workspaceId,
+        transaction_id: "txn-does-not-exist",
+        payment_instrument_id: null,
+        linked_entity_type: "invoice",
+        linked_entity_id: "invoice-remote-001",
+        amount_applied: 500,
+        amount_currency: "DOP",
+        fx_rate: null,
+        allocation_status: "matched",
+        cycle_start: null,
+        cycle_end: null,
+        notes: null,
+        created_at: "2026-06-08T10:02:00.000Z",
+        updated_at: "2026-06-08T10:02:00.000Z",
+      },
+    ]);
+
+    expect(result.appliedCount).toBe(0);
+    expect(result.skippedDueToDependencyCount).toBe(1);
+
+    const count = database
+      .prepare(`SELECT COUNT(*) AS count FROM transaction_links WHERE id = ?`)
+      .get("txn-link-missing-transaction") as { count: number };
+    expect(count.count).toBe(0);
+
+    cleanup();
+  });
+
   it("hydrates collaborator fees and payments, creating a placeholder crew member when needed", () => {
     const { cleanup, database } = createTestDatabase("bukowski-financial-pull-collaborators");
     const workspaceId = "workspace-metadata";
