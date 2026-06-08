@@ -1,10 +1,24 @@
 import * as XLSX from "xlsx";
 import { describe, expect, it } from "vitest";
 
-import { parseBancoSantaCruzXlsx } from "../features/finance/treasury/bankStatementParsers";
+import { parseBancoPopularCsv, parseBancoSantaCruzXlsx } from "../features/finance/treasury/bankStatementParsers";
 import { MAX_XLSX_SHEETS } from "../shared/lib/xlsxSafety";
 
 describe("bank statement parsers", () => {
+  it("extracts Banco Popular account metadata without needing full account persistence", () => {
+    const parsed = parseBancoPopularCsv(`METADATA CINE SRL
+Banco Popular Dominicano
+Cuenta: 000000000000788565075
+
+Fecha Posteo,Descripción Corta,Monto Transacción,Balance,No. Referencia,No. Serial,Descripción
+03/10/2025,Débito,100.00,179865.66,REF-1,SER-1,EXI COMISIONES LBTR
+`);
+
+    expect(parsed.bankName).toBe("popular");
+    expect(parsed.accountNumber?.slice(-4)).toBe("5075");
+    expect(parsed.rows).toHaveLength(1);
+  });
+
   it("parses a Santa Cruz XLSX statement", () => {
     const workbook = XLSX.utils.book_new();
     const sheet = XLSX.utils.aoa_to_sheet([
@@ -19,6 +33,7 @@ describe("bank statement parsers", () => {
 
     expect(parsed.bankName).toBe("santa_cruz");
     expect(parsed.accountNumber).toBe("1234567");
+    expect(parsed.accountNumber?.slice(-4)).toBe("4567");
     expect(parsed.currencyHint).toBe("USD");
     expect(parsed.rows).toHaveLength(1);
     expect(parsed.rows[0]).toMatchObject({

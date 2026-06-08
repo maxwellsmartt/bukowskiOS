@@ -703,6 +703,13 @@ describe("treasury mutation service", () => {
         paymentDueDay: 25,
       }),
     );
+    mutations.upsertBankAccount(
+      account("cmd-card-allocation-alt", {
+        accountLabel: "Popular Backup",
+        accountNumberFull: "123456789",
+        instrumentKind: "bank_account",
+      }),
+    );
 
     database
       .prepare(
@@ -795,11 +802,40 @@ describe("treasury mutation service", () => {
       }),
     ).toThrow("Invoice allocations cannot exceed the linked document total.");
 
+    const reassigned = mutations.assignInvoiceAllocation({
+      commandId: "cmd-allocation-reassign",
+      workspaceId,
+      ...baseChannel,
+      paymentInstrumentId: "bank-account-cmd-card-allocation-alt",
+      linkedEntityType: "invoice_extraction",
+      linkedEntityId: "invoice-extraction-allocation-001",
+      amountApplied: 700,
+      amountCurrency: "DOP",
+    });
+    expect(reassigned.allocationId).toBe(allocation.allocationId);
+    const activeAllocations = database
+      .prepare(
+        `SELECT COUNT(*) AS count, MAX(payment_instrument_id) AS paymentInstrumentId, MAX(amount_applied) AS amountApplied
+         FROM transaction_links
+         WHERE workspace_id = ?
+           AND linked_entity_type = 'invoice_extraction'
+           AND linked_entity_id = ?
+           AND allocation_status NOT IN ('rejected', 'reimbursed')`,
+      )
+      .get(workspaceId, "invoice-extraction-allocation-001") as {
+      count: number;
+      paymentInstrumentId: string;
+      amountApplied: number;
+    };
+    expect(activeAllocations.count).toBe(1);
+    expect(activeAllocations.paymentInstrumentId).toBe("bank-account-cmd-card-allocation-alt");
+    expect(activeAllocations.amountApplied).toBe(700);
+
     mutations.importStatement({
       commandId: "cmd-import-allocation-link",
       workspaceId,
       ...baseChannel,
-      bankAccountId: "bank-account-cmd-card-allocation",
+      bankAccountId: "bank-account-cmd-card-allocation-alt",
       sourceFormat: "manual",
       rows: [{ txnDate: "2026-06-09", rawDescription: "COMPRA FACTURA", amount: 700, direction: "debit" }],
     });

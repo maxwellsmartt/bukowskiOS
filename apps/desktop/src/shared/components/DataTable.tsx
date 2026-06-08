@@ -13,7 +13,9 @@ import { Check, Columns3, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { ListSortDirection } from "@contracts";
+import { useUserSetting } from "@shared/hooks/useUserSetting";
 import { readJsonPreference, writeJsonPreference } from "@shared/lib/preferences";
+import { userSettingKeys } from "@shared/lib/userSettings";
 
 type DataColumn<T> = {
   key: string;
@@ -55,6 +57,7 @@ type DataTableProps<T = unknown> = {
   emptyMessage?: string;
   emptyContent?: ReactNode;
   persistKey?: string;
+  syncPreferences?: boolean;
   defaultVisibleColumnKeys?: string[];
   shellClassName?: string;
   sortState?: {
@@ -88,6 +91,15 @@ const columnReorderThreshold = 6;
 const resolveMaxHeight = (value: DataTableProps["maxHeight"]) =>
   typeof value === "number" ? `${value}px` : value ?? "min(58vh, 620px)";
 
+const areStringArraysEqual = (left: string[], right: string[]) =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
+const areNumberRecordsEqual = (left: Record<string, number>, right: Record<string, number>) => {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return leftKeys.length === rightKeys.length && leftKeys.every((key) => left[key] === right[key]);
+};
+
 export const DataTable = <T = unknown,>({
   columns,
   rows,
@@ -102,6 +114,7 @@ export const DataTable = <T = unknown,>({
   emptyMessage,
   emptyContent,
   persistKey,
+  syncPreferences = false,
   defaultVisibleColumnKeys,
   shellClassName,
   sortState = null,
@@ -133,12 +146,15 @@ export const DataTable = <T = unknown,>({
   const suppressNextSortClickRef = useRef(false);
   const columnOrderUndoStackRef = useRef<string[][]>([]);
   const selectionAnchorRowIdRef = useRef<string | null>(null);
+  const [syncedTablePreferences, setSyncedTablePreferences] = useUserSetting(userSettingKeys.tablePreferences);
+  const syncedTablePreference = syncPreferences && persistKey ? syncedTablePreferences?.[persistKey] : undefined;
 
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
     const parsedWidths = persistKey ? readJsonPreference<Record<string, number>>(`table:${persistKey}`, {}) : {};
+    const syncedWidths = syncedTablePreference?.columnWidths ?? {};
 
     return columns.reduce<Record<string, number>>((accumulator, column) => {
-      accumulator[column.key] = parsedWidths[column.key] ?? column.width ?? 160;
+      accumulator[column.key] = syncedWidths[column.key] ?? parsedWidths[column.key] ?? column.width ?? 160;
       return accumulator;
     }, {});
   });
@@ -160,10 +176,23 @@ export const DataTable = <T = unknown,>({
       return preferredDefaultKeys.length ? preferredDefaultKeys : defaultKeys;
     }
 
-    const savedKeys = readJsonPreference<string[]>(`table-columns:${persistKey}`, preferredDefaultKeys);
+    const savedKeys = syncedTablePreference?.visibleColumnKeys ?? readJsonPreference<string[]>(`table-columns:${persistKey}`, preferredDefaultKeys);
     const validKeys = savedKeys.filter((key) => defaultKeys.includes(key));
     return validKeys.length ? validKeys : preferredDefaultKeys;
   });
+
+  const writeSyncedTablePreference = (patch: { columnWidths?: Record<string, number>; visibleColumnKeys?: string[] }) => {
+    if (!syncPreferences || !persistKey) {
+      return;
+    }
+
+    const currentTablePreference = syncedTablePreferences?.[persistKey] ?? {};
+    const nextTablePreference = { ...currentTablePreference, ...patch };
+    void setSyncedTablePreferences({
+      ...(syncedTablePreferences ?? {}),
+      [persistKey]: nextTablePreference,
+    }).catch(() => undefined);
+  };
 
   const setSelection = (nextSelection: string[]) => {
     if (onSelectedRowIdsChange) {
@@ -205,15 +234,42 @@ export const DataTable = <T = unknown,>({
   }, [columnWidths, persistKey]);
 
   useEffect(() => {
+    if (!syncPreferences || !persistKey || !syncedTablePreference) {
+      return;
+    }
+
+    if (syncedTablePreference.columnWidths) {
+      setColumnWidths((currentWidths) => {
+        const nextWidths = columns.reduce<Record<string, number>>((accumulator, column) => {
+          accumulator[column.key] = syncedTablePreference.columnWidths?.[column.key] ?? currentWidths[column.key] ?? column.width ?? 160;
+          return accumulator;
+        }, {});
+        return areNumberRecordsEqual(currentWidths, nextWidths) ? currentWidths : nextWidths;
+      });
+    }
+
+    if (syncedTablePreference.visibleColumnKeys) {
+      const defaultKeys = columns.map((column) => column.key);
+      const validKeys = syncedTablePreference.visibleColumnKeys.filter((key) => defaultKeys.includes(key));
+      if (validKeys.length) {
+        setVisibleColumnKeys((currentKeys) => (areStringArraysEqual(currentKeys, validKeys) ? currentKeys : validKeys));
+      }
+    }
+  }, [columns, persistKey, syncPreferences, syncedTablePreference]);
+
+  useEffect(() => {
     const defaultKeys = columns.map((column) => column.key);
     setVisibleColumnKeys((currentKeys) => {
       const nextKeys = currentKeys.filter((key) => defaultKeys.includes(key));
       const fallbackKeys = defaultVisibleColumnKeys?.filter((key) => defaultKeys.includes(key)) ?? defaultKeys;
+      if (persistKey) {
+        return nextKeys.length ? nextKeys : fallbackKeys;
+      }
       const missingKeys = fallbackKeys.filter((key) => !nextKeys.includes(key));
       const resolvedKeys = [...nextKeys, ...missingKeys];
       return resolvedKeys.length ? resolvedKeys : fallbackKeys;
     });
-  }, [columns, defaultVisibleColumnKeys]);
+  }, [columns, defaultVisibleColumnKeys, persistKey]);
 
   useEffect(() => {
     if (!persistKey || typeof window === "undefined") {
@@ -684,7 +740,11 @@ export const DataTable = <T = unknown,>({
       setResizingColumnKey(null);
       document.body.style.removeProperty("cursor");
       document.body.style.removeProperty("user-select");
-      setColumnWidths((currentWidths) => ({ ...currentWidths, [columnKey]: latestWidth }));
+      setColumnWidths((currentWidths) => {
+        const nextWidths = { ...currentWidths, [columnKey]: latestWidth };
+        writeSyncedTablePreference({ columnWidths: nextWidths });
+        return nextWidths;
+      });
     };
 
     resizer.addEventListener("pointermove", handlePointerMove);
@@ -700,10 +760,14 @@ export const DataTable = <T = unknown,>({
         if (!nextVisible.length) {
           return current;
         }
-        return current.filter((key) => key !== columnKey);
+        const nextKeys = current.filter((key) => key !== columnKey);
+        writeSyncedTablePreference({ visibleColumnKeys: nextKeys });
+        return nextKeys;
       }
 
-      return [...current, columnKey];
+      const nextKeys = [...current, columnKey];
+      writeSyncedTablePreference({ visibleColumnKeys: nextKeys });
+      return nextKeys;
     });
   };
 
@@ -724,6 +788,7 @@ export const DataTable = <T = unknown,>({
       const [movedKey] = nextKeys.splice(sourceIndex, 1);
       nextKeys.splice(targetIndex, 0, movedKey);
       columnOrderUndoStackRef.current = [...columnOrderUndoStackRef.current.slice(-9), currentKeys];
+      writeSyncedTablePreference({ visibleColumnKeys: nextKeys });
       return nextKeys;
     });
   };
@@ -1062,7 +1127,9 @@ export const DataTable = <T = unknown,>({
                   onClick={() => {
                     const defaultKeys = columns.map((column) => column.key);
                     const preferredDefaultKeys = defaultVisibleColumnKeys?.filter((key) => defaultKeys.includes(key)) ?? defaultKeys;
-                    setVisibleColumnKeys(preferredDefaultKeys.length ? preferredDefaultKeys : defaultKeys);
+                    const nextKeys = preferredDefaultKeys.length ? preferredDefaultKeys : defaultKeys;
+                    setVisibleColumnKeys(nextKeys);
+                    writeSyncedTablePreference({ visibleColumnKeys: nextKeys });
                     setColumnsMenuOpen(false);
                   }}
                   role="menuitem"

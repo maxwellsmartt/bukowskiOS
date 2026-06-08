@@ -17992,6 +17992,12 @@ input[type="number"] {
   margin: 4px 0 0;
 }
 
+.treasury-account-terminal {
+  color: rgba(232, 184, 106, 0.98);
+  font-weight: 750;
+  letter-spacing: 0.015em;
+}
+
 .treasury-payment-instrument-meta {
   display: grid;
   gap: 8px;
@@ -20647,6 +20653,10 @@ input[type="number"] {
 .invoice-actions-cell .icon-ghost-control svg {
   width: 13px;
   height: 13px;
+}
+
+.treasury-payment-instrument-deactivate {
+  margin-left: auto;
 }
 
 /* Documents folder setting ================================================== */

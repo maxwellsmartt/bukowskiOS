@@ -42,6 +42,8 @@ export const userSettingKeys = {
   nativeNotifications: "nativeNotifications",
   /** Whether chart/graph entrance animations play. Default true. */
   chartAnimations: "chartAnimations",
+  /** Cross-device table layouts for user-controlled columns in high-value screens. */
+  tablePreferences: "tablePreferences",
 } as const;
 
 export type UserSettingKey = (typeof userSettingKeys)[keyof typeof userSettingKeys];
@@ -62,7 +64,15 @@ export type UserSettingsMap = {
   [userSettingKeys.defaultCurrency]?: string;
   [userSettingKeys.nativeNotifications]?: NativeNotificationPreferences;
   [userSettingKeys.chartAnimations]?: boolean;
+  [userSettingKeys.tablePreferences]?: TablePreferencesMap;
 };
+
+export type TablePreference = {
+  columnWidths?: Record<string, number>;
+  visibleColumnKeys?: string[];
+};
+
+export type TablePreferencesMap = Record<string, TablePreference>;
 
 type Listener = (settings: UserSettingsMap) => void;
 
@@ -115,6 +125,46 @@ const isDateFormatMode = (value: unknown): value is DateFormatMode =>
 
 const isCurrencyCode = (value: unknown): value is string =>
   typeof value === "string" && /^[A-Z]{3}$/.test(value);
+
+const sanitizeTablePreferences = (raw: unknown): TablePreferencesMap | undefined => {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return undefined;
+  }
+
+  const next: TablePreferencesMap = {};
+  for (const [tableKey, preference] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^[a-zA-Z0-9:_-]{1,96}$/.test(tableKey) || !preference || typeof preference !== "object" || Array.isArray(preference)) {
+      continue;
+    }
+
+    const source = preference as Record<string, unknown>;
+    const tablePreference: TablePreference = {};
+    if (source.columnWidths && typeof source.columnWidths === "object" && !Array.isArray(source.columnWidths)) {
+      const widths: Record<string, number> = {};
+      for (const [columnKey, width] of Object.entries(source.columnWidths as Record<string, unknown>)) {
+        if (/^[a-zA-Z0-9:_-]{1,96}$/.test(columnKey) && typeof width === "number" && Number.isFinite(width) && width >= 40 && width <= 1200) {
+          widths[columnKey] = Math.round(width);
+        }
+      }
+      if (Object.keys(widths).length) {
+        tablePreference.columnWidths = widths;
+      }
+    }
+    if (Array.isArray(source.visibleColumnKeys)) {
+      const visibleColumnKeys = source.visibleColumnKeys.filter(
+        (columnKey): columnKey is string => typeof columnKey === "string" && /^[a-zA-Z0-9:_-]{1,96}$/.test(columnKey),
+      );
+      if (visibleColumnKeys.length) {
+        tablePreference.visibleColumnKeys = Array.from(new Set(visibleColumnKeys));
+      }
+    }
+    if (tablePreference.columnWidths || tablePreference.visibleColumnKeys) {
+      next[tableKey] = tablePreference;
+    }
+  }
+
+  return Object.keys(next).length ? next : undefined;
+};
 
 export const NOTIFICATION_CATEGORIES = [
   "invoiceInbox",
@@ -194,6 +244,11 @@ const sanitizeRemoteSettings = (raw: unknown): UserSettingsMap => {
 
   if (typeof source[userSettingKeys.chartAnimations] === "boolean") {
     next[userSettingKeys.chartAnimations] = source[userSettingKeys.chartAnimations] as boolean;
+  }
+
+  const tablePreferences = sanitizeTablePreferences(source[userSettingKeys.tablePreferences]);
+  if (tablePreferences) {
+    next[userSettingKeys.tablePreferences] = tablePreferences;
   }
 
   return next;

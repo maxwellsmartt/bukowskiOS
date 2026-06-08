@@ -493,6 +493,26 @@ const loadAllocation = (db: DatabaseSync, workspaceId: string, allocationId: str
   return row;
 };
 
+const loadLatestOpenAllocationForEntity = (
+  db: DatabaseSync,
+  workspaceId: string,
+  linkedEntityType: string,
+  linkedEntityId: string,
+) => {
+  return db
+    .prepare(
+      `SELECT *
+       FROM transaction_links
+       WHERE workspace_id = ?
+         AND linked_entity_type = ?
+         AND linked_entity_id = ?
+         AND allocation_status NOT IN ('rejected', 'reimbursed')
+       ORDER BY updated_at DESC, created_at DESC
+       LIMIT 1`,
+    )
+    .get(workspaceId, linkedEntityType, linkedEntityId) as ReturnType<typeof loadAllocation> | undefined;
+};
+
 const loadLinkedEntityTotal = (db: DatabaseSync, workspaceId: string, linkedEntityType: string, linkedEntityId: string) => {
   if (linkedEntityType === "invoice") {
     const row = db
@@ -1822,10 +1842,16 @@ const syncCardPaymentReminder = (
       const allocationId = `txn-link-${input.commandId}`;
       const existing = receiptHelpers.getExistingReceipt(input.commandId);
       if (existing?.outcome_status === "success") {
+        const currentAllocation = loadLatestOpenAllocationForEntity(
+          db,
+          input.workspaceId,
+          input.linkedEntityType,
+          input.linkedEntityId,
+        );
         return {
           commandId: input.commandId,
-          allocationId,
-          transactionId: null,
+          allocationId: currentAllocation?.id ?? allocationId,
+          transactionId: currentAllocation?.transaction_id ?? null,
           repeated: true,
           summary: "Invoice allocation already assigned.",
         };
@@ -1841,37 +1867,78 @@ const syncCardPaymentReminder = (
       if (normalizeCurrency(instrument.currency) !== amountCurrency && !input.fxRate) {
         throw new Error("Multicurrency invoice allocations require an FX rate.");
       }
-      ensureAllocationTotalWithinEntity(db, { ...input, amountCurrency });
+      const currentAllocation = loadLatestOpenAllocationForEntity(
+        db,
+        input.workspaceId,
+        input.linkedEntityType,
+        input.linkedEntityId,
+      );
+      const shouldUpdateExistingAllocation =
+        currentAllocation != null && currentAllocation.payment_instrument_id !== input.paymentInstrumentId;
+      ensureAllocationTotalWithinEntity(db, {
+        ...input,
+        amountCurrency,
+        excludeAllocationId: shouldUpdateExistingAllocation ? currentAllocation.id : null,
+      });
 
       db.exec("BEGIN");
       try {
-        db.prepare(
-          `INSERT INTO transaction_links (
-             id, workspace_id, transaction_id, payment_instrument_id,
-             linked_entity_type, linked_entity_id, amount_applied, amount_currency,
-             fx_rate, allocation_status, cycle_start, cycle_end, notes, created_at, updated_at
-           ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
-           ON CONFLICT DO NOTHING`,
-        ).run(
-          allocationId,
-          input.workspaceId,
-          input.paymentInstrumentId,
-          input.linkedEntityType,
-          input.linkedEntityId,
-          round2(input.amountApplied),
-          amountCurrency,
-          input.fxRate ?? null,
-          input.cycleStart?.trim() || null,
-          input.cycleEnd?.trim() || null,
-          input.notes?.trim() || null,
-          now,
-          now,
-        );
+        const targetAllocationId = shouldUpdateExistingAllocation ? currentAllocation.id : allocationId;
+        if (shouldUpdateExistingAllocation) {
+          db.prepare(
+            `UPDATE transaction_links
+             SET transaction_id = NULL,
+                 payment_instrument_id = ?,
+                 amount_applied = ?,
+                 amount_currency = ?,
+                 fx_rate = ?,
+                 allocation_status = 'pending',
+                 cycle_start = COALESCE(?, cycle_start),
+                 cycle_end = COALESCE(?, cycle_end),
+                 notes = COALESCE(?, notes),
+                 updated_at = ?
+             WHERE workspace_id = ? AND id = ?`,
+          ).run(
+            input.paymentInstrumentId,
+            round2(input.amountApplied),
+            amountCurrency,
+            input.fxRate ?? null,
+            input.cycleStart?.trim() || null,
+            input.cycleEnd?.trim() || null,
+            input.notes?.trim() || null,
+            now,
+            input.workspaceId,
+            targetAllocationId,
+          );
+        } else {
+          db.prepare(
+            `INSERT INTO transaction_links (
+               id, workspace_id, transaction_id, payment_instrument_id,
+               linked_entity_type, linked_entity_id, amount_applied, amount_currency,
+               fx_rate, allocation_status, cycle_start, cycle_end, notes, created_at, updated_at
+             ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
+             ON CONFLICT DO NOTHING`,
+          ).run(
+            allocationId,
+            input.workspaceId,
+            input.paymentInstrumentId,
+            input.linkedEntityType,
+            input.linkedEntityId,
+            round2(input.amountApplied),
+            amountCurrency,
+            input.fxRate ?? null,
+            input.cycleStart?.trim() || null,
+            input.cycleEnd?.trim() || null,
+            input.notes?.trim() || null,
+            now,
+            now,
+          );
+        }
         enqueueOutbox(
           db,
           input.workspaceId,
           "transaction_link",
-          allocationId,
+          targetAllocationId,
           { linkedEntityType: input.linkedEntityType, linkedEntityId: input.linkedEntityId },
           `sync-${input.commandId}`,
           now,
@@ -1886,7 +1953,7 @@ const syncCardPaymentReminder = (
 
       return {
         commandId: input.commandId,
-        allocationId,
+        allocationId: shouldUpdateExistingAllocation ? currentAllocation.id : allocationId,
         transactionId: null,
         repeated: false,
         summary: "Invoice allocation assigned.",
