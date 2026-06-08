@@ -3948,12 +3948,13 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   display: grid;
   gap: 10px;
   min-height: 0;
-  padding: 12px;
-  border: 1px solid rgba(92, 153, 255, 0.18);
-  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid rgba(92, 153, 255, 0.32);
+  border-radius: 14px;
   background:
-    linear-gradient(180deg, rgba(92, 153, 255, 0.075), rgba(92, 153, 255, 0.035)),
-    rgba(255, 255, 255, 0.02);
+    linear-gradient(180deg, rgba(92, 153, 255, 0.12), rgba(92, 153, 255, 0.05)),
+    rgba(255, 255, 255, 0.028);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 22px rgba(8, 12, 20, 0.28);
 }
 
 .asset-operation-cart-header {
