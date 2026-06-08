@@ -1570,6 +1570,7 @@
       "searchPlaceholder": "Buscar descripción, concepto o contraparte…",
       "tabs": {
         "overview": "Resumen",
+        "accounts": "Cuentas y tarjetas",
         "movements": "Movimientos",
         "review": "Revisión contable",
         "invoices": "Facturas",
@@ -1604,8 +1605,16 @@
           "category": "Categoría",
           "uploadedBy": "Subido por",
           "uploadedOn": "Subido el",
+          "paymentInstrument": "Medio de pago",
+          "reconciliation": "Conciliación",
           "match": "Movimiento sugerido",
           "actions": "Acciones"
+        },
+        "reconciliation": {
+          "applied": "Aplicada",
+          "suggested": "Sugerida",
+          "failed": "Error",
+          "pending": "Pendiente"
         },
         "status": {
           "pending": "En cola",
@@ -1654,7 +1663,7 @@
         "unclassified": "Sin clasificar"
       },
       "actions": {
-        "newAccount": "Nueva cuenta",
+        "newAccount": "Nuevo medio de pago",
         "import": "Importar estado",
         "backToOverview": "Volver al resumen",
         "addRow": "Agregar movimiento"
@@ -1688,6 +1697,13 @@
       },
       "accounts": {
         "title": "Cuentas",
+        "paymentTitle": "Cuentas y tarjetas",
+        "paymentHint": "Administra medios de pago sin guardar números completos. Las tarjetas de crédito activas crean reminders mensuales.",
+        "active": "Activo",
+        "inactive": "Inactivo",
+        "activeCount": "{{count}} activos",
+        "inactiveCount": "{{count}} inactivos",
+        "openMovements": "Movimientos",
         "emptyTitle": "Aún no hay cuentas bancarias",
         "emptyBody": "Agrega una cuenta bancaria y luego importa su estado CSV/XLSX para empezar a registrar movimientos.",
         "openHint": "Ver los movimientos de esta cuenta",
@@ -1777,13 +1793,53 @@
         "emptyBody": "Reparte los gastos entre proyectos para ver la rentabilidad real por proyecto."
       },
       "account": {
-        "saved": "Cuenta bancaria guardada.",
-        "failed": "No se pudo guardar la cuenta bancaria.",
+        "saved": "Medio de pago guardado.",
+        "failed": "No se pudo guardar el medio de pago.",
+        "deactivated": "Medio de pago desactivado.",
+        "deactivateFailed": "No se pudo desactivar el medio de pago.",
+        "deactivate": "Desactivar",
+        "newTitle": "Nuevo medio de pago",
+        "editTitle": "Editar medio de pago",
+        "safeHint": "Guarda solo metadata operativa. No introduzcas números completos de cuenta o tarjeta.",
+        "noSensitiveData": "Sin datos sensibles",
         "bank": "Banco",
         "label": "Etiqueta",
         "number": "Número de cuenta",
+        "masked": "Máscara visible",
+        "instrumentKind": "Tipo",
+        "accountType": "Cuenta",
+        "owner": "Owner",
+        "ownerUserId": "Usuario responsable",
+        "ownerName": "Nombre snapshot",
+        "last4": "Últimos 4",
+        "issuer": "Emisor",
+        "statementCycleDay": "Día de corte",
+        "paymentDueDay": "Día de pago",
+        "reminderUserId": "Usuario reminder",
+        "reminderHint": "Requerido si no hay responsable",
+        "notes": "Notas",
+        "balance": "Balance",
+        "cardCycle": "Ciclo tarjeta",
+        "cardCycleValue": "Corte {{cycle}} · Pago {{due}}",
         "currency": "Moneda",
         "openingBalance": "Balance inicial"
+      },
+      "accountTypes": {
+        "checking": "Corriente",
+        "savings": "Ahorro",
+        "other": "Otra"
+      },
+      "instrumentKinds": {
+        "bank_account": "Cuenta bancaria",
+        "debit_card": "Tarjeta débito",
+        "credit_card": "Tarjeta crédito",
+        "cash": "Efectivo",
+        "other": "Otro"
+      },
+      "owners": {
+        "company": "Empresa",
+        "user": "Usuario",
+        "shared": "Compartido"
       },
       "banks": {
         "popular": "Banco Popular",

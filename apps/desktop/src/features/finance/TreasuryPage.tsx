@@ -1,4 +1,4 @@
-import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, FileDown, FileUp, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Banknote, Check, ChevronDown, CreditCard, Download, Edit3, FileDown, FileUp, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useChartAnimationsEnabled } from "@shared/hooks/useChartAnimations";
@@ -20,11 +20,14 @@ import {
 
 import type {
   BankAccountRow,
+  BankAccountType,
   BankName,
   BankTransactionRow,
   CounterpartyRulePreview,
   DgiiReportExportFormat,
   DgiiReportKind,
+  PaymentInstrumentKind,
+  PaymentInstrumentOwner,
   ReviewQueueRow,
   TreasuryDeductibleLedgerExportFormat,
   TransactionDirection,
@@ -60,8 +63,8 @@ import {
   useTreasuryDeductibleLedger,
 } from "./useTreasuryData";
 
-type Tab = "overview" | "movements" | "review" | "invoices" | "projects";
-const treasuryTabs: Tab[] = ["overview", "movements", "review", "invoices", "projects"];
+type Tab = "overview" | "accounts" | "movements" | "review" | "invoices" | "projects";
+const treasuryTabs: Tab[] = ["overview", "accounts", "movements", "review", "invoices", "projects"];
 type MovementDateFilter = "all" | "month" | "custom";
 type TreasuryReportCurrency = "DOP" | "USD";
 type PendingClassificationRule = {
@@ -449,6 +452,8 @@ export const TreasuryPage = () => {
   const [unclassifiedOnly, setUnclassifiedOnly] = useState(false);
   const [suggestedOnly, setSuggestedOnly] = useState(false);
   const [showAccountForm, setShowAccountForm] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<BankAccountRow | null>(null);
+  const [deactivatingAccountId, setDeactivatingAccountId] = useState<string | null>(null);
   const [showManualForm, setShowManualForm] = useState(false);
   const [importHistoryOpen, setImportHistoryOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -561,6 +566,12 @@ export const TreasuryPage = () => {
     [t],
   );
   const formatMoney = formatTreasuryMoney;
+  const instrumentKindLabel = (kind: PaymentInstrumentKind) =>
+    t(`finance.treasury.instrumentKinds.${kind}`, { defaultValue: kind.replace(/_/g, " ") });
+  const ownerLabel = (owner: PaymentInstrumentOwner) =>
+    t(`finance.treasury.owners.${owner}`, { defaultValue: owner });
+  const activeAccounts = useMemo(() => accounts.data.filter((account) => account.isActive), [accounts.data]);
+  const inactiveAccounts = useMemo(() => accounts.data.filter((account) => !account.isActive), [accounts.data]);
   const visibleMovements = useMemo(
     () => (suggestedOnly ? transactions.data.filter((row) => inferTreasurySuggestion(row)) : transactions.data),
     [suggestedOnly, transactions.data],
@@ -635,6 +646,61 @@ export const TreasuryPage = () => {
   const openAccount = (accountId: string) => {
     setAccountFilter(accountId);
     setTab("movements");
+  };
+
+  const startNewPaymentInstrument = () => {
+    setEditingAccount(null);
+    setShowAccountForm((current) => !current);
+    setTab("accounts");
+  };
+
+  const startEditPaymentInstrument = (account: BankAccountRow) => {
+    setEditingAccount(account);
+    setShowAccountForm(true);
+    setTab("accounts");
+  };
+
+  const savePaymentInstrument = async (draft: AccountDraft) => {
+    try {
+      await mutations.upsertPaymentInstrument({
+        commandId: newCommandId("treasury-instrument"),
+        workspaceId: activeWorkspaceId,
+        actorType: "user",
+        sourceChannel: "desktop",
+        bankAccountId: editingAccount?.id ?? null,
+        ...draft,
+        accountNumberFull: null,
+      });
+      toast.success(t("finance.treasury.account.saved"));
+      setShowAccountForm(false);
+      setEditingAccount(null);
+      accounts.refresh();
+      overview.refresh();
+      undoPreview.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("finance.treasury.account.failed"));
+    }
+  };
+
+  const deactivatePaymentInstrument = async (account: BankAccountRow) => {
+    setDeactivatingAccountId(account.id);
+    try {
+      await mutations.deactivatePaymentInstrument({
+        commandId: newCommandId("treasury-instrument-deactivate"),
+        workspaceId: activeWorkspaceId,
+        actorType: "user",
+        sourceChannel: "desktop",
+        paymentInstrumentId: account.id,
+      });
+      toast.success(t("finance.treasury.account.deactivated", { defaultValue: "Medio de pago desactivado." }));
+      accounts.refresh();
+      overview.refresh();
+      undoPreview.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("finance.treasury.account.deactivateFailed", { defaultValue: "No se pudo desactivar el medio de pago." }));
+    } finally {
+      setDeactivatingAccountId(null);
+    }
   };
 
   const beginEdit = (row: BankTransactionRow) => {
@@ -1386,7 +1452,7 @@ export const TreasuryPage = () => {
         {canManageAccounts ? (
           <button
             className={`ghost-control treasury-new-account-button${showAccountForm ? " is-active" : ""}`}
-            onClick={() => setShowAccountForm((v) => !v)}
+            onClick={startNewPaymentInstrument}
             type="button"
           >
             <Plus size={13} />
@@ -1397,31 +1463,19 @@ export const TreasuryPage = () => {
 
       {showAccountForm ? (
         <AccountForm
-          onCancel={() => setShowAccountForm(false)}
-          onSave={async (draft) => {
-            try {
-              await mutations.upsertAccount({
-                commandId: newCommandId("treasury-account"),
-                workspaceId: activeWorkspaceId,
-                actorType: "user",
-                sourceChannel: "desktop",
-                ...draft,
-              });
-              toast.success(t("finance.treasury.account.saved"));
-              setShowAccountForm(false);
-              accounts.refresh();
-              undoPreview.refresh();
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : t("finance.treasury.account.failed"));
-            }
+          initialAccount={editingAccount}
+          onCancel={() => {
+            setShowAccountForm(false);
+            setEditingAccount(null);
           }}
+          onSave={savePaymentInstrument}
         />
       ) : null}
 
       <div
         className="treasury-segmented-tabs"
         role="tablist"
-        style={{ "--treasury-tab-index": treasuryTabs.indexOf(tab) } as CSSProperties}
+        style={{ "--treasury-tab-count": treasuryTabs.length, "--treasury-tab-index": treasuryTabs.indexOf(tab) } as CSSProperties}
       >
         <span aria-hidden="true" className="treasury-segmented-tabs-indicator" />
         {treasuryTabs.map((value) => (
@@ -1800,6 +1854,132 @@ export const TreasuryPage = () => {
             )}
           </SurfaceCard>
         </>
+      ) : null}
+
+      {tab === "accounts" ? (
+        <SurfaceCard className="treasury-payment-instruments-card">
+          <div className="treasury-payment-instruments-header">
+            <div>
+              <h2 className="section-subtitle">{t("finance.treasury.accounts.paymentTitle", { defaultValue: "Cuentas y tarjetas" })}</h2>
+              <p>
+                {t("finance.treasury.accounts.paymentHint", {
+                  defaultValue:
+                    "Administra medios de pago sin guardar números completos. Las tarjetas de crédito activas crean reminders mensuales.",
+                })}
+              </p>
+            </div>
+            <div className="treasury-payment-instruments-stats">
+              <span>{t("finance.treasury.accounts.activeCount", { defaultValue: "{{count}} activos", count: activeAccounts.length })}</span>
+              <span>{t("finance.treasury.accounts.inactiveCount", { defaultValue: "{{count}} inactivos", count: inactiveAccounts.length })}</span>
+            </div>
+          </div>
+
+          {accounts.isLoading ? (
+            <TableSkeleton rows={4} columns={4} />
+          ) : accounts.data.length === 0 ? (
+            <GuidedEmptyState
+              body={t("finance.treasury.accounts.emptyBody")}
+              title={t("finance.treasury.accounts.emptyTitle")}
+            />
+          ) : (
+            <div className="treasury-payment-instruments-grid">
+              {accounts.data.map((account) => {
+                const isCard = account.instrumentKind === "credit_card" || account.instrumentKind === "debit_card";
+                return (
+                  <article
+                    className={`treasury-payment-instrument${account.isActive ? "" : " is-inactive"}`}
+                    key={account.id}
+                  >
+                    <div className="treasury-payment-instrument-top">
+                      <span className="treasury-payment-instrument-icon">
+                        {isCard ? <CreditCard size={18} /> : <Banknote size={18} />}
+                      </span>
+                      <div>
+                        <h3>{account.accountLabel}</h3>
+                        <p>
+                          {instrumentKindLabel(account.instrumentKind)} · {account.currency}
+                          {account.last4 ? ` · •••• ${account.last4}` : ""}
+                        </p>
+                      </div>
+                      <StatusBadge tone={account.isActive ? "success" : "neutral"}>
+                        {account.isActive
+                          ? t("finance.treasury.accounts.active", { defaultValue: "Activo" })
+                          : t("finance.treasury.accounts.inactive", { defaultValue: "Inactivo" })}
+                      </StatusBadge>
+                    </div>
+
+                    <dl className="treasury-payment-instrument-meta">
+                      <div>
+                        <dt>{t("finance.treasury.account.bank")}</dt>
+                        <dd>{t(`finance.treasury.banks.${account.bankName}`, { defaultValue: account.bankName })}</dd>
+                      </div>
+                      <div>
+                        <dt>{t("finance.treasury.account.owner", { defaultValue: "Owner" })}</dt>
+                        <dd>{ownerLabel(account.owner)}</dd>
+                      </div>
+                      <div>
+                        <dt>{t("finance.treasury.account.balance", { defaultValue: "Balance" })}</dt>
+                        <dd>{formatMoney(account.currentBalance ?? account.openingBalance, account.currency)}</dd>
+                      </div>
+                      <div>
+                        <dt>{t("finance.treasury.accounts.movementCount", { count: account.transactionCount })}</dt>
+                        <dd>{account.accountNumberMasked || account.issuer || "—"}</dd>
+                      </div>
+                      {account.instrumentKind === "credit_card" ? (
+                        <div>
+                          <dt>{t("finance.treasury.account.cardCycle", { defaultValue: "Ciclo tarjeta" })}</dt>
+                          <dd>
+                            {t("finance.treasury.account.cardCycleValue", {
+                              defaultValue: "Corte {{cycle}} · Pago {{due}}",
+                              cycle: account.statementCycleDay ?? "—",
+                              due: account.paymentDueDay ?? "—",
+                            })}
+                          </dd>
+                        </div>
+                      ) : null}
+                    </dl>
+
+                    <div className="treasury-payment-instrument-actions">
+                      <button className="ghost-control" onClick={() => openAccount(account.id)} type="button">
+                        <ArrowUpRight size={13} />
+                        {t("finance.treasury.accounts.openMovements", { defaultValue: "Movimientos" })}
+                      </button>
+                      {canImport && account.isActive ? (
+                        <button
+                          className="ghost-control"
+                          onClick={() => triggerImport(account.id, account.bankName)}
+                          type="button"
+                        >
+                          <FileUp size={13} />
+                          {t("finance.treasury.actions.import")}
+                        </button>
+                      ) : null}
+                      {canManageAccounts ? (
+                        <button className="ghost-control" onClick={() => startEditPaymentInstrument(account)} type="button">
+                          <Edit3 size={13} />
+                          {t("common.edit", { defaultValue: "Editar" })}
+                        </button>
+                      ) : null}
+                      {canManageAccounts && account.isActive ? (
+                        <button
+                          className="ghost-control treasury-danger-control"
+                          disabled={deactivatingAccountId === account.id}
+                          onClick={() => deactivatePaymentInstrument(account)}
+                          type="button"
+                        >
+                          <Trash2 size={13} />
+                          {deactivatingAccountId === account.id
+                            ? t("common.saving", { defaultValue: "Guardando..." })
+                            : t("finance.treasury.account.deactivate", { defaultValue: "Desactivar" })}
+                        </button>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </SurfaceCard>
       ) : null}
 
       {tab === "movements" ? (
@@ -2443,9 +2623,20 @@ export const TreasuryPage = () => {
 type AccountDraft = {
   bankName: BankName;
   accountLabel: string;
-  accountNumberFull: string;
+  accountNumberMasked: string;
   currency: string;
+  accountType: BankAccountType | null;
+  owner: PaymentInstrumentOwner;
+  ownerUserId: string;
+  ownerUserNameSnapshot: string;
+  instrumentKind: PaymentInstrumentKind;
+  last4: string;
+  issuer: string;
+  statementCycleDay: number | null;
+  paymentDueDay: number | null;
+  reminderUserId: string;
   openingBalance: number;
+  notes: string;
 };
 
 type ManualTransactionDraft = {
@@ -2567,20 +2758,34 @@ const ManualTransactionForm = ({
 };
 
 const AccountForm = ({
+  initialAccount,
   onCancel,
   onSave,
 }: {
+  initialAccount?: BankAccountRow | null;
   onCancel: () => void;
   onSave: (draft: AccountDraft) => void;
 }) => {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<AccountDraft>({
-    bankName: "popular",
-    accountLabel: "",
-    accountNumberFull: "",
-    currency: "DOP",
-    openingBalance: 0,
+    bankName: initialAccount?.bankName ?? "popular",
+    accountLabel: initialAccount?.accountLabel ?? "",
+    accountNumberMasked: initialAccount?.accountNumberMasked ?? "",
+    currency: initialAccount?.currency ?? "DOP",
+    accountType: initialAccount?.accountType ?? "checking",
+    owner: initialAccount?.owner ?? "company",
+    ownerUserId: initialAccount?.ownerUserId ?? "",
+    ownerUserNameSnapshot: initialAccount?.ownerUserNameSnapshot ?? "",
+    instrumentKind: initialAccount?.instrumentKind ?? "bank_account",
+    last4: initialAccount?.last4 ?? "",
+    issuer: initialAccount?.issuer ?? "",
+    statementCycleDay: initialAccount?.statementCycleDay ?? null,
+    paymentDueDay: initialAccount?.paymentDueDay ?? null,
+    reminderUserId: initialAccount?.reminderUserId ?? "",
+    openingBalance: initialAccount?.openingBalance ?? 0,
+    notes: initialAccount?.notes ?? "",
   });
+  const isCreditCard = draft.instrumentKind === "credit_card";
   const bankOptions = useMemo(
     () =>
       bankNames.map((name) => ({
@@ -2597,9 +2802,53 @@ const AccountForm = ({
     ],
     [],
   );
+  const accountTypeOptions = useMemo(
+    () => [
+      { value: "checking" as const, label: t("finance.treasury.accountTypes.checking", { defaultValue: "Corriente" }) },
+      { value: "savings" as const, label: t("finance.treasury.accountTypes.savings", { defaultValue: "Ahorro" }) },
+      { value: "other" as const, label: t("finance.treasury.accountTypes.other", { defaultValue: "Otra" }) },
+    ],
+    [t],
+  );
+  const instrumentKindOptions = useMemo(
+    () => [
+      { value: "bank_account" as const, label: t("finance.treasury.instrumentKinds.bank_account", { defaultValue: "Cuenta bancaria" }) },
+      { value: "debit_card" as const, label: t("finance.treasury.instrumentKinds.debit_card", { defaultValue: "Tarjeta débito" }) },
+      { value: "credit_card" as const, label: t("finance.treasury.instrumentKinds.credit_card", { defaultValue: "Tarjeta crédito" }) },
+      { value: "cash" as const, label: t("finance.treasury.instrumentKinds.cash", { defaultValue: "Efectivo" }) },
+      { value: "other" as const, label: t("finance.treasury.instrumentKinds.other", { defaultValue: "Otro" }) },
+    ],
+    [t],
+  );
+  const ownerOptions = useMemo(
+    () => [
+      { value: "company" as const, label: t("finance.treasury.owners.company", { defaultValue: "Empresa" }) },
+      { value: "user" as const, label: t("finance.treasury.owners.user", { defaultValue: "Usuario" }) },
+      { value: "shared" as const, label: t("finance.treasury.owners.shared", { defaultValue: "Compartido" }) },
+    ],
+    [t],
+  );
+  const dayValue = (value: number | null) => (value == null ? "" : String(value));
+  const parseDay = (value: string) => {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 31) return null;
+    return parsed;
+  };
+  const canSave =
+    draft.accountLabel.trim().length > 0 &&
+    (!isCreditCard || (draft.statementCycleDay != null && draft.paymentDueDay != null)) &&
+    (draft.owner !== "user" || draft.ownerUserId.trim().length > 0) &&
+    (!isCreditCard || draft.ownerUserId.trim().length > 0 || draft.reminderUserId.trim().length > 0);
 
   return (
     <SurfaceCard className="treasury-account-form-card">
+      <div className="treasury-account-form-heading">
+        <div>
+          <h3>{initialAccount ? t("finance.treasury.account.editTitle", { defaultValue: "Editar medio de pago" }) : t("finance.treasury.account.newTitle", { defaultValue: "Nuevo medio de pago" })}</h3>
+          <p>{t("finance.treasury.account.safeHint", { defaultValue: "Guarda solo metadata operativa. No introduzcas números completos de cuenta o tarjeta." })}</p>
+        </div>
+        <span className="treasury-security-pill">{t("finance.treasury.account.noSensitiveData", { defaultValue: "Sin datos sensibles" })}</span>
+      </div>
       <div className="treasury-account-form-grid">
         <label className="compact-filter-field">
           <span>{t("finance.treasury.account.bank")}</span>
@@ -2619,11 +2868,12 @@ const AccountForm = ({
           />
         </label>
         <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.number")}</span>
-          <input
-            className="field-input"
-            onChange={(event) => setDraft((d) => ({ ...d, accountNumberFull: event.target.value }))}
-            value={draft.accountNumberFull}
+          <span>{t("finance.treasury.account.instrumentKind", { defaultValue: "Tipo" })}</span>
+          <CompactSelect<PaymentInstrumentKind>
+            ariaLabel={t("finance.treasury.account.instrumentKind", { defaultValue: "Tipo" })}
+            onChange={(instrumentKind) => setDraft((d) => ({ ...d, instrumentKind }))}
+            options={instrumentKindOptions}
+            value={draft.instrumentKind}
           />
         </label>
         <label className="compact-filter-field">
@@ -2636,6 +2886,103 @@ const AccountForm = ({
           />
         </label>
         <label className="compact-filter-field">
+          <span>{t("finance.treasury.account.accountType", { defaultValue: "Cuenta" })}</span>
+          <CompactSelect<BankAccountType>
+            ariaLabel={t("finance.treasury.account.accountType", { defaultValue: "Cuenta" })}
+            onChange={(accountType) => setDraft((d) => ({ ...d, accountType }))}
+            options={accountTypeOptions}
+            value={draft.accountType ?? "other"}
+          />
+        </label>
+        <label className="compact-filter-field">
+          <span>{t("finance.treasury.account.owner", { defaultValue: "Owner" })}</span>
+          <CompactSelect<PaymentInstrumentOwner>
+            ariaLabel={t("finance.treasury.account.owner", { defaultValue: "Owner" })}
+            onChange={(owner) => setDraft((d) => ({ ...d, owner }))}
+            options={ownerOptions}
+            value={draft.owner}
+          />
+        </label>
+        <label className="compact-filter-field">
+          <span>{t("finance.treasury.account.ownerUserId", { defaultValue: "Usuario responsable" })}</span>
+          <input
+            className="field-input"
+            onChange={(event) => setDraft((d) => ({ ...d, ownerUserId: event.target.value }))}
+            placeholder={draft.owner === "user" ? t("common.required", { defaultValue: "Requerido" }) : t("common.optional", { defaultValue: "Opcional" })}
+            value={draft.ownerUserId}
+          />
+        </label>
+        <label className="compact-filter-field">
+          <span>{t("finance.treasury.account.ownerName", { defaultValue: "Nombre snapshot" })}</span>
+          <input
+            className="field-input"
+            onChange={(event) => setDraft((d) => ({ ...d, ownerUserNameSnapshot: event.target.value }))}
+            value={draft.ownerUserNameSnapshot}
+          />
+        </label>
+        <label className="compact-filter-field">
+          <span>{t("finance.treasury.account.last4", { defaultValue: "Últimos 4" })}</span>
+          <input
+            className="field-input"
+            inputMode="numeric"
+            maxLength={4}
+            onChange={(event) => setDraft((d) => ({ ...d, last4: event.target.value.replace(/\D/g, "").slice(0, 4) }))}
+            value={draft.last4}
+          />
+        </label>
+        <label className="compact-filter-field">
+          <span>{t("finance.treasury.account.masked", { defaultValue: "Máscara visible" })}</span>
+          <input
+            className="field-input"
+            onChange={(event) => setDraft((d) => ({ ...d, accountNumberMasked: event.target.value }))}
+            placeholder="•••• 1234"
+            value={draft.accountNumberMasked}
+          />
+        </label>
+        <label className="compact-filter-field">
+          <span>{t("finance.treasury.account.issuer", { defaultValue: "Emisor" })}</span>
+          <input
+            className="field-input"
+            onChange={(event) => setDraft((d) => ({ ...d, issuer: event.target.value }))}
+            value={draft.issuer}
+          />
+        </label>
+        <label className="compact-filter-field">
+          <span>{t("finance.treasury.account.statementCycleDay", { defaultValue: "Día de corte" })}</span>
+          <input
+            className="field-input"
+            disabled={!isCreditCard}
+            max={31}
+            min={1}
+            onChange={(event) => setDraft((d) => ({ ...d, statementCycleDay: parseDay(event.target.value) }))}
+            placeholder={isCreditCard ? t("common.required", { defaultValue: "Requerido" }) : "—"}
+            type="number"
+            value={dayValue(draft.statementCycleDay)}
+          />
+        </label>
+        <label className="compact-filter-field">
+          <span>{t("finance.treasury.account.paymentDueDay", { defaultValue: "Día de pago" })}</span>
+          <input
+            className="field-input"
+            disabled={!isCreditCard}
+            max={31}
+            min={1}
+            onChange={(event) => setDraft((d) => ({ ...d, paymentDueDay: parseDay(event.target.value) }))}
+            placeholder={isCreditCard ? t("common.required", { defaultValue: "Requerido" }) : "—"}
+            type="number"
+            value={dayValue(draft.paymentDueDay)}
+          />
+        </label>
+        <label className="compact-filter-field">
+          <span>{t("finance.treasury.account.reminderUserId", { defaultValue: "Usuario reminder" })}</span>
+          <input
+            className="field-input"
+            onChange={(event) => setDraft((d) => ({ ...d, reminderUserId: event.target.value }))}
+            placeholder={isCreditCard ? t("finance.treasury.account.reminderHint", { defaultValue: "Requerido si no hay responsable" }) : t("common.optional", { defaultValue: "Opcional" })}
+            value={draft.reminderUserId}
+          />
+        </label>
+        <label className="compact-filter-field">
           <span>{t("finance.treasury.account.openingBalance")}</span>
           <input
             className="field-input"
@@ -2644,10 +2991,18 @@ const AccountForm = ({
             value={draft.openingBalance}
           />
         </label>
+        <label className="compact-filter-field treasury-account-notes-field">
+          <span>{t("finance.treasury.account.notes", { defaultValue: "Notas" })}</span>
+          <input
+            className="field-input"
+            onChange={(event) => setDraft((d) => ({ ...d, notes: event.target.value }))}
+            value={draft.notes}
+          />
+        </label>
         <div className="treasury-account-form-actions">
           <button
             className="ghost-control treasury-action-save"
-            disabled={!draft.accountLabel.trim()}
+            disabled={!canSave}
             onClick={() => onSave(draft)}
             type="button"
           >

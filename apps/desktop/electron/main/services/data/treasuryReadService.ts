@@ -15,6 +15,8 @@ import {
   type DgiiReportRow,
   type StatementSourceFormat,
   type FiscalStatus,
+  type PaymentInstrumentKind,
+  type PaymentInstrumentOwner,
   type ProjectAllocationRow,
   type ProjectPnlRow,
   type ReimbursementStatus,
@@ -139,6 +141,21 @@ const mapAccount = (row: Record<string, unknown>): BankAccountRow => ({
   accountNumberFull: (row.account_number_full as string | null) ?? null,
   currency: row.currency as string,
   accountType: (row.account_type as BankAccountType | null) ?? null,
+  owner: (row.owner as PaymentInstrumentOwner | null) ?? "company",
+  ownerUserId: (row.owner_user_id as string | null) ?? null,
+  ownerUserNameSnapshot: (row.owner_user_name_snapshot as string | null) ?? null,
+  instrumentKind: (row.instrument_kind as PaymentInstrumentKind | null) ?? "bank_account",
+  last4: (row.last4 as string | null) ?? null,
+  issuer: (row.issuer as string | null) ?? null,
+  statementCycleDay:
+    row.statement_cycle_day === null || row.statement_cycle_day === undefined
+      ? null
+      : Number(row.statement_cycle_day),
+  paymentDueDay:
+    row.payment_due_day === null || row.payment_due_day === undefined
+      ? null
+      : Number(row.payment_due_day),
+  reminderUserId: (row.reminder_user_id as string | null) ?? null,
   openingBalance: Number(row.opening_balance ?? 0),
   openingBalanceDate: (row.opening_balance_date as string | null) ?? null,
   isActive: Number(row.is_active ?? 1) === 1,

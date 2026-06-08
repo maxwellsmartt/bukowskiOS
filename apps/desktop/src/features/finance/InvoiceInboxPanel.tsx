@@ -188,6 +188,14 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     return map;
   }, [transactions.data]);
 
+  const txnAccountLabel = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of transactions.data) {
+      map.set(row.id, row.bankAccountLabel);
+    }
+    return map;
+  }, [transactions.data]);
+
   const uploaderOptions = useMemo(() => {
     const seen = new Map<string, string>();
     for (const row of inbox.data) {
@@ -860,6 +868,46 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                     <small className="text-muted">{row.createdAt.slice(0, 10)}</small>
                   </div>
                 ),
+              },
+              {
+                key: "paymentInstrument",
+                label: t("finance.treasury.invoices.columns.paymentInstrument", { defaultValue: "Medio de pago" }),
+                render: (row) => {
+                  const transactionId = row.appliedTransactionId ?? row.suggestedTransactionId;
+                  return transactionId ? txnAccountLabel.get(transactionId) ?? "—" : "—";
+                },
+              },
+              {
+                key: "reconciliation",
+                label: t("finance.treasury.invoices.columns.reconciliation", { defaultValue: "Conciliación" }),
+                render: (row) => {
+                  if (row.status === "applied" && row.appliedTransactionId) {
+                    return (
+                      <StatusBadge tone="success">
+                        {t("finance.treasury.invoices.reconciliation.applied", { defaultValue: "Aplicada" })}
+                      </StatusBadge>
+                    );
+                  }
+                  if (row.suggestedTransactionId) {
+                    return (
+                      <StatusBadge tone="info">
+                        {t("finance.treasury.invoices.reconciliation.suggested", { defaultValue: "Sugerida" })}
+                      </StatusBadge>
+                    );
+                  }
+                  if (row.status === "failed") {
+                    return (
+                      <StatusBadge tone="critical">
+                        {t("finance.treasury.invoices.reconciliation.failed", { defaultValue: "Error" })}
+                      </StatusBadge>
+                    );
+                  }
+                  return (
+                    <StatusBadge tone="neutral">
+                      {t("finance.treasury.invoices.reconciliation.pending", { defaultValue: "Pendiente" })}
+                    </StatusBadge>
+                  );
+                },
               },
               {
                 key: "match",

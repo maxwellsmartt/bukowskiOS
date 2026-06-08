@@ -37,6 +37,8 @@ import type {
   InvoiceExtraction,
   RetryInvoiceExtractionsCommand,
   UpdateInvoiceExtractionCommand,
+  UpsertPaymentInstrumentCommand,
+  DeactivatePaymentInstrumentCommand,
 } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
@@ -467,6 +469,14 @@ export const useTreasuryMutations = () =>
       async upsertAccount(input: UpsertBankAccountCommand) {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.upsertAccount(input);
+      },
+      async upsertPaymentInstrument(input: UpsertPaymentInstrumentCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.paymentInstrumentUpsert(input);
+      },
+      async deactivatePaymentInstrument(input: DeactivatePaymentInstrumentCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.paymentInstrumentDeactivate(input);
       },
       async importStatement(input: ImportStatementCommand) {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");

@@ -16656,7 +16656,7 @@ input[type="number"] {
 }
 
 .treasury-segmented-tabs {
-  --treasury-tab-count: 4;
+  --treasury-tab-count: 6;
   --treasury-tab-index: 0;
   align-self: flex-start;
   align-items: center;
@@ -16674,7 +16674,7 @@ input[type="number"] {
   overflow: hidden;
   padding: 2px;
   position: relative;
-  width: min(100%, 480px);
+  width: min(100%, 690px);
 }
 
 .treasury-segmented-tabs-indicator {
@@ -17800,17 +17800,48 @@ input[type="number"] {
   padding: 12px;
 }
 
+.treasury-account-form-heading {
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.065);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+}
+
+.treasury-account-form-heading h3 {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: var(--weight-semibold, 600);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.treasury-account-form-heading p {
+  color: var(--text-muted);
+  font-size: var(--font-xs, 12px);
+  line-height: 1.4;
+  margin: 5px 0 0;
+  max-width: 720px;
+}
+
+.treasury-security-pill {
+  background: rgba(126, 183, 178, 0.1);
+  border: 1px solid rgba(126, 183, 178, 0.24);
+  border-radius: 999px;
+  color: rgba(205, 239, 235, 0.95);
+  flex: 0 0 auto;
+  font-size: var(--font-2xs, 11px);
+  line-height: 1;
+  padding: 7px 9px;
+}
+
 .treasury-account-form-grid {
   align-items: end;
   display: grid;
   gap: 10px;
-  grid-template-columns:
-    minmax(160px, 0.8fr)
-    minmax(180px, 1fr)
-    minmax(180px, 1fr)
-    minmax(120px, 0.65fr)
-    minmax(150px, 0.75fr)
-    auto;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
 }
 
 .treasury-account-form-grid .field-input,
@@ -17824,7 +17855,164 @@ input[type="number"] {
   display: inline-flex;
   gap: 8px;
   justify-content: flex-end;
+  grid-column: 1 / -1;
   white-space: nowrap;
+}
+
+.treasury-account-notes-field {
+  grid-column: span 2;
+}
+
+.treasury-payment-instruments-card {
+  background:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.075), transparent 34%),
+    rgba(255, 255, 255, 0.024);
+  border-color: rgba(155, 176, 196, 0.14);
+}
+
+.treasury-payment-instruments-header {
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.065);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+}
+
+.treasury-payment-instruments-header p {
+  color: var(--text-muted);
+  font-size: var(--font-xs, 12px);
+  line-height: 1.45;
+  margin: 5px 0 0;
+  max-width: 720px;
+}
+
+.treasury-payment-instruments-stats {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: flex-end;
+}
+
+.treasury-payment-instruments-stats span {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: var(--font-2xs, 11px);
+  line-height: 1;
+  padding: 7px 9px;
+}
+
+.treasury-payment-instruments-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+}
+
+.treasury-payment-instrument {
+  background: rgba(255, 255, 255, 0.026);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 12px;
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.treasury-payment-instrument.is-inactive {
+  opacity: 0.62;
+}
+
+.treasury-payment-instrument-top {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.treasury-payment-instrument-icon {
+  align-items: center;
+  background: rgba(214, 179, 122, 0.12);
+  border: 1px solid rgba(214, 179, 122, 0.22);
+  border-radius: 12px;
+  color: rgba(234, 205, 156, 0.95);
+  display: inline-flex;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.treasury-payment-instrument-top h3 {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: var(--weight-semibold, 600);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.treasury-payment-instrument-top p {
+  color: var(--text-muted);
+  font-size: var(--font-xs, 12px);
+  margin: 4px 0 0;
+}
+
+.treasury-payment-instrument-meta {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.treasury-payment-instrument-meta div {
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 9px;
+  min-width: 0;
+  padding: 8px 9px;
+}
+
+.treasury-payment-instrument-meta dt {
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 11px);
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.treasury-payment-instrument-meta dd {
+  color: var(--text-primary);
+  font-size: var(--font-xs, 12px);
+  line-height: 1.25;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.treasury-payment-instrument-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.treasury-payment-instrument-actions .ghost-control {
+  min-height: 30px;
+}
+
+.treasury-danger-control {
+  background: rgba(214, 88, 88, 0.08);
+  border-color: rgba(214, 88, 88, 0.2);
+  color: rgba(255, 187, 187, 0.94);
+}
+
+.treasury-danger-control:hover:not(:disabled) {
+  background: rgba(214, 88, 88, 0.14);
+  border-color: rgba(214, 88, 88, 0.34);
+  color: #fff;
 }
 
 .treasury-action-save {
@@ -18333,7 +18521,7 @@ input[type="number"] {
 
   .treasury-segmented-tabs {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--treasury-tab-count), minmax(112px, 1fr));
     overflow-x: auto;
   }
 
@@ -18377,6 +18565,16 @@ input[type="number"] {
     grid-template-columns: 1fr;
   }
 
+  .treasury-account-form-heading,
+  .treasury-payment-instruments-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .treasury-account-notes-field {
+    grid-column: 1;
+  }
+
   .treasury-manual-form-grid,
   .treasury-import-row {
     grid-template-columns: 1fr;
@@ -18401,6 +18599,10 @@ input[type="number"] {
 @media (min-width: 761px) and (max-width: 1180px) {
   .treasury-account-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .treasury-account-notes-field {
+    grid-column: span 2;
   }
 
   .treasury-manual-form-grid {

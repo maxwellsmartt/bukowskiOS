@@ -1568,6 +1568,7 @@
       "searchPlaceholder": "Search description, concept or counterparty…",
       "tabs": {
         "overview": "Overview",
+        "accounts": "Accounts & cards",
         "movements": "Movements",
         "review": "Accountant review",
         "invoices": "Invoices",
@@ -1602,8 +1603,16 @@
           "category": "Category",
           "uploadedBy": "Uploaded by",
           "uploadedOn": "Uploaded on",
+          "paymentInstrument": "Payment method",
+          "reconciliation": "Reconciliation",
           "match": "Suggested movement",
           "actions": "Actions"
+        },
+        "reconciliation": {
+          "applied": "Applied",
+          "suggested": "Suggested",
+          "failed": "Failed",
+          "pending": "Pending"
         },
         "status": {
           "pending": "Queued",
@@ -1652,7 +1661,7 @@
         "unclassified": "Unclassified"
       },
       "actions": {
-        "newAccount": "New account",
+        "newAccount": "New payment method",
         "import": "Import statement",
         "backToOverview": "Back to overview",
         "addRow": "Add movement"
@@ -1686,6 +1695,13 @@
       },
       "accounts": {
         "title": "Accounts",
+        "paymentTitle": "Accounts & cards",
+        "paymentHint": "Manage payment methods without storing full numbers. Active credit cards create monthly reminders.",
+        "active": "Active",
+        "inactive": "Inactive",
+        "activeCount": "{{count}} active",
+        "inactiveCount": "{{count}} inactive",
+        "openMovements": "Movements",
         "emptyTitle": "No bank accounts yet",
         "emptyBody": "Add a bank account, then import its CSV/XLSX statement to start tracking movements.",
         "openHint": "Open this account's movements",
@@ -1775,13 +1791,53 @@
         "emptyBody": "Split expenses across projects to see real per-project profitability."
       },
       "account": {
-        "saved": "Bank account saved.",
-        "failed": "Could not save the bank account.",
+        "saved": "Payment method saved.",
+        "failed": "Could not save the payment method.",
+        "deactivated": "Payment method deactivated.",
+        "deactivateFailed": "Could not deactivate the payment method.",
+        "deactivate": "Deactivate",
+        "newTitle": "New payment method",
+        "editTitle": "Edit payment method",
+        "safeHint": "Store operational metadata only. Do not enter full account or card numbers.",
+        "noSensitiveData": "No sensitive data",
         "bank": "Bank",
         "label": "Label",
         "number": "Account number",
+        "masked": "Visible mask",
+        "instrumentKind": "Type",
+        "accountType": "Account",
+        "owner": "Owner",
+        "ownerUserId": "Responsible user",
+        "ownerName": "Name snapshot",
+        "last4": "Last 4",
+        "issuer": "Issuer",
+        "statementCycleDay": "Statement day",
+        "paymentDueDay": "Payment day",
+        "reminderUserId": "Reminder user",
+        "reminderHint": "Required when no responsible user exists",
+        "notes": "Notes",
+        "balance": "Balance",
+        "cardCycle": "Card cycle",
+        "cardCycleValue": "Statement {{cycle}} · Payment {{due}}",
         "currency": "Currency",
         "openingBalance": "Opening balance"
+      },
+      "accountTypes": {
+        "checking": "Checking",
+        "savings": "Savings",
+        "other": "Other"
+      },
+      "instrumentKinds": {
+        "bank_account": "Bank account",
+        "debit_card": "Debit card",
+        "credit_card": "Credit card",
+        "cash": "Cash",
+        "other": "Other"
+      },
+      "owners": {
+        "company": "Company",
+        "user": "User",
+        "shared": "Shared"
       },
       "banks": {
         "popular": "Banco Popular",

@@ -4,7 +4,7 @@
 
 - **Fecha de apertura:** 2026-06-08
 - **Fuente:** `/Users/ernestomaxwell/Desktop/PLAN.md`
-- **Estado general:** Slices 1-3 implementados localmente; pendiente aplicar/verificar migracion en Supabase remoto y avanzar con UX de Tesoreria.
+- **Estado general:** Slices 1-4 MVP implementados localmente; pendiente aplicar/verificar migracion en Supabase remoto y avanzar con conciliacion asistida/reembolsos.
 - **Prioridad:** Alta para Tesoreria, porque desbloquea asignaciones de facturas a tarjetas/cuentas sin duplicar gastos ni perder links pendientes entre maquinas.
 
 ## Resumen ejecutivo
@@ -120,15 +120,16 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 
 ### Slice 4 — UX de medios de pago y asignaciones
 
-**Estado:** Pendiente
+**Estado:** MVP implementado en frontend el 2026-06-08
 
 **Objetivo:** Darle a Tesoreria una UI usable para administrar medios y asignar facturas.
 
 **Frontend:**
-- Nueva vista **Cuentas y tarjetas** en Tesoreria.
-- Drawer compacto para crear/editar medios de pago, sin campos sensibles.
-- Bandeja de facturas agrega: Medio de pago, Estado conciliacion, Movimiento, Reembolso.
-- Seleccion multiple permite asignar medio, vincular movimiento y marcar reembolsado.
+- Nueva vista **Cuentas y tarjetas** en Tesoreria. **Implementado.**
+- Formulario compacto para crear/editar medios de pago, sin campos sensibles ni numero completo. **Implementado.**
+- Bandeja de facturas agrega: Medio de pago y Estado conciliacion derivados de movimiento sugerido/aplicado. **Implementado parcial.**
+- Seleccion multiple mantiene acciones existentes de usuario/proyecto/retry/download/dismiss. **Existente.**
+- Pendiente: asignacion batch directa a medio de pago, vincular movimiento manualmente desde Inbox y marcar reembolsado desde factura.
 
 ### Slice 5 — Conciliacion asistida y Reembolsos
 
@@ -199,14 +200,22 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 - Verificacion Slice 3:
   - `corepack pnpm exec vitest run src/test/treasury-mutation-service.test.ts` desde `apps/desktop`: **21 passed**.
   - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
+- Se implementa Slice 4 MVP frontend:
+  - `BankAccountRow` expone metadata segura de medios de pago;
+  - Tesoreria agrega tab **Cuentas y tarjetas**;
+  - formulario de medio de pago elimina `account_number_full` de la UI;
+  - acciones de editar/desactivar usan comandos idempotentes `paymentInstrumentUpsert` y `paymentInstrumentDeactivate`;
+  - Bandeja de facturas muestra Medio de pago y Conciliacion usando movimiento sugerido/aplicado existente.
+- Verificacion Slice 4:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
 
 ## Proximo slice recomendado
 
-**Slice 4 — UX de medios de pago y asignaciones.**
+**Slice 5 — Conciliacion asistida y Reembolsos.**
 
 Orden sugerido:
-1. Crear vista **Cuentas y tarjetas** en Tesoreria usando los IPC ya disponibles.
-2. Agregar drawer compacto de crear/editar medio de pago sin campos sensibles.
-3. Agregar columnas de medio de pago, conciliacion, movimiento y reembolso en Bandeja de facturas.
-4. Habilitar acciones batch para asignar medio, vincular movimiento, rechazar y marcar reembolsado.
-5. Dejar conciliacion asistida avanzada para Slice 5.
+1. Extender read model de Inbox para traer allocation/link real por `invoice_extraction`.
+2. Habilitar asignacion batch de facturas a medio de pago sin movimiento.
+3. Agregar accion de vincular movimiento manualmente desde Inbox.
+4. Agregar vista **Reembolsos** derivada por usuario x medio x ciclo.
+5. Dejar auto-conciliacion sin confirmacion humana fuera de v1.

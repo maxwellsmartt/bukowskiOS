@@ -2,6 +2,8 @@ import type {
   BankAccountType,
   BankName,
   FiscalStatus,
+  PaymentInstrumentKind,
+  PaymentInstrumentOwner,
   ReimbursementStatus,
   StatementSourceFormat,
   TransactionDirection,
@@ -19,6 +21,15 @@ export type BankAccountRow = {
   accountNumberFull: string | null;
   currency: string;
   accountType: BankAccountType | null;
+  owner: PaymentInstrumentOwner;
+  ownerUserId: string | null;
+  ownerUserNameSnapshot: string | null;
+  instrumentKind: PaymentInstrumentKind;
+  last4: string | null;
+  issuer: string | null;
+  statementCycleDay: number | null;
+  paymentDueDay: number | null;
+  reminderUserId: string | null;
   openingBalance: number;
   openingBalanceDate: string | null;
   isActive: boolean;
