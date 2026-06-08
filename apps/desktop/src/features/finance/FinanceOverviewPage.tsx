@@ -640,34 +640,44 @@ export const FinanceOverviewPage = () => {
 
       <div className="finance-grid">
         <SurfaceCard>
-          <span className="metric-value metric-tone-success">
-            {formatSummaryMoney(treasurySnapshot?.totalIncome ?? 0, treasuryCurrency)}
-          </span>
-          <p className="metric-label">{t("finance.overview.liveMetrics.income")}</p>
+          <dl className="metric">
+            <dt className="metric-label">{t("finance.overview.liveMetrics.income")}</dt>
+            <dd className="metric-value metric-tone-success">
+              {formatSummaryMoney(treasurySnapshot?.totalIncome ?? 0, treasuryCurrency)}
+            </dd>
+          </dl>
         </SurfaceCard>
         <SurfaceCard>
-          <span className="metric-value metric-tone-critical">
-            {formatSummaryMoney(treasurySnapshot?.totalExpense ?? 0, treasuryCurrency)}
-          </span>
-          <p className="metric-label">{t("finance.overview.liveMetrics.expense")}</p>
+          <dl className="metric">
+            <dt className="metric-label">{t("finance.overview.liveMetrics.expense")}</dt>
+            <dd className="metric-value metric-tone-critical">
+              {formatSummaryMoney(treasurySnapshot?.totalExpense ?? 0, treasuryCurrency)}
+            </dd>
+          </dl>
         </SurfaceCard>
         <SurfaceCard>
-          <span className={`metric-value metric-tone-${(treasurySnapshot?.net ?? 0) >= 0 ? "warning" : "critical"}`}>
-            {formatSummaryMoney(treasurySnapshot?.net ?? 0, treasuryCurrency)}
-          </span>
-          <p className="metric-label">{t("finance.overview.liveMetrics.net")}</p>
+          <dl className="metric">
+            <dt className="metric-label">{t("finance.overview.liveMetrics.net")}</dt>
+            <dd className={`metric-value metric-tone-${(treasurySnapshot?.net ?? 0) >= 0 ? "warning" : "critical"}`}>
+              {formatSummaryMoney(treasurySnapshot?.net ?? 0, treasuryCurrency)}
+            </dd>
+          </dl>
         </SurfaceCard>
         <SurfaceCard>
-          <span className="metric-value metric-tone-info">
-            {formatSummaryMoney(treasurySnapshot?.totalDeductibleExpense ?? 0, treasuryCurrency)}
-          </span>
-          <p className="metric-label">{t("finance.overview.liveMetrics.deductible")}</p>
+          <dl className="metric">
+            <dt className="metric-label">{t("finance.overview.liveMetrics.deductible")}</dt>
+            <dd className="metric-value metric-tone-info">
+              {formatSummaryMoney(treasurySnapshot?.totalDeductibleExpense ?? 0, treasuryCurrency)}
+            </dd>
+          </dl>
         </SurfaceCard>
         <SurfaceCard>
-          <span className={`metric-value metric-tone-${collaboratorSummary.data.pendingAmount > 0 ? "warning" : "success"}`}>
-            {formatSummaryMoney(collaboratorSummary.data.pendingAmount, "DOP")}
-          </span>
-          <p className="metric-label">{t("finance.overview.liveMetrics.crewPending")}</p>
+          <dl className="metric">
+            <dt className="metric-label">{t("finance.overview.liveMetrics.crewPending")}</dt>
+            <dd className={`metric-value metric-tone-${collaboratorSummary.data.pendingAmount > 0 ? "warning" : "success"}`}>
+              {formatSummaryMoney(collaboratorSummary.data.pendingAmount, "DOP")}
+            </dd>
+          </dl>
         </SurfaceCard>
       </div>
 

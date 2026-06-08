@@ -32,6 +32,21 @@ const trustedAvatarOrigins = new Set([
   "https://secure.gravatar.com",
 ]);
 
+// The configured Supabase project also serves user-uploaded avatars from its
+// public storage bucket; trust that origin too so uploaded photos convert to a
+// cacheable data URL (and therefore survive offline) just like OAuth avatars.
+const supabaseStorageOrigin = (() => {
+  const url = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "").trim();
+  try {
+    return url ? new URL(url).origin : null;
+  } catch {
+    return null;
+  }
+})();
+if (supabaseStorageOrigin) {
+  trustedAvatarOrigins.add(supabaseStorageOrigin);
+}
+
 const fetchTrustedAvatarDataUrl = async (avatarUrl: string) => {
   const parsedUrl = new URL(avatarUrl);
   if (!trustedAvatarOrigins.has(parsedUrl.origin)) {

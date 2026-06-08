@@ -1490,34 +1490,34 @@ export const TreasuryPage = () => {
 
             <div className="treasury-kpi-layout">
               <div className="treasury-kpi-primary-grid">
-                <div className="treasury-kpi-tile treasury-kpi-income">
-                  <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.income")}</span>
-                  <strong className="treasury-money-value">
+                <dl className="treasury-kpi-tile treasury-kpi-income">
+                  <dt className="quotes-summary-tile-label">{t("finance.treasury.kpi.income")}</dt>
+                  <dd className="treasury-money-value">
                     {formatSignedTreasuryMoney(snap?.totalIncome ?? 0, moneyCurrency, "positive")}
-                  </strong>
-                </div>
-                <div className="treasury-kpi-tile treasury-kpi-expense">
-                  <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.expense")}</span>
-                  <strong className="treasury-money-value">
+                  </dd>
+                </dl>
+                <dl className="treasury-kpi-tile treasury-kpi-expense">
+                  <dt className="quotes-summary-tile-label">{t("finance.treasury.kpi.expense")}</dt>
+                  <dd className="treasury-money-value">
                     {formatSignedTreasuryMoney(snap?.totalExpense ?? 0, moneyCurrency, "negative")}
-                  </strong>
-                </div>
-                <div className="treasury-kpi-tile treasury-kpi-net">
-                  <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.net")}</span>
-                  <strong className="treasury-money-value">{formatSignedTreasuryMoney(snap?.net ?? 0, moneyCurrency)}</strong>
-                </div>
+                  </dd>
+                </dl>
+                <dl className="treasury-kpi-tile treasury-kpi-net">
+                  <dt className="quotes-summary-tile-label">{t("finance.treasury.kpi.net")}</dt>
+                  <dd className="treasury-money-value">{formatSignedTreasuryMoney(snap?.net ?? 0, moneyCurrency)}</dd>
+                </dl>
               </div>
               <div className="treasury-kpi-secondary-grid">
-                <div className="treasury-kpi-tile treasury-kpi-secondary treasury-kpi-deductible">
-                  <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.deductible")}</span>
-                  <strong className="treasury-money-value">
+                <dl className="treasury-kpi-tile treasury-kpi-secondary treasury-kpi-deductible">
+                  <dt className="quotes-summary-tile-label">{t("finance.treasury.kpi.deductible")}</dt>
+                  <dd className="treasury-money-value">
                     {formatSignedTreasuryMoney(snap?.totalDeductibleExpense ?? 0, moneyCurrency, "negative")}
-                  </strong>
-                </div>
-                <div className="treasury-kpi-tile treasury-kpi-secondary treasury-kpi-neutral">
-                  <span className="quotes-summary-tile-label">{t("finance.treasury.kpi.unclassified")}</span>
-                  <strong className="treasury-money-value">{snap?.unclassifiedCount ?? 0}</strong>
-                </div>
+                  </dd>
+                </dl>
+                <dl className="treasury-kpi-tile treasury-kpi-secondary treasury-kpi-neutral">
+                  <dt className="quotes-summary-tile-label">{t("finance.treasury.kpi.unclassified")}</dt>
+                  <dd className="treasury-money-value">{snap?.unclassifiedCount ?? 0}</dd>
+                </dl>
               </div>
             </div>
           </SurfaceCard>
@@ -1525,7 +1525,7 @@ export const TreasuryPage = () => {
           <div className="treasury-charts-grid">
             <SurfaceCard className="treasury-chart-card">
               <div className="treasury-chart-heading">
-                <h3 className="section-subtitle">{t("finance.treasury.overview.flowTitle")}</h3>
+                <h2 className="section-subtitle">{t("finance.treasury.overview.flowTitle")}</h2>
                 <div className="treasury-flow-legend" aria-label={t("finance.treasury.overview.legend")}>
                   <span><i style={{ background: "#7eb7b2" }} />{t("finance.treasury.kpi.income")}</span>
                   <span><i style={{ background: "#c88d7f" }} />{t("finance.treasury.kpi.expense")}</span>
@@ -1581,7 +1581,7 @@ export const TreasuryPage = () => {
 
             <SurfaceCard className="treasury-chart-card">
               <div className="treasury-chart-heading treasury-chart-heading-solo">
-                <h3 className="section-subtitle">{t("finance.treasury.overview.categoryTitle")}</h3>
+                <h2 className="section-subtitle">{t("finance.treasury.overview.categoryTitle")}</h2>
               </div>
               {snap && categoryChartData.length > 0 ? (
                 <div className="finance-chart-shell finance-chart-shell-pie">
@@ -1638,7 +1638,7 @@ export const TreasuryPage = () => {
 
             <SurfaceCard className="treasury-chart-card">
               <div className="treasury-chart-heading">
-                <h3 className="section-subtitle">{t("finance.treasury.overview.deductibleTitle")}</h3>
+                <h2 className="section-subtitle">{t("finance.treasury.overview.deductibleTitle")}</h2>
                 <div className="treasury-flow-legend" aria-label={t("finance.treasury.overview.legend")}>
                   <span><i style={{ background: "#7eb7b2" }} />{t("finance.treasury.overview.deductibleLabel")}</span>
                   <span><i style={{ background: "#5a6072" }} />{t("finance.treasury.overview.nonDeductibleLabel")}</span>
@@ -1681,7 +1681,7 @@ export const TreasuryPage = () => {
 
           <SurfaceCard className="treasury-chart-card treasury-balance-trend-card">
             <div className="treasury-chart-heading">
-              <h3 className="section-subtitle">{t("finance.treasury.overview.balanceTitle")}</h3>
+              <h2 className="section-subtitle">{t("finance.treasury.overview.balanceTitle")}</h2>
               <div className="treasury-flow-legend" aria-label={t("finance.treasury.overview.legend")}>
                 {(snap?.balanceTrendAccounts ?? []).map((account, index) => (
                   <span key={account.accountId}>
@@ -1742,7 +1742,7 @@ export const TreasuryPage = () => {
           </SurfaceCard>
 
           <SurfaceCard className="treasury-accounts-card">
-            <h3 className="section-subtitle">{t("finance.treasury.accounts.title")}</h3>
+            <h2 className="section-subtitle">{t("finance.treasury.accounts.title")}</h2>
             {accounts.data.length === 0 ? (
               <GuidedEmptyState
                 body={t("finance.treasury.accounts.emptyBody")}
@@ -2132,7 +2132,7 @@ export const TreasuryPage = () => {
         <SurfaceCard className="treasury-review-card">
           <div className="treasury-review-header">
             <div className="cell-stack">
-              <h3 className="section-subtitle">{t("finance.treasury.review.title")}</h3>
+              <h2 className="section-subtitle">{t("finance.treasury.review.title")}</h2>
               <small className="text-muted">{t("finance.treasury.review.subtitle")}</small>
             </div>
             {reviewQueue.data.length > 0 || (deductibleLedger.data?.totalsByCurrency.length ?? 0) > 0 ? (
@@ -2324,7 +2324,7 @@ export const TreasuryPage = () => {
 
       {tab === "projects" ? (
         <SurfaceCard>
-          <h3 className="section-subtitle">{t("finance.treasury.projects.title")}</h3>
+          <h2 className="section-subtitle">{t("finance.treasury.projects.title")}</h2>
           {projectPnl.data.length === 0 ? (
             <GuidedEmptyState
               body={t("finance.treasury.projects.emptyBody")}

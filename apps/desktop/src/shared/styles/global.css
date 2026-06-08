@@ -5841,6 +5841,19 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   gap: 12px;
 }
 
+/* KPI as a semantic description list: <dt> label precedes <dd> value in the DOM,
+   but column-reverse keeps the value visually on top. */
+.metric {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 6px;
+  margin: 0;
+}
+
+.metric dd {
+  margin: 0;
+}
+
 .metric-value {
   font-size: 24px;
   font-weight: 500;
@@ -17067,6 +17080,11 @@ input[type="number"] {
   gap: 7px;
   min-height: 94px;
   padding: 12px;
+  margin: 0;
+}
+
+.treasury-kpi-tile dd {
+  margin: 0;
 }
 
 .treasury-kpi-secondary {

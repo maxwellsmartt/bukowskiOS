@@ -130,6 +130,29 @@ const isAccessTokenFresh = (accessToken: string | null | undefined) => {
   }
 };
 
+// Avatars live remotely (Supabase storage / OAuth provider). We cache the
+// resolved data URL per user so it still shows offline and on a cold start,
+// instead of falling back to initials whenever the network is unavailable.
+const AVATAR_CACHE_PREFIX = "bukowski:avatar:";
+
+const cacheAvatarDataUrl = (userId: string, avatarUrl: string | null) => {
+  try {
+    if (avatarUrl && avatarUrl.startsWith("data:")) {
+      window.localStorage.setItem(`${AVATAR_CACHE_PREFIX}${userId}`, avatarUrl);
+    }
+  } catch {
+    /* storage unavailable — avatar simply won't persist offline */
+  }
+};
+
+const readCachedAvatarDataUrl = (userId: string): string | null => {
+  try {
+    return window.localStorage.getItem(`${AVATAR_CACHE_PREFIX}${userId}`);
+  } catch {
+    return null;
+  }
+};
+
 const buildCachedSessionUser = (accessToken: string | null | undefined): BukowskiSessionUser | null => {
   const token = accessToken?.trim();
 
@@ -156,11 +179,15 @@ const buildCachedSessionUser = (accessToken: string | null | undefined): Bukowsk
       return null;
     }
 
-    return toSessionUser({
+    const sessionUser = toSessionUser({
       id: userId,
       email,
       user_metadata: userMetadata,
     });
+
+    // The JWT only carries an OAuth avatar (if any); fall back to the locally
+    // cached data URL so an uploaded/Supabase avatar survives an offline start.
+    return sessionUser.avatarUrl ? sessionUser : { ...sessionUser, avatarUrl: readCachedAvatarDataUrl(userId) };
   } catch {
     return null;
   }
@@ -218,7 +245,13 @@ const resolveSessionUser = async (
   }
 
   const avatarDataUrl = await window.bukowskiAuth?.getAvatarDataUrl(sessionUser.avatarUrl).catch(() => null);
-  return avatarDataUrl ? { ...sessionUser, avatarUrl: avatarDataUrl } : sessionUser;
+  if (avatarDataUrl) {
+    cacheAvatarDataUrl(sessionUser.id, avatarDataUrl);
+    return { ...sessionUser, avatarUrl: avatarDataUrl };
+  }
+  // No data URL (e.g. offline): reuse the cached avatar rather than a remote URL
+  // that won't load without a connection.
+  return { ...sessionUser, avatarUrl: sessionUser.avatarUrl ?? readCachedAvatarDataUrl(sessionUser.id) };
 };
 
 const acceptWorkspaceInvite = async (workspaceId: string | null) => {
