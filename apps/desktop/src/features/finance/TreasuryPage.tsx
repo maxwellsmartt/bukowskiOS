@@ -1,6 +1,7 @@
 import { ArrowUpRight, Banknote, Check, ChevronDown, Download, Edit3, FileDown, FileUp, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
+import { useChartAnimationsEnabled } from "@shared/hooks/useChartAnimations";
 import { toast } from "sonner";
 import {
   Bar,
@@ -423,6 +424,7 @@ const TreasuryBalanceTooltip = ({
 
 export const TreasuryPage = () => {
   const { t } = useTranslation();
+  const chartsAnimated = useChartAnimationsEnabled();
   const { activeWorkspaceId, hasPermission } = useWorkspace();
   // Defense in depth + clearer UX: hide/disable write controls the signed-in
   // role can't use, instead of letting the click bounce off the main-process
@@ -1558,9 +1560,9 @@ export const TreasuryPage = () => {
                         width={70}
                       />
                       <Tooltip content={<TreasuryChartTooltip currency={moneyCurrency} />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-                      <Bar dataKey="income" fill="#7eb7b2" name={t("finance.treasury.kpi.income")} radius={[8, 8, 0, 0]} />
-                      <Bar dataKey="expense" fill="#c88d7f" name={t("finance.treasury.kpi.expense")} radius={[8, 8, 0, 0]} />
-                      <Line
+                      <Bar isAnimationActive={chartsAnimated} dataKey="income" fill="#7eb7b2" name={t("finance.treasury.kpi.income")} radius={[8, 8, 0, 0]} />
+                      <Bar isAnimationActive={chartsAnimated} dataKey="expense" fill="#c88d7f" name={t("finance.treasury.kpi.expense")} radius={[8, 8, 0, 0]} />
+                      <Line isAnimationActive={chartsAnimated}
                         dataKey="net"
                         dot={{ r: 3, fill: "#d6b37a" }}
                         name={t("finance.treasury.overview.netLabel")}
@@ -1665,8 +1667,8 @@ export const TreasuryPage = () => {
                         width={70}
                       />
                       <Tooltip content={<TreasuryChartTooltip currency={moneyCurrency} />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-                      <Bar dataKey="deductible" fill="#7eb7b2" name={t("finance.treasury.overview.deductibleLabel")} radius={[0, 0, 0, 0]} stackId="exp" />
-                      <Bar dataKey="nonDeductible" fill="#5a6072" name={t("finance.treasury.overview.nonDeductibleLabel")} radius={[8, 8, 0, 0]} stackId="exp" />
+                      <Bar isAnimationActive={chartsAnimated} dataKey="deductible" fill="#7eb7b2" name={t("finance.treasury.overview.deductibleLabel")} radius={[0, 0, 0, 0]} stackId="exp" />
+                      <Bar isAnimationActive={chartsAnimated} dataKey="nonDeductible" fill="#5a6072" name={t("finance.treasury.overview.nonDeductibleLabel")} radius={[8, 8, 0, 0]} stackId="exp" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1718,7 +1720,7 @@ export const TreasuryPage = () => {
                     ))}
                     <Tooltip content={<TreasuryBalanceTooltip accounts={snap.balanceTrendAccounts} />} />
                     {snap.balanceTrendAccounts.map((account, index) => (
-                      <Line
+                      <Line isAnimationActive={chartsAnimated}
                         connectNulls
                         dataKey={account.accountId}
                         dot={false}

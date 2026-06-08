@@ -40,6 +40,8 @@ export const userSettingKeys = {
   defaultCurrency: "defaultCurrency",
   /** macOS native notification delivery preferences. In-app notifications stay on. */
   nativeNotifications: "nativeNotifications",
+  /** Whether chart/graph entrance animations play. Default true. */
+  chartAnimations: "chartAnimations",
 } as const;
 
 export type UserSettingKey = (typeof userSettingKeys)[keyof typeof userSettingKeys];
@@ -59,6 +61,7 @@ export type UserSettingsMap = {
   /** Three-letter ISO-4217 code, uppercase. */
   [userSettingKeys.defaultCurrency]?: string;
   [userSettingKeys.nativeNotifications]?: NativeNotificationPreferences;
+  [userSettingKeys.chartAnimations]?: boolean;
 };
 
 type Listener = (settings: UserSettingsMap) => void;
@@ -187,6 +190,10 @@ const sanitizeRemoteSettings = (raw: unknown): UserSettingsMap => {
 
   if (source[userSettingKeys.nativeNotifications] !== undefined) {
     next[userSettingKeys.nativeNotifications] = mergeNativeNotificationPreferences(source[userSettingKeys.nativeNotifications]);
+  }
+
+  if (typeof source[userSettingKeys.chartAnimations] === "boolean") {
+    next[userSettingKeys.chartAnimations] = source[userSettingKeys.chartAnimations] as boolean;
   }
 
   return next;

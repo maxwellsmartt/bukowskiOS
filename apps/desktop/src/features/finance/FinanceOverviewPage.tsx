@@ -2,6 +2,7 @@ import { RefreshCw, Upload } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useChartAnimationsEnabled } from "@shared/hooks/useChartAnimations";
 import {
   Bar,
   BarChart,
@@ -221,6 +222,7 @@ const ChartTooltip = ({
 
 export const FinanceOverviewPage = () => {
   const { t } = useTranslation();
+  const chartsAnimated = useChartAnimationsEnabled();
   const { activeWorkspaceId } = useWorkspace();
   const toast = useToast();
   const { formatDate } = useLocale();
@@ -846,7 +848,7 @@ export const FinanceOverviewPage = () => {
                 />
                 <Tooltip content={<RateChartTooltip />} />
                 {exchangeRateInstitutions.map((institution) => (
-                  <Line
+                  <Line isAnimationActive={chartsAnimated}
                     key={institution.source}
                     type="monotone"
                     dataKey={institution.source}
@@ -903,9 +905,9 @@ export const FinanceOverviewPage = () => {
                     width={58}
                   />
                   <Tooltip content={<ChartTooltip currency={treasuryCurrency} />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-                  <Bar dataKey="income" name={t("finance.overview.liveMetrics.income")} radius={[8, 8, 0, 0]} fill="#7eb7b2" />
-                  <Bar dataKey="expense" name={t("finance.overview.liveMetrics.expense")} radius={[8, 8, 0, 0]} fill="#c88d7f" />
-                  <Line
+                  <Bar isAnimationActive={chartsAnimated} dataKey="income" name={t("finance.overview.liveMetrics.income")} radius={[8, 8, 0, 0]} fill="#7eb7b2" />
+                  <Bar isAnimationActive={chartsAnimated} dataKey="expense" name={t("finance.overview.liveMetrics.expense")} radius={[8, 8, 0, 0]} fill="#c88d7f" />
+                  <Line isAnimationActive={chartsAnimated}
                     type="monotone"
                     dataKey="net"
                     name={t("finance.overview.liveMetrics.net")}

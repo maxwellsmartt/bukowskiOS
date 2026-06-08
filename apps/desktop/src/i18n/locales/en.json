@@ -3847,6 +3847,10 @@
         "minutes_other": "{{count}} min",
         "hour": "1 hour"
       },
+      "chartAnimations": {
+        "label": "Chart animations",
+        "helper": "Animate charts as they load. Turn this off if you prefer them to appear instantly."
+      },
       "notifications": {
         "label": "Desktop notifications",
         "helper": "Choose what we alert you about outside the app. Inside, everything still shows in the bell and Inbox.",

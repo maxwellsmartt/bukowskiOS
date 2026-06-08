@@ -73,6 +73,8 @@ export const GeneralSettingsCard = () => {
   const [dateFormatMode, setDateFormatMode] = useUserSetting(userSettingKeys.dateFormatMode);
   const [defaultCurrency, setDefaultCurrency] = useUserSetting(userSettingKeys.defaultCurrency);
   const [nativeNotifications, setNativeNotifications] = useUserSetting(userSettingKeys.nativeNotifications);
+  const [chartAnimations, setChartAnimations] = useUserSetting(userSettingKeys.chartAnimations);
+  const chartAnimationsEnabled = chartAnimations ?? true;
   const [nativeState, setNativeState] = useState<NativeNotificationState | null>(null);
 
   const workspaceCurrency = (activeMembership?.baseCurrency ?? "USD").toUpperCase();
@@ -219,6 +221,30 @@ export const GeneralSettingsCard = () => {
           </div>
           <div className="general-settings-row-control">
             <AutoLogoutSetting />
+          </div>
+        </div>
+
+        {/* Chart animations */}
+        <div className="general-settings-row">
+          <div className="general-settings-row-label">
+            <strong>{t("settings.general.chartAnimations.label")}</strong>
+            <small>{t("settings.general.chartAnimations.helper")}</small>
+          </div>
+          <div className="general-settings-row-control general-settings-row-control-toggle">
+            <label className="settings-switch-row settings-switch-row-bare">
+              <input
+                checked={chartAnimationsEnabled}
+                onChange={(event) =>
+                  void handleSet("chart animations", async () => {
+                    await setChartAnimations(event.target.checked);
+                  })
+                }
+                type="checkbox"
+              />
+              <span className="settings-switch-track" aria-hidden="true">
+                <span className="settings-switch-thumb" />
+              </span>
+            </label>
           </div>
         </div>
 

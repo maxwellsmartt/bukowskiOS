@@ -19444,6 +19444,11 @@ input[type="number"] {
   pointer-events: none;
 }
 
+/* A switch with no adjacent copy (the row already carries its own label). */
+.settings-switch-row.settings-switch-row-bare {
+  grid-template-columns: auto;
+}
+
 .settings-switch-track {
   position: relative;
   inline-size: 30px;

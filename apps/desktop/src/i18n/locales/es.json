@@ -3851,6 +3851,10 @@
         "minutes_other": "{{count}} min",
         "hour": "1 hora"
       },
+      "chartAnimations": {
+        "label": "Animaciones de gráficas",
+        "helper": "Anima las gráficas al cargarlas. Apágalo si prefieres que aparezcan al instante."
+      },
       "notifications": {
         "label": "Notificaciones de escritorio",
         "helper": "Elige de qué te avisamos fuera del app. Dentro siempre verás todo en la campana y en Inbox.",
