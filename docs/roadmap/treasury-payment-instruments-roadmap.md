@@ -161,7 +161,7 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 
 ### Slice 7 — Reembolsos historicos y formulario contextual
 
-**Estado:** MVP implementado parcialmente el 2026-06-08
+**Estado:** MVP implementado el 2026-06-08
 
 **Objetivo:** Quitar dependencia del scope visible de Inbox y reducir friccion del formulario de medios de pago.
 
@@ -176,6 +176,23 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 - Pendiente: tabla expandida con drill-down a facturas/movimientos y export CSV/XLSX.
 - Pendiente: selector real de usuarios/responsables en vez de introducir IDs manuales.
 - Pendiente: importadores de estados para bancos adicionales; hoy el modelo acepta `Otro`, pero los parsers automaticos solo cubren Banco Popular CSV y Banco Santa Cruz XLSX.
+
+### Slice 8 — Filtros y drill-down de reembolsos
+
+**Estado:** MVP implementado parcialmente el 2026-06-08
+
+**Objetivo:** Convertir el panel de reembolsos en una herramienta operativa, no solo un resumen.
+
+**Frontend/backend:**
+- `TreasuryReimbursementGroup` incluye `items` con factura, proveedor, RNC, NCF, fecha, monto, estado y movimiento vinculado. **Implementado MVP.**
+- Panel de reembolsos agrega filtros visibles por responsable, medio, estado y ciclo. **Implementado MVP.**
+- Tarjetas de reembolso se expanden para ver facturas/movimientos dentro del grupo. **Implementado MVP.**
+- Totales por moneda se muestran arriba del panel filtrado. **Implementado MVP.**
+- Self-heal local agrega columnas fiscales antiguas de `invoice_extractions` si faltan en DBs viejas. **Implementado.**
+- Pendiente: accion directa desde drill-down para abrir preview/editar factura.
+- Pendiente: selector mejorado de responsables usando usuarios operativos reales, no solo crew/catalog IDs.
+- Pendiente: export CSV/XLSX del resultado filtrado.
+- Pendiente: soporte de import para bancos adicionales.
 
 ## Tests criticos
 
@@ -272,15 +289,22 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
   - `corepack pnpm --dir apps/desktop exec vitest run src/test/treasury-mutation-service.test.ts`: **21 passed**.
   - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
   - Nota: un intento previo con `corepack pnpm --filter @bukowski/desktop test -- src/test/treasury-mutation-service.test.ts` ejecuto gran parte de la suite desktop y fallo solo por un test local mal invocado; luego se corrigio el test y el spec focalizado paso.
+- Se implementa Slice 8 MVP parcial:
+  - grupos de reembolso ahora incluyen detalle `items` por factura;
+  - el panel agrega filtros por responsable, medio, estado y ciclo;
+  - se agregan totales por moneda y tarjetas expandibles con proveedor, NCF, fecha, monto y movimiento vinculado;
+  - `invoice_extractions` suma self-heal para columnas fiscales si una DB local antigua no las tiene.
+- Verificacion Slice 8 MVP parcial:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
+  - `corepack pnpm --dir apps/desktop exec vitest run src/test/treasury-mutation-service.test.ts`: **21 passed**.
 
 ## Proximo slice recomendado
 
-**Slice 8 — filtros y drill-down de reembolsos.**
+**Slice 9 — acciones operativas y export de reembolsos.**
 
 Orden sugerido:
-1. Agregar filtros visibles por responsable, medio, ciclo y estado.
-2. Agregar vista/tabla expandida de reembolsos con drill-down a facturas y movimientos.
-3. Reemplazar IDs manuales por selector de usuarios/responsables conectado al catalogo local.
-4. Considerar export CSV/XLSX de reembolsos pendientes.
-5. Diseñar soporte para bancos adicionales: primero metadata `Otro/custom`, luego parser generico CSV/manual y despues parsers dedicados por banco.
-6. Dejar auto-conciliacion sin confirmacion humana fuera de v1.
+1. Accion directa desde drill-down: abrir preview/editar factura y saltar al movimiento vinculado cuando exista.
+2. Export CSV/XLSX de reembolsos filtrados.
+3. Reemplazar IDs manuales por selector de usuarios/responsables conectado al catalogo local y usuarios operativos.
+4. Diseñar soporte para bancos adicionales: primero metadata `Otro/custom`, luego parser generico CSV/manual y despues parsers dedicados por banco.
+5. Dejar auto-conciliacion sin confirmacion humana fuera de v1.

@@ -865,11 +865,20 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
              l.cycle_start,
              l.cycle_end,
              l.updated_at,
+             l.linked_entity_id,
+             l.transaction_id,
+             ix.original_name,
+             ix.supplier_name,
+             ix.supplier_rnc,
+             ix.ncf,
+             ix.invoice_date,
+             COALESCE(txn.txn_date || ' · ' || COALESCE(txn.raw_description, ''), NULL) AS transaction_label,
              COALESCE(NULLIF(ix.linked_user_id, ''), NULLIF(ix.uploaded_by_user_id, '')) AS owner_user_id,
              COALESCE(NULLIF(ix.linked_user_name, ''), NULLIF(ix.uploaded_by_name, ''), 'Sin usuario') AS owner_name
            FROM transaction_links l
            LEFT JOIN invoice_extractions ix ON ix.id = l.linked_entity_id
            LEFT JOIN bank_accounts acc ON acc.id = l.payment_instrument_id
+           LEFT JOIN bank_transactions txn ON txn.id = l.transaction_id
            WHERE ${conditions.join(" AND ")}
            ORDER BY l.updated_at DESC, l.created_at DESC`,
         )
@@ -883,6 +892,14 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
         cycle_start: string | null;
         cycle_end: string | null;
         updated_at: string | null;
+        linked_entity_id: string | null;
+        transaction_id: string | null;
+        original_name: string | null;
+        supplier_name: string | null;
+        supplier_rnc: string | null;
+        ncf: string | null;
+        invoice_date: string | null;
+        transaction_label: string | null;
         owner_user_id: string | null;
         owner_name: string | null;
       }>;
@@ -912,9 +929,25 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
             invoiceCount: 0,
             amount: 0,
             latestUpdatedAt: row.updated_at ?? null,
+            items: [],
           };
         current.invoiceCount += 1;
         current.amount = round2(current.amount + Number(row.amount_applied ?? 0));
+        current.items.push({
+          allocationId: row.id,
+          invoiceExtractionId: row.linked_entity_id ?? "",
+          originalName: row.original_name ?? row.linked_entity_id ?? "Factura sin nombre",
+          supplierName: row.supplier_name ?? null,
+          supplierRnc: row.supplier_rnc ?? null,
+          ncf: row.ncf ?? null,
+          invoiceDate: row.invoice_date ?? null,
+          amount: round2(Number(row.amount_applied ?? 0)),
+          currency,
+          status: row.allocation_status as TreasuryReimbursementsSnapshot["groups"][number]["items"][number]["status"],
+          transactionId: row.transaction_id ?? null,
+          transactionLabel: row.transaction_label ?? null,
+          updatedAt: row.updated_at ?? null,
+        });
         if (current.status !== row.allocation_status) current.status = "mixed";
         if (row.updated_at && (!current.latestUpdatedAt || row.updated_at > current.latestUpdatedAt)) {
           current.latestUpdatedAt = row.updated_at;

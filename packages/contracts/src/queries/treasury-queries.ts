@@ -219,6 +219,22 @@ export type TreasuryReimbursementsQuery = {
   cycleEnd?: string | null;
 };
 
+export type TreasuryReimbursementItem = {
+  allocationId: string;
+  invoiceExtractionId: string;
+  originalName: string;
+  supplierName: string | null;
+  supplierRnc: string | null;
+  ncf: string | null;
+  invoiceDate: string | null;
+  amount: number;
+  currency: string;
+  status: InvoiceAllocationStatus;
+  transactionId: string | null;
+  transactionLabel: string | null;
+  updatedAt: string | null;
+};
+
 export type TreasuryReimbursementGroup = {
   key: string;
   ownerUserId: string | null;
@@ -232,6 +248,7 @@ export type TreasuryReimbursementGroup = {
   invoiceCount: number;
   amount: number;
   latestUpdatedAt: string | null;
+  items: TreasuryReimbursementItem[];
 };
 
 export type TreasuryReimbursementsSnapshot = {

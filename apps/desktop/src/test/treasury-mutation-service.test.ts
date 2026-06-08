@@ -679,6 +679,10 @@ describe("treasury mutation service", () => {
         byte_size INTEGER NOT NULL DEFAULT 0,
         total REAL,
         currency TEXT,
+        supplier_name TEXT,
+        supplier_rnc TEXT,
+        ncf TEXT,
+        invoice_date TEXT,
         uploaded_by_user_id TEXT,
         uploaded_by_name TEXT,
         linked_user_id TEXT,
@@ -704,9 +708,10 @@ describe("treasury mutation service", () => {
       .prepare(
         `INSERT INTO invoice_extractions (
            id, workspace_id, batch_id, status, original_name, storage_path, mime_type,
-           byte_size, total, currency, uploaded_by_user_id, uploaded_by_name,
+           byte_size, total, currency, supplier_name, supplier_rnc, ncf, invoice_date,
+           uploaded_by_user_id, uploaded_by_name,
            linked_user_id, linked_user_name, created_at, updated_at
-         ) VALUES (?, ?, ?, 'extracted', ?, ?, 'application/pdf', 100, ?, 'DOP', ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, 'extracted', ?, ?, 'application/pdf', 100, ?, 'DOP', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         "invoice-extraction-allocation-001",
@@ -715,6 +720,10 @@ describe("treasury mutation service", () => {
         "factura.pdf",
         "/tmp/factura.pdf",
         1000,
+        "Proveedor Uno",
+        "101000000",
+        "B0100000001",
+        "2026-06-08",
         "user-ops",
         "Carlos",
         "user-ops",
@@ -760,6 +769,17 @@ describe("treasury mutation service", () => {
       status: "pending",
       cycleStart: "2026-06-01",
       cycleEnd: "2026-06-30",
+    });
+    expect(openReimbursements.groups[0].items[0]).toMatchObject({
+      allocationId: allocation.allocationId,
+      originalName: "factura.pdf",
+      supplierName: "Proveedor Uno",
+      supplierRnc: "101000000",
+      ncf: "B0100000001",
+      invoiceDate: "2026-06-08",
+      amount: 700,
+      currency: "DOP",
+      status: "pending",
     });
 
     expect(() =>

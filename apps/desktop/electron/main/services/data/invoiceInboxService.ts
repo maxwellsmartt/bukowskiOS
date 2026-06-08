@@ -163,6 +163,18 @@ const ensureTable = (db: DatabaseSync) => {
   if (!columns.includes("uploaded_by_name")) {
     db.exec(`ALTER TABLE invoice_extractions ADD COLUMN uploaded_by_name TEXT`);
   }
+  if (!columns.includes("supplier_name")) {
+    db.exec(`ALTER TABLE invoice_extractions ADD COLUMN supplier_name TEXT`);
+  }
+  if (!columns.includes("supplier_rnc")) {
+    db.exec(`ALTER TABLE invoice_extractions ADD COLUMN supplier_rnc TEXT`);
+  }
+  if (!columns.includes("ncf")) {
+    db.exec(`ALTER TABLE invoice_extractions ADD COLUMN ncf TEXT`);
+  }
+  if (!columns.includes("invoice_date")) {
+    db.exec(`ALTER TABLE invoice_extractions ADD COLUMN invoice_date TEXT`);
+  }
   // Iteration 2: who the expense really belongs to (distinct from uploader),
   // the synced cloud object key for the file bytes, and the multi-project tags.
   if (!columns.includes("linked_user_id")) {

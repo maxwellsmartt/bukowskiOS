@@ -125,9 +125,6 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const transactions = useTreasuryTransactions(
     useMemo(() => ({ workspaceId, limit: 1000 }), [workspaceId]),
   );
-  const reimbursements = useTreasuryReimbursements(
-    useMemo(() => ({ workspaceId, status: "open" }), [workspaceId]),
-  );
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isBulkDismissing, setIsBulkDismissing] = useState(false);
@@ -138,6 +135,12 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [uploaderFilter, setUploaderFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
+  const [reimbursementOwnerFilter, setReimbursementOwnerFilter] = useState<string>("all");
+  const [reimbursementInstrumentFilter, setReimbursementInstrumentFilter] = useState<string>("all");
+  const [reimbursementStatusFilter, setReimbursementStatusFilter] = useState<string>("open");
+  const [reimbursementCycleStartFilter, setReimbursementCycleStartFilter] = useState<string>("");
+  const [reimbursementCycleEndFilter, setReimbursementCycleEndFilter] = useState<string>("");
+  const [expandedReimbursementKeys, setExpandedReimbursementKeys] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // Rows the user explicitly switched to multi-project mode (chips). By
   // default an invoice is assigned to a single project.
@@ -148,6 +151,25 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const [preview, setPreview] = useState<{ id: string; name: string } | null>(null);
   const [previewData, setPreviewData] = useState<{ dataUrl: string; mimeType: string } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const reimbursementQuery = useMemo(
+    () => ({
+      workspaceId,
+      ownerUserId: reimbursementOwnerFilter === "all" ? null : reimbursementOwnerFilter,
+      paymentInstrumentId: reimbursementInstrumentFilter === "all" ? null : reimbursementInstrumentFilter,
+      status: reimbursementStatusFilter as "open" | "all" | "pending" | "matched" | "partial" | "rejected" | "reimbursed",
+      cycleStart: reimbursementCycleStartFilter || null,
+      cycleEnd: reimbursementCycleEndFilter || null,
+    }),
+    [
+      reimbursementCycleEndFilter,
+      reimbursementCycleStartFilter,
+      reimbursementInstrumentFilter,
+      reimbursementOwnerFilter,
+      reimbursementStatusFilter,
+      workspaceId,
+    ],
+  );
+  const reimbursements = useTreasuryReimbursements(reimbursementQuery);
 
   // Projects for project tags. "Gasto de" is sourced from catalog crew below.
   useEffect(() => {
@@ -262,6 +284,41 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     ],
     [accounts.data, t],
   );
+  const reimbursementOwnerOptions = useMemo(
+    () => [
+      { value: "all", label: t("finance.treasury.invoices.reimbursements.allOwners", { defaultValue: "Todos los responsables" }) },
+      ...memberOptions,
+    ],
+    [memberOptions, t],
+  );
+  const reimbursementInstrumentOptions = useMemo(
+    () => [
+      { value: "all", label: t("finance.treasury.invoices.reimbursements.allInstruments", { defaultValue: "Todos los medios" }) },
+      ...accounts.data
+        .filter((account) => account.isActive)
+        .map((account) => ({
+          value: account.id,
+          label: `${account.accountLabel} · ${account.currency}${account.last4 ? ` · •••• ${account.last4}` : ""}`,
+        })),
+    ],
+    [accounts.data, t],
+  );
+  const reimbursementStatusOptions = useMemo(
+    () => [
+      { value: "open", label: t("finance.treasury.invoices.reimbursements.status.open", { defaultValue: "Abiertos" }) },
+      { value: "pending", label: t("finance.treasury.invoices.reimbursements.status.pending", { defaultValue: "Pendientes" }) },
+      { value: "matched", label: t("finance.treasury.invoices.reimbursements.status.matched", { defaultValue: "Conciliados" }) },
+      { value: "partial", label: t("finance.treasury.invoices.reimbursements.status.partial", { defaultValue: "Parciales" }) },
+      { value: "reimbursed", label: t("finance.treasury.invoices.reimbursements.status.reimbursed", { defaultValue: "Reembolsados" }) },
+      { value: "rejected", label: t("finance.treasury.invoices.reimbursements.status.rejected", { defaultValue: "Rechazados" }) },
+      { value: "all", label: t("finance.treasury.invoices.reimbursements.status.all", { defaultValue: "Todos" }) },
+    ],
+    [t],
+  );
+
+  useEffect(() => {
+    setExpandedReimbursementKeys(new Set());
+  }, [reimbursementQuery]);
 
   const filteredRows = useMemo(() => {
     return inbox.data.filter((row) => {
@@ -286,6 +343,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
         key: group.key,
         owner: group.ownerName,
         instrument: group.paymentInstrumentLabel,
+        status: group.status,
         cycle:
           group.cycleStart && group.cycleEnd
             ? `${group.cycleStart} → ${group.cycleEnd}`
@@ -293,9 +351,18 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
         currency: group.currency,
         amount: group.amount,
         count: group.invoiceCount,
+        latestUpdatedAt: group.latestUpdatedAt,
+        items: group.items,
       })),
     [reimbursements.data?.groups, t],
   );
+  const hasActiveReimbursementFilters =
+    reimbursementOwnerFilter !== "all" ||
+    reimbursementInstrumentFilter !== "all" ||
+    reimbursementStatusFilter !== "open" ||
+    Boolean(reimbursementCycleStartFilter) ||
+    Boolean(reimbursementCycleEndFilter);
+  const reimbursementTotals = reimbursements.data?.totalsByCurrency ?? [];
 
   const reconciliationCandidates = useMemo(() => {
     if (!reconciling) return [];
@@ -844,7 +911,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
         />
       ) : (
         <>
-          {reimbursementGroups.length > 0 ? (
+          {reimbursementGroups.length > 0 || hasActiveReimbursementFilters ? (
             <div className="invoice-reimbursement-panel">
               <div className="invoice-reimbursement-panel-heading">
                 <div>
@@ -862,20 +929,136 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                   })}
                 </small>
               </div>
-              <div className="invoice-reimbursement-grid">
-                {reimbursementGroups.slice(0, 6).map((group) => (
-                  <article className="invoice-reimbursement-card" key={group.key}>
-                    <span>{group.owner}</span>
-                    <strong>{formatInvoiceMoney(group.amount, group.currency)}</strong>
-                    <small>{group.instrument}</small>
-                    <em>
-                      {group.cycle} · {t("finance.treasury.invoices.reimbursements.invoiceCount", {
+              <div className="invoice-reimbursement-filters">
+                <CompactSelect
+                  className="invoice-filter-select"
+                  ariaLabel={t("finance.treasury.invoices.reimbursements.filterOwner", { defaultValue: "Filtrar responsable" })}
+                  value={reimbursementOwnerFilter}
+                  onChange={setReimbursementOwnerFilter}
+                  options={reimbursementOwnerOptions}
+                />
+                <CompactSelect
+                  className="invoice-filter-select"
+                  ariaLabel={t("finance.treasury.invoices.reimbursements.filterInstrument", { defaultValue: "Filtrar medio" })}
+                  value={reimbursementInstrumentFilter}
+                  onChange={setReimbursementInstrumentFilter}
+                  options={reimbursementInstrumentOptions}
+                />
+                <CompactSelect
+                  className="invoice-filter-select"
+                  ariaLabel={t("finance.treasury.invoices.reimbursements.filterStatus", { defaultValue: "Filtrar estado" })}
+                  value={reimbursementStatusFilter}
+                  onChange={setReimbursementStatusFilter}
+                  options={reimbursementStatusOptions}
+                />
+                <label className="invoice-reimbursement-date-filter">
+                  <span>{t("finance.treasury.invoices.reimbursements.cycleStart", { defaultValue: "Ciclo desde" })}</span>
+                  <input
+                    className="field-input"
+                    type="date"
+                    value={reimbursementCycleStartFilter}
+                    onChange={(event) => setReimbursementCycleStartFilter(event.target.value)}
+                  />
+                </label>
+                <label className="invoice-reimbursement-date-filter">
+                  <span>{t("finance.treasury.invoices.reimbursements.cycleEnd", { defaultValue: "Ciclo hasta" })}</span>
+                  <input
+                    className="field-input"
+                    type="date"
+                    value={reimbursementCycleEndFilter}
+                    onChange={(event) => setReimbursementCycleEndFilter(event.target.value)}
+                  />
+                </label>
+                {hasActiveReimbursementFilters ? (
+                  <button
+                    className="ghost-control"
+                    type="button"
+                    onClick={() => {
+                      setReimbursementOwnerFilter("all");
+                      setReimbursementInstrumentFilter("all");
+                      setReimbursementStatusFilter("open");
+                      setReimbursementCycleStartFilter("");
+                      setReimbursementCycleEndFilter("");
+                    }}
+                  >
+                    {t("finance.treasury.invoices.reimbursements.clearFilters", { defaultValue: "Limpiar filtros" })}
+                  </button>
+                ) : null}
+              </div>
+              {reimbursementTotals.length > 0 ? (
+                <div className="invoice-reimbursement-totals">
+                  {reimbursementTotals.map((total) => (
+                    <span key={total.currency}>
+                      {formatInvoiceMoney(total.amount, total.currency)} ·{" "}
+                      {t("finance.treasury.invoices.reimbursements.invoiceCount", {
                         defaultValue: "{{count}} factura(s)",
-                        count: group.count,
+                        count: total.invoiceCount,
                       })}
-                    </em>
-                  </article>
-                ))}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <div className="invoice-reimbursement-grid">
+                {reimbursementGroups.length > 0 ? (
+                  reimbursementGroups.map((group) => {
+                    const isExpanded = expandedReimbursementKeys.has(group.key);
+                    return (
+                      <article className={`invoice-reimbursement-card${isExpanded ? " is-expanded" : ""}`} key={group.key}>
+                        <button
+                          className="invoice-reimbursement-card-main"
+                          type="button"
+                          onClick={() =>
+                            setExpandedReimbursementKeys((current) => {
+                              const next = new Set(current);
+                              if (next.has(group.key)) next.delete(group.key);
+                              else next.add(group.key);
+                              return next;
+                            })
+                          }
+                        >
+                          <span>{group.owner}</span>
+                          <strong>{formatInvoiceMoney(group.amount, group.currency)}</strong>
+                          <small>{group.instrument}</small>
+                          <em>
+                            {group.cycle} · {t("finance.treasury.invoices.reimbursements.invoiceCount", {
+                              defaultValue: "{{count}} factura(s)",
+                              count: group.count,
+                            })}
+                          </em>
+                        </button>
+                        {isExpanded ? (
+                          <div className="invoice-reimbursement-detail">
+                            {group.items.map((item) => (
+                              <div className="invoice-reimbursement-item" key={item.allocationId}>
+                                <span>
+                                  <strong>{item.originalName}</strong>
+                                  <small>{item.supplierName ?? t("finance.treasury.invoices.unknownSupplier", { defaultValue: "Proveedor no detectado" })}</small>
+                                </span>
+                                <span>
+                                  {item.invoiceDate ?? "—"}
+                                  {item.ncf ? <small>{item.ncf}</small> : null}
+                                </span>
+                                <span>
+                                  {formatInvoiceMoney(item.amount, item.currency)}
+                                  <small>
+                                    {item.transactionLabel ??
+                                      t("finance.treasury.invoices.reimbursements.noMovement", { defaultValue: "Sin movimiento vinculado" })}
+                                  </small>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })
+                ) : (
+                  <div className="invoice-reimbursement-empty">
+                    {t("finance.treasury.invoices.reimbursements.emptyFiltered", {
+                      defaultValue: "No hay reembolsos con esos filtros.",
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           ) : null}

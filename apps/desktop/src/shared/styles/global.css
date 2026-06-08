@@ -20239,6 +20239,48 @@ input[type="number"] {
   font-size: var(--font-2xs, 11px);
 }
 
+.invoice-reimbursement-filters {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin-bottom: 10px;
+}
+
+.invoice-reimbursement-date-filter {
+  display: grid;
+  gap: 4px;
+}
+
+.invoice-reimbursement-date-filter span {
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 11px);
+  font-weight: var(--weight-semibold, 600);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.invoice-reimbursement-date-filter .field-input {
+  min-height: 34px;
+}
+
+.invoice-reimbursement-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.invoice-reimbursement-totals span {
+  background: rgba(214, 179, 122, 0.1);
+  border: 1px solid rgba(214, 179, 122, 0.18);
+  border-radius: 999px;
+  color: rgba(238, 214, 176, 0.96);
+  font-size: var(--font-2xs, 11px);
+  font-weight: var(--weight-semibold, 600);
+  padding: 5px 9px;
+}
+
 .invoice-reimbursement-grid {
   display: grid;
   gap: 8px;
@@ -20252,7 +20294,28 @@ input[type="number"] {
   display: grid;
   gap: 4px;
   min-width: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.invoice-reimbursement-card.is-expanded {
+  grid-column: span 2;
+}
+
+.invoice-reimbursement-card-main {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
   padding: 10px;
+  text-align: left;
+}
+
+.invoice-reimbursement-card-main:hover {
+  background: rgba(126, 183, 178, 0.06);
 }
 
 .invoice-reimbursement-card span,
@@ -20279,6 +20342,47 @@ input[type="number"] {
   color: var(--text-muted);
   font-size: var(--font-2xs, 11px);
   font-style: normal;
+}
+
+.invoice-reimbursement-detail {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  display: grid;
+  gap: 1px;
+}
+
+.invoice-reimbursement-item {
+  align-items: start;
+  background: rgba(255, 255, 255, 0.025);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(150px, 1.4fr) minmax(90px, 0.8fr) minmax(140px, 1fr);
+  padding: 9px 10px;
+}
+
+.invoice-reimbursement-item > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.invoice-reimbursement-item strong,
+.invoice-reimbursement-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invoice-reimbursement-item strong {
+  color: var(--text-primary);
+  font-size: var(--font-xs, 12px);
+}
+
+.invoice-reimbursement-empty {
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: var(--font-xs, 12px);
+  padding: 14px;
 }
 
 .invoice-reconcile-drawer {
