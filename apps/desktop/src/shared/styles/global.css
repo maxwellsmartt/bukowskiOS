@@ -17795,9 +17795,13 @@ input[type="number"] {
 }
 
 .treasury-account-form-card {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(214, 173, 112, 0.14);
-  padding: 12px;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(126, 183, 178, 0.08), transparent 26%),
+    linear-gradient(135deg, rgba(214, 179, 122, 0.055), rgba(255, 255, 255, 0.018) 38%, rgba(126, 183, 178, 0.035)),
+    rgba(255, 255, 255, 0.018);
+  border-color: rgba(214, 179, 122, 0.18);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  padding: 16px;
 }
 
 .treasury-account-form-heading {
@@ -17806,8 +17810,8 @@ input[type="number"] {
   display: flex;
   gap: 14px;
   justify-content: space-between;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
 }
 
 .treasury-account-form-heading h3 {
@@ -17840,14 +17844,27 @@ input[type="number"] {
 .treasury-account-form-grid {
   align-items: end;
   display: grid;
-  gap: 10px;
+  gap: 12px;
   grid-template-columns: repeat(4, minmax(150px, 1fr));
+}
+
+.treasury-account-form-grid .compact-filter-field {
+  align-items: stretch;
+  display: grid;
+  gap: 6px;
+}
+
+.treasury-account-form-grid .compact-filter-field > span {
+  padding-left: 2px;
 }
 
 .treasury-account-form-grid .field-input,
 .treasury-account-form-grid .compact-select-trigger {
-  height: 36px;
-  min-height: 36px;
+  border-color: rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+  height: 40px;
+  min-height: 40px;
+  padding-inline: 12px;
 }
 
 .treasury-account-form-actions {
@@ -17856,6 +17873,7 @@ input[type="number"] {
   gap: 8px;
   justify-content: flex-end;
   grid-column: 1 / -1;
+  padding-top: 6px;
   white-space: nowrap;
 }
 
@@ -17865,7 +17883,8 @@ input[type="number"] {
 
 .treasury-payment-instruments-card {
   background:
-    radial-gradient(circle at top left, rgba(126, 183, 178, 0.075), transparent 34%),
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.105), transparent 34%),
+    radial-gradient(circle at 80% 10%, rgba(214, 179, 122, 0.075), transparent 30%),
     rgba(255, 255, 255, 0.024);
   border-color: rgba(155, 176, 196, 0.14);
 }
@@ -17897,8 +17916,8 @@ input[type="number"] {
 }
 
 .treasury-payment-instruments-stats span {
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 999px;
   color: var(--text-secondary);
   font-size: var(--font-2xs, 11px);
@@ -17908,18 +17927,30 @@ input[type="number"] {
 
 .treasury-payment-instruments-grid {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
 .treasury-payment-instrument {
-  background: rgba(255, 255, 255, 0.026);
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 12px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: 16px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.035);
   display: grid;
   gap: 13px;
   min-width: 0;
-  padding: 14px;
+  padding: 16px;
+  transition: border-color 140ms ease, transform 140ms ease, background 140ms ease;
+}
+
+.treasury-payment-instrument:hover {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.022)),
+    rgba(255, 255, 255, 0.02);
+  border-color: rgba(214, 179, 122, 0.22);
+  transform: translateY(-1px);
 }
 
 .treasury-payment-instrument.is-inactive {
@@ -17937,7 +17968,7 @@ input[type="number"] {
   align-items: center;
   background: rgba(214, 179, 122, 0.12);
   border: 1px solid rgba(214, 179, 122, 0.22);
-  border-radius: 12px;
+  border-radius: 14px;
   color: rgba(234, 205, 156, 0.95);
   display: inline-flex;
   height: 40px;
@@ -17969,9 +18000,9 @@ input[type="number"] {
 }
 
 .treasury-payment-instrument-meta div {
-  background: rgba(0, 0, 0, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.055);
-  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 11px;
   min-width: 0;
   padding: 8px 9px;
 }
@@ -17997,6 +18028,7 @@ input[type="number"] {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding-top: 2px;
 }
 
 .treasury-payment-instrument-actions .ghost-control {
@@ -20173,6 +20205,82 @@ input[type="number"] {
   font-weight: var(--weight-semibold, 600);
 }
 
+.invoice-reimbursement-panel {
+  background:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.11), transparent 30%),
+    rgba(255, 255, 255, 0.022);
+  border: 1px solid rgba(126, 183, 178, 0.18);
+  border-radius: 14px;
+  margin-bottom: 10px;
+  padding: 12px;
+}
+
+.invoice-reimbursement-panel-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.invoice-reimbursement-panel-heading div {
+  display: grid;
+  gap: 3px;
+}
+
+.invoice-reimbursement-panel-heading strong {
+  color: var(--text-primary);
+  font-size: var(--font-sm, 13px);
+}
+
+.invoice-reimbursement-panel-heading span,
+.invoice-reimbursement-panel-heading small {
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 11px);
+}
+
+.invoice-reimbursement-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.invoice-reimbursement-card {
+  background: rgba(0, 0, 0, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.invoice-reimbursement-card span,
+.invoice-reimbursement-card small,
+.invoice-reimbursement-card em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invoice-reimbursement-card span {
+  color: var(--text-secondary);
+  font-size: var(--font-xs, 12px);
+}
+
+.invoice-reimbursement-card strong {
+  color: rgba(214, 179, 122, 0.98);
+  font-size: 17px;
+  line-height: 1.15;
+}
+
+.invoice-reimbursement-card small,
+.invoice-reimbursement-card em {
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 11px);
+  font-style: normal;
+}
+
 .invoice-batch-danger {
   border-color: rgba(248, 113, 113, 0.32);
   color: #fca5a5;
@@ -20217,6 +20325,11 @@ input[type="number"] {
   max-width: 170px;
   height: 28px;
   font-size: var(--font-xs, 11px);
+}
+
+.invoice-payment-instrument-select.compact-select-trigger {
+  max-width: 220px;
+  min-width: 180px;
 }
 
 /* In-row selects (Gasto de / Proyecto): identical size, fill their cell. */

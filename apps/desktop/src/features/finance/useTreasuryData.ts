@@ -39,6 +39,9 @@ import type {
   UpdateInvoiceExtractionCommand,
   UpsertPaymentInstrumentCommand,
   DeactivatePaymentInstrumentCommand,
+  AssignInvoiceAllocationCommand,
+  LinkInvoiceAllocationToTransactionCommand,
+  MarkInvoiceAllocationReimbursedCommand,
 } from "@contracts";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
@@ -517,6 +520,18 @@ export const useTreasuryMutations = () =>
       async linkTransaction(input: LinkTransactionCommand): Promise<TransactionMutationResult> {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.linkTransaction(input);
+      },
+      async assignInvoiceAllocation(input: AssignInvoiceAllocationCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceAllocationAssign(input);
+      },
+      async linkInvoiceAllocationToTransaction(input: LinkInvoiceAllocationToTransactionCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceAllocationLinkToTransaction(input);
+      },
+      async markInvoiceAllocationReimbursed(input: MarkInvoiceAllocationReimbursedCommand) {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.invoiceAllocationMarkReimbursed(input);
       },
       async undoLastAction(input: UndoTreasuryActionCommand): Promise<TransactionMutationResult> {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");

@@ -12,6 +12,7 @@ import type {
   EnqueueInvoiceBatchCommand,
   EnqueueInvoiceBatchResult,
   InvoiceExtraction,
+  InvoiceExtractionAllocation,
   InvoiceExtractionMutationResult,
   InvoiceExtractionProjectInput,
   InvoiceExtractionProjectTag,
@@ -100,6 +101,21 @@ type ExtractionRow = {
   updated_at: string;
 };
 
+type AllocationRow = {
+  linked_entity_id: string;
+  id: string;
+  payment_instrument_id: string | null;
+  payment_instrument_label: string | null;
+  transaction_id: string | null;
+  transaction_label: string | null;
+  amount_applied: number | null;
+  amount_currency: string | null;
+  allocation_status: string;
+  cycle_start: string | null;
+  cycle_end: string | null;
+  notes: string | null;
+};
+
 const ensureTable = (db: DatabaseSync) => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS invoice_extractions (
@@ -182,7 +198,25 @@ const ensureTable = (db: DatabaseSync) => {
   );
 };
 
-const mapRow = (row: ExtractionRow, projects: InvoiceExtractionProjectTag[] = []): InvoiceExtraction => ({
+const mapAllocation = (row: AllocationRow): InvoiceExtractionAllocation => ({
+  id: row.id,
+  paymentInstrumentId: row.payment_instrument_id,
+  paymentInstrumentLabel: row.payment_instrument_label,
+  transactionId: row.transaction_id,
+  transactionLabel: row.transaction_label,
+  amountApplied: row.amount_applied,
+  amountCurrency: row.amount_currency,
+  allocationStatus: row.allocation_status as InvoiceExtractionAllocation["allocationStatus"],
+  cycleStart: row.cycle_start,
+  cycleEnd: row.cycle_end,
+  notes: row.notes,
+});
+
+const mapRow = (
+  row: ExtractionRow,
+  projects: InvoiceExtractionProjectTag[] = [],
+  allocation: InvoiceExtractionAllocation | null = null,
+): InvoiceExtraction => ({
   id: row.id,
   workspaceId: row.workspace_id,
   batchId: row.batch_id,
@@ -195,6 +229,7 @@ const mapRow = (row: ExtractionRow, projects: InvoiceExtractionProjectTag[] = []
   linkedUserId: row.linked_user_id,
   linkedUserName: row.linked_user_name,
   projects,
+  allocation,
   supplierName: row.supplier_name,
   supplierRnc: row.supplier_rnc,
   ncf: row.ncf,
@@ -306,6 +341,43 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
       const list = byId.get(row.invoice_extraction_id) ?? [];
       list.push({ projectId: row.project_id, projectName: row.project_name_snapshot });
       byId.set(row.invoice_extraction_id, list);
+    }
+    return byId;
+  };
+
+  const loadAllocationsFor = (extractionIds: string[]): Map<string, InvoiceExtractionAllocation> => {
+    const byId = new Map<string, InvoiceExtractionAllocation>();
+    if (!extractionIds.length) return byId;
+    const placeholders = extractionIds.map(() => "?").join(", ");
+    const rows = db
+      .prepare(
+        `SELECT
+           l.linked_entity_id,
+           l.id,
+           l.payment_instrument_id,
+           acc.account_label AS payment_instrument_label,
+           l.transaction_id,
+           CASE
+             WHEN t.id IS NULL THEN NULL
+             ELSE t.txn_date || ' · ' || COALESCE(NULLIF(t.raw_description, ''), t.reference, t.id)
+           END AS transaction_label,
+           l.amount_applied,
+           l.amount_currency,
+           l.allocation_status,
+           l.cycle_start,
+           l.cycle_end,
+           l.notes
+         FROM transaction_links l
+         LEFT JOIN bank_accounts acc ON acc.id = l.payment_instrument_id
+         LEFT JOIN bank_transactions t ON t.id = l.transaction_id
+         WHERE l.linked_entity_type = 'invoice_extraction'
+           AND l.linked_entity_id IN (${placeholders})
+         ORDER BY l.updated_at DESC, l.created_at DESC`,
+      )
+      .all(...extractionIds) as AllocationRow[];
+    for (const row of rows) {
+      if (byId.has(row.linked_entity_id)) continue;
+      byId.set(row.linked_entity_id, mapAllocation(row));
     }
     return byId;
   };
@@ -429,8 +501,10 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
         `SELECT * FROM invoice_extractions WHERE ${clauses.join(" AND ")} ORDER BY created_at DESC, rowid DESC`,
       )
       .all(...params) as ExtractionRow[];
-    const projectsById = loadProjectsFor(rows.map((row) => row.id));
-    return rows.map((row) => mapRow(row, projectsById.get(row.id) ?? []));
+    const extractionIds = rows.map((row) => row.id);
+    const projectsById = loadProjectsFor(extractionIds);
+    const allocationsById = loadAllocationsFor(extractionIds);
+    return rows.map((row) => mapRow(row, projectsById.get(row.id) ?? [], allocationsById.get(row.id) ?? null));
   };
 
   const getFileBuffer = async (

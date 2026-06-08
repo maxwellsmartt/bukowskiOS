@@ -368,6 +368,20 @@ export type InvoiceExtractionProjectTag = {
   projectName: string | null;
 };
 
+export type InvoiceExtractionAllocation = {
+  id: string;
+  paymentInstrumentId: string | null;
+  paymentInstrumentLabel: string | null;
+  transactionId: string | null;
+  transactionLabel: string | null;
+  amountApplied: number | null;
+  amountCurrency: string | null;
+  allocationStatus: "pending" | "matched" | "partial" | "rejected" | "reimbursed";
+  cycleStart: string | null;
+  cycleEnd: string | null;
+  notes: string | null;
+};
+
 /** One uploaded expense document (PNG/JPG/PDF) and its extracted fields. */
 export type InvoiceExtraction = {
   id: string;
@@ -384,6 +398,7 @@ export type InvoiceExtraction = {
   linkedUserName: string | null;
   /** Projects this expense is attributed to. Empty = company-general expense. */
   projects: InvoiceExtractionProjectTag[];
+  allocation: InvoiceExtractionAllocation | null;
   supplierName: string | null;
   supplierRnc: string | null;
   ncf: string | null;

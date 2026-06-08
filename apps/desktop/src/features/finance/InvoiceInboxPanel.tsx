@@ -1,4 +1,4 @@
-import { AlertCircle, Check, CheckCircle2, Clock, Download, FileText, Image as ImageIcon, Loader2, Pencil, RotateCcw, Trash2, UploadCloud, X } from "lucide-react";
+import { AlertCircle, ArrowRightLeft, BadgeCheck, Check, CheckCircle2, Clock, Download, FileText, Image as ImageIcon, Loader2, Pencil, RotateCcw, Trash2, UploadCloud, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -27,6 +27,7 @@ import { useCatalogData } from "@features/projects/useProjectsData";
 
 import {
   useExpenseCategories,
+  useBankAccounts,
   useInvoiceDuplicates,
   useInvoiceInbox,
   useTreasuryTransactions,
@@ -108,6 +109,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const { createNotification } = useNotifications();
   const inbox = useInvoiceInbox(workspaceId);
   const expenseCategories = useExpenseCategories(workspaceId);
+  const accounts = useBankAccounts(workspaceId);
   const duplicates = useInvoiceDuplicates(workspaceId);
   const catalog = useCatalogData({ workspaceId, entityType: "crew", search: "", sortBy: "fullName", sortDirection: "asc" });
   const [showDuplicates, setShowDuplicates] = useState(false);
@@ -121,6 +123,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const [isBulkDismissing, setIsBulkDismissing] = useState(false);
   const [isBulkRetrying, setIsBulkRetrying] = useState(false);
   const [isBulkDownloading, setIsBulkDownloading] = useState(false);
+  const [isBulkAssigningInstrument, setIsBulkAssigningInstrument] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [uploaderFilter, setUploaderFilter] = useState<string>("all");
@@ -236,6 +239,19 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     [catalog.data.crewMembers, t],
   );
 
+  const paymentInstrumentOptions = useMemo(
+    () => [
+      { value: "", label: t("finance.treasury.invoices.choosePaymentInstrument", { defaultValue: "Asignar medio de pago..." }) },
+      ...accounts.data
+        .filter((account) => account.isActive)
+        .map((account) => ({
+          value: account.id,
+          label: `${account.accountLabel} · ${account.currency}${account.last4 ? ` · •••• ${account.last4}` : ""}`,
+        })),
+    ],
+    [accounts.data, t],
+  );
+
   const filteredRows = useMemo(() => {
     return inbox.data.filter((row) => {
       const uploaderKey = row.uploadedByUserId ?? row.uploadedByName ?? "unknown";
@@ -253,6 +269,34 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     () => selectedRows.filter((row) => row.status !== "processing" && row.status !== "applied" && row.status !== "dismissed"),
     [selectedRows],
   );
+  const reimbursementGroups = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        key: string;
+        owner: string;
+        instrument: string;
+        cycle: string;
+        currency: string;
+        amount: number;
+        count: number;
+      }
+    >();
+    for (const row of filteredRows) {
+      const allocation = row.allocation;
+      if (!allocation || allocation.allocationStatus === "reimbursed" || allocation.allocationStatus === "rejected") continue;
+      const owner = row.linkedUserName ?? row.uploadedByName ?? t("finance.treasury.invoices.unknownUploader", { defaultValue: "Sin usuario" });
+      const instrument = allocation.paymentInstrumentLabel ?? t("finance.treasury.invoices.unassignedPaymentInstrument", { defaultValue: "Sin medio" });
+      const cycle = allocation.cycleStart && allocation.cycleEnd ? `${allocation.cycleStart} → ${allocation.cycleEnd}` : t("finance.treasury.invoices.noCycle", { defaultValue: "Sin ciclo" });
+      const currency = (allocation.amountCurrency ?? row.currency ?? "DOP").toUpperCase();
+      const key = `${owner}::${instrument}::${cycle}::${currency}`;
+      const current = groups.get(key) ?? { key, owner, instrument, cycle, currency, amount: 0, count: 0 };
+      current.amount += allocation.amountApplied ?? row.total ?? 0;
+      current.count += 1;
+      groups.set(key, current);
+    }
+    return Array.from(groups.values()).sort((a, b) => b.amount - a.amount);
+  }, [filteredRows, t]);
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || !fileList.length) return;
@@ -531,6 +575,115 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     }
   };
 
+  const bulkAssignPaymentInstrument = async (paymentInstrumentId: string) => {
+    if (!paymentInstrumentId) return;
+    const assignableRows = selectedRows.filter(
+      (row) => row.status !== "dismissed" && row.total != null && row.total > 0 && row.currency,
+    );
+    const skippedCount = selectedRows.length - assignableRows.length;
+    if (!assignableRows.length) {
+      toast.info(
+        t("finance.treasury.invoices.paymentInstrumentNone", {
+          defaultValue: "No hay facturas seleccionadas con total y moneda para asignar.",
+        }),
+      );
+      return;
+    }
+    setIsBulkAssigningInstrument(true);
+    try {
+      for (const row of assignableRows) {
+        await mutations.assignInvoiceAllocation({
+          commandId: `invoice-allocation-${row.id}-${paymentInstrumentId}`,
+          workspaceId,
+          actorType: "user",
+          sourceChannel: "desktop",
+          paymentInstrumentId,
+          linkedEntityType: "invoice_extraction",
+          linkedEntityId: row.id,
+          amountApplied: row.total ?? 0,
+          amountCurrency: (row.currency ?? "DOP").toUpperCase(),
+          notes: "Asignado desde bandeja de facturas",
+        });
+      }
+      toast.success(
+        t("finance.treasury.invoices.paymentInstrumentAssigned", {
+          defaultValue: "{{count}} factura(s) asignada(s) a medio de pago.",
+          count: assignableRows.length,
+        }),
+        skippedCount
+          ? {
+              description: t("finance.treasury.invoices.paymentInstrumentSkipped", {
+                defaultValue: "{{count}} factura(s) se omitieron por falta de total/moneda.",
+                count: skippedCount,
+              }),
+            }
+          : undefined,
+      );
+      setSelectedIds(new Set());
+      inbox.refresh();
+    } catch (error) {
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          t("finance.treasury.invoices.paymentInstrumentFailed", { defaultValue: "No se pudo asignar el medio de pago." }),
+        ),
+      );
+    } finally {
+      setIsBulkAssigningInstrument(false);
+    }
+  };
+
+  const linkSuggestedTransaction = async (row: InvoiceExtraction) => {
+    if (!row.allocation?.id || !row.suggestedTransactionId) return;
+    setBusyId(row.id);
+    try {
+      const result = await mutations.linkInvoiceAllocationToTransaction({
+        commandId: `invoice-allocation-link-${row.allocation.id}-${row.suggestedTransactionId}`,
+        workspaceId,
+        actorType: "user",
+        sourceChannel: "desktop",
+        allocationId: row.allocation.id,
+        transactionId: row.suggestedTransactionId,
+      });
+      toast.success(result.summary);
+      inbox.refresh();
+    } catch (error) {
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          t("finance.treasury.invoices.linkTransactionFailed", { defaultValue: "No se pudo vincular el movimiento." }),
+        ),
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const markAllocationReimbursed = async (row: InvoiceExtraction) => {
+    if (!row.allocation?.id) return;
+    setBusyId(row.id);
+    try {
+      const result = await mutations.markInvoiceAllocationReimbursed({
+        commandId: `invoice-allocation-reimbursed-${row.allocation.id}`,
+        workspaceId,
+        actorType: "user",
+        sourceChannel: "desktop",
+        allocationId: row.allocation.id,
+      });
+      toast.success(result.summary);
+      inbox.refresh();
+    } catch (error) {
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          t("finance.treasury.invoices.reimbursedFailed", { defaultValue: "No se pudo marcar reembolsado." }),
+        ),
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const retryRows = async (rows: InvoiceExtraction[]) => {
     const retryableRows = rows.filter((row) => row.status !== "processing" && row.status !== "applied" && row.status !== "dismissed");
     if (!retryableRows.length) {
@@ -626,6 +779,42 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
         />
       ) : (
         <>
+          {reimbursementGroups.length > 0 ? (
+            <div className="invoice-reimbursement-panel">
+              <div className="invoice-reimbursement-panel-heading">
+                <div>
+                  <strong>{t("finance.treasury.invoices.reimbursements.title", { defaultValue: "Reembolsos pendientes" })}</strong>
+                  <span>
+                    {t("finance.treasury.invoices.reimbursements.subtitle", {
+                      defaultValue: "Agrupados por responsable, medio de pago y ciclo.",
+                    })}
+                  </span>
+                </div>
+                <small>
+                  {t("finance.treasury.invoices.reimbursements.groupCount", {
+                    defaultValue: "{{count}} grupo(s)",
+                    count: reimbursementGroups.length,
+                  })}
+                </small>
+              </div>
+              <div className="invoice-reimbursement-grid">
+                {reimbursementGroups.slice(0, 6).map((group) => (
+                  <article className="invoice-reimbursement-card" key={group.key}>
+                    <span>{group.owner}</span>
+                    <strong>{formatInvoiceMoney(group.amount, group.currency)}</strong>
+                    <small>{group.instrument}</small>
+                    <em>
+                      {group.cycle} · {t("finance.treasury.invoices.reimbursements.invoiceCount", {
+                        defaultValue: "{{count}} factura(s)",
+                        count: group.count,
+                      })}
+                    </em>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {selectedIds.size > 0 ? (
             <div className="invoice-batch-bar">
               <span className="invoice-batch-bar-label">
@@ -662,6 +851,14 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                   },
                   ...projects.map((project) => ({ value: project.id, label: project.name })),
                 ]}
+              />
+              <CompactSelect
+                className="invoice-filter-select invoice-payment-instrument-select"
+                ariaLabel={t("finance.treasury.invoices.batchAssignPaymentInstrument", { defaultValue: "Asignar medio de pago" })}
+                value=""
+                onChange={(value) => void bulkAssignPaymentInstrument(value)}
+                options={paymentInstrumentOptions}
+                disabled={isBulkAssigningInstrument || paymentInstrumentOptions.length <= 1}
               />
               <button className="ghost-control" type="button" onClick={() => setSelectedIds(new Set())}>
                 {t("finance.treasury.invoices.clearSelection", { defaultValue: "Limpiar" })}
@@ -873,6 +1070,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                 key: "paymentInstrument",
                 label: t("finance.treasury.invoices.columns.paymentInstrument", { defaultValue: "Medio de pago" }),
                 render: (row) => {
+                  if (row.allocation?.paymentInstrumentLabel) return row.allocation.paymentInstrumentLabel;
                   const transactionId = row.appliedTransactionId ?? row.suggestedTransactionId;
                   return transactionId ? txnAccountLabel.get(transactionId) ?? "—" : "—";
                 },
@@ -881,6 +1079,34 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                 key: "reconciliation",
                 label: t("finance.treasury.invoices.columns.reconciliation", { defaultValue: "Conciliación" }),
                 render: (row) => {
+                  if (row.allocation?.allocationStatus === "reimbursed") {
+                    return (
+                      <StatusBadge tone="success">
+                        {t("finance.treasury.invoices.reconciliation.reimbursed", { defaultValue: "Reembolsada" })}
+                      </StatusBadge>
+                    );
+                  }
+                  if (row.allocation?.allocationStatus === "matched" || row.allocation?.allocationStatus === "partial") {
+                    return (
+                      <StatusBadge tone="success">
+                        {t("finance.treasury.invoices.reconciliation.matched", { defaultValue: "Conciliada" })}
+                      </StatusBadge>
+                    );
+                  }
+                  if (row.allocation?.allocationStatus === "pending") {
+                    return (
+                      <StatusBadge tone="warning">
+                        {t("finance.treasury.invoices.reconciliation.assigned", { defaultValue: "Asignada" })}
+                      </StatusBadge>
+                    );
+                  }
+                  if (row.allocation?.allocationStatus === "rejected") {
+                    return (
+                      <StatusBadge tone="critical">
+                        {t("finance.treasury.invoices.reconciliation.rejected", { defaultValue: "Rechazada" })}
+                      </StatusBadge>
+                    );
+                  }
                   if (row.status === "applied" && row.appliedTransactionId) {
                     return (
                       <StatusBadge tone="success">
@@ -913,7 +1139,9 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                 key: "match",
                 label: t("finance.treasury.invoices.columns.match", { defaultValue: "Movimiento sugerido" }),
                 render: (row) =>
-                  row.status === "applied" && row.appliedTransactionId
+                  row.allocation?.transactionLabel
+                    ? row.allocation.transactionLabel
+                    : row.status === "applied" && row.appliedTransactionId
                     ? txnLabel.get(row.appliedTransactionId) ?? t("finance.treasury.invoices.applied", { defaultValue: "Aplicado" })
                     : row.suggestedTransactionId
                       ? `${txnLabel.get(row.suggestedTransactionId) ?? row.suggestedTransactionId}${
@@ -931,6 +1159,8 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                   const editLabel = t("finance.treasury.invoices.edit", { defaultValue: "Editar" });
                   const retryLabel = t("finance.treasury.invoices.retry", { defaultValue: "Reprocesar" });
                   const applyLabel = t("finance.treasury.invoices.apply", { defaultValue: "Aplicar" });
+                  const linkLabel = t("finance.treasury.invoices.linkSuggested", { defaultValue: "Vincular sugerido" });
+                  const reimbursedLabel = t("finance.treasury.invoices.markReimbursed", { defaultValue: "Marcar reembolsado" });
                   const dismissLabel = t("finance.treasury.invoices.dismiss", { defaultValue: "Descartar" });
                   return (
                     <span className="invoice-actions-cell">
@@ -982,6 +1212,37 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                         aria-label={applyLabel}
                       >
                         <Check size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-ghost-control"
+                        disabled={
+                          busyId === row.id ||
+                          row.status === "dismissed" ||
+                          !row.allocation?.id ||
+                          !row.suggestedTransactionId ||
+                          Boolean(row.allocation.transactionId)
+                        }
+                        onClick={() => void linkSuggestedTransaction(row)}
+                        data-tooltip={linkLabel}
+                        aria-label={linkLabel}
+                      >
+                        <ArrowRightLeft size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-ghost-control is-success"
+                        disabled={
+                          busyId === row.id ||
+                          row.status === "dismissed" ||
+                          !row.allocation?.id ||
+                          row.allocation.allocationStatus === "reimbursed"
+                        }
+                        onClick={() => void markAllocationReimbursed(row)}
+                        data-tooltip={reimbursedLabel}
+                        aria-label={reimbursedLabel}
+                      >
+                        <BadgeCheck size={15} />
                       </button>
                       <button
                         type="button"

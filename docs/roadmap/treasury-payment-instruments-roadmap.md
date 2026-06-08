@@ -4,7 +4,7 @@
 
 - **Fecha de apertura:** 2026-06-08
 - **Fuente:** `/Users/ernestomaxwell/Desktop/PLAN.md`
-- **Estado general:** Slices 1-4 MVP implementados localmente; pendiente aplicar/verificar migracion en Supabase remoto y avanzar con conciliacion asistida/reembolsos.
+- **Estado general:** Slices 1-5 MVP implementados localmente; pendiente aplicar/verificar migracion en Supabase remoto y hardening de conciliacion asistida.
 - **Prioridad:** Alta para Tesoreria, porque desbloquea asignaciones de facturas a tarjetas/cuentas sin duplicar gastos ni perder links pendientes entre maquinas.
 
 ## Resumen ejecutivo
@@ -129,17 +129,22 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 - Formulario compacto para crear/editar medios de pago, sin campos sensibles ni numero completo. **Implementado.**
 - Bandeja de facturas agrega: Medio de pago y Estado conciliacion derivados de movimiento sugerido/aplicado. **Implementado parcial.**
 - Seleccion multiple mantiene acciones existentes de usuario/proyecto/retry/download/dismiss. **Existente.**
-- Pendiente: asignacion batch directa a medio de pago, vincular movimiento manualmente desde Inbox y marcar reembolsado desde factura.
+- Asignacion batch directa a medio de pago, vincular sugerido y marcar reembolsado se completan en Slice 5 MVP.
 
 ### Slice 5 — Conciliacion asistida y Reembolsos
 
-**Estado:** Pendiente
+**Estado:** MVP implementado el 2026-06-08
 
 **Objetivo:** Conciliar contra candidatos y visualizar deuda de reembolso.
 
 **Frontend/backend:**
-- Drawer de conciliacion con candidatos rankeados por medio, monto, fecha, proveedor/RNC/descripcion y moneda.
-- Vista **Reembolsos** derivada: agrupar por `owner_user_id x payment_instrument_id x ciclo`.
+- Read model de Inbox trae allocation/link real por `invoice_extraction`. **Implementado.**
+- Asignacion batch de facturas a medio de pago sin movimiento. **Implementado.**
+- Accion para vincular el movimiento sugerido al allocation. **Implementado.**
+- Accion para marcar allocation como reembolsado desde Inbox. **Implementado.**
+- Vista **Reembolsos** derivada: agrupa por usuario/responsable x medio x ciclo desde filas visibles de Inbox. **Implementado MVP.**
+- Pendiente hardening: drawer de conciliacion con candidatos rankeados por medio, monto, fecha, proveedor/RNC/descripcion y moneda.
+- Pendiente hardening: query dedicada para historico completo de reembolsos, no limitada al scope visible de Inbox.
 - No crear `reimbursement_batches` formal en v1.
 
 ## Tests criticos
@@ -208,14 +213,24 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
   - Bandeja de facturas muestra Medio de pago y Conciliacion usando movimiento sugerido/aplicado existente.
 - Verificacion Slice 4:
   - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
+- Se implementa Slice 5 MVP:
+  - `InvoiceExtraction` expone `allocation` real desde `transaction_links`;
+  - Inbox permite asignar facturas seleccionadas a medio de pago;
+  - Inbox permite vincular el movimiento sugerido al allocation;
+  - Inbox permite marcar allocations como reembolsadas;
+  - se agrega panel visual de reembolsos pendientes agrupado por responsable, medio y ciclo;
+  - se pule visualmente Cuentas y tarjetas: formulario con labels verticales, card premium, microjerarquia y estados mas claros.
+- Verificacion Slice 5:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
+  - `corepack pnpm exec vitest run src/test/invoice-inbox-service.test.ts src/test/treasury-mutation-service.test.ts` desde `apps/desktop`: **28 passed**.
 
 ## Proximo slice recomendado
 
-**Slice 5 — Conciliacion asistida y Reembolsos.**
+**Slice 6 — hardening de conciliacion asistida.**
 
 Orden sugerido:
-1. Extender read model de Inbox para traer allocation/link real por `invoice_extraction`.
-2. Habilitar asignacion batch de facturas a medio de pago sin movimiento.
-3. Agregar accion de vincular movimiento manualmente desde Inbox.
-4. Agregar vista **Reembolsos** derivada por usuario x medio x ciclo.
+1. Crear drawer de conciliacion con candidatos rankeados por medio, monto, fecha, proveedor/RNC/descripcion y moneda.
+2. Agregar query dedicada de reembolsos historicos para no depender de filas visibles del Inbox.
+3. Permitir seleccionar movimiento manualmente, no solo el sugerido.
+4. Agregar filtros por responsable, medio, ciclo y estado.
 5. Dejar auto-conciliacion sin confirmacion humana fuera de v1.
