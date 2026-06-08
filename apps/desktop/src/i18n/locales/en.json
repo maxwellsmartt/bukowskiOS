@@ -558,13 +558,13 @@
       ]
     },
     "cart": {
-      "kicker": "Operation cart",
+      "kicker": "Quick actions",
       "oneSelected": "1 asset selected",
       "manySelected": "{{count}} assets selected",
       "oneUnit": "1 unit queued",
       "manyUnits": "{{count}} units queued",
-      "clearAria": "Clear operation cart",
-      "clearTooltip": "Clear cart",
+      "clearAria": "Clear selection",
+      "clearTooltip": "Clear selection",
       "addToCompare": "Add to compare",
       "reportIssue": "Report issue",
       "reportIssueSingleTip": "Open asset detail to report an issue",
@@ -766,6 +766,13 @@
         "assigned": "Assigned {{ratio}}",
         "checkout": "In use {{ratio}}"
       }
+    },
+    "condition": {
+      "good": "Good",
+      "fair": "Fair",
+      "poor": "Poor",
+      "damaged": "Damaged",
+      "needsRepair": "Needs repair"
     }
   },
   "finance": {

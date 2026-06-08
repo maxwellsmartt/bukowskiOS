@@ -560,13 +560,13 @@
       ]
     },
     "cart": {
-      "kicker": "Carrito de operación",
+      "kicker": "Acciones rápidas",
       "oneSelected": "1 equipo seleccionado",
       "manySelected": "{{count}} equipos seleccionados",
       "oneUnit": "1 unidad en cola",
       "manyUnits": "{{count}} unidades en cola",
-      "clearAria": "Vaciar carrito de operación",
-      "clearTooltip": "Vaciar carrito",
+      "clearAria": "Vaciar selección",
+      "clearTooltip": "Vaciar selección",
       "addToCompare": "Agregar a comparar",
       "reportIssue": "Reportar incidencia",
       "reportIssueSingleTip": "Abre el detalle del equipo para reportar una incidencia",
@@ -768,6 +768,13 @@
         "assigned": "Asignado {{ratio}}",
         "checkout": "En uso {{ratio}}"
       }
+    },
+    "condition": {
+      "good": "Bueno",
+      "fair": "Regular",
+      "poor": "Malo",
+      "damaged": "Dañado",
+      "needsRepair": "Necesita reparación"
     }
   },
   "finance": {

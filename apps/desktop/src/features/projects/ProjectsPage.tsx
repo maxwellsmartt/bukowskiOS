@@ -18,6 +18,7 @@ import { useShellContext } from "@shared/hooks/useShellContext";
 import { uiPreferenceKeys } from "@shared/lib/preferences";
 import { hasFinanceAccess } from "@shared/lib/financeAccess";
 import { resolveProjectColor } from "@shared/lib/projectColors";
+import { isPlaceholderValue } from "@shared/lib/displayValue";
 
 import { ProjectDetailPanel } from "./ProjectDetailPanel";
 import { useProjectDetail, useProjectsRegistry } from "./useProjectsData";
@@ -107,7 +108,9 @@ export const ProjectsPage = () => {
                       id: project.id,
                       entityType: "project" as const,
                       label: `${project.code} · ${project.name}`,
-                      subtitle: `${project.client} · ${project.status}`,
+                      subtitle: isPlaceholderValue(project.client)
+                        ? project.status
+                        : `${project.client} · ${project.status}`,
                       meta: project.startDate || project.endDate ? `${project.startDate ?? t("projects.fallbacks.open")} - ${project.endDate ?? t("projects.fallbacks.open")}` : undefined,
                     })),
                 )
@@ -174,7 +177,8 @@ export const ProjectsPage = () => {
                     <div className="identity-cell">
                       <span className="identity-title">{row.name}</span>
                       <span className="identity-meta">
-                        {row.code} · {row.client}
+                        {row.code}
+                        {isPlaceholderValue(row.client) ? "" : ` · ${row.client}`}
                       </span>
                     </div>
                   </div>

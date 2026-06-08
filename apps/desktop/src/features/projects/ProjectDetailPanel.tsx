@@ -15,6 +15,7 @@ import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { formatProjectAssignmentInline } from "@shared/lib/assetQuantityPresentation";
 import { resolveProjectColor } from "@shared/lib/projectColors";
+import { cleanDisplay } from "@shared/lib/displayValue";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { hasFinanceAccess } from "@shared/lib/financeAccess";
 
@@ -126,7 +127,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
           </div>
           <div className="summary-row">
             <span className="summary-label">{t("projects.detail.summary.client")}</span>
-            <span className="summary-value">{project.client}</span>
+            <span className="summary-value">{cleanDisplay(project.client)}</span>
           </div>
           {canAccessFinance ? (
             <div className="summary-row">

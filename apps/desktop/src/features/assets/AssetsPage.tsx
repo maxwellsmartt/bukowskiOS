@@ -22,7 +22,8 @@ import { useShellContext } from "@shared/hooks/useShellContext";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { resolveAssetAvailability, summarizeUnavailableAssets, translateAssetAvailabilityLabel, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
 import { formatAssetStockDetailRows, formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
-import { presentAssetStatus } from "@shared/lib/assetStatusPresentation";
+import { presentAssetCondition, presentAssetStatus } from "@shared/lib/assetStatusPresentation";
+import { cleanDisplay } from "@shared/lib/displayValue";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
@@ -1482,8 +1483,17 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
           return <StatusBadge tone={presented.tone}>{presented.label}</StatusBadge>;
         },
       },
-      { key: "condition", label: t("assets.columns.condition"), width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.condition },
-      { key: "custody", label: t("assets.columns.custody"), width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.custody },
+      {
+        key: "condition",
+        label: t("assets.columns.condition"),
+        width: 120,
+        minWidth: 100,
+        render: (row: (typeof assets)[number]) => {
+          const presented = presentAssetCondition(row.condition, t);
+          return <StatusBadge tone={presented.tone}>{presented.label}</StatusBadge>;
+        },
+      },
+      { key: "custody", label: t("assets.columns.custody"), width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => cleanDisplay(row.custody) },
       { key: "location", label: t("assets.columns.location"), width: 190, minWidth: 150, render: (row: (typeof assets)[number]) => row.location },
       { key: "project", label: t("assets.columns.project"), width: 170, minWidth: 140, render: (row: (typeof assets)[number]) => row.project },
       { key: "projectUnit", label: t("assets.columns.unit"), width: 150, minWidth: 124, render: (row: (typeof assets)[number]) => row.projectUnit },
@@ -1496,7 +1506,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       { key: "replacementValue", label: t("assets.columns.replacementValue"), align: "right" as const, width: 148, minWidth: 124, render: (row: (typeof assets)[number]) => row.replacementValue },
       { key: "warehouseSlot", label: t("assets.columns.warehouse"), width: 126, minWidth: 108, render: (row: (typeof assets)[number]) => row.warehouseSlot },
       { key: "folderPath", label: t("assets.columns.folderPath"), width: 250, minWidth: 200, render: (row: (typeof assets)[number]) => row.folderPath },
-      { key: "hasAccessories", label: t("assets.columns.accessories"), width: 110, minWidth: 96, render: (row: (typeof assets)[number]) => row.hasAccessories },
+      { key: "hasAccessories", label: t("assets.columns.accessories"), width: 110, minWidth: 96, render: (row: (typeof assets)[number]) => cleanDisplay(row.hasAccessories) },
       { key: "source", label: t("assets.columns.source"), width: 176, minWidth: 150, render: (row: (typeof assets)[number]) => row.source },
       { key: "incidents", label: t("assets.columns.openIssues"), align: "right" as const, width: 96, minWidth: 84, render: (row: (typeof assets)[number]) => row.incidentsOpen },
     ],
