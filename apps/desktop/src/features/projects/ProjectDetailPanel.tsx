@@ -102,15 +102,18 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         subtitle={project.description}
         aside={
           <div className="project-detail-header-actions">
-            <button className="ghost-control" onClick={() => navigate(`/projects/${project.id}/info`)} type="button">
+            <button
+              className="ghost-control action-row-button"
+              onClick={() => navigate(`/projects/${project.id}/info`)}
+              type="button"
+            >
               {t("projects.detail.editProject")}
             </button>
             <button
-              className="action-primary-button"
+              className="action-primary-button action-row-button"
               onClick={() => {
                 setReportOpen(true);
                 setReportError(null);
-
               }}
               type="button"
             >

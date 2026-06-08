@@ -6718,7 +6718,15 @@ body.is-resizing-side-rail {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+
+/* In the narrow detail rail, stack the title above the actions so the two
+   buttons stay side by side on their own row instead of wrapping vertically. */
+.project-overview-card .surface-card-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
 }
 
 .project-detail-title-group {

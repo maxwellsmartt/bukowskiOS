@@ -7,6 +7,7 @@ const PROBE_TIMEOUT_MS = 8_000;
 // solely on navigator.onLine because Chromium's network notifier can get stuck
 // (e.g. after sleep/network changes on macOS) and report offline while the box
 // is actually online — the probe corrects that and detects recovery quickly.
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
 const probeUrl = (() => {
   const base = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim().replace(/\/+$/, "");
   return base ? `${base}/auth/v1/health` : null;
@@ -34,9 +35,16 @@ export const useConnectivity = () => {
       const controller = new AbortController();
       const timeout = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
       try {
-        // Any resolved response (even an opaque one) means the round-trip
-        // succeeded; only a network failure throws.
-        await fetch(probeUrl, { method: "GET", mode: "no-cors", cache: "no-store", signal: controller.signal });
+        // Send the anon key so the health endpoint returns 200 instead of 401 —
+        // a 401 still proves reachability but Chromium logs it as a failed
+        // resource every tick, which is just console noise. Any resolved
+        // response means the round-trip succeeded; only a network failure throws.
+        await fetch(probeUrl, {
+          method: "GET",
+          cache: "no-store",
+          signal: controller.signal,
+          headers: supabaseAnonKey ? { apikey: supabaseAnonKey } : undefined,
+        });
         if (!cancelled) {
           setIsOnline(true);
         }
