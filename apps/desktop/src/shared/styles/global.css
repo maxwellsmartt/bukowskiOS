@@ -7543,6 +7543,26 @@ body.is-resizing-side-rail {
   background: rgba(255, 255, 255, 0.022);
 }
 
+/* Clickable list row (e.g. a project's assets opening the asset detail). */
+.queue-item-button {
+  width: 100%;
+  border: 1px solid transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.queue-item-button:hover {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.queue-item-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .compare-tray {
   display: flex;
   flex-direction: column;

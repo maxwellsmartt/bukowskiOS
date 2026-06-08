@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -9,7 +8,6 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
 import { useCatalogData } from "@features/projects/useProjectsData";
-import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -40,16 +38,6 @@ const toneForStatus = (status: string) => {
   }
 };
 
-const projectMetricLabelKeys: Record<string, string> = {
-  "Assigned assets": "projects.detail.metrics.assignedAssets",
-  "Open incidents": "projects.detail.metrics.openIncidents",
-  "Incident exposure": "projects.detail.metrics.incidentExposure",
-  "Replacement at risk": "projects.detail.metrics.replacementAtRisk",
-};
-
-const translateProjectMetricLabel = (label: string, t: TFunction) =>
-  projectMetricLabelKeys[label] ? t(projectMetricLabelKeys[label]) : label;
-
 export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }: ProjectDetailPanelProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -57,8 +45,6 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
   const canAccessFinance = hasFinanceAccess(activeMembership);
   const { projects, refreshProjects } = useShellContext();
   const { data: catalog, error: catalogError } = useCatalogData();
-  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
-  const [selectedIncidentIds, setSelectedIncidentIds] = useState<string[]>([]);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -206,15 +192,6 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
         />
       ) : null}
 
-      <div className="metric-grid">
-        {data.metrics.map((metric) => (
-          <SurfaceCard key={metric.label}>
-            <span className={`metric-value metric-tone-${metric.tone}`}>{metric.value}</span>
-            <p className="metric-label">{translateProjectMetricLabel(metric.label, t)}</p>
-          </SurfaceCard>
-        ))}
-      </div>
-
       <div className="project-detail-support-grid">
         <SurfaceCard className="project-scroll-card" title={t("projects.detail.units.title")}>
           {data.units.length ? (
@@ -265,105 +242,59 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
       </div>
 
       <SurfaceCard className="project-scroll-card" title={t("projects.detail.assets.title")}>
-        <DataTable
-          columns={[
-            {
-              key: "asset",
-              label: t("projects.detail.assets.columns.asset"),
-              width: 230,
-              minWidth: 180,
-              render: (row) => (
+        {data.assets.length ? (
+          <div className="queue-list project-scroll-list">
+            {data.assets.map((row) => (
+              <button
+                key={row.id}
+                className="queue-item queue-item-button"
+                onClick={() => navigate(`/assets/${row.id}`)}
+                type="button"
+              >
                 <div className="identity-cell">
                   <span className="identity-title">{row.name}</span>
-                  <span className="identity-meta">{row.code}</span>
+                  <span className="identity-meta">
+                    {row.code} · {row.location} ·{" "}
+                    {formatProjectAssignmentInline(
+                      {
+                        totalQuantity: row.totalQuantity,
+                        assignedQuantity: row.assignedQuantity,
+                        checkedOutQuantity: row.checkedOutQuantity,
+                      },
+                      t,
+                    )}
+                  </span>
                 </div>
-              ),
-            },
-            { key: "status", label: t("projects.detail.assets.columns.status"), width: 110, minWidth: 92, render: (row) => row.status },
-            {
-              key: "stock",
-              label: t("projects.detail.assets.columns.stock"),
-              width: 176,
-              minWidth: 150,
-              render: (row) => (
-                <span className="stock-inline-text">
-                  {formatProjectAssignmentInline({
-                    totalQuantity: row.totalQuantity,
-                    assignedQuantity: row.assignedQuantity,
-                    checkedOutQuantity: row.checkedOutQuantity,
-                  }, t)}
-                </span>
-              ),
-            },
-            { key: "location", label: t("projects.detail.assets.columns.location"), width: 180, minWidth: 140, render: (row) => row.location },
-            { key: "unit", label: t("projects.detail.assets.columns.unit"), width: 150, minWidth: 124, render: (row) => row.projectUnit },
-            { key: "responsible", label: t("projects.detail.assets.columns.responsible"), width: 160, minWidth: 132, render: (row) => row.responsible },
-            { key: "condition", label: t("projects.detail.assets.columns.condition"), width: 110, minWidth: 94, render: (row) => row.condition },
-            {
-              key: "replacementValue",
-              label: t("projects.detail.assets.columns.replacement"),
-              align: "right",
-              width: 124,
-              minWidth: 108,
-              render: (row) => row.replacementValue,
-            },
-          ]}
-          getRowId={(row) => row.id}
-          emptyMessage={t("projects.detail.assets.empty")}
-          maxHeight="min(42vh, 440px)"
-          onRowDoubleClick={(row) => navigate(`/assets/${row.id}`)}
-          persistKey="project-detail-assets"
-          rows={data.assets}
-          shellClassName="table-shell-natural"
-          selectable
-          selectedRowIds={selectedAssetIds}
-          onSelectedRowIdsChange={setSelectedAssetIds}
-        />
+                <StatusBadge tone="neutral">{row.condition}</StatusBadge>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">{t("projects.detail.assets.empty")}</div>
+        )}
       </SurfaceCard>
 
       <SurfaceCard className="project-scroll-card" title={t("projects.detail.incidents.title")}>
-        <DataTable
-          columns={[
-            {
-              key: "incident",
-              label: t("projects.detail.incidents.columns.incident"),
-              width: 250,
-              minWidth: 190,
-              render: (row) => (
+        {data.incidents.length ? (
+          <div className="queue-list project-scroll-list">
+            {data.incidents.map((row) => (
+              <div key={row.id} className="queue-item">
                 <div className="identity-cell">
                   <span className="identity-title">{row.title}</span>
-                  <span className="identity-meta">{row.asset}</span>
+                  <span className="identity-meta">
+                    {row.asset} · {t(`incidents.severity.${row.severity}`, { defaultValue: row.severity })}
+                    {row.costEstimate ? ` · ${row.costEstimate}` : ""}
+                  </span>
                 </div>
-              ),
-            },
-            { key: "responsible", label: t("projects.detail.incidents.columns.responsible"), width: 160, minWidth: 132, render: (row) => row.responsible },
-            { key: "unit", label: t("projects.detail.incidents.columns.unit"), width: 150, minWidth: 124, render: (row) => row.projectUnit },
-            {
-              key: "severity",
-              label: t("projects.detail.incidents.columns.severity"),
-              width: 100,
-              minWidth: 90,
-              render: (row) => t(`incidents.severity.${row.severity}`, { defaultValue: row.severity }),
-            },
-            { key: "costEstimate", label: t("projects.detail.incidents.columns.cost"), align: "right", width: 110, minWidth: 96, render: (row) => row.costEstimate },
-            {
-              key: "status",
-              label: t("projects.detail.incidents.columns.status"),
-              width: 108,
-              minWidth: 92,
-              render: (row) => t(`incidents.statuses.${row.status}`, { defaultValue: row.status }),
-            },
-          ]}
-          getRowId={(row) => row.id}
-          emptyMessage={t("projects.detail.incidents.empty")}
-          maxHeight="min(42vh, 440px)"
-          persistKey="project-detail-incidents"
-          rows={data.incidents}
-          shellClassName="table-shell-natural"
-          selectable
-          selectedRowIds={selectedIncidentIds}
-          onSelectedRowIdsChange={setSelectedIncidentIds}
-        />
+                <StatusBadge tone={row.status === "Open" || row.status === "In review" ? "critical" : "success"}>
+                  {t(`incidents.statuses.${row.status}`, { defaultValue: row.status })}
+                </StatusBadge>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">{t("projects.detail.incidents.empty")}</div>
+        )}
       </SurfaceCard>
     </div>
   );
