@@ -143,9 +143,21 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 - Accion para vincular el movimiento sugerido al allocation. **Implementado.**
 - Accion para marcar allocation como reembolsado desde Inbox. **Implementado.**
 - Vista **Reembolsos** derivada: agrupa por usuario/responsable x medio x ciclo desde filas visibles de Inbox. **Implementado MVP.**
-- Pendiente hardening: drawer de conciliacion con candidatos rankeados por medio, monto, fecha, proveedor/RNC/descripcion y moneda.
+- Drawer de conciliacion con candidatos rankeados por medio, monto, fecha, proveedor/RNC/descripcion y moneda. **Implementado en Slice 6.**
 - Pendiente hardening: query dedicada para historico completo de reembolsos, no limitada al scope visible de Inbox.
 - No crear `reimbursement_batches` formal en v1.
+
+### Slice 6 — Hardening de conciliacion asistida
+
+**Estado:** Implementado parcialmente el 2026-06-08
+
+**Objetivo:** Mejorar la seleccion manual de movimientos y corregir fricciones visuales del flujo de medios de pago.
+
+**Frontend/backend:**
+- Sub-nav interna de Tesoreria queda por encima del formulario de editar medio de pago. **Implementado.**
+- Drawer de conciliacion asistida muestra candidatos rankeados por monto, fecha, medio de pago y texto proveedor/descripcion. **Implementado.**
+- Elegir candidato crea allocation si falta y luego vincula el movimiento de forma idempotente. **Implementado.**
+- Pendiente: query dedicada de reembolsos historicos y filtros avanzados por responsable/medio/ciclo/estado.
 
 ## Tests criticos
 
@@ -223,14 +235,22 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 - Verificacion Slice 5:
   - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
   - `corepack pnpm exec vitest run src/test/invoice-inbox-service.test.ts src/test/treasury-mutation-service.test.ts` desde `apps/desktop`: **28 passed**.
+- Se implementa Slice 6 parcial:
+  - se corrige el orden visual para que las tabs de Tesoreria queden sobre el formulario de editar medio de pago;
+  - se agrega drawer de conciliacion asistida en Inbox;
+  - los candidatos se rankean por monto cercano, fecha cercana, mismo medio y coincidencia de proveedor;
+  - al seleccionar un candidato se crea allocation si hace falta y se vincula el movimiento con `commandId` deterministico.
+- Verificacion Slice 6:
+  - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
+  - `corepack pnpm exec vitest run src/test/invoice-inbox-service.test.ts src/test/treasury-mutation-service.test.ts` desde `apps/desktop`: **28 passed**.
 
 ## Proximo slice recomendado
 
-**Slice 6 — hardening de conciliacion asistida.**
+**Slice 7 — reembolsos historicos y filtros.**
 
 Orden sugerido:
-1. Crear drawer de conciliacion con candidatos rankeados por medio, monto, fecha, proveedor/RNC/descripcion y moneda.
-2. Agregar query dedicada de reembolsos historicos para no depender de filas visibles del Inbox.
-3. Permitir seleccionar movimiento manualmente, no solo el sugerido.
-4. Agregar filtros por responsable, medio, ciclo y estado.
+1. Agregar query dedicada de reembolsos historicos para no depender de filas visibles del Inbox.
+2. Agregar filtros por responsable, medio, ciclo y estado.
+3. Agregar vista/tabla expandida de reembolsos con drill-down a facturas y movimientos.
+4. Considerar export CSV/XLSX de reembolsos pendientes.
 5. Dejar auto-conciliacion sin confirmacion humana fuera de v1.

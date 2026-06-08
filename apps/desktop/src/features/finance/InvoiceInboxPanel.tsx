@@ -10,6 +10,7 @@ import type {
   InvoiceExtraction,
   InvoiceExtractionProjectInput,
   InvoiceInboxFileInput,
+  BankTransactionRow,
   UpdateInvoiceExtractionCommand,
 } from "@contracts";
 import { useSession } from "@app/providers/SessionProvider";
@@ -97,6 +98,11 @@ const statusIcon = (status: InvoiceExtraction["status"]): { icon: LucideIcon; sp
 };
 
 type Project = { id: string; name: string };
+type ReconciliationCandidate = {
+  row: BankTransactionRow;
+  score: number;
+  reasons: string[];
+};
 
 type Props = {
   workspaceId: string;
@@ -134,6 +140,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const [multiModeIds, setMultiModeIds] = useState<Set<string>>(new Set());
   const [projects, setProjects] = useState<Project[]>([]);
   const [editing, setEditing] = useState<InvoiceExtraction | null>(null);
+  const [reconciling, setReconciling] = useState<InvoiceExtraction | null>(null);
   const [preview, setPreview] = useState<{ id: string; name: string } | null>(null);
   const [previewData, setPreviewData] = useState<{ dataUrl: string; mimeType: string } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -297,6 +304,53 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     }
     return Array.from(groups.values()).sort((a, b) => b.amount - a.amount);
   }, [filteredRows, t]);
+
+  const reconciliationCandidates = useMemo(() => {
+    if (!reconciling) return [];
+    const invoiceTotal = reconciling.total ?? 0;
+    const invoiceTime = reconciling.invoiceDate ? Date.parse(reconciling.invoiceDate) : Number.NaN;
+    const supplier = (reconciling.supplierName ?? "").trim().toLowerCase();
+    return transactions.data
+      .filter((row) => row.direction === "debit")
+      .map((row): ReconciliationCandidate => {
+        const reasons: string[] = [];
+        let score = 0;
+        if (invoiceTotal > 0) {
+          const diff = Math.abs(row.amount - invoiceTotal);
+          const tolerance = Math.max(1, invoiceTotal * 0.03);
+          if (diff <= tolerance) {
+            score += 45 * (1 - Math.min(1, diff / tolerance));
+            reasons.push(t("finance.treasury.invoices.reconcile.reasonAmount", { defaultValue: "monto cercano" }));
+          }
+        }
+        if (!Number.isNaN(invoiceTime)) {
+          const txnTime = Date.parse(row.txnDate);
+          if (!Number.isNaN(txnTime)) {
+            const days = Math.abs(txnTime - invoiceTime) / 86_400_000;
+            if (days <= 14) {
+              score += 25 * (1 - days / 14);
+              reasons.push(t("finance.treasury.invoices.reconcile.reasonDate", { defaultValue: "fecha cercana" }));
+            }
+          }
+        }
+        if (reconciling.allocation?.paymentInstrumentId && row.bankAccountId === reconciling.allocation.paymentInstrumentId) {
+          score += 20;
+          reasons.push(t("finance.treasury.invoices.reconcile.reasonInstrument", { defaultValue: "mismo medio" }));
+        }
+        if (supplier && (row.rawDescription ?? "").toLowerCase().includes(supplier.slice(0, Math.min(8, supplier.length)))) {
+          score += 10;
+          reasons.push(t("finance.treasury.invoices.reconcile.reasonSupplier", { defaultValue: "proveedor en descripción" }));
+        }
+        if (row.id === reconciling.suggestedTransactionId) {
+          score += 18;
+          reasons.unshift(t("finance.treasury.invoices.reconcile.reasonSuggested", { defaultValue: "sugerido por el sistema" }));
+        }
+        return { row, score: Math.round(score), reasons };
+      })
+      .filter((candidate) => candidate.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
+  }, [reconciling, t, transactions.data]);
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || !fileList.length) return;
@@ -633,32 +687,6 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     }
   };
 
-  const linkSuggestedTransaction = async (row: InvoiceExtraction) => {
-    if (!row.allocation?.id || !row.suggestedTransactionId) return;
-    setBusyId(row.id);
-    try {
-      const result = await mutations.linkInvoiceAllocationToTransaction({
-        commandId: `invoice-allocation-link-${row.allocation.id}-${row.suggestedTransactionId}`,
-        workspaceId,
-        actorType: "user",
-        sourceChannel: "desktop",
-        allocationId: row.allocation.id,
-        transactionId: row.suggestedTransactionId,
-      });
-      toast.success(result.summary);
-      inbox.refresh();
-    } catch (error) {
-      toast.error(
-        getUserFacingErrorMessage(
-          error,
-          t("finance.treasury.invoices.linkTransactionFailed", { defaultValue: "No se pudo vincular el movimiento." }),
-        ),
-      );
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   const markAllocationReimbursed = async (row: InvoiceExtraction) => {
     if (!row.allocation?.id) return;
     setBusyId(row.id);
@@ -677,6 +705,48 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
         getUserFacingErrorMessage(
           error,
           t("finance.treasury.invoices.reimbursedFailed", { defaultValue: "No se pudo marcar reembolsado." }),
+        ),
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const reconcileWithCandidate = async (row: InvoiceExtraction, candidate: BankTransactionRow) => {
+    setBusyId(row.id);
+    try {
+      let allocationId = row.allocation?.id ?? null;
+      if (!allocationId) {
+        const assigned = await mutations.assignInvoiceAllocation({
+          commandId: `invoice-allocation-${row.id}-${candidate.bankAccountId}`,
+          workspaceId,
+          actorType: "user",
+          sourceChannel: "desktop",
+          paymentInstrumentId: candidate.bankAccountId,
+          linkedEntityType: "invoice_extraction",
+          linkedEntityId: row.id,
+          amountApplied: row.total ?? candidate.amount,
+          amountCurrency: (row.currency ?? candidate.currency ?? "DOP").toUpperCase(),
+          notes: "Asignado desde conciliación asistida",
+        });
+        allocationId = assigned.allocationId;
+      }
+      const result = await mutations.linkInvoiceAllocationToTransaction({
+        commandId: `invoice-allocation-link-${allocationId}-${candidate.id}`,
+        workspaceId,
+        actorType: "user",
+        sourceChannel: "desktop",
+        allocationId,
+        transactionId: candidate.id,
+      });
+      toast.success(result.summary);
+      setReconciling(null);
+      inbox.refresh();
+    } catch (error) {
+      toast.error(
+        getUserFacingErrorMessage(
+          error,
+          t("finance.treasury.invoices.reconcile.failed", { defaultValue: "No se pudo conciliar la factura." }),
         ),
       );
     } finally {
@@ -1159,7 +1229,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                   const editLabel = t("finance.treasury.invoices.edit", { defaultValue: "Editar" });
                   const retryLabel = t("finance.treasury.invoices.retry", { defaultValue: "Reprocesar" });
                   const applyLabel = t("finance.treasury.invoices.apply", { defaultValue: "Aplicar" });
-                  const linkLabel = t("finance.treasury.invoices.linkSuggested", { defaultValue: "Vincular sugerido" });
+                  const reconcileLabel = t("finance.treasury.invoices.reconcile.open", { defaultValue: "Conciliar" });
                   const reimbursedLabel = t("finance.treasury.invoices.markReimbursed", { defaultValue: "Marcar reembolsado" });
                   const dismissLabel = t("finance.treasury.invoices.dismiss", { defaultValue: "Descartar" });
                   return (
@@ -1219,13 +1289,11 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                         disabled={
                           busyId === row.id ||
                           row.status === "dismissed" ||
-                          !row.allocation?.id ||
-                          !row.suggestedTransactionId ||
-                          Boolean(row.allocation.transactionId)
+                          Boolean(row.allocation?.transactionId)
                         }
-                        onClick={() => void linkSuggestedTransaction(row)}
-                        data-tooltip={linkLabel}
-                        aria-label={linkLabel}
+                        onClick={() => setReconciling(row)}
+                        data-tooltip={reconcileLabel}
+                        aria-label={reconcileLabel}
                       >
                         <ArrowRightLeft size={15} />
                       </button>
@@ -1299,6 +1367,17 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
               toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.editFailed", { defaultValue: "No se pudo guardar." })));
             }
           }}
+        />
+      ) : null}
+
+      {reconciling ? (
+        <ReconciliationDrawer
+          candidates={reconciliationCandidates}
+          extraction={reconciling}
+          formatMoney={formatMoney}
+          isBusy={busyId === reconciling.id}
+          onClose={() => setReconciling(null)}
+          onSelect={(candidate) => void reconcileWithCandidate(reconciling, candidate)}
         />
       ) : null}
     </SurfaceCard>
@@ -1432,6 +1511,84 @@ const InvoiceEditModal = ({
           </button>
         </div>
       </div>
+    </div>,
+    document.body,
+  );
+};
+
+const ReconciliationDrawer = ({
+  candidates,
+  extraction,
+  formatMoney,
+  isBusy,
+  onClose,
+  onSelect,
+}: {
+  candidates: ReconciliationCandidate[];
+  extraction: InvoiceExtraction;
+  formatMoney: (value: number) => string;
+  isBusy: boolean;
+  onClose: () => void;
+  onSelect: (candidate: BankTransactionRow) => void;
+}) => {
+  const { t } = useTranslation();
+  return createPortal(
+    <div className="document-preview-backdrop" onClick={onClose} role="presentation">
+      <aside
+        aria-label={t("finance.treasury.invoices.reconcile.title", { defaultValue: "Conciliar factura" })}
+        className="invoice-reconcile-drawer"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="invoice-reconcile-header">
+          <div>
+            <span>{t("finance.treasury.invoices.reconcile.eyebrow", { defaultValue: "Conciliación asistida" })}</span>
+            <h3>{extraction.supplierName ?? extraction.originalName}</h3>
+            <p>
+              {extraction.total != null
+                ? formatInvoiceMoney(extraction.total, extraction.currency)
+                : t("finance.treasury.invoices.reconcile.noTotal", { defaultValue: "Sin total extraído" })}
+              {extraction.invoiceDate ? ` · ${extraction.invoiceDate}` : ""}
+            </p>
+          </div>
+          <button className="icon-ghost-control" onClick={onClose} type="button">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="invoice-reconcile-list">
+          {candidates.length === 0 ? (
+            <GuidedEmptyState
+              body={t("finance.treasury.invoices.reconcile.emptyBody", {
+                defaultValue: "No encontramos movimientos suficientemente parecidos. Puedes ajustar total/fecha o importar más movimientos.",
+              })}
+              title={t("finance.treasury.invoices.reconcile.emptyTitle", { defaultValue: "Sin candidatos claros" })}
+            />
+          ) : (
+            candidates.map((candidate) => (
+              <button
+                className="invoice-reconcile-candidate"
+                disabled={isBusy}
+                key={candidate.row.id}
+                onClick={() => onSelect(candidate.row)}
+                type="button"
+              >
+                <span className="invoice-reconcile-score">{candidate.score}%</span>
+                <span className="invoice-reconcile-main">
+                  <strong>{candidate.row.rawDescription ?? candidate.row.reference ?? candidate.row.id}</strong>
+                  <small>
+                    {candidate.row.txnDate} · {candidate.row.bankAccountLabel} · {formatMoney(candidate.row.amount)}
+                  </small>
+                </span>
+                <span className="invoice-reconcile-reasons">
+                  {candidate.reasons.slice(0, 3).map((reason) => (
+                    <em key={reason}>{reason}</em>
+                  ))}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </aside>
     </div>,
     document.body,
   );

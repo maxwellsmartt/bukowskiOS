@@ -1461,17 +1461,6 @@ export const TreasuryPage = () => {
         ) : null}
       </div>
 
-      {showAccountForm ? (
-        <AccountForm
-          initialAccount={editingAccount}
-          onCancel={() => {
-            setShowAccountForm(false);
-            setEditingAccount(null);
-          }}
-          onSave={savePaymentInstrument}
-        />
-      ) : null}
-
       <div
         className="treasury-segmented-tabs"
         role="tablist"
@@ -1491,6 +1480,17 @@ export const TreasuryPage = () => {
           </button>
         ))}
       </div>
+
+      {showAccountForm ? (
+        <AccountForm
+          initialAccount={editingAccount}
+          onCancel={() => {
+            setShowAccountForm(false);
+            setEditingAccount(null);
+          }}
+          onSave={savePaymentInstrument}
+        />
+      ) : null}
 
       {tab === "overview" ? (
         <>
