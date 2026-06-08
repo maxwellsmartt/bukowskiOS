@@ -14,6 +14,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { formatProjectAssignmentInline } from "@shared/lib/assetQuantityPresentation";
+import { resolveProjectColor } from "@shared/lib/projectColors";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { hasFinanceAccess } from "@shared/lib/financeAccess";
 
@@ -81,6 +82,11 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
       <SurfaceCard
         title={
           <span className="project-detail-title-group">
+            <span
+              aria-hidden="true"
+              className="project-color-dot"
+              style={{ background: resolveProjectColor(data.schedule?.colorKey) }}
+            />
             <span>{`${project.code} · ${project.name}`}</span>
             <StatusBadge tone={toneForStatus(project.status)}>{t(`projects.statuses.${project.status}`, { defaultValue: project.status })}</StatusBadge>
           </span>

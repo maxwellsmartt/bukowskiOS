@@ -17,6 +17,7 @@ import { type ListSortOption, useListControls } from "@shared/hooks/useListContr
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { uiPreferenceKeys } from "@shared/lib/preferences";
 import { hasFinanceAccess } from "@shared/lib/financeAccess";
+import { resolveProjectColor } from "@shared/lib/projectColors";
 
 import { ProjectDetailPanel } from "./ProjectDetailPanel";
 import { useProjectDetail, useProjectsRegistry } from "./useProjectsData";
@@ -164,11 +165,18 @@ export const ProjectsPage = () => {
                 width: 250,
                 minWidth: 180,
                 render: (row) => (
-                  <div className="identity-cell">
-                    <span className="identity-title">{row.name}</span>
-                    <span className="identity-meta">
-                      {row.code} · {row.client}
-                    </span>
+                  <div className="project-name-cell">
+                    <span
+                      aria-hidden="true"
+                      className="project-color-dot"
+                      style={{ background: resolveProjectColor(row.colorKey) }}
+                    />
+                    <div className="identity-cell">
+                      <span className="identity-title">{row.name}</span>
+                      <span className="identity-meta">
+                        {row.code} · {row.client}
+                      </span>
+                    </div>
                   </div>
                 ),
               },
@@ -197,13 +205,6 @@ export const ProjectsPage = () => {
                 width: 108,
                 minWidth: 92,
                 render: (row) => row.endDate ?? "—",
-              },
-              {
-                key: "colorKey",
-                label: t("projects.registry.columns.color"),
-                width: 94,
-                minWidth: 82,
-                render: (row) => row.colorKey ?? t("projects.fallbacks.default"),
               },
               {
                 key: "activeUnitCount",
