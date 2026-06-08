@@ -23,6 +23,8 @@ import type {
   TreasuryDeductibleLedger,
   TreasuryDeductibleLedgerExportInput,
   TreasuryDeductibleLedgerQuery,
+  TreasuryReimbursementsQuery,
+  TreasuryReimbursementsSnapshot,
   TransactionMutationResult,
   TreasuryOverviewQuery,
   TreasuryOverviewSnapshot,
@@ -458,6 +460,53 @@ export const useTreasuryDeductibleLedger = (query: TreasuryDeductibleLedgerQuery
     query.period,
     query.customStartDate,
     query.customEndDate,
+    hasTreasuryReadAccess,
+    version,
+    refreshVersion,
+  ]);
+
+  return { data, isLoading, error, refresh };
+};
+
+export const useTreasuryReimbursements = (query: TreasuryReimbursementsQuery) => {
+  const hasTreasuryReadAccess = useTreasuryReadAccess();
+  const [data, setData] = useState<TreasuryReimbursementsSnapshot | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const refreshVersion = useWorkspaceDataRefreshVersion();
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!window.bukowskiTreasury || !query.workspaceId || !hasTreasuryReadAccess) {
+      setData(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    window.bukowskiTreasury
+      .reimbursements(query)
+      .then((snapshot) => {
+        if (!cancelled) setData(snapshot);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load reimbursements.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    query.workspaceId,
+    query.ownerUserId,
+    query.paymentInstrumentId,
+    query.status,
+    query.cycleStart,
+    query.cycleEnd,
     hasTreasuryReadAccess,
     version,
     refreshVersion,

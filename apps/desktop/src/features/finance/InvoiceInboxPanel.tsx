@@ -33,6 +33,7 @@ import {
   useInvoiceInbox,
   useTreasuryTransactions,
   useTreasuryMutations,
+  useTreasuryReimbursements,
 } from "./useTreasuryData";
 
 const ACCEPTED = "image/png,image/jpeg,image/webp,application/pdf";
@@ -123,6 +124,9 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   const mutations = useTreasuryMutations();
   const transactions = useTreasuryTransactions(
     useMemo(() => ({ workspaceId, limit: 1000 }), [workspaceId]),
+  );
+  const reimbursements = useTreasuryReimbursements(
+    useMemo(() => ({ workspaceId, status: "open" }), [workspaceId]),
   );
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -276,34 +280,22 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     () => selectedRows.filter((row) => row.status !== "processing" && row.status !== "applied" && row.status !== "dismissed"),
     [selectedRows],
   );
-  const reimbursementGroups = useMemo(() => {
-    const groups = new Map<
-      string,
-      {
-        key: string;
-        owner: string;
-        instrument: string;
-        cycle: string;
-        currency: string;
-        amount: number;
-        count: number;
-      }
-    >();
-    for (const row of filteredRows) {
-      const allocation = row.allocation;
-      if (!allocation || allocation.allocationStatus === "reimbursed" || allocation.allocationStatus === "rejected") continue;
-      const owner = row.linkedUserName ?? row.uploadedByName ?? t("finance.treasury.invoices.unknownUploader", { defaultValue: "Sin usuario" });
-      const instrument = allocation.paymentInstrumentLabel ?? t("finance.treasury.invoices.unassignedPaymentInstrument", { defaultValue: "Sin medio" });
-      const cycle = allocation.cycleStart && allocation.cycleEnd ? `${allocation.cycleStart} → ${allocation.cycleEnd}` : t("finance.treasury.invoices.noCycle", { defaultValue: "Sin ciclo" });
-      const currency = (allocation.amountCurrency ?? row.currency ?? "DOP").toUpperCase();
-      const key = `${owner}::${instrument}::${cycle}::${currency}`;
-      const current = groups.get(key) ?? { key, owner, instrument, cycle, currency, amount: 0, count: 0 };
-      current.amount += allocation.amountApplied ?? row.total ?? 0;
-      current.count += 1;
-      groups.set(key, current);
-    }
-    return Array.from(groups.values()).sort((a, b) => b.amount - a.amount);
-  }, [filteredRows, t]);
+  const reimbursementGroups = useMemo(
+    () =>
+      (reimbursements.data?.groups ?? []).map((group) => ({
+        key: group.key,
+        owner: group.ownerName,
+        instrument: group.paymentInstrumentLabel,
+        cycle:
+          group.cycleStart && group.cycleEnd
+            ? `${group.cycleStart} → ${group.cycleEnd}`
+            : t("finance.treasury.invoices.noCycle", { defaultValue: "Sin ciclo" }),
+        currency: group.currency,
+        amount: group.amount,
+        count: group.invoiceCount,
+      })),
+    [reimbursements.data?.groups, t],
+  );
 
   const reconciliationCandidates = useMemo(() => {
     if (!reconciling) return [];
@@ -605,6 +597,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
       );
       setSelectedIds(new Set());
       inbox.refresh();
+      reimbursements.refresh();
     } catch (error) {
       toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.dismissFailed", { defaultValue: "No se pudo descartar." })));
     } finally {
@@ -624,6 +617,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
       });
       toast.success(result.summary);
       inbox.refresh();
+      reimbursements.refresh();
     } catch (error) {
       toast.error(getUserFacingErrorMessage(error, t("finance.treasury.invoices.projectFailed", { defaultValue: "No se pudieron guardar los proyectos." })));
     }
@@ -742,6 +736,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
       toast.success(result.summary);
       setReconciling(null);
       inbox.refresh();
+      reimbursements.refresh();
     } catch (error) {
       toast.error(
         getUserFacingErrorMessage(

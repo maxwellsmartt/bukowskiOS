@@ -666,6 +666,7 @@ describe("treasury mutation service", () => {
   it("assigns pending invoice allocations and links them to transactions without exceeding invoice totals", () => {
     const { cleanup, database } = createTestDatabase("treasury-invoice-allocation-flow");
     const mutations = createTreasuryMutationService(database);
+    const reads = createTreasuryReadService(database);
     database.exec(`
       CREATE TABLE IF NOT EXISTS invoice_extractions (
         id TEXT PRIMARY KEY,
@@ -678,6 +679,10 @@ describe("treasury mutation service", () => {
         byte_size INTEGER NOT NULL DEFAULT 0,
         total REAL,
         currency TEXT,
+        uploaded_by_user_id TEXT,
+        uploaded_by_name TEXT,
+        linked_user_id TEXT,
+        linked_user_name TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -699,8 +704,9 @@ describe("treasury mutation service", () => {
       .prepare(
         `INSERT INTO invoice_extractions (
            id, workspace_id, batch_id, status, original_name, storage_path, mime_type,
-           byte_size, total, currency, created_at, updated_at
-         ) VALUES (?, ?, ?, 'extracted', ?, ?, 'application/pdf', 100, ?, 'DOP', ?, ?)`,
+           byte_size, total, currency, uploaded_by_user_id, uploaded_by_name,
+           linked_user_id, linked_user_name, created_at, updated_at
+         ) VALUES (?, ?, ?, 'extracted', ?, ?, 'application/pdf', 100, ?, 'DOP', ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         "invoice-extraction-allocation-001",
@@ -709,6 +715,10 @@ describe("treasury mutation service", () => {
         "factura.pdf",
         "/tmp/factura.pdf",
         1000,
+        "user-ops",
+        "Carlos",
+        "user-ops",
+        "Carlos",
         "2026-06-08T10:00:00.000Z",
         "2026-06-08T10:00:00.000Z",
       );
@@ -737,6 +747,20 @@ describe("treasury mutation service", () => {
     });
     expect(allocation.allocationId).toBe("txn-link-cmd-allocation-assign");
     expect(repeated.repeated).toBe(true);
+
+    const openReimbursements = reads.getReimbursements({ workspaceId, status: "open" });
+    expect(openReimbursements.groups).toHaveLength(1);
+    expect(openReimbursements.groups[0]).toMatchObject({
+      ownerUserId: "user-ops",
+      ownerName: "Carlos",
+      paymentInstrumentId: "bank-account-cmd-card-allocation",
+      paymentInstrumentLabel: "Visa Carlos",
+      amount: 700,
+      invoiceCount: 1,
+      status: "pending",
+      cycleStart: "2026-06-01",
+      cycleEnd: "2026-06-30",
+    });
 
     expect(() =>
       mutations.assignInvoiceAllocation({
@@ -776,6 +800,17 @@ describe("treasury mutation service", () => {
       .get(allocation.allocationId) as { transaction_id: string; allocation_status: string };
     expect(row.transaction_id).toBe(txn.id);
     expect(row.allocation_status).toBe("matched");
+
+    mutations.markInvoiceAllocationReimbursed({
+      commandId: "cmd-allocation-reimbursed",
+      workspaceId,
+      ...baseChannel,
+      allocationId: allocation.allocationId,
+    });
+    expect(reads.getReimbursements({ workspaceId, status: "open" }).groups).toHaveLength(0);
+    const reimbursed = reads.getReimbursements({ workspaceId, status: "reimbursed" });
+    expect(reimbursed.groups).toHaveLength(1);
+    expect(reimbursed.groups[0].status).toBe("reimbursed");
 
     cleanup();
   });

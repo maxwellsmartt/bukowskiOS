@@ -82,6 +82,7 @@ import {
   treasuryProjectPnlReadArgsSchema,
   treasuryUndoPreviewReadArgsSchema,
   treasuryDeductibleLedgerReadArgsSchema,
+  treasuryReimbursementsReadArgsSchema,
   treasuryDeductibleLedgerExportSchema,
   dgiiReportReadArgsSchema,
   dgiiReportExportSchema,
@@ -503,6 +504,9 @@ type RegisterFoundationIpcOptions = {
     getDeductibleLedger: (
       query: import("@contracts").TreasuryDeductibleLedgerQuery,
     ) => import("@contracts").TreasuryDeductibleLedger;
+    getReimbursements: (
+      query: import("@contracts").TreasuryReimbursementsQuery,
+    ) => import("@contracts").TreasuryReimbursementsSnapshot;
     getDgiiReport: (query: import("@contracts").DgiiReportQuery) => import("@contracts").DgiiReport;
   };
   invoiceInbox: {
@@ -2690,6 +2694,20 @@ export const registerFoundationIpc = ({
       return treasuryReads.getDeductibleLedger(query);
     },
     "The app could not load the deductible ledger.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.treasury.reimbursements,
+    treasuryReimbursementsReadArgsSchema,
+    async (_event, query: import("@contracts").TreasuryReimbursementsQuery) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "load treasury reimbursements",
+        accessLevel: "read",
+        requiredPermission: "treasury.transactions.read",
+      });
+      return treasuryReads.getReimbursements(query);
+    },
+    "The app could not load treasury reimbursements.",
   );
   safeHandle(ipcChannels.treasury.exportDeductibleLedger, treasuryDeductibleLedgerExportSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({

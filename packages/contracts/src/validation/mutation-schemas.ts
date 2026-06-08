@@ -1851,6 +1851,17 @@ export const treasuryDeductibleLedgerExportSchema = treasuryDeductibleLedgerQuer
   format: z.enum(["csv", "xlsx", "pdf"]),
 });
 
+export const treasuryReimbursementsQuerySchema = z
+  .object({
+    workspaceId: nonEmptyString,
+    ownerUserId: optionalTrimmedString,
+    paymentInstrumentId: optionalTrimmedString,
+    status: z.enum(["pending", "matched", "partial", "rejected", "reimbursed", "open", "all"]).optional(),
+    cycleStart: optionalTrimmedString,
+    cycleEnd: optionalTrimmedString,
+  })
+  .strict();
+
 export const dgiiReportQuerySchema = z
   .object({
     workspaceId: nonEmptyString,
@@ -1895,6 +1906,7 @@ export const treasuryReviewQueueReadArgsSchema = z.tuple([treasuryAccountsQueryS
 export const treasuryProjectPnlReadArgsSchema = z.tuple([treasuryProjectPnlQuerySchema]);
 export const treasuryUndoPreviewReadArgsSchema = z.tuple([treasuryUndoPreviewQuerySchema]);
 export const treasuryDeductibleLedgerReadArgsSchema = z.tuple([treasuryDeductibleLedgerQuerySchema]);
+export const treasuryReimbursementsReadArgsSchema = z.tuple([treasuryReimbursementsQuerySchema]);
 export const invoiceInboxListReadArgsSchema = z.tuple([invoiceInboxListQuerySchema]);
 export const invoiceInboxPreviewReadArgsSchema = z.tuple([
   z.object({ workspaceId: nonEmptyString, extractionId: nonEmptyString }).strict(),

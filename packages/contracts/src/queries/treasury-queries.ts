@@ -2,6 +2,7 @@ import type {
   BankAccountType,
   BankName,
   FiscalStatus,
+  InvoiceAllocationStatus,
   PaymentInstrumentKind,
   PaymentInstrumentOwner,
   ReimbursementStatus,
@@ -206,6 +207,40 @@ export type TreasuryDeductibleLedger = {
     claimedAmount: number;
     deductibleAmount: number;
     rejectedAmount: number;
+  }>;
+};
+
+export type TreasuryReimbursementsQuery = {
+  workspaceId: string;
+  ownerUserId?: string | null;
+  paymentInstrumentId?: string | null;
+  status?: InvoiceAllocationStatus | "open" | "all" | null;
+  cycleStart?: string | null;
+  cycleEnd?: string | null;
+};
+
+export type TreasuryReimbursementGroup = {
+  key: string;
+  ownerUserId: string | null;
+  ownerName: string;
+  paymentInstrumentId: string | null;
+  paymentInstrumentLabel: string;
+  cycleStart: string | null;
+  cycleEnd: string | null;
+  status: InvoiceAllocationStatus | "mixed";
+  currency: string;
+  invoiceCount: number;
+  amount: number;
+  latestUpdatedAt: string | null;
+};
+
+export type TreasuryReimbursementsSnapshot = {
+  query: TreasuryReimbursementsQuery;
+  groups: TreasuryReimbursementGroup[];
+  totalsByCurrency: Array<{
+    currency: string;
+    amount: number;
+    invoiceCount: number;
   }>;
 };
 

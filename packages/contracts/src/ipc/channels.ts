@@ -262,6 +262,7 @@ export const ipcChannels = {
     projectPnl: "bukowskiTreasury:projectPnl",
     undoPreview: "bukowskiTreasury:undoPreview",
     deductibleLedger: "bukowskiTreasury:deductibleLedger",
+    reimbursements: "bukowskiTreasury:reimbursements",
     exportDeductibleLedger: "bukowskiTreasury:exportDeductibleLedger",
     dgiiReport: "bukowskiTreasury:dgiiReport",
     exportDgiiReport: "bukowskiTreasury:exportDgiiReport",

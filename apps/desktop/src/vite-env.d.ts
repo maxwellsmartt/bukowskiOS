@@ -562,6 +562,9 @@ declare global {
       deductibleLedger: (
         query: import("@contracts").TreasuryDeductibleLedgerQuery,
       ) => Promise<import("@contracts").TreasuryDeductibleLedger>;
+      reimbursements: (
+        query: import("@contracts").TreasuryReimbursementsQuery,
+      ) => Promise<import("@contracts").TreasuryReimbursementsSnapshot>;
       exportDeductibleLedger: (
         input: import("@contracts").TreasuryDeductibleLedgerExportInput,
       ) => Promise<import("@contracts").AppExportResult>;

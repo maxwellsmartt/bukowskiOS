@@ -149,7 +149,7 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 
 ### Slice 6 — Hardening de conciliacion asistida
 
-**Estado:** Implementado parcialmente el 2026-06-08
+**Estado:** Implementado el 2026-06-08
 
 **Objetivo:** Mejorar la seleccion manual de movimientos y corregir fricciones visuales del flujo de medios de pago.
 
@@ -157,7 +157,25 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 - Sub-nav interna de Tesoreria queda por encima del formulario de editar medio de pago. **Implementado.**
 - Drawer de conciliacion asistida muestra candidatos rankeados por monto, fecha, medio de pago y texto proveedor/descripcion. **Implementado.**
 - Elegir candidato crea allocation si falta y luego vincula el movimiento de forma idempotente. **Implementado.**
-- Pendiente: query dedicada de reembolsos historicos y filtros avanzados por responsable/medio/ciclo/estado.
+- El panel de crear/editar medio de pago se cierra automaticamente al salir de **Cuentas y tarjetas**. **Implementado en Slice 7.**
+
+### Slice 7 — Reembolsos historicos y formulario contextual
+
+**Estado:** MVP implementado parcialmente el 2026-06-08
+
+**Objetivo:** Quitar dependencia del scope visible de Inbox y reducir friccion del formulario de medios de pago.
+
+**Frontend/backend:**
+- Query dedicada `treasury.reimbursements` para consultar reembolsos por workspace, responsable, medio, ciclo y estado. **Implementado MVP.**
+- El panel de reembolsos de Inbox ahora lee el historico desde SQLite local, no solo las filas visibles/filtradas. **Implementado MVP.**
+- Formulario de medio de pago prioriza `Tipo` como primer campo. **Implementado.**
+- Campos contextuales por tipo: cuenta bancaria, tarjeta debito, tarjeta credito, efectivo/otro muestran solo metadata relevante. **Implementado MVP.**
+- Campos internos/confusos se reducen: `Nombre snapshot` deja de mostrarse; `Usuario reminder` queda como `ID para recordatorio` y solo aparece cuando una tarjeta de credito no tiene responsable. **Implementado MVP.**
+- Sanitizacion antes de guardar limpia metadata que no aplica al tipo seleccionado. **Implementado.**
+- Pendiente: filtros visibles por responsable/medio/ciclo/estado en la UI de reembolsos.
+- Pendiente: tabla expandida con drill-down a facturas/movimientos y export CSV/XLSX.
+- Pendiente: selector real de usuarios/responsables en vez de introducir IDs manuales.
+- Pendiente: importadores de estados para bancos adicionales; hoy el modelo acepta `Otro`, pero los parsers automaticos solo cubren Banco Popular CSV y Banco Santa Cruz XLSX.
 
 ## Tests criticos
 
@@ -243,14 +261,26 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 - Verificacion Slice 6:
   - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
   - `corepack pnpm exec vitest run src/test/invoice-inbox-service.test.ts src/test/treasury-mutation-service.test.ts` desde `apps/desktop`: **28 passed**.
+- Se implementa Slice 7 MVP parcial:
+  - se agrega query local-first `treasury.reimbursements` con IPC/preload/hook renderer;
+  - el panel de reembolsos de Inbox deja de depender de las filas visibles y consume el historico agrupado desde SQLite;
+  - se corrige el bug donde el panel Nuevo/Editar medio de pago seguia visible al navegar a otra sub-seccion de Tesoreria;
+  - el formulario de medio de pago pone `Tipo` primero y muestra/oculta campos segun cuenta, tarjeta, efectivo u otro;
+  - se oculta `Nombre snapshot` y se renombra/acota `Usuario reminder` para reducir carga cognitiva;
+  - se sanitizan campos no aplicables antes de persistir cambios.
+- Verificacion Slice 7 MVP parcial:
+  - `corepack pnpm --dir apps/desktop exec vitest run src/test/treasury-mutation-service.test.ts`: **21 passed**.
+  - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
+  - Nota: un intento previo con `corepack pnpm --filter @bukowski/desktop test -- src/test/treasury-mutation-service.test.ts` ejecuto gran parte de la suite desktop y fallo solo por un test local mal invocado; luego se corrigio el test y el spec focalizado paso.
 
 ## Proximo slice recomendado
 
-**Slice 7 — reembolsos historicos y filtros.**
+**Slice 8 — filtros y drill-down de reembolsos.**
 
 Orden sugerido:
-1. Agregar query dedicada de reembolsos historicos para no depender de filas visibles del Inbox.
-2. Agregar filtros por responsable, medio, ciclo y estado.
-3. Agregar vista/tabla expandida de reembolsos con drill-down a facturas y movimientos.
+1. Agregar filtros visibles por responsable, medio, ciclo y estado.
+2. Agregar vista/tabla expandida de reembolsos con drill-down a facturas y movimientos.
+3. Reemplazar IDs manuales por selector de usuarios/responsables conectado al catalogo local.
 4. Considerar export CSV/XLSX de reembolsos pendientes.
-5. Dejar auto-conciliacion sin confirmacion humana fuera de v1.
+5. Diseñar soporte para bancos adicionales: primero metadata `Otro/custom`, luego parser generico CSV/manual y despues parsers dedicados por banco.
+6. Dejar auto-conciliacion sin confirmacion humana fuera de v1.

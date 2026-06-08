@@ -747,6 +747,10 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.deductibleLedger, query) as Promise<
       import("@contracts").TreasuryDeductibleLedger
     >,
+  reimbursements: (query: import("@contracts").TreasuryReimbursementsQuery) =>
+    ipcRenderer.invoke(ipcChannels.treasury.reimbursements, query) as Promise<
+      import("@contracts").TreasuryReimbursementsSnapshot
+    >,
   exportDeductibleLedger: (input: import("@contracts").TreasuryDeductibleLedgerExportInput) =>
     ipcRenderer.invoke(ipcChannels.treasury.exportDeductibleLedger, input) as Promise<
       import("@contracts").AppExportResult

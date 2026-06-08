@@ -635,6 +635,12 @@ export const TreasuryPage = () => {
   };
 
   useEffect(() => {
+    if (tab === "accounts" || !showAccountForm) return;
+    setShowAccountForm(false);
+    setEditingAccount(null);
+  }, [showAccountForm, tab]);
+
+  useEffect(() => {
     setSelectedMovementIds((current) => {
       if (!current.length) return current;
       const visibleIds = new Set(visibleMovements.map((row) => row.id));
@@ -662,13 +668,29 @@ export const TreasuryPage = () => {
 
   const savePaymentInstrument = async (draft: AccountDraft) => {
     try {
+      const isDraftBankAccount = draft.instrumentKind === "bank_account";
+      const isDraftCard = draft.instrumentKind === "credit_card" || draft.instrumentKind === "debit_card";
+      const isDraftCreditCard = draft.instrumentKind === "credit_card";
+      const sanitizedDraft: AccountDraft = {
+        ...draft,
+        bankName: draft.instrumentKind === "cash" ? "custom" : draft.bankName,
+        accountType: isDraftBankAccount ? draft.accountType : "other",
+        accountNumberMasked: isDraftBankAccount ? draft.accountNumberMasked : "",
+        last4: isDraftCard ? draft.last4 : "",
+        issuer: isDraftCard ? draft.issuer : "",
+        statementCycleDay: isDraftCreditCard ? draft.statementCycleDay : null,
+        paymentDueDay: isDraftCreditCard ? draft.paymentDueDay : null,
+        reminderUserId: isDraftCreditCard ? draft.reminderUserId : "",
+        ownerUserId: draft.owner === "company" ? "" : draft.ownerUserId,
+        ownerUserNameSnapshot: "",
+      };
       await mutations.upsertPaymentInstrument({
         commandId: newCommandId("treasury-instrument"),
         workspaceId: activeWorkspaceId,
         actorType: "user",
         sourceChannel: "desktop",
         bankAccountId: editingAccount?.id ?? null,
-        ...draft,
+        ...sanitizedDraft,
         accountNumberFull: null,
       });
       toast.success(t("finance.treasury.account.saved"));
@@ -2786,6 +2808,12 @@ const AccountForm = ({
     notes: initialAccount?.notes ?? "",
   });
   const isCreditCard = draft.instrumentKind === "credit_card";
+  const isDebitCard = draft.instrumentKind === "debit_card";
+  const isCard = isCreditCard || isDebitCard;
+  const isBankAccount = draft.instrumentKind === "bank_account";
+  const isCash = draft.instrumentKind === "cash";
+  const needsResponsibleUser = draft.owner === "user" || draft.owner === "shared";
+  const needsReminderUser = isCreditCard && !draft.ownerUserId.trim();
   const bankOptions = useMemo(
     () =>
       bankNames.map((name) => ({
@@ -2837,8 +2865,8 @@ const AccountForm = ({
   const canSave =
     draft.accountLabel.trim().length > 0 &&
     (!isCreditCard || (draft.statementCycleDay != null && draft.paymentDueDay != null)) &&
-    (draft.owner !== "user" || draft.ownerUserId.trim().length > 0) &&
-    (!isCreditCard || draft.ownerUserId.trim().length > 0 || draft.reminderUserId.trim().length > 0);
+    (!needsResponsibleUser || draft.ownerUserId.trim().length > 0) &&
+    (!needsReminderUser || draft.reminderUserId.trim().length > 0);
 
   return (
     <SurfaceCard className="treasury-account-form-card">
@@ -2851,29 +2879,42 @@ const AccountForm = ({
       </div>
       <div className="treasury-account-form-grid">
         <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.bank")}</span>
-          <CompactSelect<BankName>
-            ariaLabel={t("finance.treasury.account.bank")}
-            onChange={(bankName) => setDraft((d) => ({ ...d, bankName }))}
-            options={bankOptions}
-            value={draft.bankName}
+          <span>{t("finance.treasury.account.instrumentKind", { defaultValue: "Tipo" })}</span>
+          <CompactSelect<PaymentInstrumentKind>
+            ariaLabel={t("finance.treasury.account.instrumentKind", { defaultValue: "Tipo" })}
+            onChange={(instrumentKind) =>
+              setDraft((d) => ({
+                ...d,
+                instrumentKind,
+                bankName: instrumentKind === "cash" ? "custom" : d.bankName,
+                accountType: instrumentKind === "bank_account" ? d.accountType ?? "checking" : "other",
+                statementCycleDay: instrumentKind === "credit_card" ? d.statementCycleDay : null,
+                paymentDueDay: instrumentKind === "credit_card" ? d.paymentDueDay : null,
+                reminderUserId: instrumentKind === "credit_card" ? d.reminderUserId : "",
+              }))
+            }
+            options={instrumentKindOptions}
+            value={draft.instrumentKind}
           />
         </label>
+        {!isCash ? (
+          <label className="compact-filter-field">
+            <span>{t("finance.treasury.account.bank")}</span>
+            <CompactSelect<BankName>
+              ariaLabel={t("finance.treasury.account.bank")}
+              onChange={(bankName) => setDraft((d) => ({ ...d, bankName }))}
+              options={bankOptions}
+              value={draft.bankName}
+            />
+          </label>
+        ) : null}
         <label className="compact-filter-field">
           <span>{t("finance.treasury.account.label")}</span>
           <input
             className="field-input"
             onChange={(event) => setDraft((d) => ({ ...d, accountLabel: event.target.value }))}
+            placeholder={isCash ? t("finance.treasury.account.cashLabelPlaceholder", { defaultValue: "Caja chica, efectivo..." }) : undefined}
             value={draft.accountLabel}
-          />
-        </label>
-        <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.instrumentKind", { defaultValue: "Tipo" })}</span>
-          <CompactSelect<PaymentInstrumentKind>
-            ariaLabel={t("finance.treasury.account.instrumentKind", { defaultValue: "Tipo" })}
-            onChange={(instrumentKind) => setDraft((d) => ({ ...d, instrumentKind }))}
-            options={instrumentKindOptions}
-            value={draft.instrumentKind}
           />
         </label>
         <label className="compact-filter-field">
@@ -2885,103 +2926,110 @@ const AccountForm = ({
             value={draft.currency}
           />
         </label>
+        {isBankAccount ? (
+          <label className="compact-filter-field">
+            <span>{t("finance.treasury.account.accountType", { defaultValue: "Cuenta" })}</span>
+            <CompactSelect<BankAccountType>
+              ariaLabel={t("finance.treasury.account.accountType", { defaultValue: "Cuenta" })}
+              onChange={(accountType) => setDraft((d) => ({ ...d, accountType }))}
+              options={accountTypeOptions}
+              value={draft.accountType ?? "other"}
+            />
+          </label>
+        ) : null}
         <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.accountType", { defaultValue: "Cuenta" })}</span>
-          <CompactSelect<BankAccountType>
-            ariaLabel={t("finance.treasury.account.accountType", { defaultValue: "Cuenta" })}
-            onChange={(accountType) => setDraft((d) => ({ ...d, accountType }))}
-            options={accountTypeOptions}
-            value={draft.accountType ?? "other"}
-          />
-        </label>
-        <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.owner", { defaultValue: "Owner" })}</span>
+          <span>{t("finance.treasury.account.owner", { defaultValue: "Uso" })}</span>
           <CompactSelect<PaymentInstrumentOwner>
-            ariaLabel={t("finance.treasury.account.owner", { defaultValue: "Owner" })}
-            onChange={(owner) => setDraft((d) => ({ ...d, owner }))}
+            ariaLabel={t("finance.treasury.account.owner", { defaultValue: "Uso" })}
+            onChange={(owner) => setDraft((d) => ({ ...d, owner, ownerUserId: owner === "company" ? "" : d.ownerUserId }))}
             options={ownerOptions}
             value={draft.owner}
           />
         </label>
-        <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.ownerUserId", { defaultValue: "Usuario responsable" })}</span>
-          <input
-            className="field-input"
-            onChange={(event) => setDraft((d) => ({ ...d, ownerUserId: event.target.value }))}
-            placeholder={draft.owner === "user" ? t("common.required", { defaultValue: "Requerido" }) : t("common.optional", { defaultValue: "Opcional" })}
-            value={draft.ownerUserId}
-          />
-        </label>
-        <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.ownerName", { defaultValue: "Nombre snapshot" })}</span>
-          <input
-            className="field-input"
-            onChange={(event) => setDraft((d) => ({ ...d, ownerUserNameSnapshot: event.target.value }))}
-            value={draft.ownerUserNameSnapshot}
-          />
-        </label>
-        <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.last4", { defaultValue: "Últimos 4" })}</span>
-          <input
-            className="field-input"
-            inputMode="numeric"
-            maxLength={4}
-            onChange={(event) => setDraft((d) => ({ ...d, last4: event.target.value.replace(/\D/g, "").slice(0, 4) }))}
-            value={draft.last4}
-          />
-        </label>
-        <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.masked", { defaultValue: "Máscara visible" })}</span>
-          <input
-            className="field-input"
-            onChange={(event) => setDraft((d) => ({ ...d, accountNumberMasked: event.target.value }))}
-            placeholder="•••• 1234"
-            value={draft.accountNumberMasked}
-          />
-        </label>
-        <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.issuer", { defaultValue: "Emisor" })}</span>
-          <input
-            className="field-input"
-            onChange={(event) => setDraft((d) => ({ ...d, issuer: event.target.value }))}
-            value={draft.issuer}
-          />
-        </label>
-        <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.statementCycleDay", { defaultValue: "Día de corte" })}</span>
-          <input
-            className="field-input"
-            disabled={!isCreditCard}
-            max={31}
-            min={1}
-            onChange={(event) => setDraft((d) => ({ ...d, statementCycleDay: parseDay(event.target.value) }))}
-            placeholder={isCreditCard ? t("common.required", { defaultValue: "Requerido" }) : "—"}
-            type="number"
-            value={dayValue(draft.statementCycleDay)}
-          />
-        </label>
-        <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.paymentDueDay", { defaultValue: "Día de pago" })}</span>
-          <input
-            className="field-input"
-            disabled={!isCreditCard}
-            max={31}
-            min={1}
-            onChange={(event) => setDraft((d) => ({ ...d, paymentDueDay: parseDay(event.target.value) }))}
-            placeholder={isCreditCard ? t("common.required", { defaultValue: "Requerido" }) : "—"}
-            type="number"
-            value={dayValue(draft.paymentDueDay)}
-          />
-        </label>
-        <label className="compact-filter-field">
-          <span>{t("finance.treasury.account.reminderUserId", { defaultValue: "Usuario reminder" })}</span>
-          <input
-            className="field-input"
-            onChange={(event) => setDraft((d) => ({ ...d, reminderUserId: event.target.value }))}
-            placeholder={isCreditCard ? t("finance.treasury.account.reminderHint", { defaultValue: "Requerido si no hay responsable" }) : t("common.optional", { defaultValue: "Opcional" })}
-            value={draft.reminderUserId}
-          />
-        </label>
+        {needsResponsibleUser ? (
+          <label className="compact-filter-field">
+            <span>{t("finance.treasury.account.ownerUserId", { defaultValue: "ID del responsable" })}</span>
+            <input
+              className="field-input"
+              onChange={(event) => setDraft((d) => ({ ...d, ownerUserId: event.target.value }))}
+              placeholder={t("common.required", { defaultValue: "Requerido" })}
+              value={draft.ownerUserId}
+            />
+          </label>
+        ) : null}
+        {isCard ? (
+          <>
+            <label className="compact-filter-field">
+              <span>{t("finance.treasury.account.last4", { defaultValue: "Últimos 4" })}</span>
+              <input
+                className="field-input"
+                inputMode="numeric"
+                maxLength={4}
+                onChange={(event) => setDraft((d) => ({ ...d, last4: event.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                value={draft.last4}
+              />
+            </label>
+            <label className="compact-filter-field">
+              <span>{t("finance.treasury.account.issuer", { defaultValue: "Emisor" })}</span>
+              <input
+                className="field-input"
+                onChange={(event) => setDraft((d) => ({ ...d, issuer: event.target.value }))}
+                placeholder="Visa, Mastercard..."
+                value={draft.issuer}
+              />
+            </label>
+          </>
+        ) : null}
+        {isBankAccount ? (
+          <label className="compact-filter-field">
+            <span>{t("finance.treasury.account.masked", { defaultValue: "Número visible" })}</span>
+            <input
+              className="field-input"
+              onChange={(event) => setDraft((d) => ({ ...d, accountNumberMasked: event.target.value }))}
+              placeholder="•••• 1234"
+              value={draft.accountNumberMasked}
+            />
+          </label>
+        ) : null}
+        {isCreditCard ? (
+          <>
+            <label className="compact-filter-field">
+              <span>{t("finance.treasury.account.statementCycleDay", { defaultValue: "Día de corte" })}</span>
+              <input
+                className="field-input"
+                max={31}
+                min={1}
+                onChange={(event) => setDraft((d) => ({ ...d, statementCycleDay: parseDay(event.target.value) }))}
+                placeholder={t("common.required", { defaultValue: "Requerido" })}
+                type="number"
+                value={dayValue(draft.statementCycleDay)}
+              />
+            </label>
+            <label className="compact-filter-field">
+              <span>{t("finance.treasury.account.paymentDueDay", { defaultValue: "Día de pago" })}</span>
+              <input
+                className="field-input"
+                max={31}
+                min={1}
+                onChange={(event) => setDraft((d) => ({ ...d, paymentDueDay: parseDay(event.target.value) }))}
+                placeholder={t("common.required", { defaultValue: "Requerido" })}
+                type="number"
+                value={dayValue(draft.paymentDueDay)}
+              />
+            </label>
+            {needsReminderUser ? (
+              <label className="compact-filter-field">
+                <span>{t("finance.treasury.account.reminderUserId", { defaultValue: "ID para recordatorio" })}</span>
+                <input
+                  className="field-input"
+                  onChange={(event) => setDraft((d) => ({ ...d, reminderUserId: event.target.value }))}
+                  placeholder={t("finance.treasury.account.reminderHint", { defaultValue: "Quién recibe el reminder de pago" })}
+                  value={draft.reminderUserId}
+                />
+              </label>
+            ) : null}
+          </>
+        ) : null}
         <label className="compact-filter-field">
           <span>{t("finance.treasury.account.openingBalance")}</span>
           <input

@@ -28,6 +28,8 @@ import {
   type TreasuryOverviewSnapshot,
   type TreasuryDeductibleLedger,
   type TreasuryDeductibleLedgerQuery,
+  type TreasuryReimbursementsQuery,
+  type TreasuryReimbursementsSnapshot,
   type TreasuryTransactionListQuery,
   type TreasuryUndoPreview,
 } from "@contracts";
@@ -821,6 +823,117 @@ export const createTreasuryReadService = (db: DatabaseSync) => {
         kind: row.kind,
         label: row.label,
         createdAt: row.created_at,
+      };
+    },
+
+    getReimbursements(query: TreasuryReimbursementsQuery): TreasuryReimbursementsSnapshot {
+      const ws = resolveWorkspaceId(query.workspaceId);
+      const conditions = ["l.workspace_id = ?", "l.linked_entity_type = 'invoice_extraction'"];
+      const params: Array<string | number> = [ws];
+      const status = query.status ?? "open";
+      if (status === "open") {
+        conditions.push("l.allocation_status NOT IN ('reimbursed', 'rejected')");
+      } else if (status && status !== "all") {
+        conditions.push("l.allocation_status = ?");
+        params.push(status);
+      }
+      if (query.ownerUserId) {
+        conditions.push("COALESCE(NULLIF(ix.linked_user_id, ''), NULLIF(ix.uploaded_by_user_id, '')) = ?");
+        params.push(query.ownerUserId);
+      }
+      if (query.paymentInstrumentId) {
+        conditions.push("l.payment_instrument_id = ?");
+        params.push(query.paymentInstrumentId);
+      }
+      if (query.cycleStart) {
+        conditions.push("COALESCE(l.cycle_start, '') = ?");
+        params.push(query.cycleStart);
+      }
+      if (query.cycleEnd) {
+        conditions.push("COALESCE(l.cycle_end, '') = ?");
+        params.push(query.cycleEnd);
+      }
+      const rows = db
+        .prepare(
+          `SELECT
+             l.id,
+             l.payment_instrument_id,
+             COALESCE(acc.account_label, 'Sin medio') AS payment_instrument_label,
+             l.amount_applied,
+             l.amount_currency,
+             l.allocation_status,
+             l.cycle_start,
+             l.cycle_end,
+             l.updated_at,
+             COALESCE(NULLIF(ix.linked_user_id, ''), NULLIF(ix.uploaded_by_user_id, '')) AS owner_user_id,
+             COALESCE(NULLIF(ix.linked_user_name, ''), NULLIF(ix.uploaded_by_name, ''), 'Sin usuario') AS owner_name
+           FROM transaction_links l
+           LEFT JOIN invoice_extractions ix ON ix.id = l.linked_entity_id
+           LEFT JOIN bank_accounts acc ON acc.id = l.payment_instrument_id
+           WHERE ${conditions.join(" AND ")}
+           ORDER BY l.updated_at DESC, l.created_at DESC`,
+        )
+        .all(...params) as Array<{
+        id: string;
+        payment_instrument_id: string | null;
+        payment_instrument_label: string | null;
+        amount_applied: number | null;
+        amount_currency: string | null;
+        allocation_status: string;
+        cycle_start: string | null;
+        cycle_end: string | null;
+        updated_at: string | null;
+        owner_user_id: string | null;
+        owner_name: string | null;
+      }>;
+
+      const groups = new Map<string, TreasuryReimbursementsSnapshot["groups"][number]>();
+      for (const row of rows) {
+        const currency = normalizeCurrency(row.amount_currency, "DOP");
+        const key = [
+          row.owner_user_id ?? "",
+          row.payment_instrument_id ?? "",
+          row.cycle_start ?? "",
+          row.cycle_end ?? "",
+          currency,
+        ].join("::");
+        const current =
+          groups.get(key) ??
+          {
+            key,
+            ownerUserId: row.owner_user_id ?? null,
+            ownerName: row.owner_name ?? "Sin usuario",
+            paymentInstrumentId: row.payment_instrument_id ?? null,
+            paymentInstrumentLabel: row.payment_instrument_label ?? "Sin medio",
+            cycleStart: row.cycle_start ?? null,
+            cycleEnd: row.cycle_end ?? null,
+            status: row.allocation_status as TreasuryReimbursementsSnapshot["groups"][number]["status"],
+            currency,
+            invoiceCount: 0,
+            amount: 0,
+            latestUpdatedAt: row.updated_at ?? null,
+          };
+        current.invoiceCount += 1;
+        current.amount = round2(current.amount + Number(row.amount_applied ?? 0));
+        if (current.status !== row.allocation_status) current.status = "mixed";
+        if (row.updated_at && (!current.latestUpdatedAt || row.updated_at > current.latestUpdatedAt)) {
+          current.latestUpdatedAt = row.updated_at;
+        }
+        groups.set(key, current);
+      }
+
+      const groupRows = Array.from(groups.values()).sort((a, b) => b.amount - a.amount);
+      const totalsMap = new Map<string, { currency: string; amount: number; invoiceCount: number }>();
+      for (const group of groupRows) {
+        const current = totalsMap.get(group.currency) ?? { currency: group.currency, amount: 0, invoiceCount: 0 };
+        current.amount = round2(current.amount + group.amount);
+        current.invoiceCount += group.invoiceCount;
+        totalsMap.set(group.currency, current);
+      }
+      return {
+        query,
+        groups: groupRows,
+        totalsByCurrency: Array.from(totalsMap.values()).sort((a, b) => a.currency.localeCompare(b.currency)),
       };
     },
 
