@@ -44,6 +44,10 @@
   /* Keyboard focus ring (WCAG 2.4.7) — one consistent indicator for controls. */
   --focus-ring: rgba(115, 164, 255, 0.6);
 
+  /* Hybrid accent system: blue = primary action + "where am I" (active nav/tab),
+     the warm brand gold stays for identity. One action accent, used consistently. */
+  --accent-action: #5c99ff;
+
   /* ------------------------------------------------------------------ *
    * Status tokens — single source of truth for pills/badges/dots so
    * every "success/warning/critical/info/neutral" surface stays in sync
