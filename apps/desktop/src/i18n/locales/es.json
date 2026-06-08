@@ -53,7 +53,10 @@
       "syncFailed": "La sincronización necesita atención",
       "syncFailedWithCount": "Sincronización con errores · {{count}} fallidos",
       "syncing": "Sincronizando · {{count}} en cola",
-      "upToDate": "Al día"
+      "upToDate": "Al día",
+      "online": "En línea",
+      "offline": "Sin conexión",
+      "offlineTooltip": "Sin conexión · trabajando con datos locales"
     },
     "userMenu": {
       "closeMenu": "Cerrar menú de usuario",

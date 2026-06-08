@@ -1,9 +1,10 @@
-import { CloudCog, Search } from "lucide-react";
+import { CloudCog, Search, Wifi, WifiOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { HelpMenu } from "@features/onboarding/HelpMenu";
+import { useConnectivity } from "@shared/hooks/useConnectivity";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useVisiblePolling } from "@shared/hooks/useVisiblePolling";
 import type { AppDiagnosticsSnapshot } from "@contracts";
@@ -18,6 +19,7 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
   const { scopeChipLabel } = useShellContext();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const isOnline = useConnectivity();
   const [diagnostics, setDiagnostics] = useState<AppDiagnosticsSnapshot | null>(null);
   const isMountedRef = useRef(true);
 
@@ -107,6 +109,14 @@ export const TopContextBar = ({ onOpenSearch }: TopContextBarProps) => {
         </button>
         <NotificationsButton />
         <HelpMenu />
+        <span
+          aria-label={isOnline ? t("shell.topBar.online") : t("shell.topBar.offlineTooltip")}
+          className={`icon-ghost-control connectivity-indicator ${isOnline ? "is-online" : "is-offline"}`}
+          data-tooltip={isOnline ? t("shell.topBar.online") : t("shell.topBar.offlineTooltip")}
+          role="status"
+        >
+          {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
+        </span>
         <button
           aria-label={syncState.label}
           className={`icon-ghost-control sync-control ${syncState.className}`}

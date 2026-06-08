@@ -53,7 +53,10 @@
       "syncFailed": "Sync needs attention",
       "syncFailedWithCount": "Sync needs attention · {{count}} failed",
       "syncing": "Syncing · {{count}} queued",
-      "upToDate": "Up to date"
+      "upToDate": "Up to date",
+      "online": "Online",
+      "offline": "Offline",
+      "offlineTooltip": "Offline · working with local data"
     },
     "userMenu": {
       "closeMenu": "Close user menu",

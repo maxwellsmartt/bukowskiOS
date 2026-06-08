@@ -3005,6 +3005,26 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   justify-content: space-between;
 }
 
+/* Same icon-button footprint as the bell/help/sync controls — only the glyph
+   colour changes with state, so going offline never shifts the layout. */
+.connectivity-indicator {
+  cursor: default;
+}
+
+.connectivity-indicator.is-online {
+  color: color-mix(in srgb, var(--status-success-fg) 78%, var(--text-muted));
+}
+
+.connectivity-indicator.is-offline {
+  color: var(--status-warning-fg);
+}
+
+/* The status glyph isn't interactive, so don't give it the hover affordance. */
+.connectivity-indicator:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
 .sync-control {
   position: relative;
   color: var(--text-primary);
