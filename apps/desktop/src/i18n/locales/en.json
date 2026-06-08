@@ -651,6 +651,7 @@
         "location": "Location",
         "qty": "Qty",
         "serial": "Serial",
+        "condition": "Condition",
         "purchase": "Purchase",
         "additionalCosts": "Add. costs",
         "current": "Current"
@@ -773,6 +774,7 @@
     },
     "condition": {
       "good": "Good",
+      "review": "Review",
       "fair": "Fair",
       "poor": "Poor",
       "damaged": "Damaged",

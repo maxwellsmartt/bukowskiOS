@@ -4250,24 +4250,48 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .asset-import-review-table {
   display: grid;
   gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
+  max-height: 46vh;
+  overflow: auto;
+  padding: 0 2px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  scrollbar-width: thin;
 }
 
 .asset-import-review-row {
   display: grid;
-  grid-template-columns: 42px 92px minmax(190px, 1.6fr) minmax(96px, 0.75fr) minmax(150px, 1fr) minmax(150px, 1fr) 72px 120px 96px 96px 96px;
-  gap: 6px;
+  grid-template-columns: 42px 92px minmax(190px, 1.7fr) minmax(96px, 0.8fr) minmax(150px, 1fr) minmax(150px, 1fr) 72px 130px minmax(112px, 0.8fr);
+  gap: 8px;
   align-items: center;
-  min-width: 1280px;
+  min-width: 1040px;
+}
+
+.asset-import-review-condition {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .asset-import-review-row.is-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 8px 0 7px;
+  background: rgba(11, 15, 19, 0.985);
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.asset-import-review-row:not(.is-header) {
+  padding: 2px 0;
+  border-radius: 9px;
+}
+
+.asset-import-review-row:not(.is-header):hover {
+  background: rgba(255, 255, 255, 0.022);
 }
 
 .asset-import-review-row-number {
@@ -4305,7 +4329,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .asset-import-review-row-note {
-  min-width: 1280px;
+  min-width: 1040px;
   margin-top: -2px;
   padding: 7px 10px;
   border: 1px solid rgba(255, 219, 132, 0.14);
@@ -4316,7 +4340,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .asset-import-review-notes {
-  min-width: 1280px;
+  min-width: 1040px;
   min-height: 48px;
   resize: vertical;
   padding: 9px 10px;

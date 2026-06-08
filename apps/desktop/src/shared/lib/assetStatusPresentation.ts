@@ -26,6 +26,8 @@ export const presentAssetCondition = (condition: string, t: TFunction): { label:
   switch (condition) {
     case "Good":
       return { label: t("assets.condition.good"), tone: "success" };
+    case "Review":
+      return { label: t("assets.condition.review"), tone: "warning" };
     case "Fair":
       return { label: t("assets.condition.fair"), tone: "warning" };
     case "Poor":

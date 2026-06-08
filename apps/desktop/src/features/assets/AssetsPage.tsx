@@ -1420,19 +1420,6 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     });
   };
 
-  const handleCsvOptionalMoneyEdit =
-    (
-      importRowNumber: number,
-      field: keyof Pick<AssetCsvDraft, "purchasePrice" | "additionalCosts" | "currentBookValue">,
-    ) =>
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const rawValue = event.target.value.trim();
-      const parsedValue = Number(rawValue);
-      updateCsvDraft(importRowNumber, {
-        [field]: rawValue && Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : undefined,
-      } as Partial<AssetCsvDraft>);
-    };
-
   const handleCsvNotesEdit = (importRowNumber: number) => (event: ChangeEvent<HTMLTextAreaElement>) => {
     updateCsvDraft(importRowNumber, { notes: event.target.value });
   };
@@ -1865,9 +1852,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                       <span>{t("assets.csv.reviewColumns.location")}</span>
                       <span>{t("assets.csv.reviewColumns.qty")}</span>
                       <span>{t("assets.csv.reviewColumns.serial")}</span>
-                      <span>{t("assets.csv.reviewColumns.purchase")}</span>
-                      <span>{t("assets.csv.reviewColumns.additionalCosts")}</span>
-                      <span>{t("assets.csv.reviewColumns.current")}</span>
+                      <span>{t("assets.csv.reviewColumns.condition")}</span>
                     </div>
                     {csvReviewDrafts.map((draft) => (
                       <Fragment key={draft.importRowNumber}>
@@ -1939,30 +1924,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                             onChange={handleCsvTextEdit(draft.importRowNumber, "serialNumber")}
                             value={draft.serialNumber}
                           />
-                          <input
-                            aria-label={t("assets.csv.aria.purchasePrice", { row: draft.importRowNumber })}
-                            className="asset-import-review-input asset-import-review-quantity"
-                            min={0}
-                            onChange={handleCsvOptionalMoneyEdit(draft.importRowNumber, "purchasePrice")}
-                            type="number"
-                            value={draft.purchasePrice ?? ""}
-                          />
-                          <input
-                            aria-label={t("assets.csv.aria.additionalCosts", { row: draft.importRowNumber })}
-                            className="asset-import-review-input asset-import-review-quantity"
-                            min={0}
-                            onChange={handleCsvOptionalMoneyEdit(draft.importRowNumber, "additionalCosts")}
-                            type="number"
-                            value={draft.additionalCosts ?? ""}
-                          />
-                          <input
-                            aria-label={t("assets.csv.aria.currentValue", { row: draft.importRowNumber })}
-                            className="asset-import-review-input asset-import-review-quantity"
-                            min={0}
-                            onChange={handleCsvOptionalMoneyEdit(draft.importRowNumber, "currentBookValue")}
-                            type="number"
-                            value={draft.currentBookValue ?? ""}
-                          />
+                          <span className="asset-import-review-condition">
+                            <StatusBadge tone={presentAssetCondition(draft.conditionStatus, t).tone}>
+                              {presentAssetCondition(draft.conditionStatus, t).label}
+                            </StatusBadge>
+                          </span>
                         </div>
                         <textarea
                           aria-label={t("assets.csv.aria.notes", { row: draft.importRowNumber })}

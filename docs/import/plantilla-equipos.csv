@@ -1,0 +1,3 @@
+name,code,category,brand,model,serial,condition,quantity,ownership,location,warehouse,qr,description,notes,purchasePrice,replacementValue,currentBookValue
+"SMALLHD CINE 24""",1007,MON,SMALLHD,"CINE 24""",24DS221670029,Good,1,owned,Almacén principal,Estante A-3,QR-1007,Monitor de referencia 24 pulgadas,Estado (DLC): Activo; monitor con montura INNOVATIV,4500,5200,3800
+GOBO NEGRO,1502,GRIP,Matthews,Gobo Head Negro,,Good,5,owned,Almacén principal,Estante G-1,,Cabezal gobo negro estándar,Grupo de 5 unidades idénticas,35,45,
