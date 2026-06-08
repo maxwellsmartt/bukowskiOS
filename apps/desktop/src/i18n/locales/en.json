@@ -235,9 +235,48 @@
         "insuredValue": "Insured value",
         "primaryCode": "Primary code"
       },
+      "actions": {
+        "editAsset": "Edit asset",
+        "reportIncident": "Report incident"
+      },
+      "catalogUnavailable": "Incident catalog unavailable: {{message}}",
+      "noFiles": "No files attached.",
+      "images": {
+        "title": "Asset images",
+        "add": "Add images",
+        "adding": "Adding…",
+        "max": "2 images max",
+        "remove": "Remove image",
+        "removeAria": "Remove {{name}}",
+        "openInFinder": "Open in Finder",
+        "previewUnavailable": "Preview unavailable",
+        "empty": "Add up to 2 JPEG or PNG images to make this asset easier to identify.",
+        "removeTitle": "Remove \"{{name}}\"?",
+        "removeBody": "This image will be removed from the asset. This can't be undone.",
+        "removeConfirm": "Remove image",
+        "removeCancel": "Keep image"
+      },
       "toasts": {
         "filesUpdated": "Files updated",
-        "unableRemoveImage": "Unable to remove that asset image."
+        "unableRemoveImage": "Unable to remove that asset image.",
+        "unableAddImages": "Unable to add images to this asset.",
+        "unableOpenImage": "Unable to open that asset image.",
+        "unableOpenFile": "Unable to open that asset file.",
+        "unableAttachFiles": "Unable to attach files to this asset.",
+        "unableArchive": "Unable to archive asset.",
+        "unableSaveChanges": "Unable to save asset changes.",
+        "unableCreateIncident": "Unable to create incident.",
+        "assetSaved": "Asset saved",
+        "incidentReported": "Incident reported"
+      },
+      "summary": {
+        "assetCode": "Asset code",
+        "currentLocation": "Current location",
+        "stock": "Stock",
+        "project": "Project",
+        "responsible": "Responsible",
+        "condition": "Condition",
+        "lifecycleTooltip": "Lifecycle: Active means in service, Maintenance means under repair, Retired means out of rotation. For day-to-day work look at Availability below."
       }
     },
     "inKit": "In kit {{codes}}",

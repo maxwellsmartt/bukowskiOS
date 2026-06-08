@@ -1,5 +1,5 @@
-import { Trash2 } from "lucide-react";
-import { useState } from "react";
+import { FolderOpen, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useSearchParams } from "react-router-dom";
 
@@ -86,8 +86,37 @@ export const AssetDetailPage = () => {
   const [openingFileId, setOpeningFileId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
   const [pendingImageDelete, setPendingImageDelete] = useState<{ id: string; name: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; name: string; fileId: string } | null>(null);
   const [isSubmittingEditor, setIsSubmittingEditor] = useState(false);
   const [isArchivingAsset, setIsArchivingAsset] = useState(false);
+
+  const openInFinder = (fileId: string) => {
+    setFilesError(null);
+    void (async () => {
+      try {
+        setOpeningFileId(fileId);
+        await openAssetFile(fileId);
+      } catch (nextError) {
+        setFilesError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableOpenImage")));
+        await reload();
+      } finally {
+        setOpeningFileId(null);
+      }
+    })();
+  };
+
+  useEffect(() => {
+    if (!lightbox) {
+      return undefined;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setLightbox(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox]);
 
   const handleConfirmImageDelete = async () => {
     if (!pendingImageDelete) {
@@ -130,35 +159,31 @@ export const AssetDetailPage = () => {
     <div className="page-stack">
       <div className="entity-detail-action-bar">
         <button
-          className="ghost-control"
+          className="ghost-control action-row-button"
           onClick={() => {
             setEditorOpen(true);
             setEditorError(null);
-
           }}
           type="button"
         >
-          Edit asset
+          {t("assets.detail.actions.editAsset")}
         </button>
         <button
-          className="action-primary-button"
+          className="action-primary-button action-row-button"
           onClick={() => {
             setReportOpen(true);
             setReportError(null);
-
           }}
           type="button"
         >
-          Report incident
+          {t("assets.detail.actions.reportIncident")}
         </button>
       </div>
 
       <SurfaceCard
         title={data.asset.name}
         aside={
-          <span
-            data-tooltip="Lifecycle: Active means in service, Maintenance means under repair, Retired means out of rotation. For day-to-day work look at Availability below."
-          >
+          <span data-tooltip={t("assets.detail.summary.lifecycleTooltip")}>
             <StatusBadge tone={data.asset.status === "Maintenance" ? "warning" : data.asset.status === "Retired" ? "critical" : "info"}>
               {data.asset.status}
             </StatusBadge>
@@ -167,27 +192,27 @@ export const AssetDetailPage = () => {
       >
         <div className="summary-grid">
           <div className="summary-row">
-            <span className="summary-label">Asset code</span>
+            <span className="summary-label">{t("assets.detail.summary.assetCode")}</span>
             <span className="summary-value">{data.asset.code}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Current location</span>
+            <span className="summary-label">{t("assets.detail.summary.currentLocation")}</span>
             <span className="summary-value">{data.asset.location}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Stock</span>
+            <span className="summary-label">{t("assets.detail.summary.stock")}</span>
             <span className="summary-value">{stockSummary}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Project</span>
+            <span className="summary-label">{t("assets.detail.summary.project")}</span>
             <span className="summary-value">{data.asset.project}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Responsible</span>
+            <span className="summary-label">{t("assets.detail.summary.responsible")}</span>
             <span className="summary-value">{data.asset.responsible}</span>
           </div>
           <div className="summary-row">
-            <span className="summary-label">Condition</span>
+            <span className="summary-label">{t("assets.detail.summary.condition")}</span>
             <span className="summary-value">{data.asset.condition}</span>
           </div>
         </div>
@@ -218,17 +243,17 @@ export const AssetDetailPage = () => {
         </div>
       </SurfaceCard>
 
-      {catalogError ? <div className="empty-state">Incident catalog unavailable: {catalogError}</div> : null}
+      {catalogError ? <div className="empty-state">{t("assets.detail.catalogUnavailable", { message: catalogError })}</div> : null}
       {filesError ? <div className="action-feedback action-feedback-error">{filesError}</div> : null}
       <SurfaceCard
-        title="Asset images"
+        title={t("assets.detail.images.title")}
         aside={
           <button
             className="surface-card-action-text"
             disabled={isUploadingImages || remainingImageSlots <= 0}
             onClick={() => {
               setFilesError(null);
-              
+
               void (async () => {
                 try {
                   setIsUploadingImages(true);
@@ -236,9 +261,9 @@ export const AssetDetailPage = () => {
                   if (result.uploadedCount > 0) {
                     await reload();
                   }
-                  toast.success("Files updated", result.summary);
+                  toast.success(t("assets.detail.toasts.filesUpdated"), result.summary);
                 } catch (nextError) {
-                  setFilesError(getUserFacingErrorMessage(nextError, "Unable to add images to this asset."));
+                  setFilesError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableAddImages")));
                 } finally {
                   setIsUploadingImages(false);
                 }
@@ -246,7 +271,11 @@ export const AssetDetailPage = () => {
             }}
             type="button"
           >
-            {isUploadingImages ? "Adding..." : remainingImageSlots <= 0 ? "2 images max" : "Add images"}
+            {isUploadingImages
+              ? t("assets.detail.images.adding")
+              : remainingImageSlots <= 0
+                ? t("assets.detail.images.max")
+                : t("assets.detail.images.add")}
           </button>
         }
       >
@@ -259,35 +288,30 @@ export const AssetDetailPage = () => {
               >
                 <button
                   className="asset-image-open"
-                  disabled={openingFileId === file.id || deletingFileId === file.id}
+                  disabled={deletingFileId === file.id}
                   onClick={() => {
-                    setFilesError(null);
-                    void (async () => {
-                      try {
-                        setOpeningFileId(file.id);
-                        await openAssetFile(file.id);
-                      } catch (nextError) {
-                        setFilesError(getUserFacingErrorMessage(nextError, "Unable to open that asset image."));
-                        await reload();
-                      } finally {
-                        setOpeningFileId(null);
-                      }
-                    })();
+                    if (file.previewDataUrl) {
+                      setLightbox({ src: file.previewDataUrl, name: file.originalName, fileId: file.id });
+                    } else {
+                      openInFinder(file.id);
+                    }
                   }}
                   type="button"
                 >
                   {file.previewDataUrl ? (
                     <img alt={file.originalName} className="asset-image-preview" src={file.previewDataUrl} />
                   ) : (
-                    <span className="asset-image-preview asset-image-preview-placeholder">Preview unavailable</span>
+                    <span className="asset-image-preview asset-image-preview-placeholder">
+                      {t("assets.detail.images.previewUnavailable")}
+                    </span>
                   )}
                 </button>
                 <div className="asset-image-meta-row">
                   <span className="asset-image-caption">{file.originalName}</span>
                   <button
-                    aria-label={`Remove ${file.originalName}`}
+                    aria-label={t("assets.detail.images.removeAria", { name: file.originalName })}
                     className="asset-image-remove"
-                    data-tooltip="Remove image"
+                    data-tooltip={t("assets.detail.images.remove")}
                     disabled={deletingFileId === file.id}
                     onClick={() => setPendingImageDelete({ id: file.id, name: file.originalName })}
                     type="button"
@@ -300,7 +324,7 @@ export const AssetDetailPage = () => {
           </div>
         ) : (
           <div className="asset-image-empty">
-            Add up to 2 JPEG or PNG images to make this asset easier to identify.
+            {t("assets.detail.images.empty")}
           </div>
         )}
       </SurfaceCard>
@@ -328,9 +352,9 @@ export const AssetDetailPage = () => {
               await Promise.all([reload(), refreshProjects()]);
               setEditorOpen(false);
               setEditorError(null);
-              toast.success("Asset saved", result.summary);
+              toast.success(t("assets.detail.toasts.assetSaved"), result.summary);
             } catch (nextError) {
-              setEditorError(getUserFacingErrorMessage(nextError, "Unable to archive asset."));
+              setEditorError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableArchive")));
             } finally {
               setIsArchivingAsset(false);
             }
@@ -355,9 +379,9 @@ export const AssetDetailPage = () => {
               await Promise.all([reload(), refreshProjects()]);
               setEditorOpen(false);
               setEditorError(null);
-              toast.success("Asset saved", result.summary);
+              toast.success(t("assets.detail.toasts.assetSaved"), result.summary);
             } catch (nextError) {
-              setEditorError(getUserFacingErrorMessage(nextError, "Unable to save asset changes."));
+              setEditorError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableSaveChanges")));
             } finally {
               setIsSubmittingEditor(false);
             }
@@ -410,9 +434,9 @@ export const AssetDetailPage = () => {
               await Promise.all([reload(), refreshProjects()]);
               setReportOpen(false);
               setReportError(null);
-              toast.success("Incident reported", result.summary);
+              toast.success(t("assets.detail.toasts.incidentReported"), result.summary);
             } catch (nextError) {
-              setReportError(getUserFacingErrorMessage(nextError, "Unable to create incident."));
+              setReportError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableCreateIncident")));
             } finally {
               setIsSubmitting(false);
             }
@@ -568,9 +592,9 @@ export const AssetDetailPage = () => {
                       if (result.uploadedCount > 0) {
                         await reload();
                       }
-                      toast.success("Files updated", result.summary);
+                      toast.success(t("assets.detail.toasts.filesUpdated"), result.summary);
                     } catch (nextError) {
-                      setFilesError(getUserFacingErrorMessage(nextError, "Unable to attach files to this asset."));
+                      setFilesError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableAttachFiles")));
                     } finally {
                       setIsUploadingFiles(false);
                     }
@@ -640,7 +664,7 @@ export const AssetDetailPage = () => {
                                   setOpeningFileId(file.id);
                                   await openAssetFile(file.id);
                                 } catch (nextError) {
-                                  setFilesError(getUserFacingErrorMessage(nextError, "Unable to open that asset file."));
+                                  setFilesError(getUserFacingErrorMessage(nextError, t("assets.detail.toasts.unableOpenFile")));
                                   await reload();
                                 } finally {
                                   setOpeningFileId(null);
@@ -656,7 +680,7 @@ export const AssetDetailPage = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="empty-state">No files attached.</div>
+                  <div className="empty-state">{t("assets.detail.noFiles")}</div>
                 )}
               </section>
             </div>
@@ -668,14 +692,50 @@ export const AssetDetailPage = () => {
         <ConfirmDialog
           isOpen
           tone="danger"
-          title={`Remove "${pendingImageDelete.name}"?`}
-          body="This image will be removed from the asset. Action cannot be undone."
-          confirmLabel="Remove image"
-          cancelLabel="Keep image"
+          title={t("assets.detail.images.removeTitle", { name: pendingImageDelete.name })}
+          body={t("assets.detail.images.removeBody")}
+          confirmLabel={t("assets.detail.images.removeConfirm")}
+          cancelLabel={t("assets.detail.images.removeCancel")}
           isSubmitting={deletingFileId === pendingImageDelete.id}
           onConfirm={handleConfirmImageDelete}
           onCancel={() => setPendingImageDelete(null)}
         />
+      ) : null}
+
+      {lightbox ? (
+        <div
+          className="asset-lightbox-overlay"
+          onClick={() => setLightbox(null)}
+          role="presentation"
+        >
+          <div className="asset-lightbox" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={lightbox.name}>
+            <div className="asset-lightbox-header">
+              <span className="asset-lightbox-title">{lightbox.name}</span>
+              <div className="asset-lightbox-actions">
+                <button
+                  className="ghost-control action-row-button"
+                  disabled={openingFileId === lightbox.fileId}
+                  onClick={() => openInFinder(lightbox.fileId)}
+                  type="button"
+                >
+                  <FolderOpen size={14} />
+                  <span>{t("assets.detail.images.openInFinder")}</span>
+                </button>
+                <button
+                  aria-label={t("common.close")}
+                  className="icon-ghost-control"
+                  onClick={() => setLightbox(null)}
+                  type="button"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="asset-lightbox-body">
+              <img alt={lightbox.name} src={lightbox.src} />
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

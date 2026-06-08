@@ -235,9 +235,48 @@
         "insuredValue": "Valor asegurado",
         "primaryCode": "Código principal"
       },
+      "actions": {
+        "editAsset": "Editar equipo",
+        "reportIncident": "Reportar incidencia"
+      },
+      "catalogUnavailable": "Catálogo de incidentes no disponible: {{message}}",
+      "noFiles": "No hay archivos adjuntos.",
+      "images": {
+        "title": "Imágenes del equipo",
+        "add": "Agregar imágenes",
+        "adding": "Agregando…",
+        "max": "Máx. 2 imágenes",
+        "remove": "Eliminar imagen",
+        "removeAria": "Eliminar {{name}}",
+        "openInFinder": "Abrir en Finder",
+        "previewUnavailable": "Vista previa no disponible",
+        "empty": "Agrega hasta 2 imágenes JPEG o PNG para identificar este equipo más fácil.",
+        "removeTitle": "¿Eliminar \"{{name}}\"?",
+        "removeBody": "Esta imagen se quitará del equipo. No se puede deshacer.",
+        "removeConfirm": "Eliminar imagen",
+        "removeCancel": "Conservar imagen"
+      },
       "toasts": {
         "filesUpdated": "Archivos actualizados",
-        "unableRemoveImage": "No se pudo eliminar esa imagen del equipo."
+        "unableRemoveImage": "No se pudo eliminar esa imagen del equipo.",
+        "unableAddImages": "No se pudieron agregar imágenes a este equipo.",
+        "unableOpenImage": "No se pudo abrir esa imagen del equipo.",
+        "unableOpenFile": "No se pudo abrir ese archivo del equipo.",
+        "unableAttachFiles": "No se pudieron adjuntar archivos a este equipo.",
+        "unableArchive": "No se pudo archivar el equipo.",
+        "unableSaveChanges": "No se pudieron guardar los cambios del equipo.",
+        "unableCreateIncident": "No se pudo crear la incidencia.",
+        "assetSaved": "Equipo guardado",
+        "incidentReported": "Incidencia reportada"
+      },
+      "summary": {
+        "assetCode": "Código de equipo",
+        "currentLocation": "Ubicación actual",
+        "stock": "Stock",
+        "project": "Proyecto",
+        "responsible": "Responsable",
+        "condition": "Condición",
+        "lifecycleTooltip": "Ciclo de vida: Activo = en servicio, Mantenimiento = en reparación, Retirado = fuera de rotación. Para el día a día mira Disponibilidad más abajo."
       }
     },
     "inKit": "En kit {{codes}}",
