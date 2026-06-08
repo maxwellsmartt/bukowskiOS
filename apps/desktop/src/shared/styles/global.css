@@ -3173,6 +3173,17 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   overflow: hidden;
 }
 
+/* The asset DETAIL page is a tall vertical stack, not a self-scrolling table, so
+   it needs to scroll itself inside the clipped assets container (otherwise the
+   bottom of the page is unreachable). */
+.shell-content-assets > .entity-detail-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  padding-bottom: clamp(14px, 1.2vw, 28px);
+}
+
 .shell-content-licenses {
   overflow-x: hidden;
   overflow-y: auto;
@@ -7569,33 +7580,34 @@ body.is-resizing-side-rail {
 
 .scannable-preview-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 220px));
+  gap: 10px;
+  justify-content: start;
 }
 
 .scannable-preview-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   justify-content: center;
-  min-height: 170px;
-  padding: 14px;
-  border-radius: 14px;
+  min-height: 0;
+  padding: 12px;
+  border-radius: 12px;
   background: rgba(0, 0, 0, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .scannable-preview-image {
-  width: min(100%, 172px);
+  width: min(100%, 112px);
   height: auto;
-  border-radius: 10px;
+  border-radius: 8px;
   image-rendering: pixelated;
 }
 
 .scannable-preview-barcode {
   width: 100%;
-  max-width: 220px;
+  max-width: 180px;
   height: auto;
   image-rendering: pixelated;
 }

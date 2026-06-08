@@ -157,7 +157,7 @@ export const AssetDetailPage = () => {
   const remainingImageSlots = Math.max(0, 2 - assetImages.length);
 
   return (
-    <div className="page-stack">
+    <div className="page-stack is-dense entity-detail-scroll">
       <div className="entity-detail-action-bar">
         <button
           className="ghost-control action-row-button"
