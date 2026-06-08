@@ -547,6 +547,226 @@ describe("treasury mutation service", () => {
     cleanup();
   });
 
+  it("validates payment instruments and never persists full account numbers", () => {
+    const { cleanup, database } = createTestDatabase("treasury-payment-instrument-validation");
+    const mutations = createTreasuryMutationService(database);
+
+    expect(() =>
+      mutations.upsertBankAccount(
+        account("cmd-card-invalid", {
+          accountLabel: "Visa personal",
+          accountNumberFull: "4111111111111234",
+          instrumentKind: "credit_card",
+          owner: "user",
+          ownerUserId: "user-ops",
+          currency: "DOP",
+        }),
+      ),
+    ).toThrow("Active credit cards require statement cycle and payment due days.");
+
+    mutations.upsertBankAccount(
+      account("cmd-card-valid", {
+        accountLabel: "Visa personal",
+        accountNumberFull: "4111111111111234",
+        instrumentKind: "credit_card",
+        owner: "user",
+        ownerUserId: "user-ops",
+        statementCycleDay: 15,
+        paymentDueDay: 30,
+        currency: "DOP",
+      }),
+    );
+
+    const stored = database
+      .prepare(`SELECT account_number_full, account_number_masked, last4, instrument_kind, owner_user_id FROM bank_accounts WHERE id = ?`)
+      .get("bank-account-cmd-card-valid") as {
+      account_number_full: string | null;
+      account_number_masked: string | null;
+      last4: string | null;
+      instrument_kind: string;
+      owner_user_id: string;
+    };
+    expect(stored.account_number_full).toBeNull();
+    expect(stored.account_number_masked).toBe("****1234");
+    expect(stored.last4).toBe("1234");
+    expect(stored.instrument_kind).toBe("credit_card");
+    expect(stored.owner_user_id).toBe("user-ops");
+
+    cleanup();
+  });
+
+  it("assigns pending invoice allocations and links them to transactions without exceeding invoice totals", () => {
+    const { cleanup, database } = createTestDatabase("treasury-invoice-allocation-flow");
+    const mutations = createTreasuryMutationService(database);
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS invoice_extractions (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        batch_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        original_name TEXT NOT NULL,
+        storage_path TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        byte_size INTEGER NOT NULL DEFAULT 0,
+        total REAL,
+        currency TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+
+    mutations.upsertBankAccount(
+      account("cmd-card-allocation", {
+        accountLabel: "Visa Carlos",
+        accountNumberFull: "4111111111119876",
+        instrumentKind: "credit_card",
+        owner: "user",
+        ownerUserId: "user-ops",
+        statementCycleDay: 10,
+        paymentDueDay: 25,
+      }),
+    );
+
+    database
+      .prepare(
+        `INSERT INTO invoice_extractions (
+           id, workspace_id, batch_id, status, original_name, storage_path, mime_type,
+           byte_size, total, currency, created_at, updated_at
+         ) VALUES (?, ?, ?, 'extracted', ?, ?, 'application/pdf', 100, ?, 'DOP', ?, ?)`,
+      )
+      .run(
+        "invoice-extraction-allocation-001",
+        workspaceId,
+        "batch-allocation",
+        "factura.pdf",
+        "/tmp/factura.pdf",
+        1000,
+        "2026-06-08T10:00:00.000Z",
+        "2026-06-08T10:00:00.000Z",
+      );
+
+    const allocation = mutations.assignInvoiceAllocation({
+      commandId: "cmd-allocation-assign",
+      workspaceId,
+      ...baseChannel,
+      paymentInstrumentId: "bank-account-cmd-card-allocation",
+      linkedEntityType: "invoice_extraction",
+      linkedEntityId: "invoice-extraction-allocation-001",
+      amountApplied: 700,
+      amountCurrency: "DOP",
+      cycleStart: "2026-06-01",
+      cycleEnd: "2026-06-30",
+    });
+    const repeated = mutations.assignInvoiceAllocation({
+      commandId: "cmd-allocation-assign",
+      workspaceId,
+      ...baseChannel,
+      paymentInstrumentId: "bank-account-cmd-card-allocation",
+      linkedEntityType: "invoice_extraction",
+      linkedEntityId: "invoice-extraction-allocation-001",
+      amountApplied: 700,
+      amountCurrency: "DOP",
+    });
+    expect(allocation.allocationId).toBe("txn-link-cmd-allocation-assign");
+    expect(repeated.repeated).toBe(true);
+
+    expect(() =>
+      mutations.assignInvoiceAllocation({
+        commandId: "cmd-allocation-too-much",
+        workspaceId,
+        ...baseChannel,
+        paymentInstrumentId: "bank-account-cmd-card-allocation",
+        linkedEntityType: "invoice_extraction",
+        linkedEntityId: "invoice-extraction-allocation-001",
+        amountApplied: 400,
+        amountCurrency: "DOP",
+      }),
+    ).toThrow("Invoice allocations cannot exceed the linked document total.");
+
+    mutations.importStatement({
+      commandId: "cmd-import-allocation-link",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-card-allocation",
+      sourceFormat: "manual",
+      rows: [{ txnDate: "2026-06-09", rawDescription: "COMPRA FACTURA", amount: 700, direction: "debit" }],
+    });
+    const txn = database.prepare(`SELECT id FROM bank_transactions WHERE raw_description = ?`).get("COMPRA FACTURA") as {
+      id: string;
+    };
+    const linked = mutations.linkInvoiceAllocationToTransaction({
+      commandId: "cmd-allocation-link",
+      workspaceId,
+      ...baseChannel,
+      allocationId: allocation.allocationId,
+      transactionId: txn.id,
+    });
+    expect(linked.transactionId).toBe(txn.id);
+
+    const row = database
+      .prepare(`SELECT transaction_id, allocation_status FROM transaction_links WHERE id = ?`)
+      .get(allocation.allocationId) as { transaction_id: string; allocation_status: string };
+    expect(row.transaction_id).toBe(txn.id);
+    expect(row.allocation_status).toBe("matched");
+
+    cleanup();
+  });
+
+  it("creates card settlements as internal transfers and can close cycle allocations", () => {
+    const { cleanup, database } = createTestDatabase("treasury-card-settlement");
+    const mutations = createTreasuryMutationService(database);
+
+    mutations.upsertBankAccount(
+      account("cmd-card-settlement", {
+        accountLabel: "Visa settlement",
+        accountNumberFull: "4111111111114321",
+        instrumentKind: "credit_card",
+        owner: "user",
+        ownerUserId: "user-ops",
+        statementCycleDay: 15,
+        paymentDueDay: 30,
+      }),
+    );
+    mutations.importStatement({
+      commandId: "cmd-import-card-settlement",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-card-settlement",
+      sourceFormat: "manual",
+      rows: [{ txnDate: "2026-06-30", rawDescription: "PAGO TARJETA", amount: 1200, direction: "debit" }],
+    });
+    const txn = database.prepare(`SELECT id FROM bank_transactions WHERE raw_description = ?`).get("PAGO TARJETA") as {
+      id: string;
+    };
+    const result = mutations.createCardSettlement({
+      commandId: "cmd-card-settlement-create",
+      workspaceId,
+      ...baseChannel,
+      paymentInstrumentId: "bank-account-cmd-card-settlement",
+      transactionId: txn.id,
+      cycleStart: "2026-06-01",
+      cycleEnd: "2026-06-30",
+      closeAllocations: true,
+    });
+    expect(result.transactionId).toBe(txn.id);
+
+    const annotation = database
+      .prepare(`SELECT txn_kind, is_internal_transfer FROM transaction_annotations WHERE transaction_id = ?`)
+      .get(txn.id) as { txn_kind: string; is_internal_transfer: number };
+    expect(annotation).toEqual({ txn_kind: "transfer", is_internal_transfer: 1 });
+
+    const link = database
+      .prepare(`SELECT linked_entity_type, linked_entity_id, allocation_status FROM transaction_links WHERE id = ?`)
+      .get(result.allocationId) as { linked_entity_type: string; linked_entity_id: string; allocation_status: string };
+    expect(link).toEqual({
+      linked_entity_type: "card_settlement",
+      linked_entity_id: "bank-account-cmd-card-settlement",
+      allocation_status: "matched",
+    });
+
+    cleanup();
+  });
+
   it("builds a deductible ledger with fiscal totals and exportable files", () => {
     const { cleanup, database } = createTestDatabase("treasury-deductible-ledger");
     const mutations = createTreasuryMutationService(database);

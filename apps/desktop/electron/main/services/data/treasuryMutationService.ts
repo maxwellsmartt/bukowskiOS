@@ -7,18 +7,27 @@ import type {
   ApplyCounterpartyRuleCommand,
   ApplyCounterpartyRuleResult,
   BankAccountMutationResult,
+  CreateCardSettlementCommand,
   CorrectTransactionCommand,
+  DeactivatePaymentInstrumentCommand,
   DeleteImportCommand,
   ImportStatementCommand,
   ImportStatementResult,
+  InvoiceAllocationMutationResult,
+  LinkInvoiceAllocationToTransactionCommand,
   LinkTransactionCommand,
+  AssignInvoiceAllocationCommand,
+  MarkInvoiceAllocationReimbursedCommand,
   ParsedBankTransaction,
+  RejectInvoiceAllocationCommand,
   ReviewReimbursementCommand,
   SetAllocationsCommand,
   TransactionKind,
   TransactionMutationResult,
+  UnlinkInvoiceAllocationCommand,
   UndoTreasuryActionCommand,
   UpsertBankAccountCommand,
+  UpsertPaymentInstrumentCommand,
 } from "@contracts";
 
 const defaultActorUserId = "user-ops";
@@ -27,6 +36,26 @@ const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 1
 const extractLast4 = (value: string | null | undefined) => {
   const digits = (value ?? "").replace(/\D/g, "");
   return digits.length >= 4 ? digits.slice(-4) : null;
+};
+
+const normalizeCurrency = (value: string) => value.trim().toUpperCase();
+
+const ensureCreditCardDays = (input: {
+  instrumentKind?: string;
+  isActive?: boolean;
+  statementCycleDay?: number | null;
+  paymentDueDay?: number | null;
+}) => {
+  if (input.instrumentKind !== "credit_card" || input.isActive === false) return;
+  if (!input.statementCycleDay || !input.paymentDueDay) {
+    throw new Error("Active credit cards require statement cycle and payment due days.");
+  }
+};
+
+const validatePaymentInstrumentOwner = (input: { owner?: string; ownerUserId?: string | null }) => {
+  if (input.owner === "user" && !input.ownerUserId?.trim()) {
+    throw new Error("User-owned payment instruments require an owner user.");
+  }
 };
 
 const buildFailedCommandMessage = (label: string, previousError?: string | null) =>
@@ -292,6 +321,191 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
     );
   };
 
+  const updateInvoiceAllocationStatus = (
+    input: UnlinkInvoiceAllocationCommand | RejectInvoiceAllocationCommand | MarkInvoiceAllocationReimbursedCommand,
+    options: {
+      status: "pending" | "rejected" | "reimbursed";
+      transactionId?: string | null;
+      summary: string;
+      failedLabel: string;
+    },
+  ): InvoiceAllocationMutationResult => {
+    const existing = receiptHelpers.getExistingReceipt(input.commandId);
+    if (existing?.outcome_status === "success") {
+      const allocation = loadAllocation(db, input.workspaceId, input.allocationId);
+      return {
+        commandId: input.commandId,
+        allocationId: input.allocationId,
+        transactionId: allocation.transaction_id,
+        repeated: true,
+        summary: options.summary,
+      };
+    }
+    if (existing?.outcome_status === "failed") {
+      throw new Error(buildFailedCommandMessage(options.failedLabel, existing.error_message));
+    }
+
+    const now = new Date().toISOString();
+    db.exec("BEGIN");
+    try {
+      loadAllocation(db, input.workspaceId, input.allocationId);
+      db.prepare(
+        `UPDATE transaction_links
+         SET transaction_id = COALESCE(?, transaction_id),
+             allocation_status = ?,
+             notes = COALESCE(?, notes),
+             updated_at = ?
+         WHERE workspace_id = ? AND id = ?`,
+      ).run(
+        options.transactionId === null ? null : options.transactionId ?? null,
+        options.status,
+        input.notes?.trim() || null,
+        now,
+        input.workspaceId,
+        input.allocationId,
+      );
+      if (options.transactionId === null) {
+        db.prepare(`UPDATE transaction_links SET transaction_id = NULL WHERE workspace_id = ? AND id = ?`).run(
+          input.workspaceId,
+          input.allocationId,
+        );
+      }
+      enqueueOutbox(
+        db,
+        input.workspaceId,
+        "transaction_link",
+        input.allocationId,
+        { allocationStatus: options.status },
+        `sync-${input.commandId}`,
+        now,
+      );
+      recordReceipt(input, now, "success", null);
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      recordReceipt(input, now, "failed", error instanceof Error ? error.message : "Allocation status failed.");
+      throw error;
+    }
+    const allocation = loadAllocation(db, input.workspaceId, input.allocationId);
+    return {
+      commandId: input.commandId,
+      allocationId: input.allocationId,
+      transactionId: allocation.transaction_id,
+      repeated: false,
+      summary: options.summary,
+    };
+  };
+
+const loadPaymentInstrument = (db: DatabaseSync, workspaceId: string, paymentInstrumentId: string) => {
+  const row = db
+    .prepare(
+      `SELECT id, currency, is_active, instrument_kind
+       FROM bank_accounts
+       WHERE workspace_id = ? AND id = ?
+       LIMIT 1`,
+    )
+    .get(workspaceId, paymentInstrumentId) as
+    | { id: string; currency: string; is_active: number; instrument_kind: string | null }
+    | undefined;
+  if (!row) throw new Error("Payment instrument not found for this workspace.");
+  return row;
+};
+
+const loadBankTransaction = (db: DatabaseSync, workspaceId: string, transactionId: string) => {
+  const row = db
+    .prepare(
+      `SELECT id, amount, currency
+       FROM bank_transactions
+       WHERE workspace_id = ? AND id = ?
+       LIMIT 1`,
+    )
+    .get(workspaceId, transactionId) as { id: string; amount: number; currency: string } | undefined;
+  if (!row) throw new Error("Bank transaction not found for this workspace.");
+  return row;
+};
+
+const loadAllocation = (db: DatabaseSync, workspaceId: string, allocationId: string) => {
+  const row = db
+    .prepare(`SELECT * FROM transaction_links WHERE workspace_id = ? AND id = ? LIMIT 1`)
+    .get(workspaceId, allocationId) as
+    | {
+        id: string;
+        workspace_id: string;
+        transaction_id: string | null;
+        payment_instrument_id: string | null;
+        linked_entity_type: string;
+        linked_entity_id: string;
+        amount_applied: number | null;
+        amount_currency: string | null;
+        allocation_status: string;
+      }
+    | undefined;
+  if (!row) throw new Error("Invoice allocation not found for this workspace.");
+  return row;
+};
+
+const loadLinkedEntityTotal = (db: DatabaseSync, workspaceId: string, linkedEntityType: string, linkedEntityId: string) => {
+  if (linkedEntityType === "invoice") {
+    const row = db
+      .prepare(`SELECT total_amount AS amount, currency FROM invoices WHERE workspace_id = ? AND id = ? LIMIT 1`)
+      .get(workspaceId, linkedEntityId) as { amount: number; currency: string } | undefined;
+    return row ?? null;
+  }
+  if (linkedEntityType === "invoice_extraction") {
+    const row = db
+      .prepare(`SELECT total AS amount, currency FROM invoice_extractions WHERE workspace_id = ? AND id = ? LIMIT 1`)
+      .get(workspaceId, linkedEntityId) as { amount: number | null; currency: string | null } | undefined;
+    return row?.amount != null && row.currency ? { amount: row.amount, currency: row.currency } : null;
+  }
+  if (linkedEntityType === "financial_entry") {
+    const row = db
+      .prepare(`SELECT amount, currency FROM financial_entries WHERE workspace_id = ? AND id = ? LIMIT 1`)
+      .get(workspaceId, linkedEntityId) as { amount: number; currency: string } | undefined;
+    return row ?? null;
+  }
+  return null;
+};
+
+const ensureAllocationTotalWithinEntity = (
+  db: DatabaseSync,
+  input: {
+    workspaceId: string;
+    linkedEntityType: string;
+    linkedEntityId: string;
+    amountApplied: number;
+    amountCurrency: string;
+    excludeAllocationId?: string | null;
+  },
+) => {
+  const entityTotal = loadLinkedEntityTotal(db, input.workspaceId, input.linkedEntityType, input.linkedEntityId);
+  if (!entityTotal) return;
+  if (normalizeCurrency(entityTotal.currency) !== normalizeCurrency(input.amountCurrency)) return;
+  const existing = db
+    .prepare(
+      `
+        SELECT COALESCE(SUM(amount_applied), 0) AS total
+        FROM transaction_links
+        WHERE workspace_id = ?
+          AND linked_entity_type = ?
+          AND linked_entity_id = ?
+          AND allocation_status NOT IN ('rejected')
+          AND id <> ?
+          AND COALESCE(amount_currency, ?) = ?
+      `,
+    )
+    .get(
+      input.workspaceId,
+      input.linkedEntityType,
+      input.linkedEntityId,
+      input.excludeAllocationId ?? "",
+      input.amountCurrency,
+      input.amountCurrency,
+    ) as { total: number };
+  if (round2(Number(existing.total ?? 0) + input.amountApplied) - round2(entityTotal.amount) > 0.005) {
+    throw new Error("Invoice allocations cannot exceed the linked document total.");
+  }
+};
+
   const importTransactions = (input: ImportStatementCommand): ImportStatementResult => {
     const existing = receiptHelpers.getExistingReceipt(input.commandId);
     const importId = `import-${input.commandId}`;
@@ -492,10 +706,14 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
         throw new Error(buildFailedCommandMessage("bank account", existing.error_message));
       }
       if (!input.accountLabel.trim()) throw new Error("Account label is required.");
+      ensureCreditCardDays(input);
+      validatePaymentInstrumentOwner(input);
 
       const now = new Date().toISOString();
       const last4 = extractLast4(input.accountNumberMasked) ?? extractLast4(input.accountNumberFull);
       const maskedNumber = input.accountNumberMasked?.trim() || (last4 ? `****${last4}` : null);
+      const owner = input.owner ?? "company";
+      const instrumentKind = input.instrumentKind ?? "bank_account";
       db.exec("BEGIN");
       try {
         const priorAccount = db.prepare(`SELECT * FROM bank_accounts WHERE id = ?`).get(bankAccountId) ?? null;
@@ -515,8 +733,11 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           `INSERT INTO bank_accounts (
              id, workspace_id, bank_name, account_label, account_number_masked,
              account_number_full, currency, account_type, opening_balance,
-             opening_balance_date, is_active, notes, last4, created_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             opening_balance_date, is_active, notes, owner, owner_user_id,
+             owner_user_name_snapshot, instrument_kind, last4, issuer,
+             statement_cycle_day, payment_due_day, reminder_user_id,
+             created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              bank_name = excluded.bank_name,
              account_label = excluded.account_label,
@@ -528,7 +749,15 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
              opening_balance_date = excluded.opening_balance_date,
              is_active = excluded.is_active,
              notes = excluded.notes,
+             owner = excluded.owner,
+             owner_user_id = excluded.owner_user_id,
+             owner_user_name_snapshot = excluded.owner_user_name_snapshot,
+             instrument_kind = excluded.instrument_kind,
              last4 = excluded.last4,
+             issuer = excluded.issuer,
+             statement_cycle_day = excluded.statement_cycle_day,
+             payment_due_day = excluded.payment_due_day,
+             reminder_user_id = excluded.reminder_user_id,
              updated_at = excluded.updated_at`,
         ).run(
           bankAccountId,
@@ -537,13 +766,21 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
           input.accountLabel.trim(),
           maskedNumber,
           null,
-          input.currency.trim().toUpperCase(),
+          normalizeCurrency(input.currency),
           input.accountType ?? null,
           input.openingBalance != null ? round2(input.openingBalance) : 0,
           input.openingBalanceDate?.trim() || null,
           input.isActive === false ? 0 : 1,
           input.notes?.trim() || null,
+          owner,
+          input.ownerUserId?.trim() || null,
+          input.ownerUserNameSnapshot?.trim() || null,
+          instrumentKind,
           last4,
+          input.issuer?.trim() || null,
+          input.statementCycleDay ?? null,
+          input.paymentDueDay ?? null,
+          input.reminderUserId?.trim() || null,
           now,
           now,
         );
@@ -1384,6 +1621,355 @@ export const createTreasuryMutationService = (db: DatabaseSync) => {
         transactionId: input.transactionId,
         repeated: false,
         summary: "Transaction linked.",
+      };
+    },
+
+    deactivatePaymentInstrument(input: DeactivatePaymentInstrumentCommand): BankAccountMutationResult {
+      const existing = receiptHelpers.getExistingReceipt(input.commandId);
+      if (existing?.outcome_status === "success") {
+        return {
+          commandId: input.commandId,
+          bankAccountId: input.paymentInstrumentId,
+          repeated: true,
+          summary: "Payment instrument already deactivated.",
+        };
+      }
+      if (existing?.outcome_status === "failed") {
+        throw new Error(buildFailedCommandMessage("payment instrument deactivate", existing.error_message));
+      }
+
+      const now = new Date().toISOString();
+      db.exec("BEGIN");
+      try {
+        const priorAccount = db
+          .prepare(`SELECT * FROM bank_accounts WHERE workspace_id = ? AND id = ? LIMIT 1`)
+          .get(input.workspaceId, input.paymentInstrumentId) as Record<string, unknown> | undefined;
+        if (!priorAccount) throw new Error("Payment instrument not found for this workspace.");
+        recordUndo(
+          db,
+          input.workspaceId,
+          input.commandId,
+          "account",
+          String(priorAccount.account_label ?? input.paymentInstrumentId),
+          { accountId: input.paymentInstrumentId, prior: priorAccount },
+          now,
+        );
+        db.prepare(`UPDATE bank_accounts SET is_active = 0, notes = COALESCE(?, notes), updated_at = ? WHERE id = ?`).run(
+          input.notes?.trim() || null,
+          now,
+          input.paymentInstrumentId,
+        );
+        enqueueOutbox(
+          db,
+          input.workspaceId,
+          "bank_account",
+          input.paymentInstrumentId,
+          { paymentInstrumentId: input.paymentInstrumentId, deactivated: true },
+          `sync-${input.commandId}`,
+          now,
+        );
+        recordReceipt(input, now, "success", null);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        recordReceipt(input, now, "failed", error instanceof Error ? error.message : "Deactivate failed.");
+        throw error;
+      }
+      return {
+        commandId: input.commandId,
+        bankAccountId: input.paymentInstrumentId,
+        repeated: false,
+        summary: "Payment instrument deactivated.",
+      };
+    },
+
+    assignInvoiceAllocation(input: AssignInvoiceAllocationCommand): InvoiceAllocationMutationResult {
+      const allocationId = `txn-link-${input.commandId}`;
+      const existing = receiptHelpers.getExistingReceipt(input.commandId);
+      if (existing?.outcome_status === "success") {
+        return {
+          commandId: input.commandId,
+          allocationId,
+          transactionId: null,
+          repeated: true,
+          summary: "Invoice allocation already assigned.",
+        };
+      }
+      if (existing?.outcome_status === "failed") {
+        throw new Error(buildFailedCommandMessage("invoice allocation assign", existing.error_message));
+      }
+
+      const now = new Date().toISOString();
+      const amountCurrency = normalizeCurrency(input.amountCurrency);
+      const instrument = loadPaymentInstrument(db, input.workspaceId, input.paymentInstrumentId);
+      if (!instrument.is_active) throw new Error("Cannot assign invoices to an inactive payment instrument.");
+      if (normalizeCurrency(instrument.currency) !== amountCurrency && !input.fxRate) {
+        throw new Error("Multicurrency invoice allocations require an FX rate.");
+      }
+      ensureAllocationTotalWithinEntity(db, { ...input, amountCurrency });
+
+      db.exec("BEGIN");
+      try {
+        db.prepare(
+          `INSERT INTO transaction_links (
+             id, workspace_id, transaction_id, payment_instrument_id,
+             linked_entity_type, linked_entity_id, amount_applied, amount_currency,
+             fx_rate, allocation_status, cycle_start, cycle_end, notes, created_at, updated_at
+           ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
+           ON CONFLICT DO NOTHING`,
+        ).run(
+          allocationId,
+          input.workspaceId,
+          input.paymentInstrumentId,
+          input.linkedEntityType,
+          input.linkedEntityId,
+          round2(input.amountApplied),
+          amountCurrency,
+          input.fxRate ?? null,
+          input.cycleStart?.trim() || null,
+          input.cycleEnd?.trim() || null,
+          input.notes?.trim() || null,
+          now,
+          now,
+        );
+        enqueueOutbox(
+          db,
+          input.workspaceId,
+          "transaction_link",
+          allocationId,
+          { linkedEntityType: input.linkedEntityType, linkedEntityId: input.linkedEntityId },
+          `sync-${input.commandId}`,
+          now,
+        );
+        recordReceipt(input, now, "success", null);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        recordReceipt(input, now, "failed", error instanceof Error ? error.message : "Allocation assign failed.");
+        throw error;
+      }
+
+      return {
+        commandId: input.commandId,
+        allocationId,
+        transactionId: null,
+        repeated: false,
+        summary: "Invoice allocation assigned.",
+      };
+    },
+
+    linkInvoiceAllocationToTransaction(input: LinkInvoiceAllocationToTransactionCommand): InvoiceAllocationMutationResult {
+      const existing = receiptHelpers.getExistingReceipt(input.commandId);
+      if (existing?.outcome_status === "success") {
+        const allocation = loadAllocation(db, input.workspaceId, input.allocationId);
+        return {
+          commandId: input.commandId,
+          allocationId: input.allocationId,
+          transactionId: allocation.transaction_id,
+          repeated: true,
+          summary: "Invoice allocation already linked.",
+        };
+      }
+      if (existing?.outcome_status === "failed") {
+        throw new Error(buildFailedCommandMessage("invoice allocation link", existing.error_message));
+      }
+
+      const now = new Date().toISOString();
+      const allocation = loadAllocation(db, input.workspaceId, input.allocationId);
+      const transaction = loadBankTransaction(db, input.workspaceId, input.transactionId);
+      const amountApplied = round2(input.amountApplied ?? allocation.amount_applied ?? transaction.amount);
+      const amountCurrency = normalizeCurrency(allocation.amount_currency ?? transaction.currency);
+      if (normalizeCurrency(transaction.currency) !== amountCurrency && !input.fxRate) {
+        throw new Error("Multicurrency invoice allocation links require an FX rate.");
+      }
+      ensureAllocationTotalWithinEntity(db, {
+        workspaceId: input.workspaceId,
+        linkedEntityType: allocation.linked_entity_type,
+        linkedEntityId: allocation.linked_entity_id,
+        amountApplied,
+        amountCurrency,
+        excludeAllocationId: input.allocationId,
+      });
+
+      db.exec("BEGIN");
+      try {
+        db.prepare(
+          `UPDATE transaction_links
+           SET transaction_id = ?,
+               amount_applied = ?,
+               amount_currency = ?,
+               fx_rate = COALESCE(?, fx_rate),
+               allocation_status = ?,
+               notes = COALESCE(?, notes),
+               updated_at = ?
+           WHERE workspace_id = ? AND id = ?`,
+        ).run(
+          input.transactionId,
+          amountApplied,
+          amountCurrency,
+          input.fxRate ?? null,
+          amountApplied < round2(transaction.amount) ? "partial" : "matched",
+          input.notes?.trim() || null,
+          now,
+          input.workspaceId,
+          input.allocationId,
+        );
+        enqueueOutbox(
+          db,
+          input.workspaceId,
+          "transaction_link",
+          input.allocationId,
+          { transactionId: input.transactionId },
+          `sync-${input.commandId}`,
+          now,
+        );
+        recordReceipt(input, now, "success", null);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        recordReceipt(input, now, "failed", error instanceof Error ? error.message : "Allocation link failed.");
+        throw error;
+      }
+      return {
+        commandId: input.commandId,
+        allocationId: input.allocationId,
+        transactionId: input.transactionId,
+        repeated: false,
+        summary: "Invoice allocation linked to transaction.",
+      };
+    },
+
+    unlinkInvoiceAllocation(input: UnlinkInvoiceAllocationCommand): InvoiceAllocationMutationResult {
+      return updateInvoiceAllocationStatus(input, {
+        status: "pending",
+        transactionId: null,
+        summary: "Invoice allocation unlinked.",
+        failedLabel: "invoice allocation unlink",
+      });
+    },
+
+    rejectInvoiceAllocation(input: RejectInvoiceAllocationCommand): InvoiceAllocationMutationResult {
+      return updateInvoiceAllocationStatus(input, {
+        status: "rejected",
+        summary: "Invoice allocation rejected.",
+        failedLabel: "invoice allocation reject",
+      });
+    },
+
+    markInvoiceAllocationReimbursed(input: MarkInvoiceAllocationReimbursedCommand): InvoiceAllocationMutationResult {
+      return updateInvoiceAllocationStatus(input, {
+        status: "reimbursed",
+        summary: "Invoice allocation marked reimbursed.",
+        failedLabel: "invoice allocation reimbursed",
+      });
+    },
+
+    createCardSettlement(input: CreateCardSettlementCommand): InvoiceAllocationMutationResult {
+      const settlementId = `txn-link-settlement-${input.commandId}`;
+      const existing = receiptHelpers.getExistingReceipt(input.commandId);
+      if (existing?.outcome_status === "success") {
+        return {
+          commandId: input.commandId,
+          allocationId: settlementId,
+          transactionId: input.transactionId,
+          repeated: true,
+          summary: "Card settlement already created.",
+        };
+      }
+      if (existing?.outcome_status === "failed") {
+        throw new Error(buildFailedCommandMessage("card settlement", existing.error_message));
+      }
+
+      const now = new Date().toISOString();
+      const instrument = loadPaymentInstrument(db, input.workspaceId, input.paymentInstrumentId);
+      const transaction = loadBankTransaction(db, input.workspaceId, input.transactionId);
+      db.exec("BEGIN");
+      try {
+        db.prepare(
+          `INSERT INTO transaction_annotations (
+             transaction_id, workspace_id, txn_kind, concept, counterparty,
+             is_internal_transfer, reimbursement_status, fiscal_status, notes, updated_at
+           ) VALUES (?, ?, 'transfer', 'Card settlement', 'Internal transfer', 1, 'n/a', 'pending', ?, ?)
+           ON CONFLICT(transaction_id) DO UPDATE SET
+             txn_kind = 'transfer',
+             concept = COALESCE(transaction_annotations.concept, 'Card settlement'),
+             counterparty = COALESCE(transaction_annotations.counterparty, 'Internal transfer'),
+             is_internal_transfer = 1,
+             notes = COALESCE(?, transaction_annotations.notes),
+             updated_at = excluded.updated_at`,
+        ).run(input.transactionId, input.workspaceId, input.notes?.trim() || null, now, input.notes?.trim() || null);
+        db.prepare(
+          `INSERT INTO transaction_links (
+             id, workspace_id, transaction_id, payment_instrument_id,
+             linked_entity_type, linked_entity_id, amount_applied, amount_currency,
+             allocation_status, cycle_start, cycle_end, notes, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, 'card_settlement', ?, ?, ?, 'matched', ?, ?, ?, ?, ?)
+           ON CONFLICT DO NOTHING`,
+        ).run(
+          settlementId,
+          input.workspaceId,
+          input.transactionId,
+          input.paymentInstrumentId,
+          input.paymentInstrumentId,
+          round2(transaction.amount),
+          normalizeCurrency(transaction.currency),
+          input.cycleStart?.trim() || null,
+          input.cycleEnd?.trim() || null,
+          input.notes?.trim() || null,
+          now,
+          now,
+        );
+        if (input.closeAllocations) {
+          db.prepare(
+            `UPDATE transaction_links
+             SET allocation_status = 'reimbursed', updated_at = ?
+             WHERE workspace_id = ?
+               AND payment_instrument_id = ?
+               AND linked_entity_type <> 'card_settlement'
+               AND allocation_status IN ('pending', 'matched', 'partial')
+               AND (? IS NULL OR cycle_start >= ?)
+               AND (? IS NULL OR cycle_end <= ?)`,
+          ).run(
+            now,
+            input.workspaceId,
+            input.paymentInstrumentId,
+            input.cycleStart ?? null,
+            input.cycleStart ?? null,
+            input.cycleEnd ?? null,
+            input.cycleEnd ?? null,
+          );
+        }
+        enqueueOutbox(
+          db,
+          input.workspaceId,
+          "transaction_annotation",
+          input.transactionId,
+          { cardSettlement: true },
+          `sync-${input.commandId}-annotation`,
+          now,
+        );
+        enqueueOutbox(
+          db,
+          input.workspaceId,
+          "transaction_link",
+          settlementId,
+          { linkedEntityType: "card_settlement", paymentInstrumentId: instrument.id },
+          `sync-${input.commandId}-link`,
+          now,
+        );
+        recordReceipt(input, now, "success", null);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        recordReceipt(input, now, "failed", error instanceof Error ? error.message : "Card settlement failed.");
+        throw error;
+      }
+      return {
+        commandId: input.commandId,
+        allocationId: settlementId,
+        transactionId: input.transactionId,
+        repeated: false,
+        summary: "Card settlement created.",
       };
     },
 

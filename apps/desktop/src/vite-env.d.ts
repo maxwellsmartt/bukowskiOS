@@ -529,6 +529,12 @@ declare global {
       upsertAccount: (
         input: import("@contracts").UpsertBankAccountCommand,
       ) => Promise<import("@contracts").BankAccountMutationResult>;
+      paymentInstrumentUpsert: (
+        input: import("@contracts").UpsertPaymentInstrumentCommand,
+      ) => Promise<import("@contracts").BankAccountMutationResult>;
+      paymentInstrumentDeactivate: (
+        input: import("@contracts").DeactivatePaymentInstrumentCommand,
+      ) => Promise<import("@contracts").BankAccountMutationResult>;
       listTransactions: (
         query: import("@contracts").TreasuryTransactionListQuery,
       ) => Promise<import("@contracts").BankTransactionRow[]>;
@@ -590,6 +596,24 @@ declare global {
       linkTransaction: (
         input: import("@contracts").LinkTransactionCommand,
       ) => Promise<import("@contracts").TransactionMutationResult>;
+      invoiceAllocationAssign: (
+        input: import("@contracts").AssignInvoiceAllocationCommand,
+      ) => Promise<import("@contracts").InvoiceAllocationMutationResult>;
+      invoiceAllocationLinkToTransaction: (
+        input: import("@contracts").LinkInvoiceAllocationToTransactionCommand,
+      ) => Promise<import("@contracts").InvoiceAllocationMutationResult>;
+      invoiceAllocationUnlink: (
+        input: import("@contracts").UnlinkInvoiceAllocationCommand,
+      ) => Promise<import("@contracts").InvoiceAllocationMutationResult>;
+      invoiceAllocationReject: (
+        input: import("@contracts").RejectInvoiceAllocationCommand,
+      ) => Promise<import("@contracts").InvoiceAllocationMutationResult>;
+      invoiceAllocationMarkReimbursed: (
+        input: import("@contracts").MarkInvoiceAllocationReimbursedCommand,
+      ) => Promise<import("@contracts").InvoiceAllocationMutationResult>;
+      cardSettlementCreate: (
+        input: import("@contracts").CreateCardSettlementCommand,
+      ) => Promise<import("@contracts").InvoiceAllocationMutationResult>;
       undoLastAction: (
         input: import("@contracts").UndoTreasuryActionCommand,
       ) => Promise<import("@contracts").TransactionMutationResult>;

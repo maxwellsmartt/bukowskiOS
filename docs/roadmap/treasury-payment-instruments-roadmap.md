@@ -63,26 +63,40 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 
 ### Slice 2 — Comandos idempotentes de Tesoreria
 
-**Estado:** Pendiente
+**Estado:** Implementado en backend/IPC el 2026-06-08
 
 **Objetivo:** Agregar comandos seguros, idempotentes y auditables.
 
 **Comandos:**
-- `treasury.paymentInstrument.upsert`
-- `treasury.paymentInstrument.deactivate`
-- `treasury.invoiceAllocation.assign`
-- `treasury.invoiceAllocation.linkToTransaction`
-- `treasury.invoiceAllocation.unlink`
-- `treasury.invoiceAllocation.reject`
-- `treasury.invoiceAllocation.markReimbursed`
-- `treasury.cardSettlement.create`
+- `treasury.paymentInstrument.upsert` -> IPC `bukowskiTreasury:paymentInstrumentUpsert`
+- `treasury.paymentInstrument.deactivate` -> IPC `bukowskiTreasury:paymentInstrumentDeactivate`
+- `treasury.invoiceAllocation.assign` -> IPC `bukowskiTreasury:invoiceAllocationAssign`
+- `treasury.invoiceAllocation.linkToTransaction` -> IPC `bukowskiTreasury:invoiceAllocationLinkToTransaction`
+- `treasury.invoiceAllocation.unlink` -> IPC `bukowskiTreasury:invoiceAllocationUnlink`
+- `treasury.invoiceAllocation.reject` -> IPC `bukowskiTreasury:invoiceAllocationReject`
+- `treasury.invoiceAllocation.markReimbursed` -> IPC `bukowskiTreasury:invoiceAllocationMarkReimbursed`
+- `treasury.cardSettlement.create` -> IPC `bukowskiTreasury:cardSettlementCreate`
 
 **Reglas:**
-- Todos idempotentes por `commandId`, con receipts y undo donde aplique.
+- Todos idempotentes por `commandId`, con receipts y outbox.
+- `paymentInstrument.upsert` reutiliza la ruta segura de cuentas, pero ahora valida metadata de medio de pago.
+- Tarjeta de credito activa exige `statement_cycle_day` y `payment_due_day`.
+- `owner = 'user'` exige `owner_user_id`.
 - `cardSettlement.create` marca el movimiento de pago de tarjeta como `is_internal_transfer = 1`.
-- La liquidacion de tarjeta solo cierra allocations del ciclo si el usuario lo confirma.
-- Suma de allocations no puede exceder total de factura.
+- La liquidacion de tarjeta solo cierra allocations del ciclo si `closeAllocations = true`.
+- Suma de allocations no puede exceder total de factura cuando el documento local tiene total/moneda.
 - Multimoneda exige `fx_rate`.
+- `account_number_full` sigue sin persistirse.
+
+**Archivos principales:**
+- `packages/contracts/src/commands/treasury-commands.ts`
+- `packages/contracts/src/validation/mutation-schemas.ts`
+- `packages/contracts/src/ipc/channels.ts`
+- `apps/desktop/electron/main/services/data/treasuryMutationService.ts`
+- `apps/desktop/electron/main/ipc/registerFoundationIpc.ts`
+- `apps/desktop/electron/preload/index.ts`
+- `apps/desktop/src/vite-env.d.ts`
+- `apps/desktop/src/test/treasury-mutation-service.test.ts`
 
 ### Slice 3 — Reminders ligeros
 
@@ -160,15 +174,24 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 - Verificacion local:
   - `corepack pnpm --filter @bukowski/desktop test -- src/test/financial-domain-pull-service.test.ts src/test/treasury-mutation-service.test.ts` termino ejecutando la suite desktop completa: **287 passed, 2 skipped**.
   - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
+- Se implementa Slice 2 backend/IPC:
+  - comandos explicitos de payment instruments;
+  - comandos de invoice allocations;
+  - liquidacion de tarjeta como transferencia interna;
+  - schemas IPC y preload renderer;
+  - pruebas de tarjeta activa, no persistencia de numero completo, allocation pendiente, link posterior, limite por total y settlement.
+- Verificacion Slice 2:
+  - `corepack pnpm --filter @bukowski/desktop test -- src/test/treasury-mutation-service.test.ts`: **290 passed, 2 skipped**.
+  - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
 
 ## Proximo slice recomendado
 
-**Slice 2 — comandos idempotentes de Tesoreria.**
+**Slice 3 — reminders ligeros.**
 
 Orden sugerido:
-1. `treasury.paymentInstrument.upsert/deactivate` con validaciones de tarjeta activa, owner/reminder y no almacenamiento de datos sensibles.
-2. `treasury.invoiceAllocation.assign` para crear links pendientes sin movimiento.
-3. `treasury.invoiceAllocation.linkToTransaction/unlink/reject/markReimbursed`.
-4. `treasury.cardSettlement.create` marcando pago de tarjeta como transferencia interna.
+1. Crear/actualizar reminders mensuales simples al guardar tarjetas activas.
+2. Usar `owner_user_id` como default si existe.
+3. Para company/shared sin owner, exigir `reminder_user_id` cuando se active reminder.
+4. No implementar calendario bancario movil avanzado todavia.
 
-No empezar UX hasta tener estos comandos y tests, porque la UI depende de reglas de negocio correctas.
+Despues de Slice 3, avanzar a Slice 4 UX de Cuentas y tarjetas + columnas de allocation en Bandeja de facturas.

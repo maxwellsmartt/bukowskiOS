@@ -1438,6 +1438,8 @@ const transactionKindSchema = z.enum([
 const reimbursementStatusSchema = z.enum(["n/a", "pending", "accepted", "rejected", "partial"]);
 const fiscalStatusSchema = z.enum(["pending", "accepted", "rejected"]);
 const statementSourceFormatSchema = z.enum(["csv", "xlsx", "manual", "pdf"]);
+const paymentInstrumentOwnerSchema = z.enum(["company", "user", "shared"]);
+const paymentInstrumentKindSchema = z.enum(["bank_account", "debit_card", "credit_card", "cash", "other"]);
 const transactionLinkEntityTypeSchema = z.enum([
   "invoice",
   "invoice_payment",
@@ -1460,9 +1462,31 @@ export const upsertBankAccountSchema = z
     accountNumberFull: nullableOrOptionalString,
     currency: z.string().trim().min(2).max(8).transform((v) => v.toUpperCase()),
     accountType: bankAccountTypeSchema.nullable().optional(),
+    owner: paymentInstrumentOwnerSchema.optional(),
+    ownerUserId: nullableOrOptionalString,
+    ownerUserNameSnapshot: nullableOrOptionalString,
+    instrumentKind: paymentInstrumentKindSchema.optional(),
+    last4: nullableOrOptionalString,
+    issuer: nullableOrOptionalString,
+    statementCycleDay: z.number().int().min(1).max(31).nullable().optional(),
+    paymentDueDay: z.number().int().min(1).max(31).nullable().optional(),
+    reminderUserId: nullableOrOptionalString,
     openingBalance: z.number().finite().nullable().optional(),
     openingBalanceDate: nullableOrOptionalString,
     isActive: z.boolean().optional(),
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+export const upsertPaymentInstrumentSchema = upsertBankAccountSchema;
+
+export const deactivatePaymentInstrumentSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    paymentInstrumentId: nonEmptyString,
     notes: nullableOrOptionalString,
   })
   .strict();
@@ -1608,6 +1632,68 @@ export const linkTransactionSchema = z
     transactionId: nonEmptyString,
     linkedEntityType: transactionLinkEntityTypeSchema,
     linkedEntityId: nonEmptyString,
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+export const assignInvoiceAllocationSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    paymentInstrumentId: nonEmptyString,
+    linkedEntityType: z.enum(["invoice", "invoice_extraction", "financial_entry"]),
+    linkedEntityId: nonEmptyString,
+    amountApplied: z.number().finite().positive(),
+    amountCurrency: z.string().trim().min(2).max(8).transform((v) => v.toUpperCase()),
+    fxRate: z.number().finite().positive().nullable().optional(),
+    cycleStart: nullableOrOptionalString,
+    cycleEnd: nullableOrOptionalString,
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+export const linkInvoiceAllocationToTransactionSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    allocationId: nonEmptyString,
+    transactionId: nonEmptyString,
+    amountApplied: z.number().finite().positive().nullable().optional(),
+    fxRate: z.number().finite().positive().nullable().optional(),
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+export const invoiceAllocationByIdSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    allocationId: nonEmptyString,
+    notes: nullableOrOptionalString,
+  })
+  .strict();
+
+export const rejectInvoiceAllocationSchema = invoiceAllocationByIdSchema;
+export const unlinkInvoiceAllocationSchema = invoiceAllocationByIdSchema;
+export const markInvoiceAllocationReimbursedSchema = invoiceAllocationByIdSchema;
+
+export const createCardSettlementSchema = z
+  .object({
+    commandId: nonEmptyString,
+    workspaceId: nonEmptyString,
+    actorType: commandActorTypeSchema,
+    sourceChannel: commandSourceChannelSchema,
+    paymentInstrumentId: nonEmptyString,
+    transactionId: nonEmptyString,
+    cycleStart: nullableOrOptionalString,
+    cycleEnd: nullableOrOptionalString,
+    closeAllocations: z.boolean().optional(),
     notes: nullableOrOptionalString,
   })
   .strict();

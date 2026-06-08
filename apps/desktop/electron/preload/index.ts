@@ -703,6 +703,14 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.upsertAccount, input) as Promise<
       import("@contracts").BankAccountMutationResult
     >,
+  paymentInstrumentUpsert: (input: import("@contracts").UpsertPaymentInstrumentCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.paymentInstrumentUpsert, input) as Promise<
+      import("@contracts").BankAccountMutationResult
+    >,
+  paymentInstrumentDeactivate: (input: import("@contracts").DeactivatePaymentInstrumentCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.paymentInstrumentDeactivate, input) as Promise<
+      import("@contracts").BankAccountMutationResult
+    >,
   listTransactions: (query: import("@contracts").TreasuryTransactionListQuery) =>
     ipcRenderer.invoke(ipcChannels.treasury.listTransactions, query) as Promise<
       import("@contracts").BankTransactionRow[]
@@ -782,6 +790,30 @@ const bukowskiTreasury = {
   linkTransaction: (input: import("@contracts").LinkTransactionCommand) =>
     ipcRenderer.invoke(ipcChannels.treasury.linkTransaction, input) as Promise<
       import("@contracts").TransactionMutationResult
+    >,
+  invoiceAllocationAssign: (input: import("@contracts").AssignInvoiceAllocationCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceAllocationAssign, input) as Promise<
+      import("@contracts").InvoiceAllocationMutationResult
+    >,
+  invoiceAllocationLinkToTransaction: (input: import("@contracts").LinkInvoiceAllocationToTransactionCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceAllocationLinkToTransaction, input) as Promise<
+      import("@contracts").InvoiceAllocationMutationResult
+    >,
+  invoiceAllocationUnlink: (input: import("@contracts").UnlinkInvoiceAllocationCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceAllocationUnlink, input) as Promise<
+      import("@contracts").InvoiceAllocationMutationResult
+    >,
+  invoiceAllocationReject: (input: import("@contracts").RejectInvoiceAllocationCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceAllocationReject, input) as Promise<
+      import("@contracts").InvoiceAllocationMutationResult
+    >,
+  invoiceAllocationMarkReimbursed: (input: import("@contracts").MarkInvoiceAllocationReimbursedCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.invoiceAllocationMarkReimbursed, input) as Promise<
+      import("@contracts").InvoiceAllocationMutationResult
+    >,
+  cardSettlementCreate: (input: import("@contracts").CreateCardSettlementCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.cardSettlementCreate, input) as Promise<
+      import("@contracts").InvoiceAllocationMutationResult
     >,
   undoLastAction: (input: import("@contracts").UndoTreasuryActionCommand) =>
     ipcRenderer.invoke(ipcChannels.treasury.undoLastAction, input) as Promise<

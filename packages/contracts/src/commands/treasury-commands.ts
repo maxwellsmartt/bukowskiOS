@@ -11,6 +11,8 @@ import type { CommandActorType, CommandSourceChannel } from "./asset-commands";
 
 export type BankName = "popular" | "santa_cruz" | "custom";
 export type BankAccountType = "checking" | "savings" | "other";
+export type PaymentInstrumentOwner = "company" | "user" | "shared";
+export type PaymentInstrumentKind = "bank_account" | "debit_card" | "credit_card" | "cash" | "other";
 
 export type TransactionDirection = "debit" | "credit";
 
@@ -58,6 +60,15 @@ export type UpsertBankAccountCommand = {
   accountNumberFull?: string | null;
   currency: string;
   accountType?: BankAccountType | null;
+  owner?: PaymentInstrumentOwner;
+  ownerUserId?: string | null;
+  ownerUserNameSnapshot?: string | null;
+  instrumentKind?: PaymentInstrumentKind;
+  last4?: string | null;
+  issuer?: string | null;
+  statementCycleDay?: number | null;
+  paymentDueDay?: number | null;
+  reminderUserId?: string | null;
   openingBalance?: number | null;
   openingBalanceDate?: string | null;
   isActive?: boolean;
@@ -69,6 +80,17 @@ export type BankAccountMutationResult = {
   bankAccountId: string;
   repeated: boolean;
   summary: string;
+};
+
+export type UpsertPaymentInstrumentCommand = UpsertBankAccountCommand;
+
+export type DeactivatePaymentInstrumentCommand = {
+  commandId: string;
+  workspaceId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+  paymentInstrumentId: string;
+  notes?: string | null;
 };
 
 /* ----------------------------------------------------------------------- */
@@ -233,6 +255,84 @@ export type LinkTransactionCommand = {
   linkedEntityType: TransactionLinkEntityType;
   linkedEntityId: string;
   notes?: string | null;
+};
+
+export type InvoiceAllocationStatus = "pending" | "matched" | "partial" | "rejected" | "reimbursed";
+
+export type AssignInvoiceAllocationCommand = {
+  commandId: string;
+  workspaceId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+  paymentInstrumentId: string;
+  linkedEntityType: Extract<TransactionLinkEntityType, "invoice" | "invoice_extraction" | "financial_entry">;
+  linkedEntityId: string;
+  amountApplied: number;
+  amountCurrency: string;
+  fxRate?: number | null;
+  cycleStart?: string | null;
+  cycleEnd?: string | null;
+  notes?: string | null;
+};
+
+export type LinkInvoiceAllocationToTransactionCommand = {
+  commandId: string;
+  workspaceId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+  allocationId: string;
+  transactionId: string;
+  amountApplied?: number | null;
+  fxRate?: number | null;
+  notes?: string | null;
+};
+
+export type UnlinkInvoiceAllocationCommand = {
+  commandId: string;
+  workspaceId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+  allocationId: string;
+  notes?: string | null;
+};
+
+export type RejectInvoiceAllocationCommand = {
+  commandId: string;
+  workspaceId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+  allocationId: string;
+  notes?: string | null;
+};
+
+export type MarkInvoiceAllocationReimbursedCommand = {
+  commandId: string;
+  workspaceId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+  allocationId: string;
+  notes?: string | null;
+};
+
+export type CreateCardSettlementCommand = {
+  commandId: string;
+  workspaceId: string;
+  actorType: CommandActorType;
+  sourceChannel: CommandSourceChannel;
+  paymentInstrumentId: string;
+  transactionId: string;
+  cycleStart?: string | null;
+  cycleEnd?: string | null;
+  closeAllocations?: boolean;
+  notes?: string | null;
+};
+
+export type InvoiceAllocationMutationResult = {
+  commandId: string;
+  allocationId: string;
+  transactionId: string | null;
+  repeated: boolean;
+  summary: string;
 };
 
 export type UndoTreasuryActionCommand = {

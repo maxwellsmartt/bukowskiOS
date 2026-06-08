@@ -37,6 +37,8 @@ import {
   issueInvoiceSchema,
   approveCollaboratorFeeSchema,
   upsertBankAccountSchema,
+  upsertPaymentInstrumentSchema,
+  deactivatePaymentInstrumentSchema,
   importStatementSchema,
   addManualTransactionsSchema,
   deleteImportSchema,
@@ -46,6 +48,12 @@ import {
   setAllocationsSchema,
   reviewReimbursementSchema,
   linkTransactionSchema,
+  assignInvoiceAllocationSchema,
+  linkInvoiceAllocationToTransactionSchema,
+  unlinkInvoiceAllocationSchema,
+  rejectInvoiceAllocationSchema,
+  markInvoiceAllocationReimbursedSchema,
+  createCardSettlementSchema,
   undoTreasuryActionSchema,
   enqueueInvoiceBatchSchema,
   invoiceInboxListReadArgsSchema,
@@ -417,6 +425,9 @@ type RegisterFoundationIpcOptions = {
     upsertBankAccount: (
       input: import("@contracts").UpsertBankAccountCommand,
     ) => import("@contracts").BankAccountMutationResult;
+    deactivatePaymentInstrument: (
+      input: import("@contracts").DeactivatePaymentInstrumentCommand,
+    ) => import("@contracts").BankAccountMutationResult;
     importStatement: (
       input: import("@contracts").ImportStatementCommand,
     ) => import("@contracts").ImportStatementResult;
@@ -444,6 +455,24 @@ type RegisterFoundationIpcOptions = {
     linkTransaction: (
       input: import("@contracts").LinkTransactionCommand,
     ) => import("@contracts").TransactionMutationResult;
+    assignInvoiceAllocation: (
+      input: import("@contracts").AssignInvoiceAllocationCommand,
+    ) => import("@contracts").InvoiceAllocationMutationResult;
+    linkInvoiceAllocationToTransaction: (
+      input: import("@contracts").LinkInvoiceAllocationToTransactionCommand,
+    ) => import("@contracts").InvoiceAllocationMutationResult;
+    unlinkInvoiceAllocation: (
+      input: import("@contracts").UnlinkInvoiceAllocationCommand,
+    ) => import("@contracts").InvoiceAllocationMutationResult;
+    rejectInvoiceAllocation: (
+      input: import("@contracts").RejectInvoiceAllocationCommand,
+    ) => import("@contracts").InvoiceAllocationMutationResult;
+    markInvoiceAllocationReimbursed: (
+      input: import("@contracts").MarkInvoiceAllocationReimbursedCommand,
+    ) => import("@contracts").InvoiceAllocationMutationResult;
+    createCardSettlement: (
+      input: import("@contracts").CreateCardSettlementCommand,
+    ) => import("@contracts").InvoiceAllocationMutationResult;
     undoLastAction: (
       input: import("@contracts").UndoTreasuryActionCommand,
     ) => import("@contracts").TransactionMutationResult;
@@ -2760,6 +2789,28 @@ export const registerFoundationIpc = ({
     });
     return treasuryMutations.upsertBankAccount(input);
   });
+  safeHandle(ipcChannels.treasury.paymentInstrumentUpsert, upsertPaymentInstrumentSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "save payment instrument",
+      accessLevel: "write",
+      requiredPermission: "treasury.accounts.manage",
+    });
+    return treasuryMutations.upsertBankAccount(input);
+  });
+  safeHandle(
+    ipcChannels.treasury.paymentInstrumentDeactivate,
+    deactivatePaymentInstrumentSchema,
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "deactivate payment instrument",
+        accessLevel: "write",
+        requiredPermission: "treasury.accounts.manage",
+      });
+      return treasuryMutations.deactivatePaymentInstrument(input);
+    },
+  );
   safeHandle(ipcChannels.treasury.importStatement, importStatementSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({
       workspaceId: input.workspaceId,
@@ -2856,6 +2907,72 @@ export const registerFoundationIpc = ({
       requiredPermission: "treasury.transactions.classify",
     });
     return treasuryMutations.linkTransaction(input);
+  });
+  safeHandle(
+    ipcChannels.treasury.invoiceAllocationAssign,
+    assignInvoiceAllocationSchema,
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "assign invoice allocation",
+        accessLevel: "write",
+        requiredPermission: "treasury.transactions.classify",
+      });
+      return treasuryMutations.assignInvoiceAllocation(input);
+    },
+  );
+  safeHandle(
+    ipcChannels.treasury.invoiceAllocationLinkToTransaction,
+    linkInvoiceAllocationToTransactionSchema,
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "link invoice allocation",
+        accessLevel: "write",
+        requiredPermission: "treasury.transactions.classify",
+      });
+      return treasuryMutations.linkInvoiceAllocationToTransaction(input);
+    },
+  );
+  safeHandle(ipcChannels.treasury.invoiceAllocationUnlink, unlinkInvoiceAllocationSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "unlink invoice allocation",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return treasuryMutations.unlinkInvoiceAllocation(input);
+  });
+  safeHandle(ipcChannels.treasury.invoiceAllocationReject, rejectInvoiceAllocationSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "reject invoice allocation",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return treasuryMutations.rejectInvoiceAllocation(input);
+  });
+  safeHandle(
+    ipcChannels.treasury.invoiceAllocationMarkReimbursed,
+    markInvoiceAllocationReimbursedSchema,
+    async (_event, input) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: input.workspaceId,
+        action: "mark invoice allocation reimbursed",
+        accessLevel: "write",
+        requiredPermission: "treasury.reimbursements.review",
+      });
+      return treasuryMutations.markInvoiceAllocationReimbursed(input);
+    },
+  );
+  safeHandle(ipcChannels.treasury.cardSettlementCreate, createCardSettlementSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "create card settlement",
+      accessLevel: "write",
+      requiredPermission: "treasury.transactions.classify",
+    });
+    return treasuryMutations.createCardSettlement(input);
   });
   safeHandle(ipcChannels.treasury.undoLastAction, undoTreasuryActionSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({
