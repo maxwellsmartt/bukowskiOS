@@ -73,7 +73,10 @@ const assetSortOptions: Array<ListSortOption<AssetSortField>> = [
   { value: "createdAt", label: "assets.sort.createdAt" },
 ];
 
-const assetDefaultColumnKeys = ["asset", "category", "quantity", "status", "condition", "location", "project", "responsible"];
+// Curated default: the columns that actually drive a decision. The rest (serial,
+// tracking, custody, warehouse, costs, etc.) stay one click away in the column
+// manager instead of cluttering the table with mostly-constant noise.
+const assetDefaultColumnKeys = ["asset", "category", "quantity", "location", "project", "status"];
 
 const normalizeCsvHeader = (value: string) =>
   value
@@ -2297,12 +2300,14 @@ const GlobalAssetsMetrics = () => {
   const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
   const { data: assetsOverview, error } = useAssetsOverview({ workspaceId: activeWorkspaceId });
+  // Operational cards only earn space when they need attention — hide the zeros
+  // so a clean inventory shows a short, meaningful strip instead of a wall of 0s.
   const operationalCards = [
     { ...assetsOverview.cards.overdueReturns, label: t("assets.metrics.overdueReturns") },
     { ...assetsOverview.cards.openPackingSlips, label: t("assets.metrics.openPackingSlips") },
     { ...assetsOverview.cards.activeIncidents, label: t("assets.metrics.activeIncidents") },
     { ...assetsOverview.cards.maintenanceWatch, label: t("assets.metrics.maintenanceWatch") },
-  ];
+  ].filter((card) => String(card.value).trim() !== "0" && String(card.value).trim() !== "");
   const overviewCards = [
     {
       label: t("assets.metrics.totalUnits"),

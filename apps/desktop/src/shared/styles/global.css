@@ -4914,7 +4914,19 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .overview-operational-grid-assets {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  /* auto-fit so the strip stays full and balanced as zero-value cards drop out */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* A lighter, thinner stat strip so KPIs inform without dominating the page. */
+.overview-operational-grid-assets .overview-operational-card {
+  min-height: 0;
+  padding: 10px 14px;
+  gap: 3px;
+}
+
+.overview-operational-grid-assets .overview-operational-value {
+  font-size: 19px;
 }
 
 .queue-grid,
