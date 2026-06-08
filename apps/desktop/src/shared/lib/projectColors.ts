@@ -20,3 +20,27 @@ const DEFAULT_PROJECT_COLOR = "#8b93a3";
 
 export const resolveProjectColor = (colorKey?: string | null): string =>
   (colorKey ? PROJECT_COLOR_HEX[colorKey] : undefined) ?? DEFAULT_PROJECT_COLOR;
+
+type StatusTone = "success" | "info" | "warning" | "critical" | "neutral";
+
+/**
+ * Semantic tone for a project status chip so the lifecycle reads at a glance:
+ * green = live, amber = getting ready / paused, grey = done/archived.
+ */
+export const projectStatusTone = (status: string): StatusTone => {
+  switch (status) {
+    case "Active":
+      return "success";
+    case "Prep":
+    case "On hold":
+    case "In review":
+      return "warning";
+    case "Open":
+      return "info";
+    case "Wrapped":
+    case "Archived":
+      return "neutral";
+    default:
+      return "neutral";
+  }
+};

@@ -1,4 +1,4 @@
-import { ChevronRight, Folder } from "lucide-react";
+import { ChevronLeft, ChevronRight, Folder } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
@@ -148,6 +148,26 @@ export const Breadcrumb = () => {
 
   return (
     <nav aria-label="Breadcrumb" className="breadcrumb-bar">
+      <div className="breadcrumb-history-nav">
+        <button
+          aria-label={t("shell.breadcrumb.back")}
+          className="icon-ghost-control breadcrumb-history-button"
+          data-tooltip={t("shell.breadcrumb.back")}
+          onClick={() => navigate(-1)}
+          type="button"
+        >
+          <ChevronLeft size={15} />
+        </button>
+        <button
+          aria-label={t("shell.breadcrumb.forward")}
+          className="icon-ghost-control breadcrumb-history-button"
+          data-tooltip={t("shell.breadcrumb.forward")}
+          onClick={() => navigate(1)}
+          type="button"
+        >
+          <ChevronRight size={15} />
+        </button>
+      </div>
       <Folder aria-hidden="true" className="breadcrumb-leading-icon" size={12} />
       {crumbs.map((crumb, index) => {
         const isLast = index === crumbs.length - 1;

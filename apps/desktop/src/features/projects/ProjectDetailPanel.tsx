@@ -14,7 +14,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { formatProjectAssignmentInline } from "@shared/lib/assetQuantityPresentation";
-import { resolveProjectColor } from "@shared/lib/projectColors";
+import { projectStatusTone, resolveProjectColor } from "@shared/lib/projectColors";
 import { cleanDisplay } from "@shared/lib/displayValue";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { hasFinanceAccess } from "@shared/lib/financeAccess";
@@ -24,20 +24,6 @@ type ProjectDetailPanelProps = {
   error: string | null;
   isLoading: boolean;
   onIncidentCreated: () => void | Promise<void>;
-};
-
-const toneForStatus = (status: string) => {
-  switch (status) {
-    case "Active":
-      return "info" as const;
-    case "Open":
-    case "In review":
-      return "critical" as const;
-    case "Prep":
-      return "warning" as const;
-    default:
-      return undefined;
-  }
 };
 
 export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }: ProjectDetailPanelProps) => {
@@ -89,7 +75,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
               style={{ background: resolveProjectColor(data.schedule?.colorKey) }}
             />
             <span>{`${project.code} · ${project.name}`}</span>
-            <StatusBadge tone={toneForStatus(project.status)}>{t(`projects.statuses.${project.status}`, { defaultValue: project.status })}</StatusBadge>
+            <StatusBadge tone={projectStatusTone(project.status)}>{t(`projects.statuses.${project.status}`, { defaultValue: project.status })}</StatusBadge>
           </span>
         }
         subtitle={project.description}

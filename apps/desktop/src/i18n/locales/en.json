@@ -155,6 +155,10 @@
         "project": "Projects",
         "financial_entry": "Finance"
       }
+    },
+    "breadcrumb": {
+      "back": "Back",
+      "forward": "Forward"
     }
   },
   "assets": {

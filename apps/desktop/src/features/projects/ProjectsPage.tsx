@@ -17,7 +17,7 @@ import { type ListSortOption, useListControls } from "@shared/hooks/useListContr
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { uiPreferenceKeys } from "@shared/lib/preferences";
 import { hasFinanceAccess } from "@shared/lib/financeAccess";
-import { resolveProjectColor } from "@shared/lib/projectColors";
+import { projectStatusTone, resolveProjectColor } from "@shared/lib/projectColors";
 import { isPlaceholderValue } from "@shared/lib/displayValue";
 
 import { ProjectDetailPanel } from "./ProjectDetailPanel";
@@ -191,7 +191,7 @@ export const ProjectsPage = () => {
                 minWidth: 86,
                 render: (row) => (
                   <div className="status-stack-cell">
-                    <StatusBadge>{t(`projects.statuses.${row.status}`, { defaultValue: row.status })}</StatusBadge>
+                    <StatusBadge tone={projectStatusTone(row.status)}>{t(`projects.statuses.${row.status}`, { defaultValue: row.status })}</StatusBadge>
                     {row.isArchived ? <StatusBadge tone="warning">{t("projects.statuses.Archived")}</StatusBadge> : null}
                   </div>
                 ),

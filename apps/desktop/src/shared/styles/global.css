@@ -15214,6 +15214,24 @@ select.field-input {
   border-bottom: none;
 }
 
+.breadcrumb-history-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 4px;
+}
+
+.breadcrumb-history-button {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  color: var(--text-muted);
+}
+
+.breadcrumb-history-button:hover {
+  color: var(--text-primary);
+}
+
 .breadcrumb-leading-icon {
   color: rgba(255, 255, 255, 0.32);
   margin-right: 4px;

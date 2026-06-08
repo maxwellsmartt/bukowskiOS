@@ -155,6 +155,10 @@
         "project": "Proyectos",
         "financial_entry": "Finanzas"
       }
+    },
+    "breadcrumb": {
+      "back": "Atrás",
+      "forward": "Adelante"
     }
   },
   "assets": {
