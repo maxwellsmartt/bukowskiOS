@@ -231,7 +231,8 @@
         "timeline": "Cronología",
         "operations": "Operaciones",
         "incidents": "Incidencias",
-        "files": "Archivos"
+        "files": "Archivos",
+        "viewCodes": "Ver códigos (QR / barras)"
       },
       "labels": {
         "tracking": "Tracking",

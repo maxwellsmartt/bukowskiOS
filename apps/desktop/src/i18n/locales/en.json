@@ -231,7 +231,8 @@
         "timeline": "Timeline",
         "operations": "Operations",
         "incidents": "Incidents",
-        "files": "Files"
+        "files": "Files",
+        "viewCodes": "View codes (QR / barcode)"
       },
       "labels": {
         "tracking": "Tracking",

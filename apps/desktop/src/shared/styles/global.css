@@ -7134,6 +7134,23 @@ body.is-resizing-side-rail {
   min-height: 0;
 }
 
+/* Availability headline merged into the asset summary card. */
+.asset-availability-headline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--hairline-faint);
+}
+
+.asset-availability-text {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 /* ----- Asset image lightbox (in-app, instead of opening Finder) ----- */
 .asset-lightbox-overlay {
   position: fixed;

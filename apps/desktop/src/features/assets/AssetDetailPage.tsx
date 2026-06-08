@@ -191,6 +191,12 @@ export const AssetDetailPage = () => {
           </span>
         }
       >
+        <div className="asset-availability-headline">
+          <StatusBadge tone={availability.tone}>{translateAssetAvailabilityLabel(availability, t)}</StatusBadge>
+          <span className="asset-availability-text">
+            {translateAssetAvailabilityReason(availability, t)} {translateAssetAvailabilityNextAction(availability, t)}
+          </span>
+        </div>
         <div className="summary-grid">
           <div className="summary-row">
             <span className="summary-label">{t("assets.detail.summary.assetCode")}</span>
@@ -215,31 +221,6 @@ export const AssetDetailPage = () => {
           <div className="summary-row">
             <span className="summary-label">{t("assets.detail.summary.condition")}</span>
             <span className="summary-value">{data.asset.condition}</span>
-          </div>
-        </div>
-      </SurfaceCard>
-
-      <SurfaceCard
-        title={t("assets.availability.title")}
-        subtitle={t("assets.availability.subtitle")}
-        aside={
-          <span data-tooltip={t("assets.availability.tooltip")}>
-            <StatusBadge tone={availability.tone}>{translateAssetAvailabilityLabel(availability, t)}</StatusBadge>
-          </span>
-        }
-      >
-        <div className="summary-grid compact-summary-grid">
-          <div className="summary-row">
-            <span className="summary-label">{t("assets.availability.currentState")}</span>
-            <span className="summary-value">{translateAssetAvailabilityReason(availability, t)}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label">{t("assets.availability.toUse")}</span>
-            <span className="summary-value">{translateAssetAvailabilityNextAction(availability, t)}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label">{t("assets.columns.stock")}</span>
-            <span className="summary-value">{stockSummary}</span>
           </div>
         </div>
       </SurfaceCard>
@@ -501,20 +482,25 @@ export const AssetDetailPage = () => {
             ) : null}
 
             {data.editor?.primaryCodeValue ? (
-              <ScannableCodePanel
-                codeValue={data.editor.primaryCodeValue}
-                subtitle={t("assets.detail.labels.primaryCode")}
-                title={data.asset.name}
-                onPrint={({ qrDataUrl, barcodeDataUrl }) =>
-                  printScannableLabel({
-                    title: data.asset!.name,
-                    subtitle: data.asset!.code,
-                    codeValue: data.editor!.primaryCodeValue,
-                    qrDataUrl,
-                    barcodeDataUrl,
-                  })
-                }
-              />
+              <details className="detail-disclosure">
+                <summary className="detail-disclosure-summary">{t("assets.detail.sections.viewCodes")}</summary>
+                <div className="detail-disclosure-content">
+                  <ScannableCodePanel
+                    codeValue={data.editor.primaryCodeValue}
+                    subtitle={t("assets.detail.labels.primaryCode")}
+                    title={data.asset.name}
+                    onPrint={({ qrDataUrl, barcodeDataUrl }) =>
+                      printScannableLabel({
+                        title: data.asset!.name,
+                        subtitle: data.asset!.code,
+                        codeValue: data.editor!.primaryCodeValue,
+                        qrDataUrl,
+                        barcodeDataUrl,
+                      })
+                    }
+                  />
+                </div>
+              </details>
             ) : null}
 
             <details className="detail-disclosure">
