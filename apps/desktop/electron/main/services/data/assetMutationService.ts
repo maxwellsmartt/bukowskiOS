@@ -324,19 +324,37 @@ const ensureInternalCodeAvailable = (db: DatabaseSync, workspaceId: string, inte
   }
 };
 
+// Validates the category strictly and resolves the optional default location,
+// returning the location id to persist (or null when there is none).
+//
+// With `allowMissingLocation`, a location id that no longer exists in the catalog
+// (e.g. an orphaned reference left by the legacy Rentman 2021 import) is dropped
+// rather than throwing, so it never blocks editing the rest of the asset.
 const ensureAssetEditableReferences = (
   db: DatabaseSync,
   workspaceId: string,
   categoryId: string,
   locationId?: string,
-) => {
+  options: { allowMissingLocation?: boolean } = {},
+): string | null => {
   const categoryMap = loadCategoryEntities(db, workspaceId, uniqueValues([categoryId]));
   ensureEntityExists(categoryId, "Category", categoryMap);
 
-  if (locationId) {
-    const locationMap = loadNamedEntities(db, "locations", workspaceId, uniqueValues([locationId]));
-    ensureEntityExists(locationId, "Default location", locationMap);
+  const trimmedLocationId = locationId?.trim();
+  if (!trimmedLocationId) {
+    return null;
   }
+
+  const locationMap = loadNamedEntities(db, "locations", workspaceId, uniqueValues([trimmedLocationId]));
+  if (locationMap.has(trimmedLocationId)) {
+    return trimmedLocationId;
+  }
+
+  if (options.allowMissingLocation) {
+    return null;
+  }
+
+  throw new Error("Default location not found.");
 };
 
 const normalizeOptionalText = (value?: string) => {
@@ -1441,7 +1459,13 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
     }
 
     ensureInternalCodeAvailable(db, input.workspaceId, internalCode, input.assetId);
-    ensureAssetEditableReferences(db, input.workspaceId, input.categoryId, input.defaultLocationId ?? undefined);
+    const resolvedDefaultLocationId = ensureAssetEditableReferences(
+      db,
+      input.workspaceId,
+      input.categoryId,
+      input.defaultLocationId ?? undefined,
+      { allowMissingLocation: true },
+    );
 
     db.exec("BEGIN");
 
@@ -1489,7 +1513,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         typeof input.replacementValue === "number" ? input.replacementValue : null,
         typeof input.currentBookValue === "number" ? input.currentBookValue : null,
         normalizeOptionalText(input.ownershipType) ?? "owned",
-        input.defaultLocationId?.trim() || null,
+        resolvedDefaultLocationId,
         primaryCode.codeValue,
         normalizeOptionalText(input.notes),
         input.isActive === false ? 0 : 1,
@@ -1501,7 +1525,7 @@ export const createAssetMutationService = (db: DatabaseSync) => ({
         kind: "asset_profile_updated",
         internalCode,
         categoryId: input.categoryId,
-        defaultLocationId: input.defaultLocationId?.trim() || null,
+        defaultLocationId: resolvedDefaultLocationId,
         primaryCodeValue: primaryCode.codeValue,
         purchasePrice: input.purchasePrice ?? null,
         additionalCosts: input.additionalCosts ?? null,

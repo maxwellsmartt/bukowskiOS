@@ -69,7 +69,14 @@ export const AssetEditorPanel = ({
   const [model, setModel] = useState(initialValue?.model ?? "");
   const [serialNumber, setSerialNumber] = useState(initialValue?.serialNumber ?? "");
   const [description, setDescription] = useState(initialValue?.description ?? "");
-  const [defaultLocationId, setDefaultLocationId] = useState(initialValue?.defaultLocationId ?? "");
+  // Guard against orphaned/legacy location references (e.g. left by the Rentman
+  // 2021 import): if the stored location is no longer in the catalog, start the
+  // field empty so the displayed placeholder matches what actually gets saved.
+  const [defaultLocationId, setDefaultLocationId] = useState(
+    initialValue?.defaultLocationId && locations.some((location) => location.id === initialValue.defaultLocationId)
+      ? initialValue.defaultLocationId
+      : "",
+  );
   const [conditionStatus, setConditionStatus] = useState(initialValue?.conditionStatus ?? "Good");
   const [notes, setNotes] = useState(initialValue?.notes ?? "");
   const [purchasePrice, setPurchasePrice] = useState(

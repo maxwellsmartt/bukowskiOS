@@ -579,6 +579,63 @@ describe("asset mutation service", () => {
     cleanup();
   });
 
+  it("tolerates a default location missing from the catalog when updating an asset", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-orphan-location-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createAssetMutationService(database);
+
+    const before = reads.getAssetDetail("asset-legacy-rentman-1");
+
+    // Legacy assets (e.g. from the Rentman 2021 import) can carry an orphaned
+    // default-location reference that no longer exists in the catalog. Editing
+    // them — including just flipping the condition — must not be blocked by it.
+    const result = mutations.updateAsset({
+      commandId: "cmd-test-asset-orphan-location",
+      workspaceId: "workspace-metadata",
+      assetId: "asset-legacy-rentman-1",
+      name: before.asset!.name,
+      internalCode: before.editor!.internalCode,
+      categoryId: before.editor!.categoryId,
+      defaultLocationId: "loc-deleted-from-catalog",
+      conditionStatus: "Damaged",
+      actorType: "user",
+      sourceChannel: "desktop",
+    });
+
+    expect(result.repeated).toBe(false);
+
+    const after = reads.getAssetDetail("asset-legacy-rentman-1");
+    expect(after.asset?.condition).toBe("Damaged");
+    // The missing location is dropped rather than persisted.
+    expect(after.editor?.defaultLocationId ?? null).toBeNull();
+
+    cleanup();
+  });
+
+  it("still rejects an asset update whose category does not exist", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-asset-bad-category-test");
+    const reads = createFoundationReadService(database);
+    const mutations = createAssetMutationService(database);
+
+    const before = reads.getAssetDetail("asset-legacy-rentman-1");
+
+    expect(() =>
+      mutations.updateAsset({
+        commandId: "cmd-test-asset-bad-category",
+        workspaceId: "workspace-metadata",
+        assetId: "asset-legacy-rentman-1",
+        name: before.asset!.name,
+        internalCode: before.editor!.internalCode,
+        categoryId: "cat-does-not-exist",
+        conditionStatus: "Good",
+        actorType: "user",
+        sourceChannel: "desktop",
+      }),
+    ).toThrow("Category not found.");
+
+    cleanup();
+  });
+
   it("filters asset lists by workspace id", () => {
     const { cleanup, database } = createTestDatabase("bukowski-asset-workspace-filter");
     const reads = createFoundationReadService(database);
