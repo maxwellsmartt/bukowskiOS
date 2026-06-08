@@ -754,6 +754,18 @@
         "shortDescription": "Short description",
         "optionalNote": "Optional note"
       }
+    },
+    "status": {
+      "available": "Available",
+      "assigned": "Assigned",
+      "checkedOut": "In use",
+      "split": "Split allocation",
+      "maintenance": "Maintenance",
+      "retired": "Retired",
+      "partial": {
+        "assigned": "Assigned {{ratio}}",
+        "checkout": "In use {{ratio}}"
+      }
     }
   },
   "finance": {

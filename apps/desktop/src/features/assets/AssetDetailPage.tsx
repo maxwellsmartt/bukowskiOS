@@ -15,6 +15,7 @@ import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useLocale } from "@shared/hooks/useLocale";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { resolveAssetAvailability, translateAssetAvailabilityLabel, translateAssetAvailabilityNextAction, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
+import { presentAssetStatus } from "@shared/lib/assetStatusPresentation";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { printScannableLabel } from "@shared/utils/printScannableLabel";
 
@@ -185,9 +186,10 @@ export const AssetDetailPage = () => {
         title={data.asset.name}
         aside={
           <span data-tooltip={t("assets.detail.summary.lifecycleTooltip")}>
-            <StatusBadge tone={data.asset.status === "Maintenance" ? "warning" : data.asset.status === "Retired" ? "critical" : "info"}>
-              {data.asset.status}
-            </StatusBadge>
+            {(() => {
+              const presented = presentAssetStatus(data.asset.status, t);
+              return <StatusBadge tone={presented.tone}>{presented.label}</StatusBadge>;
+            })()}
           </span>
         }
       >

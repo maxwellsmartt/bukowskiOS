@@ -22,6 +22,7 @@ import { useShellContext } from "@shared/hooks/useShellContext";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { resolveAssetAvailability, summarizeUnavailableAssets, translateAssetAvailabilityLabel, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
 import { formatAssetStockDetailRows, formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
+import { presentAssetStatus } from "@shared/lib/assetStatusPresentation";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
@@ -1471,7 +1472,16 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         ),
       },
       { key: "tracking", label: t("assets.columns.tracking"), width: 110, minWidth: 96, render: (row: (typeof assets)[number]) => row.tracking },
-      { key: "status", label: t("assets.columns.status"), width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.status },
+      {
+        key: "status",
+        label: t("assets.columns.status"),
+        width: 138,
+        minWidth: 112,
+        render: (row: (typeof assets)[number]) => {
+          const presented = presentAssetStatus(row.status, t);
+          return <StatusBadge tone={presented.tone}>{presented.label}</StatusBadge>;
+        },
+      },
       { key: "condition", label: t("assets.columns.condition"), width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.condition },
       { key: "custody", label: t("assets.columns.custody"), width: 112, minWidth: 96, render: (row: (typeof assets)[number]) => row.custody },
       { key: "location", label: t("assets.columns.location"), width: 190, minWidth: 150, render: (row: (typeof assets)[number]) => row.location },

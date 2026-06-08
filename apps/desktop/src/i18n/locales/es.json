@@ -756,6 +756,18 @@
         "shortDescription": "Descripción corta",
         "optionalNote": "Nota opcional"
       }
+    },
+    "status": {
+      "available": "Disponible",
+      "assigned": "Asignado",
+      "checkedOut": "En uso",
+      "split": "Asignación mixta",
+      "maintenance": "Mantenimiento",
+      "retired": "Retirado",
+      "partial": {
+        "assigned": "Asignado {{ratio}}",
+        "checkout": "En uso {{ratio}}"
+      }
     }
   },
   "finance": {
