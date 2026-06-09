@@ -21,7 +21,7 @@
         "budget": "Presupuesto"
       },
       "projects": {
-        "schedule": "Calendario general",
+        "schedule": "Timeline",
         "projects": "Proyectos"
       },
       "assets": {
@@ -2211,13 +2211,47 @@
     "timeline": {
       "datesPending": "Fechas pendientes",
       "detailsUnavailable": "Detalles no disponibles",
+      "controls": {
+        "density": "Densidad",
+        "move": "Mover",
+        "range": "Rango",
+        "view": "Vista"
+      },
+      "density": {
+        "balanced": "Balanceada",
+        "compact": "Compacta",
+        "expanded": "Amplia"
+      },
+      "empty": {
+        "body": "Crea un proyecto con fechas o completa la agenda de los proyectos existentes para que aparezcan aquí.",
+        "title": "Todavía no hay proyectos calendarizados"
+      },
       "gridDensity": "Densidad del calendario",
+      "hints": {
+        "drag": "Arrastra el calendario para moverte por fechas.",
+        "label": "Ayudas de uso del calendario",
+        "zoom": "Usa Cmd/Ctrl + scroll sobre el calendario para cambiar zoom."
+      },
       "incident": "Incidente",
       "loading": "Cargando calendario...",
       "more": "+{{count}} más",
+      "nextWindow": "Ver ventana siguiente",
+      "previousWindow": "Ver ventana anterior",
       "projectsUnits": "Proyectos / unidades",
       "showMore": "Mostrar más proyectos",
-      "title": "Calendario",
+      "summary": {
+        "activeSignals": "Señales",
+        "complete": "Todo cargado",
+        "loadedProjects": "Cargados",
+        "moreAvailable": "Hay más",
+        "noActiveSignals": "Sin alertas",
+        "pageStatus": "Estado",
+        "projectsUnits": "{{projects}} proyectos · {{units}} unidades",
+        "signalBreakdown": "{{conflicts}} conflictos · {{incidents}} incidentes",
+        "unscheduled": "Sin fechas",
+        "window": "Ventana"
+      },
+      "title": "Timeline",
       "today": "Hoy",
       "unitsCount": "{{count}} unidades",
       "scale": {
@@ -3632,7 +3666,8 @@
       "title": "Resumen del proyecto"
     },
     "schedule": {
-      "title": "Agenda de proyectos"
+      "body": "Vista global para revisar fechas, unidades, señales operativas y proyectos que todavía necesitan calendario.",
+      "title": "Timeline"
     },
     "registry": {
       "title": "Proyectos",

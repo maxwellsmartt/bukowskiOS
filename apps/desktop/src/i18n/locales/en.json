@@ -21,7 +21,7 @@
         "budget": "Budget"
       },
       "projects": {
-        "schedule": "Schedule Overview",
+        "schedule": "Timeline",
         "projects": "Projects"
       },
       "assets": {
@@ -2207,13 +2207,47 @@
     "timeline": {
       "datesPending": "Dates pending",
       "detailsUnavailable": "Details unavailable",
+      "controls": {
+        "density": "Density",
+        "move": "Move",
+        "range": "Range",
+        "view": "View"
+      },
+      "density": {
+        "balanced": "Balanced",
+        "compact": "Compact",
+        "expanded": "Wide"
+      },
+      "empty": {
+        "body": "Create a project with dates or complete the schedule for existing projects so they appear here.",
+        "title": "No scheduled projects yet"
+      },
       "gridDensity": "Timeline grid density",
+      "hints": {
+        "drag": "Drag the schedule to move across dates.",
+        "label": "Schedule usage hints",
+        "zoom": "Use Cmd/Ctrl + scroll over the schedule to change zoom."
+      },
       "incident": "Incident",
       "loading": "Loading schedule...",
       "more": "+{{count}} more",
+      "nextWindow": "View next window",
+      "previousWindow": "View previous window",
       "projectsUnits": "Projects / units",
       "showMore": "Show more projects",
-      "title": "Schedule",
+      "summary": {
+        "activeSignals": "Signals",
+        "complete": "All loaded",
+        "loadedProjects": "Loaded",
+        "moreAvailable": "More available",
+        "noActiveSignals": "No alerts",
+        "pageStatus": "Status",
+        "projectsUnits": "{{projects}} projects · {{units}} units",
+        "signalBreakdown": "{{conflicts}} conflicts · {{incidents}} incidents",
+        "unscheduled": "Unscheduled",
+        "window": "Window"
+      },
+      "title": "Timeline",
       "today": "Today",
       "unitsCount": "{{count}} units",
       "scale": {
@@ -3628,7 +3662,8 @@
       "title": "Project Overview"
     },
     "schedule": {
-      "title": "Schedule Overview"
+      "body": "Global view for reviewing dates, units, operational signals, and projects that still need scheduling.",
+      "title": "Timeline"
     },
     "registry": {
       "title": "Projects",

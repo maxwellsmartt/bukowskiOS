@@ -726,6 +726,17 @@ const resolveDateFromClientX = (clientX: number, rect: DOMRect, rangeStart: stri
 
 const shiftAnchorDate = (anchorDate: string, deltaDays: number) => addDays(anchorDate, deltaDays);
 
+const clampFloatingLayerPosition = (
+  left: number,
+  top: number,
+  containerRect: DOMRect,
+  estimatedWidth: number,
+  estimatedHeight: number,
+) => ({
+  left: Math.min(Math.max(left, 12), Math.max(containerRect.width - estimatedWidth - 12, 12)),
+  top: Math.min(Math.max(top, 12), Math.max(containerRect.height - estimatedHeight - 12, 12)),
+});
+
 const deriveUnitPalette = (
   projectPalette: (typeof colorMap)[keyof typeof colorMap],
   unitIndex: number,
@@ -920,7 +931,6 @@ const TimelineIncidentMarkers = ({
 
 const TimelineLane = ({
   bands,
-  interactionHandlers,
   isExpanded,
   onBarHover,
   onBarLeave,
@@ -935,7 +945,6 @@ const TimelineLane = ({
   language,
 }: {
   bands: ReturnType<typeof buildTimelineBands>;
-  interactionHandlers: TimelineInteractionHandlers;
   isExpanded: boolean;
   onBarHover: (
     event: ReactPointerEvent<HTMLDivElement>,
@@ -1001,14 +1010,7 @@ const TimelineLane = ({
                 </div>
 
         <div className="timeline-track">
-          <div
-                className="timeline-track-grid"
-            onPointerCancel={interactionHandlers.onPointerCancel}
-            onPointerDown={interactionHandlers.onPointerDown}
-            onPointerMove={interactionHandlers.onPointerMove}
-            onPointerUp={interactionHandlers.onPointerUp}
-            onWheel={interactionHandlers.onWheel}
-          >
+          <div className="timeline-track-grid">
             <TimelineGrid
               bands={bands}
               density={density}
@@ -1120,14 +1122,7 @@ const TimelineLane = ({
                 </div>
 
                 <div className="timeline-track">
-                  <div
-                    className="timeline-track-grid"
-                    onPointerCancel={interactionHandlers.onPointerCancel}
-                    onPointerDown={interactionHandlers.onPointerDown}
-                    onPointerMove={interactionHandlers.onPointerMove}
-                    onPointerUp={interactionHandlers.onPointerUp}
-                    onWheel={interactionHandlers.onWheel}
-                  >
+                  <div className="timeline-track-grid">
                     <TimelineGrid
                       bands={bands}
                       density={density}
@@ -1322,6 +1317,23 @@ export const OverviewScheduleTimeline = ({
     [effectiveAnchorDate, gridDensity, range, scale],
   );
   const visibleWindowDays = diffDaysInclusive(visibleWindow.start, visibleWindow.end);
+  const timelineSummary = useMemo(() => {
+    const loadedProjects = snapshot.projects.length;
+    const visibleUnits = snapshot.projects.reduce((total, project) => total + project.units.length, 0);
+    const conflicts = snapshot.projects.reduce((total, project) => total + project.conflictCount, 0);
+    const incidents = snapshot.projects.reduce((total, project) => total + project.activeIncidentCount, 0);
+    const activeSignals = conflicts + incidents;
+
+    return {
+      activeSignals,
+      conflicts,
+      incidents,
+      loadedProjects,
+      unscheduled: snapshot.unscheduled.length,
+      visibleUnits,
+    };
+  }, [snapshot.projects, snapshot.unscheduled.length]);
+  const hasTimelineData = timelineSummary.loadedProjects > 0 || timelineSummary.unscheduled > 0;
   const clampedPlayheadDate =
     visibleWindow.start && visibleWindow.end
       ? clampDate(currentDate, visibleWindow.start, visibleWindow.end)
@@ -1388,12 +1400,19 @@ export const OverviewScheduleTimeline = ({
     }
 
     const title = parentName ? `${parentName} · ${row.name}` : row.name;
+    const position = clampFloatingLayerPosition(
+      event.clientX - containerRect.left + 14,
+      event.clientY - containerRect.top - 18,
+      containerRect,
+      280,
+      92,
+    );
     setTooltip({
       label: title,
-      left: event.clientX - containerRect.left + 14,
+      left: position.left,
       status: row.status,
       subtitle: formatRangeLabel(row.startDate, row.endDate, language),
-      top: event.clientY - containerRect.top - 18,
+      top: position.top,
     });
   };
 
@@ -1410,6 +1429,13 @@ export const OverviewScheduleTimeline = ({
       return;
     }
 
+    const position = clampFloatingLayerPosition(
+      event.clientX - containerRect.left + 14,
+      event.clientY - containerRect.top + 14,
+      containerRect,
+      332,
+      220,
+    );
     setSignalPopover({
       items:
         items.length > 0
@@ -1421,10 +1447,10 @@ export const OverviewScheduleTimeline = ({
                 meta: null,
               },
             ],
-      left: event.clientX - containerRect.left + 14,
+      left: position.left,
       remainingCount: Math.max(total - items.length, 0),
       title,
-      top: event.clientY - containerRect.top + 14,
+      top: position.top,
     });
   };
 
@@ -1432,6 +1458,11 @@ export const OverviewScheduleTimeline = ({
 
   const handleTrackPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) {
+      return;
+    }
+
+    const interactiveTarget = (event.target as HTMLElement | null)?.closest("button, input, a, select, textarea, [role='button']");
+    if (interactiveTarget) {
       return;
     }
 
@@ -1541,73 +1572,163 @@ export const OverviewScheduleTimeline = ({
 
   return (
     <SurfaceCard
-      className="timeline-surface"
+      className="surface-card--fill timeline-surface"
       title={t("overview.timeline.title")}
       aside={
         <div className="timeline-toolbar">
-          <div className="timeline-control-group">
-            {(Object.entries(scaleLabelMap) as Array<[ScheduleTimelineScale, string]>).map(([value, label]) => (
+          <div className="timeline-toolbar-cluster">
+            <span className="timeline-toolbar-label">{t("overview.timeline.controls.view")}</span>
+            <div className="timeline-control-group">
+              {(Object.entries(scaleLabelMap) as Array<[ScheduleTimelineScale, string]>).map(([value, label]) => (
+                <button
+                  key={value}
+                  className={`timeline-control-button${scale === value ? " active" : ""}`}
+                  onClick={() => onScaleChange(value)}
+                  title={t(label)}
+                  type="button"
+                >
+                  {t(label)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="timeline-toolbar-cluster">
+            <span className="timeline-toolbar-label">{t("overview.timeline.controls.range")}</span>
+            <div className="timeline-control-group">
+              {(Object.entries(rangeLabelMap) as Array<[ScheduleTimelineRange, string]>).map(([value, label]) => (
+                <button
+                  key={value}
+                  className={`timeline-control-button${range === value ? " active" : ""}`}
+                  onClick={() => onRangeChange(value)}
+                  title={label}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="timeline-toolbar-cluster">
+            <span className="timeline-toolbar-label">{t("overview.timeline.controls.move")}</span>
+            <div className="timeline-control-group">
               <button
-                key={value}
-                className={`timeline-control-button${scale === value ? " active" : ""}`}
-                onClick={() => onScaleChange(value)}
+                aria-label={t("overview.timeline.previousWindow")}
+                className="timeline-icon-button"
+                onClick={() => shiftWindow(-1)}
+                title={t("overview.timeline.previousWindow")}
                 type="button"
               >
-                {t(label)}
+                <ArrowLeft size={14} />
               </button>
-            ))}
-          </div>
-
-          <div className="timeline-control-group">
-            {(Object.entries(rangeLabelMap) as Array<[ScheduleTimelineRange, string]>).map(([value, label]) => (
               <button
-                key={value}
-                className={`timeline-control-button${range === value ? " active" : ""}`}
-                onClick={() => onRangeChange(value)}
+                aria-label={t("overview.timeline.today")}
+                className="timeline-icon-button"
+                onClick={setTodayAnchor}
+                title={t("overview.timeline.today")}
                 type="button"
               >
-                {label}
+                <Crosshair size={14} />
+                <span>{t("overview.timeline.today")}</span>
               </button>
-            ))}
+              <button
+                aria-label={t("overview.timeline.nextWindow")}
+                className="timeline-icon-button"
+                onClick={() => shiftWindow(1)}
+                title={t("overview.timeline.nextWindow")}
+                type="button"
+              >
+                <ArrowRight size={14} />
+              </button>
+            </div>
           </div>
 
-          <div className="timeline-control-group">
-            <button className="timeline-icon-button" onClick={() => shiftWindow(-1)} type="button">
-              <ArrowLeft size={14} />
-            </button>
-            <button className="timeline-icon-button" onClick={setTodayAnchor} type="button">
-              <Crosshair size={14} />
-              <span>{t("overview.timeline.today")}</span>
-            </button>
-            <button className="timeline-icon-button" onClick={() => shiftWindow(1)} type="button">
-              <ArrowRight size={14} />
-            </button>
-          </div>
-
-          <div className="timeline-control-group timeline-control-group-grid">
-            <input
-              aria-label={t("overview.timeline.gridDensity")}
-              className="timeline-grid-density-slider"
-              max={2}
-              min={0}
-              onPointerCancel={() => setIsAdjustingGridDensity(false)}
-              onPointerDown={() => setIsAdjustingGridDensity(true)}
-              onPointerUp={() => setIsAdjustingGridDensity(false)}
-              onChange={(event) => {
-                const nextValue = Number.parseInt(event.target.value, 10);
-                setGridDensity(nextValue <= 0 ? "compact" : nextValue >= 2 ? "expanded" : "balanced");
-              }}
-              step={1}
-              type="range"
-              value={gridDensityValue}
-            />
+          <div className="timeline-toolbar-cluster timeline-toolbar-cluster-density">
+            <span className="timeline-toolbar-label">{t("overview.timeline.controls.density")}</span>
+            <div className="timeline-control-group timeline-control-group-grid">
+              <span className="timeline-density-caption">{t(`overview.timeline.density.${gridDensity}`)}</span>
+              <input
+                aria-label={t("overview.timeline.gridDensity")}
+                className="timeline-grid-density-slider"
+                max={2}
+                min={0}
+                onPointerCancel={() => setIsAdjustingGridDensity(false)}
+                onPointerDown={() => setIsAdjustingGridDensity(true)}
+                onPointerUp={() => setIsAdjustingGridDensity(false)}
+                onChange={(event) => {
+                  const nextValue = Number.parseInt(event.target.value, 10);
+                  setGridDensity(nextValue <= 0 ? "compact" : nextValue >= 2 ? "expanded" : "balanced");
+                }}
+                step={1}
+                title={t("overview.timeline.gridDensity")}
+                type="range"
+                value={gridDensityValue}
+              />
+            </div>
           </div>
         </div>
       }
     >
+      <div className="timeline-summary-strip">
+        <span>
+          <small>{t("overview.timeline.summary.window")}</small>
+          <strong>{formatRangeLabel(visibleWindow.start, visibleWindow.end, language)}</strong>
+        </span>
+        <span>
+          <small>{t("overview.timeline.summary.loadedProjects")}</small>
+          <strong>
+            {t("overview.timeline.summary.projectsUnits", {
+              projects: timelineSummary.loadedProjects,
+              units: timelineSummary.visibleUnits,
+            })}
+          </strong>
+        </span>
+        <span>
+          <small>{t("overview.timeline.summary.unscheduled")}</small>
+          <strong>{timelineSummary.unscheduled}</strong>
+        </span>
+        <span className={timelineSummary.activeSignals ? "has-alerts" : ""}>
+          <small>{t("overview.timeline.summary.activeSignals")}</small>
+          <strong>
+            {timelineSummary.activeSignals
+              ? t("overview.timeline.summary.signalBreakdown", {
+                  conflicts: timelineSummary.conflicts,
+                  incidents: timelineSummary.incidents,
+                })
+              : t("overview.timeline.summary.noActiveSignals")}
+          </strong>
+        </span>
+        <span>
+          <small>{t("overview.timeline.summary.pageStatus")}</small>
+          <strong>{snapshot.hasMoreProjects ? t("overview.timeline.summary.moreAvailable") : t("overview.timeline.summary.complete")}</strong>
+        </span>
+      </div>
+
+      <div className="timeline-interaction-hints" aria-label={t("overview.timeline.hints.label")}>
+        <span>{t("overview.timeline.hints.drag")}</span>
+        <span>{t("overview.timeline.hints.zoom")}</span>
+      </div>
+
       {isLoading && !snapshot.projects.length && !snapshot.unscheduled.length ? <div className="empty-state">{t("overview.timeline.loading")}</div> : null}
 
-      <div className={`timeline-layout${isTimelineInteracting ? " is-interacting" : ""}`} ref={timelineRootRef}>
+      {!isLoading && !hasTimelineData ? (
+        <div className="timeline-empty-panel">
+          <strong>{t("overview.timeline.empty.title")}</strong>
+          <span>{t("overview.timeline.empty.body")}</span>
+        </div>
+      ) : null}
+
+      <div
+        className={`timeline-layout${isTimelineInteracting ? " is-interacting" : ""}${hasTimelineData ? "" : " is-empty"}`}
+        onClick={interactionHandlers.onClick}
+        onPointerCancel={interactionHandlers.onPointerCancel}
+        onPointerDown={interactionHandlers.onPointerDown}
+        onPointerMove={interactionHandlers.onPointerMove}
+        onPointerUp={interactionHandlers.onPointerUp}
+        onWheel={interactionHandlers.onWheel}
+        ref={timelineRootRef}
+      >
         <div className="timeline-main">
           <div className="timeline-shared-playhead" style={sharedPlayheadStyle} />
           <div className="timeline-shared-playhead-chip" style={sharedPlayheadStyle}>
@@ -1619,15 +1740,7 @@ export const OverviewScheduleTimeline = ({
               <span className="timeline-header-label">{t("overview.timeline.projectsUnits")}</span>
             </div>
 
-            <div
-              className="timeline-header-panel"
-              onClick={interactionHandlers.onClick}
-              onPointerCancel={interactionHandlers.onPointerCancel}
-              onPointerDown={interactionHandlers.onPointerDown}
-              onPointerMove={interactionHandlers.onPointerMove}
-              onPointerUp={interactionHandlers.onPointerUp}
-              onWheel={interactionHandlers.onWheel}
-            >
+            <div className="timeline-header-panel">
               <div className="timeline-header-bands timeline-header-bands-months">
                 {visibleMonthBands.map((band) => (
                   <div
@@ -1679,7 +1792,6 @@ export const OverviewScheduleTimeline = ({
               <TimelineLane
                 key={project.id}
                 bands={bands}
-                interactionHandlers={interactionHandlers}
                 isExpanded={expandedProjectIds.includes(project.id)}
                 onBarHover={updateTooltip}
                 onBarLeave={clearTooltip}

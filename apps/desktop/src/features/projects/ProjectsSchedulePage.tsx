@@ -68,7 +68,7 @@ export const ProjectsSchedulePage = () => {
   }, [timelineRange, timelineScale]);
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--fill projects-schedule-page-stack">
       <SectionHeader title={t("projects.schedule.title")} />
 
       <OverviewScheduleTimeline
