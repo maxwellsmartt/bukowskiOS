@@ -1476,6 +1476,9 @@ const createRuntime = async (): Promise<LocalDatabaseRuntime> => {
         return rows.length ? [{ table: "todos", onConflict: "id", rows }] : [];
       }
       case "reminder": {
+        if (row.entity_id.startsWith("treasury-card-payment-")) {
+          return [];
+        }
         const rows = selectAll("SELECT * FROM reminders WHERE id = ?", row.entity_id);
         return rows.length ? [{ table: "reminders", onConflict: "id", rows }] : [];
       }

@@ -378,6 +378,16 @@ describe("security regression checks", () => {
     expect(collaboratorPullSource).toContain("!canPullCollaboratorPayments");
   });
 
+  it("keeps treasury card reminder sync compatible with Supabase uuid ids", () => {
+    const treasuryMutationSource = readText("apps/desktop/electron/main/services/data/treasuryMutationService.ts");
+    const localDatabaseSource = readText("apps/desktop/electron/main/services/data/localDatabase.ts");
+
+    expect(treasuryMutationSource).toContain("uuidFromStableKey(`treasury-card-payment:${paymentInstrumentId}`)");
+    expect(treasuryMutationSource).toContain("legacyCardPaymentReminderId");
+    expect(localDatabaseSource).toContain('row.entity_id.startsWith("treasury-card-payment-")');
+    expect(treasuryMutationSource).not.toContain("const cardPaymentReminderId = (paymentInstrumentId: string) => `treasury-card-payment-${paymentInstrumentId}`;");
+  });
+
   it("does not expose project budget targets to generic workspace members", () => {
     const migrationText = readText("supabase/migrations/20260605130000_finance_access_role_hardening.sql");
 

@@ -70,7 +70,15 @@ const validateCreditCardReminderUser = (input: {
   }
 };
 
-const cardPaymentReminderId = (paymentInstrumentId: string) => `treasury-card-payment-${paymentInstrumentId}`;
+const uuidFromStableKey = (key: string) => {
+  const hex = createHash("sha256").update(key).digest("hex").slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+};
+
+const legacyCardPaymentReminderId = (paymentInstrumentId: string) => `treasury-card-payment-${paymentInstrumentId}`;
+
+const cardPaymentReminderId = (paymentInstrumentId: string) =>
+  uuidFromStableKey(`treasury-card-payment:${paymentInstrumentId}`);
 
 const ensureReminderTable = (db: DatabaseSync) => {
   db.exec(`
@@ -591,8 +599,12 @@ const syncCardPaymentReminder = (
 ) => {
   ensureReminderTable(db);
   const reminderId = cardPaymentReminderId(input.paymentInstrumentId);
+  const legacyReminderId = legacyCardPaymentReminderId(input.paymentInstrumentId);
+  db.prepare(`DELETE FROM reminders WHERE id = ? AND workspace_id = ?`).run(legacyReminderId, input.workspaceId);
   if (input.instrumentKind !== "credit_card" || !input.isActive) {
-    const deleted = db.prepare(`DELETE FROM reminders WHERE id = ? AND workspace_id = ?`).run(reminderId, input.workspaceId);
+    const deleted = db
+      .prepare(`DELETE FROM reminders WHERE id IN (?, ?) AND workspace_id = ?`)
+      .run(reminderId, legacyReminderId, input.workspaceId);
     if (Number(deleted.changes ?? 0) > 0) {
       enqueueOutbox(db, input.workspaceId, "reminder", reminderId, { id: reminderId }, `sync-reminder-${reminderId}`, now, "delete");
     }
