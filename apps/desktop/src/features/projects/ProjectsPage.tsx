@@ -1,4 +1,4 @@
-import { Archive } from "lucide-react";
+import { Archive, ExternalLink, GitCompareArrows, PanelRightOpen, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -75,12 +75,44 @@ export const ProjectsPage = () => {
   });
   const { data, error, isLoading } = useProjectsRegistry(projectControls.query);
   const { activeProjectId, openProject, setActiveProjectId, setShowArchivedProjects } = useShellContext();
-  const { addItems, hasItem } = useCompareTray();
+  const { addItems } = useCompareTray();
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
-  const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = useProjectDetail(activeProjectId);
+  const selectedProjects = useMemo(() => data.filter((project) => selectedRowIds.includes(project.id)), [data, selectedRowIds]);
+  const detailProjectId = selectedRowIds.length === 1 ? selectedRowIds[0] ?? null : selectedRowIds.length > 1 ? null : activeProjectId;
+  const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = useProjectDetail(detailProjectId);
+
+  const addProjectsToCompare = (projects: ProjectCardRow[]) =>
+    addItems(
+      projects.map((project) => ({
+        id: project.id,
+        entityType: "project" as const,
+        label: `${project.code} · ${project.name}`,
+        subtitle: isPlaceholderValue(project.client)
+          ? project.status
+          : `${project.client} · ${project.status}`,
+        meta: project.startDate || project.endDate ? `${project.startDate ?? t("projects.fallbacks.open")} - ${project.endDate ?? t("projects.fallbacks.open")}` : undefined,
+      })),
+    );
+
+  const addSelectedProjectsToCompare = () => addProjectsToCompare(selectedProjects);
+
+  const openProjectFromRegistry = (project: ProjectCardRow) => {
+    if (project.isArchived) {
+      setShowArchivedProjects(true);
+    }
+
+    openProject(project.id);
+  };
+
+  const handleSelectedRowIdsChange = (nextRowIds: string[]) => {
+    setSelectedRowIds(nextRowIds);
+    if (nextRowIds.length === 1) {
+      setActiveProjectId(nextRowIds[0] ?? null);
+    }
+  };
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--fill projects-page-stack">
       <SectionHeader title={t("projects.registry.title")} />
 
       {error ? <div className="empty-state">{t("projects.registry.unavailable", { message: error })}</div> : null}
@@ -100,24 +132,15 @@ export const ProjectsPage = () => {
           <div className="selection-action-buttons">
             <button
               className="ghost-control"
-              onClick={() =>
-                addItems(
-                  data
-                    .filter((project) => selectedRowIds.includes(project.id))
-                    .map((project) => ({
-                      id: project.id,
-                      entityType: "project" as const,
-                      label: `${project.code} · ${project.name}`,
-                      subtitle: isPlaceholderValue(project.client)
-                        ? project.status
-                        : `${project.client} · ${project.status}`,
-                      meta: project.startDate || project.endDate ? `${project.startDate ?? t("projects.fallbacks.open")} - ${project.endDate ?? t("projects.fallbacks.open")}` : undefined,
-                    })),
-                )
-              }
+              onClick={addSelectedProjectsToCompare}
               type="button"
             >
+              <GitCompareArrows size={14} />
               {t("projects.registry.addToCompare")}
+            </button>
+            <button className="ghost-control" onClick={() => setSelectedRowIds([])} type="button">
+              <X size={14} />
+              {t("projects.registry.clearSelection")}
             </button>
           </div>
         </div>
@@ -130,7 +153,7 @@ export const ProjectsPage = () => {
         minWidth={360}
         storageKey={uiPreferenceKeys.projectsSideRailWidth}
       >
-        <SurfaceCard className="projects-registry-card" title={t("projects.registry.cardTitle")}>
+        <SurfaceCard className="surface-card--fill projects-registry-card" title={t("projects.registry.cardTitle")}>
           <ListToolbar
             activeSortLabel={
               projectControls.activeSortOption
@@ -161,6 +184,7 @@ export const ProjectsPage = () => {
           <DataTable
             activeRowId={activeProjectId}
             autoScrollToActiveRow
+            fillParent
             columns={[
               {
                 key: "project",
@@ -267,12 +291,28 @@ export const ProjectsPage = () => {
             getRowId={(row) => row.id}
             onRowClick={(row) => setActiveProjectId(row.id)}
             onRowDoubleClick={(row) => {
-              if (row.isArchived) {
-                setShowArchivedProjects(true);
-              }
-
-              openProject(row.id);
+              openProjectFromRegistry(row);
             }}
+            rowActions={(row) => [
+              {
+                key: "open-detail",
+                label: t("projects.registry.rowActions.openDetail"),
+                icon: <PanelRightOpen size={14} />,
+                onSelect: () => setActiveProjectId(row.id),
+              },
+              {
+                key: "open-project",
+                label: t("projects.registry.rowActions.openProject"),
+                icon: <ExternalLink size={14} />,
+                onSelect: () => openProjectFromRegistry(row),
+              },
+              {
+                key: "add-to-compare",
+                label: t("projects.registry.rowActions.addToCompare"),
+                icon: <GitCompareArrows size={14} />,
+                onSelect: () => addProjectsToCompare([row]),
+              },
+            ]}
             onSortRequest={projectControls.handleColumnSortRequest}
             persistKey="projects-registry"
             rows={data}
@@ -297,11 +337,67 @@ export const ProjectsPage = () => {
                   }
                 : null
             }
-            onSelectedRowIdsChange={setSelectedRowIds}
+            onSelectedRowIdsChange={handleSelectedRowIdsChange}
           />
         </SurfaceCard>
 
-        <ProjectDetailPanel data={detail} error={detailError} isLoading={detailLoading} onIncidentCreated={reloadDetail} />
+        {selectedRowIds.length > 1 ? (
+          <SurfaceCard className="project-detail-stack project-selection-detail-card" title={t("projects.registry.selectionDetail.title")}>
+            <div className="project-selection-summary">
+              <span>
+                <small>{t("projects.registry.selectionDetail.projects")}</small>
+                <strong>{selectedProjects.length}</strong>
+              </span>
+              <span>
+                <small>{t("projects.registry.selectionDetail.assets")}</small>
+                <strong>{selectedProjects.reduce((total, project) => total + project.assetCount, 0)}</strong>
+              </span>
+              <span>
+                <small>{t("projects.registry.selectionDetail.incidents")}</small>
+                <strong>{selectedProjects.reduce((total, project) => total + project.incidentCount, 0)}</strong>
+              </span>
+              <span>
+                <small>{t("projects.registry.selectionDetail.units")}</small>
+                <strong>{selectedProjects.reduce((total, project) => total + project.activeUnitCount, 0)}</strong>
+              </span>
+            </div>
+            <p className="project-selection-helper">{t("projects.registry.selectionDetail.body")}</p>
+            <div className="selection-action-buttons project-selection-actions">
+              <button className="ghost-control" onClick={addSelectedProjectsToCompare} type="button">
+                <GitCompareArrows size={14} />
+                {t("projects.registry.addToCompare")}
+              </button>
+              <button className="ghost-control" onClick={() => setSelectedRowIds([])} type="button">
+                <X size={14} />
+                {t("projects.registry.clearSelection")}
+              </button>
+            </div>
+            <div className="queue-list project-scroll-list">
+              {selectedProjects.map((project) => (
+                <button
+                  key={project.id}
+                  className="queue-item queue-item-button"
+                  onClick={() => {
+                    setSelectedRowIds([project.id]);
+                    setActiveProjectId(project.id);
+                  }}
+                  type="button"
+                >
+                  <div className="identity-cell">
+                    <span className="identity-title">{project.name}</span>
+                    <span className="identity-meta">
+                      {project.code}
+                      {isPlaceholderValue(project.client) ? "" : ` · ${project.client}`}
+                    </span>
+                  </div>
+                  <StatusBadge tone={projectStatusTone(project.status)}>{t(`projects.statuses.${project.status}`, { defaultValue: project.status })}</StatusBadge>
+                </button>
+              ))}
+            </div>
+          </SurfaceCard>
+        ) : (
+          <ProjectDetailPanel data={detail} error={detailError} isLoading={detailLoading} onIncidentCreated={reloadDetail} />
+        )}
       </ResizableSideRailLayout>
     </div>
   );

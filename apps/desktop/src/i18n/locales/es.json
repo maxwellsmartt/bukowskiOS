@@ -2117,7 +2117,13 @@
       "selectAllRows": "Seleccionar todas las filas",
       "selectRow": "Seleccionar fila {{index}}",
       "selectionHint": "Shift-clic para seleccionar un rango · ⌘/Alt-clic para alternar filas",
-      "openDetail": "Abrir detalle"
+      "openDetail": "Abrir detalle",
+      "contextMenu": {
+        "clearSelection": "Limpiar selección",
+        "deselectRow": "Quitar fila de selección",
+        "selectAll": "Seleccionar todo",
+        "selectRow": "Seleccionar fila"
+      }
     },
     "scannable": {
       "noCode": "Aún no hay un código escaneable.",
@@ -3680,10 +3686,16 @@
       "projectsSelected_other": "{{count}} proyectos seleccionados",
       "compareSubtitle": "Agrégalos para comparar.",
       "addToCompare": "Agregar a comparar",
+      "clearSelection": "Limpiar selección",
       "searchPlaceholder": "Buscar proyectos, clientes o departamentos",
       "loading": "Cargando proyectos…",
       "showArchived": "Mostrar proyectos archivados",
       "hideArchived": "Ocultar proyectos archivados",
+      "rowActions": {
+        "addToCompare": "Agregar a comparar",
+        "openDetail": "Abrir detalle",
+        "openProject": "Abrir proyecto"
+      },
       "sort": {
         "name": "Nombre del proyecto",
         "code": "Código",
@@ -3720,6 +3732,14 @@
         "tipCreate": "Puedes crear proyectos nuevos desde el sidebar.",
         "tipUnits": "Usa unidades para dividir un rodaje largo en bloques.",
         "tipArchive": "Archiva un proyecto cuando cierre; siempre puedes restaurarlo."
+      },
+      "selectionDetail": {
+        "assets": "Equipos",
+        "body": "Estás viendo una selección múltiple. Abre un proyecto de la lista para revisar su detalle individual o agrega la selección a comparar.",
+        "incidents": "Incidentes",
+        "projects": "Proyectos",
+        "title": "Selección de proyectos",
+        "units": "Unidades"
       }
     },
     "detail": {

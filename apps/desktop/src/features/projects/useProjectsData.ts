@@ -23,6 +23,7 @@ import type {
   UpdateProjectUnitInput,
 } from "@contracts";
 import type { CatalogSnapshot, ProjectCardRow, ProjectDetailSnapshot } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAsyncValue } from "@shared/hooks/useAsyncValue";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { useWorkspaceDataRefreshVersion } from "@shared/hooks/useWorkspaceDataRefresh";
@@ -124,22 +125,25 @@ export const useProjectsRegistry = (query: ProjectListQuery = defaultProjectList
 };
 
 export const useCatalogData = (query: CatalogListQuery = defaultCatalogListQuery) => {
+  const { activeWorkspaceId } = useWorkspace();
   const refreshVersion = useCatalogRefreshVersion();
+  const workspaceId = query.workspaceId ?? activeWorkspaceId;
+  const scopedQuery = { ...query, workspaceId };
 
   return useAsyncValue(
     async () => {
       if (!window.bukowskiProjects) {
         if (window.bukowskiCatalog) {
-          return window.bukowskiCatalog.getSnapshot(query);
+          return window.bukowskiCatalog.getSnapshot(scopedQuery);
         }
 
         return emptyCatalog;
       }
 
-      return window.bukowskiCatalog ? window.bukowskiCatalog.getSnapshot(query) : window.bukowskiProjects.getCatalog({ workspaceId: query.workspaceId });
+      return window.bukowskiCatalog ? window.bukowskiCatalog.getSnapshot(scopedQuery) : window.bukowskiProjects.getCatalog({ workspaceId });
     },
     emptyCatalog,
-    [query.entityType, query.search, query.sortBy, query.sortDirection, query.workspaceId, refreshVersion],
+    [query.entityType, query.search, query.sortBy, query.sortDirection, workspaceId, refreshVersion],
   );
 };
 

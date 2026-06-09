@@ -2113,7 +2113,13 @@
       "selectAllRows": "Select all rows",
       "selectRow": "Select row {{index}}",
       "selectionHint": "Shift-click to select a range · ⌘/Alt-click to toggle individual rows",
-      "openDetail": "Open detail"
+      "openDetail": "Open detail",
+      "contextMenu": {
+        "clearSelection": "Clear selection",
+        "deselectRow": "Remove row from selection",
+        "selectAll": "Select all",
+        "selectRow": "Select row"
+      }
     },
     "scannable": {
       "noCode": "No scannable code is available yet.",
@@ -3676,10 +3682,16 @@
       "projectsSelected_other": "{{count}} projects selected",
       "compareSubtitle": "Add them to compare.",
       "addToCompare": "Add to compare",
+      "clearSelection": "Clear selection",
       "searchPlaceholder": "Search projects, clients or departments",
       "loading": "Loading projects…",
       "showArchived": "Show archived projects",
       "hideArchived": "Hide archived projects",
+      "rowActions": {
+        "addToCompare": "Add to compare",
+        "openDetail": "Open detail",
+        "openProject": "Open project"
+      },
       "sort": {
         "name": "Project name",
         "code": "Code",
@@ -3716,6 +3728,14 @@
         "tipCreate": "You can create new projects from the sidebar.",
         "tipUnits": "Use units to split a long shoot into blocks.",
         "tipArchive": "Archive a project when it wraps — you can always restore it."
+      },
+      "selectionDetail": {
+        "assets": "Assets",
+        "body": "You are viewing a multi-project selection. Open a project from the list to inspect its individual detail, or add the selection to compare.",
+        "incidents": "Incidents",
+        "projects": "Projects",
+        "title": "Project selection",
+        "units": "Units"
       }
     },
     "detail": {

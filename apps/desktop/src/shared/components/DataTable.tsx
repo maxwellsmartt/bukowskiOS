@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Check, Columns3, RotateCcw } from "lucide-react";
+import { Check, Columns3, RotateCcw, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { ListSortDirection } from "@contracts";
@@ -611,6 +611,58 @@ export const DataTable = <T = unknown,>({
     );
   };
 
+  const buildSelectionContextActions = (rowId: string): DataTableRowAction<T>[] => {
+    if (!selectable) {
+      return [];
+    }
+
+    const isSelected = activeSelection.includes(rowId);
+    const allVisibleRowsSelected = resolvedRowIds.length > 0 && resolvedRowIds.every((id) => activeSelection.includes(id));
+
+    return [
+      {
+        key: "__data-table-toggle-row-selection",
+        label: isSelected ? t("shared.dataTable.contextMenu.deselectRow") : t("shared.dataTable.contextMenu.selectRow"),
+        icon: isSelected ? <X size={14} /> : <Check size={14} />,
+        onSelect: () => {
+          toggleRowSelection(rowId, !isSelected);
+          selectionAnchorRowIdRef.current = rowId;
+        },
+      },
+      {
+        key: "__data-table-select-all",
+        label: t("shared.dataTable.contextMenu.selectAll"),
+        icon: <Check size={14} />,
+        disabled: resolvedRowIds.length === 0 || allVisibleRowsSelected,
+        onSelect: () => toggleAllRows(true),
+      },
+      {
+        key: "__data-table-clear-selection",
+        label: t("shared.dataTable.contextMenu.clearSelection"),
+        icon: <X size={14} />,
+        disabled: activeSelection.length === 0,
+        onSelect: () => setSelection([]),
+      },
+    ];
+  };
+
+  const buildContextMenuActions = (row: T, rowId: string): DataTableRowAction<T>[] => {
+    const selectionActions = buildSelectionContextActions(rowId);
+    const customActions = rowActions?.(row) ?? [];
+
+    if (!selectionActions.length || !customActions.length) {
+      return [...selectionActions, ...customActions];
+    }
+
+    return [
+      ...selectionActions,
+      ...customActions.map((action, index) => ({
+        ...action,
+        separatorBefore: index === 0 ? true : action.separatorBefore,
+      })),
+    ];
+  };
+
   const replaceSelectionWithRow = (rowId: string, isSelected: boolean) => {
     setSelection(isSelected && activeSelection.length === 1 ? [] : [rowId]);
   };
@@ -1030,10 +1082,7 @@ export const DataTable = <T = unknown,>({
                   onClick={(event) => handleRowClick(event, row, rowId, isSelected)}
                   onDoubleClick={() => onRowDoubleClick?.(row)}
                   onContextMenu={(event) => {
-                    if (!rowActions) {
-                      return;
-                    }
-                    const actions = rowActions(row);
+                    const actions = buildContextMenuActions(row, rowId);
                     if (!actions.length) {
                       return;
                     }
@@ -1145,7 +1194,7 @@ export const DataTable = <T = unknown,>({
             document.body,
           )
         : null}
-      {contextMenu && rowActions
+      {contextMenu
         ? createPortal(
             <div
               className="list-toolbar-menu list-toolbar-menu-bottom data-table-context-menu"
@@ -1154,7 +1203,7 @@ export const DataTable = <T = unknown,>({
               style={{ top: contextMenu.y, left: contextMenu.x }}
             >
               <div className="list-toolbar-menu-section">
-                {rowActions(contextMenu.row).map((action) => (
+                {buildContextMenuActions(contextMenu.row, contextMenu.rowId).map((action) => (
                   <div key={action.key}>
                     {action.separatorBefore ? <div className="list-toolbar-menu-divider" /> : null}
                     <button

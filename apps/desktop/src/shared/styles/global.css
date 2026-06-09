@@ -3692,6 +3692,17 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   color: var(--text-primary);
 }
 
+.list-toolbar-menu-item:disabled {
+  cursor: not-allowed;
+  color: rgba(151, 160, 174, 0.44);
+  opacity: 0.62;
+}
+
+.list-toolbar-menu-item:disabled:hover {
+  background: transparent;
+  color: rgba(151, 160, 174, 0.44);
+}
+
 .data-table-columns-menu .list-toolbar-menu-item {
   min-height: 26px;
   padding: 5px 0;
@@ -4989,8 +5000,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   justify-content: flex-end;
 }
 
-.action-panel-actions .ghost-control,
-.project-detail-header-actions .ghost-control {
+.action-panel-actions .ghost-control {
   min-height: 34px;
   padding: 0 14px;
   border-radius: 10px;
@@ -6815,12 +6825,28 @@ body.is-resizing-side-rail {
   min-height: 0;
 }
 
+.projects-page-stack {
+  overflow: hidden;
+}
+
+.projects-page-stack > .section-header,
+.projects-page-stack > .chip-row,
+.projects-page-stack > .selection-action-bar {
+  flex: 0 0 auto;
+}
+
+.projects-page-stack > .projects-layout {
+  flex: 1;
+  min-height: 0;
+}
+
 .resizable-side-layout.projects-layout.has-side-rail {
   /* The flexible column must be a full 1fr: a sub-1 flex factor (0.9fr) makes
      Grid leave the remaining ~10% of free space empty to the right of the
      detail rail. 1fr lets the table absorb all of it. */
   grid-template-columns: minmax(320px, 1fr) 14px minmax(var(--side-rail-min-width, 360px), var(--side-rail-width, 520px));
   gap: 0;
+  align-items: stretch;
 }
 
 .resizable-side-layout.projects-layout.has-side-rail > :first-child {
@@ -6828,7 +6854,8 @@ body.is-resizing-side-rail {
 }
 
 .projects-registry-card {
-  min-height: min(76vh, 820px);
+  min-height: 0;
+  max-height: none;
 }
 
 .projects-registry-card,
@@ -6860,6 +6887,34 @@ body.is-resizing-side-rail {
   gap: var(--space-md);
   min-width: 0;
   min-height: 0;
+  max-height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.project-overview-card .surface-card-header {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.project-overview-card .surface-card-header > div:first-child {
+  min-width: 0;
+}
+
+.project-overview-card .surface-card-header > div:last-child {
+  flex: 0 0 auto;
+  padding-top: 1px;
+}
+
+.project-overview-card {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(126, 183, 178, 0.16);
+  background:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.1), transparent 38%),
+    linear-gradient(145deg, rgba(25, 33, 35, 0.96), rgba(16, 18, 22, 0.96));
 }
 
 .project-detail-header-actions {
@@ -6870,12 +6925,46 @@ body.is-resizing-side-rail {
   flex-wrap: nowrap;
 }
 
-/* In the narrow detail rail, stack the title above the actions so the two
-   buttons stay side by side on their own row instead of wrapping vertically. */
-.project-overview-card .surface-card-header {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 12px;
+.project-detail-header-actions .action-row-button {
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: var(--font-2xs, 10px);
+}
+
+.project-detail-header-actions .ghost-control {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.project-detail-header-actions .action-primary-button {
+  border-color: rgba(126, 183, 178, 0.24);
+  background: rgba(126, 183, 178, 0.12);
+  color: var(--text-primary);
+}
+
+@media (max-width: 1180px) {
+  .project-overview-card .surface-card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .project-detail-header-actions {
+    justify-content: flex-start;
+  }
+}
+
+.project-overview-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.07), transparent 32%);
+  opacity: 0.35;
+}
+
+.project-overview-card > * {
+  position: relative;
 }
 
 .project-detail-title-group {
@@ -6883,6 +6972,14 @@ body.is-resizing-side-rail {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  font-size: var(--font-lg, 18px);
+  line-height: 1.2;
+}
+
+.project-detail-title-group .project-color-dot {
+  width: 12px;
+  height: 12px;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
 }
 
 .project-detail-support-grid {
@@ -6891,14 +6988,75 @@ body.is-resizing-side-rail {
   gap: var(--space-md);
 }
 
-.project-overview-card {
-  gap: 12px;
-}
-
 .project-overview-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.project-overview-summary .summary-row {
+  min-height: 68px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  background: rgba(7, 10, 12, 0.24);
+}
+
+.project-overview-summary .summary-label {
+  font-size: var(--font-2xs, 10px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-overview-summary .summary-value {
+  color: var(--text-primary);
+  font-size: var(--font-sm, 12px);
+  font-weight: var(--weight-semibold, 600);
+}
+
+.project-selection-detail-card {
+  gap: 14px;
+}
+
+.project-selection-summary {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.project-selection-summary span {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(126, 183, 178, 0.13);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.08), transparent 48%),
+    rgba(255, 255, 255, 0.018);
+}
+
+.project-selection-summary small {
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 10px);
+  font-weight: var(--weight-semibold, 600);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-selection-summary strong {
+  color: var(--text-primary);
+  font-size: var(--font-md, 15px);
+}
+
+.project-selection-helper {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-sm, 12px);
+  line-height: 1.45;
+}
+
+.project-selection-actions {
+  justify-content: flex-start;
 }
 
 .project-budget-grid {
