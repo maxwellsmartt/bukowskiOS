@@ -4,7 +4,7 @@
 
 - **Fecha de apertura:** 2026-06-08
 - **Fuente:** `/Users/ernestomaxwell/Desktop/PLAN.md`
-- **Estado general:** Slices 1-5 MVP implementados localmente; pendiente aplicar/verificar migracion en Supabase remoto y hardening de conciliacion asistida.
+- **Estado general:** Slices 1-8 MVP implementados localmente; pendiente cerrar Slice 9 operativo, smoke multiusuario real y hardening Supabase/RLS/storage antes de declarar cierre robusto.
 - **Prioridad:** Alta para Tesoreria, porque desbloquea asignaciones de facturas a tarjetas/cuentas sin duplicar gastos ni perder links pendientes entre maquinas.
 
 ## Resumen ejecutivo
@@ -297,14 +297,29 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 - Verificacion Slice 8 MVP parcial:
   - `corepack pnpm --filter @bukowski/desktop typecheck`: **passed**.
   - `corepack pnpm --dir apps/desktop exec vitest run src/test/treasury-mutation-service.test.ts`: **21 passed**.
+- Se implementa polish posterior a Slice 8:
+  - selector batch de Facturas queda organizado por grupos logicos, con acciones coherentes con menu contextual;
+  - tabla de Facturas usa altura estable/fill parent para evitar crecimiento al cambiar de seccion;
+  - drawer de conciliacion asistida queda centrado, mas compacto y con scroll interno;
+  - medio de pago en Facturas muestra terminal `last4` en bold/ambar cuando existe;
+  - Cuentas y tarjetas usa iconos por tipo, grilla estable, terminal solo en header, tipo de cuenta en vez de movimiento para cuentas bancarias y sin microcard de movimientos en tarjetas;
+  - formulario de medios acepta bancos custom, usuarios responsables por selector y terminal de tarjetas como `last4` seguro;
+  - servicio de Tesoreria persiste `last4` enviado por UI sin guardar numeros completos y lo cubre con test de regresion;
+  - loading gate de workspace cubre todo el viewport para no filtrar contenido interno del app en bordes de Electron/macOS.
+- Verificacion polish posterior:
+  - `npm run typecheck` desde `apps/desktop`: **passed**.
+  - `npm run test -- treasury-mutation-service.test.ts` desde `apps/desktop`: **21 passed**.
 
 ## Proximo slice recomendado
 
 **Slice 9 — acciones operativas y export de reembolsos.**
 
 Orden sugerido:
-1. Accion directa desde drill-down: abrir preview/editar factura y saltar al movimiento vinculado cuando exista.
-2. Export CSV/XLSX de reembolsos filtrados.
-3. Reemplazar IDs manuales por selector de usuarios/responsables conectado al catalogo local y usuarios operativos.
-4. Diseñar soporte para bancos adicionales: primero metadata `Otro/custom`, luego parser generico CSV/manual y despues parsers dedicados por banco.
-5. Dejar auto-conciliacion sin confirmacion humana fuera de v1.
+1. Accion directa desde drill-down: abrir preview/editar factura.
+2. Accion directa desde drill-down: saltar al movimiento vinculado cuando exista.
+3. Export CSV/XLSX de reembolsos filtrados.
+4. Reemplazar IDs/manual labels restantes por selector de usuarios/responsables conectado al catalogo local y usuarios operativos.
+5. Smoke multiusuario real: Facturas, Cuentas, Movimientos y Reembolsos entre dos Macs/usuarios.
+6. Hardening Supabase/RLS/storage: confirmar grants, policies y disponibilidad real de PDFs/adjuntos.
+7. Diseñar soporte para bancos adicionales: primero metadata `Otro/custom`, luego parser generico CSV/manual y despues parsers dedicados por banco.
+8. Dejar auto-conciliacion sin confirmacion humana fuera de v1.

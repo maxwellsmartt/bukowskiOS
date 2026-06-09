@@ -33,6 +33,7 @@ html,
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #050607;
   text-rendering: optimizeLegibility;
 }
 
@@ -11300,9 +11301,15 @@ select.field-input {
 .auth-blocking-shell {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100dvh;
   z-index: 200;
   display: grid;
   place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background-color: #050607;
   background:
     radial-gradient(ellipse 64% 46% at 50% 48%, rgba(246, 188, 188, 0.028) 0%, rgba(246, 188, 188, 0.012) 42%, transparent 78%),
     radial-gradient(ellipse 78% 56% at 52% 52%, rgba(154, 183, 229, 0.022) 0%, rgba(154, 183, 229, 0.008) 48%, transparent 84%),
@@ -11310,6 +11317,15 @@ select.field-input {
   backdrop-filter: blur(var(--blur-lg)) saturate(1.1);
   -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.1);
   animation: auth-blocking-fade-in 220ms ease-out;
+}
+
+.app-startup-gate::before,
+.auth-blocking-shell::before {
+  content: "";
+  position: fixed;
+  inset: -4px;
+  z-index: -1;
+  background: #050607;
 }
 
 @keyframes auth-blocking-fade-in {
