@@ -76,6 +76,9 @@ export const PackingSlipDetailPanel = ({
   const returnLabel = selectedPendingAssetIds.length
     ? t("packing.detail.returnSelected", { count: selectedPendingAssetIds.length })
     : t("packing.detail.returnAllPending", { count: pendingAssetIds.length });
+  const returnHint = selectedPendingAssetIds.length
+    ? t("packing.detail.returnSelectedHint", { count: selectedPendingAssetIds.length })
+    : t("packing.detail.returnAllHint", { count: pendingAssetIds.length });
   const headerActions = (
     <div className="packing-detail-header-actions">
       <StatusBadge tone={data.slip.status === "Overdue" ? "critical" : data.slip.status === "Closed" ? "success" : "info"}>
@@ -114,10 +117,14 @@ export const PackingSlipDetailPanel = ({
   return (
     <SurfaceCard
       className="packing-detail-card"
+      subtitle={t("packing.detail.subtitle", {
+        project: data.slip.project,
+        responsible: data.slip.responsible,
+      })}
       title={data.slip.number}
       aside={headerActions}
     >
-      <div className="summary-grid">
+      <div className="packing-detail-hero-grid">
         <div className="summary-row">
           <span className="summary-label">{t("packing.detail.project")}</span>
           <span className="summary-value">{data.slip.project}</span>
@@ -125,10 +132,6 @@ export const PackingSlipDetailPanel = ({
         <div className="summary-row">
           <span className="summary-label">{t("packing.detail.responsible")}</span>
           <span className="summary-value">{data.slip.responsible}</span>
-        </div>
-        <div className="summary-row">
-          <span className="summary-label">{t("packing.detail.preparedBy")}</span>
-          <span className="summary-value">{data.slip.preparedBy}</span>
         </div>
         <div className="summary-row">
           <span className="summary-label">{t("packing.detail.issuedDue")}</span>
@@ -145,6 +148,13 @@ export const PackingSlipDetailPanel = ({
           <span className="summary-value">
             {t("packing.progress", { returned: data.slip.returnedCount, pending: data.slip.pendingCount })}
           </span>
+        </div>
+      </div>
+
+      <div className="summary-grid packing-detail-document-grid">
+        <div className="summary-row">
+          <span className="summary-label">{t("packing.detail.preparedBy")}</span>
+          <span className="summary-value">{data.slip.preparedBy}</span>
         </div>
         <div className="summary-row">
           <span className="summary-label">{t("packing.detail.qrReady")}</span>
@@ -178,13 +188,18 @@ export const PackingSlipDetailPanel = ({
       </div>
 
       {data.slip.primaryCodeValue ? (
-        <ScannableCodePanel
-          codeValue={data.slip.primaryCodeValue}
-          subtitle={t("packing.detail.slipCode")}
-          title={data.slip.number}
-          qrLabel={t("packing.detail.slipQr")}
-          barcodeLabel={t("packing.detail.slipBarcode")}
-        />
+        <details className="detail-disclosure packing-code-disclosure">
+          <summary className="detail-disclosure-summary">{t("packing.detail.showCodes")}</summary>
+          <div className="detail-disclosure-content">
+            <ScannableCodePanel
+              codeValue={data.slip.primaryCodeValue}
+              subtitle={t("packing.detail.slipCode")}
+              title={data.slip.number}
+              qrLabel={t("packing.detail.slipQr")}
+              barcodeLabel={t("packing.detail.slipBarcode")}
+            />
+          </div>
+        </details>
       ) : null}
 
       {missingInsuranceValueCount ? (
@@ -230,9 +245,13 @@ export const PackingSlipDetailPanel = ({
         </label>
       </div>
 
+      <div className="packing-return-hint">
+        {returnHint}
+      </div>
+
       <DataTable
         getRowId={(row) => row.assetId}
-        maxHeight="min(56vh, 620px)"
+        maxHeight="min(42vh, 460px)"
         persistKey="packing-slip-detail-items"
         columns={[
           {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
@@ -81,6 +81,15 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = usePackingDetail(activePackingSlipId);
   const focusedPackingSlipId = searchParams.get("focus");
   const translatedSortOptions = packingSortOptions.map((option) => ({ ...option, label: t(option.label) }));
+  const packingStats = useMemo(
+    () => ({
+      open: data.filter((row) => row.status !== "Closed").length,
+      overdue: data.filter((row) => row.status === "Overdue").length,
+      pendingItems: data.reduce((total, row) => total + Math.max(0, row.itemCount - row.returnedCount), 0),
+    }),
+    [data],
+  );
+  const firstSelectedPackingSlip = selectedRowIds.length ? data.find((row) => row.id === selectedRowIds[0]) ?? null : null;
 
   useEffect(() => {
     if (!data.length) {
@@ -135,6 +144,47 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             sortDirection={packingControls.sortDirection}
             sortOptions={translatedSortOptions}
           />
+          <div className="packing-overview-strip" aria-label={t("packing.overview.title")}>
+            <span>
+              <strong>{packingStats.open}</strong>
+              {t("packing.overview.open")}
+            </span>
+            <span>
+              <strong>{packingStats.overdue}</strong>
+              {t("packing.overview.overdue")}
+            </span>
+            <span>
+              <strong>{packingStats.pendingItems}</strong>
+              {t("packing.overview.pendingUnits")}
+            </span>
+          </div>
+          {selectedRowIds.length ? (
+            <div className="selection-action-bar packing-selection-bar">
+              <div className="selection-action-copy">
+                <span className="selection-action-title">{t("packing.selection.title", { count: selectedRowIds.length })}</span>
+                <span className="selection-action-subtitle">{t("packing.selection.subtitle")}</span>
+              </div>
+              <div className="selection-action-buttons">
+                <button
+                  className="ghost-control"
+                  disabled={!firstSelectedPackingSlip}
+                  onClick={() => {
+                    if (!firstSelectedPackingSlip) {
+                      return;
+                    }
+                    setActivePackingSlipId(firstSelectedPackingSlip.id);
+                    setReturnError(null);
+                  }}
+                  type="button"
+                >
+                  {t("packing.selection.openFirst")}
+                </button>
+                <button className="ghost-control" onClick={() => setSelectedRowIds([])} type="button">
+                  {t("packing.selection.clear")}
+                </button>
+              </div>
+            </div>
+          ) : null}
           <DataTable
             activeRowId={activePackingSlipId}
             autoScrollToActiveRow

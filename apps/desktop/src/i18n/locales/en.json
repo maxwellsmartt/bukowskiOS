@@ -2010,6 +2010,19 @@
       "searchPlaceholder": "Search slips, projects or crew",
       "searchPlaceholderProject": "Search slips, departments or crew"
     },
+    "overview": {
+      "title": "Packing slip overview",
+      "open": "open",
+      "overdue": "overdue",
+      "pendingUnits": "pending units"
+    },
+    "selection": {
+      "title_one": "{{count}} slip selected",
+      "title_other": "{{count}} slips selected",
+      "subtitle": "Selection is ready for future batch actions. For now you can open the first slip or clear selection.",
+      "openFirst": "Open first",
+      "clear": "Clear selection"
+    },
     "sort": {
       "issuedDate": "Issued date",
       "dueDate": "Due date",
@@ -2089,6 +2102,7 @@
     },
     "detail": {
       "title": "Packing details",
+      "subtitle": "{{project}} · {{responsible}}",
       "loading": "Loading slip details.",
       "unableLoad": "Unable to load this slip. Try again.",
       "chooseSlip": "Choose a packing slip to see details.",
@@ -2099,6 +2113,9 @@
       "returnSelected_one": "Return {{count}} selected",
       "returnSelected_other": "Return {{count}} selected",
       "returnAllPending": "Return all pending ({{count}})",
+      "returnSelectedHint_one": "Only the pending asset selected in the table will be returned.",
+      "returnSelectedHint_other": "Only the {{count}} pending assets selected in the table will be returned.",
+      "returnAllHint": "If no assets are selected in the table, this action returns all pending assets on the slip ({{count}}).",
       "project": "Project",
       "responsible": "Responsible",
       "preparedBy": "Prepared by",
@@ -2115,6 +2132,7 @@
       "slipCode": "Slip code",
       "slipQr": "Slip QR",
       "slipBarcode": "Slip barcode",
+      "showCodes": "Show QR and codes",
       "missingInsuranceTitle_one": "{{count}} item needs insurance values",
       "missingInsuranceTitle_other": "{{count}} items need insurance values",
       "missingInsuranceBody": "Add current value, replacement value, or purchase price plus additional costs before exporting the insurance list.",
