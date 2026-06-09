@@ -277,6 +277,20 @@ type AssetCsvPreview = {
   };
 };
 
+type AssetCsvImportProgress = {
+  status: "running" | "completed" | "failed";
+  fileName: string;
+  totalRows: number;
+  processedRows: number;
+  importedRows: number;
+  skippedDuplicateRows: number;
+  skippedReviewRows: number;
+  failedRows: Array<{
+    rowNumber: number;
+    message: string;
+  }>;
+};
+
 type AssetCsvValidationIssue = {
   rowNumber: number;
   message: string;
@@ -927,6 +941,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const [openingPreviewImageId, setOpeningPreviewImageId] = useState<string | null>(null);
   const [isImportingAssets, setIsImportingAssets] = useState(false);
   const [csvImportPreview, setCsvImportPreview] = useState<AssetCsvPreview | null>(null);
+  const [csvImportProgress, setCsvImportProgress] = useState<AssetCsvImportProgress | null>(null);
   const [csvShowAllRows, setCsvShowAllRows] = useState(false);
   const [csvReportCopied, setCsvReportCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1339,9 +1354,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
       const csvText = await file.text();
       setCsvImportPreview(buildAssetCsvPreview({ assets, catalog, csvText, fileName: file.name }));
+      setCsvImportProgress(null);
       setCsvShowAllRows(false);
     } catch (error) {
       setCsvImportPreview(null);
+      setCsvImportProgress(null);
       setEditorError(getUserFacingErrorMessage(error, t("assets.csv.importFailed")));
     } finally {
       if (fileInputRef.current) {
@@ -1367,6 +1384,22 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       let importedCount = 0;
       let skippedDuplicateCount = 0;
       let skippedReviewCount = 0;
+      let processedCount = 0;
+      const totalRows = csvImportPreview.drafts.length;
+      const updateProgress = (patch: Partial<AssetCsvImportProgress>) =>
+        setCsvImportProgress({
+          status: "running",
+          fileName: csvImportPreview.fileName,
+          totalRows,
+          processedRows: processedCount,
+          importedRows: importedCount,
+          skippedDuplicateRows: skippedDuplicateCount,
+          skippedReviewRows: skippedReviewCount,
+          failedRows: [],
+          ...patch,
+        });
+
+      updateProgress({});
 
       for (const draft of csvImportPreview.drafts) {
         const { importRowNumber, importWarnings: _importWarnings, ...assetDraft } = draft;
@@ -1374,11 +1407,15 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
 
         if (readyRowNumbers && !readyRowNumbers.has(importRowNumber)) {
           skippedReviewCount += 1;
+          processedCount += 1;
+          updateProgress({});
           continue;
         }
 
         if (existingCodes.has(normalizedCode)) {
           skippedDuplicateCount += 1;
+          processedCount += 1;
+          updateProgress({});
           continue;
         }
 
@@ -1392,22 +1429,37 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             ...assetDraft,
           });
           importedCount += 1;
+          processedCount += 1;
           existingCodes.add(normalizedCode);
+          updateProgress({});
         } catch (error) {
           if (isDuplicateRegistryCodeError(error)) {
             skippedDuplicateCount += 1;
+            processedCount += 1;
             existingCodes.add(normalizedCode);
+            updateProgress({});
             continue;
           }
 
+          const message = getErrorMessage(error) || t("assets.csv.unknownImportError");
+          updateProgress({
+            status: "failed",
+            processedRows: processedCount,
+            failedRows: [{ rowNumber: importRowNumber, message }],
+          });
           throw new Error(
             t("assets.csv.rowImportFailed", {
               row: importRowNumber,
-              message: getErrorMessage(error) || t("assets.csv.unknownImportError"),
+              message,
             }),
           );
         }
       }
+
+      updateProgress({
+        status: "completed",
+        processedRows: processedCount,
+      });
 
       await Promise.all([reload(), refreshProjects()]);
       if (readyRowNumbers && skippedReviewCount) {
@@ -1847,6 +1899,53 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             sortDirection={assetControls.sortDirection}
             sortOptions={translatedSortOptions}
           />
+          {csvImportProgress ? (
+            <div className={`asset-import-progress is-${csvImportProgress.status}`}>
+              <div className="asset-import-progress-copy">
+                <span className="asset-import-preview-kicker">{t("assets.csv.progress.title")}</span>
+                <strong>
+                  {csvImportProgress.status === "running"
+                    ? t("assets.csv.progress.running", { fileName: csvImportProgress.fileName })
+                    : csvImportProgress.status === "completed"
+                      ? t("assets.csv.progress.completed", { fileName: csvImportProgress.fileName })
+                      : t("assets.csv.progress.failed", { fileName: csvImportProgress.fileName })}
+                </strong>
+                <span>
+                  {t("assets.csv.progress.processed", {
+                    processed: csvImportProgress.processedRows,
+                    total: csvImportProgress.totalRows,
+                  })}
+                </span>
+              </div>
+              <div className="asset-import-progress-stats">
+                <span>
+                  <strong>{csvImportProgress.importedRows}</strong>
+                  {t("assets.csv.progress.imported")}
+                </span>
+                <span>
+                  <strong>{csvImportProgress.skippedDuplicateRows}</strong>
+                  {t("assets.csv.progress.skippedDuplicate")}
+                </span>
+                <span>
+                  <strong>{csvImportProgress.skippedReviewRows}</strong>
+                  {t("assets.csv.progress.skippedReview")}
+                </span>
+                <span className={csvImportProgress.failedRows.length ? "asset-import-stat-error" : undefined}>
+                  <strong>{csvImportProgress.failedRows.length}</strong>
+                  {t("assets.csv.progress.failedRows")}
+                </span>
+              </div>
+              {csvImportProgress.failedRows.length ? (
+                <div className="asset-import-progress-errors">
+                  {csvImportProgress.failedRows.map((row) => (
+                    <span key={`${row.rowNumber}-${row.message}`}>
+                      {t("assets.csv.rowNote", { row: row.rowNumber, message: row.message })}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {csvImportPreview ? (
             <div className={`asset-import-preview${csvImportPreview.errors.length ? " has-errors" : ""}`}>
               <div className="asset-import-preview-header">
@@ -1875,6 +1974,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                     disabled={isImportingAssets}
                     onClick={() => {
                       setCsvImportPreview(null);
+                      setCsvImportProgress(null);
                       setCsvShowAllRows(false);
                     }}
                     type="button"

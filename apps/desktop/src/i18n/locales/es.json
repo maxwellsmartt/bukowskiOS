@@ -161,6 +161,62 @@
       "forward": "Adelante"
     }
   },
+  "compare": {
+    "title": "Bandeja de comparación",
+    "body": "Compara los elementos seleccionados para ver diferencias operativas antes de decidir o abrir un flujo más profundo.",
+    "close": "Cerrar comparación",
+    "back": "Volver",
+    "clearTray": "Limpiar selección",
+    "itemsReady_one": "{{count}} elemento listo",
+    "itemsReady_other": "{{count}} elementos listos",
+    "hiddenItems_one": "{{count}} elemento adicional no se muestra aquí",
+    "hiddenItems_other": "{{count}} elementos adicionales no se muestran aquí",
+    "removeItemAria": "Quitar {{item}} de la comparación",
+    "removeItemTooltip": "Quitar {{item}}",
+    "types": {
+      "asset": "Equipos",
+      "project": "Proyectos",
+      "financial_entry": "Finanzas"
+    },
+    "fallbacks": {
+      "open": "Abierto",
+      "unassigned": "Sin asignar"
+    },
+    "empty": {
+      "title": "No hay comparación lista",
+      "body": "Selecciona al menos dos equipos, proyectos o entradas financieras del mismo tipo para compararlos lado a lado.",
+      "tipSelect": "Selecciona filas en Equipos, Proyectos o Finanzas.",
+      "tipAdd": "Usa Agregar a comparación desde la selección.",
+      "tipOpen": "Luego abre la bandeja de comparación."
+    },
+    "fields": {
+      "code": "Código",
+      "category": "Categoría",
+      "status": "Estado",
+      "condition": "Condición",
+      "custody": "Custodia",
+      "location": "Ubicación",
+      "project": "Proyecto",
+      "unit": "Unidad",
+      "responsible": "Responsable",
+      "serial": "Serie",
+      "qr": "QR",
+      "warehouse": "Almacén",
+      "openIssues": "Incidentes abiertos",
+      "client": "Cliente",
+      "start": "Inicio",
+      "end": "Fin",
+      "units": "Unidades",
+      "assets": "Equipos",
+      "incidents": "Incidentes",
+      "exposure": "Exposición",
+      "departments": "Departamentos",
+      "reference": "Referencia",
+      "date": "Fecha",
+      "type": "Tipo",
+      "amount": "Monto"
+    }
+  },
   "assets": {
     "title": "Equipos",
     "titleProject": "Equipos del proyecto",
@@ -633,6 +689,17 @@
       "skippedExisting_other": "Se omitieron {{count}} códigos existentes.",
       "leftForReview_one": "Quedó {{count}} fila para revisar.",
       "leftForReview_other": "Quedaron {{count}} filas para revisar.",
+      "progress": {
+        "title": "Resultado de importación",
+        "running": "Importando {{fileName}}…",
+        "completed": "{{fileName}} importado",
+        "failed": "{{fileName}} se detuvo por error",
+        "processed": "{{processed}} de {{total}} filas procesadas.",
+        "imported": "importadas",
+        "skippedDuplicate": "duplicadas",
+        "skippedReview": "en revisión",
+        "failedRows": "fallidas"
+      },
       "stats": {
         "rows": "Filas",
         "uniqueAssets": "Equipos únicos",

@@ -1,5 +1,7 @@
 import { ArrowLeft, Scale, Trash2, X } from "lucide-react";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import type { AssetListRow, CompareEntityType, CompareItem, FinanceEntryRow, ProjectCardRow } from "@contracts";
 import { useCompareTray } from "@app/providers/CompareTrayContext";
@@ -30,51 +32,45 @@ type CompareSurfaceProps = {
   variant?: "page" | "dialog";
 };
 
-const typeLabelMap: Record<CompareEntityType, string> = {
-  asset: "Assets",
-  project: "Projects",
-  financial_entry: "Finance entries",
-};
-
 const normalizeCompareValue = (value: string) => value.trim().toLowerCase();
 
-const buildAssetFields = (asset: AssetListRow): CompareField[] => [
-  { label: "Code", value: asset.code, emphasized: true },
-  { label: "Category", value: asset.category },
-  { label: "Status", value: asset.status },
-  { label: "Condition", value: asset.condition },
-  { label: "Custody", value: asset.custody },
-  { label: "Location", value: asset.location },
-  { label: "Project", value: asset.project || "Unassigned" },
-  { label: "Unit", value: asset.projectUnit || "-" },
-  { label: "Responsible", value: asset.responsible || "-" },
-  { label: "Serial", value: asset.serialNumber || "-" },
-  { label: "QR", value: asset.qrCode || "-" },
-  { label: "Warehouse", value: asset.warehouseSlot || "-" },
-  { label: "Open issues", value: String(asset.incidentsOpen) },
+const buildAssetFields = (asset: AssetListRow, t: TFunction): CompareField[] => [
+  { label: t("compare.fields.code"), value: asset.code, emphasized: true },
+  { label: t("compare.fields.category"), value: asset.category },
+  { label: t("compare.fields.status"), value: asset.status },
+  { label: t("compare.fields.condition"), value: asset.condition },
+  { label: t("compare.fields.custody"), value: asset.custody },
+  { label: t("compare.fields.location"), value: asset.location },
+  { label: t("compare.fields.project"), value: asset.project || t("compare.fallbacks.unassigned") },
+  { label: t("compare.fields.unit"), value: asset.projectUnit || "-" },
+  { label: t("compare.fields.responsible"), value: asset.responsible || "-" },
+  { label: t("compare.fields.serial"), value: asset.serialNumber || "-" },
+  { label: t("compare.fields.qr"), value: asset.qrCode || "-" },
+  { label: t("compare.fields.warehouse"), value: asset.warehouseSlot || "-" },
+  { label: t("compare.fields.openIssues"), value: String(asset.incidentsOpen) },
 ];
 
-const buildProjectFields = (project: ProjectCardRow): CompareField[] => [
-  { label: "Code", value: project.code, emphasized: true },
-  { label: "Client", value: project.client },
-  { label: "Status", value: project.status },
-  { label: "Start", value: project.startDate ?? "Open" },
-  { label: "End", value: project.endDate ?? "Open" },
-  { label: "Units", value: String(project.activeUnitCount) },
-  { label: "Assets", value: String(project.assetCount) },
-  { label: "Incidents", value: String(project.incidentCount) },
-  { label: "Exposure", value: project.exposure },
-  { label: "Departments", value: project.departments },
+const buildProjectFields = (project: ProjectCardRow, t: TFunction): CompareField[] => [
+  { label: t("compare.fields.code"), value: project.code, emphasized: true },
+  { label: t("compare.fields.client"), value: project.client },
+  { label: t("compare.fields.status"), value: project.status },
+  { label: t("compare.fields.start"), value: project.startDate ?? t("compare.fallbacks.open") },
+  { label: t("compare.fields.end"), value: project.endDate ?? t("compare.fallbacks.open") },
+  { label: t("compare.fields.units"), value: String(project.activeUnitCount) },
+  { label: t("compare.fields.assets"), value: String(project.assetCount) },
+  { label: t("compare.fields.incidents"), value: String(project.incidentCount) },
+  { label: t("compare.fields.exposure"), value: project.exposure },
+  { label: t("compare.fields.departments"), value: project.departments },
 ];
 
-const buildFinanceFields = (entry: FinanceEntryRow): CompareField[] => [
-  { label: "Reference", value: entry.reference, emphasized: true },
-  { label: "Date", value: entry.date },
-  { label: "Type", value: entry.type },
-  { label: "Category", value: entry.category },
-  { label: "Project", value: entry.project },
-  { label: "Amount", value: entry.amount },
-  { label: "Status", value: entry.status },
+const buildFinanceFields = (entry: FinanceEntryRow, t: TFunction): CompareField[] => [
+  { label: t("compare.fields.reference"), value: entry.reference, emphasized: true },
+  { label: t("compare.fields.date"), value: entry.date },
+  { label: t("compare.fields.type"), value: entry.type },
+  { label: t("compare.fields.category"), value: entry.category },
+  { label: t("compare.fields.project"), value: entry.project },
+  { label: t("compare.fields.amount"), value: entry.amount },
+  { label: t("compare.fields.status"), value: entry.status },
 ];
 
 const buildFieldDiffSet = (cards: CompareCard[]) => {
@@ -92,6 +88,7 @@ const buildFieldDiffSet = (cards: CompareCard[]) => {
 };
 
 export const CompareSurface = ({ requestedType = null, onBack, onClose, variant = "page" }: CompareSurfaceProps) => {
+  const { t } = useTranslation();
   const { clear, compatibleItems, compatibleType, items, removeItem } = useCompareTray();
   const { data: assets } = useAssetsList();
   const { data: projects } = useProjectsRegistry();
@@ -113,7 +110,7 @@ export const CompareSurface = ({ requestedType = null, onBack, onClose, variant 
       return comparableItems
         .map((item) => {
           const asset = byId.get(item.id);
-          return asset ? { item, fields: buildAssetFields(asset) } : null;
+          return asset ? { item, fields: buildAssetFields(asset, t) } : null;
         })
         .filter(Boolean) as CompareCard[];
     }
@@ -123,7 +120,7 @@ export const CompareSurface = ({ requestedType = null, onBack, onClose, variant 
       return comparableItems
         .map((item) => {
           const project = byId.get(item.id);
-          return project ? { item, fields: buildProjectFields(project) } : null;
+          return project ? { item, fields: buildProjectFields(project, t) } : null;
         })
         .filter(Boolean) as CompareCard[];
     }
@@ -132,10 +129,10 @@ export const CompareSurface = ({ requestedType = null, onBack, onClose, variant 
     return comparableItems
       .map((item) => {
         const entry = byId.get(item.id);
-        return entry ? { item, fields: buildFinanceFields(entry) } : null;
+        return entry ? { item, fields: buildFinanceFields(entry, t) } : null;
       })
       .filter(Boolean) as CompareCard[];
-  }, [activeType, assets, comparableItems, financeEntries, projects]);
+  }, [activeType, assets, comparableItems, financeEntries, projects, t]);
 
   const diffSet = useMemo(() => buildFieldDiffSet(cards), [cards]);
 
@@ -144,12 +141,12 @@ export const CompareSurface = ({ requestedType = null, onBack, onClose, variant 
       return (
         <div className="compare-dialog-empty">
           <div>
-            <h2>Nothing is ready to compare yet</h2>
-            <p>Add at least two assets, projects or finance entries of the same type to compare them side by side.</p>
+            <h2>{t("compare.empty.title")}</h2>
+            <p>{t("compare.empty.body")}</p>
           </div>
           {onClose ? (
             <button className="ghost-control" onClick={onClose} type="button">
-              Close
+              {t("common.close")}
             </button>
           ) : null}
         </div>
@@ -158,24 +155,24 @@ export const CompareSurface = ({ requestedType = null, onBack, onClose, variant 
 
     return (
       <div className="page-stack">
-        <SectionHeader title="Compare" body="Review comparable items side by side once the tray has at least two items of the same type." />
+        <SectionHeader title={t("compare.title")} body={t("compare.body")} />
         <GuidedEmptyState
-          title="Nothing is ready to compare yet"
-          body="Add at least two assets, projects or finance entries of the same type to the compare tray. Mixed trays are fine, but compare opens the first compatible group."
+          title={t("compare.empty.title")}
+          body={t("compare.empty.body")}
           tips={[
-            "Select rows in Assets, Projects or Finance Entries",
-            "Use Add to compare from the selection bar",
-            "Then open Compare from the tray",
+            t("compare.empty.tipSelect"),
+            t("compare.empty.tipAdd"),
+            t("compare.empty.tipOpen"),
           ]}
-          actionLabel="Go back"
+          actionLabel={t("compare.back")}
           onAction={onBack}
         />
       </div>
     );
   }
 
-  const title = `${typeLabelMap[activeType]} side by side`;
-  const body = "Use this view to spot operational differences quickly before making decisions or opening a deeper workflow.";
+  const title = t("compare.title");
+  const body = t("compare.body");
   const hiddenItems = items.length - cards.length;
   const clearComparison = () => {
     clear();
@@ -188,28 +185,27 @@ export const CompareSurface = ({ requestedType = null, onBack, onClose, variant 
       {variant === "dialog" ? (
         <header className="compare-dialog-header">
           <div>
-            <span className="compare-dialog-eyebrow">Compare</span>
             <h2>{title}</h2>
             <p>{body}</p>
           </div>
           {onClose ? (
-            <button aria-label="Close comparison" className="icon-ghost-control" onClick={onClose} type="button">
+            <button aria-label={t("compare.close")} className="icon-ghost-control compare-remove-button" data-tooltip={t("compare.close")} onClick={onClose} type="button">
               <X size={18} />
             </button>
           ) : null}
         </header>
       ) : (
-        <SectionHeader eyebrow="Compare" title={title} body={body} />
+        <SectionHeader title={title} body={body} />
       )}
 
       <div className="compare-toolbar">
         <div className="compare-overview-row">
           <StatusBadge tone="success">
             <Scale size={12} />
-            <span>{cards.length} items ready</span>
+            <span>{t("compare.itemsReady", { count: cards.length })}</span>
           </StatusBadge>
           {hiddenItems > 0 ? (
-            <StatusBadge tone="warning">{`${hiddenItems} other tray item${hiddenItems === 1 ? "" : "s"} not shown here`}</StatusBadge>
+            <StatusBadge tone="warning">{t("compare.hiddenItems", { count: hiddenItems })}</StatusBadge>
           ) : null}
         </div>
 
@@ -217,12 +213,12 @@ export const CompareSurface = ({ requestedType = null, onBack, onClose, variant 
           {onBack ? (
             <button className="ghost-control" onClick={onBack} type="button">
               <ArrowLeft size={14} />
-              <span>Back</span>
+              <span>{t("compare.back")}</span>
             </button>
           ) : null}
           <button className="ghost-control is-danger" onClick={clearComparison} type="button">
             <Trash2 size={14} />
-            <span>Clear tray</span>
+            <span>{t("compare.clearTray")}</span>
           </button>
         </div>
       </div>
@@ -236,9 +232,9 @@ export const CompareSurface = ({ requestedType = null, onBack, onClose, variant 
             subtitle={card.item.subtitle}
             aside={
               <button
-                aria-label={`Remove ${card.item.label} from compare`}
-                className="surface-card-action is-danger"
-                data-tooltip={`Remove ${card.item.label}`}
+                aria-label={t("compare.removeItemAria", { item: card.item.label })}
+                className="surface-card-action compare-remove-button is-danger"
+                data-tooltip={t("compare.removeItemTooltip", { item: card.item.label })}
                 onClick={() => removeItem(card.item.entityType, card.item.id)}
                 type="button"
               >

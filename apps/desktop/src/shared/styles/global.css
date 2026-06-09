@@ -4254,6 +4254,76 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   background: rgba(255, 118, 118, 0.06);
 }
 
+.asset-import-progress {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(126, 183, 178, 0.16);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.08), transparent 42%),
+    rgba(255, 255, 255, 0.018);
+}
+
+.asset-import-progress.is-failed {
+  border-color: rgba(231, 154, 154, 0.22);
+  background:
+    radial-gradient(circle at top left, rgba(231, 154, 154, 0.08), transparent 42%),
+    rgba(255, 255, 255, 0.018);
+}
+
+.asset-import-progress-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.asset-import-progress-copy strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.asset-import-progress-copy span:not(.asset-import-preview-kicker),
+.asset-import-progress-errors {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.asset-import-progress-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.asset-import-progress-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.026);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.asset-import-progress-stats strong {
+  color: var(--text-primary);
+}
+
+.asset-import-progress-errors {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 3px;
+  padding-top: 2px;
+}
+
 .asset-import-preview-header {
   display: flex;
   align-items: flex-start;
@@ -8239,6 +8309,22 @@ body.is-resizing-side-rail {
 
 .compare-card {
   min-height: 0;
+}
+
+.compare-remove-button,
+.compare-remove-button.is-danger {
+  width: 28px;
+  height: 28px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.compare-remove-button:hover,
+.compare-remove-button.is-danger:hover {
+  border-color: transparent;
+  background: transparent;
+  color: #ffd2d2;
 }
 
 .compare-dialog-shell {

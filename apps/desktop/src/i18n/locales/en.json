@@ -161,6 +161,62 @@
       "forward": "Forward"
     }
   },
+  "compare": {
+    "title": "Compare tray",
+    "body": "Compare selected items to spot operational differences before deciding or opening a deeper workflow.",
+    "close": "Close comparison",
+    "back": "Back",
+    "clearTray": "Clear selection",
+    "itemsReady_one": "{{count}} item ready",
+    "itemsReady_other": "{{count}} items ready",
+    "hiddenItems_one": "{{count}} additional item is not shown here",
+    "hiddenItems_other": "{{count}} additional items are not shown here",
+    "removeItemAria": "Remove {{item}} from comparison",
+    "removeItemTooltip": "Remove {{item}}",
+    "types": {
+      "asset": "Assets",
+      "project": "Projects",
+      "financial_entry": "Finance"
+    },
+    "fallbacks": {
+      "open": "Open",
+      "unassigned": "Unassigned"
+    },
+    "empty": {
+      "title": "No comparison is ready",
+      "body": "Select at least two assets, projects or finance entries of the same type to compare them side by side.",
+      "tipSelect": "Select rows in Assets, Projects or Finance.",
+      "tipAdd": "Use Add to compare from the selection.",
+      "tipOpen": "Then open the compare tray."
+    },
+    "fields": {
+      "code": "Code",
+      "category": "Category",
+      "status": "Status",
+      "condition": "Condition",
+      "custody": "Custody",
+      "location": "Location",
+      "project": "Project",
+      "unit": "Unit",
+      "responsible": "Responsible",
+      "serial": "Serial",
+      "qr": "QR",
+      "warehouse": "Warehouse",
+      "openIssues": "Open issues",
+      "client": "Client",
+      "start": "Start",
+      "end": "End",
+      "units": "Units",
+      "assets": "Assets",
+      "incidents": "Incidents",
+      "exposure": "Exposure",
+      "departments": "Departments",
+      "reference": "Reference",
+      "date": "Date",
+      "type": "Type",
+      "amount": "Amount"
+    }
+  },
   "assets": {
     "title": "Assets",
     "titleProject": "Project assets",
@@ -631,6 +687,17 @@
       "skippedExisting_other": "Skipped {{count}} existing codes.",
       "leftForReview_one": "Left {{count}} row for review.",
       "leftForReview_other": "Left {{count}} rows for review.",
+      "progress": {
+        "title": "Import result",
+        "running": "Importing {{fileName}}…",
+        "completed": "{{fileName}} imported",
+        "failed": "{{fileName}} stopped with an error",
+        "processed": "{{processed}} of {{total}} rows processed.",
+        "imported": "imported",
+        "skippedDuplicate": "duplicates",
+        "skippedReview": "in review",
+        "failedRows": "failed"
+      },
       "stats": {
         "rows": "Rows",
         "uniqueAssets": "Unique assets",
