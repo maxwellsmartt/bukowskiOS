@@ -2016,11 +2016,27 @@
       "overdue": "overdue",
       "pendingUnits": "pending units"
     },
+    "filters": {
+      "title": "Packing quick filters",
+      "all": "All",
+      "open": "Open",
+      "overdue": "Overdue",
+      "pending": "Pending",
+      "closed": "Closed"
+    },
     "selection": {
       "title_one": "{{count}} slip selected",
       "title_other": "{{count}} slips selected",
-      "subtitle": "Selection is ready for future batch actions. For now you can open the first slip or clear selection.",
+      "subtitle": "Export documents for selected slips or open the first one to review details.",
       "openFirst": "Open first",
+      "exportPdf": "Export slips",
+      "exportInsurance": "Export insurance",
+      "exporting": "Exporting…",
+      "batchExportPdfDone_one": "{{count}} slip exported.",
+      "batchExportPdfDone_other": "{{count}} slips exported.",
+      "batchExportInsuranceDone_one": "{{count}} insurance file exported.",
+      "batchExportInsuranceDone_other": "{{count}} insurance files exported.",
+      "batchExportPartial": "{{exported}} exported. Failed: {{failed}}.",
       "clear": "Clear selection"
     },
     "sort": {
@@ -2153,6 +2169,7 @@
     },
     "toasts": {
       "doneTitle": "Done",
+      "partialTitle": "Partial export",
       "unableExportInsurance": "Unable to export insurance list PDF.",
       "unableExportSlip": "Unable to export packing slip PDF.",
       "unableReturn": "Unable to register packing return."

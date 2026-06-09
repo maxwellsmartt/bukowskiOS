@@ -15,12 +15,19 @@ La seccion de Packing Slips ya permite listar slips, abrir detalle, exportar PDF
 - El QR/codigo del slip queda disponible, pero colapsado por defecto para no saturar el rail.
 - La accion de devolucion ahora explica si devolvera seleccion o todos los pendientes.
 
+## Cambios aplicados en S2.1
+
+- Se agregaron filtros rapidos por todos, abiertos, vencidos, pendientes y cerrados.
+- La tabla ahora muestra el conteo filtrado en el buscador y conserva la seleccion dentro de las filas visibles.
+- La seleccion de slips permite exportar PDFs de slips o PDFs de seguro en batch usando los comandos existentes.
+- La exportacion batch corre una sola pasada sin retries largos y reporta resumen parcial si alguna fila falla.
+
 ## Hallazgos y deuda pendiente
 
 ### MVP
 
 - Backend: validar si `create`, `returnItems`, `exportPdf` y `exportInsurancePdf` escriben outbox/sync con comandos idempotentes y `commandId`.
-- Frontend: agregar acciones batch reales para slips seleccionados: exportar PDFs, exportar seguro y marcar revision/seguimiento.
+- Frontend: evaluar si hace falta una accion batch adicional de revision/seguimiento para slips seleccionados.
 - UX: revisar si el nombre "Packing slips" debe mantenerse o traducirse como "Salidas / devoluciones" para usuarios no tecnicos.
 
 ### Hardening
@@ -37,4 +44,4 @@ La seccion de Packing Slips ya permite listar slips, abrir detalle, exportar PDF
 
 ## Proximo slice recomendado
 
-S2 debe enfocarse en funcionamiento operativo: filtros rapidos por estado/responsable, accion batch de export y matriz de sync para confirmar que Carlos/Jeannette/Ivan ven slips y devoluciones actualizadas entre maquinas.
+S2.2 debe enfocarse en la matriz de sync para confirmar que Carlos/Jeannette/Ivan ven slips y devoluciones actualizadas entre maquinas, incluyendo creacion, devolucion parcial/total, cambios de estado, assets afectados y archivos exportados.

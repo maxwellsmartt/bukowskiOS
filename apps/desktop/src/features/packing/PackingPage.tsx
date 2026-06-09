@@ -29,6 +29,8 @@ type PackingPageProps = {
   projectName?: string | null;
 };
 
+type PackingStatusFilter = "all" | "open" | "overdue" | "pending" | "closed";
+
 const packingSortOptions: Array<ListSortOption<PackingSlipSortField>> = [
   { value: "issuedDate", label: "packing.sort.issuedDate", columnKey: "issuedDate" },
   { value: "dueDate", label: "packing.sort.dueDate", columnKey: "dueDate" },
@@ -78,6 +80,9 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const toast = useToast();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingInsurancePdf, setIsExportingInsurancePdf] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<PackingStatusFilter>("all");
+  const [isBatchExportingPdf, setIsBatchExportingPdf] = useState(false);
+  const [isBatchExportingInsurancePdf, setIsBatchExportingInsurancePdf] = useState(false);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = usePackingDetail(activePackingSlipId);
   const focusedPackingSlipId = searchParams.get("focus");
   const translatedSortOptions = packingSortOptions.map((option) => ({ ...option, label: t(option.label) }));
@@ -85,24 +90,61 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
     () => ({
       open: data.filter((row) => row.status !== "Closed").length,
       overdue: data.filter((row) => row.status === "Overdue").length,
+      pendingSlips: data.filter((row) => Math.max(0, row.itemCount - row.returnedCount) > 0).length,
       pendingItems: data.reduce((total, row) => total + Math.max(0, row.itemCount - row.returnedCount), 0),
     }),
     [data],
   );
-  const firstSelectedPackingSlip = selectedRowIds.length ? data.find((row) => row.id === selectedRowIds[0]) ?? null : null;
+  const visiblePackingSlips = useMemo(
+    () =>
+      data.filter((row) => {
+        const pendingCount = Math.max(0, row.itemCount - row.returnedCount);
+
+        if (statusFilter === "open") {
+          return row.status !== "Closed";
+        }
+
+        if (statusFilter === "overdue") {
+          return row.status === "Overdue";
+        }
+
+        if (statusFilter === "pending") {
+          return pendingCount > 0;
+        }
+
+        if (statusFilter === "closed") {
+          return row.status === "Closed";
+        }
+
+        return true;
+      }),
+    [data, statusFilter],
+  );
+  const selectedPackingSlips = useMemo(() => visiblePackingSlips.filter((row) => selectedRowIds.includes(row.id)), [selectedRowIds, visiblePackingSlips]);
+  const firstSelectedPackingSlip = selectedRowIds.length ? visiblePackingSlips.find((row) => row.id === selectedRowIds[0]) ?? null : null;
+  const filterOptions = useMemo(
+    () => [
+      { value: "all" as const, label: t("packing.filters.all"), count: data.length },
+      { value: "open" as const, label: t("packing.filters.open"), count: packingStats.open },
+      { value: "overdue" as const, label: t("packing.filters.overdue"), count: packingStats.overdue },
+      { value: "pending" as const, label: t("packing.filters.pending"), count: packingStats.pendingSlips },
+      { value: "closed" as const, label: t("packing.filters.closed"), count: data.filter((row) => row.status === "Closed").length },
+    ],
+    [data, packingStats.open, packingStats.overdue, packingStats.pendingSlips, t],
+  );
 
   useEffect(() => {
-    if (!data.length) {
+    if (!visiblePackingSlips.length) {
       setActivePackingSlipId(null);
       return;
     }
 
-    if (activePackingSlipId && data.some((row) => row.id === activePackingSlipId)) {
+    if (activePackingSlipId && visiblePackingSlips.some((row) => row.id === activePackingSlipId)) {
       return;
     }
 
-    setActivePackingSlipId(data[0]?.id ?? null);
-  }, [activePackingSlipId, data]);
+    setActivePackingSlipId(visiblePackingSlips[0]?.id ?? null);
+  }, [activePackingSlipId, visiblePackingSlips]);
 
   useEffect(() => {
     if (focusedPackingSlipId && data.some((row) => row.id === focusedPackingSlipId)) {
@@ -113,6 +155,41 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   useEffect(() => {
     writePreference(uiPreferenceKeys.activePackingSlipId, activePackingSlipId);
   }, [activePackingSlipId]);
+
+  const exportSelectedPackingSlips = async (type: "pdf" | "insurance") => {
+    if (!selectedPackingSlips.length) {
+      return;
+    }
+
+    const setBusy = type === "pdf" ? setIsBatchExportingPdf : setIsBatchExportingInsurancePdf;
+    const exportOne = type === "pdf" ? exportPackingSlipPdf : exportPackingSlipInsurancePdf;
+    setBusy(true);
+
+    const failed: string[] = [];
+    let exportedCount = 0;
+
+    try {
+      for (const slip of selectedPackingSlips) {
+        try {
+          await exportOne(slip.id);
+          exportedCount += 1;
+        } catch {
+          failed.push(slip.number);
+        }
+      }
+
+      if (failed.length) {
+        setReturnError(t("packing.selection.batchExportPartial", { exported: exportedCount, failed: failed.join(", ") }));
+        toast.info(t("packing.toasts.partialTitle"), t("packing.selection.batchExportPartial", { exported: exportedCount, failed: failed.join(", ") }));
+        return;
+      }
+
+      setReturnError(null);
+      toast.success(t("packing.toasts.doneTitle"), t(type === "pdf" ? "packing.selection.batchExportPdfDone" : "packing.selection.batchExportInsuranceDone", { count: exportedCount }));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="page-stack packing-page-stack">
@@ -136,7 +213,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             onSearchValueChange={packingControls.setSearchValue}
             onSortByChange={packingControls.setSortField}
             onToggleSortDirection={packingControls.toggleSortDirection}
-            resultCount={data.length}
+            resultCount={visiblePackingSlips.length}
             resultLabel={t("packing.resultLabel")}
             searchPlaceholder={isProjectMode ? t("packing.toolbar.searchPlaceholderProject") : t("packing.toolbar.searchPlaceholder")}
             searchValue={packingControls.searchValue}
@@ -158,6 +235,19 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               {t("packing.overview.pendingUnits")}
             </span>
           </div>
+          <div className="packing-filter-row" aria-label={t("packing.filters.title")}>
+            {filterOptions.map((option) => (
+              <button
+                className={`filter-chip packing-filter-chip${statusFilter === option.value ? " active" : ""}`}
+                key={option.value}
+                onClick={() => setStatusFilter(option.value)}
+                type="button"
+              >
+                <span>{option.label}</span>
+                <strong>{option.count}</strong>
+              </button>
+            ))}
+          </div>
           {selectedRowIds.length ? (
             <div className="selection-action-bar packing-selection-bar">
               <div className="selection-action-copy">
@@ -178,6 +268,22 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
                   type="button"
                 >
                   {t("packing.selection.openFirst")}
+                </button>
+                <button
+                  className="ghost-control"
+                  disabled={isBatchExportingPdf || !selectedPackingSlips.length}
+                  onClick={() => void exportSelectedPackingSlips("pdf")}
+                  type="button"
+                >
+                  {isBatchExportingPdf ? t("packing.selection.exporting") : t("packing.selection.exportPdf")}
+                </button>
+                <button
+                  className="ghost-control"
+                  disabled={isBatchExportingInsurancePdf || !selectedPackingSlips.length}
+                  onClick={() => void exportSelectedPackingSlips("insurance")}
+                  type="button"
+                >
+                  {isBatchExportingInsurancePdf ? t("packing.selection.exporting") : t("packing.selection.exportInsurance")}
                 </button>
                 <button className="ghost-control" onClick={() => setSelectedRowIds([])} type="button">
                   {t("packing.selection.clear")}
@@ -232,7 +338,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
                 ),
               },
             ]}
-            rows={data}
+            rows={visiblePackingSlips}
             selectable
             selectedRowIds={selectedRowIds}
             sortState={

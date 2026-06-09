@@ -2020,11 +2020,27 @@
       "overdue": "vencidos",
       "pendingUnits": "unidades pendientes"
     },
+    "filters": {
+      "title": "Filtros rápidos de packing",
+      "all": "Todos",
+      "open": "Abiertos",
+      "overdue": "Vencidos",
+      "pending": "Pendientes",
+      "closed": "Cerrados"
+    },
     "selection": {
       "title_one": "{{count}} slip seleccionado",
       "title_other": "{{count}} slips seleccionados",
-      "subtitle": "La selección está lista para futuras acciones batch. Por ahora puedes abrir el primer slip o limpiar la selección.",
+      "subtitle": "Exporta documentos de los slips seleccionados o abre el primero para revisar detalles.",
       "openFirst": "Abrir primero",
+      "exportPdf": "Exportar slips",
+      "exportInsurance": "Exportar seguros",
+      "exporting": "Exportando…",
+      "batchExportPdfDone_one": "{{count}} slip exportado.",
+      "batchExportPdfDone_other": "{{count}} slips exportados.",
+      "batchExportInsuranceDone_one": "{{count}} seguro exportado.",
+      "batchExportInsuranceDone_other": "{{count}} seguros exportados.",
+      "batchExportPartial": "{{exported}} exportado(s). Fallaron: {{failed}}.",
       "clear": "Limpiar selección"
     },
     "sort": {
@@ -2157,6 +2173,7 @@
     },
     "toasts": {
       "doneTitle": "Listo",
+      "partialTitle": "Exportación parcial",
       "unableExportInsurance": "No se pudo exportar el PDF de seguro.",
       "unableExportSlip": "No se pudo exportar el PDF del packing slip.",
       "unableReturn": "No se pudo registrar la devolución."
