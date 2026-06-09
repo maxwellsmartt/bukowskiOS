@@ -156,6 +156,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
   const [reimbursementStatusFilter, setReimbursementStatusFilter] = useState<string>("open");
   const [reimbursementCycleStartFilter, setReimbursementCycleStartFilter] = useState<string>("");
   const [reimbursementCycleEndFilter, setReimbursementCycleEndFilter] = useState<string>("");
+  const [showReimbursements, setShowReimbursements] = useState(false);
   const [expandedReimbursementKeys, setExpandedReimbursementKeys] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [optimisticAllocations, setOptimisticAllocations] = useState<Map<string, InvoiceExtractionAllocation>>(new Map());
@@ -1230,8 +1231,10 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
         />
       ) : (
         <>
-          {reimbursementGroups.length > 0 || hasActiveReimbursementFilters ? (
-            <div className="invoice-reimbursement-panel">
+          {showReimbursements
+            ? createPortal(
+                <div className="document-preview-backdrop invoice-reimbursement-popover-backdrop" onClick={() => setShowReimbursements(false)} role="presentation">
+                  <section className="invoice-reimbursement-panel invoice-reimbursement-popover" onClick={(event) => event.stopPropagation()}>
               <div className="invoice-reimbursement-panel-heading">
                 <div>
                   <strong>{t("finance.treasury.invoices.reimbursements.title", { defaultValue: "Reembolsos pendientes" })}</strong>
@@ -1248,13 +1251,21 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
                   })}
                 </small>
                 <div className="invoice-reimbursement-export-actions">
-                  <button className="ghost-control" onClick={() => void exportReimbursements("csv")} type="button">
+                  <button className="ghost-control" disabled={!reimbursementExportRows.length} onClick={() => void exportReimbursements("csv")} type="button">
                     <Download size={13} />
                     CSV
                   </button>
-                  <button className="ghost-control" onClick={() => void exportReimbursements("xlsx")} type="button">
+                  <button className="ghost-control" disabled={!reimbursementExportRows.length} onClick={() => void exportReimbursements("xlsx")} type="button">
                     <Download size={13} />
                     XLSX
+                  </button>
+                  <button
+                    aria-label={t("common.close", { defaultValue: "Cerrar" })}
+                    className="icon-ghost-control"
+                    onClick={() => setShowReimbursements(false)}
+                    type="button"
+                  >
+                    <X size={14} />
                   </button>
                 </div>
               </div>
@@ -1428,8 +1439,11 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
                   </div>
                 )}
               </div>
-            </div>
-          ) : null}
+                  </section>
+                </div>,
+                document.body,
+              )
+            : null}
 
           {selectedIds.size > 0 ? (
             <div className="invoice-batch-bar">
@@ -1647,21 +1661,28 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
               },
             ]}
             controlsAddon={
-              <div className="invoice-inbox-filters">
-                <CompactSelect
-                  className="invoice-filter-select"
-                  ariaLabel={t("finance.treasury.invoices.filterUploader", { defaultValue: "Filtrar por usuario" })}
-                  value={uploaderFilter}
-                  onChange={setUploaderFilter}
-                  options={uploaderOptions}
-                />
-                <CompactSelect
-                  className="invoice-filter-select"
-                  ariaLabel={t("finance.treasury.invoices.filterDate", { defaultValue: "Filtrar por fecha" })}
-                  value={dateFilter}
-                  onChange={setDateFilter}
-                  options={dateOptions}
-                />
+              <div className="invoice-inbox-toolbar">
+                <button className="ghost-control invoice-reimbursement-trigger" onClick={() => setShowReimbursements(true)} type="button">
+                  <BadgeCheck size={13} />
+                  {t("finance.treasury.invoices.reimbursements.show", { defaultValue: "Reembolsos" })}
+                  <span>{reimbursementGroups.length}</span>
+                </button>
+                <div className="invoice-inbox-filters">
+                  <CompactSelect
+                    className="invoice-filter-select"
+                    ariaLabel={t("finance.treasury.invoices.filterUploader", { defaultValue: "Filtrar por usuario" })}
+                    value={uploaderFilter}
+                    onChange={setUploaderFilter}
+                    options={uploaderOptions}
+                  />
+                  <CompactSelect
+                    className="invoice-filter-select"
+                    ariaLabel={t("finance.treasury.invoices.filterDate", { defaultValue: "Filtrar por fecha" })}
+                    value={dateFilter}
+                    onChange={setDateFilter}
+                    options={dateOptions}
+                  />
+                </div>
               </div>
             }
             columns={[
