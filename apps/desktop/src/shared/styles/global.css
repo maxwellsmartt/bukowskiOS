@@ -19978,6 +19978,16 @@ input[type="number"] {
 }
 
 /* ----- Treasury · Invoice inbox ----- */
+.invoice-inbox-card {
+  height: min(76vh, 860px);
+  min-height: min(76vh, 720px);
+  overflow: hidden;
+}
+
+.invoice-inbox-card .data-table-stack {
+  min-height: 0;
+}
+
 .invoice-inbox-hint {
   color: var(--text-muted);
   font-size: var(--font-xs, 12px);
@@ -20485,13 +20495,14 @@ input[type="number"] {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  margin-left: auto;
-  max-height: min(760px, calc(100vh - 48px));
+  margin: 0;
+  max-height: min(640px, calc(100vh - 64px));
   overflow: hidden;
-  padding: 16px;
-  width: min(560px, calc(100vw - 32px));
+  padding: 14px;
+  width: min(500px, calc(100vw - 32px));
 }
 
 .invoice-reconcile-header {
@@ -20527,8 +20538,11 @@ input[type="number"] {
 .invoice-reconcile-list {
   display: grid;
   gap: 9px;
-  max-height: calc(100vh - 190px);
-  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding-right: 2px;
 }
 
@@ -20543,7 +20557,7 @@ input[type="number"] {
   display: grid;
   gap: 10px;
   grid-template-columns: auto minmax(0, 1fr);
-  padding: 11px;
+  padding: 10px;
   text-align: left;
   transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
@@ -20563,9 +20577,9 @@ input[type="number"] {
   display: inline-flex;
   font-size: var(--font-xs, 12px);
   font-weight: var(--weight-bold, 700);
-  height: 36px;
+  height: 32px;
   justify-content: center;
-  width: 48px;
+  width: 44px;
 }
 
 .invoice-reconcile-main {

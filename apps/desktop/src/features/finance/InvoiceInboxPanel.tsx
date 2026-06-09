@@ -1100,7 +1100,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   };
 
   return (
-    <SurfaceCard>
+    <SurfaceCard className="surface-card--fill invoice-inbox-card">
       <h3 className="section-subtitle">{t("finance.treasury.invoices.title", { defaultValue: "Bandeja de facturas" })}</h3>
 
       <button
@@ -1435,6 +1435,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
           ) : null}
 
           <DataTable
+            fillParent
             getRowId={(row) => row.id}
             persistKey="treasury-invoice-inbox-v3"
             syncPreferences
