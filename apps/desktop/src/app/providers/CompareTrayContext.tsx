@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { CompareEntityType, CompareItem, CompareTrayGroup, CompareTrayState } from "@contracts";
 import { readJsonPreference, uiPreferenceKeys, writeJsonPreference } from "@shared/lib/preferences";
@@ -10,6 +10,7 @@ type CompareTrayContextValue = {
   compatibleItems: CompareItem[];
   reasonDisabled: string | null;
   addItems: (items: CompareItem[]) => void;
+  replaceItems: (items: CompareItem[]) => void;
   removeItem: (entityType: CompareEntityType, entityId: string) => void;
   clear: () => void;
   hasItem: (entityType: CompareEntityType, entityId: string) => boolean;
@@ -102,6 +103,30 @@ export const CompareTrayProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [compatibility.compatibleType, compatibility.reasonDisabled, groups, items]);
 
+  const addItems = useCallback((nextItems: CompareItem[]) => {
+    setItems((current) => {
+      const merged = [...current];
+
+      nextItems.forEach((nextItem) => {
+        if (merged.some((currentItem) => currentItem.entityType === nextItem.entityType && currentItem.id === nextItem.id)) {
+          return;
+        }
+
+        merged.push(nextItem);
+      });
+
+      return merged;
+    });
+  }, []);
+
+  const replaceItems = useCallback((nextItems: CompareItem[]) => setItems(nextItems), []);
+
+  const removeItem = useCallback((entityType: CompareEntityType, entityId: string) => {
+    setItems((current) => current.filter((item) => !(item.entityType === entityType && item.id === entityId)));
+  }, []);
+
+  const clear = useCallback(() => setItems([]), []);
+
   const value = useMemo<CompareTrayContextValue>(
     () => ({
       items,
@@ -109,28 +134,13 @@ export const CompareTrayProvider = ({ children }: { children: ReactNode }) => {
       compatibleType: compatibility.compatibleType,
       compatibleItems,
       reasonDisabled: compatibility.reasonDisabled,
-      addItems: (nextItems) => {
-        setItems((current) => {
-          const merged = [...current];
-
-          nextItems.forEach((nextItem) => {
-            if (merged.some((currentItem) => currentItem.entityType === nextItem.entityType && currentItem.id === nextItem.id)) {
-              return;
-            }
-
-            merged.push(nextItem);
-          });
-
-          return merged;
-        });
-      },
-      removeItem: (entityType, entityId) => {
-        setItems((current) => current.filter((item) => !(item.entityType === entityType && item.id === entityId)));
-      },
-      clear: () => setItems([]),
+      addItems,
+      replaceItems,
+      removeItem,
+      clear,
       hasItem: (entityType, entityId) => items.some((item) => item.entityType === entityType && item.id === entityId),
     }),
-    [compatibility.compatibleType, compatibility.reasonDisabled, compatibleItems, groups, items],
+    [addItems, clear, compatibility.compatibleType, compatibility.reasonDisabled, compatibleItems, groups, items, removeItem, replaceItems],
   );
 
   return <CompareTrayContext.Provider value={value}>{children}</CompareTrayContext.Provider>;

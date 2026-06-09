@@ -582,7 +582,7 @@ export const GlobalAssistantChat = () => {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-  const { items } = useCompareTray();
+  const { compatibleItems } = useCompareTray();
   const { applyAgentNotificationIntents, createNotification, unreadCount } = useNotifications();
   const {
     activeSession,
@@ -690,8 +690,8 @@ export const GlobalAssistantChat = () => {
   }, [unreadCount]);
 
   useEffect(() => {
-    setCompareTrayVisible(items.length > 0);
-  }, [items.length, setCompareTrayVisible]);
+    setCompareTrayVisible(compatibleItems.length >= 2);
+  }, [compatibleItems.length, setCompareTrayVisible]);
 
   useEffect(() => {
     if (!isOpen) {

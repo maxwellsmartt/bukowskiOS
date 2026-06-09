@@ -871,7 +871,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   const location = useLocation();
   const { activeWorkspaceId } = useWorkspace();
   const { projects, refreshProjects } = useShellContext();
-  const { addItems } = useCompareTray();
+  const { addItems, clear: clearCompareTray, replaceItems } = useCompareTray();
   const isProjectMode = Boolean(projectId);
   const translatedSortOptions = useMemo(
     () => assetSortOptions.map((option) => ({ ...option, label: t(option.label) })),
@@ -1031,6 +1031,27 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
       .join(", ");
   }, [selectedKitLockedAssets]);
 
+  const buildAssetCompareItem = (asset: AssetListRow) => ({
+    id: asset.id,
+    entityType: "asset" as const,
+    label: `${asset.code} · ${asset.name}`,
+    subtitle: `${asset.location} · ${asset.project}`,
+    meta: asset.projectUnit && asset.projectUnit !== "—" ? t("assets.cart.unitMeta", { unit: asset.projectUnit }) : undefined,
+  });
+
+  useEffect(() => {
+    if (selectedAssets.length >= 2) {
+      replaceItems(selectedAssets.map(buildAssetCompareItem));
+      return;
+    }
+
+    clearCompareTray();
+    // Keep the global compare launcher tied to the current Assets table selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAssets, clearCompareTray, replaceItems]);
+
+  useEffect(() => () => clearCompareTray(), [clearCompareTray]);
+
   useEffect(() => {
     if (isProjectMode || !routeState?.assignProjectId) {
       return;
@@ -1130,6 +1151,11 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     setAssignNextStep(null);
   };
 
+  useEffect(() => {
+    window.addEventListener("bukowski:compare-tray-clear-selection", clearOperationCart);
+    return () => window.removeEventListener("bukowski:compare-tray-clear-selection", clearOperationCart);
+  }, []);
+
   const replaceOperationCartWithAssets = (targetAssets: AssetListRow[]) => {
     setCartItemsById(
       targetAssets.reduce<Record<string, AssetOperationCartItem>>((nextItems, asset) => {
@@ -1157,15 +1183,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
   };
 
   const addAssetToCompare = (asset: AssetListRow) =>
-    addItems([
-      {
-        id: asset.id,
-        entityType: "asset" as const,
-        label: `${asset.code} · ${asset.name}`,
-        subtitle: `${asset.location} · ${asset.project}`,
-        meta: asset.projectUnit && asset.projectUnit !== "—" ? t("assets.cart.unitMeta", { unit: asset.projectUnit }) : undefined,
-      },
-    ]);
+    addItems([buildAssetCompareItem(asset)]);
 
   const handleAssignMove = async (formValue: AssetAssignMoveFormValue) => {
     try {
@@ -2224,15 +2242,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
             <AssetOperationCart
               items={selectedAssets}
               onAddToCompare={() =>
-                addItems(
-                  selectedAssets.map((asset) => ({
-                    id: asset.id,
-                    entityType: "asset" as const,
-                    label: `${asset.code} · ${asset.name}`,
-                    subtitle: `${asset.location} · ${asset.project}`,
-                    meta: asset.projectUnit && asset.projectUnit !== "—" ? t("assets.cart.unitMeta", { unit: asset.projectUnit }) : undefined,
-                  })),
-                )
+                replaceItems(selectedAssets.map(buildAssetCompareItem))
               }
               onClear={clearOperationCart}
               onCreatePackingSlip={() => {
