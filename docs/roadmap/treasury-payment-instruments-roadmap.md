@@ -309,17 +309,23 @@ La base critica es cambiar `transaction_links` para que su identidad de sync sea
 - Verificacion polish posterior:
   - `npm run typecheck` desde `apps/desktop`: **passed**.
   - `npm run test -- treasury-mutation-service.test.ts` desde `apps/desktop`: **21 passed**.
+- Se implementa Slice 9 parcial:
+  - drill-down de reembolsos agrega acciones directas para preview de factura, editar factura y saltar al movimiento vinculado;
+  - saltar al movimiento cambia a tab **Movimientos**, limpia filtros que podrian ocultar la fila, selecciona la transaccion y hace auto-scroll;
+  - reembolsos filtrados exportan CSV y XLSX desde el renderer, en formato plano por factura/allocation;
+  - filtro de responsables de reembolsos incluye tanto catalogo local como responsables reales retornados por la query, evitando depender de IDs manuales;
+  - labels de responsable/reminder dejan de exponer "ID" al usuario.
+- Verificacion Slice 9 parcial:
+  - `npm run typecheck` desde `apps/desktop`: **passed**.
 
 ## Proximo slice recomendado
 
-**Slice 9 — acciones operativas y export de reembolsos.**
+**Slice 10 — smoke multiusuario y cierre MVP.**
 
 Orden sugerido:
-1. Accion directa desde drill-down: abrir preview/editar factura.
-2. Accion directa desde drill-down: saltar al movimiento vinculado cuando exista.
-3. Export CSV/XLSX de reembolsos filtrados.
-4. Reemplazar IDs/manual labels restantes por selector de usuarios/responsables conectado al catalogo local y usuarios operativos.
-5. Smoke multiusuario real: Facturas, Cuentas, Movimientos y Reembolsos entre dos Macs/usuarios.
-6. Hardening Supabase/RLS/storage: confirmar grants, policies y disponibilidad real de PDFs/adjuntos.
-7. Diseñar soporte para bancos adicionales: primero metadata `Otro/custom`, luego parser generico CSV/manual y despues parsers dedicados por banco.
-8. Dejar auto-conciliacion sin confirmacion humana fuera de v1.
+1. Smoke multiusuario real: Facturas, Cuentas, Movimientos y Reembolsos entre dos Macs/usuarios.
+2. Confirmar que la migracion Supabase `20260608211102_treasury_payment_instruments_v4.sql` esta aplicada en remoto y no hay drift.
+3. Revisar `sync_outbox`, pull cursors y errores visibles despues del smoke.
+4. Hardening Supabase/RLS/storage: confirmar grants, policies y disponibilidad real de PDFs/adjuntos.
+5. Diseñar soporte para bancos adicionales: primero metadata `Otro/custom`, luego parser generico CSV/manual y despues parsers dedicados por banco.
+6. Dejar auto-conciliacion sin confirmacion humana fuera de v1.

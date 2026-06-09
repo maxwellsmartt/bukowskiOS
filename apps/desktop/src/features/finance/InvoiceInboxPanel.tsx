@@ -54,6 +54,20 @@ const formatInvoiceMoney = (value: number, currency: string | null | undefined) 
     maximumFractionDigits: 2,
   })}`;
 
+const csvEscape = (value: string | number | null | undefined) => {
+  const text = value == null ? "" : String(value);
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
 const readFileAsDataUrl = (file: File): Promise<InvoiceInboxFileInput> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -109,9 +123,10 @@ type ReconciliationCandidate = {
 type Props = {
   workspaceId: string;
   formatMoney: (value: number) => string;
+  onOpenMovement?: (transactionId: string) => void;
 };
 
-export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
+export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: Props) => {
   const { t } = useTranslation();
   const { user } = useSession();
   const { createNotification } = useNotifications();
@@ -326,11 +341,19 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
   );
 
   const reimbursementOwnerOptions = useMemo(
-    () => [
-      { value: "all", label: t("finance.treasury.invoices.reimbursements.allOwners", { defaultValue: "Todos los responsables" }) },
-      ...memberOptions,
-    ],
-    [memberOptions, t],
+    () => {
+      const options = [
+        { value: "all", label: t("finance.treasury.invoices.reimbursements.allOwners", { defaultValue: "Todos los responsables" }) },
+        ...memberOptions,
+      ];
+      for (const group of reimbursements.data?.groups ?? []) {
+        if (group.ownerUserId && !options.some((option) => option.value === group.ownerUserId)) {
+          options.push({ value: group.ownerUserId, label: group.ownerName });
+        }
+      }
+      return options;
+    },
+    [memberOptions, reimbursements.data?.groups, t],
   );
   const reimbursementInstrumentOptions = useMemo(
     () => [
@@ -369,6 +392,10 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
       return matchUploader && matchDate;
     });
   }, [inbox.data, uploaderFilter, dateFilter]);
+  const invoiceRowsById = useMemo(
+    () => new Map(inbox.data.map((row) => [row.id, row])),
+    [inbox.data],
+  );
   useEffect(() => {
     setOptimisticAllocations((current) => {
       if (!current.size) return current;
@@ -451,6 +478,54 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
     Boolean(reimbursementCycleStartFilter) ||
     Boolean(reimbursementCycleEndFilter);
   const reimbursementTotals = reimbursements.data?.totalsByCurrency ?? [];
+  const reimbursementExportRows = useMemo(
+    () =>
+      reimbursementGroups.flatMap((group) =>
+        group.items.map((item) => ({
+          responsable: group.owner,
+          medio: group.instrument,
+          ciclo: group.cycle,
+          estadoGrupo: group.status,
+          factura: item.originalName,
+          proveedor: item.supplierName ?? "",
+          rnc: item.supplierRnc ?? "",
+          ncf: item.ncf ?? "",
+          fecha: item.invoiceDate ?? "",
+          monto: item.amount,
+          moneda: item.currency,
+          estado: item.status,
+          movimiento: item.transactionLabel ?? "",
+          transactionId: item.transactionId ?? "",
+          allocationId: item.allocationId,
+        })),
+      ),
+    [reimbursementGroups],
+  );
+
+  const exportReimbursements = async (format: "csv" | "xlsx") => {
+    if (!reimbursementExportRows.length) {
+      toast.info(t("finance.treasury.invoices.reimbursements.exportEmpty", { defaultValue: "No hay reembolsos filtrados para exportar." }));
+      return;
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `bukowski-reembolsos-${stamp}.${format}`;
+    if (format === "csv") {
+      const headers = Object.keys(reimbursementExportRows[0]);
+      const csv = [
+        headers.map(csvEscape).join(","),
+        ...reimbursementExportRows.map((row) => headers.map((header) => csvEscape(row[header as keyof typeof row])).join(",")),
+      ].join("\n");
+      downloadBlob(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }), filename);
+      return;
+    }
+    const XLSX = await import("xlsx");
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet(reimbursementExportRows);
+    sheet["!autofilter"] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(sheet["!ref"] ?? "A1:A1")) };
+    XLSX.utils.book_append_sheet(workbook, sheet, "Reembolsos");
+    const data = XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+    downloadBlob(new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
+  };
 
   const reconciliationCandidates = useMemo(() => {
     if (!reconciling) return [];
@@ -1172,6 +1247,16 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                     count: reimbursementGroups.length,
                   })}
                 </small>
+                <div className="invoice-reimbursement-export-actions">
+                  <button className="ghost-control" onClick={() => void exportReimbursements("csv")} type="button">
+                    <Download size={13} />
+                    CSV
+                  </button>
+                  <button className="ghost-control" onClick={() => void exportReimbursements("xlsx")} type="button">
+                    <Download size={13} />
+                    XLSX
+                  </button>
+                </div>
               </div>
               <div className="invoice-reimbursement-filters">
                 <CompactSelect
@@ -1288,6 +1373,45 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney }: Props) => {
                                     {item.transactionLabel ??
                                       t("finance.treasury.invoices.reimbursements.noMovement", { defaultValue: "Sin movimiento vinculado" })}
                                   </small>
+                                </span>
+                                <span className="invoice-reimbursement-actions">
+                                  <button
+                                    aria-label={t("finance.treasury.invoices.preview", { defaultValue: "Ver factura" })}
+                                    className="icon-ghost-control"
+                                    disabled={!invoiceRowsById.has(item.invoiceExtractionId)}
+                                    onClick={() => {
+                                      const row = invoiceRowsById.get(item.invoiceExtractionId);
+                                      if (!row) return;
+                                      setPreview({ id: row.id, name: row.originalName });
+                                    }}
+                                    type="button"
+                                  >
+                                    <FileText size={13} />
+                                  </button>
+                                  <button
+                                    aria-label={t("finance.treasury.invoices.edit", { defaultValue: "Editar" })}
+                                    className="icon-ghost-control"
+                                    disabled={!invoiceRowsById.has(item.invoiceExtractionId)}
+                                    onClick={() => {
+                                      const row = invoiceRowsById.get(item.invoiceExtractionId);
+                                      if (!row) return;
+                                      setEditing(row);
+                                    }}
+                                    type="button"
+                                  >
+                                    <Pencil size={13} />
+                                  </button>
+                                  <button
+                                    aria-label={t("finance.treasury.invoices.reimbursements.openMovement", { defaultValue: "Ver movimiento" })}
+                                    className="icon-ghost-control"
+                                    disabled={!item.transactionId || !onOpenMovement}
+                                    onClick={() => {
+                                      if (item.transactionId) onOpenMovement?.(item.transactionId);
+                                    }}
+                                    type="button"
+                                  >
+                                    <ArrowRightLeft size={13} />
+                                  </button>
                                 </span>
                               </div>
                             ))}

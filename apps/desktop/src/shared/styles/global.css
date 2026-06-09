@@ -20357,6 +20357,22 @@ input[type="number"] {
   font-size: var(--font-2xs, 11px);
 }
 
+.invoice-reimbursement-export-actions {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.invoice-reimbursement-panel-heading .invoice-reimbursement-export-actions {
+  display: flex;
+}
+
+.invoice-reimbursement-export-actions .ghost-control {
+  font-size: var(--font-2xs, 11px);
+  min-height: 28px;
+  padding: 5px 8px;
+}
+
 .invoice-reimbursement-filters {
   align-items: end;
   display: grid;
@@ -20473,7 +20489,7 @@ input[type="number"] {
   background: rgba(255, 255, 255, 0.025);
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(150px, 1.4fr) minmax(90px, 0.8fr) minmax(140px, 1fr);
+  grid-template-columns: minmax(150px, 1.35fr) minmax(90px, 0.75fr) minmax(140px, 1fr) auto;
   padding: 9px 10px;
 }
 
@@ -20493,6 +20509,19 @@ input[type="number"] {
 .invoice-reimbursement-item strong {
   color: var(--text-primary);
   font-size: var(--font-xs, 12px);
+}
+
+.invoice-reimbursement-actions {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+.invoice-reimbursement-actions .icon-ghost-control {
+  height: 26px;
+  min-height: 26px;
+  width: 26px;
 }
 
 .invoice-reimbursement-empty {

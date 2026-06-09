@@ -460,6 +460,7 @@ export const TreasuryPage = () => {
   const [showManualForm, setShowManualForm] = useState(false);
   const [importHistoryOpen, setImportHistoryOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeMovementId, setActiveMovementId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<TransactionDraft | null>(null);
   const [pendingRule, setPendingRule] = useState<PendingClassificationRule | null>(null);
   const [isApplyingRule, setIsApplyingRule] = useState(false);
@@ -689,6 +690,18 @@ export const TreasuryPage = () => {
 
   const openAccount = (accountId: string) => {
     setAccountFilter(accountId);
+    setTab("movements");
+  };
+
+  const openMovement = (transactionId: string) => {
+    setPeriod("all");
+    setAccountFilter("");
+    setDateFilter("all");
+    setSearch("");
+    setUnclassifiedOnly(false);
+    setSuggestedOnly(false);
+    setSelectedMovementIds([transactionId]);
+    setActiveMovementId(transactionId);
     setTab("movements");
   };
 
@@ -2394,6 +2407,8 @@ export const TreasuryPage = () => {
             />
           ) : (
             <DataTable<BankTransactionRow>
+              activeRowId={activeMovementId}
+              autoScrollToActiveRow
               columns={movementColumns}
               fillRemainingColumnKey="actions"
               fitToColumnWidths
@@ -2605,7 +2620,7 @@ export const TreasuryPage = () => {
       ) : null}
 
       {tab === "invoices" ? (
-        <InvoiceInboxPanel workspaceId={activeWorkspaceId} formatMoney={formatMoney} />
+        <InvoiceInboxPanel workspaceId={activeWorkspaceId} formatMoney={formatMoney} onOpenMovement={openMovement} />
       ) : null}
 
       {tab === "projects" ? (
