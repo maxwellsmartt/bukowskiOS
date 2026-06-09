@@ -605,6 +605,30 @@ describe("treasury mutation service", () => {
     expect(reminder.recurrence_rule).toBe("FREQ=MONTHLY");
     expect(reminder.completed_at).toBeNull();
 
+    mutations.upsertBankAccount(
+      account("cmd-card-last4-only", {
+        accountLabel: "Mastercard empresa",
+        instrumentKind: "credit_card",
+        last4: "9876",
+        owner: "user",
+        ownerUserId: "user-ops",
+        statementCycleDay: 12,
+        paymentDueDay: 27,
+        currency: "DOP",
+      }),
+    );
+
+    const storedLast4Only = database
+      .prepare(`SELECT account_number_full, account_number_masked, last4 FROM bank_accounts WHERE id = ?`)
+      .get("bank-account-cmd-card-last4-only") as {
+      account_number_full: string | null;
+      account_number_masked: string | null;
+      last4: string | null;
+    };
+    expect(storedLast4Only.account_number_full).toBeNull();
+    expect(storedLast4Only.account_number_masked).toBe("****9876");
+    expect(storedLast4Only.last4).toBe("9876");
+
     cleanup();
   });
 

@@ -17933,8 +17933,8 @@ input[type="number"] {
 
 .treasury-payment-instruments-grid {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .treasury-payment-instrument {
@@ -17945,9 +17945,9 @@ input[type="number"] {
   border-radius: 16px;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.035);
   display: grid;
-  gap: 13px;
+  gap: 12px;
   min-width: 0;
-  padding: 16px;
+  padding: 14px;
   transition: border-color 140ms ease, transform 140ms ease, background 140ms ease;
 }
 
@@ -17966,7 +17966,7 @@ input[type="number"] {
 .treasury-payment-instrument-top {
   align-items: center;
   display: grid;
-  gap: 10px;
+  gap: 9px;
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
@@ -17977,9 +17977,9 @@ input[type="number"] {
   border-radius: 14px;
   color: rgba(234, 205, 156, 0.95);
   display: inline-flex;
-  height: 40px;
+  height: 36px;
   justify-content: center;
-  width: 40px;
+  width: 36px;
 }
 
 .treasury-payment-instrument-top h3 {
@@ -18006,7 +18006,7 @@ input[type="number"] {
 
 .treasury-payment-instrument-meta {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0;
 }
@@ -18016,7 +18016,7 @@ input[type="number"] {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 11px;
   min-width: 0;
-  padding: 8px 9px;
+  padding: 7px 8px;
 }
 
 .treasury-payment-instrument-meta dt {
@@ -18038,13 +18038,25 @@ input[type="number"] {
 
 .treasury-payment-instrument-actions {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 5px;
   padding-top: 2px;
 }
 
 .treasury-payment-instrument-actions .ghost-control {
-  min-height: 30px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  gap: 4px;
+  min-height: 24px;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
+.treasury-payment-instrument-actions .ghost-control svg {
+  flex: 0 0 auto;
+  height: 12px;
+  width: 12px;
 }
 
 .treasury-danger-control {
@@ -18609,6 +18621,10 @@ input[type="number"] {
     grid-template-columns: 1fr;
   }
 
+  .treasury-payment-instruments-grid {
+    grid-template-columns: 1fr;
+  }
+
   .treasury-account-form-heading,
   .treasury-payment-instruments-header {
     align-items: stretch;
@@ -18641,6 +18657,10 @@ input[type="number"] {
 }
 
 @media (min-width: 761px) and (max-width: 1180px) {
+  .treasury-payment-instruments-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .treasury-account-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -18666,6 +18686,12 @@ input[type="number"] {
 
   .treasury-account-form-actions {
     justify-content: flex-start;
+  }
+}
+
+@media (min-width: 1181px) and (max-width: 1540px) {
+  .treasury-payment-instruments-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

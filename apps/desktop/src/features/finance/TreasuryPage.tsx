@@ -561,6 +561,8 @@ export const TreasuryPage = () => {
   const formatMoney = formatTreasuryMoney;
   const instrumentKindLabel = (kind: PaymentInstrumentKind) =>
     t(`finance.treasury.instrumentKinds.${kind}`, { defaultValue: kind.replace(/_/g, " ") });
+  const accountTypeLabel = (type: BankAccountType | null | undefined) =>
+    t(`finance.treasury.accountTypes.${type ?? "other"}`, { defaultValue: type ?? "Otra" });
   const ownerLabel = (owner: PaymentInstrumentOwner) =>
     t(`finance.treasury.owners.${owner}`, { defaultValue: owner });
   const bankDisplayLabel = (account: BankAccountRow) =>
@@ -2006,15 +2008,7 @@ export const TreasuryPage = () => {
                     <dl className="treasury-payment-instrument-meta">
                       <div>
                         <dt>{t("finance.treasury.account.bank")}</dt>
-                        <dd>
-                          {bankDisplayLabel(account)}
-                          {terminal ? (
-                            <>
-                              {" · "}
-                              <span className="treasury-account-terminal">•••• {terminal}</span>
-                            </>
-                          ) : null}
-                        </dd>
+                        <dd>{bankDisplayLabel(account)}</dd>
                       </div>
                       <div>
                         <dt>{t("finance.treasury.account.owner", { defaultValue: "Owner" })}</dt>
@@ -2024,10 +2018,17 @@ export const TreasuryPage = () => {
                         <dt>{t("finance.treasury.account.balance", { defaultValue: "Balance" })}</dt>
                         <dd>{formatMoney(account.currentBalance ?? account.openingBalance, account.currency)}</dd>
                       </div>
-                      <div>
-                        <dt>{t("finance.treasury.accounts.movementsLabel", { defaultValue: "Movimientos" })}</dt>
-                        <dd>{t("finance.treasury.accounts.movementCountValue", { defaultValue: "{{count}} movimientos", count: account.transactionCount })}</dd>
-                      </div>
+                      {account.instrumentKind === "bank_account" ? (
+                        <div>
+                          <dt>{t("finance.treasury.account.accountType", { defaultValue: "Tipo de cuenta" })}</dt>
+                          <dd>{accountTypeLabel(account.accountType)}</dd>
+                        </div>
+                      ) : !isCard ? (
+                        <div>
+                          <dt>{t("finance.treasury.accounts.movementsLabel", { defaultValue: "Movimientos" })}</dt>
+                          <dd>{t("finance.treasury.accounts.movementCountValue", { defaultValue: "{{count}} movimientos", count: account.transactionCount })}</dd>
+                        </div>
+                      ) : null}
                       {account.instrumentKind === "credit_card" ? (
                         <div>
                           <dt>{t("finance.treasury.account.cardCycle", { defaultValue: "Ciclo tarjeta" })}</dt>
@@ -3080,12 +3081,13 @@ const AccountForm = ({
         {isCard ? (
           <>
             <label className="compact-filter-field">
-              <span>{t("finance.treasury.account.last4", { defaultValue: "Últimos 4" })}</span>
+              <span>{t("finance.treasury.account.last4", { defaultValue: "Terminal (últimos 4)" })}</span>
               <input
                 className="field-input"
                 inputMode="numeric"
                 maxLength={4}
                 onChange={(event) => setDraft((d) => ({ ...d, last4: event.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                placeholder="1234"
                 value={draft.last4}
               />
             </label>

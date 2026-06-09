@@ -835,7 +835,7 @@ const syncCardPaymentReminder = (
       validateCreditCardReminderUser(input);
 
       const now = new Date().toISOString();
-      const last4 = extractLast4(input.accountNumberMasked) ?? extractLast4(input.accountNumberFull);
+      const last4 = extractLast4(input.accountNumberMasked) ?? extractLast4(input.last4) ?? extractLast4(input.accountNumberFull);
       const maskedNumber = input.accountNumberMasked?.trim() || (last4 ? `****${last4}` : null);
       const owner = input.owner ?? "company";
       const instrumentKind = input.instrumentKind ?? "bank_account";
