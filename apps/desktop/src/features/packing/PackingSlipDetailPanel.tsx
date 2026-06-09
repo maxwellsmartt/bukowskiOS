@@ -92,6 +92,7 @@ export const PackingSlipDetailPanel = ({
   const defaultRateSource = currencySettings?.defaultRateSource ?? "manual";
   const defaultRateType = currencySettings?.defaultRateType ?? "manual";
   const defaultOutputCurrency = currencySettings?.baseCurrency === "DOP" ? "DOP" : "USD";
+  const hasOperationalNotes = Boolean(data.slip.notes?.trim()) && data.slip.notes !== "No operational notes yet.";
   const headerActions = (
     <div className="packing-detail-header-actions">
       <StatusBadge tone={data.slip.status === "Overdue" ? "critical" : data.slip.status === "Closed" ? "success" : "info"}>
@@ -137,68 +138,54 @@ export const PackingSlipDetailPanel = ({
       title={data.slip.number}
       aside={headerActions}
     >
-      <div className="packing-detail-hero-grid">
+      <div className="packing-detail-hero-grid packing-detail-operations-grid">
         <div className="summary-row">
           <span className="summary-label">{t("packing.detail.project")}</span>
           <span className="summary-value">{data.slip.project}</span>
+          <span className="summary-meta">{data.slip.projectCode} · {data.slip.department}</span>
         </div>
         <div className="summary-row">
-          <span className="summary-label">{t("packing.detail.responsible")}</span>
+          <span className="summary-label">{t("packing.detail.owner")}</span>
           <span className="summary-value">{data.slip.responsible}</span>
+          <span className="summary-meta">{t("packing.detail.preparedByShort", { name: data.slip.preparedBy })}</span>
         </div>
         <div className="summary-row">
           <span className="summary-label">{t("packing.detail.issuedDue")}</span>
           <span className="summary-value">
             {data.slip.issueDate} · {data.slip.dueDate}
           </span>
-        </div>
-        <div className="summary-row">
-          <span className="summary-label">{t("packing.detail.unitsOnSlip")}</span>
-          <span className="summary-value">{data.slip.itemCount}</span>
+          <span className="summary-meta">{t("packing.detail.issueDateShort", { date: data.slip.issueDateCompact })}</span>
         </div>
         <div className="summary-row">
           <span className="summary-label">{t("packing.detail.returnProgress")}</span>
           <span className="summary-value">
             {t("packing.progress", { returned: data.slip.returnedCount, pending: data.slip.pendingCount })}
           </span>
+          <span className="summary-meta">{t("packing.detail.unitsSummary", { count: operationalQuantity })}</span>
         </div>
       </div>
 
-      <div className="summary-grid packing-detail-document-grid">
-        <div className="summary-row">
-          <span className="summary-label">{t("packing.detail.preparedBy")}</span>
-          <span className="summary-value">{data.slip.preparedBy}</span>
-        </div>
-        <div className="summary-row">
-          <span className="summary-label">{t("packing.detail.qrReady")}</span>
-          <span className="summary-value">{data.slip.primaryCodeValue}</span>
-        </div>
-        <div className="summary-row">
-          <span className="summary-label">{t("packing.detail.notes")}</span>
-          <span className="summary-value">{data.slip.notes}</span>
-        </div>
+      <div className="packing-detail-meta-strip" aria-label={t("packing.detail.documentContext")}>
+        <span>
+          <strong>{t("packing.detail.insuranceValues")}</strong>
+          {t("packing.detail.insuranceValuesProgress", { ready: insuredItemsCount, pending: missingInsuranceValueCount })}
+        </span>
+        <span>
+          <strong>{t("packing.detail.insuredTotal")}</strong>
+          {data.slip.insuredTotal}
+        </span>
+        <span>
+          <strong>{t("packing.detail.qrReady")}</strong>
+          {data.slip.primaryCodeValue}
+        </span>
       </div>
 
-      <div className="packing-detail-summary-grid">
-        <div className="summary-row">
-          <span className="summary-label">{t("packing.detail.items")}</span>
-          <span className="summary-value">{data.items.length}</span>
+      {hasOperationalNotes ? (
+        <div className="packing-detail-note">
+          <span>{t("packing.detail.notes")}</span>
+          <strong>{data.slip.notes}</strong>
         </div>
-        <div className="summary-row">
-          <span className="summary-label">{t("packing.detail.operationalQty")}</span>
-          <span className="summary-value">{operationalQuantity}</span>
-        </div>
-        <div className="summary-row">
-          <span className="summary-label">{t("packing.detail.insuredTotal")}</span>
-          <span className="summary-value">{data.slip.insuredTotal}</span>
-        </div>
-        <div className="summary-row">
-          <span className="summary-label">{t("packing.detail.insuranceValues")}</span>
-          <span className="summary-value">
-            {t("packing.detail.insuranceValuesProgress", { ready: insuredItemsCount, pending: missingInsuranceValueCount })}
-          </span>
-        </div>
-      </div>
+      ) : null}
 
       {data.slip.primaryCodeValue ? (
         <details className="detail-disclosure packing-code-disclosure">
