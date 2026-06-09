@@ -116,6 +116,36 @@ const upsertSupabaseRow = async ({
   }
 };
 
+const updateSupabaseRows = async ({
+  accessToken,
+  anonKey,
+  endpoint,
+  payload,
+  fetchImpl,
+}: {
+  accessToken: string;
+  anonKey: string;
+  endpoint: string;
+  payload: Record<string, unknown>;
+  fetchImpl: typeof fetch;
+}) => {
+  const response = await fetchImpl(endpoint, {
+    method: "PATCH",
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const detail = await readErrorBody(response);
+    throw new Error(`Supabase domain update failed (${response.status}): ${detail}`);
+  }
+};
+
 const deleteSupabaseRows = async ({
   accessToken,
   anonKey,
@@ -140,6 +170,36 @@ const deleteSupabaseRows = async ({
     const detail = await readErrorBody(response);
     throw new Error(`Supabase domain delete failed (${response.status}): ${detail}`);
   }
+};
+
+const isTransactionLinkDedupeConflict = (error: unknown) =>
+  error instanceof Error &&
+  /409/.test(error.message) &&
+  /idx_txn_links_dedupe_v4|duplicate key value violates unique constraint/i.test(error.message);
+
+const requireFilterValue = (record: Record<string, unknown>, column: string) => {
+  const value = record[column];
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`Transaction link dedupe recovery cannot run without ${column}.`);
+  }
+  return value;
+};
+
+const filterParam = (column: string, value: unknown) => {
+  const encodedColumn = encodeURIComponent(column);
+  if (value === null || value === undefined || value === "") return `${encodedColumn}=is.null`;
+  return `${encodedColumn}=eq.${encodeURIComponent(String(value))}`;
+};
+
+const transactionLinkDedupeEndpoint = (normalizedUrl: string, record: Record<string, unknown>) => {
+  const filters = [
+    filterParam("workspace_id", requireFilterValue(record, "workspace_id")),
+    filterParam("linked_entity_type", requireFilterValue(record, "linked_entity_type")),
+    filterParam("linked_entity_id", requireFilterValue(record, "linked_entity_id")),
+    filterParam("transaction_id", record.transaction_id),
+    filterParam("payment_instrument_id", record.payment_instrument_id),
+  ];
+  return `${normalizedUrl}/rest/v1/transaction_links?${filters.join("&")}`;
 };
 
 export const createSupabaseOutboxTransport = ({
@@ -274,13 +334,26 @@ export const createSupabaseOutboxTransport = ({
             });
           }
           for (const record of upsert.rows) {
-            await upsertSupabaseRow({
-              accessToken,
-              anonKey,
-              endpoint: `${normalizedUrl}/rest/v1/${upsert.table}?on_conflict=${upsert.onConflict}`,
-              payload: record,
-              fetchImpl,
-            });
+            try {
+              await upsertSupabaseRow({
+                accessToken,
+                anonKey,
+                endpoint: `${normalizedUrl}/rest/v1/${upsert.table}?on_conflict=${upsert.onConflict}`,
+                payload: record,
+                fetchImpl,
+              });
+            } catch (error) {
+              if (upsert.table !== "transaction_links" || !isTransactionLinkDedupeConflict(error)) {
+                throw error;
+              }
+              await updateSupabaseRows({
+                accessToken,
+                anonKey,
+                endpoint: transactionLinkDedupeEndpoint(normalizedUrl, record),
+                payload: record,
+                fetchImpl,
+              });
+            }
           }
         }
       }

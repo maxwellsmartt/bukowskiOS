@@ -1,4 +1,4 @@
-import { ArrowUpRight, Banknote, Check, ChevronDown, CreditCard, Download, Edit3, FileDown, FileUp, Landmark, Plus, RotateCcw, Search, Trash2, Wallet, X } from "lucide-react";
+import { ArrowUpRight, Banknote, Check, ChevronDown, CreditCard, Download, Edit3, FileDown, FileUp, Landmark, Plus, RotateCcw, Search, Trash2, UploadCloud, Wallet, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useChartAnimationsEnabled } from "@shared/hooks/useChartAnimations";
@@ -28,6 +28,7 @@ import type {
   DgiiReportKind,
   PaymentInstrumentKind,
   PaymentInstrumentOwner,
+  StatementImportPreview,
   ReviewQueueRow,
   TreasuryDeductibleLedgerExportFormat,
   TransactionDirection,
@@ -39,6 +40,7 @@ import { DataTable } from "@shared/components/DataTable";
 import { CompactSelect } from "@shared/components/CompactSelect";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
+import { ModalShell } from "@shared/components/ModalShell";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -98,6 +100,14 @@ type TransactionDraft = {
   amount: number;
   direction: TransactionDirection;
   runningBalance: string;
+};
+type PendingStatementImport = {
+  bankAccountId: string;
+  bankName: BankName;
+  sourceFormat: "csv" | "xlsx" | "manual" | "pdf";
+  originalFilename: string;
+  accountAutofillLast4: string | null;
+  preview: StatementImportPreview;
 };
 
 const transactionKinds: TransactionKind[] = [
@@ -468,6 +478,8 @@ export const TreasuryPage = () => {
   const [isDeletingImport, setIsDeletingImport] = useState(false);
   const [importBankName, setImportBankName] = useState<BankName>("popular");
   const [importAccountId, setImportAccountId] = useState<string>("");
+  const [pendingStatementImport, setPendingStatementImport] = useState<PendingStatementImport | null>(null);
+  const [isConfirmingStatementImport, setIsConfirmingStatementImport] = useState(false);
   const [busy, setBusy] = useState(false);
   const [overviewCurrency, setOverviewCurrency] = useState<TreasuryReportCurrency>("DOP");
   const [selectedMovementIds, setSelectedMovementIds] = useState<string[]>([]);
@@ -915,8 +927,39 @@ export const TreasuryPage = () => {
           return;
         }
       }
-      if (target && parsed.accountNumber && !accountTerminal(target)) {
-        const last4 = parsed.accountNumber.slice(-4);
+      const sourceFormat = parsed.bankName === "santa_cruz" ? "xlsx" : "csv";
+      const preview = await mutations.previewStatementImport({
+        workspaceId: activeWorkspaceId,
+        bankAccountId: importAccountId,
+        sourceFormat,
+        originalFilename: file.name,
+        periodStart: parsed.periodStart,
+        periodEnd: parsed.periodEnd,
+        rows: parsed.rows,
+      });
+      setPendingStatementImport({
+        bankAccountId: importAccountId,
+        bankName: importBankName,
+        sourceFormat,
+        originalFilename: file.name,
+        accountAutofillLast4: target && parsed.accountNumber && !accountTerminal(target) ? parsed.accountNumber.slice(-4) : null,
+        preview,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("finance.treasury.import.failed"));
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const confirmStatementImport = async () => {
+    if (!pendingStatementImport) return;
+    setIsConfirmingStatementImport(true);
+    try {
+      const target = accounts.data.find((account) => account.id === pendingStatementImport.bankAccountId);
+      if (target && pendingStatementImport.accountAutofillLast4) {
+        const last4 = pendingStatementImport.accountAutofillLast4;
         await mutations.upsertPaymentInstrument({
           commandId: newCommandId("treasury-instrument-autofill"),
           workspaceId: activeWorkspaceId,
@@ -948,20 +991,29 @@ export const TreasuryPage = () => {
         workspaceId: activeWorkspaceId,
         actorType: "user",
         sourceChannel: "desktop",
-        bankAccountId: importAccountId,
-        sourceFormat: parsed.bankName === "santa_cruz" ? "xlsx" : "csv",
-        originalFilename: file.name,
-        periodStart: parsed.periodStart,
-        periodEnd: parsed.periodEnd,
-        rows: parsed.rows,
+        bankAccountId: pendingStatementImport.bankAccountId,
+        sourceFormat: pendingStatementImport.sourceFormat,
+        originalFilename: pendingStatementImport.originalFilename,
+        periodStart: pendingStatementImport.preview.periodStart,
+        periodEnd: pendingStatementImport.preview.periodEnd,
+        rows: pendingStatementImport.preview.rows.map((row) => ({
+          txnDate: row.txnDate,
+          valueDate: row.valueDate ?? null,
+          rawDescription: row.rawDescription ?? null,
+          reference: row.reference ?? null,
+          serial: row.serial ?? null,
+          amount: row.amount,
+          direction: row.direction,
+          runningBalance: row.runningBalance ?? null,
+        })),
       });
       toast.success(result.summary);
+      setPendingStatementImport(null);
       refreshAll();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("finance.treasury.import.failed"));
     } finally {
-      setBusy(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setIsConfirmingStatementImport(false);
     }
   };
 
@@ -1746,7 +1798,7 @@ export const TreasuryPage = () => {
                 <div className="finance-chart-shell finance-chart-shell-pie">
                   <div className="finance-category-layout">
                     <div className="finance-donut-wrap">
-                      <ResponsiveContainer height={252} width="100%">
+                      <ResponsiveContainer height="100%" width="100%">
                         <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                           <Pie
                             cx="50%"
@@ -2669,6 +2721,16 @@ export const TreasuryPage = () => {
       ) : null}
 
     </div>
+    {pendingStatementImport ? (
+      <StatementImportPreviewDialog
+        accountLabel={accounts.data.find((account) => account.id === pendingStatementImport.bankAccountId)?.accountLabel ?? ""}
+        currency={accounts.data.find((account) => account.id === pendingStatementImport.bankAccountId)?.currency ?? "DOP"}
+        importPreview={pendingStatementImport.preview}
+        isSubmitting={isConfirmingStatementImport}
+        onCancel={() => setPendingStatementImport(null)}
+        onConfirm={() => void confirmStatementImport()}
+      />
+    ) : null}
     <ConfirmDialog
       body={t("finance.treasury.classify.applySimilarBody", {
         defaultValue:
@@ -2765,6 +2827,135 @@ type ManualTransactionDraft = {
   reference: string;
   amount: number;
   direction: TransactionDirection;
+};
+
+const StatementImportPreviewDialog = ({
+  accountLabel,
+  currency,
+  importPreview,
+  isSubmitting,
+  onCancel,
+  onConfirm,
+}: {
+  accountLabel: string;
+  currency: string;
+  importPreview: StatementImportPreview;
+  isSubmitting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) => {
+  const { t } = useTranslation();
+  const sampleRows = importPreview.rows.slice(0, 80);
+  const duplicateRows = importPreview.rows.filter((row) => row.status !== "new").slice(0, 6);
+  const hasNewRows = importPreview.newCount > 0;
+
+  return (
+    <ModalShell
+      backdropClassName="compare-dialog-backdrop"
+      className="treasury-import-preview-dialog"
+      onClose={isSubmitting ? () => undefined : onCancel}
+      width={1040}
+    >
+      <div className="treasury-import-preview-header">
+        <div>
+          <span className="finance-kicker">
+            {t("finance.treasury.importPreview.kicker", { defaultValue: "Previsualización de importación" })}
+          </span>
+          <h2>{t("finance.treasury.importPreview.title", { defaultValue: "Revisar estado de cuenta" })}</h2>
+          <p>
+            {importPreview.originalFilename || importPreview.sourceFormat.toUpperCase()} · {accountLabel || importPreview.bankAccountId}
+          </p>
+        </div>
+        <button className="icon-ghost-control" type="button" onClick={onCancel} disabled={isSubmitting} aria-label="Close">
+          <X size={16} />
+        </button>
+      </div>
+
+      <div className="treasury-import-preview-stats">
+        <div className="treasury-import-preview-stat is-new">
+          <span>{t("finance.treasury.importPreview.new", { defaultValue: "Nuevos" })}</span>
+          <strong>{importPreview.newCount}</strong>
+        </div>
+        <div className="treasury-import-preview-stat is-duplicate">
+          <span>{t("finance.treasury.importPreview.duplicates", { defaultValue: "Duplicados" })}</span>
+          <strong>{importPreview.duplicateCount}</strong>
+        </div>
+        <div className="treasury-import-preview-stat">
+          <span>{t("finance.treasury.importPreview.total", { defaultValue: "Filas leídas" })}</span>
+          <strong>{importPreview.rowCount}</strong>
+        </div>
+        <div className="treasury-import-preview-stat">
+          <span>{t("finance.treasury.importPreview.period", { defaultValue: "Período" })}</span>
+          <strong>
+            {importPreview.periodStart
+              ? `${importPreview.periodStart} → ${importPreview.periodEnd ?? "?"}`
+              : t("finance.treasury.imports.noPeriod", { defaultValue: "Sin período" })}
+          </strong>
+        </div>
+      </div>
+
+      {duplicateRows.length > 0 ? (
+        <div className="treasury-import-preview-alert">
+          <strong>{t("finance.treasury.importPreview.duplicateTitle", { defaultValue: "Duplicados detectados" })}</strong>
+          <span>
+            {t("finance.treasury.importPreview.duplicateBody", {
+              defaultValue:
+                "Estos movimientos no se volverán a insertar. El sistema importará solamente las filas nuevas y conservará intacto el historial existente.",
+            })}
+          </span>
+        </div>
+      ) : null}
+
+      <div className="treasury-import-preview-table">
+        <div className="treasury-import-preview-row is-head">
+          <span>{t("finance.treasury.columns.date", { defaultValue: "Fecha" })}</span>
+          <span>{t("finance.treasury.columns.description", { defaultValue: "Descripción" })}</span>
+          <span>{t("finance.treasury.columns.amount", { defaultValue: "Monto" })}</span>
+          <span>{t("finance.treasury.importPreview.status", { defaultValue: "Estado" })}</span>
+        </div>
+        {sampleRows.map((row) => (
+          <div className="treasury-import-preview-row" key={`${row.dedupeHash}-${row.rowIndex}`}>
+            <span>{row.txnDate}</span>
+            <span title={row.rawDescription ?? ""}>{row.rawDescription || row.reference || "—"}</span>
+            <span>{formatSignedTreasuryMoney(row.direction === "credit" ? row.amount : -row.amount, currency)}</span>
+            <span>
+              <StatusBadge tone={row.status === "new" ? "success" : "warning"}>
+                {
+                  row.status === "new"
+                    ? t("finance.treasury.importPreview.statusNew", { defaultValue: "Nuevo" })
+                    : row.status === "file_duplicate"
+                      ? t("finance.treasury.importPreview.statusFileDuplicate", { defaultValue: "Duplicado en archivo" })
+                      : t("finance.treasury.importPreview.statusDuplicate", { defaultValue: "Ya existe" })
+                }
+              </StatusBadge>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="treasury-import-preview-footer">
+        <button className="ghost-control" type="button" onClick={onCancel} disabled={isSubmitting}>
+          {t("common.cancel", { defaultValue: "Cancelar" })}
+        </button>
+        <button
+          className="action-primary-button"
+          type="button"
+          onClick={onConfirm}
+          disabled={!hasNewRows || isSubmitting}
+        >
+          <UploadCloud size={15} />
+          <span>
+            {isSubmitting
+              ? t("finance.treasury.importPreview.importing", { defaultValue: "Importando..." })
+              : t("finance.treasury.importPreview.confirm", {
+                  defaultValue: "Importar {{count}} nuevo(s)",
+                  count: importPreview.newCount,
+                })}
+          </span>
+        </button>
+      </div>
+    </ModalShell>
+  );
 };
 
 const ManualTransactionForm = ({

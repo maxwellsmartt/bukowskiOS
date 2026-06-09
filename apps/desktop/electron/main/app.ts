@@ -2,7 +2,7 @@ import { app, BrowserWindow, Menu, session } from "electron";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { format } from "date-fns";
-import { DEFAULT_WORKSPACE_ID, ipcChannels, type CreateProjectBlueprintInput, type TreasuryOverviewQuery } from "@contracts";
+import { DEFAULT_WORKSPACE_ID, ipcChannels, type CreateProjectBlueprintInput, type PackingInsuranceExportOptions, type TreasuryOverviewQuery } from "@contracts";
 
 import { buildContentSecurityPolicy } from "./security/securityConfig";
 import { registerAuthIpc } from "./ipc/registerAuthIpc";
@@ -650,11 +650,35 @@ app.whenReady().then(async () => {
         targetFilePath,
       };
     },
-    exportPackingSlipInsurancePdf: async (packingSlipId, targetFilePath) => {
+    exportPackingSlipInsurancePdf: async (packingSlipId, targetFilePath, options?: PackingInsuranceExportOptions | null) => {
       const detail = localDatabase.foundationReads.getPackingSlipDetail(packingSlipId);
       if (!detail.slip) {
         throw new Error("Packing slip was not found.");
       }
+      const resolvedCurrency = options ?? {
+        outputCurrency: "USD" as const,
+        exchangeRate: 1,
+        exchangeRateSource: "manual" as const,
+        exchangeRateType: "manual" as const,
+        exchangeRateEffectiveDate: null,
+        exchangeRateSourceLabel: "No conversion",
+        mode: "manual" as const,
+      };
+      const convertInsuranceAmount = (value: number | null | undefined) =>
+        typeof value === "number"
+          ? resolvedCurrency.outputCurrency === "USD"
+            ? value
+            : value * resolvedCurrency.exchangeRate
+          : null;
+      const insuredTotal = detail.items.reduce((total, item) => total + (convertInsuranceAmount(item.insuredTotalAmount) ?? 0), 0);
+      const insuredTotalLabel =
+        insuredTotal > 0
+          ? new Intl.NumberFormat("en-US", {
+              style: "currency",
+              currency: resolvedCurrency.outputCurrency,
+              maximumFractionDigits: 0,
+            }).format(insuredTotal)
+          : "Pending";
 
       const pdf = await documentGeneration.createPackingSlipInsurancePdf({
         slipNumber: detail.slip.number,
@@ -674,7 +698,16 @@ app.whenReady().then(async () => {
           itemCount: detail.slip.itemCount,
           returnedCount: detail.slip.returnedCount,
           pendingCount: detail.slip.pendingCount,
-          insuredTotal: detail.slip.insuredTotal,
+          insuredTotal: insuredTotalLabel,
+        },
+        currency: {
+          sourceCurrency: "USD",
+          outputCurrency: resolvedCurrency.outputCurrency,
+          exchangeRate: resolvedCurrency.exchangeRate,
+          exchangeRateSource: resolvedCurrency.exchangeRateSourceLabel ?? resolvedCurrency.exchangeRateSource,
+          exchangeRateType: resolvedCurrency.exchangeRateType,
+          exchangeRateEffectiveDate: resolvedCurrency.exchangeRateEffectiveDate ?? null,
+          mode: resolvedCurrency.mode,
         },
         items: detail.items.map((item) => ({
           code: item.code,

@@ -1,14 +1,17 @@
-import { FileText, RotateCcw, ShieldAlert, Upload } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Check, FileText, RotateCcw, ShieldAlert, Upload, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PackingSlipDetailSnapshot } from "@contracts";
+import type { CurrencyRateSource, CurrencyRateType, PackingInsuranceExportOptions, PackingSlipDetailSnapshot } from "@contracts";
+import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
+import { ModalShell } from "@shared/components/ModalShell";
 import { ScannableCodePanel } from "@shared/components/ScannableCodePanel";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
+import { useCurrencySettings, useExchangeRates } from "@features/finance/useCurrencyData";
 
 type PackingSlipDetailPanelProps = {
   data: PackingSlipDetailSnapshot;
@@ -19,10 +22,13 @@ type PackingSlipDetailPanelProps = {
   isExportingInsurancePdf: boolean;
   onReturnItems: (assetIds: string[], conditionIn?: string, notes?: string) => Promise<void>;
   onExportPdf: () => Promise<void>;
-  onExportInsurancePdf: () => Promise<void>;
+  onExportInsurancePdf: (options: PackingInsuranceExportOptions) => Promise<void>;
 };
 
 const conditionOptions = ["Good", "Review", "Damaged"] as const;
+const insuranceCurrencyOptions = ["USD", "DOP"] as const;
+const rateSources: CurrencyRateSource[] = ["manual", "banco_popular", "banco_central", "banco_santa_cruz", "custom"];
+const rateTypes: CurrencyRateType[] = ["buy", "sell", "average", "manual"];
 
 export const PackingSlipDetailPanel = ({
   data,
@@ -36,9 +42,13 @@ export const PackingSlipDetailPanel = ({
   onExportInsurancePdf,
 }: PackingSlipDetailPanelProps) => {
   const { t } = useTranslation();
+  const { activeWorkspaceId } = useWorkspace();
+  const { data: currencySettings } = useCurrencySettings(activeWorkspaceId);
+  const { data: usdDopRates } = useExchangeRates(activeWorkspaceId, { baseCurrency: "USD", quoteCurrency: "DOP", limit: 200 });
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [conditionIn, setConditionIn] = useState("Good");
   const [notes, setNotes] = useState("");
+  const [insuranceDialogOpen, setInsuranceDialogOpen] = useState(false);
   const pendingAssetIds = useMemo(
     () => data.items.filter((item) => item.status === "Out").map((item) => item.assetId),
     [data.items],
@@ -79,6 +89,9 @@ export const PackingSlipDetailPanel = ({
   const returnHint = selectedPendingAssetIds.length
     ? t("packing.detail.returnSelectedHint", { count: selectedPendingAssetIds.length })
     : t("packing.detail.returnAllHint", { count: pendingAssetIds.length });
+  const defaultRateSource = currencySettings?.defaultRateSource ?? "manual";
+  const defaultRateType = currencySettings?.defaultRateType ?? "manual";
+  const defaultOutputCurrency = currencySettings?.baseCurrency === "DOP" ? "DOP" : "USD";
   const headerActions = (
     <div className="packing-detail-header-actions">
       <StatusBadge tone={data.slip.status === "Overdue" ? "critical" : data.slip.status === "Closed" ? "success" : "info"}>
@@ -105,7 +118,7 @@ export const PackingSlipDetailPanel = ({
       <button
         className="ghost-control action-row-button"
         disabled={isExportingInsurancePdf}
-        onClick={() => void onExportInsurancePdf()}
+        onClick={() => setInsuranceDialogOpen(true)}
         type="button"
       >
         <FileText size={14} />
@@ -289,6 +302,165 @@ export const PackingSlipDetailPanel = ({
         selectedRowIds={selectedItemIds}
         onSelectedRowIdsChange={setSelectedItemIds}
       />
+      {insuranceDialogOpen ? (
+        <InsuranceExportDialog
+          defaultOutputCurrency={defaultOutputCurrency}
+          defaultRateSource={defaultRateSource}
+          defaultRateType={defaultRateType}
+          isSubmitting={isExportingInsurancePdf}
+          rates={usdDopRates}
+          onClose={() => setInsuranceDialogOpen(false)}
+          onExport={async (options) => {
+            await onExportInsurancePdf(options);
+            setInsuranceDialogOpen(false);
+          }}
+        />
+      ) : null}
     </SurfaceCard>
+  );
+};
+
+const sourceLabel = (source: CurrencyRateSource) => {
+  if (source === "banco_popular") return "Banco Popular";
+  if (source === "banco_central") return "Banco Central";
+  if (source === "banco_santa_cruz") return "Banco Santa Cruz";
+  if (source === "custom") return "Personalizada";
+  return "Manual";
+};
+
+const InsuranceExportDialog = ({
+  defaultOutputCurrency,
+  defaultRateSource,
+  defaultRateType,
+  isSubmitting,
+  onClose,
+  onExport,
+  rates,
+}: {
+  defaultOutputCurrency: "USD" | "DOP";
+  defaultRateSource: CurrencyRateSource;
+  defaultRateType: CurrencyRateType;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onExport: (options: PackingInsuranceExportOptions) => Promise<void>;
+  rates: Array<{
+    rate: number;
+    source: CurrencyRateSource;
+    sourceLabel: string | null;
+    rateType: CurrencyRateType;
+    effectiveDate: string;
+  }>;
+}) => {
+  const { t } = useTranslation();
+  const [outputCurrency, setOutputCurrency] = useState<"USD" | "DOP">(defaultOutputCurrency);
+  const [mode, setMode] = useState<"automatic" | "manual">(defaultRateSource === "manual" ? "manual" : "automatic");
+  const [rateSource, setRateSource] = useState<CurrencyRateSource>(defaultRateSource);
+  const [rateType, setRateType] = useState<CurrencyRateType>(defaultRateType);
+  const automaticRate = useMemo(
+    () =>
+      rates.find((rate) => rate.source === rateSource && rate.rateType === rateType) ??
+      rates.find((rate) => rate.source === rateSource) ??
+      null,
+    [rateSource, rateType, rates],
+  );
+  const [manualRate, setManualRate] = useState("");
+  const effectiveRate = outputCurrency === "USD" ? 1 : mode === "automatic" ? automaticRate?.rate ?? null : Number.parseFloat(manualRate.replace(/,/g, ""));
+  const canExport = outputCurrency === "USD" || (Number.isFinite(effectiveRate) && Number(effectiveRate) > 0);
+
+  useEffect(() => {
+    if (outputCurrency === "USD") return;
+    if (mode === "automatic" && automaticRate?.rate) {
+      setManualRate(String(automaticRate.rate));
+    }
+  }, [automaticRate?.rate, mode, outputCurrency]);
+
+  const submit = async () => {
+    if (!canExport || !effectiveRate) return;
+    await onExport({
+      outputCurrency,
+      exchangeRate: outputCurrency === "USD" ? 1 : Number(effectiveRate),
+      exchangeRateSource: outputCurrency === "USD" ? "manual" : mode === "manual" ? "manual" : rateSource,
+      exchangeRateType: outputCurrency === "USD" ? "manual" : mode === "manual" ? "manual" : rateType,
+      exchangeRateEffectiveDate: outputCurrency === "USD" ? null : mode === "automatic" ? automaticRate?.effectiveDate ?? null : new Date().toISOString().slice(0, 10),
+      exchangeRateSourceLabel: outputCurrency === "USD" ? "No conversion" : mode === "automatic" ? automaticRate?.sourceLabel ?? sourceLabel(rateSource) : "Manual",
+      mode: outputCurrency === "USD" ? "manual" : mode,
+    });
+  };
+
+  return (
+    <ModalShell backdropClassName="compare-dialog-backdrop" className="packing-insurance-export-dialog" onClose={isSubmitting ? () => undefined : onClose} width={620}>
+      <div className="document-preview-header">
+        <span className="document-preview-title">{t("packing.insuranceExport.title", { defaultValue: "Exportar listado de seguro" })}</span>
+        <button className="icon-ghost-control" onClick={onClose} type="button" aria-label="Close" disabled={isSubmitting}>
+          <X size={16} />
+        </button>
+      </div>
+      <div className="packing-insurance-export-body">
+        <div className="packing-insurance-export-grid">
+          <label>
+            <span>{t("packing.insuranceExport.currency", { defaultValue: "Moneda del PDF" })}</span>
+            <SelectField value={outputCurrency} onChange={(event) => setOutputCurrency(event.target.value as "USD" | "DOP")}>
+              {insuranceCurrencyOptions.map((currency) => (
+                <option key={currency} value={currency}>{currency}</option>
+              ))}
+            </SelectField>
+          </label>
+          <label>
+            <span>{t("packing.insuranceExport.mode", { defaultValue: "Tasa" })}</span>
+            <SelectField value={mode} onChange={(event) => setMode(event.target.value as "automatic" | "manual")} disabled={outputCurrency === "USD"}>
+              <option value="automatic">{t("packing.insuranceExport.automatic", { defaultValue: "Automática" })}</option>
+              <option value="manual">{t("packing.insuranceExport.manual", { defaultValue: "Manual" })}</option>
+            </SelectField>
+          </label>
+          <label>
+            <span>{t("packing.insuranceExport.source", { defaultValue: "Banco/fuente" })}</span>
+            <SelectField value={rateSource} onChange={(event) => setRateSource(event.target.value as CurrencyRateSource)} disabled={outputCurrency === "USD" || mode === "manual"}>
+              {rateSources.map((source) => (
+                <option key={source} value={source}>{sourceLabel(source)}</option>
+              ))}
+            </SelectField>
+          </label>
+          <label>
+            <span>{t("packing.insuranceExport.rateType", { defaultValue: "Tipo" })}</span>
+            <SelectField value={rateType} onChange={(event) => setRateType(event.target.value as CurrencyRateType)} disabled={outputCurrency === "USD" || mode === "manual"}>
+              {rateTypes.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </SelectField>
+          </label>
+          <label className="packing-insurance-export-rate">
+            <span>{t("packing.insuranceExport.rateValue", { defaultValue: "Tasa USD → DOP" })}</span>
+            <input
+              className="field-input"
+              disabled={outputCurrency === "USD" || mode === "automatic"}
+              inputMode="decimal"
+              value={outputCurrency === "USD" ? "1" : mode === "automatic" ? (automaticRate?.rate ? String(automaticRate.rate) : "") : manualRate}
+              placeholder="0.00"
+              onChange={(event) => setManualRate(event.target.value.replace(/[^\d.,]/g, ""))}
+            />
+          </label>
+        </div>
+        <div className={`action-feedback ${canExport ? "action-feedback-info" : "action-feedback-warning"}`}>
+          {outputCurrency === "USD"
+            ? t("packing.insuranceExport.usdNote", { defaultValue: "Los valores asegurados ya están registrados en USD; no se aplicará conversión." })
+            : canExport
+              ? t("packing.insuranceExport.snapshotNote", {
+                  defaultValue: "El PDF guardará esta tasa como snapshot visible para auditoría.",
+                })
+              : t("packing.insuranceExport.missingRate", {
+                  defaultValue: "No hay una tasa automática para esa fuente/tipo. Cambia a manual o actualiza las tasas.",
+                })}
+        </div>
+      </div>
+      <div className="document-preview-header packing-insurance-export-footer">
+        <button className="ghost-control" type="button" onClick={onClose} disabled={isSubmitting}>
+          {t("common.cancel", { defaultValue: "Cancelar" })}
+        </button>
+        <button className="action-primary-button" type="button" onClick={() => void submit()} disabled={isSubmitting || !canExport}>
+          <Check size={15} />
+          <span>{isSubmitting ? t("common.exporting", { defaultValue: "Exportando..." }) : t("packing.detail.exportInsurance")}</span>
+        </button>
+      </div>
+    </ModalShell>
   );
 };

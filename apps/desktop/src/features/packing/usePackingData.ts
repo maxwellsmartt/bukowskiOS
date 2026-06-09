@@ -2,6 +2,7 @@ import type {
   AppExportResult,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
+  ExportPackingSlipInsurancePdfInput,
   PackingSlipDetailSnapshot,
   PackingSlipListQuery,
   PackingSlipRow,
@@ -82,10 +83,13 @@ export const exportPackingSlipPdf = async (packingSlipId: string): Promise<AppEx
   return window.bukowskiPacking.exportPdf(packingSlipId);
 };
 
-export const exportPackingSlipInsurancePdf = async (packingSlipId: string): Promise<AppExportResult> => {
+export const exportPackingSlipInsurancePdf = async (
+  packingSlipId: string,
+  options?: ExportPackingSlipInsurancePdfInput["options"],
+): Promise<AppExportResult> => {
   if (!window.bukowskiPacking) {
     throw new Error("Packing bridge unavailable");
   }
 
-  return window.bukowskiPacking.exportInsurancePdf(packingSlipId);
+  return window.bukowskiPacking.exportInsurancePdf({ packingSlipId, options });
 };

@@ -456,7 +456,7 @@ export const registerAppIpc = ({
     platform: process.platform,
     isPackaged: app.isPackaged,
     version: app.getVersion(),
-    shellVersion: "foundation-v1",
+    shellVersion: "Beta 2",
   }));
   safeHandleReadWithSchema(ipcChannels.app.getDiagnostics, emptyReadArgsSchema, () => getDiagnosticsSnapshot());
   safeHandleReadWithSchema(ipcChannels.app.getSupportSnapshot, emptyReadArgsSchema, () => getSupportSnapshot());

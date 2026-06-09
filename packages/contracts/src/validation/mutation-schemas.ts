@@ -1522,6 +1522,13 @@ export const importStatementSchema = z
 
 export const addManualTransactionsSchema = importStatementSchema;
 
+export const previewStatementImportSchema = importStatementSchema.omit({
+  commandId: true,
+  actorType: true,
+  sourceChannel: true,
+  notes: true,
+});
+
 export const deleteImportSchema = z
   .object({
     commandId: nonEmptyString,

@@ -39,6 +39,7 @@ import {
   upsertBankAccountSchema,
   upsertPaymentInstrumentSchema,
   deactivatePaymentInstrumentSchema,
+  previewStatementImportSchema,
   importStatementSchema,
   addManualTransactionsSchema,
   deleteImportSchema,
@@ -96,6 +97,7 @@ import {
   setQuoteStatusSchema,
   updateQuoteSchema,
   upsertCurrencySettingsSchema,
+  exportPackingSlipInsurancePdfReadArgsSchema,
   createPackingSlipSchema,
   createProjectBlueprintReadArgsSchema,
   createProjectBlueprintSchema,
@@ -429,6 +431,9 @@ type RegisterFoundationIpcOptions = {
     deactivatePaymentInstrument: (
       input: import("@contracts").DeactivatePaymentInstrumentCommand,
     ) => import("@contracts").BankAccountMutationResult;
+    previewStatementImport: (
+      input: import("@contracts").PreviewStatementImportCommand,
+    ) => import("@contracts").StatementImportPreview;
     importStatement: (
       input: import("@contracts").ImportStatementCommand,
     ) => import("@contracts").ImportStatementResult;
@@ -581,6 +586,7 @@ type RegisterFoundationIpcOptions = {
   exportPackingSlipInsurancePdf: (
     packingSlipId: string,
     targetFilePath: string,
+    options?: import("@contracts").PackingInsuranceExportOptions | null,
   ) => Promise<{
     fileName: string;
     mimeType: "application/pdf";
@@ -1318,8 +1324,9 @@ export const registerFoundationIpc = ({
   );
   safeHandleReadWithSchema(
     ipcChannels.packing.exportInsurancePdf,
-    idReadArgsSchema,
-    async (_event, packingSlipId: string) => {
+    exportPackingSlipInsurancePdfReadArgsSchema,
+    async (_event, input: import("@contracts").ExportPackingSlipInsurancePdfInput) => {
+      const { packingSlipId, options } = input;
       await workspaceAccess.assertPackingSlipAccess(packingSlipId, "export that insurance list", "read", "packing-slips.read");
       const detail = foundationReads.getPackingSlipDetail(packingSlipId);
 
@@ -1342,7 +1349,7 @@ export const registerFoundationIpc = ({
         };
       }
 
-      const pdf = await exportPackingSlipInsurancePdf(packingSlipId, filePath);
+      const pdf = await exportPackingSlipInsurancePdf(packingSlipId, filePath, options ?? null);
       fs.writeFileSync(filePath, pdf.buffer);
 
       return {
@@ -2829,6 +2836,15 @@ export const registerFoundationIpc = ({
       return treasuryMutations.deactivatePaymentInstrument(input);
     },
   );
+  safeHandle(ipcChannels.treasury.previewStatementImport, previewStatementImportSchema, async (_event, input) => {
+    await workspaceAccess.assertWorkspaceAccess({
+      workspaceId: input.workspaceId,
+      action: "preview statement import",
+      accessLevel: "write",
+      requiredPermission: "treasury.import",
+    });
+    return treasuryMutations.previewStatementImport(input);
+  });
   safeHandle(ipcChannels.treasury.importStatement, importStatementSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({
       workspaceId: input.workspaceId,

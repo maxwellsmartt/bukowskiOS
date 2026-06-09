@@ -21,6 +21,7 @@ import { CreatableSelect } from "@shared/components/CreatableSelect";
 import { DataTable } from "@shared/components/DataTable";
 import { DocumentPreviewModal } from "@shared/components/DocumentPreviewModal";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
+import { ModalShell } from "@shared/components/ModalShell";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
@@ -80,6 +81,15 @@ const readFileAsDataUrl = (file: File): Promise<InvoiceInboxFileInput> =>
       });
     reader.readAsDataURL(file);
   });
+
+type PendingFxRatePrompt = {
+  title: string;
+  body: string;
+  fromCurrency: string;
+  toCurrency: string;
+  defaultRate?: number | null;
+  onConfirm: (rate: number) => Promise<void>;
+};
 
 const statusTone = (status: InvoiceExtraction["status"]): "neutral" | "info" | "success" | "warning" | "critical" => {
   switch (status) {
@@ -166,6 +176,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
   const [projects, setProjects] = useState<Project[]>([]);
   const [editing, setEditing] = useState<InvoiceExtraction | null>(null);
   const [reconciling, setReconciling] = useState<InvoiceExtraction | null>(null);
+  const [pendingFxRatePrompt, setPendingFxRatePrompt] = useState<PendingFxRatePrompt | null>(null);
   const [preview, setPreview] = useState<{ id: string; name: string } | null>(null);
   const [previewData, setPreviewData] = useState<{ dataUrl: string; mimeType: string } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -965,7 +976,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
     }
   };
 
-  const bulkAssignPaymentInstrument = async (paymentInstrumentId: string) => {
+  const bulkAssignPaymentInstrumentWithRate = async (paymentInstrumentId: string, fxRate: number | null = null) => {
     if (!paymentInstrumentId) return;
     const instrument = accountById.get(paymentInstrumentId);
     if (!instrument) {
@@ -980,17 +991,42 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
         row.status !== "dismissed" &&
         row.total != null &&
         row.total > 0 &&
-        row.currency &&
-        row.currency.toUpperCase() === instrumentCurrency,
+        row.currency,
     );
     const skippedCount = rowsToUpdate.length - assignableRows.length;
     if (!assignableRows.length) {
       toast.info(
         t("finance.treasury.invoices.paymentInstrumentNone", {
-          defaultValue: "No hay facturas {{currency}} seleccionadas disponibles para asignar a ese medio.",
+          defaultValue: "No hay facturas seleccionadas disponibles para asignar a ese medio.",
           currency: instrumentCurrency,
         }),
       );
+      return;
+    }
+    const invoiceCurrencies = Array.from(new Set(assignableRows.map((row) => row.currency?.toUpperCase() ?? ""))).filter(Boolean);
+    if (invoiceCurrencies.length > 1) {
+      toast.info(
+        t("finance.treasury.invoices.paymentInstrumentMixedCurrencies", {
+          defaultValue: "Selecciona facturas de una sola moneda para aplicar una tasa manual correctamente.",
+        }),
+      );
+      return;
+    }
+    const invoiceCurrency = invoiceCurrencies[0] ?? instrumentCurrency;
+    if (invoiceCurrency !== instrumentCurrency && !fxRate) {
+      setPendingFxRatePrompt({
+        title: t("finance.treasury.fxRate.title", { defaultValue: "Definir tasa manual" }),
+        body: t("finance.treasury.fxRate.bulkBody", {
+          defaultValue: "Estas facturas están en {{from}} y el medio de pago está en {{to}}. Indica la tasa a usar para registrar la asignación.",
+          from: invoiceCurrency,
+          to: instrumentCurrency,
+        }),
+        fromCurrency: invoiceCurrency,
+        toCurrency: instrumentCurrency,
+        onConfirm: async (rate) => {
+          await bulkAssignPaymentInstrumentWithRate(paymentInstrumentId, rate);
+        },
+      });
       return;
     }
     setIsBulkAssigningInstrument(true);
@@ -1017,6 +1053,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
             linkedEntityId: row.id,
             amountApplied: row.total ?? 0,
             amountCurrency: (row.currency ?? "DOP").toUpperCase(),
+            fxRate: invoiceCurrency !== instrumentCurrency ? fxRate : null,
             notes: "Asignado desde bandeja de facturas",
           });
           setOptimisticAllocations((current) => {
@@ -1074,6 +1111,10 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
     }
   };
 
+  const bulkAssignPaymentInstrument = async (paymentInstrumentId: string) => {
+    await bulkAssignPaymentInstrumentWithRate(paymentInstrumentId);
+  };
+
   const markAllocationReimbursed = async (row: InvoiceExtraction) => {
     if (!row.allocation?.id) return;
     setBusyId(row.id);
@@ -1099,7 +1140,26 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
     }
   };
 
-  const reconcileWithCandidate = async (row: InvoiceExtraction, candidate: BankTransactionRow) => {
+  const reconcileWithCandidate = async (row: InvoiceExtraction, candidate: BankTransactionRow, fxRate: number | null = null) => {
+    const amountCurrency = (row.currency ?? candidate.currency ?? "DOP").toUpperCase();
+    const transactionCurrency = candidate.currency.toUpperCase();
+    if (amountCurrency !== transactionCurrency && !fxRate) {
+      setPendingFxRatePrompt({
+        title: t("finance.treasury.fxRate.title", { defaultValue: "Definir tasa manual" }),
+        body: t("finance.treasury.fxRate.reconcileBody", {
+          defaultValue:
+            "La factura está en {{from}} y el movimiento bancario está en {{to}}. Indica la tasa que se usará para conciliar.",
+          from: amountCurrency,
+          to: transactionCurrency,
+        }),
+        fromCurrency: amountCurrency,
+        toCurrency: transactionCurrency,
+        onConfirm: async (rate) => {
+          await reconcileWithCandidate(row, candidate, rate);
+        },
+      });
+      return;
+    }
     setBusyId(row.id);
     try {
       let allocationId = row.allocation?.id ?? null;
@@ -1113,7 +1173,8 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
           linkedEntityType: "invoice_extraction",
           linkedEntityId: row.id,
           amountApplied: row.total ?? candidate.amount,
-          amountCurrency: (row.currency ?? candidate.currency ?? "DOP").toUpperCase(),
+          amountCurrency,
+          fxRate: amountCurrency !== transactionCurrency ? fxRate : null,
           notes: "Asignado desde conciliación asistida",
         });
         allocationId = assigned.allocationId;
@@ -1125,6 +1186,7 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
         sourceChannel: "desktop",
         allocationId,
         transactionId: candidate.id,
+        fxRate: amountCurrency !== transactionCurrency ? fxRate : null,
       });
       toast.success(result.summary);
       setReconciling(null);
@@ -2068,6 +2130,13 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
         loadingLabel={t("finance.treasury.invoices.previewLoading", { defaultValue: "Cargando documento…" })}
       />
 
+      {pendingFxRatePrompt ? (
+        <FxRateDialog
+          prompt={pendingFxRatePrompt}
+          onClose={() => setPendingFxRatePrompt(null)}
+        />
+      ) : null}
+
       {editing ? (
         <InvoiceEditModal
           extraction={editing}
@@ -2081,59 +2150,73 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
               toast.error(t("finance.treasury.invoices.paymentInstrumentMissing", { defaultValue: "Ese medio de pago ya no está disponible." }));
               return;
             }
-            if (instrument.currency.toUpperCase() !== editing.currency.toUpperCase()) {
-              toast.error(
-                t("finance.treasury.invoices.paymentInstrumentCurrencyMismatch", {
-                  defaultValue: "Esta factura está en {{invoiceCurrency}}. Elige un medio de pago {{invoiceCurrency}}.",
-                  invoiceCurrency: editing.currency.toUpperCase(),
-                }),
+            const invoiceCurrency = editing.currency.toUpperCase();
+            const instrumentCurrency = instrument.currency.toUpperCase();
+            const assignWithRate = async (fxRate: number | null = null) => {
+              const commandId =
+                typeof crypto !== "undefined" && "randomUUID" in crypto
+                  ? crypto.randomUUID()
+                  : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+              const result = await mutations.assignInvoiceAllocation({
+                commandId: `invoice-allocation-${commandId}-${editing.id}-${paymentInstrumentId}`,
+                workspaceId,
+                actorType: "user",
+                sourceChannel: "desktop",
+                paymentInstrumentId,
+                linkedEntityType: "invoice_extraction",
+                linkedEntityId: editing.id,
+                amountApplied: editing.total ?? 0,
+                amountCurrency: invoiceCurrency,
+                fxRate,
+                notes: "Asignado desde edición de factura",
+              });
+              const nextAllocation: InvoiceExtractionAllocation = {
+                id: result.allocationId,
+                paymentInstrumentId,
+                paymentInstrumentLabel: paymentInstrumentLabel.get(paymentInstrumentId) ?? null,
+                transactionId: null,
+                transactionLabel: null,
+                amountApplied: editing.total ?? null,
+                amountCurrency: invoiceCurrency,
+                allocationStatus: "pending",
+                cycleStart: editing.allocation?.cycleStart ?? null,
+                cycleEnd: editing.allocation?.cycleEnd ?? null,
+                notes: "Asignado desde edición de factura",
+              };
+              setOptimisticAllocations((current) => {
+                const next = new Map(current);
+                next.set(editing.id, nextAllocation);
+                return next;
+              });
+              setEditing((current) =>
+                current?.id === editing.id
+                  ? {
+                      ...current,
+                      allocation: nextAllocation,
+                    }
+                  : current,
               );
+              inbox.refresh();
+              reimbursements.refresh();
+            };
+            if (instrumentCurrency !== invoiceCurrency) {
+              setPendingFxRatePrompt({
+                title: t("finance.treasury.fxRate.title", { defaultValue: "Definir tasa manual" }),
+                body: t("finance.treasury.fxRate.singleBody", {
+                  defaultValue:
+                    "Esta factura está en {{from}} y el medio de pago está en {{to}}. Indica la tasa que se usará para esta asignación.",
+                  from: invoiceCurrency,
+                  to: instrumentCurrency,
+                }),
+                fromCurrency: invoiceCurrency,
+                toCurrency: instrumentCurrency,
+                onConfirm: async (rate) => {
+                  await assignWithRate(rate);
+                },
+              });
               return;
             }
-            const commandId =
-              typeof crypto !== "undefined" && "randomUUID" in crypto
-                ? crypto.randomUUID()
-                : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-            const result = await mutations.assignInvoiceAllocation({
-              commandId: `invoice-allocation-${commandId}-${editing.id}-${paymentInstrumentId}`,
-              workspaceId,
-              actorType: "user",
-              sourceChannel: "desktop",
-              paymentInstrumentId,
-              linkedEntityType: "invoice_extraction",
-              linkedEntityId: editing.id,
-              amountApplied: editing.total,
-              amountCurrency: editing.currency.toUpperCase(),
-              notes: "Asignado desde edición de factura",
-            });
-            const nextAllocation: InvoiceExtractionAllocation = {
-              id: result.allocationId,
-              paymentInstrumentId,
-              paymentInstrumentLabel: paymentInstrumentLabel.get(paymentInstrumentId) ?? null,
-              transactionId: null,
-              transactionLabel: null,
-              amountApplied: editing.total ?? null,
-              amountCurrency: editing.currency?.toUpperCase() ?? null,
-              allocationStatus: "pending",
-              cycleStart: editing.allocation?.cycleStart ?? null,
-              cycleEnd: editing.allocation?.cycleEnd ?? null,
-              notes: "Asignado desde edición de factura",
-            };
-            setOptimisticAllocations((current) => {
-              const next = new Map(current);
-              next.set(editing.id, nextAllocation);
-              return next;
-            });
-            setEditing((current) =>
-              current?.id === editing.id
-                ? {
-                    ...current,
-                    allocation: nextAllocation,
-                  }
-                : current,
-            );
-            inbox.refresh();
-            reimbursements.refresh();
+            await assignWithRate(null);
           }}
           onSave={async (patch) => {
             try {
@@ -2170,6 +2253,82 @@ type EditPatch = Pick<
   UpdateInvoiceExtractionCommand,
   "supplierName" | "supplierRnc" | "ncf" | "invoiceDate" | "subtotal" | "itbis" | "total" | "currency" | "expenseCategory"
 >;
+
+const FxRateDialog = ({ prompt, onClose }: { prompt: PendingFxRatePrompt; onClose: () => void }) => {
+  const { t } = useTranslation();
+  const [value, setValue] = useState(prompt.defaultRate ? String(prompt.defaultRate) : "");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const parsed = Number.parseFloat(value.replace(/,/g, "").trim());
+
+  const confirm = async () => {
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setError(t("finance.treasury.fxRate.invalid", { defaultValue: "Introduce una tasa mayor que cero." }));
+      return;
+    }
+    setIsSaving(true);
+    setError(null);
+    try {
+      await prompt.onConfirm(parsed);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("finance.treasury.fxRate.failed", { defaultValue: "No se pudo aplicar la tasa." }));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <ModalShell
+      backdropClassName="compare-dialog-backdrop"
+      className="invoice-fx-rate-dialog"
+      onClose={isSaving ? () => undefined : onClose}
+      width={520}
+    >
+      <div className="document-preview-header">
+        <span className="document-preview-title">{prompt.title}</span>
+        <button className="icon-ghost-control" onClick={onClose} type="button" aria-label="Close" disabled={isSaving}>
+          <X size={16} />
+        </button>
+      </div>
+      <div className="invoice-fx-rate-body">
+        <p>{prompt.body}</p>
+        <label>
+          <span>
+            {t("finance.treasury.fxRate.field", {
+              defaultValue: "Tasa {{from}} → {{to}}",
+              from: prompt.fromCurrency,
+              to: prompt.toCurrency,
+            })}
+          </span>
+          <input
+            autoFocus
+            className="field-input"
+            inputMode="decimal"
+            placeholder="0.00"
+            value={value}
+            onChange={(event) => setValue(event.target.value.replace(/[^\d.,]/g, ""))}
+          />
+        </label>
+        <small>
+          {t("finance.treasury.fxRate.help", {
+            defaultValue: "La tasa queda guardada en esta asignación/conciliación para que el documento no cambie si luego cambia la tasa global.",
+          })}
+        </small>
+        {error ? <span className="form-error">{error}</span> : null}
+      </div>
+      <div className="document-preview-header" style={{ justifyContent: "flex-end", borderTop: "1px solid var(--hairline-faint, rgba(255,255,255,0.05))", borderBottom: 0 }}>
+        <button className="ghost-control" type="button" onClick={onClose} disabled={isSaving}>
+          {t("common.cancel", { defaultValue: "Cancelar" })}
+        </button>
+        <button className="action-primary-button" type="button" onClick={() => void confirm()} disabled={isSaving}>
+          <Check size={15} />
+          <span>{t("common.apply", { defaultValue: "Aplicar" })}</span>
+        </button>
+      </div>
+    </ModalShell>
+  );
+};
 
 const InvoiceEditModal = ({
   extraction,

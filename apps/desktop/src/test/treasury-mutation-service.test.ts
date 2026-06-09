@@ -85,6 +85,37 @@ describe("treasury mutation service", () => {
     cleanup();
   });
 
+  it("previews statement imports with existing and in-file duplicates", () => {
+    const { cleanup, database } = createTestDatabase("treasury-import-preview");
+    const mutations = createTreasuryMutationService(database);
+
+    mutations.upsertBankAccount(account("cmd-acct-preview"));
+    mutations.importStatement({
+      commandId: "cmd-import-preview-seed",
+      workspaceId,
+      ...baseChannel,
+      bankAccountId: "bank-account-cmd-acct-preview",
+      sourceFormat: "csv",
+      rows: [rows()[0]!],
+    });
+
+    const previewRows = [rows()[0]!, rows()[1]!, rows()[1]!];
+    const preview = mutations.previewStatementImport({
+      workspaceId,
+      bankAccountId: "bank-account-cmd-acct-preview",
+      sourceFormat: "csv",
+      originalFilename: "updated.csv",
+      rows: previewRows,
+    });
+
+    expect(preview.rowCount).toBe(3);
+    expect(preview.newCount).toBe(1);
+    expect(preview.duplicateCount).toBe(2);
+    expect(preview.fileDuplicateCount).toBe(1);
+    expect(preview.rows.map((row) => row.status)).toEqual(["duplicate", "new", "file_duplicate"]);
+    cleanup();
+  });
+
   it("does not create an unsafe undo entry for a newly created bank account", () => {
     const { cleanup, database } = createTestDatabase("treasury-account-create-no-undo");
     const mutations = createTreasuryMutationService(database);
@@ -594,7 +625,7 @@ describe("treasury mutation service", () => {
 
     const reminder = database
       .prepare(`SELECT user_id, title, recurrence_rule, completed_at FROM reminders WHERE id = ?`)
-      .get("treasury-card-payment-bank-account-cmd-card-valid") as {
+      .get("e39b89b7-9fdb-49a5-8c48-482a8e238b0d") as {
       user_id: string;
       title: string;
       recurrence_rule: string;
@@ -661,7 +692,7 @@ describe("treasury mutation service", () => {
 
     const reminderBefore = database
       .prepare(`SELECT user_id, recurrence_rule FROM reminders WHERE id = ?`)
-      .get("treasury-card-payment-bank-account-cmd-card-shared-valid") as {
+      .get("26ce41a2-af98-48d2-841a-f80fd48693af") as {
       user_id: string;
       recurrence_rule: string;
     };
@@ -676,12 +707,12 @@ describe("treasury mutation service", () => {
 
     const reminderCount = database
       .prepare(`SELECT COUNT(*) AS count FROM reminders WHERE id = ?`)
-      .get("treasury-card-payment-bank-account-cmd-card-shared-valid") as { count: number };
+      .get("26ce41a2-af98-48d2-841a-f80fd48693af") as { count: number };
     expect(reminderCount.count).toBe(0);
 
     const outbox = database
       .prepare(`SELECT operation_type FROM sync_outbox WHERE entity_type = 'reminder' AND entity_id = ?`)
-      .get("treasury-card-payment-bank-account-cmd-card-shared-valid") as { operation_type: string };
+      .get("26ce41a2-af98-48d2-841a-f80fd48693af") as { operation_type: string };
     expect(outbox.operation_type).toBe("delete");
 
     cleanup();

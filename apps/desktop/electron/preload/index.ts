@@ -464,8 +464,8 @@ const bukowskiPacking = {
     ipcRenderer.invoke(ipcChannels.packing.getDetail, packingSlipId) as Promise<PackingSlipDetailSnapshot>,
   exportPdf: (packingSlipId: string) =>
     ipcRenderer.invoke(ipcChannels.packing.exportPdf, packingSlipId) as Promise<AppExportResult>,
-  exportInsurancePdf: (packingSlipId: string) =>
-    ipcRenderer.invoke(ipcChannels.packing.exportInsurancePdf, packingSlipId) as Promise<AppExportResult>,
+  exportInsurancePdf: (input: import("@contracts").ExportPackingSlipInsurancePdfInput) =>
+    ipcRenderer.invoke(ipcChannels.packing.exportInsurancePdf, input) as Promise<AppExportResult>,
   create: (input: CreatePackingSlipCommand) =>
     ipcRenderer.invoke(ipcChannels.packing.create, input) as Promise<CreatePackingSlipResult>,
   returnItems: (input: ReturnPackingSlipItemsCommand) =>
@@ -759,6 +759,10 @@ const bukowskiTreasury = {
     ipcRenderer.invoke(ipcChannels.treasury.dgiiReport, query) as Promise<import("@contracts").DgiiReport>,
   exportDgiiReport: (input: import("@contracts").DgiiReportExportInput) =>
     ipcRenderer.invoke(ipcChannels.treasury.exportDgiiReport, input) as Promise<import("@contracts").AppExportResult>,
+  previewStatementImport: (input: import("@contracts").PreviewStatementImportCommand) =>
+    ipcRenderer.invoke(ipcChannels.treasury.previewStatementImport, input) as Promise<
+      import("@contracts").StatementImportPreview
+    >,
   importStatement: (input: import("@contracts").ImportStatementCommand) =>
     ipcRenderer.invoke(ipcChannels.treasury.importStatement, input) as Promise<
       import("@contracts").ImportStatementResult

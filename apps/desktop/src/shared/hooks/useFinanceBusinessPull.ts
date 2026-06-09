@@ -23,8 +23,12 @@ const tableConfigs: Array<{ table: FinanceBusinessPullTable; cursorColumn: strin
   { table: "software_licenses", cursorColumn: "updated_at" },
 ];
 
+const cursorVersions: Partial<Record<FinanceBusinessPullTable, string>> = {
+  invoice_extractions: "v2",
+};
+
 const cursorKey = (workspaceId: string, table: FinanceBusinessPullTable) =>
-  `bukowski:finance-business-pull-cursor:${workspaceId}:${table}`;
+  `bukowski:finance-business-pull-cursor:${workspaceId}:${table}:${cursorVersions[table] ?? "v1"}`;
 
 const readCursor = (key: string): string | null => {
   try {

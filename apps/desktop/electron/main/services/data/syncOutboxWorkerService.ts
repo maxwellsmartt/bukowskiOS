@@ -64,7 +64,7 @@ const resolveRetryDelayMinutes = (attemptCount: number) => {
 };
 
 const recoverableRemoteErrorPattern =
-  /(schema cache|could not find the .* column|pgrst204|failed to fetch|networkerror|network request failed|load failed|temporarily unavailable|timeout|timed out)/i;
+  /(schema cache|could not find the .* column|pgrst204|failed to fetch|networkerror|network request failed|load failed|temporarily unavailable|timeout|timed out|idx_txn_links_dedupe_v4)/i;
 
 const isRecoverableRemoteError = (message: string | null | undefined) =>
   Boolean(message && recoverableRemoteErrorPattern.test(message));
@@ -236,6 +236,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
                 OR lower(COALESCE(last_error, '')) LIKE '%temporarily unavailable%'
                 OR lower(COALESCE(last_error, '')) LIKE '%timeout%'
                 OR lower(COALESCE(last_error, '')) LIKE '%timed out%'
+                OR lower(COALESCE(last_error, '')) LIKE '%idx_txn_links_dedupe_v4%'
               )
           `,
         )

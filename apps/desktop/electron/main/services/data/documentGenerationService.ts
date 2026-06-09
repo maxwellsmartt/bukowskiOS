@@ -40,6 +40,15 @@ type PackingSlipInsurancePdfPayload = Omit<PackingSlipPdfPayload, "summary" | "i
   summary: PackingSlipPdfPayload["summary"] & {
     insuredTotal: string;
   };
+  currency: {
+    sourceCurrency: string;
+    outputCurrency: string;
+    exchangeRate: number;
+    exchangeRateSource: string;
+    exchangeRateType: string;
+    exchangeRateEffectiveDate: string | null;
+    mode: "automatic" | "manual";
+  };
   items: Array<PackingSlipPdfPayload["items"][number] & {
     purchasePriceAmount: number | null;
     additionalCostsAmount: number | null;
@@ -277,11 +286,11 @@ const metadataLogoBuffer =
   loadOptionalAssetBuffer("apps/desktop/src/shared/assets/inbox/logos/metadata-logo-black@2x.png") ??
   loadOptionalAssetBuffer("apps/desktop/electron/main/assets/logos/metadata-cine-logo.png");
 
-const formatPdfCurrency = (value: number | null | undefined) =>
+const formatPdfCurrency = (value: number | null | undefined, currency = "USD") =>
   typeof value === "number"
     ? new Intl.NumberFormat("en-US", {
         style: "currency",
-        currency: "USD",
+        currency,
         maximumFractionDigits: 0,
       }).format(value)
     : "—";
@@ -666,6 +675,14 @@ export const createDocumentGenerationService = () => ({
       cursorY = document.page.margins.top;
     };
 
+    const outputCurrency = payload.currency.outputCurrency || "USD";
+    const convertInsuranceAmount = (value: number | null | undefined) => {
+      if (typeof value !== "number") {
+        return null;
+      }
+      return outputCurrency === payload.currency.sourceCurrency ? value : value * payload.currency.exchangeRate;
+    };
+
     const groupedItems = Array.from(
       payload.items.reduce<
         Map<
@@ -712,10 +729,10 @@ export const createDocumentGenerationService = () => ({
     ).map(([, item]) => ({
       ...item,
       serialLabel: item.serialNumbers.length ? item.serialNumbers.join(" · ") : "—",
-      purchasePrice: formatPdfCurrency(item.purchasePriceAmount),
-      additionalCosts: formatPdfCurrency(item.additionalCostsAmount),
-      unitInsuredValue: formatPdfCurrency(item.unitInsuredValueAmount),
-      insuredTotal: formatPdfCurrency(item.insuredTotalAmount),
+      purchasePrice: formatPdfCurrency(convertInsuranceAmount(item.purchasePriceAmount), outputCurrency),
+      additionalCosts: formatPdfCurrency(convertInsuranceAmount(item.additionalCostsAmount), outputCurrency),
+      unitInsuredValue: formatPdfCurrency(convertInsuranceAmount(item.unitInsuredValueAmount), outputCurrency),
+      insuredTotal: formatPdfCurrency(convertInsuranceAmount(item.insuredTotalAmount), outputCurrency),
     }));
 
     const missingValueCount = payload.items.filter((item) => item.unitInsuredValueAmount === null).length;
@@ -766,6 +783,27 @@ export const createDocumentGenerationService = () => ({
     drawMetaRow("Issued / due", `${payload.issueDate} -> ${payload.dueDate}`, cardLeft, cursorY, metaColumnWidth);
     drawMetaRow("Items", String(payload.summary.itemCount), cardLeft + metaColumnWidth + columnGap, cursorY, metaColumnWidth);
     drawMetaRow("Pending values", String(missingValueCount), cardLeft + (metaColumnWidth + columnGap) * 2, cursorY, metaColumnWidth);
+    cursorY += 42;
+
+    const rateLabel =
+      payload.currency.outputCurrency === payload.currency.sourceCurrency
+        ? `${payload.currency.outputCurrency} · no conversion`
+        : `${payload.currency.sourceCurrency} -> ${payload.currency.outputCurrency} @ ${payload.currency.exchangeRate.toLocaleString("en-US", {
+            maximumFractionDigits: 6,
+          })} · ${payload.currency.exchangeRateSource} · ${payload.currency.exchangeRateType}${
+            payload.currency.exchangeRateEffectiveDate ? ` · ${payload.currency.exchangeRateEffectiveDate}` : ""
+          }`;
+    document.roundedRect(cardLeft, cursorY, pageWidth, 28, 8).fillAndStroke(surfaceBackground, surfaceBorder);
+    document.fillColor(surfaceMuted).fontSize(7.5).text("CURRENCY SNAPSHOT", cardLeft + 12, cursorY + 10, {
+      width: 110,
+      characterSpacing: 0.8,
+      lineBreak: false,
+    });
+    document.fillColor(surfaceText).fontSize(8.4).text(rateLabel, cardLeft + 128, cursorY + 9, {
+      width: pageWidth - 144,
+      lineBreak: false,
+      ellipsis: true,
+    });
     cursorY += 42;
 
     const tableInset = 10;

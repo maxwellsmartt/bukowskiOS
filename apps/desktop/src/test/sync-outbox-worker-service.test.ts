@@ -658,6 +658,75 @@ describe("sync outbox worker service", () => {
     expect(JSON.parse(String(requests[1]?.init.body))).toMatchObject({ id: "txn-1", import_id: "import-1" });
   });
 
+  it("recovers transaction link pushes that already exist by semantic dedupe key", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const transport = createSupabaseOutboxTransport({
+      supabaseUrl: "https://bukowski.test/",
+      anonKey: "anon-test-key",
+      getAccessToken: async () => "access-test-token",
+      resolveDomainUpserts: (row) =>
+        row.entity_type === "transaction_link"
+          ? [
+              {
+                table: "transaction_links",
+                onConflict: "id",
+                rows: [
+                  {
+                    id: row.entity_id,
+                    workspace_id: row.workspace_id,
+                    transaction_id: null,
+                    payment_instrument_id: "card-1",
+                    linked_entity_type: "invoice_extraction",
+                    linked_entity_id: "invoice-1",
+                    amount_applied: 875,
+                    amount_currency: "DOP",
+                    allocation_status: "pending",
+                    created_at: "2026-06-09T19:20:00.000Z",
+                    updated_at: "2026-06-09T19:20:00.000Z",
+                  },
+                ],
+              },
+            ]
+          : null,
+      fetchImpl: (async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        if (String(url).includes("/transaction_links?on_conflict=id")) {
+          return new Response(
+            JSON.stringify({
+              message: 'duplicate key value violates unique constraint "idx_txn_links_dedupe_v4"',
+            }),
+            { status: 409, headers: { "content-type": "application/json" } },
+          );
+        }
+        return new Response(null, { status: 204 });
+      }) as typeof fetch,
+    });
+
+    await transport({
+      id: "outbox-transaction-link-duplicate",
+      workspace_id: "11111111-1111-4111-8111-111111111111",
+      entity_type: "transaction_link",
+      entity_id: "link-local-duplicate",
+      event_id: null,
+      operation_type: "upsert",
+      payload_json: JSON.stringify({ linkedEntityType: "invoice_extraction" }),
+      attempt_count: 3,
+      created_at: "2026-06-09T19:20:00.000Z",
+      updated_at: "2026-06-09T19:21:00.000Z",
+    });
+
+    expect(requests.map((request) => `${request.init.method ?? "POST"} ${request.url}`)).toEqual([
+      "POST https://bukowski.test/rest/v1/transaction_links?on_conflict=id",
+      "PATCH https://bukowski.test/rest/v1/transaction_links?workspace_id=eq.11111111-1111-4111-8111-111111111111&linked_entity_type=eq.invoice_extraction&linked_entity_id=eq.invoice-1&transaction_id=is.null&payment_instrument_id=eq.card-1",
+      "POST https://bukowski.test/rest/v1/sync_outbox?on_conflict=id",
+    ]);
+    expect(JSON.parse(String(requests[1]?.init.body))).toMatchObject({
+      id: "link-local-duplicate",
+      payment_instrument_id: "card-1",
+      linked_entity_id: "invoice-1",
+    });
+  });
+
   it("can replace child domain rows before inserting the current remote projection", async () => {
     const requests: Array<{ url: string; init: RequestInit }> = [];
     const transport = createSupabaseOutboxTransport({

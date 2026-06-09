@@ -19,9 +19,11 @@ import type {
   AssignInvoiceAllocationCommand,
   MarkInvoiceAllocationReimbursedCommand,
   ParsedBankTransaction,
+  PreviewStatementImportCommand,
   RejectInvoiceAllocationCommand,
   ReviewReimbursementCommand,
   SetAllocationsCommand,
+  StatementImportPreview,
   TransactionKind,
   TransactionMutationResult,
   UnlinkInvoiceAllocationCommand,
@@ -642,6 +644,79 @@ const syncCardPaymentReminder = (
   enqueueOutbox(db, input.workspaceId, "reminder", reminderId, { id: reminderId }, `sync-reminder-${reminderId}`, now);
 };
 
+  const buildStatementImportPreview = (input: PreviewStatementImportCommand): StatementImportPreview => {
+    const account = db
+      .prepare(
+        `SELECT id FROM bank_accounts WHERE id = ? AND workspace_id = ? LIMIT 1`,
+      )
+      .get(input.bankAccountId, input.workspaceId) as
+      | { id: string }
+      | undefined;
+    if (!account) throw new Error("Bank account not found for this workspace.");
+
+    const existsTxn = db.prepare(
+      `SELECT id FROM bank_transactions WHERE workspace_id = ? AND bank_account_id = ? AND dedupe_hash = ? LIMIT 1`,
+    );
+    const seenHashes = new Map<string, number>();
+    let newCount = 0;
+    let duplicateCount = 0;
+    let fileDuplicateCount = 0;
+    const rows = input.rows.map((row, index) => {
+      const dedupeHash = computeDedupeHash(input.bankAccountId, row);
+      const already = existsTxn.get(input.workspaceId, input.bankAccountId, dedupeHash) as
+        | { id: string }
+        | undefined;
+      const firstSeen = seenHashes.get(dedupeHash);
+      if (already) {
+        duplicateCount += 1;
+        return {
+          ...row,
+          rowIndex: index,
+          status: "duplicate" as const,
+          dedupeHash,
+          duplicateTransactionId: already.id,
+          duplicateReason: "existing_transaction" as const,
+        };
+      }
+      if (firstSeen != null) {
+        duplicateCount += 1;
+        fileDuplicateCount += 1;
+        return {
+          ...row,
+          rowIndex: index,
+          status: "file_duplicate" as const,
+          dedupeHash,
+          duplicateTransactionId: null,
+          duplicateReason: "same_file" as const,
+        };
+      }
+      seenHashes.set(dedupeHash, index);
+      newCount += 1;
+      return {
+        ...row,
+        rowIndex: index,
+        status: "new" as const,
+        dedupeHash,
+        duplicateTransactionId: null,
+        duplicateReason: null,
+      };
+    });
+
+    return {
+      workspaceId: input.workspaceId,
+      bankAccountId: input.bankAccountId,
+      sourceFormat: input.sourceFormat,
+      originalFilename: input.originalFilename ?? null,
+      periodStart: input.periodStart ?? null,
+      periodEnd: input.periodEnd ?? null,
+      rowCount: input.rows.length,
+      newCount,
+      duplicateCount,
+      fileDuplicateCount,
+      rows,
+    };
+  };
+
   const importTransactions = (input: ImportStatementCommand): ImportStatementResult => {
     const existing = receiptHelpers.getExistingReceipt(input.commandId);
     const importId = `import-${input.commandId}`;
@@ -971,6 +1046,10 @@ const syncCardPaymentReminder = (
         repeated: false,
         summary: `Bank account "${input.accountLabel.trim()}" saved.`,
       };
+    },
+
+    previewStatementImport(input: PreviewStatementImportCommand): StatementImportPreview {
+      return buildStatementImportPreview(input);
     },
 
     importStatement(input: ImportStatementCommand): ImportStatementResult {

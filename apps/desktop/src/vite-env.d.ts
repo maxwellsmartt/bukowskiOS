@@ -62,6 +62,7 @@ import type {
   CatalogCsvImportResult,
   DeleteCatalogEntitiesInput,
   ExportCatalogCsvInput,
+  ExportPackingSlipInsurancePdfInput,
   ImportCatalogCsvInput,
   CatalogListQuery,
   CatalogSnapshot,
@@ -330,7 +331,7 @@ declare global {
       getList: (query?: PackingSlipListQuery) => Promise<PackingSlipRow[]>;
       getDetail: (packingSlipId: string) => Promise<PackingSlipDetailSnapshot>;
       exportPdf: (packingSlipId: string) => Promise<AppExportResult>;
-      exportInsurancePdf: (packingSlipId: string) => Promise<AppExportResult>;
+      exportInsurancePdf: (input: ExportPackingSlipInsurancePdfInput) => Promise<AppExportResult>;
       create: (input: CreatePackingSlipCommand) => Promise<CreatePackingSlipResult>;
       returnItems: (input: ReturnPackingSlipItemsCommand) => Promise<ReturnPackingSlipItemsResult>;
     };
@@ -572,6 +573,9 @@ declare global {
       exportDgiiReport: (
         input: import("@contracts").DgiiReportExportInput,
       ) => Promise<import("@contracts").AppExportResult>;
+      previewStatementImport: (
+        input: import("@contracts").PreviewStatementImportCommand,
+      ) => Promise<import("@contracts").StatementImportPreview>;
       importStatement: (
         input: import("@contracts").ImportStatementCommand,
       ) => Promise<import("@contracts").ImportStatementResult>;

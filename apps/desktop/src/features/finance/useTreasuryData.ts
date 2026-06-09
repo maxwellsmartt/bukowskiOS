@@ -13,6 +13,7 @@ import type {
   CounterpartyRulePreviewQuery,
   ImportStatementCommand,
   LinkTransactionCommand,
+  PreviewStatementImportCommand,
   ProjectPnlRow,
   ReviewQueueRow,
   ReviewReimbursementCommand,
@@ -28,6 +29,7 @@ import type {
   TransactionMutationResult,
   TreasuryOverviewQuery,
   TreasuryOverviewSnapshot,
+  StatementImportPreview,
   TreasuryTransactionListQuery,
   TreasuryUndoPreview,
   UndoTreasuryActionCommand,
@@ -529,6 +531,10 @@ export const useTreasuryMutations = () =>
       async deactivatePaymentInstrument(input: DeactivatePaymentInstrumentCommand) {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
         return window.bukowskiTreasury.paymentInstrumentDeactivate(input);
+      },
+      async previewStatementImport(input: PreviewStatementImportCommand): Promise<StatementImportPreview> {
+        if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");
+        return window.bukowskiTreasury.previewStatementImport(input);
       },
       async importStatement(input: ImportStatementCommand) {
         if (!window.bukowskiTreasury) throw new Error("Treasury bridge unavailable.");

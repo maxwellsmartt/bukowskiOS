@@ -5,6 +5,8 @@ const nonEmptyId = z.string().trim().min(1).max(160);
 const boundedSearch = z.string().trim().max(200);
 const sortDirectionSchema = z.enum(["asc", "desc"]);
 const isoDateSchema = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/u, "Expected a YYYY-MM-DD date.");
+const currencyRateTypeSchema = z.enum(["buy", "sell", "average", "manual"]);
+const currencyRateSourceSchema = z.enum(["manual", "banco_popular", "banco_central", "banco_santa_cruz", "custom"]);
 
 const assetSortFieldSchema = z.enum([
   "name",
@@ -85,6 +87,27 @@ const catalogSortFieldSchema = z.enum([
 export const emptyReadArgsSchema = z.tuple([]);
 
 export const idReadArgsSchema = z.tuple([nonEmptyId]);
+
+export const exportPackingSlipInsurancePdfReadArgsSchema = z.tuple([
+  z
+    .object({
+      packingSlipId: nonEmptyId,
+      options: z
+        .object({
+          outputCurrency: z.enum(["USD", "DOP"]),
+          exchangeRate: z.number().finite().positive(),
+          exchangeRateSource: currencyRateSourceSchema,
+          exchangeRateType: currencyRateTypeSchema,
+          exchangeRateEffectiveDate: z.string().trim().nullable().optional(),
+          exchangeRateSourceLabel: z.string().trim().nullable().optional(),
+          mode: z.enum(["automatic", "manual"]),
+        })
+        .strict()
+        .nullable()
+        .optional(),
+    })
+    .strict(),
+]);
 
 export const workspaceQuerySchema = z.object({
   workspaceId: nonEmptyId.optional(),

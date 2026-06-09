@@ -22,6 +22,7 @@ const tableConfigs: Array<{ table: TreasuryPullTable; cursorColumn: string }> = 
 ];
 
 const cursorVersions: Partial<Record<TreasuryPullTable, string>> = {
+  bank_accounts: "v2",
   transaction_annotations: "v2",
   transaction_links: "v2",
 };

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
-import type { PackingSlipListQuery, PackingSlipSortField } from "@contracts";
+import type { PackingInsuranceExportOptions, PackingSlipListQuery, PackingSlipSortField } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
@@ -374,14 +374,14 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
           isExportingPdf={isExportingPdf}
           isLoading={detailLoading}
           isSubmittingReturn={isSubmittingReturn}
-          onExportInsurancePdf={async () => {
+          onExportInsurancePdf={async (options: PackingInsuranceExportOptions) => {
             if (!activePackingSlipId) {
               return;
             }
 
             try {
               setIsExportingInsurancePdf(true);
-              const result = await exportPackingSlipInsurancePdf(activePackingSlipId);
+              const result = await exportPackingSlipInsurancePdf(activePackingSlipId, options);
               setReturnError(null);
               toast.success(t("packing.toasts.doneTitle"), result.summary);
             } catch (nextError) {

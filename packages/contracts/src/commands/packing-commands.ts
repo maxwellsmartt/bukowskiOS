@@ -1,4 +1,5 @@
 import type { CommandActorType, CommandSourceChannel } from "./asset-commands";
+import type { CurrencyRateSource, CurrencyRateType } from "./finance-currency-commands";
 
 export type PackingSlipAssetSelection = {
   assetId: string;
@@ -50,4 +51,22 @@ export type ReturnPackingSlipItemsResult = {
   repeated: boolean;
   slipStatus: string;
   summary: string;
+};
+
+export type PackingInsuranceCurrencyMode = "automatic" | "manual";
+
+export type PackingInsuranceExportOptions = {
+  /** Asset insured values are stored in USD today; outputCurrency controls the PDF presentation. */
+  outputCurrency: "USD" | "DOP";
+  exchangeRate: number;
+  exchangeRateSource: CurrencyRateSource;
+  exchangeRateType: CurrencyRateType;
+  exchangeRateEffectiveDate?: string | null;
+  exchangeRateSourceLabel?: string | null;
+  mode: PackingInsuranceCurrencyMode;
+};
+
+export type ExportPackingSlipInsurancePdfInput = {
+  packingSlipId: string;
+  options?: PackingInsuranceExportOptions | null;
 };

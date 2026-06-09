@@ -36,6 +36,8 @@ export const CurrencySettingsCard = () => {
   const [defaultQuoteCurrency, setDefaultQuoteCurrency] = useState("DOP");
   const [defaultItbisRate, setDefaultItbisRate] = useState(0.18);
   const [defaultQuoteValidityDays, setDefaultQuoteValidityDays] = useState(30);
+  const [defaultRateSource, setDefaultRateSource] = useState<CurrencyRateSource>("manual");
+  const [defaultRateType, setDefaultRateType] = useState<CurrencyRateType>("manual");
   const [sirecineNumber, setSirecineNumber] = useState("");
   const [enabled, setEnabled] = useState<string[]>(enabledCurrencyOptions);
   const [isSaving, setIsSaving] = useState(false);
@@ -58,6 +60,8 @@ export const CurrencySettingsCard = () => {
     setDefaultQuoteCurrency(settings.defaultQuoteCurrency);
     setDefaultItbisRate(settings.defaultItbisRate);
     setDefaultQuoteValidityDays(settings.defaultQuoteValidityDays);
+    setDefaultRateSource(settings.defaultRateSource);
+    setDefaultRateType(settings.defaultRateType);
     setSirecineNumber(settings.sirecineNumber ?? "");
     setEnabled(settings.enabledCurrencies);
   }, [settings]);
@@ -81,8 +85,8 @@ export const CurrencySettingsCard = () => {
         baseCurrency,
         defaultQuoteCurrency,
         enabledCurrencies: enabled,
-        defaultRateSource: settings.defaultRateSource,
-        defaultRateType: settings.defaultRateType,
+        defaultRateSource,
+        defaultRateType,
         defaultItbisRate,
         defaultQuoteValidityDays,
         sirecineNumber: sirecineNumber.trim() || null,
@@ -326,6 +330,34 @@ export const CurrencySettingsCard = () => {
             onChange={(next) => setDefaultQuoteValidityDays(next)}
             value={defaultQuoteValidityDays}
           />
+        </label>
+        <label className="field-block">
+          <span className="field-label">{t("settings.workspace.currencyCard.defaultRateSource", { defaultValue: "Tasa por defecto" })}</span>
+          <select
+            className="field-input"
+            onChange={(event) => setDefaultRateSource(event.target.value as CurrencyRateSource)}
+            value={defaultRateSource}
+          >
+            {RATE_SOURCE_VALUES.map((source) => (
+              <option key={source} value={source}>
+                {t(`settings.workspace.currencyCard.rateSources.${source}`, { defaultValue: source.replace(/_/g, " ") })}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field-block">
+          <span className="field-label">{t("settings.workspace.currencyCard.defaultRateType", { defaultValue: "Tipo de tasa" })}</span>
+          <select
+            className="field-input"
+            onChange={(event) => setDefaultRateType(event.target.value as CurrencyRateType)}
+            value={defaultRateType}
+          >
+            {RATE_TYPE_VALUES.map((rateType) => (
+              <option key={rateType} value={rateType}>
+                {t(`settings.workspace.currencyCard.rateTypes.${rateType}`, { defaultValue: rateType })}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field-block field-block-span-2">
           <span className="field-label">{t("settings.workspace.currencyCard.sirecineNumber")}</span>

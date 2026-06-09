@@ -262,7 +262,10 @@ const sanitizeTreasuryRow = (
     if (!rowExists(db, "bank_transactions", next.transaction_id)) return null;
     if (next.project_id && !rowExists(db, "projects", next.project_id)) next.project_id = null;
   }
-  if (table === "transaction_links" && next.transaction_id && !rowExists(db, "bank_transactions", next.transaction_id)) return null;
+  if (table === "transaction_links") {
+    if (next.transaction_id && !rowExists(db, "bank_transactions", next.transaction_id)) return null;
+    if (next.payment_instrument_id && !rowExists(db, "bank_accounts", next.payment_instrument_id)) return null;
+  }
   if (table === "counterparty_rules" && next.default_project_id && !rowExists(db, "projects", next.default_project_id)) {
     next.default_project_id = null;
   }

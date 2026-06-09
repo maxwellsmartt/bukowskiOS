@@ -129,6 +129,35 @@ export type ImportStatementCommand = {
 
 export type AddManualTransactionsCommand = ImportStatementCommand;
 
+export type PreviewStatementImportCommand = Omit<
+  ImportStatementCommand,
+  "commandId" | "actorType" | "sourceChannel" | "notes"
+>;
+
+export type StatementImportPreviewRowStatus = "new" | "duplicate" | "file_duplicate";
+
+export type StatementImportPreviewRow = ParsedBankTransaction & {
+  rowIndex: number;
+  status: StatementImportPreviewRowStatus;
+  dedupeHash: string;
+  duplicateTransactionId?: string | null;
+  duplicateReason?: "existing_transaction" | "same_file" | null;
+};
+
+export type StatementImportPreview = {
+  workspaceId: string;
+  bankAccountId: string;
+  sourceFormat: StatementSourceFormat;
+  originalFilename?: string | null;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  rowCount: number;
+  newCount: number;
+  duplicateCount: number;
+  fileDuplicateCount: number;
+  rows: StatementImportPreviewRow[];
+};
+
 export type ImportStatementResult = {
   commandId: string;
   importId: string;

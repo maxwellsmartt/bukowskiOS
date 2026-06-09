@@ -79,6 +79,15 @@ test("document generation service creates an insurance list pdf buffer", async (
       pendingCount: 1,
       insuredTotal: "$9,200",
     },
+    currency: {
+      sourceCurrency: "USD",
+      outputCurrency: "USD",
+      exchangeRate: 1,
+      exchangeRateSource: "Manual",
+      exchangeRateType: "manual",
+      exchangeRateEffectiveDate: null,
+      mode: "manual",
+    },
     items: [
       {
         code: "CAM-001",
