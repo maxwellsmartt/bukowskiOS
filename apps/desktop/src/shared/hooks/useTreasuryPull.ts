@@ -4,6 +4,7 @@ import { useSession } from "@app/providers/SessionProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import type { TreasuryPullTable } from "@contracts";
 import { canReadTreasury } from "@shared/lib/financeAccess";
+import { getUserFacingErrorMessage } from "@shared/lib/errors";
 import { immediatePullEvent, notifyWorkspaceDataChanged } from "./useWorkspaceDataRefresh";
 
 const POLL_INTERVAL_MS = 20_000;
@@ -86,7 +87,10 @@ export const useTreasuryPull = () => {
             if (cursor) query = query.gt(cursorColumn, cursor);
             const { data, error } = await query;
             if (error) {
-              console.warn(`[treasury-pull] ${table} pull failed`, error);
+              console.warn(
+                `[treasury-pull] ${table} pull failed: ${getUserFacingErrorMessage(error, "Unknown treasury pull error.")}`,
+                error,
+              );
               break;
             }
 
@@ -104,7 +108,7 @@ export const useTreasuryPull = () => {
             }
             if (result.appliedCount > 0) appliedAny = true;
             if (result.errors.length > 0) {
-              console.warn(`[treasury-pull] ${table} apply had errors`, result.errors);
+              console.warn(`[treasury-pull] ${table} apply had errors: ${result.errors.join("; ")}`, result.errors);
               break;
             }
             if (!result.cursorAfter || rows.length < PULL_BATCH_SIZE) break;
@@ -113,7 +117,10 @@ export const useTreasuryPull = () => {
 
         if (appliedAny) notifyWorkspaceDataChanged();
       } catch (error) {
-        console.warn("[treasury-pull] Pull pass failed", error);
+        console.warn(
+          `[treasury-pull] Pull pass failed: ${getUserFacingErrorMessage(error, "Unknown treasury pull pass error.")}`,
+          error,
+        );
       } finally {
         inFlightRef.current = false;
       }
