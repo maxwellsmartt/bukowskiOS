@@ -2028,7 +2028,9 @@
       "title_one": "{{count}} slip selected",
       "title_other": "{{count}} slips selected",
       "subtitle": "Export documents for selected slips or open the first one to review details.",
+      "compactSubtitle": "Review or export this selection.",
       "openFirst": "Open first",
+      "moreActions": "More actions",
       "exportPdf": "Export slips",
       "exportInsurance": "Export insurance",
       "exporting": "Exporting…",
@@ -2038,6 +2040,14 @@
       "batchExportInsuranceDone_other": "{{count}} insurance files exported.",
       "batchExportPartial": "{{exported}} exported. Failed: {{failed}}.",
       "clear": "Clear selection"
+    },
+    "empty": {
+      "kicker": "No active dispatches",
+      "title": "No packing slips in this workspace yet.",
+      "body": "When you issue gear from Assets or a project, slips will appear here with return progress.",
+      "filteredKicker": "No results",
+      "filteredTitle": "No slips match these filters.",
+      "filteredBody": "Try clearing search or changing the quick filter to see the full list again."
     },
     "sort": {
       "issuedDate": "Issued date",

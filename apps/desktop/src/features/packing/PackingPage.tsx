@@ -1,3 +1,4 @@
+import { MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
@@ -83,6 +84,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const [statusFilter, setStatusFilter] = useState<PackingStatusFilter>("all");
   const [isBatchExportingPdf, setIsBatchExportingPdf] = useState(false);
   const [isBatchExportingInsurancePdf, setIsBatchExportingInsurancePdf] = useState(false);
+  const [selectionActionsOpen, setSelectionActionsOpen] = useState(false);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = usePackingDetail(activePackingSlipId);
   const focusedPackingSlipId = searchParams.get("focus");
   const translatedSortOptions = packingSortOptions.map((option) => ({ ...option, label: t(option.label) }));
@@ -122,6 +124,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   );
   const selectedPackingSlips = useMemo(() => visiblePackingSlips.filter((row) => selectedRowIds.includes(row.id)), [selectedRowIds, visiblePackingSlips]);
   const firstSelectedPackingSlip = selectedRowIds.length ? visiblePackingSlips.find((row) => row.id === selectedRowIds[0]) ?? null : null;
+  const hasActiveFilters = Boolean(packingControls.searchValue.trim()) || statusFilter !== "all";
   const filterOptions = useMemo(
     () => [
       { value: "all" as const, label: t("packing.filters.all"), count: data.length },
@@ -155,6 +158,12 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   useEffect(() => {
     writePreference(uiPreferenceKeys.activePackingSlipId, activePackingSlipId);
   }, [activePackingSlipId]);
+
+  useEffect(() => {
+    if (!selectedRowIds.length) {
+      setSelectionActionsOpen(false);
+    }
+  }, [selectedRowIds.length]);
 
   const exportSelectedPackingSlips = async (type: "pdf" | "insurance") => {
     if (!selectedPackingSlips.length) {
@@ -252,9 +261,9 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             <div className="selection-action-bar packing-selection-bar">
               <div className="selection-action-copy">
                 <span className="selection-action-title">{t("packing.selection.title", { count: selectedRowIds.length })}</span>
-                <span className="selection-action-subtitle">{t("packing.selection.subtitle")}</span>
+                <span className="selection-action-subtitle">{t("packing.selection.compactSubtitle")}</span>
               </div>
-              <div className="selection-action-buttons">
+              <div className="selection-action-buttons packing-selection-primary-actions">
                 <button
                   className="ghost-control"
                   disabled={!firstSelectedPackingSlip}
@@ -269,6 +278,55 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
                 >
                   {t("packing.selection.openFirst")}
                 </button>
+                <div className="packing-selection-more">
+                  <button
+                    aria-expanded={selectionActionsOpen}
+                    className="ghost-control icon-control"
+                    onClick={() => setSelectionActionsOpen((current) => !current)}
+                    title={t("packing.selection.moreActions")}
+                    type="button"
+                  >
+                    <MoreHorizontal size={15} />
+                  </button>
+                  {selectionActionsOpen ? (
+                    <div className="packing-selection-popover" role="menu">
+                      <button
+                        disabled={isBatchExportingPdf || !selectedPackingSlips.length}
+                        onClick={() => {
+                          setSelectionActionsOpen(false);
+                          void exportSelectedPackingSlips("pdf");
+                        }}
+                        role="menuitem"
+                        type="button"
+                      >
+                        <span>{isBatchExportingPdf ? t("packing.selection.exporting") : t("packing.selection.exportPdf")}</span>
+                      </button>
+                      <button
+                        disabled={isBatchExportingInsurancePdf || !selectedPackingSlips.length}
+                        onClick={() => {
+                          setSelectionActionsOpen(false);
+                          void exportSelectedPackingSlips("insurance");
+                        }}
+                        role="menuitem"
+                        type="button"
+                      >
+                        <span>{isBatchExportingInsurancePdf ? t("packing.selection.exporting") : t("packing.selection.exportInsurance")}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedRowIds([]);
+                          setSelectionActionsOpen(false);
+                        }}
+                        role="menuitem"
+                        type="button"
+                      >
+                        <span>{t("packing.selection.clear")}</span>
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div className="selection-action-buttons packing-selection-expanded-actions">
                 <button
                   className="ghost-control"
                   disabled={isBatchExportingPdf || !selectedPackingSlips.length}
@@ -294,9 +352,17 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
           <DataTable
             activeRowId={activePackingSlipId}
             autoScrollToActiveRow
+            defaultVisibleColumnKeys={["number", "project", "dueDate", "progress", "status"]}
+            emptyContent={
+              <div className="packing-empty-state">
+                <span className="packing-empty-kicker">{t(hasActiveFilters ? "packing.empty.filteredKicker" : "packing.empty.kicker")}</span>
+                <strong>{t(hasActiveFilters ? "packing.empty.filteredTitle" : "packing.empty.title")}</strong>
+                <span>{t(hasActiveFilters ? "packing.empty.filteredBody" : "packing.empty.body")}</span>
+              </div>
+            }
             getRowId={(row) => row.id}
             onSortRequest={packingControls.handleColumnSortRequest}
-            persistKey="packing-slips"
+            persistKey="packing-slips-v2"
             shellClassName="table-shell-fill"
             columns={[
               { key: "number", label: t("packing.columns.slip"), width: 92, minWidth: 82, render: (row) => row.number },

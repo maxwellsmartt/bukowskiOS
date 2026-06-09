@@ -263,9 +263,10 @@ export const PackingSlipDetailPanel = ({
       </div>
 
       <DataTable
+        defaultVisibleColumnKeys={["asset", "quantity", "conditionIn", "status"]}
         getRowId={(row) => row.assetId}
         maxHeight="min(42vh, 460px)"
-        persistKey="packing-slip-detail-items"
+        persistKey="packing-slip-detail-items-v2"
         columns={[
           {
             key: "asset",

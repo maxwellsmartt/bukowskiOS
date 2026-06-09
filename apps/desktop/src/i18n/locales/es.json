@@ -2032,7 +2032,9 @@
       "title_one": "{{count}} slip seleccionado",
       "title_other": "{{count}} slips seleccionados",
       "subtitle": "Exporta documentos de los slips seleccionados o abre el primero para revisar detalles.",
+      "compactSubtitle": "Revisa o exporta esta selección.",
       "openFirst": "Abrir primero",
+      "moreActions": "Más acciones",
       "exportPdf": "Exportar slips",
       "exportInsurance": "Exportar seguros",
       "exporting": "Exportando…",
@@ -2042,6 +2044,14 @@
       "batchExportInsuranceDone_other": "{{count}} seguros exportados.",
       "batchExportPartial": "{{exported}} exportado(s). Fallaron: {{failed}}.",
       "clear": "Limpiar selección"
+    },
+    "empty": {
+      "kicker": "Sin salidas activas",
+      "title": "Todavía no hay packing slips en este workspace.",
+      "body": "Cuando emitas salidas desde Equipos o desde un proyecto, aparecerán aquí con su progreso de devolución.",
+      "filteredKicker": "Sin resultados",
+      "filteredTitle": "No hay slips con estos filtros.",
+      "filteredBody": "Prueba limpiar la búsqueda o cambiar el filtro rápido para volver a ver la lista completa."
     },
     "sort": {
       "issuedDate": "Fecha de emisión",
