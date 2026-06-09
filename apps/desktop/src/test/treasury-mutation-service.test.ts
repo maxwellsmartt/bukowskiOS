@@ -868,6 +868,18 @@ describe("treasury mutation service", () => {
     expect(reimbursed.groups).toHaveLength(1);
     expect(reimbursed.groups[0].status).toBe("reimbursed");
 
+    const afterReimbursement = mutations.assignInvoiceAllocation({
+      commandId: "cmd-allocation-after-reimbursement",
+      workspaceId,
+      ...baseChannel,
+      paymentInstrumentId: "bank-account-cmd-card-allocation",
+      linkedEntityType: "invoice_extraction",
+      linkedEntityId: "invoice-extraction-allocation-001",
+      amountApplied: 700,
+      amountCurrency: "DOP",
+    });
+    expect(afterReimbursement.allocationId).toBe("txn-link-cmd-allocation-after-reimbursement");
+
     cleanup();
   });
 

@@ -384,7 +384,10 @@ export const createInvoiceInboxService = (db: DatabaseSync, options: InvoiceInbo
          LEFT JOIN bank_transactions t ON t.id = l.transaction_id
          WHERE l.linked_entity_type = 'invoice_extraction'
            AND l.linked_entity_id IN (${placeholders})
-         ORDER BY l.updated_at DESC, l.created_at DESC`,
+         ORDER BY
+           CASE WHEN l.allocation_status NOT IN ('rejected', 'reimbursed') THEN 0 ELSE 1 END,
+           l.updated_at DESC,
+           l.created_at DESC`,
       )
       .all(...extractionIds) as AllocationRow[];
     for (const row of rows) {

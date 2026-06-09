@@ -6267,6 +6267,10 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.data-table tbody tr.data-table-row-selected:hover td {
+  background: rgba(92, 153, 255, 0.12);
+}
+
 .data-table-row-clickable {
   cursor: pointer;
 }
@@ -16678,10 +16682,12 @@ input[type="number"] {
 }
 
 .treasury-segmented-tabs-indicator {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(126, 183, 178, 0.18), rgba(83, 148, 122, 0.12));
+  border: 1px solid rgba(126, 183, 178, 0.28);
   border-radius: 999px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035),
+    0 8px 20px rgba(38, 92, 72, 0.14);
   bottom: 2px;
   left: 2px;
   position: absolute;
@@ -16719,7 +16725,7 @@ input[type="number"] {
 }
 
 .treasury-segmented-tab[aria-selected="true"] {
-  color: var(--text-primary);
+  color: #d8f4e4;
 }
 
 .treasury-hero-card {
@@ -20200,15 +20206,69 @@ input[type="number"] {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 8px 10px;
-  margin-bottom: 8px;
-  border-radius: var(--radius-sm, 11px);
-  background: rgba(214, 173, 112, 0.08);
-  border: 1px solid rgba(214, 173, 112, 0.3);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.08), transparent 32%),
+    rgba(255, 255, 255, 0.024);
+  border: 1px solid rgba(126, 183, 178, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
-.invoice-batch-bar-label {
+.invoice-batch-count {
+  align-items: center;
+  color: var(--text-muted);
+  display: inline-flex;
   font-size: var(--font-xs, 11px);
   font-weight: var(--weight-semibold, 600);
+  min-height: 30px;
+  padding: 0 2px;
+  white-space: nowrap;
+}
+
+.invoice-batch-controls {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.invoice-batch-group {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.invoice-batch-divider {
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.08);
+  flex: 0 0 1px;
+  min-height: 24px;
+}
+
+.invoice-batch-bar .ghost-control,
+.invoice-batch-bar .compact-select-trigger {
+  height: 30px;
+  min-height: 30px;
+  border-radius: 999px;
+  font-size: var(--font-xs, 11px);
+}
+
+.invoice-batch-bar .compact-select-trigger {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.invoice-batch-bar .compact-select-trigger:hover:not(:disabled),
+.invoice-batch-bar .ghost-control:hover:not(:disabled) {
+  background: rgba(126, 183, 178, 0.08);
+  border-color: rgba(126, 183, 178, 0.2);
+}
+
+.invoice-batch-action {
+  white-space: nowrap;
 }
 
 .invoice-reimbursement-panel {
@@ -20537,16 +20597,41 @@ input[type="number"] {
 .invoice-edit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
 }
 .invoice-edit-grid label {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
   font-size: var(--font-2xs, 10px);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
+}
+
+.invoice-edit-grid input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.78);
+  opacity: 0.85;
+}
+
+.invoice-money-input-shell {
+  position: relative;
+}
+
+.invoice-money-prefix {
+  color: rgba(251, 191, 36, 0.9);
+  font-size: var(--font-xs, 11px);
+  font-weight: var(--weight-semibold, 600);
+  left: 14px;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.invoice-money-input.field-input {
+  padding-left: 58px;
+  font-variant-numeric: tabular-nums;
 }
 
 .invoice-select-all {
@@ -20563,9 +20648,9 @@ input[type="number"] {
 .invoice-filter-select.compact-select-trigger {
   flex: 0 0 auto;
   width: auto;
-  min-width: 132px;
-  max-width: 170px;
-  height: 28px;
+  min-width: 142px;
+  max-width: 190px;
+  height: 30px;
   font-size: var(--font-xs, 11px);
 }
 

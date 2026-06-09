@@ -557,7 +557,7 @@ const ensureAllocationTotalWithinEntity = (
         WHERE workspace_id = ?
           AND linked_entity_type = ?
           AND linked_entity_id = ?
-          AND allocation_status NOT IN ('rejected')
+          AND allocation_status NOT IN ('rejected', 'reimbursed')
           AND id <> ?
           AND COALESCE(amount_currency, ?) = ?
       `,

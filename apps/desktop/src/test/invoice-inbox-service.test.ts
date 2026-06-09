@@ -160,6 +160,71 @@ describe("invoice inbox service", () => {
     cleanup();
   });
 
+  it("shows the latest open invoice allocation before rejected historical rows", () => {
+    const { cleanup, database } = createTestDatabase("invoice-inbox-open-allocation");
+    const treasuryMutations = createTreasuryMutationService(database);
+    treasuryMutations.upsertBankAccount({
+      commandId: "cmd-open-allocation-account",
+      workspaceId,
+      ...baseChannel,
+      bankName: "popular",
+      accountLabel: "Popular RD$",
+      accountNumberFull: "788565075",
+      currency: "DOP",
+      openingBalance: 0,
+    });
+    treasuryMutations.upsertBankAccount({
+      commandId: "cmd-rejected-allocation-account",
+      workspaceId,
+      ...baseChannel,
+      bankName: "santa_cruz",
+      accountLabel: "Santa Cruz RD$",
+      accountNumberFull: "1234563024",
+      currency: "DOP",
+      openingBalance: 0,
+    });
+    const bankAccountId = (
+      database.prepare(`SELECT id FROM bank_accounts WHERE account_label = ? LIMIT 1`).get("Popular RD$") as { id: string }
+    ).id;
+    const rejectedBankAccountId = (
+      database.prepare(`SELECT id FROM bank_accounts WHERE account_label = ? LIMIT 1`).get("Santa Cruz RD$") as { id: string }
+    ).id;
+    const inbox = createInvoiceInboxService(database, {
+      userDataPath: makeUserDataPath(),
+      treasuryMutations,
+    });
+    const { ids } = inbox.enqueueBatch({
+      workspaceId,
+      files: [{ name: "factura.png", mimeType: "image/png", dataUrl: PNG_DATA_URL }],
+    });
+    inbox.recordExtraction(ids[0], fields, null);
+    const now = new Date().toISOString();
+    database
+      .prepare(
+        `INSERT INTO transaction_links (
+           id, workspace_id, transaction_id, payment_instrument_id,
+           linked_entity_type, linked_entity_id, amount_applied, amount_currency,
+           allocation_status, created_at, updated_at
+         ) VALUES (?, ?, NULL, ?, 'invoice_extraction', ?, 75000, 'DOP', 'pending', ?, ?)`,
+      )
+      .run("txn-link-open", workspaceId, bankAccountId, ids[0], "2026-06-08T10:00:00.000Z", "2026-06-08T10:00:00.000Z");
+    database
+      .prepare(
+        `INSERT INTO transaction_links (
+           id, workspace_id, transaction_id, payment_instrument_id,
+           linked_entity_type, linked_entity_id, amount_applied, amount_currency,
+           allocation_status, created_at, updated_at
+         ) VALUES (?, ?, NULL, ?, 'invoice_extraction', ?, 75000, 'DOP', 'rejected', ?, ?)`,
+      )
+      .run("txn-link-rejected-newer", workspaceId, rejectedBankAccountId, ids[0], now, now);
+
+    const row = inbox.list({ workspaceId })[0];
+    expect(row?.allocation?.id).toBe("txn-link-open");
+    expect(row?.allocation?.allocationStatus).toBe("pending");
+
+    cleanup();
+  });
+
   it("retries failed or extracted invoices without requeueing applied/dismissed rows", () => {
     const { cleanup, database } = createTestDatabase("invoice-inbox-retry");
     const treasuryMutations = createTreasuryMutationService(database);
