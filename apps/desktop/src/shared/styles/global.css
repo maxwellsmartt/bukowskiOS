@@ -4048,16 +4048,33 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .asset-operation-cart {
-  display: grid;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   min-height: 0;
-  padding: 14px;
-  border: 1px solid rgba(92, 153, 255, 0.32);
-  border-radius: 14px;
+  padding: 12px;
+  border: 1px solid rgba(126, 183, 178, 0.2);
+  border-radius: 16px;
+  overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(92, 153, 255, 0.12), rgba(92, 153, 255, 0.05)),
-    rgba(255, 255, 255, 0.028);
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.13), transparent 38%),
+    linear-gradient(145deg, rgba(25, 33, 35, 0.94), rgba(16, 18, 22, 0.95));
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 22px rgba(8, 12, 20, 0.28);
+}
+
+.asset-operation-cart::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.07), transparent 32%);
+  opacity: 0.34;
+}
+
+.asset-operation-cart > * {
+  position: relative;
 }
 
 .asset-operation-cart-header {
@@ -4098,7 +4115,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .asset-operation-cart-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 5px;
   align-items: stretch;
   min-width: 0;
   width: 100%;
@@ -4126,6 +4143,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .asset-operation-cart-list {
   display: grid;
+  align-content: start;
   gap: 7px;
   max-height: clamp(140px, 24vh, 280px);
   min-height: 0;
@@ -6742,7 +6760,7 @@ body.is-resizing-side-rail {
 .asset-side-rail {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: 10px;
   min-width: 0;
   /* Fill the bounded grid cell (.asset-list-layout is flex:1/min-height:0/
      overflow:hidden, align-items:stretch) and scroll internally, instead of
@@ -6755,24 +6773,119 @@ body.is-resizing-side-rail {
   overscroll-behavior: contain;
 }
 
+.asset-side-rail.is-selection-mode {
+  overflow: hidden;
+}
+
+.asset-side-rail.is-selection-mode .asset-operation-cart {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.asset-side-rail.is-selection-mode .asset-operation-cart-list {
+  flex: 1 1 auto;
+  max-height: none;
+}
+
+.asset-side-rail-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 32px;
+  padding: 5px 18px 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.022);
+  color: var(--text-muted);
+  font-size: var(--font-2xs, 10px);
+  font-weight: var(--weight-semibold, 600);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.asset-side-rail-context strong {
+  overflow: hidden;
+  max-width: 48%;
+  margin-right: 4px;
+  color: var(--text-primary);
+  font-size: var(--font-xs, 11px);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .asset-quick-preview-card {
   min-width: 0;
-  max-height: calc(100dvh - 260px);
+  max-height: none;
   min-height: 0;
   overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.075);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.028), transparent 44%),
+    rgba(255, 255, 255, 0.016);
+}
+
+.asset-quick-preview-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.asset-quick-preview-title > span:first-child {
+  overflow: hidden;
+  max-width: 220px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .asset-quick-preview-card .summary-grid {
   min-width: 0;
+  gap: 7px;
+}
+
+.asset-quick-preview-card .summary-row {
+  min-height: 46px;
+  padding: 8px 9px;
+  border-radius: 12px;
+  background: rgba(8, 11, 13, 0.28);
+}
+
+.asset-quick-preview-card .summary-label {
+  font-size: var(--font-2xs, 10px);
+}
+
+.asset-quick-preview-card .summary-value {
+  font-size: var(--font-xs, 11px);
+  line-height: 1.25;
+}
+
+.asset-quick-preview-card .asset-preview-image-strip {
+  min-height: 0;
+}
+
+.asset-quick-preview-card .asset-preview-image-empty {
+  min-height: 96px;
+  padding: 14px;
 }
 
 .asset-quick-preview-card .action-panel-actions {
-  align-items: stretch;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .asset-quick-preview-card .action-panel-actions > button {
-  flex: 1 1 120px;
+  flex: 0 1 auto;
   min-width: 0;
+  min-height: 30px;
+  padding-inline: 10px;
+  border-radius: 999px;
+  font-size: var(--font-xs, 11px);
 }
 
 .assets-page-stack {

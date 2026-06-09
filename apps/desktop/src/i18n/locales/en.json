@@ -529,6 +529,12 @@
       "openProjectAssets": "Open Project Assets",
       "kitLocked": "These assets are part of active kits and cannot be assigned or moved individually: {{summary}}. Remove them from the kit first if you need to operate them as standalone items."
     },
+    "sideRail": {
+      "preview": "Quick preview",
+      "selection": "Operation selection",
+      "selectionCount_one": "{{count}} asset",
+      "selectionCount_other": "{{count}} assets"
+    },
     "empty": {
       "globalTitle": "Your asset registry is still empty",
       "projectTitle": "No assets are assigned to this project yet",
@@ -592,6 +598,7 @@
       "closeAria": "Close quick preview",
       "assetCode": "Asset code",
       "location": "Location",
+      "stock": "Stock",
       "projectResponsible": "Project / responsible",
       "serial": "Serial",
       "conditionCustody": "Condition / custody",

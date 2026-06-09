@@ -531,6 +531,12 @@
       "openProjectAssets": "Abrir Equipos del proyecto",
       "kitLocked": "Estos equipos forman parte de kits activos y no se pueden asignar ni mover individualmente: {{summary}}. Quítalos del kit primero si necesitas operarlos por separado."
     },
+    "sideRail": {
+      "preview": "Vista rápida",
+      "selection": "Selección operativa",
+      "selectionCount_one": "{{count}} equipo",
+      "selectionCount_other": "{{count}} equipos"
+    },
     "empty": {
       "globalTitle": "Tu inventario aún está vacío",
       "projectTitle": "Este proyecto aún no tiene equipos asignados",
@@ -594,6 +600,7 @@
       "closeAria": "Cerrar vista rápida",
       "assetCode": "Código",
       "location": "Ubicación",
+      "stock": "Stock",
       "projectResponsible": "Proyecto / responsable",
       "serial": "Serie",
       "conditionCustody": "Condición / custodia",

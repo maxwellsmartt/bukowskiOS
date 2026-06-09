@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { ClipboardList, FileUp, Import, Plus, SquarePen, Trash2, X } from "lucide-react";
+import { ClipboardList, ExternalLink, FileUp, GitCompareArrows, Import, MoveRight, Plus, Siren, SquarePen, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -21,7 +21,7 @@ import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { resolveAssetAvailability, summarizeUnavailableAssets, translateAssetAvailabilityLabel, translateAssetAvailabilityReason } from "@shared/lib/assetAvailability";
-import { formatAssetStockDetailRows, formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
+import { formatAssetStockInline } from "@shared/lib/assetQuantityPresentation";
 import { presentAssetCondition, presentAssetStatus } from "@shared/lib/assetStatusPresentation";
 import { cleanDisplay } from "@shared/lib/displayValue";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
@@ -948,6 +948,57 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     [selectedAssetDetail.files],
   );
   const activeAssetImageSlots = Math.max(0, 2 - activeAssetImages.length);
+  const activeAssetPreviewRows = useMemo(() => {
+    if (!activeAsset) {
+      return [];
+    }
+
+    return [
+      {
+        label: t("assets.quickPreview.assetCode"),
+        value: activeAsset.code,
+      },
+      {
+        label: t("assets.quickPreview.location"),
+        value: cleanDisplay(activeAsset.location),
+      },
+      {
+        label: t("assets.quickPreview.stock"),
+        value: formatAssetStockInline(
+          {
+            availableQuantity: activeAsset.quantity,
+            assignedQuantity: activeAsset.assignedQuantity,
+            checkedOutQuantity: activeAsset.checkedOutQuantity,
+          },
+          t,
+        ),
+      },
+      {
+        label: t("assets.quickPreview.projectResponsible"),
+        value: [cleanDisplay(activeAsset.project), cleanDisplay(activeAsset.responsible)]
+          .filter((value) => value && value !== "—")
+          .join(" · ") || "—",
+      },
+      cleanDisplay(activeAsset.serialNumber) !== "—"
+        ? {
+            label: t("assets.quickPreview.serial"),
+            value: cleanDisplay(activeAsset.serialNumber),
+          }
+        : null,
+      {
+        label: t("assets.quickPreview.conditionCustody"),
+        value: [cleanDisplay(activeAsset.condition), cleanDisplay(activeAsset.custody)]
+          .filter((value) => value && value !== "—")
+          .join(" · ") || "—",
+      },
+      activeAsset.linkedKitCount
+        ? {
+            label: t("assets.quickPreview.kitMembership"),
+            value: activeAsset.linkedKitCodes.join(" · "),
+          }
+        : null,
+    ].filter(Boolean) as Array<{ label: string; value: string }>;
+  }, [activeAsset, t]);
   const selectedRowIds = useMemo(() => Object.keys(cartItemsById), [cartItemsById]);
   const selectedAssets = useMemo(() => selectedRowIds.map((assetId) => cartItemsById[assetId]).filter(Boolean), [cartItemsById, selectedRowIds]);
   const selectedAssetSelections = useMemo(
@@ -1078,6 +1129,43 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
     setCartItemsById({});
     setAssignNextStep(null);
   };
+
+  const replaceOperationCartWithAssets = (targetAssets: AssetListRow[]) => {
+    setCartItemsById(
+      targetAssets.reduce<Record<string, AssetOperationCartItem>>((nextItems, asset) => {
+        nextItems[asset.id] = buildOperationCartItem(asset);
+        return nextItems;
+      }, {}),
+    );
+  };
+
+  const openAssignMoveForAsset = (asset: AssetListRow) => {
+    replaceOperationCartWithAssets([asset]);
+    setSelectedAssetId(asset.id);
+    setActionPanelOpen(true);
+    setPackingPanelOpen(false);
+    setAssignNextStep(null);
+    setActionError(null);
+  };
+
+  const openPackingSlipForAsset = (asset: AssetListRow) => {
+    replaceOperationCartWithAssets([asset]);
+    setSelectedAssetId(asset.id);
+    setPackingPanelOpen(true);
+    setActionPanelOpen(false);
+    setPackingError(null);
+  };
+
+  const addAssetToCompare = (asset: AssetListRow) =>
+    addItems([
+      {
+        id: asset.id,
+        entityType: "asset" as const,
+        label: `${asset.code} · ${asset.name}`,
+        subtitle: `${asset.location} · ${asset.project}`,
+        meta: asset.projectUnit && asset.projectUnit !== "—" ? t("assets.cart.unitMeta", { unit: asset.projectUnit }) : undefined,
+      },
+    ]);
 
   const handleAssignMove = async (formValue: AssetAssignMoveFormValue) => {
     try {
@@ -2030,6 +2118,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               {
                 key: "open",
                 label: t("assets.quickPreview.openDetail"),
+                icon: <ExternalLink size={14} />,
                 onSelect: (target) => navigate(`/assets/${target.id}`),
               },
               {
@@ -2041,6 +2130,34 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   setEditorMode("edit");
                   setEditorError(null);
                 },
+              },
+              {
+                key: "add-to-compare",
+                label: t("assets.cart.addToCompare"),
+                icon: <GitCompareArrows size={14} />,
+                separatorBefore: true,
+                onSelect: (target) => addAssetToCompare(target),
+              },
+              {
+                key: "assign-move",
+                label: t("assets.cart.assignMove"),
+                icon: <MoveRight size={14} />,
+                disabled: row.linkedKitCount > 0,
+                onSelect: (target) => openAssignMoveForAsset(target),
+              },
+              {
+                key: "create-packing-slip",
+                label: t("assets.cart.createPackingSlip"),
+                icon: <ClipboardList size={14} />,
+                disabled: row.linkedKitCount > 0 || !resolveAssetAvailability(row).isAvailable,
+                onSelect: (target) => openPackingSlipForAsset(target),
+              },
+              {
+                key: "report-issue",
+                label: t("assets.cart.reportIssue"),
+                icon: <Siren size={14} />,
+                separatorBefore: true,
+                onSelect: (target) => navigate(`/assets/${target.id}?report=incident`),
               },
             ]}
             defaultVisibleColumnKeys={assetDefaultColumnKeys}
@@ -2095,7 +2212,15 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         </SurfaceCard>
 
         {selectedAssets.length || activeAsset ? (
-          <div className="asset-side-rail">
+          <div className={`asset-side-rail${selectedAssets.length > 1 ? " is-selection-mode" : ""}`}>
+            <div className="asset-side-rail-context">
+              <span>{selectedAssets.length ? t("assets.sideRail.selection") : t("assets.sideRail.preview")}</span>
+              <strong>
+                {selectedAssets.length
+                  ? t("assets.sideRail.selectionCount", { count: selectedAssets.length })
+                  : activeAsset?.code ?? ""}
+              </strong>
+            </div>
             <AssetOperationCart
               items={selectedAssets}
               onAddToCompare={() =>
@@ -2129,7 +2254,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
               onRemove={removeFromCart}
             />
 
-            {activeAsset ? (
+            {activeAsset && selectedAssets.length <= 1 ? (
               <SurfaceCard
                 aside={
                   <button
@@ -2142,53 +2267,23 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                   </button>
                 }
                 className="asset-quick-preview-card"
-                title={activeAsset.name}
+                title={
+                  <span className="asset-quick-preview-title">
+                    <span>{activeAsset.name}</span>
+                    <StatusBadge tone={presentAssetStatus(activeAsset.status, t).tone}>
+                      {presentAssetStatus(activeAsset.status, t).label}
+                    </StatusBadge>
+                  </span>
+                }
               >
                 <>
                   <div className="summary-grid">
-                    <div className="summary-row">
-                      <span className="summary-label">{t("assets.quickPreview.assetCode")}</span>
-                      <span className="summary-value">{activeAsset.code}</span>
-                    </div>
-                    <div className="summary-row">
-                      <span className="summary-label">{t("assets.quickPreview.location")}</span>
-                      <span className="summary-value">{activeAsset.location}</span>
-                    </div>
-                    {formatAssetStockDetailRows({
-                      totalQuantity: activeAsset.totalQuantity,
-                      availableQuantity: activeAsset.quantity,
-                      assignedQuantity: activeAsset.assignedQuantity,
-                      checkedOutQuantity: activeAsset.checkedOutQuantity,
-                    }, t).map((row) => (
+                    {activeAssetPreviewRows.map((row) => (
                       <div key={row.label} className="summary-row">
                         <span className="summary-label">{row.label}</span>
                         <span className="summary-value">{row.value}</span>
                       </div>
                     ))}
-                    <div className="summary-row">
-                      <span className="summary-label">{t("assets.quickPreview.projectResponsible")}</span>
-                      <span className="summary-value">
-                        {activeAsset.project} · {activeAsset.responsible}
-                      </span>
-                    </div>
-                    <div className="summary-row">
-                      <span className="summary-label">{t("assets.quickPreview.serial")}</span>
-                      <span className="summary-value">
-                        {activeAsset.serialNumber}
-                      </span>
-                    </div>
-                    <div className="summary-row">
-                      <span className="summary-label">{t("assets.quickPreview.conditionCustody")}</span>
-                      <span className="summary-value">
-                        {activeAsset.condition} · {activeAsset.custody}
-                      </span>
-                    </div>
-                    <div className="summary-row">
-                      <span className="summary-label">{t("assets.quickPreview.kitMembership")}</span>
-                      <span className="summary-value">
-                        {activeAsset.linkedKitCount ? activeAsset.linkedKitCodes.join(" · ") : t("assets.quickPreview.standalone")}
-                      </span>
-                    </div>
                   </div>
 
                   <div className="asset-preview-image-strip">
