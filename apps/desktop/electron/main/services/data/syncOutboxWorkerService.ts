@@ -63,6 +63,20 @@ const resolveRetryDelayMinutes = (attemptCount: number) => {
   return Math.min(60, 2 ** (attemptCount - 1));
 };
 
+const recoverableRemoteErrorPattern =
+  /(schema cache|could not find the .* column|pgrst204|failed to fetch|networkerror|network request failed|load failed|temporarily unavailable|timeout|timed out)/i;
+
+const isRecoverableRemoteError = (message: string | null | undefined) =>
+  Boolean(message && recoverableRemoteErrorPattern.test(message));
+
+const resolveRetryDelayForErrorMinutes = (attemptCount: number, message: string | null | undefined) => {
+  if (isRecoverableRemoteError(message)) {
+    return 1;
+  }
+
+  return resolveRetryDelayMinutes(attemptCount);
+};
+
 const MAX_PAYLOAD_DEPTH = 4;
 const MAX_PAYLOAD_ARRAY_ITEMS = 10;
 const MAX_PAYLOAD_OBJECT_KEYS = 20;
@@ -200,6 +214,34 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
     );
   };
 
+  const recoverRetryableRemoteRows = (timestamp: string) =>
+    Number(
+      db
+        .prepare(
+          `
+            UPDATE sync_outbox
+            SET
+              next_retry_at = ?,
+              updated_at = ?
+            WHERE status = 'failed'
+              AND next_retry_at IS NOT NULL
+              AND (
+                lower(COALESCE(last_error, '')) LIKE '%schema cache%'
+                OR lower(COALESCE(last_error, '')) LIKE '%could not find the % column%'
+                OR lower(COALESCE(last_error, '')) LIKE '%pgrst204%'
+                OR lower(COALESCE(last_error, '')) LIKE '%failed to fetch%'
+                OR lower(COALESCE(last_error, '')) LIKE '%networkerror%'
+                OR lower(COALESCE(last_error, '')) LIKE '%network request failed%'
+                OR lower(COALESCE(last_error, '')) LIKE '%load failed%'
+                OR lower(COALESCE(last_error, '')) LIKE '%temporarily unavailable%'
+                OR lower(COALESCE(last_error, '')) LIKE '%timeout%'
+                OR lower(COALESCE(last_error, '')) LIKE '%timed out%'
+              )
+          `,
+        )
+        .run(timestamp, timestamp).changes,
+    );
+
   const getCounts = () => ({
     pending: countByStatus(db, "pending"),
     processing: countByStatus(db, "processing"),
@@ -317,6 +359,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
 
       try {
         const recoveredStaleRows = recoverStaleProcessingRows(startedAt);
+        const recoveredRetryableRows = recoverRetryableRemoteRows(startedAt);
         const dueRows = db
           .prepare(
             `
@@ -396,7 +439,8 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
             });
           } catch (error) {
             const retryTimestamp = now();
-            const retryDelayMinutes = resolveRetryDelayMinutes(claimedRow.attempt_count);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const retryDelayMinutes = resolveRetryDelayForErrorMinutes(claimedRow.attempt_count, errorMessage);
             db
               .prepare(
                 `
@@ -422,7 +466,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
               operationType: claimedRow.operation_type,
               attemptCount: claimedRow.attempt_count,
               nextRetryAt: addMinutes(retryTimestamp, retryDelayMinutes),
-              error: error instanceof Error ? error.message : String(error),
+              error: errorMessage,
             });
           }
         }
@@ -430,7 +474,7 @@ export const createSyncOutboxWorkerService = (db: DatabaseSync, options: SyncOut
         const counts = getCounts();
 
         const summary = {
-          recoveredStaleRows,
+          recoveredStaleRows: recoveredStaleRows + recoveredRetryableRows,
           processedRows,
           sentRows,
           failedRows,

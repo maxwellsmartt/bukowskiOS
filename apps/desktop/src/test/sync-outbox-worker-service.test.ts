@@ -397,6 +397,79 @@ describe("sync outbox worker service", () => {
     cleanup();
   });
 
+  it("does not leave recoverable Supabase schema-cache failures sleeping until their old retry time", async () => {
+    const { cleanup, database } = createTestDatabase("bukowski-sync-outbox-recoverable-schema-cache");
+    const fixedNow = "2026-04-12T18:00:00.000Z";
+    const sentRows: string[] = [];
+
+    database.prepare("DELETE FROM sync_outbox").run();
+    database
+      .prepare(
+        `
+          INSERT INTO sync_outbox (
+            id,
+            workspace_id,
+            entity_type,
+            entity_id,
+            event_id,
+            operation_type,
+            payload_json,
+            status,
+            attempt_count,
+            last_error,
+            next_retry_at,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run(
+        "outbox-schema-cache",
+        "workspace-metadata",
+        "bank_account",
+        "account-1",
+        null,
+        "upsert",
+        JSON.stringify({ accountId: "account-1" }),
+        "failed",
+        7,
+        "Supabase outbox push failed (400): Could not find the 'instrument_kind' column of 'bank_accounts' in the schema cache",
+        "2026-04-12T19:00:00.000Z",
+        fixedNow,
+        fixedNow,
+      );
+
+    const service = createSyncOutboxWorkerService(database, {
+      now: () => fixedNow,
+      batchSize: 10,
+      transport: (row) => {
+        sentRows.push(row.id);
+      },
+    });
+
+    const summary = await service.runDueEntries();
+
+    expect(summary.recoveredStaleRows).toBe(1);
+    expect(summary.sentRows).toBe(1);
+    expect(sentRows).toEqual(["outbox-schema-cache"]);
+
+    const row = database
+      .prepare(
+        `
+          SELECT status, last_error, next_retry_at
+          FROM sync_outbox
+          WHERE id = 'outbox-schema-cache'
+          LIMIT 1
+        `,
+      )
+      .get() as { status: string; last_error: string | null; next_retry_at: string | null };
+
+    expect(row).toEqual({ status: "sent", last_error: null, next_retry_at: null });
+
+    cleanup();
+  });
+
   it("pushes outbox rows to Supabase REST with the stored user token", async () => {
     const requests: Array<{ url: string; init: RequestInit }> = [];
     const transport = createSupabaseOutboxTransport({
