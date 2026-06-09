@@ -1270,27 +1270,36 @@ export const InvoiceInboxPanel = ({ workspaceId, formatMoney, onOpenMovement }: 
                 </div>
               </div>
               <div className="invoice-reimbursement-filters">
-                <CompactSelect
-                  className="invoice-filter-select"
-                  ariaLabel={t("finance.treasury.invoices.reimbursements.filterOwner", { defaultValue: "Filtrar responsable" })}
-                  value={reimbursementOwnerFilter}
-                  onChange={setReimbursementOwnerFilter}
-                  options={reimbursementOwnerOptions}
-                />
-                <CompactSelect
-                  className="invoice-filter-select"
-                  ariaLabel={t("finance.treasury.invoices.reimbursements.filterInstrument", { defaultValue: "Filtrar medio" })}
-                  value={reimbursementInstrumentFilter}
-                  onChange={setReimbursementInstrumentFilter}
-                  options={reimbursementInstrumentOptions}
-                />
-                <CompactSelect
-                  className="invoice-filter-select"
-                  ariaLabel={t("finance.treasury.invoices.reimbursements.filterStatus", { defaultValue: "Filtrar estado" })}
-                  value={reimbursementStatusFilter}
-                  onChange={setReimbursementStatusFilter}
-                  options={reimbursementStatusOptions}
-                />
+                <label className="invoice-reimbursement-filter-field">
+                  <span>{t("finance.treasury.invoices.reimbursements.owner", { defaultValue: "Responsable" })}</span>
+                  <CompactSelect
+                    className="invoice-filter-select"
+                    ariaLabel={t("finance.treasury.invoices.reimbursements.filterOwner", { defaultValue: "Filtrar responsable" })}
+                    value={reimbursementOwnerFilter}
+                    onChange={setReimbursementOwnerFilter}
+                    options={reimbursementOwnerOptions}
+                  />
+                </label>
+                <label className="invoice-reimbursement-filter-field">
+                  <span>{t("finance.treasury.invoices.reimbursements.instrument", { defaultValue: "Medio de pago" })}</span>
+                  <CompactSelect
+                    className="invoice-filter-select"
+                    ariaLabel={t("finance.treasury.invoices.reimbursements.filterInstrument", { defaultValue: "Filtrar medio" })}
+                    value={reimbursementInstrumentFilter}
+                    onChange={setReimbursementInstrumentFilter}
+                    options={reimbursementInstrumentOptions}
+                  />
+                </label>
+                <label className="invoice-reimbursement-filter-field">
+                  <span>{t("finance.treasury.invoices.reimbursements.status", { defaultValue: "Estado" })}</span>
+                  <CompactSelect
+                    className="invoice-filter-select"
+                    ariaLabel={t("finance.treasury.invoices.reimbursements.filterStatus", { defaultValue: "Filtrar estado" })}
+                    value={reimbursementStatusFilter}
+                    onChange={setReimbursementStatusFilter}
+                    options={reimbursementStatusOptions}
+                  />
+                </label>
                 <label className="invoice-reimbursement-date-filter">
                   <span>{t("finance.treasury.invoices.reimbursements.cycleStart", { defaultValue: "Ciclo desde" })}</span>
                   <input

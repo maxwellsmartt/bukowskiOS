@@ -20435,18 +20435,21 @@ input[type="number"] {
 }
 
 .invoice-reimbursement-filters {
-  align-items: end;
+  align-items: start;
   display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  margin-bottom: 10px;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 2px 0 12px;
 }
 
+.invoice-reimbursement-filter-field,
 .invoice-reimbursement-date-filter {
   display: grid;
-  gap: 4px;
+  gap: 7px;
+  min-width: 0;
 }
 
+.invoice-reimbursement-filter-field span,
 .invoice-reimbursement-date-filter span {
   color: var(--text-muted);
   font-size: var(--font-2xs, 11px);
@@ -20455,8 +20458,21 @@ input[type="number"] {
   text-transform: uppercase;
 }
 
+.invoice-reimbursement-filter-field .compact-select-trigger,
 .invoice-reimbursement-date-filter .field-input {
-  min-height: 34px;
+  border-radius: 12px;
+  font-size: var(--font-sm, 12px);
+  height: 38px;
+  min-height: 38px;
+  width: 100%;
+}
+
+.invoice-reimbursement-date-filter .field-input {
+  padding: 0 12px;
+}
+
+.invoice-reimbursement-filter-field .compact-select-trigger {
+  padding: 0 12px;
 }
 
 .invoice-reimbursement-totals {
@@ -20489,6 +20505,18 @@ input[type="number"] {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+@media (max-width: 1120px) {
+  .invoice-reimbursement-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .invoice-reimbursement-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .invoice-reimbursement-card {
