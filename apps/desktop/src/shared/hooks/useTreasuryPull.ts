@@ -17,12 +17,13 @@ const tableConfigs: Array<{ table: TreasuryPullTable; cursorColumn: string }> = 
   { table: "bank_transactions", cursorColumn: "created_at" },
   { table: "transaction_annotations", cursorColumn: "updated_at" },
   { table: "transaction_project_allocations", cursorColumn: "updated_at" },
-  { table: "transaction_links", cursorColumn: "created_at" },
+  { table: "transaction_links", cursorColumn: "updated_at" },
   { table: "counterparty_rules", cursorColumn: "updated_at" },
 ];
 
 const cursorVersions: Partial<Record<TreasuryPullTable, string>> = {
   transaction_annotations: "v2",
+  transaction_links: "v2",
 };
 
 const cursorKey = (workspaceId: string, table: TreasuryPullTable) =>
