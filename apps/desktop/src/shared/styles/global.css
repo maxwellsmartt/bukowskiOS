@@ -45,8 +45,9 @@ body {
   align-items: center;
   justify-content: center;
   padding: 32px;
-  background: rgba(8, 10, 13, 0.78);
-  backdrop-filter: blur(var(--blur-md));
+  background: var(--glass-overlay-bg);
+  backdrop-filter: var(--glass-overlay-filter);
+  -webkit-backdrop-filter: var(--glass-overlay-filter);
 }
 
 .project-setup-modal {
@@ -54,10 +55,12 @@ body {
   grid-template-rows: auto auto 1fr auto;
   width: min(1240px, 100%);
   max-height: min(92vh, 980px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(20, 23, 29, 0.98), rgba(12, 14, 18, 0.98));
-  box-shadow: var(--shadow-modal);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
   overflow: hidden;
 }
 
@@ -2584,18 +2587,19 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(8, 9, 11, 0.72);
-  backdrop-filter: blur(var(--blur-sm));
+  background: var(--glass-overlay-bg);
+  backdrop-filter: var(--glass-overlay-filter);
+  -webkit-backdrop-filter: var(--glass-overlay-filter);
 }
 
 .project-lifecycle-dialog {
   width: min(520px, calc(100vw - 32px));
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01)),
-    #121518;
-  box-shadow: var(--shadow-elevated);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
   isolation: isolate;
   overflow: hidden;
 }
@@ -3661,8 +3665,9 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   padding: max(24px, var(--window-top-safe)) 20px 24px;
   background:
     radial-gradient(circle at 50% 42%, rgba(23, 27, 31, 0.34), rgba(9, 11, 13, 0.72) 58%),
-    rgba(9, 11, 13, 0.42);
-  backdrop-filter: blur(var(--blur-xs)) saturate(0.9);
+    var(--glass-overlay-bg);
+  backdrop-filter: var(--glass-overlay-filter);
+  -webkit-backdrop-filter: var(--glass-overlay-filter);
 }
 
 .command-palette {
@@ -3671,12 +3676,12 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   width: min(760px, calc(100vw - 40px));
   max-height: min(72vh, 760px);
   transform: translateY(-4vh);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 25%),
-    #121518;
-  box-shadow: var(--shadow-soft);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
   overflow: hidden;
 }
 
@@ -7177,8 +7182,9 @@ body.is-resizing-side-rail {
   justify-content: center;
   padding: clamp(24px, 7vh, 90px) 24px;
   overflow-y: auto;
-  background: rgba(6, 8, 11, 0.72);
-  backdrop-filter: blur(6px);
+  background: var(--glass-overlay-bg);
+  backdrop-filter: var(--glass-overlay-filter);
+  -webkit-backdrop-filter: var(--glass-overlay-filter);
   animation: lightbox-fade-in 150ms ease-out;
 }
 
@@ -7189,7 +7195,11 @@ body.is-resizing-side-rail {
   max-height: calc(100vh - clamp(48px, 14vh, 180px));
   overflow-y: auto;
   border-radius: var(--radius-panel);
-  box-shadow: 0 24px 60px rgba(4, 6, 10, 0.5);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  border: 1px solid var(--glass-panel-border);
+  box-shadow: var(--glass-panel-shadow);
 }
 
 .modal-shell-dialog > .surface-card {
@@ -8608,10 +8618,12 @@ button.timeline-signal-chip:focus-visible {
   min-width: 220px;
   max-width: 300px;
   padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 14px;
-  background: rgba(12, 15, 20, 0.96);
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
   pointer-events: none;
 }
 
@@ -10627,8 +10639,9 @@ select.field-input {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(8, 9, 10, 0.52);
-  backdrop-filter: blur(var(--blur-md));
+  background: var(--glass-overlay-bg);
+  backdrop-filter: var(--glass-overlay-filter);
+  -webkit-backdrop-filter: var(--glass-overlay-filter);
 }
 
 .agent-wizard-modal {
@@ -10636,12 +10649,12 @@ select.field-input {
   max-height: min(88vh, 920px);
   overflow: auto;
   padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 20px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01)),
-    #15181c;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.24);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
 }
 
 .agent-wizard-header,
@@ -11218,10 +11231,12 @@ select.field-input {
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border: 1px solid var(--hairline);
+  border: 1px solid var(--glass-panel-border);
   border-radius: var(--radius-md);
-  background: var(--bg-elevated);
-  box-shadow: var(--shadow-elevated);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
 }
 
 .sidebar-user-popover-header {
@@ -12609,12 +12624,12 @@ select.field-input {
   display: grid;
   gap: 2px;
   padding: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01)),
-    #15181c;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
   z-index: 8;
 }
 
@@ -13198,8 +13213,9 @@ select.field-input {
   display: grid;
   place-items: center;
   padding: 18px;
-  background: rgba(5, 7, 10, 0.42);
-  backdrop-filter: blur(10px);
+  background: var(--glass-overlay-bg);
+  backdrop-filter: var(--glass-overlay-filter);
+  -webkit-backdrop-filter: var(--glass-overlay-filter);
   z-index: 10;
 }
 
@@ -13210,12 +13226,12 @@ select.field-input {
   display: grid;
   gap: 14px;
   padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.11);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
-    #171b20;
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
 }
 
 .assistant-chat-receipt-modal-header {
@@ -13783,12 +13799,12 @@ select.field-input {
   display: grid;
   gap: 4px;
   padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01)),
-    #15181c;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
   z-index: 3;
   transform-origin: bottom right;
   animation: assistant-chat-popover-in 120ms ease;
@@ -13919,8 +13935,9 @@ select.field-input {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(6, 7, 8, 0.58);
-  backdrop-filter: blur(var(--blur-xs));
+  background: var(--glass-overlay-bg);
+  backdrop-filter: var(--glass-overlay-filter);
+  -webkit-backdrop-filter: var(--glass-overlay-filter);
 }
 
 .confirm-dialog {
@@ -13929,20 +13946,20 @@ select.field-input {
   flex-direction: column;
   gap: 18px;
   padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 18px;
-  background: #121518;
-  box-shadow: var(--shadow-elevated);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
 }
 
 .invite-member-dialog {
   width: min(620px, calc(100vw - 48px));
   gap: 0;
   padding: 0;
-  border-color: rgba(255, 255, 255, 0.1);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008) 42%),
-    rgba(12, 14, 17, 0.98);
+  border-color: var(--glass-panel-border);
+  background: var(--glass-panel-bg);
   overflow: hidden;
 }
 
@@ -14449,18 +14466,12 @@ select.field-input {
   max-height: min(520px, calc(100vh - var(--notifications-popover-top, 58px) - 18px));
   min-height: 320px;
   overflow: visible;
-  border: 1px solid rgba(214, 221, 231, 0.16);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.025) 38%, rgba(255, 255, 255, 0.015)),
-    radial-gradient(circle at 78% -10%, rgba(154, 183, 229, 0.15), transparent 34%),
-    rgba(8, 10, 13, 0.76);
-  box-shadow:
-    0 24px 72px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.025),
-    inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  backdrop-filter: blur(28px) saturate(1.24);
-  -webkit-backdrop-filter: blur(28px) saturate(1.24);
+  background: var(--glass-panel-bg);
+  box-shadow: var(--glass-panel-shadow);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
   animation: notifications-popover-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -15367,8 +15378,9 @@ select.field-input {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(6, 7, 8, 0.62);
-  backdrop-filter: blur(var(--blur-sm));
+  background: var(--glass-overlay-bg);
+  backdrop-filter: var(--glass-overlay-filter);
+  -webkit-backdrop-filter: var(--glass-overlay-filter);
 }
 
 .onboarding-card {
@@ -15377,10 +15389,12 @@ select.field-input {
   flex-direction: column;
   gap: 14px;
   padding: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 22px;
-  background: linear-gradient(165deg, rgba(214, 179, 122, 0.1), #121518 65%);
-  box-shadow: var(--shadow-modal);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
   animation: onboarding-card-in 240ms ease-out;
 }
 
@@ -15546,9 +15560,11 @@ select.field-input {
   width: 300px;
   padding: 12px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #161a1e;
-  box-shadow: var(--shadow-elevated);
+  border: 1px solid var(--glass-panel-border);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  box-shadow: var(--glass-panel-shadow);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -20095,8 +20111,9 @@ input[type="number"] {
   align-items: center;
   justify-content: center;
   padding: 32px;
-  background: rgba(6, 8, 12, 0.62);
-  backdrop-filter: blur(3px);
+  background: var(--glass-overlay-bg);
+  backdrop-filter: var(--glass-overlay-filter);
+  -webkit-backdrop-filter: var(--glass-overlay-filter);
   animation: document-preview-fade 140ms ease;
 }
 
@@ -20105,10 +20122,12 @@ input[type="number"] {
   flex-direction: column;
   width: min(860px, 92vw);
   max-height: 88vh;
-  background: var(--surface-raised, #14171d);
-  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.08));
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  border: 1px solid var(--glass-panel-border);
   border-radius: var(--radius-md, 14px);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--glass-panel-shadow);
   overflow: hidden;
   animation: document-preview-pop 160ms cubic-bezier(0.2, 0.9, 0.3, 1.1);
 }
@@ -20348,26 +20367,24 @@ input[type="number"] {
 }
 
 .invoice-reimbursement-popover-backdrop {
-  background: rgba(3, 6, 10, 0.74);
-  backdrop-filter: blur(10px) saturate(1.04);
-  -webkit-backdrop-filter: blur(10px) saturate(1.04);
+  background: var(--glass-overlay-bg);
+  backdrop-filter: var(--glass-overlay-filter);
+  -webkit-backdrop-filter: var(--glass-overlay-filter);
   padding: 26px;
 }
 
 .invoice-reimbursement-panel {
-  background:
-    radial-gradient(circle at top left, rgba(126, 183, 178, 0.13), transparent 34%),
-    linear-gradient(135deg, rgba(24, 31, 33, 0.94), rgba(12, 15, 19, 0.96));
-  backdrop-filter: blur(18px) saturate(1.08);
-  -webkit-backdrop-filter: blur(18px) saturate(1.08);
-  border: 1px solid rgba(139, 182, 177, 0.24);
+  background: var(--glass-panel-bg);
+  backdrop-filter: var(--glass-panel-filter);
+  -webkit-backdrop-filter: var(--glass-panel-filter);
+  border: 1px solid var(--glass-panel-border);
   border-radius: 14px;
   margin-bottom: 10px;
   padding: 12px;
 }
 
 .invoice-reimbursement-popover {
-  box-shadow: 0 26px 90px rgba(0, 0, 0, 0.56);
+  box-shadow: var(--glass-panel-shadow);
   display: flex;
   flex-direction: column;
   margin: 0;

@@ -100,6 +100,14 @@
   --blur-sm: 10px;
   --blur-md: 16px;
   --blur-lg: 22px;
+  --glass-overlay-bg: rgba(3, 6, 10, 0.74);
+  --glass-overlay-filter: blur(10px) saturate(1.04);
+  --glass-panel-bg:
+    radial-gradient(circle at top left, rgba(126, 183, 178, 0.13), transparent 34%),
+    linear-gradient(135deg, rgba(24, 31, 33, 0.94), rgba(12, 15, 19, 0.96));
+  --glass-panel-border: rgba(139, 182, 177, 0.24);
+  --glass-panel-filter: blur(18px) saturate(1.08);
+  --glass-panel-shadow: 0 26px 90px rgba(0, 0, 0, 0.56);
 
   /* ========================================================================
    * Typography scale + weights.
