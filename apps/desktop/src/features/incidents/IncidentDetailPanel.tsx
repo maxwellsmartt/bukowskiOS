@@ -41,7 +41,11 @@ type IncidentDetailPanelProps = {
 };
 
 const severityOptions = ["Low", "Medium", "High"] as const;
-const statusOptions = ["Open", "In review", "Resolved"] as const;
+// "Resolved" is intentionally NOT offered here: resolving must go through the
+// Resolve button so resolution notes, financial closure and asset retirement
+// run together. It is only rendered when the incident is already resolved, so
+// the select stays valid and the incident can be explicitly reopened.
+const editableStatusOptions = ["Open", "In review"] as const;
 
 const normalizeOptionalText = (value: string) => {
   const nextValue = value.trim();
@@ -144,7 +148,7 @@ export const IncidentDetailPanel = ({
 
   if (!incident) {
     return (
-      <SurfaceCard title={t("incidents.detail.emptyTitle")}>
+      <SurfaceCard className="incident-detail-card" title={t("incidents.detail.emptyTitle")}>
         <div className="empty-state">{t("incidents.detail.emptyBody")}</div>
       </SurfaceCard>
     );
@@ -152,6 +156,7 @@ export const IncidentDetailPanel = ({
 
   return (
     <SurfaceCard
+      className="incident-detail-card"
       aside={
         <button aria-label={t("incidents.detail.close")} className="icon-ghost-control" onClick={onClose} type="button">
           <X size={14} />
@@ -244,7 +249,7 @@ export const IncidentDetailPanel = ({
           <label className="action-field">
             <span className="action-field-label">{t("incidents.detail.status")}</span>
             <SelectField onChange={(event) => setStatus(event.target.value)} value={status}>
-              {statusOptions.map((option) => (
+              {[...editableStatusOptions, ...(incident.status === "Resolved" ? (["Resolved"] as const) : [])].map((option) => (
                 <option key={option} value={option}>
                   {t(`incidents.statuses.${option}`, { defaultValue: option })}
                 </option>

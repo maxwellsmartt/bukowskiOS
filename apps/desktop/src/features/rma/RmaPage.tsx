@@ -1,7 +1,7 @@
 import { Mail, Plus, SquarePen } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import type { RmaCaseStatus } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
@@ -72,6 +72,34 @@ export const RmaPage = () => {
       setPendingRmaCaseId(null);
     }
   }, [pendingRmaCaseId, snapshot.cases]);
+
+  // Deep links from incidents: ?focus=<caseId> selects an existing case;
+  // ?newForAsset=<assetId> opens the create editor with that asset preselected.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusedRmaCaseId = searchParams.get("focus");
+  const newCaseForAssetId = searchParams.get("newForAsset");
+
+  useEffect(() => {
+    if (focusedRmaCaseId && snapshot.cases.some((row) => row.id === focusedRmaCaseId)) {
+      setActiveRmaCaseId(focusedRmaCaseId);
+    }
+  }, [focusedRmaCaseId, snapshot.cases]);
+
+  useEffect(() => {
+    if (!newCaseForAssetId) {
+      return;
+    }
+
+    setEditorMode("create");
+    setInitialDraft({ assetItems: [{ assetId: newCaseForAssetId, issueSummary: "" }] });
+    setEditorError(null);
+    // Consume the param so re-renders or back navigation don't reopen the editor.
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("newForAsset");
+      return next;
+    }, { replace: true });
+  }, [newCaseForAssetId, setSearchParams]);
 
   const availableAssets = useMemo(
     () => buildAvailableRmaAssets(snapshot.maintenanceAssets, editorMode === "edit" ? detail : null, t("rma.editor.alreadyLinked")),

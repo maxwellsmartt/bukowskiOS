@@ -4917,7 +4917,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   opacity: 0.48;
 }
 
-.packing-empty-state {
+.packing-empty-state,
+.table-empty-state {
   display: grid;
   justify-items: center;
   gap: 7px;
@@ -4928,7 +4929,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   text-align: center;
 }
 
-.packing-empty-state strong {
+.packing-empty-state strong,
+.table-empty-state strong {
   color: var(--text-primary);
   font-size: var(--font-md, 15px);
 }
@@ -4937,7 +4939,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   line-height: 1.45;
 }
 
-.packing-empty-kicker {
+.packing-empty-kicker,
+.table-empty-kicker {
   color: rgba(126, 183, 178, 0.82);
   font-size: var(--font-2xs, 10px);
   font-weight: var(--weight-semibold, 600);
@@ -5355,6 +5358,60 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   margin: 0 0 12px;
   color: var(--text-secondary);
   font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* Incidentes: split rail + viewport fill on the global route, mirroring the
+   packing slips recipe (project mode keeps the bounded rail-table-card). */
+.shell-content-incidents {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.incidents-page-stack--fill {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.incidents-page-stack--fill > .split-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Outranks `.resizable-side-layout.split-layout { align-items: start }`. */
+.incidents-page-stack.incidents-page-stack--fill > .split-layout {
+  align-items: stretch;
+}
+
+.incidents-page-stack--fill > .split-layout > .surface-card {
+  min-height: 0;
+}
+
+.incidents-page-stack--fill .rail-table-card {
+  min-height: 0;
+  max-height: none;
+}
+
+.incidents-page-stack--fill .rail-table-card > .surface-card-body {
+  min-height: 0;
+}
+
+.incidents-page-stack .incident-detail-card {
+  align-self: stretch;
+}
+
+.incidents-page-stack--fill .incident-detail-card {
+  min-height: 0;
+  max-height: none;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.table-empty-state span:last-child {
   line-height: 1.45;
 }
 

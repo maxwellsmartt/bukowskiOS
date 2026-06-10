@@ -1,3 +1,4 @@
+import { Box, Eye, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -11,12 +12,15 @@ import { useRmaSnapshot } from "@features/rma/useRmaData";
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { DataTable } from "@shared/components/DataTable";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { ModalShell } from "@shared/components/ModalShell";
+import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { uiPreferenceKeys } from "@shared/lib/preferences";
 
 import { IncidentReportPanel } from "./IncidentReportPanel";
 import { IncidentDetailPanel } from "./IncidentDetailPanel";
@@ -27,15 +31,15 @@ type IncidentsPageProps = {
   projectName?: string | null;
 };
 
-const incidentSortOptions: Array<ListSortOption<IncidentSortField> & { labelKey: string }> = [
-  { value: "reportedAt", label: "Reported date", labelKey: "incidents.sort.reportedAt" },
-  { value: "title", label: "Title", labelKey: "incidents.sort.title", columnKey: "title" },
-  { value: "asset", label: "Asset", labelKey: "incidents.sort.asset", columnKey: "title" },
-  { value: "project", label: "Project", labelKey: "incidents.sort.project", columnKey: "project" },
-  { value: "responsible", label: "Responsible", labelKey: "incidents.sort.responsible", columnKey: "responsible" },
-  { value: "severity", label: "Severity", labelKey: "incidents.sort.severity", columnKey: "severity" },
-  { value: "costEstimate", label: "Cost estimate", labelKey: "incidents.sort.costEstimate", columnKey: "cost" },
-  { value: "status", label: "Status", labelKey: "incidents.sort.status", columnKey: "status" },
+const incidentSortOptions: Array<ListSortOption<IncidentSortField>> = [
+  { value: "reportedAt", label: "incidents.sort.reportedAt" },
+  { value: "title", label: "incidents.sort.title", columnKey: "title" },
+  { value: "asset", label: "incidents.sort.asset", columnKey: "title" },
+  { value: "project", label: "incidents.sort.project", columnKey: "project" },
+  { value: "responsible", label: "incidents.sort.responsible", columnKey: "responsible" },
+  { value: "severity", label: "incidents.sort.severity", columnKey: "severity" },
+  { value: "costEstimate", label: "incidents.sort.costEstimate", columnKey: "cost" },
+  { value: "status", label: "incidents.sort.status", columnKey: "status" },
 ];
 
 const resolveIncidentStatusTone = (status: string) => {
@@ -50,13 +54,12 @@ const resolveIncidentStatusTone = (status: string) => {
   return "warning" as const;
 };
 
-export const IncidentsPage = ({ projectId = null, projectName = null }: IncidentsPageProps) => {
+export const IncidentsPage = ({ projectId = null }: IncidentsPageProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
-  const { activeProject, projects, refreshProjects } = useShellContext();
+  const { projects, refreshProjects } = useShellContext();
   const isProjectMode = Boolean(projectId);
-  const effectiveProjectName = projectName ?? (isProjectMode ? activeProject?.name ?? null : null);
   const [searchParams] = useSearchParams();
   const incidentControls = useListControls<IncidentSortField, IncidentListQuery>({
     viewKey: isProjectMode ? "project-incidents-list" : "incidents-list",
@@ -128,44 +131,54 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
       : null;
 
   const handleCreateRepairCaseFromIncident = () => {
-    navigate("/rma");
+    navigate(activeIncident?.assetId ? `/rma?newForAsset=${activeIncident.assetId}` : "/rma");
   };
 
-  const handleOpenRepairCaseFromIncident = (_repairCaseId: string) => {
-    navigate("/rma");
+  const handleOpenRepairCaseFromIncident = (repairCaseId: string) => {
+    navigate(`/rma?focus=${repairCaseId}`);
   };
+
+  // Quick triage from the row context menu: Open -> In review without opening
+  // the detail. updateIncident accepts partial patches, so only the status moves.
+  const quickMarkInReview = async (incidentId: string) => {
+    try {
+      setIsSubmittingIncidentDetail(true);
+      const result = await updateIncident({
+        commandId: crypto.randomUUID(),
+        workspaceId: activeWorkspaceId,
+        incidentId,
+        status: "In review",
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+
+      await Promise.all([reload(), activeIncidentId === incidentId ? reloadIncidentDetail() : Promise.resolve()]);
+      toast.success(t("incidents.toasts.updated"), result.summary);
+    } catch (nextError) {
+      toast.error(t("incidents.toasts.updateFailed"), getUserFacingErrorMessage(nextError, t("incidents.toasts.updateFailed")));
+    } finally {
+      setIsSubmittingIncidentDetail(false);
+    }
+  };
+
+  const hasActiveSearch = Boolean(incidentControls.searchValue.trim());
+  const translatedSortOptions = incidentSortOptions.map((option) => ({ ...option, label: t(option.label) }));
 
   return (
-    <div className="page-stack page-stack--fill">
+    <div className={`page-stack incidents-page-stack${isProjectMode ? "" : " incidents-page-stack--fill"}`}>
       <SectionHeader title={t("incidents.title")} />
 
       {error ? <div className="empty-state">{t("incidents.unavailable", { message: error })}</div> : null}
       {catalogError ? <div className="empty-state">{t("incidents.catalogUnavailable", { message: catalogError })}</div> : null}
-      {!isProjectMode && rmaError ? <div className="empty-state">{t("incidents.repairUnavailable", { message: rmaError })}</div> : null}
-
-      <div className="selection-action-bar">
-        <div className="selection-action-copy">
-          <span className="selection-action-title">{t("incidents.actionBar.title")}</span>
-          <span className="selection-action-subtitle">
-            {isProjectMode
-              ? effectiveProjectName ?? t("incidents.actionBar.thisProject")
-              : t("incidents.actionBar.subtitle")}
-          </span>
-        </div>
-        <button
-          className="action-primary-button"
-          onClick={() => {
-            setReportOpen(true);
-            setReportError(null);
-
-          }}
-          type="button"
-        >
-          {t("incidents.actionBar.report")}
-        </button>
-      </div>
+      {rmaError ? <div className="empty-state">{t("incidents.repairUnavailable", { message: rmaError })}</div> : null}
 
       {reportOpen ? (
+        <ModalShell
+          onClose={() => {
+            setReportOpen(false);
+            setReportError(null);
+          }}
+        >
         <IncidentReportPanel
           assetOptions={assets.map((asset) => ({
             id: asset.id,
@@ -215,19 +228,34 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           projects={projects}
           users={catalog.users}
         />
+        </ModalShell>
       ) : null}
 
-      <SurfaceCard className="surface-card--fill" title={t("incidents.cardTitle")}>
-        <ListToolbar
-          activeSortLabel={
-            incidentControls.activeSortOption
-              ? t(
-                  (incidentControls.activeSortOption as ListSortOption<IncidentSortField> & { labelKey?: string }).labelKey ??
-                    incidentControls.activeSortOption.label,
-                  { defaultValue: incidentControls.activeSortOption.label },
-                )
-              : undefined
+      <ResizableSideRailLayout
+        className="split-layout"
+        defaultWidth={420}
+        maxWidth={640}
+        minWidth={320}
+        storageKey={uiPreferenceKeys.splitSideRailWidth}
+      >
+        <SurfaceCard
+          className="rail-table-card"
+          title={t("incidents.cardTitle")}
+          aside={
+            <button
+              className="action-primary-button"
+              onClick={() => {
+                setReportOpen(true);
+                setReportError(null);
+              }}
+              type="button"
+            >
+              {t("incidents.actionBar.report")}
+            </button>
           }
+        >
+        <ListToolbar
+          activeSortLabel={incidentControls.activeSortOption ? t(incidentControls.activeSortOption.label) : undefined}
           onSearchValueChange={incidentControls.setSearchValue}
           onSortByChange={incidentControls.setSortField}
           onToggleSortDirection={incidentControls.toggleSortDirection}
@@ -237,10 +265,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           searchValue={incidentControls.searchValue}
           sortBy={incidentControls.sortBy}
           sortDirection={incidentControls.sortDirection}
-          sortOptions={incidentSortOptions.map((option) => ({
-            ...option,
-            label: t(option.labelKey, { defaultValue: option.label }),
-          }))}
+          sortOptions={translatedSortOptions}
         />
         {isLoading && data.length === 0 ? (
           <TableSkeleton body={t("incidents.loading")} columns={6} />
@@ -248,7 +273,14 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
         <DataTable
           activeRowId={activeIncidentId}
           autoScrollToActiveRow
-          fillParent
+          shellClassName="table-shell-fill"
+          emptyContent={
+            <div className="table-empty-state">
+              <span className="table-empty-kicker">{t(hasActiveSearch ? "incidents.empty.filteredKicker" : "incidents.empty.kicker")}</span>
+              <strong>{t(hasActiveSearch ? "incidents.empty.filteredTitle" : "incidents.empty.title")}</strong>
+              <span>{t(hasActiveSearch ? "incidents.empty.filteredBody" : "incidents.empty.body")}</span>
+            </div>
+          }
           getRowId={(row) => row.id}
           onRowClick={(row) => {
             setActiveIncidentId(row.id);
@@ -258,9 +290,31 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
             {
               key: "open",
               label: t("shared.dataTable.openDetail"),
+              icon: <FileText size={14} />,
               onSelect: (target) => {
                 setActiveIncidentId(target.id);
                 setIncidentDetailError(null);
+              },
+            },
+            {
+              key: "view-asset",
+              label: t("incidents.context.viewAsset"),
+              icon: <Box size={14} />,
+              disabled: !row.assetId,
+              onSelect: (target) => {
+                if (target.assetId) {
+                  navigate(`/assets/${target.assetId}`);
+                }
+              },
+            },
+            {
+              key: "mark-in-review",
+              label: t("incidents.context.markInReview"),
+              icon: <Eye size={14} />,
+              disabled: row.status !== "Open" || isSubmittingIncidentDetail,
+              separatorBefore: true,
+              onSelect: (target) => {
+                void quickMarkInReview(target.id);
               },
             },
           ]}
@@ -331,8 +385,8 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
           setActiveIncidentId(null);
           setIncidentDetailError(null);
         }}
-        onCreateRepairCase={!isProjectMode ? handleCreateRepairCaseFromIncident : undefined}
-        onOpenRepairCase={!isProjectMode ? handleOpenRepairCaseFromIncident : undefined}
+        onCreateRepairCase={handleCreateRepairCaseFromIncident}
+        onOpenRepairCase={handleOpenRepairCaseFromIncident}
         onRefresh={reloadIncidentDetail}
         onResolve={async (value) => {
           if (!activeIncidentId) {
@@ -397,23 +451,7 @@ export const IncidentsPage = ({ projectId = null, projectName = null }: Incident
         }}
         users={catalog.users}
       />
-
-      {!isProjectMode ? (
-        <SurfaceCard
-          title={t("incidents.repair.cardTitle")}
-          subtitle={t("incidents.repair.cardSubtitle")}
-          aside={
-            <button className="action-primary-button" onClick={() => navigate("/rma")} type="button">
-              {t("incidents.repair.open")}
-            </button>
-          }
-        >
-          <p className="surface-card-subtitle">
-            {t("incidents.repair.body")}
-          </p>
-        </SurfaceCard>
-      ) : null}
-
+      </ResizableSideRailLayout>
     </div>
   );
 };

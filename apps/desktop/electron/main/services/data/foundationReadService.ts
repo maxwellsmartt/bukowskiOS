@@ -1811,6 +1811,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
             incidents.id,
             incidents.title,
             COALESCE(assets.internal_code, '—') AS asset_code,
+            incidents.asset_id,
             incidents.project_id,
             COALESCE(projects.name, '—') AS project,
             COALESCE(users.full_name, '—') AS responsible,
@@ -1829,6 +1830,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
       id: string;
       title: string;
       asset_code: string;
+      asset_id: string | null;
       project_id: string | null;
       project: string;
       responsible: string;
@@ -1843,6 +1845,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
         id: row.id,
         title: row.title,
         asset: row.asset_code,
+        assetId: row.asset_id,
         projectId: row.project_id,
         project: row.project,
         responsible: row.responsible,

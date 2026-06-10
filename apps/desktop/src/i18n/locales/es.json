@@ -3740,6 +3740,18 @@
       "resolveFailed": "No se pudo resolver el incidente.",
       "updated": "Incidente actualizado",
       "updateFailed": "No se pudo actualizar el incidente."
+    },
+    "empty": {
+      "kicker": "Sin incidentes",
+      "title": "Todo en orden",
+      "body": "Cuando se reporte un problema con un equipo aparecerá aquí para darle seguimiento.",
+      "filteredKicker": "Sin resultados",
+      "filteredTitle": "Nada coincide con esta búsqueda",
+      "filteredBody": "Prueba con otro término o limpia la búsqueda para ver todos los incidentes."
+    },
+    "context": {
+      "viewAsset": "Ver equipo",
+      "markInReview": "Marcar en revisión"
     }
   },
   "rma": {

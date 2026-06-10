@@ -3736,6 +3736,18 @@
       "resolveFailed": "Unable to resolve incident.",
       "updated": "Incident updated",
       "updateFailed": "Unable to update incident."
+    },
+    "empty": {
+      "kicker": "No incidents",
+      "title": "All clear",
+      "body": "When a problem is reported on an asset it will show up here for follow-up.",
+      "filteredKicker": "No results",
+      "filteredTitle": "Nothing matches this search",
+      "filteredBody": "Try another term or clear the search to see all incidents."
+    },
+    "context": {
+      "viewAsset": "View asset",
+      "markInReview": "Mark in review"
     }
   },
   "rma": {
