@@ -5067,11 +5067,17 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .packing-detail-actions-trigger {
   width: 30px;
   height: 30px;
-  border-color: rgba(126, 183, 178, 0.24);
-  background:
-    radial-gradient(circle at 30% 20%, rgba(126, 183, 178, 0.18), transparent 52%),
-    rgba(17, 22, 24, 0.82);
-  color: rgba(232, 237, 238, 0.9);
+  min-width: 30px;
+  border-color: transparent;
+  background: transparent;
+  color: rgba(232, 237, 238, 0.72);
+}
+
+.packing-detail-actions-trigger:hover {
+  border-color: transparent;
+  background: transparent;
+  color: rgba(232, 237, 238, 0.96);
+  transform: translateY(-1px);
 }
 
 .packing-detail-actions-popover {
