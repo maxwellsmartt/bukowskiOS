@@ -2053,6 +2053,14 @@
       "filteredTitle": "No hay slips con estos filtros.",
       "filteredBody": "Prueba limpiar la búsqueda o cambiar el filtro rápido para volver a ver la lista completa."
     },
+    "context": {
+      "open": "Abrir",
+      "exportPdf": "Exportar packing slip",
+      "exportInsurance": "Exportar seguro",
+      "printPdf": "Imprimir packing slip (próximamente)",
+      "printInsurance": "Imprimir seguro (próximamente)",
+      "returnPending": "Devolver pendientes"
+    },
     "sort": {
       "issuedDate": "Fecha de emisión",
       "dueDate": "Fecha de retorno",

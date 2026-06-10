@@ -1,5 +1,5 @@
-import { MoreHorizontal } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { FileText, MoreHorizontal, Printer, RotateCcw, ShieldCheck, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
@@ -85,6 +85,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const [isBatchExportingPdf, setIsBatchExportingPdf] = useState(false);
   const [isBatchExportingInsurancePdf, setIsBatchExportingInsurancePdf] = useState(false);
   const [selectionActionsOpen, setSelectionActionsOpen] = useState(false);
+  const selectionActionsRef = useRef<HTMLDivElement | null>(null);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = usePackingDetail(activePackingSlipId);
   const focusedPackingSlipId = searchParams.get("focus");
   const translatedSortOptions = packingSortOptions.map((option) => ({ ...option, label: t(option.label) }));
@@ -164,6 +165,83 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
       setSelectionActionsOpen(false);
     }
   }, [selectedRowIds.length]);
+
+  useEffect(() => {
+    if (!selectionActionsOpen) {
+      return undefined;
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (selectionActionsRef.current?.contains(event.target as Node)) {
+        return;
+      }
+      setSelectionActionsOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelectionActionsOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [selectionActionsOpen]);
+
+  const openPackingSlip = (packingSlipId: string) => {
+    setActivePackingSlipId(packingSlipId);
+    writePreference(uiPreferenceKeys.activePackingSlipId, packingSlipId);
+    setReturnError(null);
+  };
+
+  const exportSinglePackingSlip = async (packingSlipId: string, type: "pdf" | "insurance") => {
+    const setBusy = type === "pdf" ? setIsBatchExportingPdf : setIsBatchExportingInsurancePdf;
+    const exportOne = type === "pdf" ? exportPackingSlipPdf : exportPackingSlipInsurancePdf;
+    setBusy(true);
+    try {
+      const result = await exportOne(packingSlipId);
+      setReturnError(null);
+      if (result.saved) {
+        toast.success(t("packing.toasts.doneTitle"), result.summary);
+      }
+    } catch (nextError) {
+      setReturnError(
+        getUserFacingErrorMessage(
+          nextError,
+          t(type === "pdf" ? "packing.toasts.unableExportSlip" : "packing.toasts.unableExportInsurance"),
+        ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const returnPendingForSlip = async (packingSlipId: string) => {
+    try {
+      setIsSubmittingReturn(true);
+      const result = await returnPackingSlipItems({
+        commandId: crypto.randomUUID(),
+        workspaceId: activeWorkspaceId,
+        packingSlipId,
+        assetIds: [],
+        conditionIn: "Good",
+        actorType: "user",
+        sourceChannel: "desktop",
+      });
+
+      openPackingSlip(packingSlipId);
+      await reload();
+      setReturnError(null);
+      toast.success(t("packing.toasts.doneTitle"), result.summary);
+    } catch (nextError) {
+      setReturnError(getUserFacingErrorMessage(nextError, t("packing.toasts.unableReturn")));
+    } finally {
+      setIsSubmittingReturn(false);
+    }
+  };
 
   const exportSelectedPackingSlips = async (type: "pdf" | "insurance") => {
     if (!selectedPackingSlips.length) {
@@ -271,14 +349,13 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
                     if (!firstSelectedPackingSlip) {
                       return;
                     }
-                    setActivePackingSlipId(firstSelectedPackingSlip.id);
-                    setReturnError(null);
+                    openPackingSlip(firstSelectedPackingSlip.id);
                   }}
                   type="button"
                 >
                   {t("packing.selection.openFirst")}
                 </button>
-                <div className="packing-selection-more">
+                <div className="packing-selection-more" ref={selectionActionsRef}>
                   <button
                     aria-expanded={selectionActionsOpen}
                     className="ghost-control icon-control"
@@ -416,16 +493,58 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
                 : null
             }
             onRowClick={(row) => {
-              setActivePackingSlipId(row.id);
-              setReturnError(null);
+              openPackingSlip(row.id);
             }}
             rowActions={(row) => [
               {
                 key: "open",
-                label: t("shared.dataTable.openDetail"),
+                label: t("packing.context.open"),
+                icon: <FileText size={14} />,
                 onSelect: (target) => {
-                  setActivePackingSlipId(target.id);
-                  setReturnError(null);
+                  openPackingSlip(target.id);
+                },
+              },
+              {
+                key: "export-pdf",
+                label: t("packing.context.exportPdf"),
+                icon: <Upload size={14} />,
+                disabled: isBatchExportingPdf,
+                onSelect: (target) => {
+                  void exportSinglePackingSlip(target.id, "pdf");
+                },
+              },
+              {
+                key: "export-insurance",
+                label: t("packing.context.exportInsurance"),
+                icon: <ShieldCheck size={14} />,
+                disabled: isBatchExportingInsurancePdf,
+                onSelect: (target) => {
+                  void exportSinglePackingSlip(target.id, "insurance");
+                },
+              },
+              {
+                key: "print-pdf",
+                label: t("packing.context.printPdf"),
+                icon: <Printer size={14} />,
+                disabled: true,
+                separatorBefore: true,
+                onSelect: () => undefined,
+              },
+              {
+                key: "print-insurance",
+                label: t("packing.context.printInsurance"),
+                icon: <Printer size={14} />,
+                disabled: true,
+                onSelect: () => undefined,
+              },
+              {
+                key: "return-pending",
+                label: t("packing.context.returnPending"),
+                icon: <RotateCcw size={14} />,
+                disabled: isSubmittingReturn || Math.max(0, row.itemCount - row.returnedCount) < 1,
+                separatorBefore: true,
+                onSelect: (target) => {
+                  void returnPendingForSlip(target.id);
                 },
               },
             ]}

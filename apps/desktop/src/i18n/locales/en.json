@@ -2049,6 +2049,14 @@
       "filteredTitle": "No slips match these filters.",
       "filteredBody": "Try clearing search or changing the quick filter to see the full list again."
     },
+    "context": {
+      "open": "Open",
+      "exportPdf": "Export packing slip",
+      "exportInsurance": "Export insurance",
+      "printPdf": "Print packing slip (coming soon)",
+      "printInsurance": "Print insurance (coming soon)",
+      "returnPending": "Return pending"
+    },
     "sort": {
       "issuedDate": "Issued date",
       "dueDate": "Due date",
