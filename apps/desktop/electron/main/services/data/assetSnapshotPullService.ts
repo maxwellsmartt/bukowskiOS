@@ -105,7 +105,13 @@ const ensureCategory = (db: DatabaseSync, workspaceId: string, categoryId: strin
   const existing = existsById(db, "asset_categories", categoryId);
   if (existing) return categoryId;
 
-  const suffix = categoryId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase() || "REMOTE";
+  // The placeholder code must be unique per (workspace, code). Deriving it from
+  // a short prefix of the id collides for every "category-…" id: the first
+  // placeholder wins, INSERT OR IGNORE swallows the rest (OR IGNORE does not
+  // apply to FK failures, but it does to UNIQUE), and every asset in those
+  // categories then dies on the assets.category_id FK — permanently, because
+  // the pull cursor advances past them. Use the full sanitized id instead.
+  const suffix = categoryId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() || "REMOTE";
   const code = `REMOTE-${suffix}`;
   db
     .prepare(

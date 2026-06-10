@@ -9,8 +9,20 @@ import { immediatePullEvent } from "./useWorkspaceDataRefresh";
 const POLL_INTERVAL_MS = 60_000;
 const PULL_BATCH_SIZE = 200;
 const MAX_BATCHES_PER_PASS = 5;
+// Same recovery window as useOperationalSnapshotPull: rows that failed to
+// apply (e.g. FK parent had not synced yet) are retried on every pass instead
+// of being lost forever behind an advanced cursor. The apply service skips
+// already-applied rows by updated_at, so re-reading the window is idempotent.
+const CURSOR_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
 
 const cursorKey = (workspaceId: string) => `bukowski:asset-snapshot-pull-cursor:${workspaceId}`;
+
+const getCursorWithLookback = (cursor: string | null) => {
+  if (!cursor) return null;
+  const time = Date.parse(cursor);
+  if (Number.isNaN(time)) return cursor;
+  return new Date(Math.max(0, time - CURSOR_LOOKBACK_MS)).toISOString();
+};
 
 const readCursor = (key: string): string | null => {
   try {
@@ -135,6 +147,10 @@ export const useAssetSnapshotPull = () => {
       try {
         const key = cursorKey(activeWorkspaceId);
         let cursor = readCursor(key);
+        // Rewind only the first batch of the pass; later batches page forward
+        // from the applied cursor so a window larger than one batch still
+        // advances instead of re-reading the same head rows.
+        let effectiveCursor = getCursorWithLookback(cursor);
 
         for (let batch = 0; batch < MAX_BATCHES_PER_PASS; batch += 1) {
           const stateQuery = remote
@@ -144,8 +160,8 @@ export const useAssetSnapshotPull = () => {
             .order("updated_at", { ascending: true })
             .limit(PULL_BATCH_SIZE);
 
-          const { data: stateRows, error: stateError } = await (cursor
-            ? stateQuery.gt("updated_at", cursor)
+          const { data: stateRows, error: stateError } = await (effectiveCursor
+            ? stateQuery.gt("updated_at", effectiveCursor)
             : stateQuery);
           if (stateError) {
             console.warn("[asset-snapshot-pull] State pull failed", stateError);
@@ -180,7 +196,12 @@ export const useAssetSnapshotPull = () => {
 
           if (result.cursorAfter) {
             cursor = result.cursorAfter;
+            effectiveCursor = result.cursorAfter;
             writeCursor(key, cursor);
+          } else {
+            // Nothing applied (all rows skipped); still move past this batch
+            // so the pass can keep paging instead of spinning on the head.
+            effectiveCursor = states[states.length - 1]?.updated_at ?? effectiveCursor;
           }
 
           if (states.length < PULL_BATCH_SIZE || result.errors.length > 0) {
