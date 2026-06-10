@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, session } from "electron";
+import { app, BrowserWindow, dialog, Menu, session } from "electron";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { format } from "date-fns";
@@ -400,6 +400,24 @@ app.whenReady().then(async () => {
       errorMessage: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
+
+    // A key-integrity failure is recoverable by the user (wrong app name /
+    // keychain entry) but fatal if "recovered" automatically. Tell them what
+    // to do and quit instead of crashing into the recovery path.
+    if (error instanceof Error && error.name === "DatabaseKeyIntegrityError") {
+      dialog.showErrorBox(
+        "No se pudo abrir la base de datos local",
+        "La base de datos está cifrada pero la llave del Keychain no corresponde.\n\n" +
+          "Esto suele pasar cuando el app corre con otro nombre (por ejemplo un build de desarrollo " +
+          "lanzado desde otra carpeta), porque macOS resuelve otra entrada del Keychain.\n\n" +
+          "Abre el app con el nombre correcto (bukowskiOS). NO borres la base de datos ni el archivo " +
+          "bukowski-db-key.json: tus datos están intactos.\n\nDetalle: " +
+          error.message,
+      );
+      app.exit(1);
+      return;
+    }
+
     throw error;
   }
   const documentGeneration = createDocumentGenerationService();

@@ -87,7 +87,7 @@ import { applySchedulingFoundationMigration, bootstrapSchedulingFoundation } fro
 import { createSupportDiagnosticsService, type SupportDiagnosticsService } from "./supportDiagnosticsService";
 import { createSyncOutboxWorkerService, summarizeSyncOutboxWorker } from "./syncOutboxWorkerService";
 import { createUserAdminService, type UserAdminService } from "./userAdminService";
-import { createLocalDatabaseKeyStore } from "../auth/databaseKeyStore";
+import { createLocalDatabaseKeyStore, DatabaseKeyIntegrityError } from "../auth/databaseKeyStore";
 import { getFreshStoredAccessToken } from "../auth/supabaseAuthBridge";
 import { createWorkspaceAccessGuard, type WorkspaceAccessGuard } from "../auth/workspaceAccessGuard";
 import { createConnectorBridgeService } from "../connectors/connectorBridgeService";
@@ -591,6 +591,13 @@ const withRecoveredDatabase = async (databasePath: string, backupPath: string) =
       migrationPerformed: result.migrationPerformed,
     };
   } catch (error) {
+    // A key problem is NOT database corruption: the file on disk is fine and
+    // the backup is encrypted with the same key, so restoring it would only
+    // destroy data newer than the backup and fail the same way. Abort instead.
+    if (error instanceof DatabaseKeyIntegrityError) {
+      throw error;
+    }
+
     lastIntegrityCheckAt = new Date().toISOString();
     lastIntegrityCheckStatus = "failed";
 

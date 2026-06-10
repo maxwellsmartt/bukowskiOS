@@ -2,7 +2,7 @@ import fs from "node:fs";
 import type { DatabaseSync as NativeDatabaseSync } from "node:sqlite";
 
 import { ensurePrivateFile } from "../../security/storagePrivacy";
-import type { LocalDatabaseKeyStore } from "../auth/databaseKeyStore";
+import { DatabaseKeyIntegrityError, type LocalDatabaseKeyStore } from "../auth/databaseKeyStore";
 import { createDatabaseBackup, runIntegrityChecks } from "./localDatabaseSupport";
 import { DatabaseSync } from "./nodeSqliteShim";
 
@@ -102,7 +102,24 @@ export const openOrMigrateEncryptedDatabase = async ({
   const databaseExists = fs.existsSync(databasePath);
   const startedPlaintext = databaseExists ? isPlaintextSqliteDatabase(databasePath) : false;
 
-  const key = await keyStore.ensureKey();
+  // An already-encrypted database can only ever open with its existing key:
+  // generating a fresh one here (ensureKey) would overwrite the manifest and
+  // orphan the data permanently. Only fresh installs and plaintext databases
+  // about to be migrated may mint a key.
+  let key: Buffer;
+  if (databaseExists && !startedPlaintext) {
+    const existingKey = await keyStore.getKey();
+    if (!existingKey) {
+      throw new DatabaseKeyIntegrityError(
+        "The local database is encrypted but no key is available in the secret store. " +
+          "Restore the key (or the keychain entry that decrypts it) instead of regenerating it; " +
+          "a regenerated key can never open this database.",
+      );
+    }
+    key = existingKey;
+  } else {
+    key = await keyStore.ensureKey();
+  }
 
   if (!databaseExists) {
     return {
