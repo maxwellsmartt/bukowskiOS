@@ -153,7 +153,7 @@ export const IncidentDetailPanel = ({
   return (
     <SurfaceCard
       aside={
-        <button aria-label={t("incidents.detail.close")} className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("incidents.detail.close")} className="icon-ghost-control" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }

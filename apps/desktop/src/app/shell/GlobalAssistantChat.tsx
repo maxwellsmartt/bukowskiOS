@@ -1489,7 +1489,7 @@ export const GlobalAssistantChat = () => {
               </div>
               <button
                 aria-label={t("assistantChat.actions.close")}
-                className="surface-card-action"
+                className="icon-ghost-control"
                 data-tooltip={t("assistantChat.actions.close")}
                 onClick={close}
                 type="button"
@@ -2028,7 +2028,7 @@ export const GlobalAssistantChat = () => {
                   </div>
                   <button
                     aria-label={t("assistantChat.actions.closeOperationalReceipt")}
-                    className="surface-card-action"
+                    className="icon-ghost-control"
                     data-tooltip={t("assistantChat.actions.closeOperationalReceipt")}
                     onClick={() => setReceiptSessionId(null)}
                     type="button"

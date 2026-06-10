@@ -2369,7 +2369,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
                 aside={
                   <button
                     aria-label={t("assets.quickPreview.closeAria")}
-                    className="surface-card-action"
+                    className="icon-ghost-control"
                     onClick={() => setSelectedAssetId(null)}
                     type="button"
                   >

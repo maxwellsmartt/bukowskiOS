@@ -243,7 +243,7 @@ export const AgentWizardPanel = ({
             <span className="agent-wizard-step-label">{t("agents.wizard.stepLabel", { step, total: 2 })}</span>
             <h2 className="agent-wizard-title">{step === 1 ? t("agents.wizard.createTitle") : t("agents.wizard.reviewTitle")}</h2>
           </div>
-          <button aria-label={t("agents.wizard.close")} className="surface-card-action" onClick={onClose} type="button">
+          <button aria-label={t("agents.wizard.close")} className="icon-ghost-control" onClick={onClose} type="button">
             <X size={16} />
           </button>
         </header>

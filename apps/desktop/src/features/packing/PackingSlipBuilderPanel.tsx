@@ -111,7 +111,7 @@ export const PackingSlipBuilderPanel = ({
   return (
     <SurfaceCard
       aside={
-        <button aria-label={t("packing.builder.closeAria")} className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("packing.builder.closeAria")} className="icon-ghost-control" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }

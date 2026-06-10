@@ -174,7 +174,7 @@ export const InviteMemberDialog = ({
           </div>
           <button
             aria-label={t("settings.workspace.inviteDialog.close")}
-            className="surface-card-action"
+            className="icon-ghost-control"
             onClick={onClose}
             type="button"
             style={{ marginLeft: "auto" }}

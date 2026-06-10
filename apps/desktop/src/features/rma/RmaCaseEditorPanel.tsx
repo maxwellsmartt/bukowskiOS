@@ -137,7 +137,7 @@ export const RmaCaseEditorPanel = ({
   return (
     <SurfaceCard
       aside={
-        <button aria-label={t("rma.editor.close")} className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("rma.editor.close")} className="icon-ghost-control" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Archive, Check, Copy, CreditCard, Eye, EyeOff, KeyRound, Pencil, Plus, ReceiptText, RefreshCw, Repeat2, Save, UsersRound, X } from "lucide-react";
+import { Archive, Check, Copy, CreditCard, Eye, EyeOff, Info, KeyRound, Pencil, Plus, ReceiptText, RefreshCw, Repeat2, Save, UsersRound, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 
@@ -588,9 +588,17 @@ export const AssetLicensesPage = () => {
               <input className="field-input" min="0" onChange={(event) => updateDraftSeatCount(event.target.value)} type="number" value={draft.seatCount} />
             </label>
             <label className="field-block">
-              <span className="field-label">{t("assets.licenses.fields.renewalReminder")}</span>
+              <span className="field-label">
+                {t("assets.licenses.fields.renewalReminder")}
+                <span
+                  aria-label={t("assets.licenses.hints.reminderZero")}
+                  className="field-info-trigger"
+                  data-tooltip={t("assets.licenses.hints.reminderZero")}
+                >
+                  <Info size={12} />
+                </span>
+              </span>
               <input className="field-input" min="0" onChange={(event) => updateDraft("reminderDaysBefore", event.target.value)} type="number" value={draft.reminderDaysBefore} />
-              <small className="field-hint">{t("assets.licenses.hints.reminderZero")}</small>
             </label>
             {draft.licenseType !== "perpetual" && draft.licenseType !== "trial" ? (
               <label className="field-block">

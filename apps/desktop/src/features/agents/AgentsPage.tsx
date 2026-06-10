@@ -183,7 +183,7 @@ export const AgentsPage = () => {
               <div className="surface-card-actions">
                 <button
                   aria-label={t("agents.team.closeDetail")}
-                  className="surface-card-action"
+                  className="icon-ghost-control"
                   onClick={() => setSelectedAgentId(null)}
                   type="button"
                 >

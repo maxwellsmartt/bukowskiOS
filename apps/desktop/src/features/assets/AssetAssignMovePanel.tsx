@@ -185,7 +185,7 @@ export const AssetAssignMovePanel = ({
   return (
     <SurfaceCard
       aside={
-        <button aria-label={t("assets.assignMove.close")} className="surface-card-action" onClick={onClose} type="button">
+        <button aria-label={t("assets.assignMove.close")} className="icon-ghost-control" onClick={onClose} type="button">
           <X size={14} />
         </button>
       }

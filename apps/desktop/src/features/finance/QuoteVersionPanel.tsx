@@ -195,7 +195,7 @@ export const QuoteVersionPanel = ({
           <button
             type="button"
             aria-label={t("finance.quotes.editor.versions.panelClose")}
-            className="surface-card-action"
+            className="icon-ghost-control"
             onClick={onClose}
           >
             <X size={14} />

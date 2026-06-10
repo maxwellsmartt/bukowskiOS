@@ -179,7 +179,7 @@ export const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps)
             />
           </div>
 
-          <button aria-label={t("shell.search.close")} className="surface-card-action" onClick={onClose} type="button">
+          <button aria-label={t("shell.search.close")} className="icon-ghost-control" onClick={onClose} type="button">
             <X size={14} />
           </button>
         </div>

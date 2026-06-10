@@ -1224,7 +1224,7 @@ export const CatalogPage = () => {
             aside={
               <button
                 aria-label={t("catalog.actions.closePreview")}
-                className="surface-card-action"
+                className="icon-ghost-control"
                 onClick={() => setActivePreviewIds((current) => ({ ...current, [activeTab]: null }))}
                 type="button"
               >

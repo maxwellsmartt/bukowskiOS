@@ -11371,9 +11371,19 @@ button.timeline-signal-chip:focus-visible {
   min-height: 26px;
 }
 
-.field-block .field-hint {
+/* Small info affordance next to a field label; the copy lives in the floating
+   tooltip so the field grid stays aligned. */
+.field-info-trigger {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
   color: var(--text-muted);
-  font-size: 10.5px;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.field-info-trigger:hover {
+  color: var(--text-secondary);
 }
 
 .license-refresh-button {
