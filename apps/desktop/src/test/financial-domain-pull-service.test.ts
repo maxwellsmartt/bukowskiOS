@@ -356,6 +356,76 @@ describe("financialDomainPullService", () => {
     cleanup();
   });
 
+  it("advances the cursor past rows that fail with a permanent constraint violation", () => {
+    const { cleanup, database } = createTestDatabase("bukowski-financial-pull-constraint-cursor");
+    const workspaceId = "workspace-metadata";
+    const service = createFinancialDomainPullService(database);
+
+    service.applyRemoteTreasuryRows(workspaceId, "bank_accounts", [
+      {
+        id: "card-remote-user-002",
+        workspace_id: workspaceId,
+        bank_name: "popular",
+        account_label: "Visa empresa terminada 9876",
+        account_number_masked: "****9876",
+        account_number_full: null,
+        owner: "user",
+        owner_user_id: null,
+        owner_user_name_snapshot: "Carlos",
+        instrument_kind: "credit_card",
+        last4: "9876",
+        issuer: "Banco Popular",
+        statement_cycle_day: 15,
+        payment_due_day: 30,
+        reminder_user_id: null,
+        currency: "DOP",
+        account_type: "other",
+        opening_balance: 0,
+        opening_balance_date: null,
+        is_active: 1,
+        notes: null,
+        created_at: "2026-06-08T10:00:00.000Z",
+        updated_at: "2026-06-08T10:00:00.000Z",
+      },
+    ]);
+
+    const baseLink = {
+      workspace_id: workspaceId,
+      transaction_id: null,
+      payment_instrument_id: "card-remote-user-002",
+      linked_entity_type: "invoice_extraction",
+      linked_entity_id: "invoice-extraction-remote-dup",
+      amount_applied: 500,
+      amount_currency: "DOP",
+      fx_rate: null,
+      allocation_status: "pending",
+      cycle_start: "2026-06-01",
+      cycle_end: "2026-06-30",
+      notes: null,
+      created_at: "2026-06-08T10:01:00.000Z",
+      updated_at: "2026-06-08T10:01:00.000Z",
+    };
+
+    const firstPull = service.applyRemoteTreasuryRows(workspaceId, "transaction_links", [
+      { ...baseLink, id: "txn-link-dedupe-original" },
+    ]);
+    expect(firstPull.appliedCount).toBe(1);
+
+    // Same dedupe key (entity + instrument) under a different id: the upsert
+    // conflicts on idx_txn_links_dedupe_v4 and can never succeed. The cursor
+    // must still advance so the puller does not re-fetch this row forever.
+    const conflictPull = service.applyRemoteTreasuryRows(workspaceId, "transaction_links", [
+      { ...baseLink, id: "txn-link-dedupe-divergent", updated_at: "2026-06-09T08:00:00.000Z" },
+    ]);
+
+    expect(conflictPull.appliedCount).toBe(0);
+    expect(conflictPull.errors).toHaveLength(1);
+    expect(conflictPull.errors[0]).toContain("idx_txn_links_dedupe_v4");
+    expect(conflictPull.cursorAfter).toBe("2026-06-09T08:00:00.000Z");
+
+    cleanup();
+  });
+
   it("skips transaction links only when a non-null transaction_id is missing", () => {
     const { cleanup, database } = createTestDatabase("bukowski-financial-pull-missing-link-transaction");
     const workspaceId = "workspace-metadata";

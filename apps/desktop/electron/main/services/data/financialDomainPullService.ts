@@ -485,6 +485,15 @@ const applyRows = <TTable extends TreasuryPullTable | CollaboratorPaymentPullTab
         const message = error instanceof Error ? error.message : "Unknown financial pull error.";
         result.errors.push(`${String(rawRow[config.entityIdColumn] ?? rawRow.id ?? table)}: ${message}`);
         logger.warn("Financial domain pull row failed.", { table, error: message });
+        // A constraint violation is permanent for this row payload: retrying it can
+        // never succeed, and refusing to advance the cursor traps the puller in a
+        // hot retry loop over the same batch (starving every other IPC call). Consume
+        // the row's cursor so the pull keeps moving; the error stays recorded in
+        // sync_pull_cursors.last_error for diagnosis. Transient errors still hold
+        // the cursor back so those rows are retried.
+        if (/constraint failed/i.test(message)) {
+          markCursorApplied();
+        }
       }
     }
 
