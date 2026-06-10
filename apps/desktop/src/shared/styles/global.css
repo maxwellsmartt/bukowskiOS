@@ -5139,7 +5139,11 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   opacity: 0.48;
 }
 
-.packing-detail-card {
+/* `.detail-rail-card` is the generic alias for this chrome: every side-rail
+   detail panel (packing, incidents, repair cases) shares the same tinted
+   gradient card and summary typography so the rails read as one family. */
+.packing-detail-card,
+.detail-rail-card {
   min-width: 0;
   min-height: 0;
   align-self: start;
@@ -5153,7 +5157,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
     linear-gradient(145deg, rgba(25, 33, 35, 0.94), rgba(16, 18, 22, 0.96));
 }
 
-.packing-detail-card .surface-card-header {
+.packing-detail-card .surface-card-header,
+.detail-rail-card .surface-card-header {
   align-items: flex-start;
 }
 
@@ -5170,7 +5175,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   background: rgba(7, 10, 12, 0.26);
 }
 
-.packing-detail-card .summary-label {
+.packing-detail-card .summary-label,
+.detail-rail-card .summary-label {
   color: rgba(166, 178, 190, 0.74);
   font-size: var(--font-2xs, 10px);
   font-weight: var(--weight-semibold, 600);
@@ -5178,7 +5184,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   text-transform: uppercase;
 }
 
-.packing-detail-card .summary-value {
+.packing-detail-card .summary-value,
+.detail-rail-card .summary-value {
   color: rgba(246, 248, 250, 0.94);
   font-size: var(--font-sm, 13px);
   font-weight: var(--weight-semibold, 600);
@@ -5190,7 +5197,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   font-size: var(--font-md, 15px);
 }
 
-.packing-detail-card .summary-meta {
+.packing-detail-card .summary-meta,
+.detail-rail-card .summary-meta {
   display: block;
   margin-top: 4px;
   overflow: hidden;
@@ -5413,6 +5421,56 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 }
 
 .incidents-page-stack--fill .incident-detail-card {
+  min-height: 0;
+  max-height: none;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Casos de reparación: same viewport-fill recipe. The maintenance watch card
+   keeps its natural height on top; the cases split rail takes the rest. */
+.shell-content-rma {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.rma-page-stack--fill {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.rma-page-stack--fill > .split-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Outranks `.resizable-side-layout.split-layout { align-items: start }`. */
+.rma-page-stack.rma-page-stack--fill > .split-layout {
+  align-items: stretch;
+}
+
+.rma-page-stack--fill > .split-layout > .surface-card {
+  min-height: 0;
+}
+
+.rma-page-stack--fill .rail-table-card {
+  min-height: 0;
+  max-height: none;
+}
+
+.rma-page-stack--fill .rail-table-card > .surface-card-body {
+  min-height: 0;
+}
+
+.rma-page-stack .rma-detail-card {
+  align-self: stretch;
+}
+
+.rma-page-stack--fill .rma-detail-card {
   min-height: 0;
   max-height: none;
   height: 100%;
@@ -10304,15 +10362,28 @@ button.timeline-signal-chip:focus-visible {
   color: var(--text-muted);
 }
 
+/* Amber callout: the repair follow-up is the one action the operator must not
+   miss on a damaged asset, so it reads as a warning band with a green
+   (go-ahead) action instead of blending into the card. */
 .incident-repair-handoff {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   padding: 14px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--status-warning-border);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--status-warning-bg);
+}
+
+.incident-repair-handoff .ghost-control {
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+  color: var(--status-success-fg);
+}
+
+.incident-repair-handoff .ghost-control:hover:not(:disabled) {
+  border-color: var(--status-success-fg);
 }
 
 .incident-repair-handoff-copy {
@@ -10322,7 +10393,7 @@ button.timeline-signal-chip:focus-visible {
 }
 
 .incident-repair-handoff-copy strong {
-  color: var(--text-primary);
+  color: var(--status-warning-fg);
   font-size: 13px;
 }
 

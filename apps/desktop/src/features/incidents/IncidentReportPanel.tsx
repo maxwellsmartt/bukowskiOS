@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
 import { useProjectDetail } from "@features/projects/useProjectsData";
+import { SearchSelect } from "@shared/components/SearchSelect";
 import { SelectField } from "@shared/components/SelectField";
 
 export type IncidentAssetOption = {
@@ -132,26 +133,36 @@ export const IncidentReportPanel = ({
       <div className="action-form-grid">
         <label className="action-field">
           <span className="action-field-label">{t("incidents.report.asset")}</span>
-          <SelectField disabled={assetLocked} onChange={(event) => setAssetId(event.target.value)} value={assetId}>
-            <option value="">{t("incidents.report.noAsset")}</option>
-            {assetOptions.map((asset) => (
-              <option key={asset.id} value={asset.id}>
-                {asset.code} · {asset.name}
-              </option>
-            ))}
-          </SelectField>
+          <SearchSelect
+            ariaLabel={t("incidents.report.asset")}
+            disabled={assetLocked}
+            emptyOptionLabel={t("incidents.report.noAsset")}
+            onChange={setAssetId}
+            options={assetOptions.map((asset) => ({
+              value: asset.id,
+              label: `${asset.code} · ${asset.name}`,
+            }))}
+            placeholder={t("incidents.report.noAsset")}
+            searchPlaceholder={t("shared.searchSelect.assetPlaceholder")}
+            value={assetId}
+          />
         </label>
 
         <label className="action-field">
           <span className="action-field-label">{t("incidents.report.project")}</span>
-          <SelectField disabled={projectLocked} onChange={(event) => setProjectId(event.target.value)} value={projectId}>
-            <option value="">{t("incidents.report.noProject")}</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.code} · {project.name}
-              </option>
-            ))}
-          </SelectField>
+          <SearchSelect
+            ariaLabel={t("incidents.report.project")}
+            disabled={projectLocked}
+            emptyOptionLabel={t("incidents.report.noProject")}
+            onChange={setProjectId}
+            options={projects.map((project) => ({
+              value: project.id,
+              label: `${project.code} · ${project.name}`,
+            }))}
+            placeholder={t("incidents.report.noProject")}
+            searchPlaceholder={t("shared.searchSelect.projectPlaceholder")}
+            value={projectId}
+          />
         </label>
 
         <label className="action-field">

@@ -324,7 +324,7 @@ export const RmaPage = () => {
   const isEmpty = !snapshotError && snapshot.cases.length === 0 && !editorMode;
 
   return (
-    <div className="page-stack">
+    <div className={`page-stack rma-page-stack${isEmpty ? "" : " rma-page-stack--fill"}`}>
       <SectionHeader
         title={t("rma.title")}
         body={t("rma.body")}
@@ -399,6 +399,7 @@ export const RmaPage = () => {
           storageKey="rma-page-side-rail-width"
         >
           <SurfaceCard
+            className="rail-table-card"
             aside={
               <button className="action-primary-button" onClick={beginCreate} type="button">
                 <Plus size={14} />
@@ -427,7 +428,7 @@ export const RmaPage = () => {
               activeRowId={activeRmaCaseId}
               autoScrollToActiveRow
               getRowId={(row) => row.id}
-              maxHeight="min(54vh, 560px)"
+              shellClassName="table-shell-fill"
               persistKey="rma-page-cases"
               onSortRequest={handleColumnSortRequest}
               sortState={activeColumnKey ? { columnKey: activeColumnKey, direction: sortDirection } : null}
@@ -517,22 +518,28 @@ export const RmaPage = () => {
             />
           ) : (
             <SurfaceCard
+              className="rma-detail-card detail-rail-card"
               aside={
                 detail.caseRecord ? (
-                  <div className="surface-card-actions">
+                  <div className="detail-header-actions">
+                    <StatusBadge tone={resolveRmaStatusTone(detail.caseRecord.status)}>
+                      {t(`rma.statuses.${detail.caseRecord.status}`, { defaultValue: detail.caseRecord.status })}
+                    </StatusBadge>
                     <button
-                      className="ghost-control"
+                      aria-label={t("common.edit")}
+                      className="icon-ghost-control"
                       onClick={() => {
                         setEditorMode("edit");
                         setEditorError(null);
                       }}
+                      title={t("common.edit")}
                       type="button"
                     >
                       <SquarePen size={14} />
-                      <span>{t("common.edit")}</span>
                     </button>
                     <button
-                      className="ghost-control"
+                      aria-label={t("rma.actions.openDraftEmail")}
+                      className="icon-ghost-control"
                       disabled={!detail.caseRecord.supportEmail}
                       onClick={() => {
                         const url = buildRmaMailtoUrl(detail);
@@ -540,14 +547,15 @@ export const RmaPage = () => {
                           void window.bukowskiApp?.openExternal(url);
                         }
                       }}
+                      title={t("rma.actions.openDraftEmail")}
                       type="button"
                     >
                       <Mail size={14} />
-                      <span>{t("rma.actions.openDraftEmail")}</span>
                     </button>
                   </div>
                 ) : null
               }
+              subtitle={detail.caseRecord ? detail.caseRecord.manufacturerName : undefined}
               title={detail.caseRecord ? detail.caseRecord.title : t("rma.detail.title")}
             >
               {detailError ? <div className="action-feedback action-feedback-error">{detailError}</div> : null}
@@ -556,7 +564,7 @@ export const RmaPage = () => {
 
               {detail.caseRecord ? (
                 <div className="page-stack">
-                  <div className="summary-grid compact-summary-grid">
+                  <div className="detail-hero-grid detail-operations-grid">
                     <div className="summary-row">
                       <span className="summary-label">{t("rma.detail.manufacturer")}</span>
                       <span className="summary-value">{detail.caseRecord.manufacturerName}</span>
@@ -576,9 +584,6 @@ export const RmaPage = () => {
                   </div>
 
                   <div className="chip-row">
-                    <StatusBadge tone={resolveRmaStatusTone(detail.caseRecord.status)}>
-                      {t(`rma.statuses.${detail.caseRecord.status}`, { defaultValue: detail.caseRecord.status })}
-                    </StatusBadge>
                     {rmaStatusActions
                       .filter((action) => action.status !== detail.caseRecord?.status)
                       .map((action) => (

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AssetListRow, FinanceEntryRow, FinancialDocumentRow, IncidentListRow, ProjectCardRow } from "@contracts";
+import { SearchSelect } from "@shared/components/SearchSelect";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
@@ -258,14 +259,18 @@ export const FinanceEntryEditorPanel = ({
           <div className="action-form-grid">
             <label className="action-field">
               <span className="action-field-label">{t("finance.entries.editor.asset")}</span>
-              <SelectField onChange={(event) => setAssetId(event.target.value)} value={assetId}>
-                <option value="">{t("finance.entries.editor.unlinked")}</option>
-                {assets.map((asset) => (
-                  <option key={asset.id} value={asset.id}>
-                    {asset.code} · {asset.name}
-                  </option>
-                ))}
-              </SelectField>
+              <SearchSelect
+                ariaLabel={t("finance.entries.editor.asset")}
+                emptyOptionLabel={t("finance.entries.editor.unlinked")}
+                onChange={setAssetId}
+                options={assets.map((asset) => ({
+                  value: asset.id,
+                  label: `${asset.code} · ${asset.name}`,
+                }))}
+                placeholder={t("finance.entries.editor.unlinked")}
+                searchPlaceholder={t("shared.searchSelect.assetPlaceholder")}
+                value={assetId}
+              />
             </label>
 
             <label className="action-field">

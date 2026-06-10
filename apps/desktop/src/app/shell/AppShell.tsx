@@ -82,6 +82,7 @@ export const AppShell = () => {
   const isCatalogRoute = location.pathname === "/catalog";
   const isPackingRoute = location.pathname === "/packing-slips";
   const isIncidentsRoute = location.pathname === "/incidents";
+  const isRmaRoute = location.pathname === "/rma";
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     clampSidebarWidth(readNumberPreference(uiPreferenceKeys.shellSidebarWidth, sidebarWidthDefault)),
   );
@@ -355,7 +356,7 @@ export const AppShell = () => {
           <Breadcrumb />
           {subnavItems.length ? <SubnavTabs items={subnavItems} /> : null}
           <RouteTransitionMain
-            className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}${activeRoute.domain === "assets" ? " shell-content-assets" : ""}${isLicensesRoute ? " shell-content-licenses" : ""}${isCatalogRoute ? " shell-content-catalog" : ""}${isPackingRoute ? " shell-content-packing" : ""}${isIncidentsRoute ? " shell-content-incidents" : ""}`}
+            className={`shell-content${activeRoute.scopeMode === "project" ? " shell-content-project" : ""}${activeRoute.domain === "assets" ? " shell-content-assets" : ""}${isLicensesRoute ? " shell-content-licenses" : ""}${isCatalogRoute ? " shell-content-catalog" : ""}${isPackingRoute ? " shell-content-packing" : ""}${isIncidentsRoute ? " shell-content-incidents" : ""}${isRmaRoute ? " shell-content-rma" : ""}`}
             transitionKey={location.pathname}
           >
             {!isScopeReady ? (

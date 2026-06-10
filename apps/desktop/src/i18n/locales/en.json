@@ -2295,6 +2295,10 @@
     "confirmDialog": {
       "working": "Working..."
     },
+    "searchSelect": {
+      "assetPlaceholder": "Search by code or name…",
+      "projectPlaceholder": "Search project…"
+    },
     "dataTable": {
       "columns": "Columns",
       "empty": "No rows available.",

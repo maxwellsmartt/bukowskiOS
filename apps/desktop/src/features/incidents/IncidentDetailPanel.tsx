@@ -148,7 +148,7 @@ export const IncidentDetailPanel = ({
 
   if (!incident) {
     return (
-      <SurfaceCard className="incident-detail-card" title={t("incidents.detail.emptyTitle")}>
+      <SurfaceCard className="incident-detail-card detail-rail-card" title={t("incidents.detail.emptyTitle")}>
         <div className="empty-state">{t("incidents.detail.emptyBody")}</div>
       </SurfaceCard>
     );
@@ -156,7 +156,8 @@ export const IncidentDetailPanel = ({
 
   return (
     <SurfaceCard
-      className="incident-detail-card"
+      className="incident-detail-card detail-rail-card"
+      subtitle={[incident.asset, incident.project].filter((value) => value && value !== "—").join(" · ") || undefined}
       aside={
         <div className="detail-header-actions">
           <StatusBadge tone={resolveStatusTone(incident.status)}>

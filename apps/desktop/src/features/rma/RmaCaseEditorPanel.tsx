@@ -108,6 +108,19 @@ export const RmaCaseEditorPanel = ({
     ...resolveDraftAssetState(initialDraft),
     ...resolveInitialAssetState(initialValue),
   }));
+  const [assetFilter, setAssetFilter] = useState("");
+
+  // Selected assets always stay visible (even when they no longer match the
+  // filter) so a narrowed list can't hide what is about to be submitted.
+  const visibleAssets = useMemo(() => {
+    const term = assetFilter.trim().toLowerCase();
+    if (!term) return availableAssets;
+    return availableAssets.filter(
+      (asset) =>
+        Boolean(selectedAssets[asset.id]) ||
+        `${asset.name} ${asset.brand} ${asset.model} ${asset.serialNumber}`.toLowerCase().includes(term),
+    );
+  }, [assetFilter, availableAssets, selectedAssets]);
 
   const manufacturerEmail = useMemo(
     () => manufacturers.find((manufacturer) => manufacturer.id === manufacturerId)?.supportEmail ?? "",
@@ -136,6 +149,7 @@ export const RmaCaseEditorPanel = ({
 
   return (
     <SurfaceCard
+      className="rma-detail-card detail-rail-card"
       aside={
         <button aria-label={t("rma.editor.close")} className="icon-ghost-control" onClick={onClose} type="button">
           <X size={14} />
@@ -247,8 +261,18 @@ export const RmaCaseEditorPanel = ({
         ) : null}
       </div>
 
+      {availableAssets.length > 5 ? (
+        <input
+          className="action-field-control"
+          onChange={(event) => setAssetFilter(event.target.value)}
+          placeholder={t("shared.searchSelect.assetPlaceholder")}
+          type="search"
+          value={assetFilter}
+        />
+      ) : null}
+
       <div className="rma-asset-picker">
-        {availableAssets.map((asset) => {
+        {visibleAssets.map((asset) => {
           const selection = selectedAssets[asset.id];
 
           return (
@@ -322,7 +346,7 @@ export const RmaCaseEditorPanel = ({
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
       <div className="action-panel-actions">
-        <button className="ghost-control cancel-control" onClick={onClose} type="button">
+        <button className="ghost-control" onClick={onClose} type="button">
           {t("common.cancel")}
         </button>
 
