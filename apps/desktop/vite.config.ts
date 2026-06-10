@@ -145,6 +145,16 @@ export default defineConfig(async ({ mode }) => {
       react(),
       ...electronPlugins,
     ],
+    server: {
+      watch: {
+        // electron-builder drops the packaged .app (and its DMG staging) into
+        // dist-packaged; chokidar follows symlinks, so watching it can leak
+        // outside the repo (an Applications symlink once pulled all of
+        // /Applications and /System into the watcher and exhausted file
+        // descriptors with EMFILE). Build outputs never need HMR.
+        ignored: ["**/dist-packaged/**", "**/dist-electron/**", "**/dist/**"],
+      },
+    },
     build: {
       // The barcode renderer is intentionally lazy-loaded and large. We split
       // vendor islands so the app shell stays readable in build output, then
