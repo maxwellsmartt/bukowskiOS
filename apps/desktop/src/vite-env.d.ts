@@ -35,6 +35,7 @@ import type {
   AppApplyRemoteTreasuryRowsResult,
   AppDiagnosticsSnapshot,
   AppExportResult,
+  AppPrintResult,
   AppInfo,
   AppLocalWorkspaceRow,
   AppOperationalBackfillCommand,
@@ -332,6 +333,8 @@ declare global {
       getDetail: (packingSlipId: string) => Promise<PackingSlipDetailSnapshot>;
       exportPdf: (packingSlipId: string) => Promise<AppExportResult>;
       exportInsurancePdf: (input: ExportPackingSlipInsurancePdfInput) => Promise<AppExportResult>;
+      printPdf: (packingSlipId: string) => Promise<AppPrintResult>;
+      printInsurancePdf: (input: ExportPackingSlipInsurancePdfInput) => Promise<AppPrintResult>;
       create: (input: CreatePackingSlipCommand) => Promise<CreatePackingSlipResult>;
       returnItems: (input: ReturnPackingSlipItemsCommand) => Promise<ReturnPackingSlipItemsResult>;
     };

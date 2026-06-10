@@ -251,6 +251,7 @@ import { ipcChannels } from "@contracts";
 import type { FoundationReadService } from "../services/data/foundationReadService";
 import type { WorkspaceAccessGuard } from "../services/auth/workspaceAccessGuard";
 import { safeHandle, safeHandleRead, safeHandleReadWithSchema } from "./ipcSafeHandler";
+import { printGeneratedPdf } from "../services/documentPrintService";
 import {
   buildDeductibleLedgerCsv,
   buildDeductibleLedgerFileBaseName,
@@ -1360,6 +1361,49 @@ export const registerFoundationIpc = ({
       };
     },
     "The app could not export that insurance list PDF.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.packing.printPdf,
+    idReadArgsSchema,
+    async (_event, packingSlipId: string) => {
+      await workspaceAccess.assertPackingSlipAccess(packingSlipId, "print that packing slip", "read", "packing-slips.read");
+      const detail = foundationReads.getPackingSlipDetail(packingSlipId);
+
+      if (!detail.slip) {
+        throw new Error("Packing slip was not found.");
+      }
+
+      const fileName = buildPackingSlipPdfFileName(detail.slip, "PS");
+
+      return printGeneratedPdf({
+        fileName,
+        title: "Packing slip",
+        createPdf: (targetFilePath) => exportPackingSlipPdf(packingSlipId, targetFilePath),
+      });
+    },
+    "The app could not print that packing slip PDF.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.packing.printInsurancePdf,
+    exportPackingSlipInsurancePdfReadArgsSchema,
+    async (_event, input: import("@contracts").ExportPackingSlipInsurancePdfInput) => {
+      const { packingSlipId, options } = input;
+      await workspaceAccess.assertPackingSlipAccess(packingSlipId, "print that insurance list", "read", "packing-slips.read");
+      const detail = foundationReads.getPackingSlipDetail(packingSlipId);
+
+      if (!detail.slip) {
+        throw new Error("Packing slip was not found.");
+      }
+
+      const fileName = buildPackingSlipPdfFileName(detail.slip, "IL");
+
+      return printGeneratedPdf({
+        fileName,
+        title: "Lista de seguro",
+        createPdf: (targetFilePath) => exportPackingSlipInsurancePdf(packingSlipId, targetFilePath, options ?? null),
+      });
+    },
+    "The app could not print that insurance list PDF.",
   );
   safeHandle(ipcChannels.packing.create, createPackingSlipSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({

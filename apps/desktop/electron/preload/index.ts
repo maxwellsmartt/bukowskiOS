@@ -35,6 +35,7 @@ import type {
   AppApplyRemoteTreasuryRowsResult,
   AppDiagnosticsSnapshot,
   AppExportResult,
+  AppPrintResult,
   AppInfo,
   AppCreateRemoteWorkspaceCommand,
   AppCreateRemoteWorkspaceResult,
@@ -466,6 +467,10 @@ const bukowskiPacking = {
     ipcRenderer.invoke(ipcChannels.packing.exportPdf, packingSlipId) as Promise<AppExportResult>,
   exportInsurancePdf: (input: import("@contracts").ExportPackingSlipInsurancePdfInput) =>
     ipcRenderer.invoke(ipcChannels.packing.exportInsurancePdf, input) as Promise<AppExportResult>,
+  printPdf: (packingSlipId: string) =>
+    ipcRenderer.invoke(ipcChannels.packing.printPdf, packingSlipId) as Promise<AppPrintResult>,
+  printInsurancePdf: (input: import("@contracts").ExportPackingSlipInsurancePdfInput) =>
+    ipcRenderer.invoke(ipcChannels.packing.printInsurancePdf, input) as Promise<AppPrintResult>,
   create: (input: CreatePackingSlipCommand) =>
     ipcRenderer.invoke(ipcChannels.packing.create, input) as Promise<CreatePackingSlipResult>,
   returnItems: (input: ReturnPackingSlipItemsCommand) =>

@@ -469,6 +469,12 @@ export type AppExportResult = {
   summary: string;
 };
 
+export type AppPrintResult = {
+  printed: boolean;
+  fileName: string | null;
+  summary: string;
+};
+
 export type AppLogFileSummary = {
   name: string;
   sizeBytes: number;

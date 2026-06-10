@@ -2057,8 +2057,8 @@
       "open": "Abrir",
       "exportPdf": "Exportar packing slip",
       "exportInsurance": "Exportar seguro",
-      "printPdf": "Imprimir packing slip (próximamente)",
-      "printInsurance": "Imprimir seguro (próximamente)",
+      "printPdf": "Imprimir packing slip",
+      "printInsurance": "Imprimir seguro",
       "returnPending": "Devolver pendientes"
     },
     "sort": {
@@ -2198,8 +2198,11 @@
     "toasts": {
       "doneTitle": "Listo",
       "partialTitle": "Exportación parcial",
+      "printCancelledTitle": "Impresión cancelada",
       "unableExportInsurance": "No se pudo exportar el PDF de seguro.",
       "unableExportSlip": "No se pudo exportar el PDF del packing slip.",
+      "unablePrintInsurance": "No se pudo imprimir el PDF de seguro.",
+      "unablePrintSlip": "No se pudo imprimir el PDF del packing slip.",
       "unableReturn": "No se pudo registrar la devolución."
     }
   },

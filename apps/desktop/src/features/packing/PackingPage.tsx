@@ -20,6 +20,8 @@ import { PackingSlipDetailPanel } from "./PackingSlipDetailPanel";
 import {
   exportPackingSlipInsurancePdf,
   exportPackingSlipPdf,
+  printPackingSlipInsurancePdf,
+  printPackingSlipPdf,
   returnPackingSlipItems,
   usePackingDetail,
   usePackingList,
@@ -81,6 +83,8 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const toast = useToast();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingInsurancePdf, setIsExportingInsurancePdf] = useState(false);
+  const [isPrintingPdf, setIsPrintingPdf] = useState(false);
+  const [isPrintingInsurancePdf, setIsPrintingInsurancePdf] = useState(false);
   const [statusFilter, setStatusFilter] = useState<PackingStatusFilter>("all");
   const [isBatchExportingPdf, setIsBatchExportingPdf] = useState(false);
   const [isBatchExportingInsurancePdf, setIsBatchExportingInsurancePdf] = useState(false);
@@ -212,6 +216,30 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
         getUserFacingErrorMessage(
           nextError,
           t(type === "pdf" ? "packing.toasts.unableExportSlip" : "packing.toasts.unableExportInsurance"),
+        ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const printSinglePackingSlip = async (packingSlipId: string, type: "pdf" | "insurance") => {
+    const setBusy = type === "pdf" ? setIsPrintingPdf : setIsPrintingInsurancePdf;
+    const printOne = type === "pdf" ? printPackingSlipPdf : printPackingSlipInsurancePdf;
+    setBusy(true);
+    try {
+      const result = await printOne(packingSlipId);
+      setReturnError(null);
+      if (result.printed) {
+        toast.success(t("packing.toasts.doneTitle"), result.summary);
+      } else {
+        toast.info(t("packing.toasts.printCancelledTitle"), result.summary);
+      }
+    } catch (nextError) {
+      setReturnError(
+        getUserFacingErrorMessage(
+          nextError,
+          t(type === "pdf" ? "packing.toasts.unablePrintSlip" : "packing.toasts.unablePrintInsurance"),
         ),
       );
     } finally {
@@ -526,16 +554,20 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
                 key: "print-pdf",
                 label: t("packing.context.printPdf"),
                 icon: <Printer size={14} />,
-                disabled: true,
+                disabled: isPrintingPdf,
                 separatorBefore: true,
-                onSelect: () => undefined,
+                onSelect: (target) => {
+                  void printSinglePackingSlip(target.id, "pdf");
+                },
               },
               {
                 key: "print-insurance",
                 label: t("packing.context.printInsurance"),
                 icon: <Printer size={14} />,
-                disabled: true,
-                onSelect: () => undefined,
+                disabled: isPrintingInsurancePdf,
+                onSelect: (target) => {
+                  void printSinglePackingSlip(target.id, "insurance");
+                },
               },
               {
                 key: "return-pending",

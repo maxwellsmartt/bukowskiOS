@@ -1,5 +1,6 @@
 import type {
   AppExportResult,
+  AppPrintResult,
   CreatePackingSlipCommand,
   CreatePackingSlipResult,
   ExportPackingSlipInsurancePdfInput,
@@ -92,4 +93,23 @@ export const exportPackingSlipInsurancePdf = async (
   }
 
   return window.bukowskiPacking.exportInsurancePdf({ packingSlipId, options });
+};
+
+export const printPackingSlipPdf = async (packingSlipId: string): Promise<AppPrintResult> => {
+  if (!window.bukowskiPacking) {
+    throw new Error("Packing bridge unavailable");
+  }
+
+  return window.bukowskiPacking.printPdf(packingSlipId);
+};
+
+export const printPackingSlipInsurancePdf = async (
+  packingSlipId: string,
+  options?: ExportPackingSlipInsurancePdfInput["options"],
+): Promise<AppPrintResult> => {
+  if (!window.bukowskiPacking) {
+    throw new Error("Packing bridge unavailable");
+  }
+
+  return window.bukowskiPacking.printInsurancePdf({ packingSlipId, options });
 };

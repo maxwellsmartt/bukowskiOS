@@ -2053,8 +2053,8 @@
       "open": "Open",
       "exportPdf": "Export packing slip",
       "exportInsurance": "Export insurance",
-      "printPdf": "Print packing slip (coming soon)",
-      "printInsurance": "Print insurance (coming soon)",
+      "printPdf": "Print packing slip",
+      "printInsurance": "Print insurance",
       "returnPending": "Return pending"
     },
     "sort": {
@@ -2194,8 +2194,11 @@
     "toasts": {
       "doneTitle": "Done",
       "partialTitle": "Partial export",
+      "printCancelledTitle": "Print cancelled",
       "unableExportInsurance": "Unable to export insurance list PDF.",
       "unableExportSlip": "Unable to export packing slip PDF.",
+      "unablePrintInsurance": "Unable to print insurance list PDF.",
+      "unablePrintSlip": "Unable to print packing slip PDF.",
       "unableReturn": "Unable to register packing return."
     }
   },
