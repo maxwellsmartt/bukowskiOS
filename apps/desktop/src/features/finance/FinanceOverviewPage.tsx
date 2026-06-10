@@ -32,6 +32,7 @@ import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useLocale } from "@shared/hooks/useLocale";
 import { usePersistentState } from "@shared/hooks/usePersistentState";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { notifyExportResult } from "@shared/lib/exportNotifications";
 import bancoCentralLogo from "@shared/assets/inbox/logos/banco-central-logo.png";
 import bancoPopularLogo from "@shared/assets/inbox/logos/banco popular dominicano-logo.jpg";
 import bancoSantaCruzLogo from "@shared/assets/inbox/logos/banco santa cruz-logo.png";
@@ -565,7 +566,11 @@ export const FinanceOverviewPage = () => {
       setIsExportingPdf(true);
       const result = await exportFinanceReportPdf({ ...overviewQuery, workspaceId: activeWorkspaceId });
       setExportError(null);
-      toast.success(t("finance.overview.toasts.reportExported"), result.summary);
+      notifyExportResult(toast, result, {
+        successTitle: t("finance.overview.toasts.reportExported"),
+        cancelledTitle: t("common.exportCancelled"),
+        cancelledBody: t("common.exportCancelledBody"),
+      });
     } catch (nextError) {
       setExportError(getUserFacingErrorMessage(nextError, t("finance.overview.toasts.exportFailed")));
     } finally {

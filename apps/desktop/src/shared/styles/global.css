@@ -15553,6 +15553,13 @@ select.field-input {
   animation: toast-slide-out 220ms cubic-bezier(0.4, 0, 1, 0.4) forwards;
 }
 
+.toast-cancelled {
+  border-color: rgba(214, 179, 122, 0.18);
+  background:
+    radial-gradient(circle at 9% 22%, rgba(214, 179, 122, 0.06), transparent 34%),
+    #161a1e;
+}
+
 @keyframes toast-slide-in {
   from {
     opacity: 0;
@@ -15598,6 +15605,11 @@ select.field-input {
 .toast-icon-info {
   background: rgba(126, 183, 178, 0.18);
   color: var(--accent-info, #7eb7b2);
+}
+
+.toast-icon-cancelled {
+  background: rgba(214, 179, 122, 0.14);
+  color: rgba(214, 179, 122, 0.92);
 }
 
 .toast-icon-warning {

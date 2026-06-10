@@ -22,6 +22,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useLocale } from "@shared/hooks/useLocale";
 import { useRecentValues } from "@shared/hooks/useRecentValues";
+import { notifyExportResult } from "@shared/lib/exportNotifications";
 
 import {
   calculateQuotePreview,
@@ -653,11 +654,12 @@ export const QuoteEditorPage = () => {
     if (!quoteId || !window.bukowskiQuotes) return;
     try {
       const result = await window.bukowskiQuotes.exportPdf(activeWorkspaceId, quoteId);
-      if (result.saved) {
-        toast.success(t("finance.quotes.toasts.pdfReady"), result.summary ?? t("finance.quotes.toasts.pdfSaved"));
-      } else {
-        toast.info(t("finance.quotes.toasts.exportCancelled"), t("finance.quotes.toasts.exportCancelledBody"));
-      }
+      notifyExportResult(toast, result, {
+        successTitle: t("finance.quotes.toasts.pdfReady"),
+        successBody: result.summary ?? t("finance.quotes.toasts.pdfSaved"),
+        cancelledTitle: t("common.exportCancelled"),
+        cancelledBody: t("common.exportCancelledBody"),
+      });
     } catch (err) {
       toast.error(
         t("finance.quotes.toasts.exportFailed"),

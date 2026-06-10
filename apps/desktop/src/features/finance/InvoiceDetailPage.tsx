@@ -13,6 +13,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useLocale } from "@shared/hooks/useLocale";
+import { notifyExportResult } from "@shared/lib/exportNotifications";
 
 import { formatCurrency, newCommandId } from "./quoteHelpers";
 import { evaluateNcfHealth } from "./ncfHealth";
@@ -206,9 +207,12 @@ export const InvoiceDetailPage = () => {
     setIsExportingPdf(true);
     try {
       const result = await mutations.exportPdf(activeWorkspaceId, invoice.id);
-      if (result.saved) {
-        toast.success(t("finance.invoices.toasts.exported"), result.fileName ?? result.summary);
-      }
+      notifyExportResult(toast, result, {
+        successTitle: t("finance.invoices.toasts.exported"),
+        successBody: result.fileName ?? result.summary,
+        cancelledTitle: t("common.exportCancelled"),
+        cancelledBody: t("common.exportCancelledBody"),
+      });
     } catch (err) {
       toast.error(
         t("finance.invoices.toasts.exportFailed"),

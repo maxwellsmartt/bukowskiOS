@@ -15,6 +15,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useLocale } from "@shared/hooks/useLocale";
+import { notifyExportResult } from "@shared/lib/exportNotifications";
 
 import {
   formatCurrency,
@@ -88,11 +89,12 @@ export const QuotesPage = () => {
     if (!window.bukowskiQuotes) return;
     try {
       const result = await window.bukowskiQuotes.exportPdf(activeWorkspaceId, row.id);
-      if (result.saved) {
-        toast.success(t("finance.quotes.toasts.pdfReady"), result.summary ?? t("finance.quotes.toasts.pdfSaved"));
-      } else {
-        toast.info(t("finance.quotes.toasts.exportCancelled"), t("finance.quotes.toasts.exportCancelledBody"));
-      }
+      notifyExportResult(toast, result, {
+        successTitle: t("finance.quotes.toasts.pdfReady"),
+        successBody: result.summary ?? t("finance.quotes.toasts.pdfSaved"),
+        cancelledTitle: t("common.exportCancelled"),
+        cancelledBody: t("common.exportCancelledBody"),
+      });
     } catch (err) {
       toast.error(t("finance.quotes.toasts.exportFailed"), cleanIpcMessage(err, t("common.tryAgain")));
     }

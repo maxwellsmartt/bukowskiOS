@@ -23,6 +23,7 @@ import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
 import { useLocale } from "@shared/hooks/useLocale";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { notifyExportResult } from "@shared/lib/exportNotifications";
 
 const emptyDiagnostics: AppDiagnosticsSnapshot = {
   databaseSizeBytes: 0,
@@ -431,7 +432,15 @@ export const SettingsPage = () => {
     try {
       stateSetter(true);
       const result = await action();
-      toast.success(t("settings.actions.completeTitle"), result.summary);
+      if ("saved" in result) {
+        notifyExportResult(toast, result, {
+          successTitle: t("settings.actions.completeTitle"),
+          cancelledTitle: t("common.exportCancelled"),
+          cancelledBody: t("common.exportCancelledBody"),
+        });
+      } else {
+        toast.success(t("settings.actions.completeTitle"), result.summary);
+      }
       setError(null);
 
       if ("diagnostics" in result) {

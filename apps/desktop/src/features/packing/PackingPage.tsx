@@ -14,6 +14,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { notifyExportResult } from "@shared/lib/exportNotifications";
 import { readStringPreference, uiPreferenceKeys, writePreference } from "@shared/lib/preferences";
 
 import { PackingSlipDetailPanel } from "./PackingSlipDetailPanel";
@@ -213,9 +214,11 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
     try {
       const result = await exportOne(packingSlipId);
       setReturnError(null);
-      if (result.saved) {
-        toast.success(t("packing.toasts.doneTitle"), result.summary);
-      }
+      notifyExportResult(toast, result, {
+        successTitle: t("packing.toasts.doneTitle"),
+        cancelledTitle: t("common.exportCancelled"),
+        cancelledBody: t("common.exportCancelledBody"),
+      });
     } catch (nextError) {
       setReturnError(
         getUserFacingErrorMessage(
@@ -295,8 +298,10 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
     try {
       for (const slip of selectedPackingSlips) {
         try {
-          await exportOne(slip.id);
-          exportedCount += 1;
+          const result = await exportOne(slip.id);
+          if (result.saved) {
+            exportedCount += 1;
+          }
         } catch {
           failed.push(slip.number);
         }
@@ -309,7 +314,15 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
       }
 
       setReturnError(null);
-      toast.success(t("packing.toasts.doneTitle"), t(type === "pdf" ? "packing.selection.batchExportPdfDone" : "packing.selection.batchExportInsuranceDone", { count: exportedCount }));
+      if (exportedCount) {
+        toast.success(t("packing.toasts.doneTitle"), t(type === "pdf" ? "packing.selection.batchExportPdfDone" : "packing.selection.batchExportInsuranceDone", { count: exportedCount }));
+      } else {
+        toast.show({
+          title: t("common.exportCancelled"),
+          body: t("common.exportCancelledBody"),
+          tone: "cancelled",
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -609,7 +622,11 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               setIsExportingInsurancePdf(true);
               const result = await exportPackingSlipInsurancePdf(activePackingSlipId, options);
               setReturnError(null);
-              toast.success(t("packing.toasts.doneTitle"), result.summary);
+              notifyExportResult(toast, result, {
+                successTitle: t("packing.toasts.doneTitle"),
+                cancelledTitle: t("common.exportCancelled"),
+                cancelledBody: t("common.exportCancelledBody"),
+              });
             } catch (nextError) {
               setReturnError(getUserFacingErrorMessage(nextError, t("packing.toasts.unableExportInsurance")));
             } finally {
@@ -625,7 +642,11 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
               setIsExportingPdf(true);
               const result = await exportPackingSlipPdf(activePackingSlipId);
               setReturnError(null);
-              toast.success(t("packing.toasts.doneTitle"), result.summary);
+              notifyExportResult(toast, result, {
+                successTitle: t("packing.toasts.doneTitle"),
+                cancelledTitle: t("common.exportCancelled"),
+                cancelledBody: t("common.exportCancelledBody"),
+              });
             } catch (nextError) {
               setReturnError(getUserFacingErrorMessage(nextError, t("packing.toasts.unableExportSlip")));
             } finally {

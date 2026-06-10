@@ -2224,6 +2224,8 @@
     "confirm": "Confirmar",
     "search": "Buscar",
     "copied": "Copiado",
+    "exportCancelled": "Exportación cancelada",
+    "exportCancelledBody": "No se guardó nada. Puedes intentarlo de nuevo cuando estés listo.",
     "tryAgain": "Inténtalo de nuevo en un momento.",
     "couldNotSave": "No se pudo guardar",
     "never": "Nunca",

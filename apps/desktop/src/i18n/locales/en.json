@@ -2220,6 +2220,8 @@
     "confirm": "Confirm",
     "search": "Search",
     "copied": "Copied",
+    "exportCancelled": "Export cancelled",
+    "exportCancelledBody": "Nothing was saved. You can try again when you're ready.",
     "tryAgain": "Try again in a moment.",
     "couldNotSave": "Could not save",
     "never": "Never",

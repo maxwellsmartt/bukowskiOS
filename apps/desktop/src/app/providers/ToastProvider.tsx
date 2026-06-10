@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 
-export type ToastTone = "success" | "error" | "info" | "warning";
+export type ToastTone = "success" | "error" | "info" | "warning" | "cancelled";
 
 export type ToastInput = {
   title: string;
@@ -34,6 +34,7 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 const defaultDurationByTone: Record<ToastTone, number> = {
   success: 4000,
   info: 4000,
+  cancelled: 4200,
   warning: 6000,
   error: 7000,
 };
@@ -43,6 +44,7 @@ const toneIcon: Record<ToastTone, ReactNode> = {
   error: <AlertCircle size={16} />,
   info: <Info size={16} />,
   warning: <AlertCircle size={16} />,
+  cancelled: <XCircle size={16} />,
 };
 
 let toastCounter = 0;

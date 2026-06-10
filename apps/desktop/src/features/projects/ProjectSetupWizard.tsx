@@ -29,6 +29,7 @@ import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { useShellContext } from "@shared/hooks/useShellContext";
 import { getUserFacingErrorMessage } from "@shared/lib/errors";
+import { notifyExportResult } from "@shared/lib/exportNotifications";
 
 const projectStatusOptions = ["Prep", "Active", "Wrapped", "On hold"] as const;
 const additionalUnitPresets = ["Second Unit", "Third Unit", "Splinter Unit", "Insert Unit"] as const;
@@ -1304,7 +1305,11 @@ export const ProjectSetupWizard = ({
     try {
       setSubmitError(null);
       const result = await exportProjectBlueprintPdf({ ...normalizeDraftForSubmit(draft), workspaceId: activeWorkspaceId });
-      toast.success(t("projectSetup.toasts.exported"), result.summary);
+      notifyExportResult(toast, result, {
+        successTitle: t("projectSetup.toasts.exported"),
+        cancelledTitle: t("common.exportCancelled"),
+        cancelledBody: t("common.exportCancelledBody"),
+      });
     } catch (error) {
       setSubmitError(getUserFacingErrorMessage(error, t("projectSetup.errors.exportSummary")));
     }
