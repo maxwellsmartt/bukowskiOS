@@ -46,6 +46,11 @@ const packingSortOptions: Array<ListSortOption<PackingSlipSortField>> = [
   { value: "returnedCount", label: "packing.sort.returnedCount", columnKey: "returnedCount" },
 ];
 
+const isPrinterUnavailableError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return /no printers available|printer.*network|no printer/i.test(message);
+};
+
 export const PackingPage = ({ projectId = null, projectName = null }: PackingPageProps) => {
   const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
@@ -236,11 +241,15 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
         toast.info(t("packing.toasts.printCancelledTitle"), result.summary);
       }
     } catch (nextError) {
-      setReturnError(
-        getUserFacingErrorMessage(
-          nextError,
-          t(type === "pdf" ? "packing.toasts.unablePrintSlip" : "packing.toasts.unablePrintInsurance"),
-        ),
+      const message = isPrinterUnavailableError(nextError)
+        ? t("packing.toasts.printerUnavailableBody")
+        : getUserFacingErrorMessage(
+            nextError,
+            t(type === "pdf" ? "packing.toasts.unablePrintSlip" : "packing.toasts.unablePrintInsurance"),
+          );
+      toast.error(
+        isPrinterUnavailableError(nextError) ? t("packing.toasts.printerUnavailableTitle") : t("packing.toasts.unablePrintTitle"),
+        message,
       );
     } finally {
       setBusy(false);

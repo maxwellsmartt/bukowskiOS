@@ -1,5 +1,5 @@
-import { Check, FileText, RotateCcw, ShieldAlert, Upload, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Check, FileText, MoreVertical, RotateCcw, ShieldAlert, Upload, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CurrencyRateSource, CurrencyRateType, PackingInsuranceExportOptions, PackingSlipDetailSnapshot } from "@contracts";
@@ -49,10 +49,37 @@ export const PackingSlipDetailPanel = ({
   const [conditionIn, setConditionIn] = useState("Good");
   const [notes, setNotes] = useState("");
   const [insuranceDialogOpen, setInsuranceDialogOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement | null>(null);
   const pendingAssetIds = useMemo(
     () => data.items.filter((item) => item.status === "Out").map((item) => item.assetId),
     [data.items],
   );
+
+  useEffect(() => {
+    if (!actionsOpen) {
+      return undefined;
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node) || !actionsRef.current?.contains(target)) {
+        setActionsOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setActionsOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [actionsOpen]);
 
   if (isLoading) {
     return (
@@ -98,33 +125,55 @@ export const PackingSlipDetailPanel = ({
       <StatusBadge tone={data.slip.status === "Overdue" ? "critical" : data.slip.status === "Closed" ? "success" : "info"}>
         {t(`packing.statuses.${data.slip.status}`, { defaultValue: data.slip.status })}
       </StatusBadge>
-      <button
-        className="ghost-control action-row-button"
-        disabled={isExportingPdf}
-        onClick={() => void onExportPdf()}
-        type="button"
-      >
-        <Upload size={14} />
-        <span>{isExportingPdf ? t("packing.detail.exporting") : t("packing.detail.exportSlip")}</span>
-      </button>
-      <button
-        className="action-primary-button action-row-button"
-        disabled={isSubmittingReturn || !pendingAssetIds.length}
-        onClick={() => void onReturnItems(selectedPendingAssetIds.length ? selectedPendingAssetIds : pendingAssetIds, conditionIn, notes)}
-        type="button"
-      >
-        <RotateCcw size={14} />
-        <span>{isSubmittingReturn ? t("packing.detail.returning") : returnLabel}</span>
-      </button>
-      <button
-        className="ghost-control action-row-button"
-        disabled={isExportingInsurancePdf}
-        onClick={() => setInsuranceDialogOpen(true)}
-        type="button"
-      >
-        <FileText size={14} />
-        <span>{isExportingInsurancePdf ? t("packing.detail.exporting") : t("packing.detail.exportInsurance")}</span>
-      </button>
+      <div className="packing-detail-actions-menu" ref={actionsRef}>
+        <button
+          aria-expanded={actionsOpen}
+          aria-label={t("packing.detail.actionsMenu")}
+          className="icon-ghost-control packing-detail-actions-trigger"
+          onClick={() => setActionsOpen((value) => !value)}
+          type="button"
+        >
+          <MoreVertical size={17} />
+        </button>
+        {actionsOpen ? (
+          <div className="packing-detail-actions-popover" role="menu">
+            <button
+              disabled={isExportingPdf}
+              onClick={() => {
+                setActionsOpen(false);
+                void onExportPdf();
+              }}
+              type="button"
+            >
+              <Upload size={14} />
+              <span>{isExportingPdf ? t("packing.detail.exporting") : t("packing.detail.exportSlip")}</span>
+            </button>
+            <button
+              className="is-primary"
+              disabled={isSubmittingReturn || !pendingAssetIds.length}
+              onClick={() => {
+                setActionsOpen(false);
+                void onReturnItems(selectedPendingAssetIds.length ? selectedPendingAssetIds : pendingAssetIds, conditionIn, notes);
+              }}
+              type="button"
+            >
+              <RotateCcw size={14} />
+              <span>{isSubmittingReturn ? t("packing.detail.returning") : returnLabel}</span>
+            </button>
+            <button
+              disabled={isExportingInsurancePdf}
+              onClick={() => {
+                setActionsOpen(false);
+                setInsuranceDialogOpen(true);
+              }}
+              type="button"
+            >
+              <FileText size={14} />
+              <span>{isExportingInsurancePdf ? t("packing.detail.exporting") : t("packing.detail.exportInsurance")}</span>
+            </button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 

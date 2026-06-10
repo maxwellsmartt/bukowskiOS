@@ -1,5 +1,6 @@
 import type {
   AppExportResult,
+  AppPrintResult,
   ApproveCollaboratorFeeCommand,
   CancelCollaboratorFeeCommand,
   CollaboratorFeeDetail,
@@ -307,6 +308,14 @@ export const exportFinanceReportPdf = async (query?: FinanceOverviewQuery): Prom
   }
 
   return window.bukowskiFinance.exportReportPdf(query);
+};
+
+export const printFinanceReportPdf = async (query?: FinanceOverviewQuery): Promise<AppPrintResult> => {
+  if (!window.bukowskiFinance) {
+    throw new Error("Finance bridge unavailable");
+  }
+
+  return window.bukowskiFinance.printReportPdf(query);
 };
 
 export const uploadFinanceDocuments = async (entryId: string): Promise<FileUploadMutationResult> => {

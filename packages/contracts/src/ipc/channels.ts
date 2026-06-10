@@ -190,6 +190,7 @@ export const ipcChannels = {
   finance: {
     getOverview: "bukowskiFinance:getOverview",
     exportReportPdf: "bukowskiFinance:exportReportPdf",
+    printReportPdf: "bukowskiFinance:printReportPdf",
     getCostLinks: "bukowskiFinance:getCostLinks",
     getEntries: "bukowskiFinance:getEntries",
     getDocuments: "bukowskiFinance:getDocuments",
@@ -228,6 +229,7 @@ export const ipcChannels = {
     delete: "bukowskiQuotes:delete",
     renumber: "bukowskiQuotes:renumber",
     exportPdf: "bukowskiQuotes:exportPdf",
+    printPdf: "bukowskiQuotes:printPdf",
     listVersions: "bukowskiQuotes:listVersions",
     restoreVersion: "bukowskiQuotes:restoreVersion",
   },
@@ -235,6 +237,7 @@ export const ipcChannels = {
     list: "bukowskiInvoices:list",
     detail: "bukowskiInvoices:detail",
     exportPdf: "bukowskiInvoices:exportPdf",
+    printPdf: "bukowskiInvoices:printPdf",
     create: "bukowskiInvoices:create",
     update: "bukowskiInvoices:update",
     issue: "bukowskiInvoices:issue",

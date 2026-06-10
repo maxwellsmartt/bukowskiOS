@@ -529,6 +529,8 @@ const bukowskiFinance = {
     ipcRenderer.invoke(ipcChannels.finance.getOverview, query) as Promise<FinanceOverviewSnapshot>,
   exportReportPdf: (query?: FinanceOverviewQuery) =>
     ipcRenderer.invoke(ipcChannels.finance.exportReportPdf, query) as Promise<AppExportResult>,
+  printReportPdf: (query?: FinanceOverviewQuery) =>
+    ipcRenderer.invoke(ipcChannels.finance.printReportPdf, query) as Promise<AppPrintResult>,
   getCostLinks: (workspaceId: string) =>
     ipcRenderer.invoke(ipcChannels.finance.getCostLinks, { workspaceId }) as Promise<FinanceCostLinkRow[]>,
   getEntries: (query?: FinanceEntryListQuery) => ipcRenderer.invoke(ipcChannels.finance.getEntries, query) as Promise<FinanceEntryRow[]>,
@@ -639,6 +641,8 @@ const bukowskiQuotes = {
     >,
   exportPdf: (workspaceId: string, quoteId: string) =>
     ipcRenderer.invoke(ipcChannels.quotes.exportPdf, { workspaceId, quoteId }) as Promise<AppExportResult>,
+  printPdf: (workspaceId: string, quoteId: string) =>
+    ipcRenderer.invoke(ipcChannels.quotes.printPdf, { workspaceId, quoteId }) as Promise<AppPrintResult>,
   listVersions: (workspaceId: string, quoteId: string) =>
     ipcRenderer.invoke(ipcChannels.quotes.listVersions, { workspaceId, quoteId }) as Promise<
       Array<{
@@ -668,6 +672,10 @@ const bukowskiInvoices = {
   exportPdf: (workspaceId: string, invoiceId: string) =>
     ipcRenderer.invoke(ipcChannels.invoices.exportPdf, { workspaceId, invoiceId }) as Promise<
       import("@contracts").AppExportResult
+    >,
+  printPdf: (workspaceId: string, invoiceId: string) =>
+    ipcRenderer.invoke(ipcChannels.invoices.printPdf, { workspaceId, invoiceId }) as Promise<
+      import("@contracts").AppPrintResult
     >,
   create: (input: import("@contracts").CreateInvoiceCommand) =>
     ipcRenderer.invoke(ipcChannels.invoices.create, input) as Promise<

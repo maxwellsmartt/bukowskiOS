@@ -144,6 +144,10 @@ export const useInvoiceMutations = () =>
         if (!window.bukowskiInvoices) throw new Error("Invoices bridge unavailable.");
         return window.bukowskiInvoices.exportPdf(workspaceId, invoiceId);
       },
+      async printPdf(workspaceId: string, invoiceId: string) {
+        if (!window.bukowskiInvoices) throw new Error("Invoices bridge unavailable.");
+        return window.bukowskiInvoices.printPdf(workspaceId, invoiceId);
+      },
     }),
     [],
   );

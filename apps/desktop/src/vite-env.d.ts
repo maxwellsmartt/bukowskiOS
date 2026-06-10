@@ -370,6 +370,7 @@ declare global {
     bukowskiFinance?: {
       getOverview: (query?: FinanceOverviewQuery) => Promise<FinanceOverviewSnapshot>;
       exportReportPdf: (query?: FinanceOverviewQuery) => Promise<AppExportResult>;
+      printReportPdf: (query?: FinanceOverviewQuery) => Promise<AppPrintResult>;
       getCostLinks: (workspaceId: string) => Promise<FinanceCostLinkRow[]>;
       getEntries: (query?: FinanceEntryListQuery) => Promise<FinanceEntryRow[]>;
       getDocuments: (entryId: string) => Promise<FinancialDocumentRow[]>;
@@ -468,6 +469,7 @@ declare global {
         input: import("@contracts").RenumberQuoteCommand,
       ) => Promise<import("@contracts").QuoteMutationResult>;
       exportPdf: (workspaceId: string, quoteId: string) => Promise<AppExportResult>;
+      printPdf: (workspaceId: string, quoteId: string) => Promise<AppPrintResult>;
       listVersions: (
         workspaceId: string,
         quoteId: string,
@@ -492,6 +494,7 @@ declare global {
         invoiceId: string,
       ) => Promise<import("@contracts").InvoiceDetail | null>;
       exportPdf: (workspaceId: string, invoiceId: string) => Promise<AppExportResult>;
+      printPdf: (workspaceId: string, invoiceId: string) => Promise<AppPrintResult>;
       create: (
         input: import("@contracts").CreateInvoiceCommand,
       ) => Promise<import("@contracts").InvoiceMutationResult>;

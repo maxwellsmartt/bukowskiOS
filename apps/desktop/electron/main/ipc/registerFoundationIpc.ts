@@ -2044,6 +2044,27 @@ export const registerFoundationIpc = ({
     "The app could not export the finance report PDF.",
   );
   safeHandleReadWithSchema(
+    ipcChannels.finance.printReportPdf,
+    financeOverviewReadArgsSchema,
+    async (_event, query: FinanceOverviewQuery | undefined) => {
+      const workspaceId = requireWorkspaceId(query, "print finance report");
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId,
+        action: "print finance report",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      const dateStamp = new Date().toISOString().slice(0, 10);
+
+      return printGeneratedPdf({
+        fileName: `finance-report-${dateStamp}.pdf`,
+        title: "Reporte financiero",
+        createPdf: (targetFilePath) => exportFinanceReportPdf(query, targetFilePath),
+      });
+    },
+    "The app could not print the finance report PDF.",
+  );
+  safeHandleReadWithSchema(
     ipcChannels.finance.getCostLinks,
     workspaceQueryReadArgsSchema,
     async (_event, query: { workspaceId: string }) => {
@@ -2486,6 +2507,33 @@ export const registerFoundationIpc = ({
       };
     },
     "The app could not export the invoice PDF.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.invoices.printPdf,
+    invoiceDetailReadArgsSchema,
+    async (_event, query: { workspaceId: string; invoiceId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "print invoice PDF",
+        accessLevel: "read",
+        requiredPermission: "invoices.export",
+      });
+      const detail = invoiceReads.getInvoiceDetail(query.workspaceId, query.invoiceId);
+      if (!detail) {
+        throw new Error("Invoice was not found.");
+      }
+
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const safeNumber = detail.invoiceNumber.replace(/[^a-z0-9_-]+/gi, "_");
+      const safeClient = detail.clientNameSnapshot.replace(/[^a-z0-9_-]+/gi, "_").slice(0, 48);
+
+      return printGeneratedPdf({
+        fileName: `Factura_${safeNumber}_${safeClient}_${dateStamp}.pdf`,
+        title: "Factura",
+        createPdf: () => exportInvoicePdf(query.workspaceId, query.invoiceId),
+      });
+    },
+    "The app could not print the invoice PDF.",
   );
   safeHandle(ipcChannels.invoices.create, createInvoiceSchema, async (_event, input) => {
     await workspaceAccess.assertWorkspaceAccess({
@@ -3314,5 +3362,31 @@ export const registerFoundationIpc = ({
       };
     },
     "The app could not export the quote PDF.",
+  );
+  safeHandleReadWithSchema(
+    ipcChannels.quotes.printPdf,
+    quoteExportPdfReadArgsSchema,
+    async (_event, query: { workspaceId: string; quoteId: string }) => {
+      await workspaceAccess.assertWorkspaceAccess({
+        workspaceId: query.workspaceId,
+        action: "print quote PDF",
+        accessLevel: "read",
+        requiredPermission: "finance.read",
+      });
+      const detail = quoteReads.getQuoteDetail(query.workspaceId, query.quoteId);
+      if (!detail) {
+        throw new Error("Quote was not found.");
+      }
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const safeNumber = detail.quoteNumber.replace(/[^a-z0-9_-]+/gi, "_");
+      const safeClient = (detail.clientNameSnapshot || detail.attentionName || "cliente").replace(/[^a-z0-9_-]+/gi, "_").slice(0, 48);
+
+      return printGeneratedPdf({
+        fileName: `Cotizacion_${safeNumber}_${safeClient}_${dateStamp}.pdf`,
+        title: "Cotización",
+        createPdf: () => exportQuotePdf(query.workspaceId, query.quoteId),
+      });
+    },
+    "The app could not print the quote PDF.",
   );
 };
