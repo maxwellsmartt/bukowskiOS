@@ -161,6 +161,47 @@ export const IncidentsPage = ({ projectId = null }: IncidentsPageProps) => {
     }
   };
 
+  const selectedOpenIncidentIds = data.filter((row) => selectedRowIds.includes(row.id) && row.status === "Open").map((row) => row.id);
+
+  const bulkMarkInReview = async () => {
+    if (!selectedOpenIncidentIds.length) {
+      return;
+    }
+
+    try {
+      setIsSubmittingIncidentDetail(true);
+      const failures: string[] = [];
+      for (const incidentId of selectedOpenIncidentIds) {
+        try {
+          await updateIncident({
+            commandId: crypto.randomUUID(),
+            workspaceId: activeWorkspaceId,
+            incidentId,
+            status: "In review",
+            actorType: "user",
+            sourceChannel: "desktop",
+          });
+        } catch {
+          failures.push(incidentId);
+        }
+      }
+
+      await Promise.all([reload(), activeIncidentId ? reloadIncidentDetail() : Promise.resolve()]);
+      const updatedCount = selectedOpenIncidentIds.length - failures.length;
+      if (failures.length) {
+        toast.info(
+          t("incidents.toasts.updated"),
+          t("incidents.selection.markInReviewPartial", { updated: updatedCount, failed: failures.length }),
+        );
+      } else {
+        toast.success(t("incidents.toasts.updated"), t("incidents.selection.markInReviewDone", { count: updatedCount }));
+      }
+      setSelectedRowIds([]);
+    } finally {
+      setIsSubmittingIncidentDetail(false);
+    }
+  };
+
   const hasActiveSearch = Boolean(incidentControls.searchValue.trim());
   const translatedSortOptions = incidentSortOptions.map((option) => ({ ...option, label: t(option.label) }));
 
@@ -267,6 +308,27 @@ export const IncidentsPage = ({ projectId = null }: IncidentsPageProps) => {
           sortDirection={incidentControls.sortDirection}
           sortOptions={translatedSortOptions}
         />
+        {selectedRowIds.length ? (
+          <div className="selection-action-bar">
+            <div className="selection-action-copy">
+              <span className="selection-action-title">{t("incidents.selection.title", { count: selectedRowIds.length })}</span>
+              <span className="selection-action-subtitle">{t("incidents.selection.subtitle")}</span>
+            </div>
+            <div className="selection-action-buttons">
+              <button
+                className="ghost-control"
+                disabled={!selectedOpenIncidentIds.length || isSubmittingIncidentDetail}
+                onClick={() => void bulkMarkInReview()}
+                type="button"
+              >
+                {t("incidents.selection.markInReview", { count: selectedOpenIncidentIds.length })}
+              </button>
+              <button className="ghost-control" onClick={() => setSelectedRowIds([])} type="button">
+                {t("incidents.selection.clear")}
+              </button>
+            </div>
+          </div>
+        ) : null}
         {isLoading && data.length === 0 ? (
           <TableSkeleton body={t("incidents.loading")} columns={6} />
         ) : null}

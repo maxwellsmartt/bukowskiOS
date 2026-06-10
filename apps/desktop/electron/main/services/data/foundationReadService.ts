@@ -1333,7 +1333,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
                 AND incidents.status IN ('Open', 'In review')
               ORDER BY incidents.reported_at DESC
               LIMIT 1
-            ), 'Maintenance review pending summary.') AS latest_issue
+            ), '') AS latest_issue
           FROM asset_current_state
           JOIN assets ON assets.id = asset_current_state.asset_id
           LEFT JOIN locations ON locations.id = asset_current_state.current_location_id

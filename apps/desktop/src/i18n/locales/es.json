@@ -3752,6 +3752,17 @@
     "context": {
       "viewAsset": "Ver equipo",
       "markInReview": "Marcar en revisión"
+    },
+    "selection": {
+      "title_one": "{{count}} incidente seleccionado",
+      "title_other": "{{count}} incidentes seleccionados",
+      "subtitle": "Aplica acciones a esta selección.",
+      "markInReview_one": "Marcar en revisión ({{count}})",
+      "markInReview_other": "Marcar en revisión ({{count}})",
+      "markInReviewDone_one": "{{count}} incidente pasó a revisión.",
+      "markInReviewDone_other": "{{count}} incidentes pasaron a revisión.",
+      "markInReviewPartial": "{{updated}} actualizados, {{failed}} fallaron.",
+      "clear": "Limpiar selección"
     }
   },
   "rma": {
@@ -3800,11 +3811,27 @@
     },
     "maintenance": {
       "title": "Seguimiento de mantenimiento",
-      "empty": "No hay equipos marcados para mantenimiento."
+      "empty": "No hay equipos marcados para mantenimiento.",
+      "noIssue": "Sin incidente abierto"
     },
     "cases": {
       "title": "Casos",
       "empty": "Aún no hay casos de reparación."
+    },
+    "resultLabel": "casos",
+    "toolbar": {
+      "searchPlaceholder": "Buscar por título, fabricante o correo…"
+    },
+    "sort": {
+      "recent": "Más recientes",
+      "title": "Título",
+      "support": "Correo de soporte",
+      "status": "Estado",
+      "assets": "Equipos"
+    },
+    "context": {
+      "createCase": "Crear caso de reparación",
+      "viewAsset": "Ver equipo"
     },
     "detail": {
       "title": "Detalle del caso",

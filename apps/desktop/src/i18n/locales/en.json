@@ -3748,6 +3748,17 @@
     "context": {
       "viewAsset": "View asset",
       "markInReview": "Mark in review"
+    },
+    "selection": {
+      "title_one": "{{count}} incident selected",
+      "title_other": "{{count}} incidents selected",
+      "subtitle": "Apply actions to this selection.",
+      "markInReview_one": "Mark in review ({{count}})",
+      "markInReview_other": "Mark in review ({{count}})",
+      "markInReviewDone_one": "{{count}} incident moved to review.",
+      "markInReviewDone_other": "{{count}} incidents moved to review.",
+      "markInReviewPartial": "{{updated}} updated, {{failed}} failed.",
+      "clear": "Clear selection"
     }
   },
   "rma": {
@@ -3796,11 +3807,27 @@
     },
     "maintenance": {
       "title": "Maintenance watch",
-      "empty": "No assets currently flagged for maintenance."
+      "empty": "No assets currently flagged for maintenance.",
+      "noIssue": "No open incident"
     },
     "cases": {
       "title": "Cases",
       "empty": "No repair cases yet."
+    },
+    "resultLabel": "cases",
+    "toolbar": {
+      "searchPlaceholder": "Search by title, manufacturer or email…"
+    },
+    "sort": {
+      "recent": "Most recent",
+      "title": "Title",
+      "support": "Support email",
+      "status": "Status",
+      "assets": "Assets"
+    },
+    "context": {
+      "createCase": "Create repair case",
+      "viewAsset": "View asset"
     },
     "detail": {
       "title": "Case details",

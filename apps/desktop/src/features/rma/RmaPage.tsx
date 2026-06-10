@@ -1,13 +1,15 @@
-import { Mail, Plus, SquarePen } from "lucide-react";
+import { Box, FileText, Mail, Plus, SquarePen, Wrench } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import type { RmaCaseStatus } from "@contracts";
+import type { AssetListQuery, ListSortDirection, RmaCaseStatus } from "@contracts";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { useAssetsList } from "@features/assets/useAssetsData";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
+import { ListToolbar } from "@shared/components/ListToolbar";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -23,6 +25,16 @@ import {
 import { buildRmaMailtoUrl, resolveRmaStatusTone, rmaStatusActions } from "./rmaHelpers";
 import { createRmaCase, updateRmaCase, useRmaCaseDetail, useRmaSnapshot } from "./useRmaData";
 
+type RmaCaseSortField = "recent" | "title" | "support" | "status" | "assets";
+
+const rmaCaseSortOptions: Array<{ value: RmaCaseSortField; label: string; columnKey?: string }> = [
+  { value: "recent", label: "rma.sort.recent" },
+  { value: "title", label: "rma.sort.title", columnKey: "title" },
+  { value: "support", label: "rma.sort.support", columnKey: "support" },
+  { value: "status", label: "rma.sort.status", columnKey: "status" },
+  { value: "assets", label: "rma.sort.assets", columnKey: "assets" },
+];
+
 export const RmaPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -33,6 +45,9 @@ export const RmaPage = () => {
 
   const [activeRmaCaseId, setActiveRmaCaseId] = useState<string | null>(null);
   const [pendingRmaCaseId, setPendingRmaCaseId] = useState<string | null>(null);
+  // Set by the row context menu's "draft email": opens the mailto once the
+  // case detail (which the email body needs) finishes loading.
+  const [pendingMailCaseId, setPendingMailCaseId] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [initialDraft, setInitialDraft] = useState<RmaCaseEditorInitialDraft | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -73,6 +88,18 @@ export const RmaPage = () => {
     }
   }, [pendingRmaCaseId, snapshot.cases]);
 
+  useEffect(() => {
+    if (!pendingMailCaseId || detail.caseRecord?.id !== pendingMailCaseId) {
+      return;
+    }
+
+    setPendingMailCaseId(null);
+    const url = buildRmaMailtoUrl(detail);
+    if (url) {
+      void window.bukowskiApp?.openExternal(url);
+    }
+  }, [detail, pendingMailCaseId]);
+
   // Deep links from incidents: ?focus=<caseId> selects an existing case;
   // ?newForAsset=<assetId> opens the create editor with that asset preselected.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -101,10 +128,103 @@ export const RmaPage = () => {
     }, { replace: true });
   }, [newCaseForAssetId, setSearchParams]);
 
+  // Assets list backs the deep-link case: an incident can hand off an asset
+  // that is NOT in maintenance status, and the picker must still show it.
+  const { data: allAssets } = useAssetsList({
+    workspaceId: activeWorkspaceId,
+    search: "",
+    sortBy: "name",
+    sortDirection: "asc",
+  } satisfies AssetListQuery);
+
+  const preselectedExtraAssets = useMemo(() => {
+    if (editorMode !== "create" || !initialDraft?.assetItems?.length) {
+      return [];
+    }
+
+    const maintenanceIds = new Set(snapshot.maintenanceAssets.map((asset) => asset.id));
+    return initialDraft.assetItems
+      .filter((item) => !maintenanceIds.has(item.assetId))
+      .map((item) => allAssets.find((asset) => asset.id === item.assetId))
+      .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset))
+      .map((asset) => ({
+        id: asset.id,
+        name: asset.name,
+        brand: "",
+        model: asset.code,
+        serialNumber: asset.serialNumber,
+        location: asset.location,
+        latestIssue: "",
+      }));
+  }, [allAssets, editorMode, initialDraft, snapshot.maintenanceAssets]);
+
   const availableAssets = useMemo(
-    () => buildAvailableRmaAssets(snapshot.maintenanceAssets, editorMode === "edit" ? detail : null, t("rma.editor.alreadyLinked")),
-    [detail, editorMode, snapshot.maintenanceAssets, t],
+    () =>
+      buildAvailableRmaAssets(
+        [...snapshot.maintenanceAssets, ...preselectedExtraAssets],
+        editorMode === "edit" ? detail : null,
+        t("rma.editor.alreadyLinked"),
+      ),
+    [detail, editorMode, preselectedExtraAssets, snapshot.maintenanceAssets, t],
   );
+
+  const [searchValue, setSearchValue] = useState("");
+  const [sortBy, setSortBy] = useState<RmaCaseSortField>("recent");
+  const [sortDirection, setSortDirection] = useState<ListSortDirection>("desc");
+
+  const visibleCases = useMemo(() => {
+    const term = searchValue.trim().toLowerCase();
+    const filtered = term
+      ? snapshot.cases.filter((row) =>
+          [row.title, row.manufacturerName, row.supportEmail, row.status]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(term)),
+        )
+      : snapshot.cases;
+
+    if (sortBy === "recent") {
+      // Snapshot already arrives ordered by updated_at DESC.
+      return sortDirection === "desc" ? filtered : [...filtered].reverse();
+    }
+
+    const compare = (left: (typeof filtered)[number], right: (typeof filtered)[number]) => {
+      if (sortBy === "assets") {
+        return left.assetCount - right.assetCount;
+      }
+      if (sortBy === "support") {
+        return left.supportEmail.localeCompare(right.supportEmail);
+      }
+      if (sortBy === "status") {
+        return left.status.localeCompare(right.status);
+      }
+      return left.title.localeCompare(right.title);
+    };
+
+    const sorted = [...filtered].sort(compare);
+    return sortDirection === "desc" ? sorted.reverse() : sorted;
+  }, [searchValue, snapshot.cases, sortBy, sortDirection]);
+
+  const activeSortOption = rmaCaseSortOptions.find((option) => option.value === sortBy);
+  const activeColumnKey = activeSortOption?.columnKey ?? null;
+
+  const handleColumnSortRequest = (columnKey: string) => {
+    const option = rmaCaseSortOptions.find((candidate) => candidate.columnKey === columnKey);
+    if (!option) {
+      return;
+    }
+    if (option.value === sortBy) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(option.value);
+      setSortDirection("asc");
+    }
+  };
+
+  const beginCreateForAsset = (assetId: string, issueSummary = "") => {
+    setEditorMode("create");
+    setInitialDraft({ assetItems: [{ assetId, issueSummary }] });
+    setEditorError(null);
+  };
 
   const handleSubmit = async (draft: RmaCaseEditorDraft) => {
     try {
@@ -231,6 +351,20 @@ export const RmaPage = () => {
             getRowId={(row) => row.id}
             maxHeight="min(28vh, 240px)"
             persistKey="rma-page-maintenance-watch"
+            rowActions={(row) => [
+              {
+                key: "create-case",
+                label: t("rma.context.createCase"),
+                icon: <Wrench size={14} />,
+                onSelect: (target) => beginCreateForAsset(target.id, target.latestIssue),
+              },
+              {
+                key: "view-asset",
+                label: t("rma.context.viewAsset"),
+                icon: <Box size={14} />,
+                onSelect: (target) => navigate(`/assets/${target.id}`),
+              },
+            ]}
             columns={[
               {
                 key: "asset",
@@ -244,7 +378,11 @@ export const RmaPage = () => {
               },
               { key: "serial", label: t("rma.columns.serial"), render: (row) => row.serialNumber || t("rma.fallbacks.pending") },
               { key: "location", label: t("rma.columns.location"), render: (row) => row.location },
-              { key: "issue", label: t("rma.columns.latestIssue"), render: (row) => row.latestIssue },
+              {
+                key: "issue",
+                label: t("rma.columns.latestIssue"),
+                render: (row) => row.latestIssue || t("rma.maintenance.noIssue"),
+              },
             ]}
             rows={snapshot.maintenanceAssets}
             emptyMessage={t("rma.maintenance.empty")}
@@ -269,12 +407,63 @@ export const RmaPage = () => {
             }
             title={t("rma.cases.title")}
           >
+            <ListToolbar
+              activeSortLabel={activeSortOption ? t(activeSortOption.label) : undefined}
+              onSearchValueChange={setSearchValue}
+              onSortByChange={(value) => {
+                setSortBy(value);
+                setSortDirection(value === "recent" ? "desc" : "asc");
+              }}
+              onToggleSortDirection={() => setSortDirection((current) => (current === "asc" ? "desc" : "asc"))}
+              resultCount={visibleCases.length}
+              resultLabel={t("rma.resultLabel")}
+              searchPlaceholder={t("rma.toolbar.searchPlaceholder")}
+              searchValue={searchValue}
+              sortBy={sortBy}
+              sortDirection={sortDirection}
+              sortOptions={rmaCaseSortOptions.map((option) => ({ ...option, label: t(option.label) }))}
+            />
             <DataTable
               activeRowId={activeRmaCaseId}
               autoScrollToActiveRow
               getRowId={(row) => row.id}
               maxHeight="min(54vh, 560px)"
               persistKey="rma-page-cases"
+              onSortRequest={handleColumnSortRequest}
+              sortState={activeColumnKey ? { columnKey: activeColumnKey, direction: sortDirection } : null}
+              rowActions={(row) => [
+                {
+                  key: "open",
+                  label: t("shared.dataTable.openDetail"),
+                  icon: <FileText size={14} />,
+                  onSelect: (target) => {
+                    setActiveRmaCaseId(target.id);
+                    setEditorMode(null);
+                    setEditorError(null);
+                  },
+                },
+                {
+                  key: "edit",
+                  label: t("common.edit"),
+                  icon: <SquarePen size={14} />,
+                  onSelect: (target) => {
+                    setActiveRmaCaseId(target.id);
+                    setEditorMode("edit");
+                    setEditorError(null);
+                  },
+                },
+                {
+                  key: "email",
+                  label: t("rma.actions.openDraftEmail"),
+                  icon: <Mail size={14} />,
+                  disabled: !row.supportEmail,
+                  separatorBefore: true,
+                  onSelect: (target) => {
+                    setActiveRmaCaseId(target.id);
+                    setPendingMailCaseId(target.id);
+                  },
+                },
+              ]}
               columns={[
                 {
                   key: "title",
@@ -304,7 +493,7 @@ export const RmaPage = () => {
                 setEditorMode(null);
                 setEditorError(null);
               }}
-              rows={snapshot.cases}
+              rows={visibleCases}
             />
           </SurfaceCard>
 
