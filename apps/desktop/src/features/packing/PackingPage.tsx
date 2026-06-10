@@ -1,4 +1,4 @@
-import { FileText, MoreHorizontal, Printer, RotateCcw, ShieldCheck, Upload } from "lucide-react";
+import { FileText, MoreHorizontal, Printer, RotateCcw, ShieldCheck, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
@@ -8,8 +8,10 @@ import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { DataTable } from "@shared/components/DataTable";
 import { ListToolbar } from "@shared/components/ListToolbar";
+import { ModalShell } from "@shared/components/ModalShell";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
+import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { type ListSortOption, useListControls } from "@shared/hooks/useListControls";
@@ -34,6 +36,14 @@ type PackingPageProps = {
 };
 
 type PackingStatusFilter = "all" | "open" | "overdue" | "pending" | "closed";
+
+type PendingReturnTarget = {
+  packingSlipId: string;
+  number: string;
+  pendingCount: number;
+};
+
+const returnConditionOptions = ["Good", "Review", "Damaged"] as const;
 
 const packingSortOptions: Array<ListSortOption<PackingSlipSortField>> = [
   { value: "issuedDate", label: "packing.sort.issuedDate", columnKey: "issuedDate" },
@@ -95,6 +105,8 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const [isBatchExportingPdf, setIsBatchExportingPdf] = useState(false);
   const [isBatchExportingInsurancePdf, setIsBatchExportingInsurancePdf] = useState(false);
   const [selectionActionsOpen, setSelectionActionsOpen] = useState(false);
+  const [pendingReturnTarget, setPendingReturnTarget] = useState<PendingReturnTarget | null>(null);
+  const [pendingReturnCondition, setPendingReturnCondition] = useState<string>("Good");
   const selectionActionsRef = useRef<HTMLDivElement | null>(null);
   const { data: detail, error: detailError, isLoading: detailLoading, reload: reloadDetail } = usePackingDetail(activePackingSlipId);
   const focusedPackingSlipId = searchParams.get("focus");
@@ -104,7 +116,6 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
       open: data.filter((row) => row.status !== "Closed").length,
       overdue: data.filter((row) => row.status === "Overdue").length,
       pendingSlips: data.filter((row) => Math.max(0, row.itemCount - row.returnedCount) > 0).length,
-      pendingItems: data.reduce((total, row) => total + Math.max(0, row.itemCount - row.returnedCount), 0),
     }),
     [data],
   );
@@ -259,7 +270,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
     }
   };
 
-  const returnPendingForSlip = async (packingSlipId: string) => {
+  const returnPendingForSlip = async (packingSlipId: string, conditionIn: string) => {
     try {
       setIsSubmittingReturn(true);
       const result = await returnPackingSlipItems({
@@ -267,11 +278,12 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
         workspaceId: activeWorkspaceId,
         packingSlipId,
         assetIds: [],
-        conditionIn: "Good",
+        conditionIn,
         actorType: "user",
         sourceChannel: "desktop",
       });
 
+      setPendingReturnTarget(null);
       openPackingSlip(packingSlipId);
       await reload();
       setReturnError(null);
@@ -329,7 +341,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   };
 
   return (
-    <div className="page-stack packing-page-stack">
+    <div className={`page-stack packing-page-stack${isProjectMode ? "" : " packing-page-stack--fill"}`}>
       <SectionHeader
         title={isProjectMode ? t("packing.titleProject") : t("packing.title")}
       />
@@ -358,20 +370,6 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             sortDirection={packingControls.sortDirection}
             sortOptions={translatedSortOptions}
           />
-          <div className="packing-overview-strip" aria-label={t("packing.overview.title")}>
-            <span>
-              <strong>{packingStats.open}</strong>
-              {t("packing.overview.open")}
-            </span>
-            <span>
-              <strong>{packingStats.overdue}</strong>
-              {t("packing.overview.overdue")}
-            </span>
-            <span>
-              <strong>{packingStats.pendingItems}</strong>
-              {t("packing.overview.pendingUnits")}
-            </span>
-          </div>
           <div className="packing-filter-row" aria-label={t("packing.filters.title")}>
             {filterOptions.map((option) => (
               <button
@@ -598,7 +596,12 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
                 disabled: isSubmittingReturn || Math.max(0, row.itemCount - row.returnedCount) < 1,
                 separatorBefore: true,
                 onSelect: (target) => {
-                  void returnPendingForSlip(target.id);
+                  setPendingReturnCondition("Good");
+                  setPendingReturnTarget({
+                    packingSlipId: target.id,
+                    number: row.number,
+                    pendingCount: Math.max(0, row.itemCount - row.returnedCount),
+                  });
                 },
               },
             ]}
@@ -682,6 +685,63 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
           }}
         />
       </ResizableSideRailLayout>
+
+      {pendingReturnTarget ? (
+        <ModalShell
+          className="packing-insurance-export-dialog"
+          onClose={isSubmittingReturn ? () => undefined : () => setPendingReturnTarget(null)}
+          width={440}
+        >
+          <div className="document-preview-header">
+            <span className="document-preview-title">{t("packing.returnDialog.title")}</span>
+            <button
+              aria-label={t("common.cancel")}
+              className="icon-ghost-control"
+              disabled={isSubmittingReturn}
+              onClick={() => setPendingReturnTarget(null)}
+              type="button"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="packing-insurance-export-body">
+            <p className="packing-return-dialog-copy">
+              {t("packing.returnDialog.body", {
+                count: pendingReturnTarget.pendingCount,
+                number: pendingReturnTarget.number,
+              })}
+            </p>
+            <label className="action-field">
+              <span className="action-field-label">{t("packing.detail.conditionIn")}</span>
+              <SelectField onChange={(event) => setPendingReturnCondition(event.target.value)} value={pendingReturnCondition}>
+                {returnConditionOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {t(`packing.conditions.${option}`)}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
+          </div>
+          <div className="document-preview-header packing-insurance-export-footer">
+            <button className="ghost-control" disabled={isSubmittingReturn} onClick={() => setPendingReturnTarget(null)} type="button">
+              {t("common.cancel")}
+            </button>
+            <button
+              className="action-primary-button"
+              disabled={isSubmittingReturn}
+              onClick={() => void returnPendingForSlip(pendingReturnTarget.packingSlipId, pendingReturnCondition)}
+              type="button"
+            >
+              <RotateCcw size={15} />
+              <span>
+                {isSubmittingReturn
+                  ? t("packing.detail.returning")
+                  : t("packing.returnDialog.confirm", { count: pendingReturnTarget.pendingCount })}
+              </span>
+            </button>
+          </div>
+        </ModalShell>
+      ) : null}
     </div>
   );
 };

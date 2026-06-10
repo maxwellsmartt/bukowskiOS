@@ -1624,7 +1624,7 @@ export const createFoundationReadService = (db: DatabaseSync, deps: FoundationRe
             COALESCE(packing_slips.lifecycle_state, 'operational') AS lifecycle_state,
             packing_slips.issue_date,
             packing_slips.return_due_date,
-            COALESCE(packing_slips.notes, 'No operational notes yet.') AS notes,
+            COALESCE(packing_slips.notes, '') AS notes,
             packing_slips.project_id,
             COALESCE(projects.code, 'UNASSIGNED') AS project_code,
             COALESCE(projects.name, 'Unassigned staging') AS project,

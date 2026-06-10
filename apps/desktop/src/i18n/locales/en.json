@@ -480,7 +480,8 @@
         "loading": "Loading licenses…",
         "empty": "No software licenses yet. Add the first license to start tracking renewals, seats and codes.",
         "noVendorDetails": "No vendor details",
-        "notAdded": "Not added"
+        "notAdded": "Not added",
+        "emptyFiltered": "No results for this search or filter."
       },
       "types": {
         "subscription": "Subscription",
@@ -534,7 +535,11 @@
         "invoice": "Invoice",
         "assignSeats": "Assign seats",
         "saveSeats": "Save seats",
-        "copyCode": "Copy license code"
+        "copyCode": "Copy license code",
+        "newLicense": "New license",
+        "showCode": "Show key",
+        "hideCode": "Hide key",
+        "archive": "Archive"
       },
       "seats": {
         "used": "{{assigned}}/{{total}} seats used",
@@ -550,7 +555,8 @@
         "seatAssignment": "Seat {{index}} assignment"
       },
       "reminder": {
-        "body": "Review renewal before {{date}}."
+        "body": "Review renewal before {{date}}.",
+        "title": "License renewal: {{software}}"
       },
       "toasts": {
         "unavailableTitle": "Licenses unavailable",
@@ -575,6 +581,33 @@
         "codeCopiedTitle": "License code copied",
         "copyFailedTitle": "Could not copy code",
         "copyFailedBody": "Copy it manually from the license card."
+      },
+      "sort": {
+        "software": "Software",
+        "expiry": "Expiry"
+      },
+      "toolbar": {
+        "searchPlaceholder": "Search by software, vendor or email",
+        "resultLabel": "licenses"
+      },
+      "filters": {
+        "title": "License filters",
+        "all": "All",
+        "active": "Active",
+        "permanent": "Permanent",
+        "expiring": "Expiring",
+        "expired": "Expired"
+      },
+      "hints": {
+        "reminderZero": "0 = no reminder"
+      },
+      "edit": {
+        "title": "Edit license"
+      },
+      "confirmRemove": {
+        "title": "Archive this license?",
+        "body": "It will be removed from the active list; history is kept.",
+        "action": "Archive"
       }
     },
     "selection": {
@@ -2190,7 +2223,8 @@
         "responsible": "Responsible",
         "status": "Status",
         "returnedAt": "Returned at"
-      }
+      },
+      "allReturned": "All units have been returned."
     },
     "toasts": {
       "doneTitle": "Done",
@@ -2204,6 +2238,21 @@
       "unablePrintInsurance": "Unable to print insurance list PDF.",
       "unablePrintSlip": "Unable to print packing slip PDF.",
       "unableReturn": "Unable to register packing return."
+    },
+    "returnDialog": {
+      "title": "Return pending units",
+      "body_one": "{{count}} pending unit from slip {{number}} will be returned with the selected condition.",
+      "body_other": "{{count}} pending units from slip {{number}} will be returned with the selected condition.",
+      "confirm_one": "Return {{count}} unit",
+      "confirm_other": "Return {{count}} units"
+    },
+    "insuranceExport": {
+      "rateTypes": {
+        "buy": "Buy",
+        "sell": "Sell",
+        "average": "Average",
+        "manual": "Manual"
+      }
     }
   },
   "common": {

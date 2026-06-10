@@ -1714,7 +1714,7 @@ const AssetsContent = ({ projectId, projectName }: AssetsPageProps) => {
         </div>
       ) : null}
 
-      {!error && !isLoading && assets.length === 0 ? (
+      {!error && !isLoading && assets.length === 0 && !assetControls.searchValue.trim() ? (
         <GuidedEmptyState
           title={isProjectMode ? t("assets.empty.projectTitle") : t("assets.empty.globalTitle")}
           body={isProjectMode ? t("assets.empty.projectBody") : t("assets.empty.globalBody")}

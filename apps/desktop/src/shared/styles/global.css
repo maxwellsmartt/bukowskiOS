@@ -5298,6 +5298,66 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   padding-bottom: calc(var(--space-md) + 18px);
 }
 
+/* Packing slips (global route): fill the viewport like the other registry
+   tables. The route container stops scrolling so the page-stack owns the
+   height, and the fixed rail-card cap is lifted so the table grows with it. */
+.shell-content-packing {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.packing-page-stack--fill .rail-table-card {
+  min-height: 0;
+  max-height: none;
+}
+
+/* Outranks `.resizable-side-layout.split-layout { align-items: start }`, which
+   is declared later in this file and would otherwise collapse the cards to
+   their content height. */
+.packing-page-stack.packing-page-stack--fill > .split-layout {
+  align-items: stretch;
+}
+
+.packing-page-stack--fill .packing-detail-card {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.packing-return-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.packing-return-action-row .packing-return-hint {
+  flex: 1 1 auto;
+}
+
+.packing-return-action-row .action-primary-button {
+  flex-shrink: 0;
+}
+
+.packing-return-complete {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border: 1px solid rgba(104, 197, 151, 0.16);
+  border-radius: 12px;
+  background: rgba(104, 197, 151, 0.05);
+  color: rgba(194, 242, 217, 0.88);
+  font-size: var(--font-xs, 11px);
+}
+
+.packing-return-dialog-copy {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
 .select-field-shell {
   position: relative;
 }
@@ -11292,23 +11352,28 @@ button.timeline-signal-chip:focus-visible {
   gap: 10px;
 }
 
-.license-summary-grid {
+/* The license editor lives in a modal and the register fills the page width;
+   counts moved from KPI cards into the actionable filter chips. */
+.license-editor-body {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.license-layout {
-  display: grid;
-  grid-template-columns: minmax(360px, 0.85fr) minmax(0, 1.15fr);
   gap: 14px;
-  align-items: start;
-  min-height: 0;
+  padding: 14px 16px 16px;
 }
 
-.license-layout > .surface-card {
-  min-height: 520px;
-  overflow: visible;
+.license-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.license-filter-row .filter-chip {
+  gap: 8px;
+  min-height: 26px;
+}
+
+.field-block .field-hint {
+  color: var(--text-muted);
+  font-size: 10.5px;
 }
 
 .license-refresh-button {
@@ -11448,7 +11513,7 @@ button.timeline-signal-chip:focus-visible {
 
 .license-code-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -16420,11 +16485,6 @@ select.field-input {
 }
 
 @media (max-width: 980px) {
-  .license-summary-grid,
-  .license-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .license-row {
     grid-template-columns: minmax(0, 1fr);
   }

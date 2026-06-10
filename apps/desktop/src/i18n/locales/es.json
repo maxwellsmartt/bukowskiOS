@@ -482,7 +482,8 @@
         "loading": "Cargando licencias…",
         "empty": "Aún no hay licencias de software. Agrega la primera para controlar renovaciones, seats y códigos.",
         "noVendorDetails": "Sin datos del proveedor",
-        "notAdded": "Sin agregar"
+        "notAdded": "Sin agregar",
+        "emptyFiltered": "Sin resultados con esta búsqueda o filtro."
       },
       "types": {
         "subscription": "Suscripción",
@@ -536,7 +537,11 @@
         "invoice": "Factura",
         "assignSeats": "Asignar seats",
         "saveSeats": "Guardar seats",
-        "copyCode": "Copiar código de licencia"
+        "copyCode": "Copiar código de licencia",
+        "newLicense": "Nueva licencia",
+        "showCode": "Mostrar clave",
+        "hideCode": "Ocultar clave",
+        "archive": "Archivar"
       },
       "seats": {
         "used": "{{assigned}}/{{total}} puestos usados",
@@ -552,7 +557,8 @@
         "seatAssignment": "Asignación del seat {{index}}"
       },
       "reminder": {
-        "body": "Revisar renovación antes de {{date}}."
+        "body": "Revisar renovación antes de {{date}}.",
+        "title": "Renovación de licencia: {{software}}"
       },
       "toasts": {
         "unavailableTitle": "Licencias no disponibles",
@@ -577,6 +583,33 @@
         "codeCopiedTitle": "Código de licencia copiado",
         "copyFailedTitle": "No se pudo copiar el código",
         "copyFailedBody": "Cópialo manualmente desde el card de licencia."
+      },
+      "sort": {
+        "software": "Software",
+        "expiry": "Vencimiento"
+      },
+      "toolbar": {
+        "searchPlaceholder": "Buscar por software, proveedor o correo",
+        "resultLabel": "licencias"
+      },
+      "filters": {
+        "title": "Filtros de licencias",
+        "all": "Todas",
+        "active": "Activas",
+        "permanent": "Permanentes",
+        "expiring": "Por vencer",
+        "expired": "Vencidas"
+      },
+      "hints": {
+        "reminderZero": "0 = sin recordatorio"
+      },
+      "edit": {
+        "title": "Editar licencia"
+      },
+      "confirmRemove": {
+        "title": "¿Archivar esta licencia?",
+        "body": "Se quitará de la lista activa; el historial se conserva.",
+        "action": "Archivar"
       }
     },
     "selection": {
@@ -2194,7 +2227,8 @@
         "responsible": "Responsable",
         "status": "Estado",
         "returnedAt": "Devuelto"
-      }
+      },
+      "allReturned": "Todas las unidades fueron devueltas."
     },
     "toasts": {
       "doneTitle": "Listo",
@@ -2208,6 +2242,21 @@
       "unablePrintInsurance": "No se pudo imprimir el PDF de seguro.",
       "unablePrintSlip": "No se pudo imprimir el PDF del packing slip.",
       "unableReturn": "No se pudo registrar la devolución."
+    },
+    "returnDialog": {
+      "title": "Devolver pendientes",
+      "body_one": "Se devolverá {{count}} unidad pendiente del slip {{number}} con la condición seleccionada.",
+      "body_other": "Se devolverán {{count}} unidades pendientes del slip {{number}} con la condición seleccionada.",
+      "confirm_one": "Devolver {{count}} unidad",
+      "confirm_other": "Devolver {{count}} unidades"
+    },
+    "insuranceExport": {
+      "rateTypes": {
+        "buy": "Compra",
+        "sell": "Venta",
+        "average": "Promedio",
+        "manual": "Manual"
+      }
     }
   },
   "common": {

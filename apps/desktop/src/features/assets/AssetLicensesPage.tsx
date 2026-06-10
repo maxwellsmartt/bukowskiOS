@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Copy, CreditCard, KeyRound, Pencil, Plus, ReceiptText, RefreshCw, Repeat2, Save, Trash2, UsersRound, X } from "lucide-react";
+import { Archive, Check, Copy, CreditCard, Eye, EyeOff, KeyRound, Pencil, Plus, ReceiptText, RefreshCw, Repeat2, Save, UsersRound, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import type { SoftwareLicenseRow } from "@contracts";
 import { useNotifications } from "@app/providers/NotificationsProvider";
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
+import { ListToolbar } from "@shared/components/ListToolbar";
+import { ModalShell } from "@shared/components/ModalShell";
 import { SectionHeader } from "@shared/components/SectionHeader";
+import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { useConfirmDialog } from "@shared/hooks/useConfirmDialog";
@@ -110,7 +114,17 @@ const buildDraftFromLicense = (license: SoftwareLicenseRow): LicenseDraft => ({
   notes: license.notes ?? "",
 });
 
-const buildLicenseReminderTitle = (softwareName: string) => `License renewal: ${softwareName}`;
+type LicenseStatusFilter = "all" | "active" | "permanent" | "expiring" | "expired";
+type LicenseSortField = "software" | "expiry";
+
+const buildLicenseReminderTitle = (softwareName: string, t: TFunction) =>
+  t("assets.licenses.reminder.title", { software: softwareName });
+
+// Reminders created before the title was localized used this English form;
+// keep matching it so they get found, migrated, or cleaned up.
+const legacyLicenseReminderTitle = (softwareName: string) => `License renewal: ${softwareName}`;
+
+const maskLicenseKey = (key: string) => (key.length <= 4 ? "••••••" : `•••• ${key.slice(-4)}`);
 
 const buildLicenseReminderTime = (expiresAt: string, reminderDaysBefore: number) => {
   const reminderAt = new Date(`${expiresAt}T09:00:00`);
@@ -138,13 +152,26 @@ export const AssetLicensesPage = () => {
   };
   const [rows, setRows] = useState<SoftwareLicenseRow[]>([]);
   const [draft, setDraft] = useState<LicenseDraft>(emptyDraft);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [editingLicenseId, setEditingLicenseId] = useState<string | null>(null);
   const [seatEditorLicenseId, setSeatEditorLicenseId] = useState<string | null>(null);
   const [seatEditorDraft, setSeatEditorDraft] = useState<string[]>([]);
   const [seatEditorBusyId, setSeatEditorBusyId] = useState<string | null>(null);
   const [copiedLicenseId, setCopiedLicenseId] = useState<string | null>(null);
+  const [revealedLicenseId, setRevealedLicenseId] = useState<string | null>(null);
+  const [searchValue, setSearchValue] = useState("");
+  const [statusFilter, setStatusFilter] = useState<LicenseStatusFilter>("all");
+  const [sortBy, setSortBy] = useState<LicenseSortField>("software");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const findLicenseReminder = (softwareName: string) =>
+    reminders.find(
+      (reminder) =>
+        reminder.title === buildLicenseReminderTitle(softwareName, t) ||
+        reminder.title === legacyLicenseReminderTitle(softwareName),
+    );
 
   const loadLicenses = async () => {
     if (!window.bukowskiLicenses || !activeWorkspaceId) {
@@ -177,12 +204,52 @@ export const AssetLicensesPage = () => {
   const summary = useMemo(
     () => ({
       total: rows.length,
+      active: rows.filter((row) => row.status === "active").length,
+      permanent: rows.filter((row) => row.status === "permanent").length,
       expiring: rows.filter((row) => row.status === "expiring").length,
       expired: rows.filter((row) => row.status === "expired").length,
-      seats: rows.reduce((total, row) => total + (row.seat_count || 0), 0),
     }),
     [rows],
   );
+  const filterOptions = useMemo(
+    () => [
+      { value: "all" as const, label: t("assets.licenses.filters.all"), count: summary.total },
+      { value: "active" as const, label: t("assets.licenses.filters.active"), count: summary.active },
+      { value: "permanent" as const, label: t("assets.licenses.filters.permanent"), count: summary.permanent },
+      { value: "expiring" as const, label: t("assets.licenses.filters.expiring"), count: summary.expiring },
+      { value: "expired" as const, label: t("assets.licenses.filters.expired"), count: summary.expired },
+    ],
+    [summary, t],
+  );
+  const licenseSortOptions = useMemo(
+    () => [
+      { value: "software" as const, label: t("assets.licenses.sort.software") },
+      { value: "expiry" as const, label: t("assets.licenses.sort.expiry") },
+    ],
+    [t],
+  );
+  const visibleRows = useMemo(() => {
+    const query = searchValue.trim().toLowerCase();
+    const filtered = rows.filter((row) => {
+      if (statusFilter !== "all" && row.status !== statusFilter) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      return [row.software_name, row.vendor ?? "", row.account_email ?? ""].some((field) =>
+        field.toLowerCase().includes(query),
+      );
+    });
+
+    return [...filtered].sort((a, b) => {
+      const compared =
+        sortBy === "software"
+          ? a.software_name.localeCompare(b.software_name)
+          : (a.expires_at ?? "9999-12-31").localeCompare(b.expires_at ?? "9999-12-31");
+      return sortDirection === "asc" ? compared : -compared;
+    });
+  }, [rows, searchValue, sortBy, sortDirection, statusFilter]);
   const licenseTypeOptions = useMemo(
     () =>
       (["subscription", "perpetual", "trial", "usage_based", "web_service", "other"] as const).map((value) => ({
@@ -237,13 +304,13 @@ export const AssetLicensesPage = () => {
     softwareName: string;
   }) => {
     if (previousSoftwareName && previousSoftwareName !== softwareName) {
-      const previousReminder = reminders.find((reminder) => reminder.title === buildLicenseReminderTitle(previousSoftwareName));
+      const previousReminder = findLicenseReminder(previousSoftwareName);
       if (previousReminder) {
         await deleteReminder(previousReminder.id);
       }
     }
 
-    const existingReminder = reminders.find((reminder) => reminder.title === buildLicenseReminderTitle(softwareName));
+    const existingReminder = findLicenseReminder(softwareName);
     const reminderAt = expiresAt && reminderDaysBefore > 0 ? buildLicenseReminderTime(expiresAt, reminderDaysBefore) : null;
 
     if (!reminderAt) {
@@ -255,9 +322,11 @@ export const AssetLicensesPage = () => {
 
     const body = t("assets.licenses.reminder.body", { date: formatDate(expiresAt) });
     if (existingReminder) {
+      // Always rewrite the title so legacy English reminders migrate to the
+      // localized form the next time the license is saved.
       await updateReminder({
         id: existingReminder.id,
-        title: existingReminder.title,
+        title: buildLicenseReminderTitle(softwareName, t),
         body,
         remindAt: reminderAt,
         recurrenceRule: null,
@@ -266,7 +335,7 @@ export const AssetLicensesPage = () => {
     }
 
     await createReminder({
-      title: buildLicenseReminderTitle(softwareName),
+      title: buildLicenseReminderTitle(softwareName, t),
       body,
       remindAt: reminderAt,
     });
@@ -341,6 +410,7 @@ export const AssetLicensesPage = () => {
       });
       setDraft(emptyDraft);
       setEditingLicenseId(null);
+      setEditorOpen(false);
       toast.success(editingLicenseId ? t("assets.licenses.toasts.updatedTitle") : t("assets.licenses.toasts.savedTitle"), draft.softwareName.trim());
       await loadLicenses();
     } catch (nextError) {
@@ -353,9 +423,17 @@ export const AssetLicensesPage = () => {
   const handleEdit = (license: SoftwareLicenseRow) => {
     setEditingLicenseId(license.id);
     setDraft(buildDraftFromLicense(license));
+    setEditorOpen(true);
+  };
+
+  const handleNewLicense = () => {
+    setEditingLicenseId(null);
+    setDraft(emptyDraft);
+    setEditorOpen(true);
   };
 
   const handleCancelEdit = () => {
+    setEditorOpen(false);
     setEditingLicenseId(null);
     setDraft(emptyDraft);
   };
@@ -363,17 +441,16 @@ export const AssetLicensesPage = () => {
   const handleArchive = async (license: SoftwareLicenseRow) => {
     if (!window.bukowskiLicenses || !activeWorkspaceId) return;
     const confirmed = await confirm({
-      title: t("assets.licenses.confirmRemove.title", { defaultValue: "¿Eliminar esta licencia?" }),
-      body: t("assets.licenses.confirmRemove.body", {
-        defaultValue: "Se quitará de la lista de licencias activas.",
-      }),
+      title: t("assets.licenses.confirmRemove.title"),
+      body: t("assets.licenses.confirmRemove.body"),
       details: license.software_name,
-      confirmLabel: t("assets.licenses.confirmRemove.action", { defaultValue: "Eliminar" }),
+      confirmLabel: t("assets.licenses.confirmRemove.action"),
+      tone: "default",
     });
     if (!confirmed) return;
     try {
       await window.bukowskiLicenses.archive({ workspaceId: activeWorkspaceId, licenseId: license.id });
-      const reminder = reminders.find((item) => item.title === buildLicenseReminderTitle(license.software_name));
+      const reminder = findLicenseReminder(license.software_name);
       if (reminder) {
         await deleteReminder(reminder.id).catch(() => undefined);
       }
@@ -464,43 +541,29 @@ export const AssetLicensesPage = () => {
 
   return (
     <div className="page-stack">
-      <SectionHeader title={t("assets.licenses.title")} titleTone="accent" />
+      <SectionHeader title={t("assets.licenses.title")} />
 
-      <div className="license-summary-grid">
-        <SurfaceCard className="agents-health-card">
-          <span className="agents-health-label">{t("assets.licenses.metrics.licenses")}</span>
-          <strong className="agents-health-value">{summary.total}</strong>
-        </SurfaceCard>
-        <SurfaceCard className="agents-health-card">
-          <span className="agents-health-label">{t("assets.licenses.metrics.expiringSoon")}</span>
-          <strong className="agents-health-value">{summary.expiring}</strong>
-        </SurfaceCard>
-        <SurfaceCard className="agents-health-card">
-          <span className="agents-health-label">{t("assets.licenses.metrics.expired")}</span>
-          <strong className="agents-health-value">{summary.expired}</strong>
-        </SurfaceCard>
-        <SurfaceCard className="agents-health-card">
-          <span className="agents-health-label">{t("assets.licenses.metrics.seats")}</span>
-          <strong className="agents-health-value">{summary.seats}</strong>
-        </SurfaceCard>
-      </div>
-
-      <div className="license-layout">
-        <SurfaceCard
-          title={t("assets.licenses.add.title")}
-          aside={
+      {editorOpen ? (
+        <ModalShell
+          className="license-editor-dialog"
+          onClose={isSaving ? () => undefined : handleCancelEdit}
+          width={760}
+        >
+          <div className="document-preview-header">
+            <span className="document-preview-title">
+              {editingLicenseId ? t("assets.licenses.edit.title") : t("assets.licenses.add.title")}
+            </span>
             <button
-              aria-label={t("assets.licenses.actions.refresh")}
-              className="icon-ghost-control license-refresh-button"
-              data-tooltip={t("assets.licenses.actions.refresh")}
-              disabled={isLoading}
-              onClick={() => void loadLicenses()}
+              aria-label={t("common.cancel")}
+              className="icon-ghost-control"
+              disabled={isSaving}
+              onClick={handleCancelEdit}
               type="button"
             >
-              <RefreshCw size={14} />
+              <X size={16} />
             </button>
-          }
-        >
+          </div>
+          <div className="license-editor-body">
           <div className="license-form-grid">
             <label className="field-block field-block-span-2">
               <span className="field-label">{t("assets.licenses.fields.software")}</span>
@@ -512,13 +575,13 @@ export const AssetLicensesPage = () => {
             </label>
             <label className="field-block">
               <span className="field-label">{t("assets.licenses.fields.type")}</span>
-              <select className="field-input" onChange={(event) => updateDraft("licenseType", event.target.value as LicenseDraft["licenseType"])} value={draft.licenseType}>
+              <SelectField onChange={(event) => updateDraft("licenseType", event.target.value as LicenseDraft["licenseType"])} value={draft.licenseType}>
                 {licenseTypeOptions.map(({ value, label }) => (
                   <option key={value} value={value}>
                     {label}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
             <label className="field-block">
               <span className="field-label">{t("assets.licenses.fields.seats")}</span>
@@ -527,6 +590,7 @@ export const AssetLicensesPage = () => {
             <label className="field-block">
               <span className="field-label">{t("assets.licenses.fields.renewalReminder")}</span>
               <input className="field-input" min="0" onChange={(event) => updateDraft("reminderDaysBefore", event.target.value)} type="number" value={draft.reminderDaysBefore} />
+              <small className="field-hint">{t("assets.licenses.hints.reminderZero")}</small>
             </label>
             {draft.licenseType !== "perpetual" && draft.licenseType !== "trial" ? (
               <label className="field-block">
@@ -602,25 +666,74 @@ export const AssetLicensesPage = () => {
             </label>
           </div>
           <div className="license-form-actions">
-            {editingLicenseId ? (
-              <button className="ghost-control" onClick={handleCancelEdit} type="button">
-                {t("common.cancel")}
-              </button>
-            ) : null}
+            <button className="ghost-control" disabled={isSaving} onClick={handleCancelEdit} type="button">
+              {t("common.cancel")}
+            </button>
             <button className={`primary-control license-save-button${hasRequiredDraft ? " is-ready" : ""}`} disabled={isSaving} onClick={() => void handleSave()} type="button">
               {isSaving ? <Save size={14} /> : <Plus size={14} />}
               <span>{isSaving ? t("common.saving") : editingLicenseId ? t("common.saveChanges") : t("assets.licenses.actions.addLicense")}</span>
             </button>
           </div>
-        </SurfaceCard>
+          </div>
+        </ModalShell>
+      ) : null}
 
-        <SurfaceCard className="license-register-card" title={t("assets.licenses.register.title")}>
+      <SurfaceCard
+        className="license-register-card"
+        title={t("assets.licenses.register.title")}
+        aside={
+          <div className="surface-card-actions">
+            <button
+              aria-label={t("assets.licenses.actions.refresh")}
+              className="icon-ghost-control license-refresh-button"
+              data-tooltip={t("assets.licenses.actions.refresh")}
+              disabled={isLoading}
+              onClick={() => void loadLicenses()}
+              type="button"
+            >
+              <RefreshCw size={14} />
+            </button>
+            <button className="action-primary-button" onClick={handleNewLicense} type="button">
+              <Plus size={14} />
+              <span>{t("assets.licenses.actions.newLicense")}</span>
+            </button>
+          </div>
+        }
+      >
+          <ListToolbar
+            activeSortLabel={licenseSortOptions.find((option) => option.value === sortBy)?.label}
+            onSearchValueChange={setSearchValue}
+            onSortByChange={setSortBy}
+            onToggleSortDirection={() => setSortDirection((current) => (current === "asc" ? "desc" : "asc"))}
+            resultCount={visibleRows.length}
+            resultLabel={t("assets.licenses.toolbar.resultLabel")}
+            searchPlaceholder={t("assets.licenses.toolbar.searchPlaceholder")}
+            searchValue={searchValue}
+            sortBy={sortBy}
+            sortDirection={sortDirection}
+            sortOptions={licenseSortOptions}
+          />
+          <div className="license-filter-row" aria-label={t("assets.licenses.filters.title")}>
+            {filterOptions.map((option) => (
+              <button
+                className={`filter-chip${statusFilter === option.value ? " active" : ""}`}
+                key={option.value}
+                onClick={() => setStatusFilter(option.value)}
+                type="button"
+              >
+                <span>{option.label}</span>
+                <strong>{option.count}</strong>
+              </button>
+            ))}
+          </div>
           {isLoading ? <div className="empty-state">{t("assets.licenses.register.loading")}</div> : null}
-          {!isLoading && !rows.length ? (
-            <div className="empty-state">{t("assets.licenses.register.empty")}</div>
+          {!isLoading && !visibleRows.length ? (
+            <div className="empty-state">
+              {rows.length ? t("assets.licenses.register.emptyFiltered") : t("assets.licenses.register.empty")}
+            </div>
           ) : (
             <div className="license-list">
-              {rows.map((license) => {
+              {visibleRows.map((license) => {
                 const assignedSeats = normalizeSeatAssignments(license.seat_assignments);
                 const availableSeats = Math.max(0, license.seat_count - assignedSeats.length);
                 const isEditingSeats = seatEditorLicenseId === license.id;
@@ -652,8 +765,8 @@ export const AssetLicensesPage = () => {
                         <button className="icon-ghost-control" data-tooltip={t("common.edit")} aria-label={t("common.edit")} onClick={() => handleEdit(license)} type="button">
                           <Pencil size={14} />
                         </button>
-                        <button className="icon-ghost-control danger-icon-control" data-tooltip={t("common.delete")} aria-label={t("common.delete")} onClick={() => void handleArchive(license)} type="button">
-                          <Trash2 size={14} />
+                        <button className="icon-ghost-control" data-tooltip={t("assets.licenses.actions.archive")} aria-label={t("assets.licenses.actions.archive")} onClick={() => void handleArchive(license)} type="button">
+                          <Archive size={14} />
                         </button>
                       </div>
                     </div>
@@ -743,17 +856,34 @@ export const AssetLicensesPage = () => {
 
                     <div className="license-code-row">
                       <span className="license-code-label">{t("assets.licenses.fields.code")}</span>
-                      <code>{license.license_key ?? t("assets.licenses.register.notAdded")}</code>
+                      <code>
+                        {license.license_key
+                          ? revealedLicenseId === license.id
+                            ? license.license_key
+                            : maskLicenseKey(license.license_key)
+                          : t("assets.licenses.register.notAdded")}
+                      </code>
                       {license.license_key ? (
-                        <button
-                          aria-label={t("assets.licenses.actions.copyCode")}
-                          className="icon-ghost-control"
-                          data-tooltip={copiedLicenseId === license.id ? t("common.copied") : t("assets.licenses.actions.copyCode")}
-                          onClick={() => void handleCopyLicenseCode(license)}
-                          type="button"
-                        >
-                          {copiedLicenseId === license.id ? <Check size={13} /> : <Copy size={13} />}
-                        </button>
+                        <>
+                          <button
+                            aria-label={revealedLicenseId === license.id ? t("assets.licenses.actions.hideCode") : t("assets.licenses.actions.showCode")}
+                            className="icon-ghost-control"
+                            data-tooltip={revealedLicenseId === license.id ? t("assets.licenses.actions.hideCode") : t("assets.licenses.actions.showCode")}
+                            onClick={() => setRevealedLicenseId((current) => (current === license.id ? null : license.id))}
+                            type="button"
+                          >
+                            {revealedLicenseId === license.id ? <EyeOff size={13} /> : <Eye size={13} />}
+                          </button>
+                          <button
+                            aria-label={t("assets.licenses.actions.copyCode")}
+                            className="icon-ghost-control"
+                            data-tooltip={copiedLicenseId === license.id ? t("common.copied") : t("assets.licenses.actions.copyCode")}
+                            onClick={() => void handleCopyLicenseCode(license)}
+                            type="button"
+                          >
+                            {copiedLicenseId === license.id ? <Check size={13} /> : <Copy size={13} />}
+                          </button>
+                        </>
                       ) : null}
                     </div>
                   </article>
@@ -761,8 +891,7 @@ export const AssetLicensesPage = () => {
               })}
             </div>
           )}
-        </SurfaceCard>
-      </div>
+      </SurfaceCard>
       {confirmDialog}
     </div>
   );

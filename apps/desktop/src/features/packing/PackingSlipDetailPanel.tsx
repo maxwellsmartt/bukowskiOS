@@ -12,6 +12,7 @@ import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
 import { useCurrencySettings, useExchangeRates } from "@features/finance/useCurrencyData";
+import { presentAssetCondition } from "@shared/lib/assetStatusPresentation";
 
 type PackingSlipDetailPanelProps = {
   data: PackingSlipDetailSnapshot;
@@ -119,7 +120,14 @@ export const PackingSlipDetailPanel = ({
   const defaultRateSource = currencySettings?.defaultRateSource ?? "manual";
   const defaultRateType = currencySettings?.defaultRateType ?? "manual";
   const defaultOutputCurrency = currencySettings?.baseCurrency === "DOP" ? "DOP" : "USD";
-  const hasOperationalNotes = Boolean(data.slip.notes?.trim()) && data.slip.notes !== "No operational notes yet.";
+  const hasOperationalNotes = Boolean(data.slip.notes?.trim());
+  const conditionChip = (value: string | null | undefined) => {
+    if (!value?.trim()) {
+      return "—";
+    }
+    const presented = presentAssetCondition(value, t);
+    return <StatusBadge tone={presented.tone}>{presented.label}</StatusBadge>;
+  };
   const headerActions = (
     <div className="packing-detail-header-actions">
       <StatusBadge tone={data.slip.status === "Overdue" ? "critical" : data.slip.status === "Closed" ? "success" : "info"}>
@@ -147,18 +155,6 @@ export const PackingSlipDetailPanel = ({
             >
               <Upload size={14} />
               <span>{isExportingPdf ? t("packing.detail.exporting") : t("packing.detail.exportSlip")}</span>
-            </button>
-            <button
-              className="is-primary"
-              disabled={isSubmittingReturn || !pendingAssetIds.length}
-              onClick={() => {
-                setActionsOpen(false);
-                void onReturnItems(selectedPendingAssetIds.length ? selectedPendingAssetIds : pendingAssetIds, conditionIn, notes);
-              }}
-              type="button"
-            >
-              <RotateCcw size={14} />
-              <span>{isSubmittingReturn ? t("packing.detail.returning") : returnLabel}</span>
             </button>
             <button
               disabled={isExportingInsurancePdf}
@@ -271,32 +267,50 @@ export const PackingSlipDetailPanel = ({
         </div>
       ) : null}
 
-      <div className="action-form-grid">
-        <label className="action-field">
-          <span className="action-field-label">{t("packing.detail.conditionIn")}</span>
-          <SelectField onChange={(event) => setConditionIn(event.target.value)} value={conditionIn}>
-            {conditionOptions.map((option) => (
-              <option key={option} value={option}>
-                {t(`packing.conditions.${option}`)}
-              </option>
-            ))}
-          </SelectField>
-        </label>
+      {pendingAssetIds.length ? (
+        <>
+          <div className="action-form-grid">
+            <label className="action-field">
+              <span className="action-field-label">{t("packing.detail.conditionIn")}</span>
+              <SelectField onChange={(event) => setConditionIn(event.target.value)} value={conditionIn}>
+                {conditionOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {t(`packing.conditions.${option}`)}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
 
-        <label className="action-field action-field-wide">
-          <span className="action-field-label">{t("packing.detail.returnNote")}</span>
-          <input
-            className="action-field-control"
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder={t("packing.builder.optionalNote")}
-            value={notes}
-          />
-        </label>
-      </div>
+            <label className="action-field action-field-wide">
+              <span className="action-field-label">{t("packing.detail.returnNote")}</span>
+              <input
+                className="action-field-control"
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder={t("packing.builder.optionalNote")}
+                value={notes}
+              />
+            </label>
+          </div>
 
-      <div className="packing-return-hint">
-        {returnHint}
-      </div>
+          <div className="packing-return-action-row">
+            <span className="packing-return-hint">{returnHint}</span>
+            <button
+              className="action-primary-button"
+              disabled={isSubmittingReturn}
+              onClick={() => void onReturnItems(selectedPendingAssetIds.length ? selectedPendingAssetIds : pendingAssetIds, conditionIn, notes)}
+              type="button"
+            >
+              <RotateCcw size={14} />
+              <span>{isSubmittingReturn ? t("packing.detail.returning") : returnLabel}</span>
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="packing-return-complete">
+          <Check size={14} />
+          <span>{t("packing.detail.allReturned")}</span>
+        </div>
+      )}
 
       <DataTable
         defaultVisibleColumnKeys={["asset", "quantity", "conditionIn", "status"]}
@@ -317,8 +331,8 @@ export const PackingSlipDetailPanel = ({
             ),
           },
           { key: "quantity", label: t("packing.detail.columns.units"), align: "right", width: 72, minWidth: 60, render: (row) => row.quantity },
-          { key: "conditionOut", label: t("packing.detail.columns.conditionOut"), width: 116, minWidth: 100, render: (row) => t(`packing.conditions.${row.conditionOut}`, { defaultValue: row.conditionOut }) },
-          { key: "conditionIn", label: t("packing.detail.columns.conditionIn"), width: 116, minWidth: 100, render: (row) => t(`packing.conditions.${row.conditionIn}`, { defaultValue: row.conditionIn }) },
+          { key: "conditionOut", label: t("packing.detail.columns.conditionOut"), width: 116, minWidth: 100, render: (row) => conditionChip(row.conditionOut) },
+          { key: "conditionIn", label: t("packing.detail.columns.conditionIn"), width: 116, minWidth: 100, render: (row) => conditionChip(row.conditionIn) },
           { key: "location", label: t("packing.detail.columns.location"), width: 170, minWidth: 136, render: (row) => row.location },
           { key: "responsible", label: t("packing.detail.columns.responsible"), width: 150, minWidth: 124, render: (row) => row.responsible },
           {
@@ -461,7 +475,7 @@ const InsuranceExportDialog = ({
             <span>{t("packing.insuranceExport.rateType", { defaultValue: "Tipo" })}</span>
             <SelectField value={rateType} onChange={(event) => setRateType(event.target.value as CurrencyRateType)} disabled={outputCurrency === "USD" || mode === "manual"}>
               {rateTypes.map((type) => (
-                <option key={type} value={type}>{type}</option>
+                <option key={type} value={type}>{t(`packing.insuranceExport.rateTypes.${type}`, { defaultValue: type })}</option>
               ))}
             </SelectField>
           </label>
