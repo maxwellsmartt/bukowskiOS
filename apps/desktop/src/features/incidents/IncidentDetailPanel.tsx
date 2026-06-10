@@ -159,16 +159,18 @@ export const IncidentDetailPanel = ({
       className="incident-detail-card detail-rail-card"
       subtitle={[incident.asset, incident.project].filter((value) => value && value !== "—").join(" · ") || undefined}
       aside={
-        <div className="detail-header-actions">
-          <StatusBadge tone={resolveStatusTone(incident.status)}>
-            {t(`incidents.statuses.${incident.status}`, { defaultValue: incident.status })}
-          </StatusBadge>
-          <StatusBadge tone={incident.severity === "High" ? "critical" : incident.severity === "Medium" ? "warning" : "neutral"}>
-            {t(`incidents.severity.${incident.severity}`, { defaultValue: incident.severity })}
-          </StatusBadge>
+        <div className="detail-header-actions detail-header-actions-stacked">
           <button aria-label={t("incidents.detail.close")} className="icon-ghost-control" onClick={onClose} type="button">
             <X size={14} />
           </button>
+          <div className="detail-header-chips">
+            <StatusBadge tone={resolveStatusTone(incident.status)}>
+              {t(`incidents.statuses.${incident.status}`, { defaultValue: incident.status })}
+            </StatusBadge>
+            <StatusBadge tone={incident.severity === "High" ? "critical" : incident.severity === "Medium" ? "warning" : "neutral"}>
+              {t(`incidents.severity.${incident.severity}`, { defaultValue: incident.severity })}
+            </StatusBadge>
+          </div>
         </div>
       }
       title={incident.title}

@@ -61,6 +61,7 @@ describe("foundation navigation shell", () => {
       "shell.nav.assets.licenses",
       "shell.nav.assets.packingSlips",
       "shell.nav.assets.incidents",
+      "shell.nav.assets.repairs",
     ]);
     expect(isSubnavItemActive("/assets/licenses", "/assets/licenses")).toBe(true);
     expect(isSubnavItemActive("/assets/licenses", "/assets")).toBe(false);

@@ -28,7 +28,8 @@
         "assets": "Equipos",
         "licenses": "Licencias",
         "packingSlips": "Packing slips",
-        "incidents": "Incidentes"
+        "incidents": "Incidentes",
+        "repairs": "Reparaciones"
       },
       "finance": {
         "overview": "Resumen",
@@ -2228,7 +2229,8 @@
         "status": "Estado",
         "returnedAt": "Devuelto"
       },
-      "allReturned": "Todas las unidades fueron devueltas."
+      "allReturned": "Todas las unidades fueron devueltas.",
+      "close": "Cerrar detalle"
     },
     "toasts": {
       "doneTitle": "Listo",
@@ -3787,7 +3789,8 @@
       "status": "Estado",
       "assets": "Equipos",
       "year": "Año",
-      "issue": "Problema"
+      "issue": "Problema",
+      "updated": "Actualizado"
     },
     "statuses": {
       "Needs review": "Necesita revisión",
@@ -3845,7 +3848,8 @@
       "contact": "Contacto",
       "phone": "Teléfono",
       "problemSummary": "Resumen del problema",
-      "internalNotes": "Notas internas"
+      "internalNotes": "Notas internas",
+      "close": "Cerrar detalle"
     },
     "editor": {
       "selectedCount_one": "{{count}} equipo seleccionado",
@@ -3878,6 +3882,11 @@
       "updated": "Actualizado",
       "saveFailed": "No se pudo guardar el caso de reparación.",
       "statusFailed": "No se pudo actualizar el estado de reparación."
+    },
+    "retireConfirm": {
+      "title": "Marcar como no reparable",
+      "body": "El caso se cerrará como \"No se repara / retirado\". Los equipos del caso quedan fuera de reparación; podrás retirarlos del inventario desde su incidente o ficha.",
+      "confirm": "Sí, no se repara"
     }
   },
   "projects": {

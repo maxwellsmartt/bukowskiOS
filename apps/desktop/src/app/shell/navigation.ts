@@ -26,6 +26,7 @@ import {
   Settings,
   SwatchBook,
   Users,
+  Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -62,6 +63,7 @@ export const assetsSubnav: NavItem[] = [
   { label: "shell.nav.assets.licenses", path: "/assets/licenses", icon: KeyRound },
   { label: "shell.nav.assets.packingSlips", path: "/packing-slips", icon: PackageOpen },
   { label: "shell.nav.assets.incidents", path: "/incidents", icon: AlertTriangle },
+  { label: "shell.nav.assets.repairs", path: "/rma", icon: Wrench },
 ];
 
 export const financeSubnav: NavItem[] = [

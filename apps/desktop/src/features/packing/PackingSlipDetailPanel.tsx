@@ -24,6 +24,7 @@ type PackingSlipDetailPanelProps = {
   onReturnItems: (assetIds: string[], conditionIn?: string, notes?: string) => Promise<void>;
   onExportPdf: () => Promise<void>;
   onExportInsurancePdf: (options: PackingInsuranceExportOptions) => Promise<void>;
+  onClose?: () => void;
 };
 
 const conditionOptions = ["Good", "Review", "Damaged"] as const;
@@ -41,6 +42,7 @@ export const PackingSlipDetailPanel = ({
   onReturnItems,
   onExportPdf,
   onExportInsurancePdf,
+  onClose,
 }: PackingSlipDetailPanelProps) => {
   const { t } = useTranslation();
   const { activeWorkspaceId } = useWorkspace();
@@ -129,7 +131,13 @@ export const PackingSlipDetailPanel = ({
     return <StatusBadge tone={presented.tone}>{presented.label}</StatusBadge>;
   };
   const headerActions = (
-    <div className="packing-detail-header-actions">
+    <div className="packing-detail-header-actions detail-header-actions-stacked">
+      {onClose ? (
+        <button aria-label={t("packing.detail.close")} className="icon-ghost-control" onClick={onClose} type="button">
+          <X size={14} />
+        </button>
+      ) : null}
+      <div className="detail-header-chips">
       <StatusBadge tone={data.slip.status === "Overdue" ? "critical" : data.slip.status === "Closed" ? "success" : "info"}>
         {t(`packing.statuses.${data.slip.status}`, { defaultValue: data.slip.status })}
       </StatusBadge>
@@ -169,6 +177,7 @@ export const PackingSlipDetailPanel = ({
             </button>
           </div>
         ) : null}
+      </div>
       </div>
     </div>
   );

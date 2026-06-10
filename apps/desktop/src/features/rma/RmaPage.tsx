@@ -1,4 +1,4 @@
-import { Box, FileText, Mail, Plus, SquarePen, Wrench } from "lucide-react";
+import { Box, FileText, Mail, Plus, SquarePen, Wrench, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -7,6 +7,7 @@ import type { AssetListQuery, ListSortDirection, RmaCaseStatus } from "@contract
 import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAssetsList } from "@features/assets/useAssetsData";
+import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { DataTable } from "@shared/components/DataTable";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
@@ -48,6 +49,10 @@ export const RmaPage = () => {
   // Set by the row context menu's "draft email": opens the mailto once the
   // case detail (which the email body needs) finishes loading.
   const [pendingMailCaseId, setPendingMailCaseId] = useState<string | null>(null);
+  // True after the user closes the detail rail with the X: blocks the
+  // auto-select-first effect until they pick a case again.
+  const [detailDismissed, setDetailDismissed] = useState(false);
+  const [retireConfirmOpen, setRetireConfirmOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [initialDraft, setInitialDraft] = useState<RmaCaseEditorInitialDraft | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -62,7 +67,7 @@ export const RmaPage = () => {
   } = useRmaCaseDetail(activeRmaCaseId);
 
   useEffect(() => {
-    if (isSubmitting) {
+    if (isSubmitting || detailDismissed) {
       return;
     }
 
@@ -80,7 +85,7 @@ export const RmaPage = () => {
     }
 
     setActiveRmaCaseId(snapshot.cases[0]?.id ?? null);
-  }, [activeRmaCaseId, isSubmitting, pendingRmaCaseId, snapshot.cases]);
+  }, [activeRmaCaseId, detailDismissed, isSubmitting, pendingRmaCaseId, snapshot.cases]);
 
   useEffect(() => {
     if (pendingRmaCaseId && snapshot.cases.some((row) => row.id === pendingRmaCaseId)) {
@@ -109,6 +114,7 @@ export const RmaPage = () => {
   useEffect(() => {
     if (focusedRmaCaseId && snapshot.cases.some((row) => row.id === focusedRmaCaseId)) {
       setActiveRmaCaseId(focusedRmaCaseId);
+      setDetailDismissed(false);
     }
   }, [focusedRmaCaseId, snapshot.cases]);
 
@@ -265,6 +271,7 @@ export const RmaPage = () => {
         await reloadSnapshot();
         setPendingRmaCaseId(result.rmaCaseId);
         setActiveRmaCaseId(result.rmaCaseId);
+        setDetailDismissed(false);
         toast.success(t("rma.toasts.updated"), result.summary);
       }
 
@@ -439,6 +446,7 @@ export const RmaPage = () => {
                   icon: <FileText size={14} />,
                   onSelect: (target) => {
                     setActiveRmaCaseId(target.id);
+                    setDetailDismissed(false);
                     setEditorMode(null);
                     setEditorError(null);
                   },
@@ -449,6 +457,7 @@ export const RmaPage = () => {
                   icon: <SquarePen size={14} />,
                   onSelect: (target) => {
                     setActiveRmaCaseId(target.id);
+                    setDetailDismissed(false);
                     setEditorMode("edit");
                     setEditorError(null);
                   },
@@ -461,6 +470,7 @@ export const RmaPage = () => {
                   separatorBefore: true,
                   onSelect: (target) => {
                     setActiveRmaCaseId(target.id);
+                    setDetailDismissed(false);
                     setPendingMailCaseId(target.id);
                   },
                 },
@@ -487,10 +497,12 @@ export const RmaPage = () => {
                   ),
                 },
                 { key: "assets", label: t("rma.columns.assets"), align: "right", render: (row) => row.assetCount },
+                { key: "updated", label: t("rma.columns.updated"), render: (row) => row.updatedAtLabel },
               ]}
               emptyMessage={t("rma.cases.empty")}
               onRowClick={(row) => {
                 setActiveRmaCaseId(row.id);
+                setDetailDismissed(false);
                 setEditorMode(null);
                 setEditorError(null);
               }}
@@ -521,37 +533,50 @@ export const RmaPage = () => {
               className="rma-detail-card detail-rail-card"
               aside={
                 detail.caseRecord ? (
-                  <div className="detail-header-actions">
-                    <StatusBadge tone={resolveRmaStatusTone(detail.caseRecord.status)}>
-                      {t(`rma.statuses.${detail.caseRecord.status}`, { defaultValue: detail.caseRecord.status })}
-                    </StatusBadge>
+                  <div className="detail-header-actions detail-header-actions-stacked">
                     <button
-                      aria-label={t("common.edit")}
+                      aria-label={t("rma.detail.close")}
                       className="icon-ghost-control"
                       onClick={() => {
-                        setEditorMode("edit");
-                        setEditorError(null);
+                        setActiveRmaCaseId(null);
+                        setDetailDismissed(true);
                       }}
-                      title={t("common.edit")}
                       type="button"
                     >
-                      <SquarePen size={14} />
+                      <X size={14} />
                     </button>
-                    <button
-                      aria-label={t("rma.actions.openDraftEmail")}
-                      className="icon-ghost-control"
-                      disabled={!detail.caseRecord.supportEmail}
-                      onClick={() => {
-                        const url = buildRmaMailtoUrl(detail);
-                        if (url) {
-                          void window.bukowskiApp?.openExternal(url);
-                        }
-                      }}
-                      title={t("rma.actions.openDraftEmail")}
-                      type="button"
-                    >
-                      <Mail size={14} />
-                    </button>
+                    <div className="detail-header-chips">
+                      <StatusBadge tone={resolveRmaStatusTone(detail.caseRecord.status)}>
+                        {t(`rma.statuses.${detail.caseRecord.status}`, { defaultValue: detail.caseRecord.status })}
+                      </StatusBadge>
+                      <button
+                        aria-label={t("common.edit")}
+                        className="icon-ghost-control"
+                        onClick={() => {
+                          setEditorMode("edit");
+                          setEditorError(null);
+                        }}
+                        title={t("common.edit")}
+                        type="button"
+                      >
+                        <SquarePen size={14} />
+                      </button>
+                      <button
+                        aria-label={t("rma.actions.openDraftEmail")}
+                        className="icon-ghost-control"
+                        disabled={!detail.caseRecord.supportEmail}
+                        onClick={() => {
+                          const url = buildRmaMailtoUrl(detail);
+                          if (url) {
+                            void window.bukowskiApp?.openExternal(url);
+                          }
+                        }}
+                        title={t("rma.actions.openDraftEmail")}
+                        type="button"
+                      >
+                        <Mail size={14} />
+                      </button>
+                    </div>
                   </div>
                 ) : null
               }
@@ -591,13 +616,33 @@ export const RmaPage = () => {
                           key={action.status}
                           className={action.status === "No repair / retired" ? "ghost-control is-danger" : "ghost-control"}
                           disabled={isSubmitting}
-                          onClick={() => void handleUpdateStatus(action.status)}
+                          onClick={() => {
+                            if (action.status === "No repair / retired") {
+                              setRetireConfirmOpen(true);
+                              return;
+                            }
+                            void handleUpdateStatus(action.status);
+                          }}
                           type="button"
                         >
                           {t(action.labelKey, { defaultValue: action.label })}
                         </button>
                       ))}
                   </div>
+
+                  <ConfirmDialog
+                    body={t("rma.retireConfirm.body")}
+                    confirmLabel={t("rma.retireConfirm.confirm")}
+                    isOpen={retireConfirmOpen}
+                    isSubmitting={isSubmitting}
+                    onCancel={() => setRetireConfirmOpen(false)}
+                    onConfirm={async () => {
+                      await handleUpdateStatus("No repair / retired");
+                      setRetireConfirmOpen(false);
+                    }}
+                    title={t("rma.retireConfirm.title")}
+                    tone="danger"
+                  />
 
                   <div className="summary-row">
                     <span className="summary-label">{t("rma.detail.problemSummary")}</span>

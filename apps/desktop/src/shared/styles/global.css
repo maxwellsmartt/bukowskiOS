@@ -5067,6 +5067,24 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   font-size: var(--font-2xs, 10px);
 }
 
+/* Stacked variant: the close X sits alone in the top-right corner and the
+   status pills / quick actions drop to a row underneath, so the dismiss
+   affordance is always in the same corner across every detail rail. */
+.detail-header-actions-stacked {
+  flex-direction: column;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.detail-header-actions-stacked .detail-header-chips {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .packing-detail-actions-menu {
   position: relative;
   display: inline-flex;
@@ -5425,6 +5443,9 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   max-height: none;
   height: 100%;
   overflow-y: auto;
+  /* Same breathing room as the packing rail: the footer actions scroll into
+     view with air underneath instead of kissing the card edge. */
+  padding-bottom: calc(var(--space-md) + 18px);
 }
 
 /* Casos de reparación: same viewport-fill recipe. The maintenance watch card
@@ -5475,6 +5496,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   max-height: none;
   height: 100%;
   overflow-y: auto;
+  padding-bottom: calc(var(--space-md) + 18px);
 }
 
 .table-empty-state span:last-child {

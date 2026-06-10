@@ -94,6 +94,9 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   const [activePackingSlipId, setActivePackingSlipId] = useState<string | null>(() =>
     readStringPreference(uiPreferenceKeys.activePackingSlipId),
   );
+  // True after the user closes the detail rail with the X: blocks the
+  // auto-select-first effect until they pick a slip again.
+  const [detailDismissed, setDetailDismissed] = useState(false);
   const [returnError, setReturnError] = useState<string | null>(null);
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
   const toast = useToast();
@@ -159,6 +162,10 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
   );
 
   useEffect(() => {
+    if (detailDismissed) {
+      return;
+    }
+
     if (!visiblePackingSlips.length) {
       setActivePackingSlipId(null);
       return;
@@ -169,11 +176,12 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
     }
 
     setActivePackingSlipId(visiblePackingSlips[0]?.id ?? null);
-  }, [activePackingSlipId, visiblePackingSlips]);
+  }, [activePackingSlipId, detailDismissed, visiblePackingSlips]);
 
   useEffect(() => {
     if (focusedPackingSlipId && data.some((row) => row.id === focusedPackingSlipId)) {
       setActivePackingSlipId(focusedPackingSlipId);
+      setDetailDismissed(false);
     }
   }, [data, focusedPackingSlipId]);
 
@@ -214,6 +222,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
 
   const openPackingSlip = (packingSlipId: string) => {
     setActivePackingSlipId(packingSlipId);
+    setDetailDismissed(false);
     writePreference(uiPreferenceKeys.activePackingSlipId, packingSlipId);
     setReturnError(null);
   };
@@ -612,6 +621,11 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
         <PackingSlipDetailPanel
           data={detail}
           error={detailError}
+          onClose={() => {
+            setActivePackingSlipId(null);
+            setDetailDismissed(true);
+            writePreference(uiPreferenceKeys.activePackingSlipId, null);
+          }}
           isExportingInsurancePdf={isExportingInsurancePdf}
           isExportingPdf={isExportingPdf}
           isLoading={detailLoading}

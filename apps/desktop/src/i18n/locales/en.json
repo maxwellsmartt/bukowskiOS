@@ -28,7 +28,8 @@
         "assets": "Assets",
         "licenses": "Licenses",
         "packingSlips": "Packing Slips",
-        "incidents": "Incidents"
+        "incidents": "Incidents",
+        "repairs": "Repairs"
       },
       "finance": {
         "overview": "Overview",
@@ -2224,7 +2225,8 @@
         "status": "Status",
         "returnedAt": "Returned at"
       },
-      "allReturned": "All units have been returned."
+      "allReturned": "All units have been returned.",
+      "close": "Close detail"
     },
     "toasts": {
       "doneTitle": "Done",
@@ -3783,7 +3785,8 @@
       "status": "Status",
       "assets": "Assets",
       "year": "Year",
-      "issue": "Issue"
+      "issue": "Issue",
+      "updated": "Updated"
     },
     "statuses": {
       "Needs review": "Needs review",
@@ -3841,7 +3844,8 @@
       "contact": "Contact",
       "phone": "Phone",
       "problemSummary": "Problem summary",
-      "internalNotes": "Internal notes"
+      "internalNotes": "Internal notes",
+      "close": "Close detail"
     },
     "editor": {
       "selectedCount_one": "{{count}} asset selected",
@@ -3874,6 +3878,11 @@
       "updated": "Updated",
       "saveFailed": "Unable to save repair case.",
       "statusFailed": "Unable to update repair status."
+    },
+    "retireConfirm": {
+      "title": "Mark as not repairable",
+      "body": "The case will close as \"No repair / retired\". Its assets drop out of the repair flow; you can retire them from inventory via their incident or asset page.",
+      "confirm": "Yes, no repair"
     }
   },
   "projects": {
