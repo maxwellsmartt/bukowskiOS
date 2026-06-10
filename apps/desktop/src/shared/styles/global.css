@@ -8615,6 +8615,13 @@ body.is-resizing-side-rail {
   gap: 0;
 }
 
+/* With the rail dismissed there is no second column: the base .split-layout
+   two-column template would otherwise leave a phantom 1fr gap where the
+   detail used to live. The table takes the full width instead. */
+.resizable-side-layout.split-layout:not(.has-side-rail) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .resizable-side-layout.split-layout.has-side-rail > :first-child {
   margin-right: var(--space-md);
 }

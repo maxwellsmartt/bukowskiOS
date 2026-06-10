@@ -9,7 +9,6 @@ import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { useAssetsList } from "@features/assets/useAssetsData";
 import { ConfirmDialog } from "@shared/components/ConfirmDialog";
 import { DataTable } from "@shared/components/DataTable";
-import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { ResizableSideRailLayout } from "@shared/components/ResizableSideRailLayout";
 import { SectionHeader } from "@shared/components/SectionHeader";
@@ -328,10 +327,8 @@ export const RmaPage = () => {
 
   };
 
-  const isEmpty = !snapshotError && snapshot.cases.length === 0 && !editorMode;
-
   return (
-    <div className={`page-stack rma-page-stack${isEmpty ? "" : " rma-page-stack--fill"}`}>
+    <div className="page-stack rma-page-stack rma-page-stack--fill">
       <SectionHeader
         title={t("rma.title")}
         body={t("rma.body")}
@@ -340,20 +337,7 @@ export const RmaPage = () => {
 
       {snapshotError ? <div className="action-feedback action-feedback-error">{snapshotError}</div> : null}
 
-      {isEmpty ? (
-        <GuidedEmptyState
-          title={t("rma.empty.title")}
-          body={t("rma.empty.body")}
-          actionLabel={t("rma.empty.action")}
-          onAction={beginCreate}
-          tips={[
-            t("rma.empty.tipOne"),
-            t("rma.empty.tipTwo"),
-            t("rma.empty.tipThree"),
-          ]}
-        />
-      ) : (
-        <SurfaceCard title={t("rma.maintenance.title")}>
+      <SurfaceCard title={t("rma.maintenance.title")}>
           <DataTable
             getRowId={(row) => row.id}
             maxHeight="min(28vh, 240px)"
@@ -395,10 +379,8 @@ export const RmaPage = () => {
             emptyMessage={t("rma.maintenance.empty")}
           />
         </SurfaceCard>
-      )}
 
-      {!isEmpty ? (
-        <ResizableSideRailLayout
+      <ResizableSideRailLayout
           className="split-layout"
           defaultWidth={420}
           maxWidth={680}
@@ -499,7 +481,13 @@ export const RmaPage = () => {
                 { key: "assets", label: t("rma.columns.assets"), align: "right", render: (row) => row.assetCount },
                 { key: "updated", label: t("rma.columns.updated"), render: (row) => row.updatedAtLabel },
               ]}
-              emptyMessage={t("rma.cases.empty")}
+              emptyContent={
+                <div className="table-empty-state">
+                  <span className="table-empty-kicker">{t("rma.empty.kicker")}</span>
+                  <strong>{t("rma.empty.title")}</strong>
+                  <span>{t("rma.empty.body")}</span>
+                </div>
+              }
               onRowClick={(row) => {
                 setActiveRmaCaseId(row.id);
                 setDetailDismissed(false);
@@ -680,8 +668,7 @@ export const RmaPage = () => {
               ) : null}
             </SurfaceCard>
           ) : null}
-        </ResizableSideRailLayout>
-      ) : null}
+      </ResizableSideRailLayout>
     </div>
   );
 };

@@ -3816,6 +3816,7 @@
       "openDraftEmail": "Abrir email borrador"
     },
     "empty": {
+      "kicker": "Sin casos",
       "title": "Aún no hay casos de reparación",
       "body": "Abre un RMA cuando necesites enviar un equipo al fabricante por garantía o reparación pagada. También puedes iniciar uno desde un incidente.",
       "action": "Nuevo caso de reparación",

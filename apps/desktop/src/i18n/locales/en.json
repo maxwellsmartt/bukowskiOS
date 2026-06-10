@@ -3812,6 +3812,7 @@
       "openDraftEmail": "Open draft email"
     },
     "empty": {
+      "kicker": "No cases",
       "title": "No repair cases yet",
       "body": "Open an RMA when you need to send equipment to a manufacturer for warranty work or paid repair. You can always start one from an incident as well.",
       "action": "New repair case",
