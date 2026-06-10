@@ -5077,6 +5077,12 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   gap: 6px;
 }
 
+/* The lone close X hugs the card corner: pull it past the header padding so
+   it reads as the card's dismiss control rather than a row action. */
+.detail-header-actions-stacked > .icon-ghost-control {
+  margin: -8px -8px 0 0;
+}
+
 .detail-header-actions-stacked .detail-header-chips {
   display: inline-flex;
   align-items: center;

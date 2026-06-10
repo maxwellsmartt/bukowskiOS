@@ -618,6 +618,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
           />
         </SurfaceCard>
 
+        {activePackingSlipId ? (
         <PackingSlipDetailPanel
           data={detail}
           error={detailError}
@@ -698,6 +699,7 @@ export const PackingPage = ({ projectId = null, projectName = null }: PackingPag
             }
           }}
         />
+        ) : null}
       </ResizableSideRailLayout>
 
       {pendingReturnTarget ? (

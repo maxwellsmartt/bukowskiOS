@@ -2301,6 +2301,13 @@
       "assetPlaceholder": "Search by code or name…",
       "projectPlaceholder": "Search project…"
     },
+    "unsavedChanges": {
+      "title": "You have unsaved changes",
+      "body": "Apply your changes before closing, or discard them?",
+      "stay": "Keep editing",
+      "discard": "Discard",
+      "apply": "Apply changes"
+    },
     "dataTable": {
       "columns": "Columns",
       "empty": "No rows available.",

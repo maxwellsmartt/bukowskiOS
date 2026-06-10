@@ -1,9 +1,10 @@
 import { AlertTriangle, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
 import { useProjectDetail } from "@features/projects/useProjectsData";
+import { useModalCloseGuard } from "@shared/components/ModalShell";
 import { SearchSelect } from "@shared/components/SearchSelect";
 import { SelectField } from "@shared/components/SelectField";
 
@@ -87,6 +88,38 @@ export const IncidentReportPanel = ({
   const [notes, setNotes] = useState(initialValue?.notes ?? "");
   const { data: projectDetail } = useProjectDetail(normalizeOptional(projectId) ?? null);
 
+  // Unsaved-changes guard: dirty means any field moved away from how the form
+  // opened. Registered with the host modal so Esc/backdrop/X all go through
+  // the same keep-editing / discard / apply dialog.
+  const closeGuard = useModalCloseGuard();
+  const initialSnapshotRef = useRef({
+    assetId: initialValue?.assetId ?? "",
+    projectId: initialValue?.projectId ?? "",
+    projectUnitId: initialValue?.projectUnitId ?? "",
+    departmentId: initialValue?.departmentId ?? "",
+    responsibleUserId: initialValue?.responsibleUserId ?? "",
+    incidentType: initialValue?.incidentType ?? "damage",
+    severity: initialValue?.severity ?? "Medium",
+    title: initialValue?.title ?? "",
+    description: initialValue?.description ?? "",
+    costEstimate: typeof initialValue?.costEstimate === "number" ? String(initialValue.costEstimate) : "",
+    notes: initialValue?.notes ?? "",
+  });
+  const currentDraftRef = useRef(initialSnapshotRef.current);
+  currentDraftRef.current = {
+    assetId,
+    projectId,
+    projectUnitId,
+    departmentId,
+    responsibleUserId,
+    incidentType,
+    severity,
+    title: incidentTitle,
+    description,
+    costEstimate,
+    notes,
+  };
+
   useEffect(() => {
     setProjectUnitId((current) =>
       projectDetail.units.some((unit) => unit.id === current) ? current : "",
@@ -114,11 +147,34 @@ export const IncidentReportPanel = ({
     });
   };
 
+  const handleSubmitRef = useRef(handleSubmit);
+  handleSubmitRef.current = handleSubmit;
+
+  useEffect(() => {
+    if (!closeGuard) {
+      return undefined;
+    }
+
+    closeGuard.registerGuard({
+      isDirty: () => {
+        const initial = initialSnapshotRef.current;
+        const current = currentDraftRef.current;
+        return (Object.keys(initial) as Array<keyof typeof initial>).some(
+          (key) => (current[key] ?? "").trim() !== (initial[key] ?? "").trim(),
+        );
+      },
+      apply: () => handleSubmitRef.current(),
+    });
+    return () => closeGuard.registerGuard(null);
+  }, [closeGuard]);
+
+  const requestClose = closeGuard?.requestClose ?? onClose;
+
   return (
     <div className="incident-report-dialog">
       <div className="document-preview-header">
         <span className="document-preview-title">{title ?? t("incidents.report.title")}</span>
-        <button aria-label={t("incidents.report.close")} className="icon-ghost-control" onClick={onClose} type="button">
+        <button aria-label={t("incidents.report.close")} className="icon-ghost-control" onClick={requestClose} type="button">
           <X size={16} />
         </button>
       </div>
@@ -282,7 +338,7 @@ export const IncidentReportPanel = ({
       </div>
 
       <div className="document-preview-header packing-insurance-export-footer">
-        <button className="ghost-control" onClick={onClose} type="button">
+        <button className="ghost-control" onClick={requestClose} type="button">
           {t("common.cancel")}
         </button>
         <button className="action-primary-button" disabled={isSubmitting} onClick={() => void handleSubmit()} type="button">

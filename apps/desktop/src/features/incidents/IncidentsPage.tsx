@@ -430,6 +430,7 @@ export const IncidentsPage = ({ projectId = null }: IncidentsPageProps) => {
         />
       </SurfaceCard>
 
+      {activeIncidentId ? (
       <IncidentDetailPanel
         detail={activeIncidentDetail}
         error={incidentDetailError ?? activeIncidentDetailLoadError}
@@ -513,6 +514,7 @@ export const IncidentsPage = ({ projectId = null }: IncidentsPageProps) => {
         }}
         users={catalog.users}
       />
+      ) : null}
       </ResizableSideRailLayout>
     </div>
   );

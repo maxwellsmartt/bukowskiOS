@@ -528,7 +528,7 @@ export const RmaPage = () => {
               onOpenCatalog={() => navigate("/catalog")}
               onSubmit={handleSubmit}
             />
-          ) : (
+          ) : activeRmaCaseId ? (
             <SurfaceCard
               className="rma-detail-card detail-rail-card"
               aside={
@@ -679,7 +679,7 @@ export const RmaPage = () => {
                 </div>
               ) : null}
             </SurfaceCard>
-          )}
+          ) : null}
         </ResizableSideRailLayout>
       ) : null}
     </div>

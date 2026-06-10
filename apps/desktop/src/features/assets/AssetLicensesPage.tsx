@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, Check, Copy, CreditCard, Eye, EyeOff, Info, KeyRound, Pencil, Plus, ReceiptText, RefreshCw, Repeat2, Save, UsersRound, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -9,6 +9,7 @@ import { useToast } from "@app/providers/ToastProvider";
 import { useWorkspace } from "@app/providers/WorkspaceProvider";
 import { ListToolbar } from "@shared/components/ListToolbar";
 import { ModalShell } from "@shared/components/ModalShell";
+import { UnsavedChangesDialog } from "@shared/components/UnsavedChangesDialog";
 import { SectionHeader } from "@shared/components/SectionHeader";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
@@ -152,6 +153,8 @@ export const AssetLicensesPage = () => {
   };
   const [rows, setRows] = useState<SoftwareLicenseRow[]>([]);
   const [draft, setDraft] = useState<LicenseDraft>(emptyDraft);
+  const initialDraftRef = useRef<LicenseDraft>(emptyDraft);
+  const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingLicenseId, setEditingLicenseId] = useState<string | null>(null);
   const [seatEditorLicenseId, setSeatEditorLicenseId] = useState<string | null>(null);
@@ -422,20 +425,34 @@ export const AssetLicensesPage = () => {
 
   const handleEdit = (license: SoftwareLicenseRow) => {
     setEditingLicenseId(license.id);
-    setDraft(buildDraftFromLicense(license));
+    const initial = buildDraftFromLicense(license);
+    initialDraftRef.current = initial;
+    setDraft(initial);
     setEditorOpen(true);
   };
 
   const handleNewLicense = () => {
     setEditingLicenseId(null);
+    initialDraftRef.current = emptyDraft;
     setDraft(emptyDraft);
     setEditorOpen(true);
   };
 
-  const handleCancelEdit = () => {
+  const closeEditor = () => {
+    setUnsavedDialogOpen(false);
     setEditorOpen(false);
     setEditingLicenseId(null);
     setDraft(emptyDraft);
+  };
+
+  // Every close path (X, Esc, backdrop) lands here: with pending edits the
+  // user chooses to keep editing, discard, or save through handleSave.
+  const handleCancelEdit = () => {
+    if (JSON.stringify(draft) !== JSON.stringify(initialDraftRef.current)) {
+      setUnsavedDialogOpen(true);
+      return;
+    }
+    closeEditor();
   };
 
   const handleArchive = async (license: SoftwareLicenseRow) => {
@@ -456,7 +473,7 @@ export const AssetLicensesPage = () => {
       }
       toast.success(t("assets.licenses.toasts.removedTitle"), license.software_name);
       if (editingLicenseId === license.id) {
-        handleCancelEdit();
+        closeEditor();
       }
       await loadLicenses();
     } catch (nextError) {
@@ -688,6 +705,17 @@ export const AssetLicensesPage = () => {
           </div>
         </ModalShell>
       ) : null}
+
+      <UnsavedChangesDialog
+        isOpen={unsavedDialogOpen}
+        isSubmitting={isSaving}
+        onApply={async () => {
+          setUnsavedDialogOpen(false);
+          await handleSave();
+        }}
+        onDiscard={closeEditor}
+        onStay={() => setUnsavedDialogOpen(false)}
+      />
 
       <SurfaceCard
         className="license-register-card"

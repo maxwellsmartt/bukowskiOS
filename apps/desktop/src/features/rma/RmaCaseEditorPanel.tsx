@@ -1,11 +1,12 @@
 import { Mail, Save, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { RmaCaseAssetInput, RmaCaseDetailSnapshot, RmaCaseStatus, RmaManufacturerRow, RmaMaintenanceAssetRow } from "@contracts";
 import { SelectField } from "@shared/components/SelectField";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
+import { UnsavedChangesDialog } from "@shared/components/UnsavedChangesDialog";
 
 export type AvailableRmaAsset = {
   id: string;
@@ -130,6 +131,58 @@ export const RmaCaseEditorPanel = ({
   const selectedAssetIds = Object.keys(selectedAssets);
   const selectedCountLabel = t("rma.editor.selectedCount", { count: selectedAssetIds.length });
 
+  // Unsaved-changes guard for X / Cancel: dirty when any field or the asset
+  // selection moved away from how the editor opened.
+  const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
+  const initialSnapshotRef = useRef({
+    manufacturerId: initialValue?.caseRecord?.manufacturerId ?? initialDraft?.manufacturerId ?? manufacturers[0]?.id ?? "",
+    supportEmail: initialValue?.caseRecord?.supportEmail ?? initialDraft?.supportEmail ?? "",
+    title: initialValue?.caseRecord?.title ?? initialDraft?.title ?? "",
+    problemSummary: initialValue?.caseRecord?.problemSummary ?? initialDraft?.problemSummary ?? "",
+    notes: initialValue?.caseRecord?.notes ?? initialDraft?.notes ?? "",
+    status: (initialValue?.caseRecord?.status ?? initialDraft?.status ?? "Needs review") as string,
+    assetSignature: JSON.stringify({
+      ...resolveDraftAssetState(initialDraft),
+      ...resolveInitialAssetState(initialValue),
+    }),
+  });
+
+  const isDirty = () => {
+    const initial = initialSnapshotRef.current;
+    return (
+      manufacturerId !== initial.manufacturerId ||
+      supportEmail.trim() !== initial.supportEmail.trim() ||
+      title.trim() !== initial.title.trim() ||
+      problemSummary.trim() !== initial.problemSummary.trim() ||
+      notes.trim() !== initial.notes.trim() ||
+      status !== initial.status ||
+      JSON.stringify(selectedAssets) !== initial.assetSignature
+    );
+  };
+
+  const requestClose = () => {
+    if (isDirty()) {
+      setUnsavedDialogOpen(true);
+      return;
+    }
+    onClose();
+  };
+
+  const submitDraft = () =>
+    onSubmit({
+      manufacturerId,
+      supportEmail: normalizeOptional(supportEmail),
+      title: title.trim(),
+      problemSummary: problemSummary.trim(),
+      notes: normalizeOptional(notes),
+      status,
+      assetItems: selectedAssetIds.map((assetId) => ({
+        assetId,
+        equipmentYear: normalizeOptional(selectedAssets[assetId]?.equipmentYear),
+        issueSummary: selectedAssets[assetId]?.issueSummary.trim() ?? "",
+      })),
+    });
+
   const handleToggleAsset = (asset: AvailableRmaAsset, checked: boolean) => {
     setSelectedAssets((current) => {
       if (!checked) {
@@ -151,7 +204,7 @@ export const RmaCaseEditorPanel = ({
     <SurfaceCard
       className="rma-detail-card detail-rail-card"
       aside={
-        <button aria-label={t("rma.editor.close")} className="icon-ghost-control" onClick={onClose} type="button">
+        <button aria-label={t("rma.editor.close")} className="icon-ghost-control" onClick={requestClose} type="button">
           <X size={14} />
         </button>
       }
@@ -346,34 +399,34 @@ export const RmaCaseEditorPanel = ({
       {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
 
       <div className="action-panel-actions">
-        <button className="ghost-control" onClick={onClose} type="button">
+        <button className="ghost-control" onClick={requestClose} type="button">
           {t("common.cancel")}
         </button>
 
         <button
           className="action-primary-button"
           disabled={isSubmitting}
-          onClick={() =>
-            void onSubmit({
-              manufacturerId,
-              supportEmail: normalizeOptional(supportEmail),
-              title: title.trim(),
-              problemSummary: problemSummary.trim(),
-              notes: normalizeOptional(notes),
-              status,
-              assetItems: selectedAssetIds.map((assetId) => ({
-                assetId,
-                equipmentYear: normalizeOptional(selectedAssets[assetId]?.equipmentYear),
-                issueSummary: selectedAssets[assetId]?.issueSummary.trim() ?? "",
-              })),
-            })
-          }
+          onClick={() => void submitDraft()}
           type="button"
         >
           <Save size={14} />
           <span>{isSubmitting ? t("common.saving") : mode === "create" ? t("rma.editor.createCase") : t("rma.editor.saveCase")}</span>
         </button>
       </div>
+
+      <UnsavedChangesDialog
+        isOpen={unsavedDialogOpen}
+        isSubmitting={isSubmitting}
+        onApply={async () => {
+          setUnsavedDialogOpen(false);
+          await submitDraft();
+        }}
+        onDiscard={() => {
+          setUnsavedDialogOpen(false);
+          onClose();
+        }}
+        onStay={() => setUnsavedDialogOpen(false)}
+      />
     </SurfaceCard>
   );
 };

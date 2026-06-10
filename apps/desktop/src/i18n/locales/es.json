@@ -2305,6 +2305,13 @@
       "assetPlaceholder": "Buscar por código o nombre…",
       "projectPlaceholder": "Buscar proyecto…"
     },
+    "unsavedChanges": {
+      "title": "Tienes cambios sin guardar",
+      "body": "¿Quieres aplicar los cambios antes de cerrar o desecharlos?",
+      "stay": "Seguir editando",
+      "discard": "Desechar",
+      "apply": "Aplicar cambios"
+    },
     "dataTable": {
       "columns": "Columnas",
       "empty": "No hay filas disponibles.",
