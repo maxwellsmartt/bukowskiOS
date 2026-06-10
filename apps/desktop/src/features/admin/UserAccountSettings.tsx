@@ -37,6 +37,9 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
   const [fullName, setFullName] = useState(initialFullName);
   const [isSaving, setIsSaving] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
@@ -174,6 +177,36 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
     }
   };
 
+  const passwordTooShort = newPassword.length > 0 && newPassword.length < 8;
+  const passwordsMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
+  const canUpdatePassword = newPassword.length >= 8 && newPassword === confirmPassword && !isUpdatingPassword;
+
+  const handleUpdatePassword = async () => {
+    if (!supabase || !canUpdatePassword) {
+      return;
+    }
+    setIsUpdatingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        throw error;
+      }
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success(
+        t("settings.account.security.updatedTitle"),
+        t("settings.account.security.updatedBody"),
+      );
+    } catch (error) {
+      toast.error(
+        t("settings.account.security.failedTitle"),
+        getUserFacingErrorMessage(error, t("settings.account.toasts.couldNotSaveBody")),
+      );
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
@@ -296,6 +329,51 @@ export const UserAccountSettings = ({ showHeader = true }: UserAccountSettingsPr
             <span className="summary-value">{activeMembership?.roleName ?? t("settings.account.member")}</span>
           </div>
         </div>
+
+        {supabase && !isLocalFallback ? (
+          <details className="detail-disclosure">
+            <summary className="detail-disclosure-summary">{t("settings.account.security.changePassword")}</summary>
+            <div className="detail-disclosure-content">
+              <div className="agent-form-grid">
+                <label className="field-block">
+                  <span className="field-label">{t("settings.account.security.newPassword")}</span>
+                  <input
+                    autoComplete="new-password"
+                    className="field-input"
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    type="password"
+                    value={newPassword}
+                  />
+                </label>
+                <label className="field-block">
+                  <span className="field-label">{t("settings.account.security.confirmPassword")}</span>
+                  <input
+                    autoComplete="new-password"
+                    className="field-input"
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    type="password"
+                    value={confirmPassword}
+                  />
+                </label>
+              </div>
+              {passwordTooShort ? (
+                <p className="surface-card-subtitle">{t("settings.account.security.minLength")}</p>
+              ) : passwordsMismatch ? (
+                <p className="surface-card-subtitle">{t("settings.account.security.mismatch")}</p>
+              ) : null}
+              <div className="surface-card-actions" style={{ justifyContent: "flex-end" }}>
+                <button
+                  className="action-primary-button"
+                  disabled={!canUpdatePassword}
+                  onClick={() => void handleUpdatePassword()}
+                  type="button"
+                >
+                  {isUpdatingPassword ? t("settings.account.security.updating") : t("settings.account.security.update")}
+                </button>
+              </div>
+            </div>
+          </details>
+        ) : null}
 
         <div className="surface-card-actions" style={{ justifyContent: "flex-end" }}>
           <button

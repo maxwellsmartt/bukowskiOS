@@ -290,7 +290,13 @@ const WorkspaceDisclosure = ({ children, defaultOpen = false, summary, title }: 
   );
 };
 
-export const WorkspaceSettingsPage = () => {
+type WorkspaceSettingsPageProps = {
+  /** "access" renders only the members/invites/roles blocks, for embedding
+   *  inside the Equipo y acceso settings section. */
+  variant?: "workspace" | "access";
+};
+
+export const WorkspaceSettingsPage = ({ variant = "workspace" }: WorkspaceSettingsPageProps) => {
   const { t } = useTranslation();
   const toast = useToast();
   const navigate = useNavigate();
@@ -758,218 +764,10 @@ export const WorkspaceSettingsPage = () => {
     }
   };
 
-  return (
-    <div className="page-stack settings-page">
-      <SectionHeader title={t("settings.workspace.title")} />
-
-      {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
-
-      <SettingsLayout>
-
-      <SurfaceCard
-        title={t("settings.workspace.sections.generalInfo")}
-        aside={
-          workspaceProfile && !isEditingWorkspace && !isLocalFallback ? (
-            <button className="ghost-control" onClick={() => setIsEditingWorkspace(true)} type="button">
-              <Pencil size={13} />
-              <span>{t("common.edit")}</span>
-            </button>
-          ) : null
-        }
-      >
-        <input
-          accept="image/png,image/jpeg,image/webp"
-          className="user-account-avatar-input"
-          onChange={(event) => void handleWorkspaceAvatarFile(event)}
-          ref={workspaceAvatarInputRef}
-          type="file"
-        />
-        {isEditingWorkspace && workspaceProfile ? (
-          <div className="agent-form-grid">
-            <div className="workspace-avatar-editor" style={{ gridColumn: "1 / -1" }}>
-              <button
-                aria-label={t("settings.workspace.generalInfo.uploadAvatar")}
-                className="workspace-avatar-editor-button"
-                disabled={isUploadingWorkspaceAvatar}
-                onClick={() => workspaceAvatarInputRef.current?.click()}
-                type="button"
-              >
-                {workspaceDraft.avatarUrl ? (
-                  <img alt="" className="workspace-avatar-editor-image" src={workspaceDraft.avatarUrl} />
-                ) : (
-                  <span style={workspaceDraft.iconColor ? { background: workspaceDraft.iconColor } : undefined}>
-                    {workspaceDraft.name.slice(0, 1).toUpperCase() || "W"}
-                  </span>
-                )}
-                <span className="workspace-avatar-editor-overlay">
-                  <Camera size={16} />
-                </span>
-              </button>
-              <div className="workspace-avatar-editor-copy">
-                <strong>{t("settings.workspace.generalInfo.workspaceAvatar")}</strong>
-                <span>{t("settings.workspace.generalInfo.workspaceAvatarHelp")}</span>
-              </div>
-              {workspaceDraft.avatarUrl ? (
-                <button
-                  className="ghost-control action-row-button is-danger workspace-avatar-editor-remove"
-                  disabled={isUploadingWorkspaceAvatar}
-                  onClick={() => void handleWorkspaceAvatarRemove()}
-                  type="button"
-                >
-                  <Trash2 size={13} />
-                  <span>{t("common.remove")}</span>
-                </button>
-              ) : null}
-            </div>
-            <label className="field-block">
-              <span className="field-label">{t("settings.workspace.generalInfo.workspaceName")}</span>
-              <input
-                className="field-input"
-                onChange={(event) => setWorkspaceDraft((current) => ({ ...current, name: event.target.value }))}
-                value={workspaceDraft.name}
-              />
-            </label>
-            <label className="field-block">
-              <span className="field-label">{t("settings.workspace.generalInfo.accentColor")}</span>
-              <span className="workspace-color-picker-row">
-                <input
-                  aria-label={t("settings.workspace.generalInfo.accentColor")}
-                  className="workspace-color-input"
-                  onChange={(event) => handleWorkspaceAccentColorPreview(event.target.value)}
-                  type="color"
-                  value={workspaceDraft.iconColor || "#d6b37a"}
-                />
-                <input
-                  className="field-input"
-                  onChange={(event) => setWorkspaceDraft((current) => ({ ...current, iconColor: event.target.value }))}
-                  placeholder="#d6b37a"
-                  value={workspaceDraft.iconColor}
-                />
-              </span>
-            </label>
-            <div className="surface-card-actions" style={{ gridColumn: "1 / -1", justifyContent: "flex-end" }}>
-              <button
-                className="ghost-control action-row-button"
-                disabled={isSavingWorkspace}
-                onClick={() => {
-                  setIsEditingWorkspace(false);
-                  if (workspaceProfile) {
-                    setWorkspaceDraft({
-                      name: workspaceProfile.name,
-                      baseCurrency: workspaceProfile.baseCurrency,
-                      iconColor: workspaceProfile.iconColor ?? "",
-                      avatarUrl: workspaceProfile.avatarUrl ?? "",
-                    });
-                  }
-                }}
-                type="button"
-              >
-                <X size={13} />
-                <span>{t("common.cancel")}</span>
-              </button>
-              <button
-                className="action-primary-button action-row-button"
-                disabled={isSavingWorkspace}
-                onClick={() => void handleSaveWorkspace()}
-                type="button"
-              >
-                <Save size={13} />
-                <span>{isSavingWorkspace ? t("common.saving") : t("common.saveChanges")}</span>
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="workspace-details-groups">
-            <div className="workspace-details-group">
-              <span className="workspace-details-group-label">{t("settings.workspace.generalInfo.workspaceLabel")}</span>
-              <div className="workspace-identity-row">
-                <button
-                  aria-label={t("settings.workspace.generalInfo.uploadAvatar")}
-                  className="workspace-avatar workspace-avatar-lg workspace-avatar-inline-button"
-                  disabled={isLocalFallback || isUploadingWorkspaceAvatar}
-                  onClick={() => workspaceAvatarInputRef.current?.click()}
-                  style={workspaceProfile?.iconColor ? { background: workspaceProfile.iconColor } : undefined}
-                  type="button"
-                >
-                  {workspaceProfile?.avatarUrl ? (
-                    <img alt="" className="workspace-avatar-image" src={workspaceProfile.avatarUrl} />
-                  ) : (
-                    (workspaceProfile?.name ?? activeWorkspaceName).slice(0, 1).toUpperCase()
-                  )}
-                  <span className="workspace-avatar-inline-overlay">
-                    <Camera size={14} />
-                  </span>
-                </button>
-                <div>
-                  <strong>{workspaceProfile?.name ?? activeWorkspaceName}</strong>
-                  <span>{workspaceProfile?.slug ?? "workspace"}</span>
-                </div>
-              </div>
-              <div className="summary-grid compact-summary-grid">
-                <div className="summary-row">
-                  <span className="summary-label">{t("settings.workspace.generalInfo.shortName")}</span>
-                  <span className="summary-value">{workspaceProfile?.slug ?? "—"}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">{t("settings.workspace.generalInfo.workspaceId")}</span>
-                  <span className="summary-value workspace-id-copy-row">
-                    <code className="workspace-details-id">{activeWorkspaceId}</code>
-                    <button
-                      className={`icon-ghost-control workspace-id-copy-button${copiedWorkspaceId ? " is-copied" : ""}`}
-                      data-tooltip={copiedWorkspaceId ? t("settings.workspace.generalInfo.copied") : t("settings.workspace.generalInfo.copyId")} aria-label={copiedWorkspaceId ? t("settings.workspace.generalInfo.copied") : t("settings.workspace.generalInfo.copyId")}
-                      onClick={() => void handleCopyWorkspaceId()}
-                      type="button"
-                    >
-                      {copiedWorkspaceId ? <Check size={13} /> : <Copy size={13} />}
-                    </button>
-                  </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">{t("settings.workspace.generalInfo.accentColor")}</span>
-                  <span className="summary-value">
-                    <label className="workspace-color-chip workspace-color-chip-button">
-                      <span style={{ background: workspaceProfile?.iconColor ?? "#d6b37a" }} />
-                      <code>{workspaceProfile?.iconColor ?? "Default"}</code>
-                      <input
-                        aria-label={t("settings.workspace.generalInfo.accentColor")}
-                        disabled={isLocalFallback}
-                        onBlur={(event) => void handleWorkspaceAccentColorCommit(event.target.value)}
-                        onChange={(event) => handleWorkspaceAccentColorPreview(event.target.value)}
-                        type="color"
-                        value={workspaceProfile?.iconColor ?? "#d6b37a"}
-                      />
-                    </label>
-                  </span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">{t("settings.workspace.generalInfo.baseCurrency")}</span>
-                  <span className="summary-value">{workspaceProfile?.baseCurrency ?? "USD"}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="workspace-details-group">
-              <span className="workspace-details-group-label">{t("settings.workspace.generalInfo.yourAccess")}</span>
-              <div className="summary-grid compact-summary-grid">
-                <div className="summary-row">
-                  <span className="summary-label">{t("settings.account.role")}</span>
-                  <span className="summary-value">{activeMembership?.roleName ?? t("settings.account.member")}</span>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-label">{t("settings.workspace.members.column.permissions")}</span>
-                  <span className="summary-value">
-                    {activeMembership?.permissions.length
-                      ? t("settings.workspace.generalInfo.permissionsGranted", { count: activeMembership.permissions.length })
-                      : t("settings.workspace.generalInfo.permissionsPending")}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </SurfaceCard>
-
+  const accessSections = (
+    <>
       <WorkspaceDisclosure
+        defaultOpen
         title={t("settings.workspace.sections.members")}
         summary={t("settings.workspace.summaries.membersCount", {
           count: teamMembers.length,
@@ -1198,6 +996,250 @@ export const WorkspaceSettingsPage = () => {
           <CustomRolesEditor supabase={supabase} workspaceId={activeWorkspaceId} />
         </WorkspaceDisclosure>
       ) : null}
+    </>
+  );
+
+  if (variant === "access") {
+    return (
+      <div className="settings-access-stack page-stack">
+        {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
+        {accessSections}
+      <InviteMemberDialog
+        isOpen={inviteOpen}
+        roles={inviteRolesForDialog}
+        existingEmails={teamMembers.map((member) => member.email).filter(Boolean)}
+        pendingInviteEmails={pendingInvites.map((invite) => invite.email).filter((value) => value !== "Pending")}
+        onClose={() => setInviteOpen(false)}
+        onSent={async (email) => {
+          toast.success(
+            t("settings.workspace.toasts.inviteSentTitle"),
+            t("settings.workspace.toasts.inviteSentBody", { email }),
+          );
+          await Promise.all([loadMembers(), loadPendingInvites()]);
+        }}
+      />
+      </div>
+    );
+  }
+
+  return (
+    <div className="page-stack settings-page">
+      <SectionHeader title={t("settings.workspace.title")} />
+
+      {error ? <div className="action-feedback action-feedback-error">{error}</div> : null}
+
+      <SettingsLayout>
+
+      <SurfaceCard
+        title={t("settings.workspace.sections.generalInfo")}
+        aside={
+          workspaceProfile && !isEditingWorkspace && !isLocalFallback ? (
+            <button className="ghost-control" onClick={() => setIsEditingWorkspace(true)} type="button">
+              <Pencil size={13} />
+              <span>{t("common.edit")}</span>
+            </button>
+          ) : null
+        }
+      >
+        <input
+          accept="image/png,image/jpeg,image/webp"
+          className="user-account-avatar-input"
+          onChange={(event) => void handleWorkspaceAvatarFile(event)}
+          ref={workspaceAvatarInputRef}
+          type="file"
+        />
+        {isEditingWorkspace && workspaceProfile ? (
+          <div className="agent-form-grid">
+            <div className="workspace-avatar-editor" style={{ gridColumn: "1 / -1" }}>
+              <button
+                aria-label={t("settings.workspace.generalInfo.uploadAvatar")}
+                className="workspace-avatar-editor-button"
+                disabled={isUploadingWorkspaceAvatar}
+                onClick={() => workspaceAvatarInputRef.current?.click()}
+                type="button"
+              >
+                {workspaceDraft.avatarUrl ? (
+                  <img alt="" className="workspace-avatar-editor-image" src={workspaceDraft.avatarUrl} />
+                ) : (
+                  <span style={workspaceDraft.iconColor ? { background: workspaceDraft.iconColor } : undefined}>
+                    {workspaceDraft.name.slice(0, 1).toUpperCase() || "W"}
+                  </span>
+                )}
+                <span className="workspace-avatar-editor-overlay">
+                  <Camera size={16} />
+                </span>
+              </button>
+              <div className="workspace-avatar-editor-copy">
+                <strong>{t("settings.workspace.generalInfo.workspaceAvatar")}</strong>
+                <span>{t("settings.workspace.generalInfo.workspaceAvatarHelp")}</span>
+              </div>
+              {workspaceDraft.avatarUrl ? (
+                <button
+                  className="ghost-control action-row-button is-danger workspace-avatar-editor-remove"
+                  disabled={isUploadingWorkspaceAvatar}
+                  onClick={() => void handleWorkspaceAvatarRemove()}
+                  type="button"
+                >
+                  <Trash2 size={13} />
+                  <span>{t("common.remove")}</span>
+                </button>
+              ) : null}
+            </div>
+            <label className="field-block">
+              <span className="field-label">{t("settings.workspace.generalInfo.workspaceName")}</span>
+              <input
+                className="field-input"
+                onChange={(event) => setWorkspaceDraft((current) => ({ ...current, name: event.target.value }))}
+                value={workspaceDraft.name}
+              />
+            </label>
+            <label className="field-block">
+              <span className="field-label">{t("settings.workspace.generalInfo.accentColor")}</span>
+              <span className="workspace-color-picker-row">
+                <input
+                  aria-label={t("settings.workspace.generalInfo.accentColor")}
+                  className="workspace-color-input"
+                  onChange={(event) => handleWorkspaceAccentColorPreview(event.target.value)}
+                  type="color"
+                  value={workspaceDraft.iconColor || "#d6b37a"}
+                />
+                <input
+                  className="field-input"
+                  onChange={(event) => setWorkspaceDraft((current) => ({ ...current, iconColor: event.target.value }))}
+                  placeholder="#d6b37a"
+                  value={workspaceDraft.iconColor}
+                />
+              </span>
+            </label>
+            <div className="surface-card-actions" style={{ gridColumn: "1 / -1", justifyContent: "flex-end" }}>
+              <button
+                className="ghost-control action-row-button"
+                disabled={isSavingWorkspace}
+                onClick={() => {
+                  setIsEditingWorkspace(false);
+                  if (workspaceProfile) {
+                    setWorkspaceDraft({
+                      name: workspaceProfile.name,
+                      baseCurrency: workspaceProfile.baseCurrency,
+                      iconColor: workspaceProfile.iconColor ?? "",
+                      avatarUrl: workspaceProfile.avatarUrl ?? "",
+                    });
+                  }
+                }}
+                type="button"
+              >
+                <X size={13} />
+                <span>{t("common.cancel")}</span>
+              </button>
+              <button
+                className="action-primary-button action-row-button"
+                disabled={isSavingWorkspace}
+                onClick={() => void handleSaveWorkspace()}
+                type="button"
+              >
+                <Save size={13} />
+                <span>{isSavingWorkspace ? t("common.saving") : t("common.saveChanges")}</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="workspace-details-groups">
+            <div className="workspace-details-group">
+              <span className="workspace-details-group-label">{t("settings.workspace.generalInfo.workspaceLabel")}</span>
+              <div className="workspace-identity-row">
+                <button
+                  aria-label={t("settings.workspace.generalInfo.uploadAvatar")}
+                  className="workspace-avatar workspace-avatar-lg workspace-avatar-inline-button"
+                  disabled={isLocalFallback || isUploadingWorkspaceAvatar}
+                  onClick={() => workspaceAvatarInputRef.current?.click()}
+                  style={workspaceProfile?.iconColor ? { background: workspaceProfile.iconColor } : undefined}
+                  type="button"
+                >
+                  {workspaceProfile?.avatarUrl ? (
+                    <img alt="" className="workspace-avatar-image" src={workspaceProfile.avatarUrl} />
+                  ) : (
+                    (workspaceProfile?.name ?? activeWorkspaceName).slice(0, 1).toUpperCase()
+                  )}
+                  <span className="workspace-avatar-inline-overlay">
+                    <Camera size={14} />
+                  </span>
+                </button>
+                <div>
+                  <strong>{workspaceProfile?.name ?? activeWorkspaceName}</strong>
+                  <span>{workspaceProfile?.slug ?? "workspace"}</span>
+                </div>
+              </div>
+              <div className="summary-grid compact-summary-grid">
+                <div className="summary-row">
+                  <span className="summary-label">{t("settings.workspace.generalInfo.shortName")}</span>
+                  <span className="summary-value">{workspaceProfile?.slug ?? "—"}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">{t("settings.workspace.generalInfo.workspaceId")}</span>
+                  <span className="summary-value workspace-id-copy-row">
+                    {/* Only a short fingerprint on screen; the copy button still
+                        puts the full id on the clipboard for support. */}
+                    <code className="workspace-details-id">{`${activeWorkspaceId.slice(0, 8)}…`}</code>
+                    <button
+                      className={`icon-ghost-control workspace-id-copy-button${copiedWorkspaceId ? " is-copied" : ""}`}
+                      data-tooltip={copiedWorkspaceId ? t("settings.workspace.generalInfo.copied") : t("settings.workspace.generalInfo.copyId")} aria-label={copiedWorkspaceId ? t("settings.workspace.generalInfo.copied") : t("settings.workspace.generalInfo.copyId")}
+                      onClick={() => void handleCopyWorkspaceId()}
+                      type="button"
+                    >
+                      {copiedWorkspaceId ? <Check size={13} /> : <Copy size={13} />}
+                    </button>
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">{t("settings.workspace.generalInfo.accentColor")}</span>
+                  <span className="summary-value">
+                    <label className="workspace-color-chip workspace-color-chip-button">
+                      <span style={{ background: workspaceProfile?.iconColor ?? "#d6b37a" }} />
+                      <code>
+                        {workspaceProfile?.iconColor && workspaceProfile.iconColor !== "#000000"
+                          ? workspaceProfile.iconColor
+                          : t("settings.workspace.generalInfo.accentNotCustomized")}
+                      </code>
+                      <input
+                        aria-label={t("settings.workspace.generalInfo.accentColor")}
+                        disabled={isLocalFallback}
+                        onBlur={(event) => void handleWorkspaceAccentColorCommit(event.target.value)}
+                        onChange={(event) => handleWorkspaceAccentColorPreview(event.target.value)}
+                        type="color"
+                        value={workspaceProfile?.iconColor ?? "#d6b37a"}
+                      />
+                    </label>
+                  </span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">{t("settings.workspace.generalInfo.baseCurrency")}</span>
+                  <span className="summary-value">{workspaceProfile?.baseCurrency ?? "USD"}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="workspace-details-group">
+              <span className="workspace-details-group-label">{t("settings.workspace.generalInfo.yourAccess")}</span>
+              <div className="summary-grid compact-summary-grid">
+                <div className="summary-row">
+                  <span className="summary-label">{t("settings.account.role")}</span>
+                  <span className="summary-value">{activeMembership?.roleName ?? t("settings.account.member")}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">{t("settings.workspace.members.column.permissions")}</span>
+                  <span className="summary-value">
+                    {activeMembership?.permissions.length
+                      ? activeMembership.roleName?.toLowerCase().includes("admin")
+                        ? t("settings.workspace.generalInfo.fullAccess")
+                        : t("settings.workspace.generalInfo.permissionsGranted", { count: activeMembership.permissions.length })
+                      : t("settings.workspace.generalInfo.permissionsPending")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </SurfaceCard>
 
       <WorkspaceDisclosure
         title={t("settings.workspace.sections.branding")}
@@ -1278,20 +1320,6 @@ export const WorkspaceSettingsPage = () => {
 
       </SettingsLayout>
 
-      <InviteMemberDialog
-        isOpen={inviteOpen}
-        roles={inviteRolesForDialog}
-        existingEmails={teamMembers.map((member) => member.email).filter(Boolean)}
-        pendingInviteEmails={pendingInvites.map((invite) => invite.email).filter((value) => value !== "Pending")}
-        onClose={() => setInviteOpen(false)}
-        onSent={async (email) => {
-          toast.success(
-            t("settings.workspace.toasts.inviteSentTitle"),
-            t("settings.workspace.toasts.inviteSentBody", { email }),
-          );
-          await Promise.all([loadMembers(), loadPendingInvites()]);
-        }}
-      />
     </div>
   );
 };

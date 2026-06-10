@@ -17,10 +17,6 @@ const lazyPage = <TModule extends Record<string, ComponentType<object>>, TKey ex
 
 const SettingsPage = lazyPage(() => import("@features/admin/SettingsPage"), "SettingsPage");
 const SyncOutboxPage = lazyPage(() => import("@features/admin/SyncOutboxPage"), "SyncOutboxPage");
-const UserAccountSettingsPage = lazyPage(
-  () => import("@features/admin/UserAccountSettingsPage"),
-  "UserAccountSettingsPage",
-);
 const WorkspaceSettingsPage = lazyPage(() => import("@features/admin/WorkspaceSettingsPage"), "WorkspaceSettingsPage");
 const AgentConnectorsPage = lazyPage(() => import("@features/agents/AgentConnectorsPage"), "AgentConnectorsPage");
 const AgentModelsPage = lazyPage(() => import("@features/agents/AgentModelsPage"), "AgentModelsPage");
@@ -93,7 +89,7 @@ const routeElements = {
   "/agents/models": <AgentModelsPage />,
   "/agents/connectors": <AgentConnectorsPage />,
   "/settings": <SettingsPage />,
-  "/settings/account": <UserAccountSettingsPage />,
+  "/settings/account": <SettingsPage />,
   "/settings/workspace": <WorkspaceSettingsPage />,
   "/settings/sync": <SyncOutboxPage />,
   "/projects/schedule": <ProjectsSchedulePage />,

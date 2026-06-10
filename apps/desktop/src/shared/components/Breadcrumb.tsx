@@ -53,13 +53,11 @@ const leafLabelKeys: Record<string, string> = {
   "/catalog": "shell.nav.utility.catalog",
   "/compare": "shell.compareTray.title",
   "/settings": "shell.nav.utility.settings",
-  "/settings/account": "settings.account.title",
   "/settings/workspace": "settings.workspace.title",
   "/settings/sync": "settings.sync.title",
 };
 
 const utilityLeafParents: Record<string, string> = {
-  "/settings/account": "/settings",
   "/settings/workspace": "/settings",
   "/settings/sync": "/settings",
 };

@@ -4256,7 +4256,7 @@
   "settings": {
     "nav": {
       "general": {
-        "label": "General",
+        "label": "Mi cuenta",
         "description": "Perfil y preferencias"
       },
       "workspace": {
@@ -4264,12 +4264,12 @@
         "description": "Configuración de la empresa"
       },
       "team": {
-        "label": "Equipo",
-        "description": "Usuarios y accesos"
+        "label": "Equipo y acceso",
+        "description": "Miembros, roles y permisos"
       },
       "data": {
         "label": "Datos",
-        "description": "Copias y exportaciones"
+        "description": "Respaldos y exportaciones"
       },
       "sync": {
         "label": "Sincronización",
@@ -4417,7 +4417,7 @@
         "rolesDetail": "Plantillas de acceso"
       },
       "usersDisclosure": {
-        "title": "Usuarios",
+        "title": "Usuarios del app",
         "summary_one": "{{count}} usuario · {{active}} activo",
         "summary_other": "{{count}} usuarios · {{active}} activos"
       },
@@ -4466,7 +4466,7 @@
         "confirm": "Quitar usuario"
       },
       "rolesDisclosure": {
-        "title": "Roles",
+        "title": "Plantillas de rol",
         "summary_one": "{{count}} rol · plantillas de acceso",
         "summary_other": "{{count}} roles · plantillas de acceso"
       },
@@ -4521,10 +4521,12 @@
         "runSync": "Sincronizar ahora",
         "openSync": "Abrir actividad de sincronización",
         "retryFailed": "Reintentar todos los fallidos"
-      }
+      },
+      "syncPointerBody": "El estado de subida y bajada a la nube, la cobertura por área y la cola de cambios viven en Sincronización.",
+      "exportHelp": "Genera un archivo JSON con los datos del workspace, para respaldo controlado o soporte."
     },
     "sync": {
-      "title": "Actividad de sincronización",
+      "title": "Sincronización",
       "couldNotLoad": "La app no pudo cargar la actividad de sincronización.",
       "couldNotCompleteAction": "La app no pudo completar esa acción de sincronización local.",
       "couldNotRetryRow": "La app no pudo reintentar esa fila de sincronización.",
@@ -4576,9 +4578,12 @@
         "waiting": "Esperando la primera bajada",
         "waitingDetail": "Abre un workspace remoto y la app empezará a traer los datos soportados.",
         "metrics": {
-          "sources": "fuentes",
-          "latest": "filas recientes",
-          "errors": "errores"
+          "sources_one": "área de datos",
+          "sources_other": "áreas de datos",
+          "latest_one": "cambio reciente",
+          "latest_other": "cambios recientes",
+          "errors_one": "con problema",
+          "errors_other": "con problemas"
         },
         "lastCheck": "Última verificación: {{value}}"
       },
@@ -4738,7 +4743,14 @@
         "exportBundle": "Exportar bundle de soporte",
         "exportingLogs": "Exportando logs…",
         "exportLogs": "Exportar logs recientes",
-        "copyDiagnostics": "Copiar resumen de diagnóstico"
+        "copyDiagnostics": "Copiar resumen de diagnóstico",
+        "events": {
+          "appRestarted": "La app se reinició inesperadamente",
+          "appUnresponsive": "La app dejó de responder",
+          "loadIssue": "Hubo un problema al cargar una pantalla",
+          "generic": "Se registró un error interno"
+        },
+        "logFilesSummary": "{{count}} archivos · {{size}} en total"
       },
       "dataExport": {
         "cardTitle": "Exportar datos",
@@ -4803,6 +4815,18 @@
         "signedOutTitle": "Sesión cerrada",
         "signedOutBody": "¡Hasta pronto!",
         "signOutFailed": "No se pudo cerrar sesión"
+      },
+      "security": {
+        "changePassword": "Cambiar contraseña",
+        "newPassword": "Nueva contraseña",
+        "confirmPassword": "Confirmar contraseña",
+        "update": "Actualizar contraseña",
+        "updating": "Actualizando…",
+        "minLength": "La contraseña debe tener al menos 8 caracteres.",
+        "mismatch": "Las contraseñas no coinciden.",
+        "updatedTitle": "Contraseña actualizada",
+        "updatedBody": "Usa la nueva contraseña la próxima vez que inicies sesión.",
+        "failedTitle": "No se pudo actualizar la contraseña"
       }
     },
     "workspace": {
@@ -4812,7 +4836,7 @@
         "members": "Miembros",
         "pendingInvites": "Invitaciones pendientes",
         "systemActors": "Actores del sistema",
-        "roles": "Roles",
+        "roles": "Roles personalizados",
         "branding": "Identidad visual",
         "currency": "Moneda",
         "ncf": "NCF",
@@ -4853,7 +4877,9 @@
         "workspaceName": "Nombre del workspace",
         "workspaceAvatar": "Avatar del workspace",
         "workspaceAvatarHelp": "Aparece en el selector de workspaces, el switcher y la navegación.",
-        "uploadAvatar": "Subir avatar del workspace"
+        "uploadAvatar": "Subir avatar del workspace",
+        "accentNotCustomized": "Sin personalizar",
+        "fullAccess": "Acceso completo"
       },
       "ncfCard": {
         "cardTitle": "Numeración fiscal (NCF)",

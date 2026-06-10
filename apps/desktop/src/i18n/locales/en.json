@@ -4252,20 +4252,20 @@
   "settings": {
     "nav": {
       "general": {
-        "label": "General",
-        "description": "Profile & preferences"
+        "label": "My account",
+        "description": "Profile and preferences"
       },
       "workspace": {
         "label": "Workspace",
         "description": "Company setup"
       },
       "team": {
-        "label": "Team",
-        "description": "Users & access"
+        "label": "Team & access",
+        "description": "Members, roles and permissions"
       },
       "data": {
         "label": "Data",
-        "description": "Backups & exports"
+        "description": "Backups and exports"
       },
       "sync": {
         "label": "Sync",
@@ -4413,7 +4413,7 @@
         "rolesDetail": "Access presets"
       },
       "usersDisclosure": {
-        "title": "Users",
+        "title": "App users",
         "summary_one": "{{count}} user · {{active}} active",
         "summary_other": "{{count}} users · {{active}} active"
       },
@@ -4462,7 +4462,7 @@
         "confirm": "Remove user"
       },
       "rolesDisclosure": {
-        "title": "Roles",
+        "title": "Role templates",
         "summary_one": "{{count}} role · access presets",
         "summary_other": "{{count}} roles · access presets"
       },
@@ -4517,10 +4517,12 @@
         "runSync": "Run sync now",
         "openSync": "Open sync activity",
         "retryFailed": "Retry all failed"
-      }
+      },
+      "syncPointerBody": "Cloud upload/download status, per-area coverage and the change queue live in Sync.",
+      "exportHelp": "Generates a JSON file with the workspace data, for controlled backup or support."
     },
     "sync": {
-      "title": "Sync activity",
+      "title": "Sync",
       "couldNotLoad": "The app could not load sync activity.",
       "couldNotCompleteAction": "The app could not complete that local sync action.",
       "couldNotRetryRow": "The app could not retry that local sync row.",
@@ -4572,9 +4574,12 @@
         "waiting": "Waiting for first download",
         "waitingDetail": "Open a remote workspace and the app will start pulling supported data.",
         "metrics": {
-          "sources": "sources",
-          "latest": "latest rows",
-          "errors": "errors"
+          "sources_one": "data area",
+          "sources_other": "data areas",
+          "latest_one": "recent change",
+          "latest_other": "recent changes",
+          "errors_one": "with an issue",
+          "errors_other": "with issues"
         },
         "lastCheck": "Last download check: {{value}}"
       },
@@ -4734,7 +4739,14 @@
         "exportBundle": "Export support bundle",
         "exportingLogs": "Exporting logs…",
         "exportLogs": "Export recent logs",
-        "copyDiagnostics": "Copy diagnostics summary"
+        "copyDiagnostics": "Copy diagnostics summary",
+        "events": {
+          "appRestarted": "The app restarted unexpectedly",
+          "appUnresponsive": "The app stopped responding",
+          "loadIssue": "A screen failed to load",
+          "generic": "An internal error was recorded"
+        },
+        "logFilesSummary": "{{count}} files · {{size}} total"
       },
       "dataExport": {
         "cardTitle": "Data export",
@@ -4799,6 +4811,18 @@
         "signedOutTitle": "Signed out",
         "signedOutBody": "See you soon.",
         "signOutFailed": "Sign out failed"
+      },
+      "security": {
+        "changePassword": "Change password",
+        "newPassword": "New password",
+        "confirmPassword": "Confirm password",
+        "update": "Update password",
+        "updating": "Updating…",
+        "minLength": "The password must be at least 8 characters.",
+        "mismatch": "Passwords do not match.",
+        "updatedTitle": "Password updated",
+        "updatedBody": "Use the new password the next time you sign in.",
+        "failedTitle": "Could not update the password"
       }
     },
     "workspace": {
@@ -4808,7 +4832,7 @@
         "members": "Members",
         "pendingInvites": "Pending invites",
         "systemActors": "System actors",
-        "roles": "Roles",
+        "roles": "Custom roles",
         "branding": "Branding",
         "currency": "Currency",
         "ncf": "NCF",
@@ -4849,7 +4873,9 @@
         "workspaceName": "Workspace name",
         "workspaceAvatar": "Workspace avatar",
         "workspaceAvatarHelp": "Appears in the workspace picker, switcher and navigation surfaces.",
-        "uploadAvatar": "Upload workspace avatar"
+        "uploadAvatar": "Upload workspace avatar",
+        "accentNotCustomized": "Not customized",
+        "fullAccess": "Full access"
       },
       "ncfCard": {
         "cardTitle": "Fiscal numbering (NCF)",

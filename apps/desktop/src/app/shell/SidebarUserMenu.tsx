@@ -131,7 +131,7 @@ export const SidebarUserMenu = () => {
               className="sidebar-user-action"
               onClick={() => {
                 setOpen(false);
-                navigate("/settings/account");
+                navigate("/settings");
               }}
               type="button"
             >

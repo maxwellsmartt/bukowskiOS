@@ -435,9 +435,9 @@ export const SyncOutboxPage = () => {
             </div>
           </div>
           <div className="sync-metric-row">
-            <span><strong>{pullCursors.length}</strong> {t("settings.sync.inbound.metrics.sources")}</span>
-            <span><strong>{pullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0)}</strong> {t("settings.sync.inbound.metrics.latest")}</span>
-            <span><strong>{pullCursors.filter((row) => row.lastError).length}</strong> {t("settings.sync.inbound.metrics.errors")}</span>
+            <span><strong>{pullCursors.length}</strong> {t("settings.sync.inbound.metrics.sources", { count: pullCursors.length })}</span>
+            <span><strong>{pullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0)}</strong> {t("settings.sync.inbound.metrics.latest", { count: pullCursors.reduce((sum, row) => sum + row.lastPulledCount, 0) })}</span>
+            <span><strong>{pullCursors.filter((row) => row.lastError).length}</strong> {t("settings.sync.inbound.metrics.errors", { count: pullCursors.filter((row) => row.lastError).length })}</span>
           </div>
           <small>{t("settings.sync.inbound.lastCheck", { value: formatDateLabel(inboundStatus.latest) })}</small>
         </SurfaceCard>

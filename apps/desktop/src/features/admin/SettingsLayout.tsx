@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 
 export type SettingsSectionId =
   | "general"
-  | "account"
   | "workspace"
   | "team"
   | "data"
@@ -43,7 +42,8 @@ export const useSettingsNavLabels = () => {
 const resolveActiveSection = (pathname: string, search: string): SettingsSectionId => {
   if (pathname === "/settings/workspace") return "workspace";
   if (pathname === "/settings/sync") return "sync";
-  if (pathname === "/settings/account") return "account";
+  // Legacy deep links to the old account page land on Mi cuenta.
+  if (pathname === "/settings/account") return "general";
 
   const params = new URLSearchParams(search);
   const fromQuery = params.get("section") as SettingsSectionId | null;

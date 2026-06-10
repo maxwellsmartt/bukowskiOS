@@ -80,6 +80,7 @@ import { GeneralSettingsCard } from "./GeneralSettingsCard";
 import { SettingsLayout, useActiveSettingsSection, useSettingsNavLabels } from "./SettingsLayout";
 import { UserChannelDots } from "./UserChannelDots";
 import { UserAccountSettings } from "./UserAccountSettings";
+import { WorkspaceSettingsPage } from "./WorkspaceSettingsPage";
 
 /**
  * Each role-coverage group ships a stable id; the human label lives in
@@ -621,14 +622,38 @@ export const SettingsPage = () => {
     [diagnostics, t],
   );
 
+  // Translates engine-level event names (e.g. "render-process-gone") into
+  // plain language; unknown names fall back to a generic phrase so raw
+  // internals never reach the screen.
+  const humanizeSupportEventName = (errorName: string) => {
+    const normalized = errorName.toLowerCase();
+    if (normalized.includes("render-process-gone") || normalized.includes("crash")) {
+      return t("settings.advanced.support.events.appRestarted");
+    }
+    if (normalized.includes("unresponsive")) {
+      return t("settings.advanced.support.events.appUnresponsive");
+    }
+    if (normalized.includes("load") || normalized.includes("did-fail")) {
+      return t("settings.advanced.support.events.loadIssue");
+    }
+    return t("settings.advanced.support.events.generic");
+  };
+
   const formatSupportEvent = (event: AppSupportEventSummary | null, emptyLabel: string) =>
-    event ? `${event.processLabel} · ${event.errorName} · ${formatDateLabel(event.occurredAt)}` : emptyLabel;
+    event ? `${humanizeSupportEventName(event.errorName)} · ${formatDateLabel(event.occurredAt)}` : emptyLabel;
+
+  const platformLabel = (platform: string) => {
+    if (platform === "darwin") return "macOS";
+    if (platform === "win32") return "Windows";
+    if (platform === "linux") return "Linux";
+    return platform;
+  };
 
   const supportSummaryText = useMemo(
     () =>
       [
         `${t("settings.advanced.appInfo.app")}: ${supportSnapshot.appInfo.appName} ${supportSnapshot.appInfo.version}`,
-        `${t("settings.advanced.appInfo.platform")}: ${supportSnapshot.appInfo.platform}`,
+        `${t("settings.advanced.appInfo.platform")}: ${platformLabel(supportSnapshot.appInfo.platform)}`,
         `${t("settings.advanced.appInfo.build")}: ${supportSnapshot.appInfo.isPackaged ? t("settings.advanced.appInfo.packaged") : t("settings.advanced.appInfo.development")}`,
         `${t("settings.advanced.support.lastCrash")}: ${formatSupportEvent(supportSnapshot.lastCrash, t("settings.advanced.support.noneCaptured"))}`,
         `${t("settings.advanced.support.lastError")}: ${formatSupportEvent(supportSnapshot.lastError, t("settings.advanced.support.noneCaptured"))}`,
@@ -669,30 +694,6 @@ export const SettingsPage = () => {
       phone: crewMember?.phone || current.phone,
     }));
   };
-
-  const teamSummaryRows = useMemo(
-    () => [
-      {
-        label: t("settings.team.metrics.activeUsers"),
-        value: usersSnapshot.users.filter((user) => user.isActive).length,
-        detail: t("settings.team.metrics.activeUsersDetail", { count: usersSnapshot.users.length }),
-      },
-      {
-        label: t("settings.team.metrics.telegramLinked"),
-        value: usersSnapshot.users.filter((user) => user.telegramLinkStatus === "linked").length,
-        detail: t("settings.team.metrics.telegramLinkedDetail", {
-          count: usersSnapshot.users.filter((user) => user.readyForTelegram).length,
-        }),
-      },
-      {
-        label: t("settings.team.metrics.rolesLabel"),
-        value: usersSnapshot.roles.length,
-        detail: t("settings.team.metrics.rolesDetail"),
-      },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [usersSnapshot.roles.length, usersSnapshot.users, t],
-  );
 
   useEffect(() => {
     if (!usersSnapshot.roles.length && !usersSnapshot.users.length) {
@@ -852,15 +853,7 @@ export const SettingsPage = () => {
 
       {activeSection === "team" ? (
         <div className="page-stack">
-          <div className="settings-team-metrics">
-            {teamSummaryRows.map((row) => (
-              <div key={row.label} className="settings-team-metric">
-                <span className="summary-label">{row.label}</span>
-                <strong>{row.value}</strong>
-                <span>{row.detail}</span>
-              </div>
-            ))}
-          </div>
+          <WorkspaceSettingsPage variant="access" />
 
           <SettingsDisclosure
             title={t("settings.team.usersDisclosure.title")}
@@ -1149,33 +1142,31 @@ export const SettingsPage = () => {
             </div>
           </SurfaceCard>
 
-          <SurfaceCard title={t("settings.data.syncTitle")}>
-            <div className="summary-grid settings-stat-grid">
-              {syncHealthRows.map((row) => (
-                <SettingsStatRow key={row.label} stat={row} />
-              ))}
-              <SettingsStatRow
-                stat={{ label: t("settings.data.rows.visibleQueue"), value: String(syncRows.length) }}
-              />
-            </div>
-
-            <div className="action-panel-actions action-panel-actions-start">
-              <button className="action-primary-button" onClick={() => navigate("/settings/sync")} type="button">
+          <SurfaceCard
+            title={t("settings.sync.title")}
+            aside={
+              <button className="ghost-control" onClick={() => navigate("/settings/sync")} type="button">
                 {t("settings.data.actions.openSync")}
               </button>
-              <button
-                className="ghost-control"
-                disabled={!diagnostics.syncOutboxFailedCount || isRunningLocalSync}
-                onClick={async () => {
-                  if (!window.bukowskiApp) {
-                    return;
-                  }
+            }
+          >
+            <p className="surface-card-subtitle">{t("settings.data.syncPointerBody")}</p>
+          </SurfaceCard>
 
-                  await runAction(() => window.bukowskiApp!.retryAllFailedSyncOutboxRows(), setIsRunningLocalSync);
+          <SurfaceCard title={t("settings.advanced.dataExport.cardTitle")}>
+            <p className="surface-card-subtitle">{t("settings.data.exportHelp")}</p>
+            <div className="action-panel-actions action-panel-actions-start">
+              <button
+                className="action-primary-button"
+                disabled={isExporting}
+                onClick={async () => {
+                  const confirmed = await confirmSensitiveExport("workspaceData");
+                  if (!confirmed) return;
+                  await runAction(() => window.bukowskiApp!.exportWorkspaceData(), setIsExporting);
                 }}
                 type="button"
               >
-                {t("settings.data.actions.retryFailed")}
+                {isExporting ? t("settings.advanced.dataExport.exporting") : t("settings.advanced.dataExport.exportJson")}
               </button>
             </div>
           </SurfaceCard>
@@ -1212,9 +1203,10 @@ export const SettingsPage = () => {
                 <span className="summary-label">{t("settings.advanced.support.recentLogFiles")}</span>
                 <span className="summary-value">
                   {supportSnapshot.recentLogFiles.length
-                    ? supportSnapshot.recentLogFiles
-                        .map((file) => `${file.name} (${formatBytes(file.sizeBytes)})`)
-                        .join(", ")
+                    ? t("settings.advanced.support.logFilesSummary", {
+                        count: supportSnapshot.recentLogFiles.length,
+                        size: formatBytes(supportSnapshot.recentLogFiles.reduce((total, file) => total + file.sizeBytes, 0)),
+                      })
                     : t("settings.advanced.support.noLogFiles")}
                 </span>
               </div>
@@ -1267,40 +1259,6 @@ export const SettingsPage = () => {
             </div>
           </SurfaceCard>
 
-          <SurfaceCard className="settings-advanced-card" title={t("settings.advanced.dataExport.cardTitle")}>
-            <div className="summary-grid settings-stat-grid">
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.dataExport.format")}</span>
-                <span className="summary-value">JSON</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.dataExport.scope")}</span>
-                <span className="summary-value">{activeWorkspaceName}</span>
-              </div>
-              <div className="summary-row">
-                <span className="summary-label">{t("settings.advanced.dataExport.buildFiles")}</span>
-                <span className="summary-value">
-                  {diagnostics.internalBuildArtifacts.length ? diagnostics.internalBuildArtifacts.join(", ") : t("settings.advanced.dataExport.notPackaged")}
-                </span>
-              </div>
-            </div>
-
-            <div className="action-panel-actions action-panel-actions-start">
-              <button
-                className="action-primary-button"
-                disabled={isExporting}
-                onClick={async () => {
-                  const confirmed = await confirmSensitiveExport("workspaceData");
-                  if (!confirmed) return;
-                  await runAction(() => window.bukowskiApp!.exportWorkspaceData(), setIsExporting);
-                }}
-                type="button"
-              >
-                {isExporting ? t("settings.advanced.dataExport.exporting") : t("settings.advanced.dataExport.exportJson")}
-              </button>
-            </div>
-          </SurfaceCard>
-
           <SurfaceCard className="settings-advanced-card" title={t("settings.advanced.appInfo.cardTitle")}>
             <div className="summary-grid settings-stat-grid">
               <div className="summary-row">
@@ -1317,7 +1275,7 @@ export const SettingsPage = () => {
               </div>
               <div className="summary-row">
                 <span className="summary-label">{t("settings.advanced.appInfo.platform")}</span>
-                <span className="summary-value">{appInfo?.platform ?? t("settings.advanced.appInfo.unknown")}</span>
+                <span className="summary-value">{appInfo?.platform ? platformLabel(appInfo.platform) : t("settings.advanced.appInfo.unknown")}</span>
               </div>
               <div className="summary-row">
                 <span className="summary-label">{t("settings.advanced.appInfo.mode")}</span>
