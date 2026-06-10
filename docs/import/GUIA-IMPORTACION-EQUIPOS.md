@@ -105,17 +105,23 @@ inventario, pero "SMALLHD CINE 24"" en el PDF de Daniel). Al cruzar por **serial
 Por eso un import directo por código habría (a) saltado los monitores nuevos y
 (b) duplicado los 21 ya existentes. La reconciliación por serial lo evita.
 
-**De-colisión de códigos:** las 22 unidades nuevas cuyo código chocaba con un equipo
-distinto del inventario recibieron el prefijo **`DLC-`** (ej. `DLC-1000`) y su número
-original se guardó en `qr`. Las 116 con código libre lo conservan tal cual.
+**De-colisión de códigos (resolución final, 10-jun-2026):** los equipos del inventario
+de junio 2026 conservan **sus números exactos** (1000, 1007, …). Los 22 accesorios del
+Rentman 2021 que ocupaban esos números fueron **reasignados al código `R-<número>`**
+(ej. `R-1000`), con una nota en su ficha explicando el cambio; esos códigos `R-` son
+provisionales y pueden renumerarse después. No queda ningún prefijo `DLC-` en el
+sistema.
 
 **Importado el 08-jun-2026** (vista previa de `inventario_nuevos.csv`, verificado contra
 el importador): **138 filas · 138 a importar · 0 existentes · 247 unidades · 0 avisos ·
-0 errores.** Inventario: 629 → **767 equipos**. De las 21 existentes, las no-`Good`
-(Flanders AM250 → Dañado, QOD+ → Dañado) se actualizaron en su ficha.
+0 errores.** Inventario: 629 → **767 equipos**. De las 21 existentes, las no-`Good` se
+actualizaron en su ficha: Flanders AM250 → Dañado, QOD+ → Dañado, Epson LW-PX400 →
+Revisar.
 
-**Mapeo de estado operativo → `condition`** (el estado original de Daniel se conserva
-textual al inicio de `notes`, p. ej. `Estado (DLC): Activo`):
+**Mapeo de estado operativo → `condition`** (el estado original del inventario se
+conserva textual al inicio de `notes`, p. ej. `Estado (inventario jun-2026): Activo`;
+los equipos sin estado reportado quedan como `Estado: no reportado en inventario
+jun-2026` con condición `Review`):
 
 | Estado en el PDF | `condition` |
 |---|---|
