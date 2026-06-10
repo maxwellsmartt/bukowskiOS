@@ -9,6 +9,7 @@ import { IncidentReportPanel } from "@features/incidents/IncidentReportPanel";
 import { reportIncident } from "@features/incidents/useIncidentsData";
 import { useCatalogData } from "@features/projects/useProjectsData";
 import { GuidedEmptyState } from "@shared/components/GuidedEmptyState";
+import { ModalShell } from "@shared/components/ModalShell";
 import { StatusBadge } from "@shared/components/StatusBadge";
 import { SurfaceCard } from "@shared/components/SurfaceCard";
 import { TableSkeleton } from "@shared/components/TableSkeleton";
@@ -131,6 +132,12 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
       {catalogError ? <div className="empty-state">{t("incidents.catalogUnavailable", { message: catalogError })}</div> : null}
 
       {reportOpen ? (
+        <ModalShell
+          onClose={() => {
+            setReportOpen(false);
+            setReportError(null);
+          }}
+        >
         <IncidentReportPanel
           assetOptions={data.assets.map((asset) => ({
             id: asset.id,
@@ -183,6 +190,7 @@ export const ProjectDetailPanel = ({ data, error, isLoading, onIncidentCreated }
           projects={projects}
           users={catalog.users}
         />
+        </ModalShell>
       ) : null}
 
       <div className="project-detail-support-grid">

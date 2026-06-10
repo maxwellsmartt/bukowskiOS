@@ -590,13 +590,16 @@ export const AssetLicensesPage = () => {
             <label className="field-block">
               <span className="field-label">
                 {t("assets.licenses.fields.renewalReminder")}
-                <span
+                <button
                   aria-label={t("assets.licenses.hints.reminderZero")}
-                  className="field-info-trigger"
+                  className="icon-ghost-control field-info-trigger"
                   data-tooltip={t("assets.licenses.hints.reminderZero")}
+                  onClick={(event) => event.preventDefault()}
+                  tabIndex={-1}
+                  type="button"
                 >
                   <Info size={12} />
-                </span>
+                </button>
               </span>
               <input className="field-input" min="0" onChange={(event) => updateDraft("reminderDaysBefore", event.target.value)} type="number" value={draft.reminderDaysBefore} />
             </label>

@@ -158,22 +158,21 @@ export const IncidentDetailPanel = ({
     <SurfaceCard
       className="incident-detail-card"
       aside={
-        <button aria-label={t("incidents.detail.close")} className="icon-ghost-control" onClick={onClose} type="button">
-          <X size={14} />
-        </button>
-      }
-      title={incident.title}
-    >
-      <div className="page-stack">
-        <div className="entity-detail-status-row">
+        <div className="detail-header-actions">
           <StatusBadge tone={resolveStatusTone(incident.status)}>
             {t(`incidents.statuses.${incident.status}`, { defaultValue: incident.status })}
           </StatusBadge>
           <StatusBadge tone={incident.severity === "High" ? "critical" : incident.severity === "Medium" ? "warning" : "neutral"}>
             {t(`incidents.severity.${incident.severity}`, { defaultValue: incident.severity })}
           </StatusBadge>
+          <button aria-label={t("incidents.detail.close")} className="icon-ghost-control" onClick={onClose} type="button">
+            <X size={14} />
+          </button>
         </div>
-
+      }
+      title={incident.title}
+    >
+      <div className="page-stack">
         {incident.assetId ? (
           <div className="incident-repair-handoff">
             <div className="incident-repair-handoff-copy">
@@ -196,7 +195,7 @@ export const IncidentDetailPanel = ({
           </div>
         ) : null}
 
-        <div className="summary-grid compact-summary-grid">
+        <div className="detail-hero-grid detail-operations-grid">
           <div className="summary-row">
             <span className="summary-label">{t("incidents.detail.asset")}</span>
             <span className="summary-value">{incident.asset}</span>
@@ -204,10 +203,7 @@ export const IncidentDetailPanel = ({
           <div className="summary-row">
             <span className="summary-label">{t("incidents.detail.project")}</span>
             <span className="summary-value">{incident.project}</span>
-          </div>
-          <div className="summary-row">
-            <span className="summary-label">{t("incidents.detail.department")}</span>
-            <span className="summary-value">{incident.department}</span>
+            <span className="summary-meta">{incident.department}</span>
           </div>
           <div className="summary-row">
             <span className="summary-label">{t("incidents.detail.reported")}</span>

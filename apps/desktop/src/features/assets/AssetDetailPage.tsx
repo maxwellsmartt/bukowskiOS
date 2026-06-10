@@ -381,6 +381,12 @@ export const AssetDetailPage = () => {
       ) : null}
 
       {reportOpen ? (
+        <ModalShell
+          onClose={() => {
+            setReportOpen(false);
+            setReportError(null);
+          }}
+        >
         <IncidentReportPanel
           assetLocked
           assetOptions={[
@@ -435,6 +441,7 @@ export const AssetDetailPage = () => {
           projects={projects}
           users={catalog.users}
         />
+        </ModalShell>
       ) : null}
 
       <ResizableSideRailLayout className="split-layout asset-detail-layout" defaultWidth={420} maxWidth={640} minWidth={320} storageKey="asset-detail-side-rail-width">

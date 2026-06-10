@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import type { CatalogSnapshot, ProjectCardRow } from "@contracts";
 import { useProjectDetail } from "@features/projects/useProjectsData";
 import { SelectField } from "@shared/components/SelectField";
-import { SurfaceCard } from "@shared/components/SurfaceCard";
 
 export type IncidentAssetOption = {
   id: string;
@@ -115,14 +114,14 @@ export const IncidentReportPanel = ({
   };
 
   return (
-    <SurfaceCard
-      aside={
+    <div className="incident-report-dialog">
+      <div className="document-preview-header">
+        <span className="document-preview-title">{title ?? t("incidents.report.title")}</span>
         <button aria-label={t("incidents.report.close")} className="icon-ghost-control" onClick={onClose} type="button">
-          <X size={14} />
+          <X size={16} />
         </button>
-      }
-      title={title ?? t("incidents.report.title")}
-    >
+      </div>
+      <div className="modal-form-body">
       {assetLocked || projectLocked ? (
         <div className="action-panel-summary">
           {assetLocked ? <span>{selectedAssetLabel}</span> : null}
@@ -269,15 +268,16 @@ export const IncidentReportPanel = ({
           <span>{error}</span>
         </div>
       ) : null}
+      </div>
 
-      <div className="action-panel-actions">
-        <button className="ghost-control cancel-control" onClick={onClose} type="button">
+      <div className="document-preview-header packing-insurance-export-footer">
+        <button className="ghost-control" onClick={onClose} type="button">
           {t("common.cancel")}
         </button>
         <button className="action-primary-button" disabled={isSubmitting} onClick={() => void handleSubmit()} type="button">
           {isSubmitting ? t("common.saving") : t("incidents.report.create")}
         </button>
       </div>
-    </SurfaceCard>
+    </div>
   );
 };

@@ -397,7 +397,8 @@ body.has-floating-tooltips .icon-danger-control[aria-label]::after {
 
 .floating-tooltip {
   position: fixed;
-  z-index: 200;
+  /* Above modal shells (z-index 1200) so tooltips inside dialogs stay visible. */
+  z-index: 1400;
   max-width: min(240px, calc(100vw - 20px));
   padding: 6px 9px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -4766,7 +4767,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 
 .packing-builder-summary-grid,
 .packing-detail-summary-grid,
-.packing-detail-hero-grid {
+.packing-detail-hero-grid,
+.detail-hero-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
@@ -4775,6 +4777,7 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
 .packing-builder-summary-grid .summary-row,
 .packing-detail-summary-grid .summary-row,
 .packing-detail-hero-grid .summary-row,
+.detail-hero-grid .summary-row,
 .packing-detail-document-grid .summary-row {
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -5046,7 +5049,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   line-height: 1.35;
 }
 
-.packing-detail-header-actions {
+.packing-detail-header-actions,
+.detail-header-actions {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
@@ -5055,7 +5059,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   flex-wrap: wrap;
 }
 
-.packing-detail-header-actions .action-row-button {
+.packing-detail-header-actions .action-row-button,
+.detail-header-actions .action-row-button {
   min-height: 26px;
   padding: 0 9px;
   border-radius: 999px;
@@ -5152,12 +5157,14 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   align-items: flex-start;
 }
 
-.packing-detail-hero-grid {
+.packing-detail-hero-grid,
+.detail-hero-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.packing-detail-hero-grid .summary-row {
+.packing-detail-hero-grid .summary-row,
+.detail-hero-grid .summary-row {
   min-height: 76px;
   padding: 13px 15px;
   background: rgba(7, 10, 12, 0.26);
@@ -5178,7 +5185,8 @@ body.is-resizing-sidebar .shell-sidebar-resize-handle::before {
   line-height: 1.25;
 }
 
-.packing-detail-operations-grid .summary-value {
+.packing-detail-operations-grid .summary-value,
+.detail-operations-grid .summary-value {
   font-size: var(--font-md, 15px);
 }
 
@@ -8097,6 +8105,11 @@ body.is-resizing-side-rail {
 .modal-shell-dialog {
   display: flex;
   flex-direction: column;
+  /* Safe vertical centering: auto margins center the dialog when it is
+     shorter than the viewport and keep the top reachable (backdrop scrolls)
+     when it is taller — unlike align-items: center, which would clip. */
+  margin-top: auto;
+  margin-bottom: auto;
   min-height: 0;
   max-height: calc(100vh - clamp(48px, 14vh, 180px));
   overflow-y: auto;
@@ -11428,19 +11441,29 @@ button.timeline-signal-chip:focus-visible {
   min-height: 26px;
 }
 
-/* Small info affordance next to a field label; the copy lives in the floating
-   tooltip so the field grid stays aligned. */
-.field-info-trigger {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 6px;
-  color: var(--text-muted);
+/* Small info affordance next to a field label; the copy lives in the hover
+   tooltip so the field grid stays aligned. Compacts the icon-ghost-control
+   base (which provides the tooltip behavior) down to label size. */
+.field-info-trigger,
+.field-info-trigger.icon-ghost-control {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 4px;
   vertical-align: middle;
+  color: var(--text-muted);
   cursor: help;
 }
 
 .field-info-trigger:hover {
   color: var(--text-secondary);
+}
+
+/* Shared body for form dialogs (licenses editor, incident report). */
+.modal-form-body {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px 16px;
 }
 
 .license-refresh-button {
