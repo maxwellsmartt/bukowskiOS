@@ -957,7 +957,10 @@ export const DataTable = <T = unknown,>({
         <table
           ref={tableRef}
           className="data-table"
-          style={{ minWidth: tableWidth, width: tableWidth }}
+          // An empty table fits the visible shell exactly (no horizontal
+          // overflow), so the empty-state message centers on screen instead of
+          // on the wider column-width sum.
+          style={rows.length ? { minWidth: tableWidth, width: tableWidth } : { minWidth: "100%", width: "100%" }}
         >
         <colgroup>
           {selectable ? <col style={{ width: selectionColumnWidth, minWidth: selectionColumnWidth }} /> : null}
@@ -967,7 +970,11 @@ export const DataTable = <T = unknown,>({
               ref={(element) => {
                 colRefs.current[column.key] = element;
               }}
-              style={{ width: resolvedColumnWidths[column.key], minWidth: column.minWidth ?? defaultMinColumnWidth }}
+              style={
+                rows.length
+                  ? { width: resolvedColumnWidths[column.key], minWidth: column.minWidth ?? defaultMinColumnWidth }
+                  : undefined
+              }
             />
           ))}
         </colgroup>
